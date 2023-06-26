@@ -303,12 +303,6 @@ module Wrap = struct
                   *)
             ; zeta_to_srs_length : 'fp
             ; zeta_to_domain_size : 'fp
-            ; vbmul : 'fp  (** scalar used on the vbmul selector *)
-            ; complete_add : 'fp
-                  (** scalar used on the complete_add selector *)
-            ; endomul : 'fp  (** scalar used on the endomul selector *)
-            ; endomul_scalar : 'fp
-                  (** scalar used on the endomul_scalar selector *)
             ; perm : 'fp
                   (** scalar used on one of the permutation polynomial commitments. *)
             ; feature_flags : 'bool Plonk_types.Features.t
@@ -330,10 +324,6 @@ module Wrap = struct
             { t with
               zeta_to_srs_length = f t.zeta_to_srs_length
             ; zeta_to_domain_size = f t.zeta_to_domain_size
-            ; vbmul = f t.vbmul
-            ; complete_add = f t.complete_add
-            ; endomul = f t.endomul
-            ; endomul_scalar = f t.endomul_scalar
             ; perm = f t.perm
             ; optional_column_scalars =
                 Optional_column_scalars.map ~f:(Opt.map ~f)
@@ -350,10 +340,6 @@ module Wrap = struct
               ; challenge
               ; challenge
               ; Scalar_challenge.typ scalar_challenge
-              ; fp
-              ; fp
-              ; fp
-              ; fp
               ; fp
               ; fp
               ; fp
@@ -926,7 +912,7 @@ module Wrap = struct
             ]
         in
         Spec.T.Struct
-          [ Vector (B Field, Nat.N9.n)
+          [ Vector (B Field, Nat.N5.n)
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
@@ -954,10 +940,6 @@ module Wrap = struct
                        ; zeta
                        ; zeta_to_srs_length
                        ; zeta_to_domain_size
-                       ; vbmul
-                       ; complete_add
-                       ; endomul
-                       ; endomul_scalar
                        ; perm
                        ; feature_flags
                        ; lookup
@@ -978,10 +960,6 @@ module Wrap = struct
           ; b
           ; zeta_to_srs_length
           ; zeta_to_domain_size
-          ; vbmul
-          ; complete_add
-          ; endomul
-          ; endomul_scalar
           ; perm
           ]
         in
@@ -1030,10 +1008,6 @@ module Wrap = struct
             ; b
             ; zeta_to_srs_length
             ; zeta_to_domain_size
-            ; vbmul
-            ; complete_add
-            ; endomul
-            ; endomul_scalar
             ; perm
             ] =
           fp
@@ -1068,10 +1042,6 @@ module Wrap = struct
                     ; zeta
                     ; zeta_to_srs_length
                     ; zeta_to_domain_size
-                    ; vbmul
-                    ; complete_add
-                    ; endomul
-                    ; endomul_scalar
                     ; perm
                     ; feature_flags
                     ; lookup =
@@ -1295,7 +1265,7 @@ module Step = struct
               ]
           in
           Spec.T.Struct
-            [ Vector (B Field, Nat.N9.n)
+            [ Vector (B Field, Nat.N5.n)
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
             ; Vector (Scalar Challenge, Nat.N3.n)
@@ -1321,10 +1291,6 @@ module Step = struct
                      ; zeta
                      ; zeta_to_srs_length
                      ; zeta_to_domain_size
-                     ; vbmul
-                     ; complete_add
-                     ; endomul
-                     ; endomul_scalar
                      ; perm
                      ; feature_flags
                      ; lookup
@@ -1341,10 +1307,6 @@ module Step = struct
             ; b
             ; zeta_to_srs_length
             ; zeta_to_domain_size
-            ; vbmul
-            ; complete_add
-            ; endomul
-            ; endomul_scalar
             ; perm
             ]
           in
@@ -1376,10 +1338,6 @@ module Step = struct
                   ; b
                   ; zeta_to_srs_length
                   ; zeta_to_domain_size
-                  ; vbmul
-                  ; complete_add
-                  ; endomul
-                  ; endomul_scalar
                   ; perm
                   ]
               ; Vector.[ sponge_digest_before_evaluations ]
@@ -1409,10 +1367,6 @@ module Step = struct
                   ; zeta
                   ; zeta_to_srs_length
                   ; zeta_to_domain_size
-                  ; vbmul
-                  ; complete_add
-                  ; endomul
-                  ; endomul_scalar
                   ; perm
                   ; feature_flags
                   ; lookup =

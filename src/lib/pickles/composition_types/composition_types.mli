@@ -137,12 +137,6 @@ module Wrap : sig
             ; zeta : 'scalar_challenge
             ; zeta_to_srs_length : 'fp
             ; zeta_to_domain_size : 'fp
-            ; vbmul : 'fp  (** scalar used on the vbmul selector *)
-            ; complete_add : 'fp
-                  (** scalar used on the complete_add selector *)
-            ; endomul : 'fp  (** scalar used on the endomul selector *)
-            ; endomul_scalar : 'fp
-                  (** scalar used on the endomul_scalar selector *)
             ; perm : 'fp
                   (** scalar used on one of the permutation polynomial commitments. *)
             ; feature_flags : 'bool Plonk_types.Features.t
@@ -898,7 +892,7 @@ module Wrap : sig
         Hlist.HlistId.t
 
       type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp_opt, 'bool) flat_repr :=
-        ( ('a, Nat.N9.n) Vector.t
+        ( ('a, Nat.N5.n) Vector.t
         * ( ('b, Nat.N2.n) Vector.t
           * ( ('c, Nat.N3.n) Vector.t
             * ( ('d, Nat.N3.n) Vector.t
@@ -1181,7 +1175,7 @@ module Step : sig
              , 'fp_opt
              , 'num_bulletproof_challenges )
              flat_repr :=
-          ( ('field, Nat.N9.n) Vector.t
+          ( ('field, Nat.N5.n) Vector.t
           * ( ('digest, Nat.N1.n) Vector.t
             * ( ('challenge, Nat.N2.n) Vector.t
               * ( ('challenge Scalar_challenge.t, Nat.N3.n) Vector.t
@@ -1246,7 +1240,7 @@ module Step : sig
                       -> ('h * unit) Hlist.HlistId.t )
                 -> 'j Hlist0.Id.t )
           -> to_opt:('fp_opt -> 'fp_opt2)
-          -> ( ('c, Nat.N9.n) Vector.t
+          -> ( ('c, Nat.N5.n) Vector.t
              * ( ('f, Nat.N1.n) Vector.t
                * ( ('a, Nat.N2.n) Vector.t
                  * ( ('b, Nat.N3.n) Vector.t
@@ -1256,7 +1250,7 @@ module Step : sig
              Hlist.HlistId.t
 
         val of_data :
-             ( ('a, Nat.N9.n) Vector.t
+             ( ('a, Nat.N5.n) Vector.t
              * ( ('b, Nat.N1.n) Vector.t
                * ( ('c, Nat.N2.n) Vector.t
                  * ( ('d, Nat.N3.n) Vector.t
@@ -1461,7 +1455,7 @@ module Step : sig
                   -> ('k * unit) Hlist.HlistId.t )
             -> 'm Hlist0.Id.t )
       -> to_opt:('fp_opt -> 'fp_opt2)
-      -> ( ( ( ('c, Nat.N9.n) Vector.t
+      -> ( ( ( ('c, Nat.N5.n) Vector.t
              * ( ('f, Nat.N1.n) Vector.t
                * ( ('a, Nat.N2.n) Vector.t
                  * ( ('b, Nat.N3.n) Vector.t
@@ -1475,7 +1469,7 @@ module Step : sig
          Hlist.HlistId.t
 
     val of_data :
-         ( ( ( ('a, Nat.N9.n) Vector.t
+         ( ( ( ('a, Nat.N5.n) Vector.t
              * ( ('b, Nat.N1.n) Vector.t
                * ( ('c, Nat.N2.n) Vector.t
                  * ( ('d, Nat.N3.n) Vector.t
@@ -1519,7 +1513,7 @@ module Step : sig
       -> 'c Nat.t
       -> ('d, 'e, 'f Hlist0.Id.t, 'g Hlist0.Id.t) Wrap.Lookup_parameters.t
       -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
-      -> ( ( ( ( ('f, Nat.N9.n) Vector.t
+      -> ( ( ( ( ('f, Nat.N5.n) Vector.t
                * ( ('h, Nat.N1.n) Vector.t
                  * ( ('d, Nat.N2.n) Vector.t
                    * ( ('d Scalar_challenge.t, Nat.N3.n) Vector.t
@@ -1534,7 +1528,7 @@ module Step : sig
              Vector.t
            * ('h * (('h, 'b) Vector.t * unit)) )
            Hlist.HlistId.t
-         , ( ( ( ('g, Nat.N9.n) Vector.t
+         , ( ( ( ('g, Nat.N5.n) Vector.t
                * ( ('j, Nat.N1.n) Vector.t
                  * ( ('e, Nat.N2.n) Vector.t
                    * ( ('e Scalar_challenge.t, Nat.N3.n) Vector.t

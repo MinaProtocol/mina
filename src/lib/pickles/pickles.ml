@@ -652,7 +652,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
-                ~auxiliary_typ:Typ.unit
+                ~override_wrap_domain:N1 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
@@ -785,7 +785,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
-                ~auxiliary_typ:Typ.unit
+                ~override_wrap_domain:N1 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
