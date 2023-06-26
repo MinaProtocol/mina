@@ -35,5 +35,11 @@ let () =
               revalidation_drops_nothing_unless_ledger_changed
           ; test_case "Applying transactions invalidates them" `Quick
               application_invalidates_applied_transactions
+          ; test_case "Transaction can be replaced by one with higher fee"
+              `Quick transaction_replacement
+          ; test_case
+              "After a replacement, later transactions are discarded, if  \
+               account's balance can't support them anymore"
+              `Quick transaction_replacement_insufficient_balance
           ] )
     ]

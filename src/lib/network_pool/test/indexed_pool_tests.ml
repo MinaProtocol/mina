@@ -920,3 +920,122 @@ let application_invalidates_applied_transactions () =
         ( List.take txns app_count
         |> List.map ~f:(Fn.compose txn_hash sgn_cmd_to_txn)
         |> Transaction_hash.Set.of_list ) )
+
+let update_fee (txn : Signed_command.t) fee =
+  { txn with
+    payload = { txn.payload with common = { txn.payload.common with fee } }
+  }
+
+(* Generate a sequence of transactions, then choose one of them and replace
+   it with the same transaction, just with a higher fee. *)
+let transaction_replacement () =
+  Quickcheck.test
+    (let open Quickcheck in
+    let open Generator.Let_syntax in
+    (* Make sure we can increase the balance later. *)
+    let high = Balance.(sub_amount max_int Amount.one) |> Option.value_exn in
+    let%bind sender =
+      Account.gen_with_constrained_balance ~low:Balance.one ~high
+    in
+    let%bind receiver = Account.gen in
+    let%bind txns =
+      Stateful_gen.eval_state
+        (gen_txns_from_single_sender_to receiver.public_key)
+        sender
+    in
+    let%map to_replace = Generator.of_list txns in
+    (sender, txns, Signed_command.forget_check to_replace))
+    ~f:(fun (sender, txns, to_replace) ->
+      let account_map = accounts_map [ sender ] in
+      let pool = pool_of_transactions ~account_map txns in
+      let old_fee = to_replace.payload.common.fee in
+      let fee = Currency.Fee.(old_fee + one) |> Option.value_exn in
+      let cmd = update_fee to_replace fee in
+      (* We don't care about signatures in these tests. *)
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it replacement)
+          =
+        Signed_command.to_valid_unsafe cmd
+      in
+      let t =
+        User_command.Signed_command replacement
+        |> Transaction_hash.User_command_with_valid_signature.create
+      in
+      let balance =
+        Balance.to_amount sender.balance |> Amount.(add one) |> Option.value_exn
+      in
+      let _, pool', _ =
+        Indexed_pool.add_from_gossip_exn pool t sender.nonce balance
+        |> Result.map_error ~f:(fun e ->
+               Sexp.to_string @@ Command_error.sexp_of_t e )
+        |> Result.ok_or_failwith
+      in
+      [%test_eq: int] (Indexed_pool.size pool) (Indexed_pool.size pool') ;
+      [%test_eq: int]
+        (Indexed_pool.transactions ~logger pool |> Sequence.length)
+        (Indexed_pool.transactions ~logger pool' |> Sequence.length) )
+
+let transaction_replacement_insufficient_balance () =
+  Quickcheck.test
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind a = Account.gen in
+    let sender = { a with balance = Balance.of_mina_int_exn 31 } in
+    let%map recv = Account.gen in
+    let cmds =
+      List.init 3 ~f:(fun n ->
+          let open Signed_command.Payload in
+          let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) =
+            Signed_command.Poly.
+              { payload =
+                  Poly.
+                    { common =
+                        Common.Poly.
+                          { fee =
+                              Fee.of_nanomina_int_exn 300_000_000 (* 0.3 Mina *)
+                          ; fee_payer_pk = sender.public_key
+                          ; nonce = Account_nonce.(add sender.nonce @@ of_int n)
+                          ; valid_until = Global_slot_since_genesis.max_value
+                          ; memo = Signed_command_memo.dummy
+                          }
+                    ; body =
+                        Body.Payment
+                          Payment_payload.Poly.
+                            { receiver_pk = recv.public_key
+                            ; amount = Amount.of_mina_int_exn 10
+                            }
+                    }
+              ; signer =
+                  Option.value_exn @@ Public_key.decompress sender.public_key
+              ; signature = Signature.dummy
+              }
+            |> Signed_command.to_valid_unsafe
+          in
+          cmd )
+    in
+    (sender, cmds))
+    ~f:(fun (sender, txns) ->
+      let account_map = accounts_map [ sender ] in
+      let pool = pool_of_transactions ~account_map txns in
+      let t = List.nth_exn txns 1 |> Signed_command.forget_check in
+      let updated =
+        update_fee t (Currency.Fee.of_nanomina_int_exn 700_000_000)
+        (* 0.7 Mina *)
+      in
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it replacement)
+          =
+        Signed_command.to_valid_unsafe updated
+      in
+      let t =
+        User_command.Signed_command replacement
+        |> Transaction_hash.User_command_with_valid_signature.create
+      in
+      let balance = Balance.to_amount sender.balance in
+      let _, pool', _ =
+        Indexed_pool.add_from_gossip_exn pool t sender.nonce balance
+        |> Result.map_error ~f:(fun e ->
+               Sexp.to_string @@ Command_error.sexp_of_t e )
+        |> Result.ok_or_failwith
+      in
+      (* The last transaction gets discarded, because after the replacement,
+         the account can't afford it anymore. *)
+      [%test_eq: int] (Indexed_pool.size pool) 3 ;
+      [%test_eq: int] (Indexed_pool.size pool') 2 )
