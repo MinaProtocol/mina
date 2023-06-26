@@ -1428,12 +1428,20 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
 (* Gadget to constrain conversion of bytes array (output of Keccak gadget)
    into foreign field element with standard limbs (input of ECDSA gadget).
-   Assumes bytes array is given in big endian. *)
+   Include the endianness of the bytes list. *)
 let bytes_to_standard_element (type f)
     (module Circuit : Snark_intf.Run with type field = f)
-    (bytestring : Circuit.Field.t array) (fmod : f standard_limbs)
-    (fmod_bitlen : int) =
+    ~(endian : Keccak.endianness) (bytestring : Circuit.Field.t list)
+    (fmod : f standard_limbs) (fmod_bitlen : int) =
   let open Circuit in
+  (* Make the input bytestring a big endian value *)
+  let bytestring =
+    match endian with Little -> List.rev bytestring | Big -> bytestring
+  in
+
+  (* Convert the bytestring into a bigint *)
+  let bytestring = Array.of_list bytestring in
+
   (* C1: Check modulus_bit_length = # of bits you unpack 
    * This is partly implicit in the circuit given the number of byte outputs of Keccak:
    * · input_bitlen < fmod_bitlen : OK
