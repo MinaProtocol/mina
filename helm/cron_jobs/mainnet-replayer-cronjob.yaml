@@ -11,7 +11,7 @@ kind: CronJob
 metadata:
   name: mainnet-replayer-cronjob
 spec:
-  concurrencyPolicy: Replace
+  concurrencyPolicy: Forbid
   failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
