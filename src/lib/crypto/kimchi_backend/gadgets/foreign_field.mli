@@ -163,13 +163,6 @@ module External_checks : sig
 
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
 
-  val multi_ranges : 'a t -> 'a Snarky_backendless.Cvar.t standard_limbs list
-
-  val compact_multi_ranges :
-    'a t -> 'a Snarky_backendless.Cvar.t compact_limbs list
-
-  val bounds : 'a t -> 'a Snarky_backendless.Cvar.t standard_limbs list
-
   val append_multi_range_check :
     'field t -> 'field Cvar.t standard_limbs -> unit
 

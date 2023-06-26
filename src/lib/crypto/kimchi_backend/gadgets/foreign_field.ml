@@ -546,12 +546,6 @@ module External_checks = struct
       (module Circuit : Snark_intf.Run with type field = field) : field t =
     { multi_ranges = []; compact_multi_ranges = []; bounds = [] }
 
-  let multi_ranges (t : 'a t) = t.multi_ranges
-
-  let compact_multi_ranges (t : 'a t) = t.compact_multi_ranges
-
-  let bounds (t : 'a t) = t.bounds
-
   (* Track a multi-range-check *)
   (* TODO: improve names of these from append_ to add_, push_ or insert_ *)
   let append_multi_range_check (external_checks : 'field t)
