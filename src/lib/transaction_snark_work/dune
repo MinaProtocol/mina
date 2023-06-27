@@ -23,6 +23,7 @@
    pickles
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   o1trace
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson)))

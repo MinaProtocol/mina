@@ -1319,6 +1319,8 @@ let all_work_pairs t
     One_or_two.t
     list
     Or_error.t =
+  O1trace.sync_thread "all_work_pairs"
+  @@ fun () ->
   let all_jobs = all_jobs t in
   let module A = Available_job in
   let open Or_error.Let_syntax in

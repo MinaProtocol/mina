@@ -6,6 +6,8 @@ module With_hash = struct
   type 'a t = { hash : int; data : 'a }
 
   let create ~f data =
+    O1trace.sync_thread "snark_work_with_hash_create"
+    @@ fun () ->
     { hash =
         Ppx_hash_lib.Std.Hash.of_fold
           (One_or_two.hash_fold_t Transaction_snark.Statement.hash_fold_t)
