@@ -28,7 +28,10 @@ let commands =
 in  Pipeline.build
       Pipeline.Config::{
         spec = JobSpec::{
-        , dirtyWhen = [ S.strictlyStart (S.contains "src/") ]
+        , dirtyWhen = [
+            S.strictlyStart (S.contains "src/"),
+            S.strictlyStart (S.contains "rfcs/")
+          ]
         , path = "Lint"
         , name = "Fast"
         }

@@ -418,7 +418,7 @@ let initialize_infra ~logger network =
     result_str |> String.split_lines
     |> List.map ~f:(fun line ->
            let parts = String.split line ~on:':' in
-           assert (List.length parts = 2) ;
+           assert (Mina_stdlib.List.Length.Compare.(parts = 2)) ;
            (List.nth_exn parts 0, List.nth_exn parts 1) )
     |> List.filter ~f:(fun (pod_name, _) ->
            String.Set.mem all_pods_set pod_name )
