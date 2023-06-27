@@ -422,7 +422,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   let quotient_times_n =
     Foreign_field.add
       (module Circuit)
-      ~full:false quotient_product quotient curve.order
+      ~single:true quotient_product quotient curve.order
   in
 
   (* Bounds 9: Left input q * (n - 1) is covered by (Bounds 8)
@@ -437,7 +437,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   let computed_x =
     Foreign_field.add
       (module Circuit)
-      ~full:false quotient_times_n x_prime curve.order
+      ~single:true quotient_times_n x_prime curve.order
   in
   (* Addition chain final result row *)
   Foreign_field.result_row
@@ -840,6 +840,7 @@ let%test_unit "Ecdsa.verify_light" =
 
     () )
 
+(* TODO: switch to true once we can fit 256 bit thanks to chunking, or we remove some rangechecks*)
 let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
   if tests_enabled then (
     let open Kimchi_gadgets_test_runner in
@@ -852,7 +853,7 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
      * Note: pubkey, signature and msg_hash need to be specially crafted to produce 2-bit scalars
      *)
     let secp256k1_verify_tiny_full ?cs ?(use_precomputed_gen_doubles = true)
-        (pubkey : Affine.bignum_point)
+        (full : bool) (pubkey : Affine.bignum_point)
         (signature : Bignum_bigint.t * Bignum_bigint.t)
         (msg_hash : Bignum_bigint.t) =
       (* Generate and verify proof *)
@@ -922,10 +923,11 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
             assert (
               Mina_stdlib.List.Length.equal base_checks.compact_multi_ranges 40 ) ;
 
-            (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
-            Foreign_field.constrain_external_checks
-              (module Runner.Impl)
-              base_checks curve.modulus ;
+            if full then
+              (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
+              Foreign_field.constrain_external_checks
+                (module Runner.Impl)
+                base_checks curve.modulus ;
 
             (*
              * Perform scalar field external checks
@@ -937,10 +939,11 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
             assert (
               Mina_stdlib.List.Length.equal scalar_checks.compact_multi_ranges 3 ) ;
 
-            (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
-            Foreign_field.constrain_external_checks
-              (module Runner.Impl)
-              scalar_checks curve.order ;
+            if full then
+              (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
+              Foreign_field.constrain_external_checks
+                (module Runner.Impl)
+                scalar_checks curve.order ;
 
             () )
       in
@@ -976,12 +979,14 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
     assert (Ec_group.is_on_curve_bignum_point Secp256k1.params pubkey) ;
 
     let _cs =
-      secp256k1_verify_tiny_full ~use_precomputed_gen_doubles:false pubkey
+      secp256k1_verify_tiny_full ~use_precomputed_gen_doubles:false false pubkey
         signature msg_hash
     in
 
     () )
 
+
+(* TODO: switch to true once we can fit 256 bit thanks to chunking, or we remove some rangechecks*)
 let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
   if tests_enabled then (
     let open Kimchi_gadgets_test_runner in
@@ -993,7 +998,7 @@ let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
     (* Prove ECDSA signature verification in ZK (no subgroup check)! *)
     let test_verify_full_no_subgroup_check ?cs
         ?(use_precomputed_gen_doubles = true) ?(scalar_mul_bit_length = 0)
-        (curve : Curve_params.t) (pubkey : Affine.bignum_point)
+        (full : bool) (curve : Curve_params.t) (pubkey : Affine.bignum_point)
         (signature : Bignum_bigint.t * Bignum_bigint.t)
         (msg_hash : Bignum_bigint.t) =
       (* Generate and verify proof *)
@@ -1044,19 +1049,21 @@ let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
               ~use_precomputed_gen_doubles ~scalar_mul_bit_length base_checks
               scalar_checks curve pubkey signature msg_hash ;
 
-            (*
-             * Perform base field external checks
-             *)
-            Foreign_field.constrain_external_checks
-              (module Runner.Impl)
-              base_checks curve.modulus ;
+            if full then
+              (*
+               * Perform base field external checks
+               *)
+              Foreign_field.constrain_external_checks
+                (module Runner.Impl)
+                base_checks curve.modulus ;
 
-            (*
-             * Perform scalar field external checks
-             *)
-            Foreign_field.constrain_external_checks
-              (module Runner.Impl)
-              scalar_checks curve.order ;
+            if full then
+              (*
+               * Perform scalar field external checks
+               *)
+              Foreign_field.constrain_external_checks
+                (module Runner.Impl)
+                scalar_checks curve.order ;
 
             () )
       in
@@ -1093,7 +1100,7 @@ let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
     assert (Ec_group.is_on_curve_bignum_point Secp256k1.params pubkey) ;
 
     let _cs =
-      test_verify_full_no_subgroup_check Secp256k1.params
+      test_verify_full_no_subgroup_check false Secp256k1.params
         ~scalar_mul_bit_length:216 pubkey signature msg_hash
     in
 
@@ -1123,7 +1130,7 @@ let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
     in
 
     let _cs =
-      test_verify_full_no_subgroup_check Secp256k1.params
+      test_verify_full_no_subgroup_check false Secp256k1.params
         ~use_precomputed_gen_doubles:false ~scalar_mul_bit_length:128 pubkey
         signature msg_hash
     in
