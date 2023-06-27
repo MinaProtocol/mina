@@ -77,10 +77,11 @@ const handler = async (event, req) => {
     ) {
       // TODO #7711: Actually look at @MinaProtocol/stakeholder-reviewers team instead of hardcoding the users here
       if (
-        req.body.sender.login == "es92" ||
         req.body.sender.login == "aneesharaines" ||
         req.body.sender.login == "bkase" ||
-        req.body.sender.login == "imeckler"
+        req.body.sender.login == "deepthiskumar" ||
+        req.body.sender.login == "mrmr1993" ||
+        req.body.sender.login == "nholland94"
       ) {
         const prData = await getRequest(req.body.issue.pull_request.url);
         const buildkite = await runBuild(
