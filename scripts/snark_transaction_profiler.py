@@ -10,7 +10,7 @@ import json
 import re
 
 exit_code=0
-prog = '_build/default/src/app/cli/src/mina.exe'
+prog = 'mina'
 
 def set_error():
   global exit_code
@@ -20,26 +20,27 @@ def parse_stats (output) :
 
     print(output)
 
-    lines = output.decode ('utf-8').split ('\n')
+    lines = output.split ('\n')
 
     stats = []
 
     for line in lines :
         if line == '' :
             continue
-        try :
-            compile = '/Generated zkapp transactions with (?<updates>\d+) updates and (?<proof>\d+) proof updates in (?<time>[0-9]*[.]?[0-9]+) secs/gms'
 
-            match = re.search(compile, line)
+
+        print(line)
+        compile = 'Generated zkapp transactions with (?P<updates>\d+) updates and (?P<proof>\d+) proof updates in (?P<time>[0-9]*[.]?[0-9]+) secs'
+
+        match = re.match(compile, line)
+
+        if match :
             updates = int(match.group('updates'))
             proof = int(match.group('proof'))
             time = float(match.group('time'))
 
             stats.append((updates, proof, time))
-        except :
-            print ('Error in line: ' + line)
-            set_error           
-
+       
     return stats
 
 if __name__ == "__main__":
@@ -51,7 +52,7 @@ if __name__ == "__main__":
     max_num_updates=sys.argv[2]
     min_num_updates=sys.argv[3]
 
-    args =  [prog, 
+    args = " ".join([prog, 
         "transaction-snark-profiler",
         "--zkapps",
         "--k",
@@ -59,10 +60,10 @@ if __name__ == "__main__":
         "--max-num-updates",
         max_num_updates,
         "--min-num-updates", 
-        min_num_updates]
+        min_num_updates])
 
 
-    print(f'running snark transaction profiler: \'{" ".join(args)}\'')
+    print(f'running snark transaction profiler: {args}')
     (process_exit_code,output) = subprocess.getstatusoutput(args)
     stats = parse_stats (output)
     print(stats)
