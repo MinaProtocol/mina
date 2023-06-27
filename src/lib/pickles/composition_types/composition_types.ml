@@ -87,119 +87,28 @@ module Wrap = struct
           end
 
           module Optional_column_scalars = struct
-            type 'fp t =
-              { range_check0 : 'fp
-              ; range_check1 : 'fp
-              ; foreign_field_add : 'fp
-              ; foreign_field_mul : 'fp
-              ; xor : 'fp
-              ; rot : 'fp
-              ; lookup_gate : 'fp
-              ; runtime_tables : 'fp
-              }
+            type 'fp t = { lookup_gate : 'fp; runtime_tables : 'fp }
             [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
-            let map ~f
-                { range_check0
-                ; range_check1
-                ; foreign_field_add
-                ; foreign_field_mul
-                ; xor
-                ; rot
-                ; lookup_gate
-                ; runtime_tables
-                } =
-              { range_check0 = f range_check0
-              ; range_check1 = f range_check1
-              ; foreign_field_add = f foreign_field_add
-              ; foreign_field_mul = f foreign_field_mul
-              ; xor = f xor
-              ; rot = f rot
-              ; lookup_gate = f lookup_gate
-              ; runtime_tables = f runtime_tables
-              }
+            let map ~f { lookup_gate; runtime_tables } =
+              { lookup_gate = f lookup_gate; runtime_tables = f runtime_tables }
 
             let map2 ~f t1 t2 =
-              { range_check0 = f t1.range_check0 t2.range_check0
-              ; range_check1 = f t1.range_check1 t2.range_check1
-              ; foreign_field_add = f t1.foreign_field_add t2.foreign_field_add
-              ; foreign_field_mul = f t1.foreign_field_mul t2.foreign_field_mul
-              ; xor = f t1.xor t2.xor
-              ; rot = f t1.rot t2.rot
-              ; lookup_gate = f t1.lookup_gate t2.lookup_gate
+              { lookup_gate = f t1.lookup_gate t2.lookup_gate
               ; runtime_tables = f t1.runtime_tables t2.runtime_tables
               }
 
-            let to_list
-                { range_check0
-                ; range_check1
-                ; foreign_field_add
-                ; foreign_field_mul
-                ; xor
-                ; rot
-                ; lookup_gate
-                ; runtime_tables
-                } =
-              [ range_check0
-              ; range_check1
-              ; foreign_field_add
-              ; foreign_field_mul
-              ; xor
-              ; rot
-              ; lookup_gate
-              ; runtime_tables
-              ]
+            let to_list { lookup_gate; runtime_tables } =
+              [ lookup_gate; runtime_tables ]
 
-            let to_data
-                { range_check0
-                ; range_check1
-                ; foreign_field_add
-                ; foreign_field_mul
-                ; xor
-                ; rot
-                ; lookup_gate
-                ; runtime_tables
-                } =
-              Hlist.HlistId.
-                [ range_check0
-                ; range_check1
-                ; foreign_field_add
-                ; foreign_field_mul
-                ; xor
-                ; rot
-                ; lookup_gate
-                ; runtime_tables
-                ]
+            let to_data { lookup_gate; runtime_tables } =
+              Hlist.HlistId.[ lookup_gate; runtime_tables ]
 
-            let of_data
-                Hlist.HlistId.
-                  [ range_check0
-                  ; range_check1
-                  ; foreign_field_add
-                  ; foreign_field_mul
-                  ; xor
-                  ; rot
-                  ; lookup_gate
-                  ; runtime_tables
-                  ] =
-              { range_check0
-              ; range_check1
-              ; foreign_field_add
-              ; foreign_field_mul
-              ; xor
-              ; rot
-              ; lookup_gate
-              ; runtime_tables
-              }
+            let of_data Hlist.HlistId.[ lookup_gate; runtime_tables ] =
+              { lookup_gate; runtime_tables }
 
             let of_feature_flags (feature_flags : _ Plonk_types.Features.t) =
-              { range_check0 = feature_flags.range_check0
-              ; range_check1 = feature_flags.range_check1
-              ; foreign_field_add = feature_flags.foreign_field_add
-              ; foreign_field_mul = feature_flags.foreign_field_mul
-              ; xor = feature_flags.xor
-              ; rot = feature_flags.rot
-              ; lookup_gate = feature_flags.lookup
+              { lookup_gate = feature_flags.lookup
               ; runtime_tables = feature_flags.runtime_tables
               }
 
@@ -243,19 +152,8 @@ module Wrap = struct
                 | _ ->
                     opt_spec
               in
-              let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =
-                of_feature_flags feature_flags |> to_data
-              in
-              Spec.T.Struct
-                [ opt_spec f1
-                ; opt_spec f2
-                ; opt_spec f3
-                ; opt_spec f4
-                ; opt_spec f5
-                ; opt_spec f6
-                ; opt_spec f7
-                ; opt_spec f8
-                ]
+              let [ f1; f2 ] = of_feature_flags feature_flags |> to_data in
+              Spec.T.Struct [ opt_spec f1; opt_spec f2 ]
 
             let typ (type f fp)
                 (module Impl : Snarky_backendless.Snark_intf.Run
@@ -266,13 +164,7 @@ module Wrap = struct
                 Plonk_types.Opt.typ Impl.Boolean.typ flag fp ~dummy:dummy_scalar
               in
               Snarky_backendless.Typ.of_hlistable
-                [ opt_typ feature_flags.range_check0
-                ; opt_typ feature_flags.range_check1
-                ; opt_typ feature_flags.foreign_field_add
-                ; opt_typ feature_flags.foreign_field_mul
-                ; opt_typ feature_flags.xor
-                ; opt_typ feature_flags.rot
-                ; opt_typ feature_flags.lookup
+                [ opt_typ feature_flags.lookup
                 ; opt_typ feature_flags.runtime_tables
                 ]
                 ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist

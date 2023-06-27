@@ -1838,13 +1838,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                           with
                                           lookup = None
                                         ; optional_column_scalars =
-                                            { range_check0 = None
-                                            ; range_check1 = None
-                                            ; foreign_field_add = None
-                                            ; foreign_field_mul = None
-                                            ; xor = None
-                                            ; rot = None
-                                            ; lookup_gate = None
+                                            { lookup_gate = None
                                             ; runtime_tables = None
                                             }
                                         }
