@@ -48,7 +48,7 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = lintDirtyWhen,
         path = "Test",
-        name = "RunSnarkPofiler"
+        name = "RunSnarkProfiler"
       },
     steps = [
       buildTestCmd Size.Small dependsOn
