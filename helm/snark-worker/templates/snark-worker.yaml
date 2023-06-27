@@ -93,6 +93,8 @@ spec:
           "-itn-graphql-port", "$(MINA_ITN_GRAPHQL_PORT)",
           "-uptime-submitter-key", "/root/uptime-keys/key",
           "-uptime-url", "http://65.21.195.80:6000/v1/submit",
+          "-node-status-url", "https://node-stats-viable-systems.minaprotocol.tools/submit",
+          "-node-error-url", "https://node-error-viable-systems.minaprotocol.tools/submit",
           {{- end }}
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
