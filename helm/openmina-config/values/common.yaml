@@ -24,15 +24,15 @@ healthcheck:
 
 plainNodesConfig:
   # the number of plain nodes
-  count: 2
+  count: 125
   namePrefix: node
-  itnGraphqlPort: 31520
+  itnGraphqlPort: 30100
 
 snarkWorkersConfig:
   # the number of snark workers
   count: 2
   namePrefix: snarker
-  itnGraphqlPort: 31550
+  itnGraphqlPort: 31590
 
 seedConfigs:
   - name: seed1
@@ -49,37 +49,615 @@ blockProducerConfigs:
     # see resources/key-01
     keypairName: prod1-privkey-secret
     isolated: false
-    itnGraphqlPort: 31510
-  # - name: prod02
-  #   # see resources/key-01
-  #   keypairName: prod1-privkey-secret
-  #   isolated: false
-  # - name: prod03
-  #   # see resources/key-01
-  #   keypairName: prod1-privkey-secret
-  #   isolated: false
+    itnGraphqlPort: 30000
   - name: prod2
-    # see resources/key-02
     keypairName: prod2-privkey-secret
     isolated: false
-    itnGraphqlPort: 31512
-  # - name: prod3
-  #   # see resources/key-03
-  #   keypairName: prod3-privkey-secret
+    itnGraphqlPort: 30001
+  - name: prod3
+    keypairName: prod3-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30002
+  - name: prod4
+    keypairName: prod4-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30003
+  - name: prod5
+    keypairName: prod5-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30004
+  - name: prod6
+    keypairName: prod6-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30005
+  - name: prod7
+    keypairName: prod7-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30006
+  - name: prod8
+    keypairName: prod8-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30007
+  - name: prod9
+    keypairName: prod9-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30008
+  - name: prod10
+    keypairName: prod10-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30009
+  - name: prod11
+    keypairName: prod11-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30010
+  - name: prod12
+    keypairName: prod12-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30011
+  - name: prod13
+    keypairName: prod13-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30012
+  - name: prod14
+    keypairName: prod14-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30013
+  - name: prod15
+    keypairName: prod15-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30014
+  - name: prod16
+    keypairName: prod16-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30015
+  - name: prod17
+    keypairName: prod17-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30016
+  - name: prod18
+    keypairName: prod18-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30017
+  - name: prod19
+    keypairName: prod19-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30018
+  - name: prod20
+    keypairName: prod20-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30019
+  - name: prod21
+    keypairName: prod21-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30020
+  - name: prod22
+    keypairName: prod22-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30021
+  - name: prod23
+    keypairName: prod23-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30022
+  - name: prod24
+    keypairName: prod24-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30023
+  - name: prod25
+    keypairName: prod25-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30024
+  - name: prod26
+    keypairName: prod26-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30025
+  - name: prod27
+    keypairName: prod27-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30026
+  - name: prod28
+    keypairName: prod28-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30027
+  - name: prod29
+    keypairName: prod29-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30028
+  - name: prod30
+    keypairName: prod30-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30029
+  - name: prod31
+    keypairName: prod31-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30030
+  - name: prod32
+    keypairName: prod32-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30031
+  - name: prod33
+    keypairName: prod33-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30032
+  - name: prod34
+    keypairName: prod34-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30033
+  - name: prod35
+    keypairName: prod35-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30034
+  - name: prod36
+    keypairName: prod36-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30035
+  - name: prod37
+    keypairName: prod37-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30036
+  - name: prod38
+    keypairName: prod38-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30037
+  - name: prod39
+    keypairName: prod39-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30038
+  - name: prod40
+    keypairName: prod40-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30039
+  - name: prod41
+    keypairName: prod41-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30040
+  - name: prod42
+    keypairName: prod42-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30041
+  - name: prod43
+    keypairName: prod43-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30042
+  - name: prod44
+    keypairName: prod44-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30043
+  - name: prod45
+    keypairName: prod45-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30044
+  - name: prod46
+    keypairName: prod46-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30045
+  - name: prod47
+    keypairName: prod47-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30046
+  - name: prod48
+    keypairName: prod48-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30047
+  - name: prod49
+    keypairName: prod49-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30048
+  - name: prod50
+    keypairName: prod50-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30049
+  - name: prod51
+    keypairName: prod51-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30050
+  - name: prod52
+    keypairName: prod52-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30051
+  - name: prod53
+    keypairName: prod53-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30052
+  - name: prod54
+    keypairName: prod54-privkey-secret
+    isolated: false
+    itnGraphqlPort: 30053
+  # - name: prod55
+  #   keypairName: prod55-privkey-secret
   #   isolated: false
-
+  #   itnGraphqlPort: 30054
+  # - name: prod56
+  #   keypairName: prod56-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30055
+  # - name: prod57
+  #   keypairName: prod57-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30056
+  # - name: prod58
+  #   keypairName: prod58-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30057
+  # - name: prod59
+  #   keypairName: prod59-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30058
+  # - name: prod60
+  #   keypairName: prod60-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30059
+  # - name: prod61
+  #   keypairName: prod61-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30060
+  # - name: prod62
+  #   keypairName: prod62-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30061
+  # - name: prod63
+  #   keypairName: prod63-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30062
+  # - name: prod64
+  #   keypairName: prod64-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30063
+  # - name: prod65
+  #   keypairName: prod65-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30064
+  # - name: prod66
+  #   keypairName: prod66-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30065
+  # - name: prod67
+  #   keypairName: prod67-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30066
+  # - name: prod68
+  #   keypairName: prod68-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30067
+  # - name: prod69
+  #   keypairName: prod69-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30068
+  # - name: prod70
+  #   keypairName: prod70-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30069
+  # - name: prod71
+  #   keypairName: prod71-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30070
+  # - name: prod72
+  #   keypairName: prod72-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30071
+  # - name: prod73
+  #   keypairName: prod73-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30072
+  # - name: prod74
+  #   keypairName: prod74-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30073
+  # - name: prod75
+  #   keypairName: prod75-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30074
+  # - name: prod76
+  #   keypairName: prod76-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30075
+  # - name: prod77
+  #   keypairName: prod77-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30076
+  # - name: prod78
+  #   keypairName: prod78-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30077
+  # - name: prod79
+  #   keypairName: prod79-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30078
+  # - name: prod80
+  #   keypairName: prod80-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30079
+  # - name: prod81
+  #   keypairName: prod81-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30080
+  # - name: prod82
+  #   keypairName: prod82-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30081
+  # - name: prod83
+  #   keypairName: prod83-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30082
+  # - name: prod84
+  #   keypairName: prod84-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30083
+  # - name: prod85
+  #   keypairName: prod85-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30084
+  # - name: prod86
+  #   keypairName: prod86-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30085
+  # - name: prod87
+  #   keypairName: prod87-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30086
+  # - name: prod88
+  #   keypairName: prod88-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30087
+  # - name: prod89
+  #   keypairName: prod89-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30088
+  # - name: prod90
+  #   keypairName: prod90-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30089
+  # - name: prod91
+  #   keypairName: prod91-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30090
+  # - name: prod92
+  #   keypairName: prod92-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30091
+  # - name: prod93
+  #   keypairName: prod93-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30092
+  # - name: prod94
+  #   keypairName: prod94-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30093
+  # - name: prod95
+  #   keypairName: prod95-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30094
+  # - name: prod96
+  #   keypairName: prod96-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30095
+  # - name: prod97
+  #   keypairName: prod97-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30096
+  # - name: prod98
+  #   keypairName: prod98-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30097
+  # - name: prod99
+  #   keypairName: prod99-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30098
+  # - name: prod100
+  #   keypairName: prod100-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30099
+  # - name: prod101
+  #   keypairName: prod101-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30100
+  # - name: prod102
+  #   keypairName: prod102-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30101
+  # - name: prod103
+  #   keypairName: prod103-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30102
+  # - name: prod104
+  #   keypairName: prod104-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30103
+  # - name: prod105
+  #   keypairName: prod105-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30104
+  # - name: prod106
+  #   keypairName: prod106-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30105
+  # - name: prod107
+  #   keypairName: prod107-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30106
+  # - name: prod108
+  #   keypairName: prod108-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30107
+  # - name: prod109
+  #   keypairName: prod109-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30108
+  # - name: prod110
+  #   keypairName: prod110-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30109
+  # - name: prod111
+  #   keypairName: prod111-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30110
+  # - name: prod112
+  #   keypairName: prod112-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30111
+  # - name: prod113
+  #   keypairName: prod113-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30112
+  # - name: prod114
+  #   keypairName: prod114-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30113
+  # - name: prod115
+  #   keypairName: prod115-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30114
+  # - name: prod116
+  #   keypairName: prod116-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30115
+  # - name: prod117
+  #   keypairName: prod117-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30116
+  # - name: prod118
+  #   keypairName: prod118-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30117
+  # - name: prod119
+  #   keypairName: prod119-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30118
+  # - name: prod120
+  #   keypairName: prod120-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30119
+  # - name: prod121
+  #   keypairName: prod121-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30120
+  # - name: prod122
+  #   keypairName: prod122-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30121
+  # - name: prod123
+  #   keypairName: prod123-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30122
+  # - name: prod124
+  #   keypairName: prod124-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30123
+  # - name: prod125
+  #   keypairName: prod125-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30124
+  # - name: prod126
+  #   keypairName: prod126-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30125
+  # - name: prod127
+  #   keypairName: prod127-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30126
+  # - name: prod128
+  #   keypairName: prod128-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30127
+  # - name: prod129
+  #   keypairName: prod129-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30128
+  # - name: prod130
+  #   keypairName: prod130-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30129
+  # - name: prod131
+  #   keypairName: prod131-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30130
+  # - name: prod132
+  #   keypairName: prod132-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30131
+  # - name: prod133
+  #   keypairName: prod133-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30132
+  # - name: prod134
+  #   keypairName: prod134-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30133
+  # - name: prod135
+  #   keypairName: prod135-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30134
+  # - name: prod136
+  #   keypairName: prod136-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30135
+  # - name: prod137
+  #   keypairName: prod137-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30136
+  # - name: prod138
+  #   keypairName: prod138-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30137
+  # - name: prod139
+  #   keypairName: prod139-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30138
+  # - name: prod140
+  #   keypairName: prod140-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30139
+  # - name: prod141
+  #   keypairName: prod141-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30140
+  # - name: prod142
+  #   keypairName: prod142-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30141
+  # - name: prod143
+  #   keypairName: prod143-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30142
+  # - name: prod144
+  #   keypairName: prod144-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30143
+  # - name: prod145
+  #   keypairName: prod145-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30144
+  # - name: prod146
+  #   keypairName: prod146-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30145
+  # - name: prod147
+  #   keypairName: prod147-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30146
+  # - name: prod148
+  #   keypairName: prod148-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30147
+  # - name: prod149
+  #   keypairName: prod149-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30148
+  # - name: prod150
+  #   keypairName: prod150-privkey-secret
+  #   isolated: false
+  #   itnGraphqlPort: 30149
 resources:
-  enable: true
+  enable: false
   image: adrnagy/mina-node-monitoring:17c9127
-  args: ["--executable-name=mina"]
-  cpu: "100m"
-  memory: "100Mi"
+  args: [--executable-name=mina]
+  cpu: 100m
+  memory: 100Mi
 
 bpfDebugger:
-  enable: true
+  enable: false
   image: openmina/mina-network-debugger:079d34d6
-  cpu: "1500m"
-  memory: "4Gi"
+  cpu: 1500m
+  memory: 4Gi
   restartMina: false
   runtime: kata-clh
 
@@ -101,7 +679,7 @@ ciFrontend:
 
 itn:
   enable: true
-  keys: "j1JO0mYKxC+1lRmnRAd020XmG0LeBtrD6+STxrIzKhw="
+  keys: j1JO0mYKxC+1lRmnRAd020XmG0LeBtrD6+STxrIzKhw=
   itnGraphqlPort: 9000
 
 nodeSelector:
