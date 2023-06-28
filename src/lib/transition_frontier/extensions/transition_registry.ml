@@ -40,5 +40,12 @@ module T = struct
     None
 end
 
-module Broadcasted = Functor.Make_broadcasted (T)
+module Broadcasted = struct
+  include Functor.Make_broadcasted (T)
+
+  let update bext frontier diffs =
+    ignore (T.handle_diffs (extension bext) frontier diffs : view option) ;
+    Async_kernel.Deferred.unit
+end
+
 include T
