@@ -90,8 +90,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind sender_pub_key = pub_key_of_node node_c in
          let%bind receiver_pub_key = pub_key_of_node node_b in
          let%bind { hash = txn_hash; _ } =
-           Graphql_requests.must_send_online_payment ~logger (Network.Node.get_ingress_uri node_c ) ~sender_pub_key
-             ~receiver_pub_key
+           Graphql_requests.must_send_online_payment ~logger
+             (Network.Node.get_ingress_uri node_c)
+             ~sender_pub_key ~receiver_pub_key
              ~amount:(Currency.Amount.of_nanomina_int_exn 1_000_000)
              ~fee:(Currency.Fee.of_nanomina_int_exn 10_000_000)
          in
@@ -140,7 +141,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ~constraint_constants:(Network.constraint_constants network)
                 parties_spec
          in
-         let%bind () = send_zkapp ~logger (Network.Node.get_ingress_uri node_c) parties_create_accounts in
+         let%bind () =
+           send_zkapp ~logger
+             (Network.Node.get_ingress_uri node_c)
+             parties_create_accounts
+         in
          wait_for_zkapp parties_create_accounts )
     in
     let%bind () =
@@ -152,7 +157,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Mina_base.Account_id.create pk Mina_base.Token_id.default
          in
          let%map _account_data =
-           Graphql_requests.must_get_account_data ~logger (Network.Node.get_ingress_uri node_c) ~account_id
+           Graphql_requests.must_get_account_data ~logger
+             (Network.Node.get_ingress_uri node_c)
+             ~account_id
          in
          () )
     in

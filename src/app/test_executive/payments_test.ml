@@ -25,12 +25,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~vesting_increment : Mina_base.Account_timing.t =
       let open Currency in
       Timed
-      { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
-      ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
-      ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
-      ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
-      ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
-      }
+        { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
+        ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
+        ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
+        ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
+        ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
+        }
     in
     { default with
       requires_graphql = true
@@ -155,9 +155,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let valid_until = Mina_numbers.Global_slot_since_genesis.max_value in
     let payload =
       let payment_payload =
-        { Payment_payload.Poly.receiver_pk = receiver_pub_key
-        ; amount
-        }
+        { Payment_payload.Poly.receiver_pk = receiver_pub_key; amount }
       in
       let body = Signed_command_payload.Body.Payment payment_payload in
       let common =
@@ -219,8 +217,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          (* [%log info] "coinbase_amount: %s"
             (Currency.Amount.to_formatted_string coinbase_reward) ; *)
-         [%log info] "txn_amount: %s"
-           (Currency.Amount.to_mina_string amount) ;
+         [%log info] "txn_amount: %s" (Currency.Amount.to_mina_string amount) ;
          [%log info] "receiver_expected: %s"
            (Currency.Amount.to_mina_string receiver_expected) ;
          [%log info] "receiver_balance: %s"
@@ -426,7 +423,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.ledger_proofs_emitted_since_genesis
               ~test_config:config ~num_proofs:1 ) )
     in
-    let get_account_id pubk = (Account_id.create (pubk |> Signature_lib.Public_key.compress) Token_id.default) in 
+    let get_account_id pubk =
+      Account_id.create
+        (pubk |> Signature_lib.Public_key.compress)
+        Token_id.default
+    in
     let%bind () =
       section_hard
         "check account balances.  snark-node-key1 should be greater than or \
@@ -435,12 +436,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Integration_test_lib.Graphql_requests.must_get_account_data ~logger
              (Network.Node.get_ingress_uri untimed_node_b)
              ~account_id:(get_account_id snark_node_key1.keypair.public_key)
-             in
+         in
          let%bind { total_balance = key_2_balance_actual; _ } =
            Integration_test_lib.Graphql_requests.must_get_account_data ~logger
              (Network.Node.get_ingress_uri untimed_node_a)
-             ~account_id:(get_account_id snark_node_key2.keypair.public_key )
-             in
+             ~account_id:(get_account_id snark_node_key2.keypair.public_key)
+         in
          let key_1_balance_expected =
            Currency.Amount.of_mina_string_exn config.snark_worker_fee
          in

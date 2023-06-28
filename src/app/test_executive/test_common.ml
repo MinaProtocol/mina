@@ -214,7 +214,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                      zkapp_command.memo ) )
             ] ) ;
     match%bind.Deferred
-      Integration_test_lib.Graphql_requests.send_zkapp_batch ~logger node_uri ~zkapp_commands
+      Integration_test_lib.Graphql_requests.send_zkapp_batch ~logger node_uri
+        ~zkapp_commands
     with
     | Ok _zkapp_ids ->
         [%log info] "ZkApp transactions sent" ;
@@ -232,7 +233,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let send_invalid_zkapp ~logger node_uri zkapp_command substring =
     [%log info] "Sending zkApp, expected to fail" ;
     match%bind.Deferred
-    Integration_test_lib.Graphql_requests.send_zkapp_batch ~logger node_uri
+      Integration_test_lib.Graphql_requests.send_zkapp_batch ~logger node_uri
         ~zkapp_commands:[ zkapp_command ]
     with
     | Ok _zkapp_ids ->
@@ -261,8 +262,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "Sending payment, expected to fail" ;
     let expected_failure = String.lowercase expected_failure in
     match%bind.Deferred
-    Integration_test_lib.Graphql_requests.send_payment_with_raw_sig ~logger node_uri ~sender_pub_key
-        ~receiver_pub_key ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature
+      Integration_test_lib.Graphql_requests.send_payment_with_raw_sig ~logger
+        node_uri ~sender_pub_key ~receiver_pub_key ~amount ~fee ~nonce ~memo
+        ~valid_until ~raw_signature
     with
     | Ok _ ->
         [%log error] "Payment succeeded, expected error \"%s\"" expected_failure ;
@@ -287,7 +289,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "Getting permissions for account"
       ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
     match%bind.Deferred
-    Integration_test_lib.Graphql_requests.get_account_permissions ~logger node_uri ~account_id
+      Integration_test_lib.Graphql_requests.get_account_permissions ~logger
+        node_uri ~account_id
     with
     | Ok permissions ->
         [%log info] "Got account permissions" ;
@@ -302,7 +305,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "Getting update for account"
       ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
     match%bind.Deferred
-    Integration_test_lib.Graphql_requests.get_account_update ~logger node_uri ~account_id
+      Integration_test_lib.Graphql_requests.get_account_update ~logger node_uri
+        ~account_id
     with
     | Ok update ->
         [%log info] "Got account update" ;
@@ -318,7 +322,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ~metadata:
         [ ("pub_key", Signature_lib.Public_key.Compressed.to_yojson pk) ] ;
     match%bind.Deferred
-    Integration_test_lib.Graphql_requests.get_pooled_zkapp_commands ~logger node_uri ~pk
+      Integration_test_lib.Graphql_requests.get_pooled_zkapp_commands ~logger
+        node_uri ~pk
     with
     | Ok zkapp_commands ->
         [%log info] "Got pooled zkApp commands" ;
