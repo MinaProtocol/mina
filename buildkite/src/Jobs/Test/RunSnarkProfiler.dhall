@@ -25,7 +25,7 @@ let buildTestCmd : Size -> List Command.TaggedKey.Type -> Command.Type = \(cmd_t
       commands = [
         Cmd.runInDocker
             Cmd.Docker::{
-              image = (../Constants/ContainerImages.dhall).ubuntu2004
+              image = (../../Constants/ContainerImages.dhall).ubuntu2004
             }
             "buildkite/scripts/run-snark-transaction-profiler.sh"
       ],
