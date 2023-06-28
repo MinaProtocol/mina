@@ -56,3 +56,20 @@ spec:
         emptyDir: {}
       {{- end }} 
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
+
+
+---
+{{- if $.Values.persist_working_dir }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-{{ $.Values.workerName }}
+spec:
+  accessModes:
+    - {{ $.Values.storage.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ $.Values.storage.size | quote }}
+  storageClassName: "{{ $.Values.storage.storageClass }}"
+---
+{{ end }}
