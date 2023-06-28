@@ -230,7 +230,8 @@ struct
                    the transition_frontier *)
                 Broadcast_pipe.Reader.iter
                   (Transition_frontier.snark_pool_refcount_pipe tf) ~f:(fun x ->
-                    Strict_pipe.Writer.write tf_diff_writer (`Refcount_update x) )
+                    Strict_pipe.Writer.write tf_diff_writer (`Refcount_update x) ;
+                    Deferred.unit )
                 |> Deferred.don't_wait_for ;
                 Broadcast_pipe.Reader.iter
                   (Transition_frontier.best_tip_diff_pipe tf) ~f:(fun _ ->
@@ -238,7 +239,8 @@ struct
                       (`New_best_tip
                         ( Transition_frontier.best_tip tf
                         |> Transition_frontier.Breadcrumb.staged_ledger
-                        |> Staged_ledger.ledger ) ) )
+                        |> Staged_ledger.ledger ) ) ;
+                    Deferred.unit )
                 |> Deferred.don't_wait_for ;
                 return ()
             | None ->

@@ -260,7 +260,8 @@ end)
     (* Diffs from transition frontier extensions *)
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
-        create ~name:"Network pool transition frontier diffs" Synchronous)
+        create ~name:"Network pool transition frontier diffs"
+          (Buffered (`Capacity 100, `Overflow Crash)))
     in
     let t, locals, remotes =
       of_resource_pool_and_diffs

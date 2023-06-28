@@ -35,8 +35,8 @@ module type Resource_pool_base_intf = sig
     -> logger:Logger.t
     -> tf_diff_writer:
          ( transition_frontier_diff
-         , Strict_pipe.synchronous
-         , unit Deferred.t )
+         , Strict_pipe.crash Strict_pipe.buffered
+         , unit )
          Strict_pipe.Writer.t
     -> t
 end

@@ -881,8 +881,7 @@ struct
                         (Transition_frontier.best_tip_diff_pipe frontier)
                         ~f:(fun diff ->
                           Strict_pipe.Writer.write tf_diff_writer
-                            (diff, get_best_tip_ledger frontier)
-                          |> Deferred.don't_wait_for ;
+                            (diff, get_best_tip_ledger frontier) ;
                           Deferred.unit ) ) ;
                  Deferred.unit ) ) ;
       t
