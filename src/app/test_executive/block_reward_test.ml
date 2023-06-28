@@ -52,7 +52,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       "check that the account balances are what we expect after the block has \
        been produced"
       (let%bind { total_balance = bp_balance; _ } =
-         Graphql_requests.must_get_account_data ~logger (Network.Node.get_ingress_uri node)
+         Graphql_requests.must_get_account_data ~logger
+           (Network.Node.get_ingress_uri node)
            ~account_id:bp_pk_account_id
        in
        (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
