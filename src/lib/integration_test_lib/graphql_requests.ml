@@ -236,7 +236,7 @@ module Graphql = struct
   |}]
 end
 
-(* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
+(** this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
 let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
     ?(initial_delay_sec = 0.) ~logger ~node_uri ~query_name query_obj =
   let open Deferred.Let_syntax in
@@ -441,7 +441,7 @@ let get_account_permissions ~logger t ~account_id =
   | None ->
       fail (Error.of_string "Could not get account from ledger")
 
-(* return a Account_update.Update.t with all fields `Set` to the
+(** return a Account_update.Update.t with all fields `Set` to the
    value in the account, or `Keep` if value unavailable,
    as if this update had been applied to the account
 *)
@@ -804,13 +804,20 @@ let send_payment_with_raw_sig ~logger node_uri ~sender_pub_key ~receiver_pub_key
     in
     let variables = makeVariables ~input ~rawSignature:raw_signature () in
     let send_payment_obj = make variables in
-    let variables_json_basic = variablesToJson (serializeVariables variables) in
-    (* An awkward conversion from Yojson.Basic to Yojson.Safe *)
-    let variables_json =
-      Yojson.Basic.to_string variables_json_basic |> Yojson.Safe.from_string
-    in
-    [%log info] "send_payment_obj with $variables "
-      ~metadata:[ ("variables", variables_json) ] ;
+    [%log info]
+      "send_payment_obj with $from $to $amount $fee $memo $nonce $valid_until \
+       $raw_signature "
+      ~metadata:
+        [ ("from", Signature_lib.Public_key.Compressed.to_yojson sender_pub_key)
+        ; ("to", Signature_lib.Public_key.Compressed.to_yojson receiver_pub_key)
+        ; ("amount", Currency.Amount.to_yojson amount)
+        ; ("fee", Currency.Fee.to_yojson fee)
+        ; ("memo", `String memo)
+        ; ("nonce", Account.Nonce.to_yojson nonce)
+        ; ( "valid_until"
+          , Mina_numbers.Global_slot_since_genesis.to_yojson valid_until )
+        ; ("raw_signature", `String raw_signature)
+        ] ;
     exec_graphql_request ~logger ~node_uri
       ~query_name:"Send_payment_with_raw_sig_graphql" send_payment_obj
   in
