@@ -78,7 +78,14 @@ module T = struct
 end
 
 include T
-module Broadcasted = Functor.Make_broadcasted (T)
+
+module Broadcasted = struct
+  include Functor.Make_broadcasted (T)
+
+  let update bext frontier diffs =
+    ignore (handle_diffs (extension bext) frontier diffs : view option) ;
+    Async_kernel.Deferred.unit
+end
 
 let lookup { history; _ } = Queue.lookup history
 
