@@ -26,6 +26,7 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      priorityClassName: low-priority-preemptible
       {{ include "sideCar.podAttrs" (dict "resources" $.Values.resources "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
       initContainers:
       {{ if $.Values.itn.enable }}
