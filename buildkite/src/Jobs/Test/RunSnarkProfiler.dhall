@@ -1,5 +1,6 @@
 let Prelude = ../../External/Prelude.dhall
 
+let Docker = ./Docker/Type.dhall
 let Cmd = ../../Lib/Cmds.dhall
 let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
@@ -22,7 +23,13 @@ in
 let buildTestCmd : Size -> List Command.TaggedKey.Type -> Command.Type = \(cmd_target : Size) -> \(dependsOn : List Command.TaggedKey.Type) ->
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchain ([] : List Text) "buildkite/scripts/run-snark-transaction-profiler.sh",
+      commands = [
+        Cmd.runInDocker
+            Cmd.Docker::{
+              image = (../Constants/ContainerImages.dhall).ubuntu2004
+            }
+            "buildkite/scripts/run-snark-transaction-profiler.sh"
+      ],
       label = "Snark Transaction Profiler",
       key = "snark-transaction-profiler",
       target = cmd_target,
