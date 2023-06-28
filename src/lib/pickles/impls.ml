@@ -49,7 +49,6 @@ module Step = struct
 
   module Other_field = struct
     (* Tick.Field.t = p < q = Tock.Field.t *)
-    let size_in_bits = Tock.Field.size_in_bits
 
     module Constant = Tock.Field
 
@@ -119,7 +118,8 @@ module Step = struct
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
 
-    let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [ b ]
+    let _to_bits (x, b) =
+      Field.unpack x ~length:(Field.size_in_bits - 1) @ [ b ]
   end
 
   module Digest = Digest.Make (Impl)
@@ -248,7 +248,7 @@ module Wrap = struct
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
 
-    let to_bits x = Field.unpack x ~length:Field.size_in_bits
+    let _to_bits x = Field.unpack x ~length:Field.size_in_bits
   end
 
   let input () =
