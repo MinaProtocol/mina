@@ -2,6 +2,7 @@ open Async_kernel
 open Core_kernel
 open Mina_base
 open Pipe_lib
+open Mina_transaction
 
 type metrics_t =
   { block_production_delay : int list
@@ -211,6 +212,8 @@ module Dsl = struct
       | Signed_command_to_be_included_in_frontier
       | Ledger_proofs_emitted_since_genesis
       | Block_height_growth
+      | Zkapp_to_be_included_in_frontier
+      | Persisted_frontier_loaded
 
     val wait_condition_id : t -> wait_condition_id
 
@@ -237,6 +240,11 @@ module Dsl = struct
 
     val ledger_proofs_emitted_since_genesis :
       test_config:Test_config.t -> num_proofs:int -> t
+
+    val zkapp_to_be_included_in_frontier :
+      has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
+
+    val persisted_frontier_loaded : Engine.Network.Node.t -> t
   end
 
   module type S = sig
@@ -262,6 +270,8 @@ module Dsl = struct
     val section : string -> unit Malleable_error.t -> unit Malleable_error.t
 
     val network_state : t -> Network_state.t
+
+    val event_router : t -> Event_router.t
 
     val wait_for : t -> Wait_condition.t -> unit Malleable_error.t
 

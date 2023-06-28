@@ -8,13 +8,13 @@ module Snark_tables = struct
   module Serializable = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
-          ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+          ( Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
             Priced_proof.Stable.V1.t
           * [ `Rebroadcastable of Core.Time.Stable.With_utc_sexp.V2.t
             | `Not_rebroadcastable ] )
-          Transaction_snark_work.Statement.Stable.V1.Table.t
+          Transaction_snark_work.Statement.Stable.V2.Table.t
         [@@deriving sexp]
 
         let to_latest = Fn.id
@@ -98,7 +98,8 @@ module type S = sig
     -> Transaction_snark_work.Checked.t option
 
   val load :
-       config:Resource_pool.Config.t
+       ?allow_multiple_instances_for_tests:bool
+    -> config:Resource_pool.Config.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
@@ -107,6 +108,7 @@ module type S = sig
          transition_frontier option Broadcast_pipe.Reader.t
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
+    -> unit
     -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 end
 
@@ -434,8 +436,8 @@ struct
                   Gauge.set Snark_work.snark_pool_size
                     (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
                   Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
-                    ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
-                    |> Float.of_int )) ;
+                    ( fee.Mina_base.Fee_with_prover.fee
+                    |> Currency.Fee.to_nanomina_int |> Float.of_int )) ;
                 `Added )
               else
                 let origin =
@@ -502,22 +504,50 @@ struct
                   Error e )
           in
           let work = One_or_two.map proofs ~f:snd in
-          let prover_account_exists =
+          let account_opt =
             let open Mina_base in
             let open Option.Let_syntax in
-            Option.is_some
-              (let%bind ledger = t.best_tip_ledger () in
-               if Deferred.is_determined (Base_ledger.detached_signal ledger)
-               then None
-               else
-                 Account_id.create prover Token_id.default
-                 |> Base_ledger.location_of_account ledger )
+            let%bind ledger = t.best_tip_ledger () in
+            if Deferred.is_determined (Base_ledger.detached_signal ledger) then
+              None
+            else
+              let%bind loc =
+                Account_id.create prover Token_id.default
+                |> Base_ledger.location_of_account ledger
+              in
+              Base_ledger.get ledger loc
+          in
+          let prover_account_exists = Option.is_some account_opt in
+          let prover_permitted_to_receive =
+            let open Option.Let_syntax in
+            let%map account = account_opt in
+            Mina_base.Account.has_permission
+              ~control:Mina_base.Control.Tag.None_given ~to_:`Access account
+            && Mina_base.Account.has_permission
+                 ~control:Mina_base.Control.Tag.None_given ~to_:`Receive account
           in
           if
             not (fee_is_sufficient t ~fee ~account_exists:prover_account_exists)
           then (
             [%log' debug t.logger]
-              "Prover $prover did not have sufficient balance" ~metadata ;
+              "Snark work did not have sufficient fee to create prover $prover \
+               acccount"
+              ~metadata ;
+            return false )
+          else if
+            Option.value_map ~default:false ~f:not prover_permitted_to_receive
+          then (
+            [%log' warn t.logger]
+              "Snark work prover $prover not permitted to receive fees. \
+               Required permission to receive is $receive_permission"
+              ~metadata:
+                ( ( "receive_permission"
+                  , Mina_base.Permissions.Auth_required.to_yojson
+                      (Option.value_map account_opt
+                         ~default:Mina_base.Permissions.user_default
+                         ~f:(fun (a : Mina_base.Account.t) -> a.permissions) )
+                        .receive )
+                :: metadata ) ;
             return false )
           else if not (work_is_referenced t work) then (
             [%log' debug t.logger] "Work $stmt not referenced"
@@ -644,10 +674,10 @@ struct
 
   let loaded = ref false
 
-  let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~frontier_broadcast_pipe ~log_gossip_heard
-      ~on_remote_push =
-    if !loaded then
+  let load ?(allow_multiple_instances_for_tests = false) ~config ~logger
+      ~constraint_constants ~consensus_constants ~time_controller
+      ~frontier_broadcast_pipe ~log_gossip_heard ~on_remote_push () =
+    if (not allow_multiple_instances_for_tests) && !loaded then
       failwith
         "Snark_pool.load should only be called once. It has been called twice." ;
     loaded := true ;
@@ -683,7 +713,7 @@ end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
 include
-  Make (Mina_base.Ledger) (Staged_ledger)
+  Make (Mina_ledger.Ledger) (Staged_ledger)
     (struct
       include Transition_frontier
 
@@ -701,11 +731,11 @@ module Diff_versioned = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t = Resource_pool.Diff.t =
         | Add_solved_work of
-            Transaction_snark_work.Statement.Stable.V1.t
-            * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+            Transaction_snark_work.Statement.Stable.V2.t
+            * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
       [@@deriving compare, sexp, to_yojson, hash]
@@ -753,7 +783,8 @@ let%test_module "random set test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            () )
 
     module Mock_snark_pool =
       Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
@@ -987,7 +1018,7 @@ let%test_module "random set test" =
                         ~seed:(`Deterministic "test proof")
                         Transaction_snark.Statement.gen ) )
             ; fee =
-                { fee = Currency.Fee.of_int 0
+                { fee = Currency.Fee.zero
                 ; prover = Signature_lib.Public_key.Compressed.empty
                 }
             }
@@ -1033,7 +1064,7 @@ let%test_module "random set test" =
               , Priced_proof.
                   { proof = One_or_two.map ~f:mk_dummy_proof work
                   ; fee =
-                      { fee = Currency.Fee.of_int 0
+                      { fee = Currency.Fee.zero
                       ; prover = Signature_lib.Public_key.Compressed.empty
                       }
                   } )
@@ -1152,7 +1183,8 @@ let%test_module "random set test" =
           in
           ignore
             ( ok_exn res1
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable1 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1163,7 +1195,8 @@ let%test_module "random set test" =
           let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
           ignore
             ( ok_exn res2
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable2 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1176,7 +1209,8 @@ let%test_module "random set test" =
           let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
           ignore
             ( ok_exn res3
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable3 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1203,7 +1237,8 @@ let%test_module "random set test" =
           let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
           ignore
             ( ok_exn res6
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           (* Mark best tip as not including stmt3. *)
           let%bind () =

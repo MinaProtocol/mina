@@ -1,0 +1,96 @@
+// This is the version of the Construction API tests does not test
+// stake delegation, which cannot be tested with rosetta-sdk-go as
+// of v. 0.8.2.
+
+// Workflow used to create new accounts
+create_account(1){
+  create{
+    network = {"network":"debug", "blockchain":"mina"};
+    key = generate_key({"curve_type": "pallas"});
+    account = derive({
+      "network_identifier": {{network}},
+      "public_key": {{key.public_key}}
+    });
+
+    // If the account is not saved, the key will be lost!
+    save_account({
+      "account_identifier": {{account.account_identifier}},
+      "keypair": {{key}}
+    });
+  }
+}
+
+// Workflow used to generate payment transactions
+transfer(10){
+  transfer{
+    transfer.network = {"network":"debug", "blockchain":"mina"};
+    currency = {"symbol":"MINA", "decimals":9};
+    sender = find_balance({
+      "minimum_balance":{
+        "value": "20000000000",
+        "currency": {{currency}}
+      }
+    });
+
+    // The fee must be at least the creation fee of the account if it
+    // did not exist before the transaction
+    max_fee = "4000000000";
+    min_fee = "2000000000";
+
+    // We limit the amount to genereate multiple transactions with the
+    // same prefunded account
+    available_amount = "6000000000";
+
+    // Find recipient and construct operations
+    recipient_amount = random_number({"minimum": {{max_fee}}, "maximum": {{available_amount}}});
+    sender_amount = 0 - {{recipient_amount}};
+    fee = random_number({"minimum": {{min_fee}}, "maximum": {{max_fee}}});
+    minus_fee = 0 - {{fee}};
+    recipient = find_balance({
+      "not_account_identifier":[{{sender.account_identifier}}],
+      "minimum_balance":{
+        "value": "0",
+        "currency": {{currency}}
+      },
+      "create_limit": 100,
+      "create_probability": 50
+    });
+    transfer.confirmation_depth = "1";
+
+    // The valid_until field must be provided explicitely until the
+    // default value is fixed
+    // See https://github.com/coinbase/rosetta-sdk-go/pull/457
+    transfer.preprocess_metadata={"valid_until": "4294967295"};
+
+    // Operations for a payment transaction
+    transfer.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{minus_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"payment_source_dec",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value":{{sender_amount}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":2},
+        "type": "payment_receiver_inc",
+        "account":{{recipient.account_identifier}},
+        "amount":{
+          "value":{{recipient_amount}},
+          "currency":{{currency}}
+        }
+      }
+    ];
+  }
+}

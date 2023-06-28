@@ -29,6 +29,7 @@
    mina_net2
    mina_block
    mina_base
+   mina_transaction
    perf_histograms
    o1trace
    node_addrs_and_ports
@@ -36,9 +37,10 @@
    child_processes
    error_json
    block_time
+   genesis_constants
 )
  (preprocess
-  (pps ppx_coda ppx_version ppx_inline_test ppx_compare ppx_deriving.make ppx_deriving_yojson ppx_optcomp
+  (pps ppx_mina ppx_version ppx_inline_test ppx_compare ppx_deriving.make ppx_deriving_yojson ppx_optcomp
        ppx_here ppx_bin_prot ppx_sexp_conv ppx_fields_conv ppx_let ppx_custom_printf ppx_pipebang))
  (instrumentation (backend bisect_ppx))
  (synopsis "Gossip Network"))

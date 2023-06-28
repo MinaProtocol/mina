@@ -47,7 +47,7 @@ let char_bits c =
   List.concat_map [ hi; lo ] ~f:nybble_bits
 
 let string_to_input s =
-  Random_oracle.Input.
+  Random_oracle.Input.Legacy.
     { field_elements = [||]
     ; bitstrings = Stdlib.(Array.of_seq (Seq.map char_bits (String.to_seq s)))
     }
@@ -55,11 +55,11 @@ let string_to_input s =
 let verify ?signature_kind signature pk s =
   let m = string_to_input s in
   let inner_curve = Inner_curve.of_affine pk in
-  Schnorr.verify ?signature_kind signature inner_curve m
+  Schnorr.Legacy.verify ?signature_kind signature inner_curve m
 
 let sign ?signature_kind sk s =
   let m = string_to_input s in
-  Schnorr.sign ?signature_kind sk m
+  Schnorr.Legacy.sign ?signature_kind sk m
 
 let%test_module "Sign_string tests" =
   ( module struct
@@ -94,15 +94,47 @@ let%test_module "Sign_string tests" =
       let signature = sign ~signature_kind keypair.private_key s in
       verify ~signature_kind signature keypair.public_key s
 
-    let%test "Sign with testnet, fail to verify with mainnet" =
+    let%test "Sign, verify with other networks" =
+      let s = "Sky is blue" in
+      let signature_kind = Mina_signature_kind.Other_network "Foo" in
+      let signature =
+        sign ~signature_kind:(Other_network "Foo") keypair.private_key s
+      in
+      verify ~signature_kind signature keypair.public_key s
+
+    let%test "Sign with testnet, fail to verify with mainnet or other networks"
+        =
       let open Mina_signature_kind in
       let s = "Some pills make you larger" in
       let signature = sign ~signature_kind:Testnet keypair.private_key s in
-      not (verify ~signature_kind:Mainnet signature keypair.public_key s)
+      verify ~signature_kind:Testnet signature keypair.public_key s
+      && (not (verify ~signature_kind:Mainnet signature keypair.public_key s))
+      && not
+           (verify ~signature_kind:(Other_network "Foo") signature
+              keypair.public_key s )
 
-    let%test "Sign with mainnet, fail to verify with testnet" =
+    let%test "Sign with mainnet, fail to verify with testnet or other network" =
       let open Mina_signature_kind in
       let s = "Watson, come here, I need you" in
       let signature = sign ~signature_kind:Mainnet keypair.private_key s in
-      not (verify ~signature_kind:Testnet signature keypair.public_key s)
+      verify ~signature_kind:Mainnet signature keypair.public_key s
+      && (not (verify ~signature_kind:Testnet signature keypair.public_key s))
+      && not
+           (verify ~signature_kind:(Other_network "Foo") signature
+              keypair.public_key s )
+
+    let%test "Sign with other networks, fail to verify with mainnet or testnet \
+              or network with a different chain-name" =
+      let open Mina_signature_kind in
+      let s = "Roses are red" in
+      let signature =
+        sign ~signature_kind:(Other_network "Foo") keypair.private_key s
+      in
+      verify ~signature_kind:(Other_network "Foo") signature keypair.public_key
+        s
+      && (not (verify ~signature_kind:Mainnet signature keypair.public_key s))
+      && (not (verify ~signature_kind:Testnet signature keypair.public_key s))
+      && not
+           (verify ~signature_kind:(Other_network "Bar") signature
+              keypair.public_key s )
   end )

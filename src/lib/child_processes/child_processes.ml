@@ -138,9 +138,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
                 Deferred.unit )
       in
       match%bind Sys.file_exists lockpath with
-      | `Yes ->
-          Deferred.unit
-      | `Unknown | `No -> (
+      | `Yes | `Unknown -> (
           match%bind try_with (fun () -> Sys.remove lockpath) with
           | Ok () ->
               Deferred.unit
@@ -154,7 +152,9 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
                   [ ("childPid", `Int (Pid.to_int pid))
                   ; ("exn", `String (Exn.to_string exn))
                   ] ;
-              Deferred.unit ) )
+              Deferred.unit )
+      | `No ->
+          Deferred.unit )
   | `Unknown | `No ->
       [%log debug] "No PID file for %s" name ;
       Deferred.unit
@@ -173,7 +173,8 @@ let reader_to_strict_pipe reader output_type =
   Strict_pipe.Reader.of_linear_pipe { pipe; has_reader = false }
 
 let start_custom :
-       logger:Logger.t
+       ?allow_multiple_instances:bool
+    -> logger:Logger.t
     -> name:string
     -> git_root_relative_path:string
     -> conf_dir:string
@@ -189,9 +190,10 @@ let start_custom :
            -> Unix.Exit_or_signal.t Or_error.t
            -> unit Deferred.t
          | `Ignore ]
+    -> unit
     -> t Deferred.Or_error.t =
- fun ~logger ~name ~git_root_relative_path ~conf_dir ~args ~stdout ~stderr
-     ~termination ->
+ fun ?(allow_multiple_instances = false) ~logger ~name ~git_root_relative_path
+     ~conf_dir ~args ~stdout ~stderr ~termination () ->
   let open Deferred.Or_error.Let_syntax in
   let%bind () =
     Sys.is_directory conf_dir
@@ -204,8 +206,13 @@ let start_custom :
   in
   let lock_path = conf_dir ^/ name ^ ".lock" in
   let%bind () =
-    Deferred.map ~f:Or_error.return
-    @@ maybe_kill_and_unlock name lock_path logger
+    (* we may not wish to use a lockfile, in order to start multiple processes
+       from the same executable
+    *)
+    if allow_multiple_instances then Deferred.Or_error.return ()
+    else
+      Deferred.map ~f:Or_error.return
+      @@ maybe_kill_and_unlock name lock_path logger
   in
   [%log debug] "Starting custom child process $name with args $args"
     ~metadata:
@@ -219,10 +226,9 @@ let start_custom :
   in
   let%bind process =
     keep_trying
-      (* TODO: remove CODA...PATH and coda-, eventually *)
+      (* TODO: remove coda-, eventually *)
       (List.filter_opt
          [ Unix.getenv @@ "MINA_" ^ String.uppercase name ^ "_PATH"
-         ; Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
          ; relative_to_root
          ; Some (Filename.dirname mina_binary_path ^/ name)
          ; Some ("mina-" ^ name)
@@ -239,9 +245,11 @@ let start_custom :
   Termination.wait_for_process_log_errors ~logger process ~module_:__MODULE__
     ~location:__LOC__ ~here:[%here] ;
   let%bind () =
-    Deferred.map ~f:Or_error.return
-    @@ Async.Writer.save lock_path
-         ~contents:(Pid.to_string @@ Process.pid process)
+    if allow_multiple_instances then Deferred.Or_error.return ()
+    else
+      Deferred.map ~f:Or_error.return
+      @@ Async.Writer.save lock_path
+           ~contents:(Pid.to_string @@ Process.pid process)
   in
   let terminated_ivar = Ivar.create () in
   let stdout_pipe = reader_to_strict_pipe (Process.stdout process) stdout in
@@ -345,7 +353,7 @@ let%test_module _ =
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:[ "exit" ] ~stdout:`Chunks ~stderr:`Chunks
-              ~termination:`Raise_on_failure
+              ~termination:`Raise_on_failure ()
             |> Deferred.map ~f:Or_error.ok_exn
           in
           let%bind () =
@@ -366,7 +374,7 @@ let%test_module _ =
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:[ "loop" ] ~stdout:`Lines ~stderr:`Lines
-              ~termination:`Always_raise
+              ~termination:`Always_raise ()
             |> Deferred.map ~f:Or_error.ok_exn
           in
           let lock_exists () =
@@ -408,7 +416,7 @@ let%test_module _ =
           let mk_process () =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:[ "loop" ] ~stdout:`Chunks ~stderr:`Chunks
-              ~termination:`Ignore
+              ~termination:`Ignore ()
           in
           let%bind process1 =
             mk_process () |> Deferred.map ~f:Or_error.ok_exn
@@ -424,5 +432,26 @@ let%test_module _ =
             (termination_status process2)
             None ;
           let%bind _ = kill process2 in
+          Deferred.unit )
+
+    let%test_unit "if the lockfile already exists, then it would be cleaned" =
+      async_with_temp_dir (fun conf_dir ->
+          let open Deferred.Let_syntax in
+          let lock_path = conf_dir ^/ name ^ ".lock" in
+          let%bind () = Async.Writer.save lock_path ~contents:"123" in
+          let%bind process =
+            start_custom ~logger ~name ~git_root_relative_path ~conf_dir
+              ~args:[ "exit" ] ~stdout:`Chunks ~stderr:`Chunks
+              ~termination:`Raise_on_failure ()
+            |> Deferred.map ~f:Or_error.ok_exn
+          in
+          let%bind () =
+            Strict_pipe.Reader.iter (stdout process) ~f:(fun line ->
+                [%test_eq: string] "hello\n" line ;
+                Deferred.unit )
+          in
+          let%bind () = after process_wait_timeout in
+          [%test_eq: Unix.Exit_or_signal.t Or_error.t option] (Some (Ok (Ok ())))
+            (termination_status process) ;
           Deferred.unit )
   end )

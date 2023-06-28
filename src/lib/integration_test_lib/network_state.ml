@@ -2,6 +2,7 @@ open Async_kernel
 open Core_kernel
 open Pipe_lib
 open Mina_base
+open Mina_transaction
 
 module Make
     (Engine : Intf.Engine.S)
@@ -83,7 +84,11 @@ module Make
     ignore
       ( Event_router.on event_router Event_type.Block_produced
           ~f:(fun node block_produced ->
-            [%log debug] "Updating network state with block produced event" ;
+            [%log debug] "Updating network state with block produced event"
+              ~metadata:
+                [ ( "snark_ledger_generated"
+                  , `Bool block_produced.snarked_ledger_generated )
+                ] ;
             update ~f:(fun state ->
                 [%log debug] "handling block production from $node"
                   ~metadata:[ ("node", `String (Node.id node)) ] ;
@@ -149,7 +154,7 @@ module Make
                           in
                           [%log debug] "GOSSIP RECEIVED by $node"
                             ~metadata:[ ("node", `String (Node.id node)) ] ;
-                          [%log debug] "GOSSIP RECEIVED recevied event: $event"
+                          [%log debug] "GOSSIP RECEIVED received event: $event"
                             ~metadata:
                               [ ( "event"
                                 , Event_type.event_to_yojson

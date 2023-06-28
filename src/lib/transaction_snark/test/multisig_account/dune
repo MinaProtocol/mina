@@ -1,0 +1,48 @@
+(library
+  (name multisig_tests)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   async
+   async_kernel
+   async_unix
+   core
+   base
+   core_kernel
+   yojson
+   ;; local libraries
+   mina_wire_types
+   mina_base.import
+   pickles
+   pickles.backend
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   kimchi_backend.common
+   kimchi_backend
+   cache_dir
+   transaction_snark
+   snark_params
+   crypto_params
+   snarky.backendless
+   mina_ledger
+   mina_base
+   currency
+   mina_state
+   mina_transaction_logic
+   signature_lib
+   genesis_constants
+   transaction_protocol_state
+   pickles_types
+   mina_numbers
+   sgn
+   transaction_snark_tests
+   random_oracle
+   random_oracle_input
+   with_hash
+   data_hash_lib
+   )
+  (library_flags -linkall)
+  (inline_tests)
+  (preprocess
+    (pps ppx_snarky ppx_version ppx_jane))
+  (instrumentation (backend bisect_ppx)))
