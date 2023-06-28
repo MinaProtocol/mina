@@ -1,6 +1,5 @@
 let Prelude = ../../External/Prelude.dhall
 
-let Docker = ./Docker/Type.dhall
 let Cmd = ../../Lib/Cmds.dhall
 let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
