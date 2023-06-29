@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# script run transaction snark profiler and upload data to bucket
+# script run transaction snark profiler
 
 import subprocess
 import sys
@@ -28,8 +28,6 @@ def parse_stats (output) :
         if line == '' :
             continue
 
-
-        print(line)
         compile = 'Generated zkapp transactions with (?P<updates>\d+) updates and (?P<proof>\d+) proof updates in (?P<time>[0-9]*[.]?[0-9]+) secs'
 
         match = re.match(compile, line)
@@ -66,6 +64,7 @@ if __name__ == "__main__":
     print(f'running snark transaction profiler: {args}')
     (process_exit_code,output) = subprocess.getstatusoutput(args)
     stats = parse_stats (output)
+    #TODO: add code to check against some threshold
     print(stats)
     
 
