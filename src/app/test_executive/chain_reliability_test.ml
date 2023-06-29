@@ -106,7 +106,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (let%bind (labeled_chains : (string * string list) list) =
          Malleable_error.List.map (Core.String.Map.data all_nodes)
            ~f:(fun node ->
-             let%map chain = Network.Node.must_get_best_chain ~logger node in
+             let%map chain =
+               Integration_test_lib.Graphql_requests.must_get_best_chain ~logger
+                 (Node.get_ingress_uri node)
+             in
              (Node.id node, List.map ~f:(fun b -> b.state_hash) chain) )
        in
        let (chains : string list list) =
