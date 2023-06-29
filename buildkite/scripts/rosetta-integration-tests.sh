@@ -3,7 +3,7 @@
 # These tests use the mina-dev binary, as rosetta-cli assumes we use a testnet.
 # See https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L222
 
-set -eo pipefail
+set -eox pipefail
 
 export MINA_NETWORK=${MINA_NETWORK:=sandbox}
 export LOG_LEVEL="${LOG_LEVEL:=Info}"
