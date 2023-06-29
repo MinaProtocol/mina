@@ -2,7 +2,7 @@
 
 # update and pin packages, used by CI
 
-PACKAGES="ocaml-sodium coda_base58"
+PACKAGES="ocaml-sodium coda_base58 async_kernel"
 
 git submodule sync && git submodule update --init --recursive
 

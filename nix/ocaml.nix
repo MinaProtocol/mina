@@ -16,7 +16,7 @@ let
   repos = [ external-repo inputs.opam-repository ];
 
   export = opam-nix.importOpam ../opam.export;
-  external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
+  external-packages = pkgs.lib.getAttrs [ "sodium" "base58" "async-kernel" ]
     (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
   # Packages which are `installed` in the export.
