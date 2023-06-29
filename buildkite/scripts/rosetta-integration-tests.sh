@@ -235,7 +235,7 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
 }
 EOF
   cd "$zkapp_path"
-  npm install --no-progress ${OLDPWD}/src/lib/snarky_js_bindings/snarkyjs
+  npm install --no-progress ${OLDPWD}/src/lib/snarkyjs
   npm install --no-progress
   txn=$(zk deploy sandbox -y | sed -ne "s/https:\/\/berkeley.minaexplorer.com\/transaction\///p")
   deploy_txs+=txn
