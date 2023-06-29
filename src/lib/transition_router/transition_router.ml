@@ -552,9 +552,10 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
     (ref reader, ref writer)
   in
   O1trace.background_thread "transition_router" (fun () ->
-      don't_wait_for
-      @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun x ->
-             Strict_pipe.Writer.write !producer_transition_writer_ref x ) ;
+      Strict_pipe.(
+        don't_wait_for
+        @@ Reader.iter producer_transition_reader
+             ~f:(Writer.write !producer_transition_writer_ref)) ;
       let%bind () =
         wait_till_genesis ~logger ~time_controller ~precomputed_values
       in

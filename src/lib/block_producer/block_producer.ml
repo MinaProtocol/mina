@@ -394,7 +394,7 @@ module Precomputed = struct
 end
 
 let handle_block_production_errors ~logger ~rejected_blocks_logger
-    ~time_taken:span ~previous_protocol_state ~protocol_state x =
+    ~time_taken:span ~previous_protocol_state ~protocol_state =
   let transition_error_msg_prefix = "Validation failed: " in
   let transition_reason_for_failure =
     " One possible reason could be a ledger-catchup is triggered before we \
@@ -410,15 +410,12 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
   let state_metadata =
     ("protocol_state", Protocol_state.Value.to_yojson protocol_state)
   in
-  match x with
-  | Ok x ->
-      return x
-  | Error
-      (`Prover_error
-        ( err
-        , ( previous_protocol_state_proof
-          , internal_transition
-          , pending_coinbase_witness ) ) ) ->
+  function
+  | `Prover_error
+      ( err
+      , ( previous_protocol_state_proof
+        , internal_transition
+        , pending_coinbase_witness ) ) ->
       let msg : (_, unit, string, unit) format4 =
         "Prover failed to prove freshly generated transition: $error"
       in
@@ -435,9 +432,8 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
         ]
       in
       [%log error] ~metadata msg ;
-      [%log' debug rejected_blocks_logger] ~metadata msg ;
-      return ()
-  | Error `Invalid_genesis_protocol_state ->
+      [%log' debug rejected_blocks_logger] ~metadata msg
+  | `Invalid_genesis_protocol_state ->
       let state_yojson =
         Fn.compose State_hash.to_yojson Protocol_state.genesis_state_hash
       in
@@ -452,17 +448,15 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
       [%log warn] ~metadata msg ;
       [%log' debug rejected_blocks_logger]
         ~metadata:([ time_metadata; state_metadata ] @ metadata)
-        msg ;
-      return ()
-  | Error `Already_in_frontier ->
+        msg
+  | `Already_in_frontier ->
       let metadata = [ time_metadata; state_metadata ] in
       [%log error] ~metadata "%sproduced transition is already in frontier"
         transition_error_msg_prefix ;
       [%log' debug rejected_blocks_logger]
         ~metadata "%sproduced transition is already in frontier"
-        transition_error_msg_prefix ;
-      return ()
-  | Error `Not_selected_over_frontier_root ->
+        transition_error_msg_prefix
+  | `Not_selected_over_frontier_root ->
       let metadata = [ time_metadata; state_metadata ] in
       [%log warn] ~metadata
         "%sproduced transition is not selected over the root of transition \
@@ -472,9 +466,8 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
         ~metadata
         "%sproduced transition is not selected over the root of transition \
          frontier.%s"
-        transition_error_msg_prefix transition_reason_for_failure ;
-      return ()
-  | Error `Parent_missing_from_frontier ->
+        transition_error_msg_prefix transition_reason_for_failure
+  | `Parent_missing_from_frontier ->
       let metadata = [ time_metadata; state_metadata ] in
       [%log warn] ~metadata
         "%sparent of produced transition is missing from the frontier.%s"
@@ -482,13 +475,12 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
       [%log' debug rejected_blocks_logger]
         ~metadata
         "%sparent of produced transition is missing from the frontier.%s"
-        transition_error_msg_prefix transition_reason_for_failure ;
-      return ()
-  | Error (`Fatal_error e) ->
+        transition_error_msg_prefix transition_reason_for_failure
+  | `Fatal_error e ->
       exn_breadcrumb (Error.tag ~tag:"Fatal error" (Error.of_exn e))
-  | Error (`Invalid_staged_ledger_hash e) ->
+  | `Invalid_staged_ledger_hash e ->
       exn_breadcrumb (Error.tag ~tag:"Invalid staged ledger hash" e)
-  | Error (`Invalid_staged_ledger_diff (e, staged_ledger_diff)) ->
+  | `Invalid_staged_ledger_diff (e, staged_ledger_diff) ->
       let msg : (_, unit, string, unit) format4 =
         "Unable to build breadcrumb from produced transition due to invalid \
          staged ledger diff: $error"
@@ -501,8 +493,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
       [%log error] ~metadata msg ;
       [%log' debug rejected_blocks_logger]
         ~metadata:([ time_metadata; state_metadata ] @ metadata)
-        msg ;
-      return ()
+        msg
 
 let time ~logger ~time_controller label f =
   let open Deferred.Result.Let_syntax in
@@ -920,6 +911,13 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                           @@ diff (now ())
                           @@ Block_time.to_time_exn scheduled_time)) ;
                     [%log internal] "Send_breadcrumb_to_transition_frontier" ;
+                    (* Registry receipt is obtained before writing to pipe to avoid potential
+                       lock in case transition_reader will be read before continuing the execution
+                       of this function (AFAIU async provides no guarantee about the order) *)
+                    let registry_receipt =
+                      Transition_registry.register transition_registry
+                        protocol_state_hashes.state_hash
+                    in
                     let%bind.Async.Deferred () =
                       Strict_pipe.Writer.write transition_writer breadcrumb
                     in
@@ -934,9 +932,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                       "Waiting for block $state_hash to be inserted into \
                        frontier" ;
                     Deferred.choose
-                      [ Deferred.choice
-                          (Transition_registry.register transition_registry
-                             protocol_state_hashes.state_hash )
+                      [ Deferred.choice registry_receipt
                           (Fn.const (Ok `Transition_accepted))
                       ; Deferred.choice
                           ( Block_time.Timeout.create time_controller
@@ -990,13 +986,16 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                         [%log fatal] ~metadata msg ;
                         return ()
                   in
-                  let%bind res = emit_breadcrumb () in
-                  let span =
-                    Block_time.diff (Block_time.now time_controller) start
+                  let f =
+                    handle_block_production_errors ~logger
+                      ~rejected_blocks_logger
+                      ~time_taken:
+                        (Block_time.diff
+                           (Block_time.now time_controller)
+                           start )
+                      ~previous_protocol_state ~protocol_state
                   in
-                  handle_block_production_errors ~logger ~rejected_blocks_logger
-                    ~time_taken:span ~previous_protocol_state ~protocol_state
-                    res) )
+                  emit_breadcrumb () >>| Result.iter_error ~f) )
       in
       let production_supervisor = Singleton_supervisor.create ~task:produce in
       let scheduler = Singleton_scheduler.create time_controller in
@@ -1447,11 +1446,14 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                  disabling `-run-snark-worker` if it's configured." ;
               return ()
         in
-        let%bind res = emit_breadcrumb () in
-        let span = Block_time.diff (Block_time.now time_controller) start in
-        handle_block_production_errors ~logger ~rejected_blocks_logger
-          ~time_taken:span ~previous_protocol_state ~protocol_state res
+        let f =
+          handle_block_production_errors ~logger ~rejected_blocks_logger
+            ~previous_protocol_state ~protocol_state
+            ~time_taken:(Block_time.diff (Block_time.now time_controller) start)
+        in
+        emit_breadcrumb () >>| Result.iter_error ~f
   in
+
   let rec emit_next_block precomputed_blocks =
     (* Begin checking for the ability to produce a block *)
     match Broadcast_pipe.Reader.peek frontier_reader with
