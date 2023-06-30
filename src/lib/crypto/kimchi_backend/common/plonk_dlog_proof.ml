@@ -229,12 +229,6 @@ module Make (Inputs : Inputs_intf) = struct
     ; challenge_polynomial_commitment = g t.sg
     }
 
-  let lookup_eval_of_backend
-      ({ sorted; aggreg = _; table = _; runtime = _ } :
-        'f Kimchi_types.lookup_evaluations ) :
-      _ Pickles_types.Plonk_types.Evals.Lookup.t =
-    { sorted }
-
   let eval_of_backend
       ({ w
        ; coefficients
@@ -273,9 +267,12 @@ module Make (Inputs : Inputs_intf) = struct
     ; rot_selector
     ; lookup_aggregation = Option.map lookup ~f:(fun { aggreg; _ } -> aggreg)
     ; lookup_table = Option.map lookup ~f:(fun { table; _ } -> table)
+    ; lookup_sorted =
+        Array.init 5 ~f:(fun i ->
+            Option.bind lookup ~f:(fun { sorted; _ } ->
+                Option.try_with (fun () -> sorted.(i)) ) )
     ; runtime_lookup_table =
         Option.bind lookup ~f:(fun { runtime; _ } -> runtime)
-    ; lookup = Option.map ~f:lookup_eval_of_backend lookup
     }
 
   let of_backend (t : Backend.t) : t =
@@ -312,13 +309,6 @@ module Make (Inputs : Inputs_intf) = struct
         }
       ~openings:{ proof; evals; ft_eval1 = t.ft_eval1 }
 
-  let lookup_eval_to_backend ~aggreg ~table ~runtime
-      { Pickles_types.Plonk_types.Evals.Lookup.sorted } :
-      'f Kimchi_types.lookup_evaluations option =
-    let open Option.Let_syntax in
-    let%map aggreg = aggreg and table = table in
-    { Kimchi_types.sorted; aggreg; table; runtime }
-
   let eval_to_backend
       { Pickles_types.Plonk_types.Evals.w
       ; coefficients
@@ -338,8 +328,8 @@ module Make (Inputs : Inputs_intf) = struct
       ; rot_selector
       ; lookup_aggregation
       ; lookup_table
+      ; lookup_sorted
       ; runtime_lookup_table
-      ; lookup
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
     ; coefficients = tuple15_of_vec coefficients
@@ -358,11 +348,17 @@ module Make (Inputs : Inputs_intf) = struct
     ; xor_selector
     ; rot_selector
     ; lookup =
-        Option.bind
-          ~f:
-            (lookup_eval_to_backend ~aggreg:lookup_aggregation
-               ~table:lookup_table ~runtime:runtime_lookup_table )
-          lookup
+        (let open Option.Let_syntax in
+        let%map aggreg = lookup_aggregation and table = lookup_table in
+        let sorted =
+          let stop = ref false in
+          Array.filter_map lookup_sorted ~f:(fun x ->
+              if !stop then None
+              else (
+                stop := Option.is_none x ;
+                x ) )
+        in
+        { Kimchi_types.aggreg; table; sorted; runtime = runtime_lookup_table })
     }
 
   let vec_to_array (type t elt)

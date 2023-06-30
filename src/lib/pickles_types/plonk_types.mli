@@ -191,14 +191,6 @@ module Messages : sig
 end
 
 module Evals : sig
-  module Lookup : sig
-    type 'f t = { sorted : 'f array }
-
-    module In_circuit : sig
-      type ('f, 'bool) t = { sorted : 'f array }
-    end
-  end
-
   module In_circuit : sig
     type ('f, 'bool) t =
       { w : 'f Columns_vec.t
@@ -219,7 +211,7 @@ module Evals : sig
       ; rot_selector : ('f, 'bool) Opt.t
       ; lookup_aggregation : ('f, 'bool) Opt.t
       ; lookup_table : ('f, 'bool) Opt.t
-      ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
+      ; lookup_sorted : ('f, 'bool) Opt.t array
       ; runtime_lookup_table : ('f, 'bool) Opt.t
       }
 
@@ -234,8 +226,6 @@ module Evals : sig
     val poseidon_selector : ('a, 'b) t -> 'a
 
     val generic_selector : ('a, 'b) t -> 'a
-
-    val lookup : ('a, 'b) t -> (('a, 'b) Lookup.In_circuit.t, 'b) Opt.t
 
     (** {4 Converters} *)
 
@@ -266,7 +256,7 @@ module Evals : sig
     ; rot_selector : 'a option
     ; lookup_aggregation : 'a option
     ; lookup_table : 'a option
-    ; lookup : 'a Lookup.t option
+    ; lookup_sorted : 'a option array
     ; runtime_lookup_table : 'a option
     }
 

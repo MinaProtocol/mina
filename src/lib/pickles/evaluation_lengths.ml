@@ -24,6 +24,6 @@ let create ~of_int =
     ; rot_selector = None
     ; lookup_aggregation = None
     ; lookup_table = None
+    ; lookup_sorted = Array.init 5 ~f:(fun _ -> None)
     ; runtime_lookup_table = None
-    ; lookup = None
     }
