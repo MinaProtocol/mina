@@ -22,139 +22,194 @@ module Proof_data = struct
   [@@deriving bin_io_unversioned]
 end
 
+let get_backend_payload_version ~logger ~interruptor ~url =
+  let open Interruptible.Let_syntax in
+  let make_interruptible f = Interruptible.lift f interruptor in
+  match%bind
+    make_interruptible
+      (Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
+           Cohttp_async.Client.get url ) )
+  with
+  | Ok ({ status; _ }, body) -> (
+      let status_code = Cohttp.Code.code_of_status status in
+      let succeeded = status_code = 200 in
+      if not succeeded then (
+        [%log warn] "Failure to obtain service payload version at URL $url" ;
+        Interruptible.return None )
+      else
+        match%map
+          make_interruptible
+            (Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
+                 Cohttp_async.Body.to_string body ) )
+        with
+        | Ok body_s ->
+            int_of_string_opt body_s
+        | Error exn ->
+            [%log warn]
+              "Error when obtaining service payload version body response at \
+               URL $url"
+              ~metadata:
+                [ ("url", `String (Uri.to_string url))
+                ; ("error", `String (Exn.to_string exn))
+                ] ;
+            None )
+  | Error exn ->
+      [%log warn] "Error when obtaining service payload version at URL $url"
+        ~metadata:
+          [ ("url", `String (Uri.to_string url))
+          ; ("error", `String (Exn.to_string exn))
+          ] ;
+      Interruptible.return None
+
 let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     ~state_hash ~produced block_data =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
-  let request = Payload.create_request block_data submitter_keypair in
-  let json = Payload.request_to_yojson request in
-  let headers =
-    Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
-  in
-  let metadata_of_body = function
-    | `String s ->
-        [ ("error", `String s) ]
-    | `Strings ss ->
-        [ ("error", `List (List.map ss ~f:(fun s -> `String s))) ]
-    | `Empty | `Pipe _ ->
-        []
-  in
-  let max_attempts = 8 in
-  let attempt_pause_sec = 4.0 in
-  (* see https://github.com/MinaProtocol/mina/blob/compatible/src/app/delegation_backend/README.md
-     for significance of these status codes
-  *)
-  let unrecoverable_status_codes = [ 400; 401; 411; 413 ] in
-  let run_attempt attempt =
-    let interruptible =
-      match%map
-        make_interruptible
-          (Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
-               Cohttp_async.Client.post ~headers
-                 ~body:
-                   (Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
-                 url ) )
-      with
-      | Ok ({ status; _ }, body) ->
-          let status_code = Cohttp.Code.code_of_status status in
-          let status_string = Cohttp.Code.string_of_status status in
-          let unretriable =
-            List.mem unrecoverable_status_codes status_code ~equal:Int.equal
-          in
-          let succeeded = status_code = 200 in
-          ( if succeeded then
-            [%log info]
-              "Sent block with state hash $state_hash to uptime service at URL \
-               $url"
-              ~metadata:
-                [ ("state_hash", State_hash.to_yojson state_hash)
-                ; ("url", `String (Uri.to_string url))
-                ; ( "includes_snark_work"
-                  , `Bool (Option.is_some block_data.snark_work) )
-                ; ("is_produced_block", `Bool produced)
-                ]
-          else if unretriable then
+  match%bind get_backend_payload_version ~logger ~interruptor ~url with
+  | None ->
+      Interruptible.return ()
+  | Some version ->
+      let json =
+        match version with
+        | 0 ->
+            let request =
+              Payload.V0.create_request block_data submitter_keypair
+            in
+            Payload.request_to_yojson Payload.V0.block_data_to_yojson request
+        | _ ->
+            let request =
+              Payload.V1.create_request block_data submitter_keypair
+            in
+            Payload.request_to_yojson Payload.V1.block_data_to_yojson request
+      in
+      let headers =
+        Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
+      in
+      let metadata_of_body = function
+        | `String s ->
+            [ ("error", `String s) ]
+        | `Strings ss ->
+            [ ("error", `List (List.map ss ~f:(fun s -> `String s))) ]
+        | `Empty | `Pipe _ ->
+            []
+      in
+      let max_attempts = 8 in
+      let attempt_pause_sec = 4.0 in
+      (* see https://github.com/MinaProtocol/mina/blob/compatible/src/app/delegation_backend/README.md
+         for significance of these status codes
+      *)
+      let unrecoverable_status_codes = [ 400; 401; 411; 413 ] in
+      let run_attempt attempt =
+        let interruptible =
+          match%map
+            make_interruptible
+              (Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
+                   Cohttp_async.Client.post ~headers
+                     ~body:
+                       ( Yojson.Safe.to_string json
+                       |> Cohttp_async.Body.of_string )
+                     url ) )
+          with
+          | Ok ({ status; _ }, body) ->
+              let status_code = Cohttp.Code.code_of_status status in
+              let status_string = Cohttp.Code.string_of_status status in
+              let unretriable =
+                List.mem unrecoverable_status_codes status_code ~equal:Int.equal
+              in
+              let succeeded = status_code = 200 in
+              ( if succeeded then
+                [%log info]
+                  "Sent block with state hash $state_hash to uptime service at \
+                   URL $url"
+                  ~metadata:
+                    [ ("state_hash", State_hash.to_yojson state_hash)
+                    ; ("url", `String (Uri.to_string url))
+                    ; ( "includes_snark_work"
+                      , `Bool (Option.is_some block_data.snark_work) )
+                    ; ("is_produced_block", `Bool produced)
+                    ]
+              else if unretriable then
+                [%log error]
+                  "Got unrecoverable response from update service backend at \
+                   URL $url, not retrying to send block"
+                  ~metadata:
+                    [ ("state_hash", State_hash.to_yojson state_hash)
+                    ; ("url", `String (Uri.to_string url))
+                    ; ("http_code", `Int status_code)
+                    ; ("http_error", `String status_string)
+                    ; ("payload", json)
+                    ]
+              else if attempt >= max_attempts then
+                let base_metadata =
+                  [ ("state_hash", State_hash.to_yojson state_hash)
+                  ; ("url", `String (Uri.to_string url))
+                  ; ("http_code", `Int status_code)
+                  ; ("http_error", `String status_string)
+                  ; ("payload", json)
+                  ]
+                in
+                let extra_metadata = metadata_of_body body in
+                let metadata = base_metadata @ extra_metadata in
+                [%log error]
+                  "After %d attempts, failed to send block with state hash \
+                   $state_hash to uptime service at URL $url, no more retries"
+                  max_attempts ~metadata
+              else
+                let base_metadata =
+                  [ ("state_hash", State_hash.to_yojson state_hash)
+                  ; ("url", `String (Uri.to_string url))
+                  ; ("http_code", `Int status_code)
+                  ; ("http_error", `String status_string)
+                  ]
+                in
+                let extra_metadata = metadata_of_body body in
+                let metadata = base_metadata @ extra_metadata in
+                [%log info]
+                  "Failure when sending block with state hash $state_hash to \
+                   uptime service at URL $url, attempt %d of %d, retrying"
+                  attempt max_attempts ~metadata ) ;
+              succeeded || unretriable
+          | Error exn ->
+              [%log warn]
+                "Error when sending block with state hash $state_hash to \
+                 uptime service at URL $url"
+                ~metadata:
+                  [ ("state_hash", State_hash.to_yojson state_hash)
+                  ; ("url", `String (Uri.to_string url))
+                  ; ("payload", json)
+                  ; ("error", `String (Exn.to_string exn))
+                  ] ;
+              (* retry *)
+              false
+        in
+        match%map.Deferred Interruptible.force interruptible with
+        | Ok succeeded ->
+            succeeded
+        | Error _ ->
             [%log error]
-              "Got unrecoverable response from update service backend at URL \
-               $url, not retrying to send block"
+              "In uptime service, POST of block with state hash $state_hash \
+               was interrupted"
               ~metadata:
                 [ ("state_hash", State_hash.to_yojson state_hash)
-                ; ("url", `String (Uri.to_string url))
-                ; ("http_code", `Int status_code)
-                ; ("http_error", `String status_string)
                 ; ("payload", json)
-                ]
-          else if attempt >= max_attempts then
-            let base_metadata =
-              [ ("state_hash", State_hash.to_yojson state_hash)
-              ; ("url", `String (Uri.to_string url))
-              ; ("http_code", `Int status_code)
-              ; ("http_error", `String status_string)
-              ; ("payload", json)
-              ]
-            in
-            let extra_metadata = metadata_of_body body in
-            let metadata = base_metadata @ extra_metadata in
-            [%log error]
-              "After %d attempts, failed to send block with state hash \
-               $state_hash to uptime service at URL $url, no more retries"
-              max_attempts ~metadata
-          else
-            let base_metadata =
-              [ ("state_hash", State_hash.to_yojson state_hash)
-              ; ("url", `String (Uri.to_string url))
-              ; ("http_code", `Int status_code)
-              ; ("http_error", `String status_string)
-              ]
-            in
-            let extra_metadata = metadata_of_body body in
-            let metadata = base_metadata @ extra_metadata in
-            [%log info]
-              "Failure when sending block with state hash $state_hash to \
-               uptime service at URL $url, attempt %d of %d, retrying"
-              attempt max_attempts ~metadata ) ;
-          succeeded || unretriable
-      | Error exn ->
-          [%log warn]
-            "Error when sending block with state hash $state_hash to uptime \
-             service at URL $url"
-            ~metadata:
-              [ ("state_hash", State_hash.to_yojson state_hash)
-              ; ("url", `String (Uri.to_string url))
-              ; ("payload", json)
-              ; ("error", `String (Exn.to_string exn))
-              ] ;
-          (* retry *)
-          false
-    in
-    match%map.Deferred Interruptible.force interruptible with
-    | Ok succeeded ->
-        succeeded
-    | Error _ ->
-        [%log error]
-          "In uptime service, POST of block with state hash $state_hash was \
-           interrupted"
-          ~metadata:
-            [ ("state_hash", State_hash.to_yojson state_hash)
-            ; ("payload", json)
-            ] ;
-        (* interrupted, don't want to retry, claim success *)
-        true
-  in
-  let rec go attempt =
-    let open Deferred.Let_syntax in
-    let%bind succeeded = run_attempt attempt in
-    if succeeded then Deferred.return ()
-    else if attempt < max_attempts then (
-      let%bind () = Async.after (Time.Span.of_sec attempt_pause_sec) in
-      [%log info]
-        "In uptime service, retrying to send block, attempt %d of %d attempts \
-         allowed"
-        attempt max_attempts ;
-      go (attempt + 1) )
-    else Deferred.unit
-  in
-  make_interruptible (go 1)
+                ] ;
+            (* interrupted, don't want to retry, claim success *)
+            true
+      in
+      let rec go attempt =
+        let open Deferred.Let_syntax in
+        let%bind succeeded = run_attempt attempt in
+        if succeeded then Deferred.return ()
+        else if attempt < max_attempts then (
+          let%bind () = Async.after (Time.Span.of_sec attempt_pause_sec) in
+          [%log info]
+            "In uptime service, retrying to send block, attempt %d of %d \
+             attempts allowed"
+            attempt max_attempts ;
+          go (attempt + 1) )
+        else Deferred.unit
+      in
+      make_interruptible (go 1)
 
 let block_base64_of_breadcrumb breadcrumb =
   let external_transition =
