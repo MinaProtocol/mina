@@ -5,7 +5,6 @@ import (
 	itn "block_producers_uptime/itn_uptime_analyzer"
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -17,8 +16,13 @@ import (
 func main() {
 
 	// Get the time of execution
-	// currentTime := itn.GetCurrentTime()
-	currentTime := time.Date(2023, 06, 23, 13, 00, 0, 0, time.UTC)
+	currentTime := itn.GetCurrentTime()
+
+	// Set up sync period of type int representing minutes
+	syncPeriod := 15
+
+	// Set up execution interval type int representing hours
+	executionInterval := 12
 
 	// Setting up logging for application
 
@@ -67,9 +71,9 @@ func main() {
 
 	for _, identity := range identities {
 		if itn.IsFirstHalfOfTheDay(currentTime) {
-			identity.GetUptimeOfTwoDays(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime)
+			identity.GetUptimeOfTwoDays(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime, syncPeriod, executionInterval)
 		} else {
-			identity.GetUptimeOfToday(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime)
+			identity.GetUptimeOfToday(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime, syncPeriod, executionInterval)
 		}
 
 		exactMatch, rowIndex, firstEmptyRow := identity.GetCell(appCfg, sheetsService, log, sheetTitle)

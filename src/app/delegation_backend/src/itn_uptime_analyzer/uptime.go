@@ -18,10 +18,14 @@ import (
 // To the uptime array, the length of which determines if the node was up or not
 // Length of 47 is enough
 
-func (identity Identity) GetUptimeOfToday(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time) {
+func (identity Identity) GetUptimeOfToday(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, syncPeriod int, executionInterval int) {
 
 	currentDate := currentTime.Format("2006-01-02")
 	lastExecutionTime := GetLastExecutionTime(config, sheet, log, sheetTitle, currentTime)
+
+	numberOfSubmissionsNeeded := (60 / syncPeriod) * executionInterval
+
+	fmt.Println(numberOfSubmissionsNeeded)
 
 	prefixToday := strings.Join([]string{ctx.Prefix, "submissions", currentDate}, "/")
 
@@ -89,7 +93,7 @@ func (identity Identity) GetUptimeOfToday(config AppConfig, sheet *sheets.Servic
 							log.Fatalf("Error parsing time: %v", err)
 						}
 
-						if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(10 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(20 * time.Minute))) {
+						if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(time.Duration(syncPeriod-5) * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(time.Duration(syncPeriod+5) * time.Minute))) {
 							uptimeToday = append(uptimeToday, true)
 							lastSubmissionTimeString = submissionDataToday.CreatedAt
 						} else if lastSubmissionTimeString == "" {
@@ -111,7 +115,7 @@ func (identity Identity) GetUptimeOfToday(config AppConfig, sheet *sheets.Servic
 							log.Fatalf("Error parsing time: %v", err)
 						}
 
-						if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(10 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(20 * time.Minute))) {
+						if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(time.Duration(syncPeriod-5) * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(time.Duration(syncPeriod+5) * time.Minute))) {
 							uptimeToday = append(uptimeToday, true)
 							lastSubmissionTimeString = submissionDataToday.CreatedAt
 						} else if lastSubmissionTimeString == "" {
@@ -123,7 +127,9 @@ func (identity Identity) GetUptimeOfToday(config AppConfig, sheet *sheets.Servic
 			}
 		}
 
-		uptimePercent := (float64(len(uptimeToday)) / 47.0) * 100
+		fmt.Println(len(uptimeToday))
+
+		uptimePercent := (float64(len(uptimeToday)) / float64(numberOfSubmissionsNeeded)) * 100
 		if uptimePercent > 100.00 {
 			uptimePercent = 100.00
 		}
@@ -133,7 +139,7 @@ func (identity Identity) GetUptimeOfToday(config AppConfig, sheet *sheets.Servic
 
 // This function does the same as the one above only that it calculates the difference between the time elapsed
 // today and 12 hours and enters the folder for the previous day aswell
-func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time) {
+func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, syncPeriod int, executionInterval int) {
 
 	currentDate := currentTime.Format("2006-01-02")
 	executionDifference, err := time.ParseDuration("12h")
@@ -142,6 +148,10 @@ func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Serv
 	}
 	yesterdaysTime := currentTime.Add(-executionDifference)
 	yesterdaysDate := yesterdaysTime.Format("2006-01-02")
+
+	numberOfSubmissionsNeeded := (60 / syncPeriod) * executionInterval
+
+	fmt.Println(numberOfSubmissionsNeeded)
 
 	lastExecutionTime := GetLastExecutionTime(config, sheet, log, sheetTitle, currentTime)
 
@@ -220,7 +230,7 @@ func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Serv
 							log.Fatalf("Error parsing time: %v", err)
 						}
 
-						if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(10 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(20 * time.Minute))) {
+						if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(time.Duration(syncPeriod-5) * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(time.Duration(syncPeriod+5) * time.Minute))) {
 							uptimeYesterday = append(uptimeYesterday, true)
 							lastSubmissionTimeString = submissionDataYesterday.CreatedAt
 						} else if lastSubmissionTimeString == "" {
@@ -242,7 +252,7 @@ func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Serv
 							log.Fatalf("Error parsing time: %v", err)
 						}
 
-						if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(10 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(20 * time.Minute))) {
+						if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(time.Duration(syncPeriod-5) * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(time.Duration(syncPeriod+5) * time.Minute))) {
 							uptimeYesterday = append(uptimeYesterday, true)
 							lastSubmissionTimeString = submissionDataYesterday.CreatedAt
 						} else if lastSubmissionTimeString == "" {
@@ -306,7 +316,7 @@ func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Serv
 								log.Fatalf("Error parsing time: %v", err)
 							}
 
-							if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(10 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(20 * time.Minute))) {
+							if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(time.Duration(syncPeriod-5) * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(time.Duration(syncPeriod+5) * time.Minute))) {
 								uptimeToday = append(uptimeToday, true)
 								lastSubmissionTimeString = submissionDataToday.CreatedAt
 							} else if lastSubmissionTimeString == "" {
@@ -328,7 +338,7 @@ func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Serv
 								log.Fatalf("Error parsing time: %v", err)
 							}
 
-							if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(10 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(20 * time.Minute))) {
+							if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(time.Duration(syncPeriod-5) * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(time.Duration(syncPeriod+5) * time.Minute))) {
 								uptimeToday = append(uptimeToday, true)
 								lastSubmissionTimeString = submissionDataToday.CreatedAt
 							} else if lastSubmissionTimeString == "" {
@@ -340,7 +350,9 @@ func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Serv
 				}
 			}
 
-			uptimePercent := (float64(len(uptimeToday)+len(uptimeYesterday)) / 47.0) * 100
+			fmt.Println(len(uptimeToday))
+
+			uptimePercent := (float64(len(uptimeToday)+len(uptimeYesterday)) / float64(numberOfSubmissionsNeeded)) * 100
 			if uptimePercent > 100.00 {
 				uptimePercent = 100.00
 			}
