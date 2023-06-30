@@ -23,5 +23,6 @@ let create ~of_int =
     ; xor_selector = None
     ; rot_selector = None
     ; lookup_aggregation = None
+    ; lookup_table = None
     ; lookup = None
     }

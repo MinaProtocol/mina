@@ -308,7 +308,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     | Coefficient i ->
         get_eval coefficients.(i)
     | LookupTable ->
-        get_eval (Opt.value_exn e.lookup).table
+        get_eval (Opt.value_exn e.lookup_table)
     | LookupSorted i ->
         let sorted = (Opt.value_exn e.lookup).sorted in
         if i < Array.length sorted then get_eval sorted.(i)
