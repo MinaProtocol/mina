@@ -316,7 +316,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
           (* Return zero padding when the index is larger than sorted *)
           F.zero
     | LookupAggreg ->
-        get_eval (Opt.value_exn e.lookup).aggreg
+        get_eval (Opt.value_exn e.lookup_aggregation)
     | LookupRuntimeTable ->
         get_eval (Opt.value_exn (Opt.value_exn e.lookup).runtime)
     | LookupKindIndex (Lookup | Xor | RangeCheck | ForeignFieldMul) ->

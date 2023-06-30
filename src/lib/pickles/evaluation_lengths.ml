@@ -22,5 +22,6 @@ let create ~of_int =
     ; foreign_field_mul_selector = None
     ; xor_selector = None
     ; rot_selector = None
+    ; lookup_aggregation = None
     ; lookup = None
     }

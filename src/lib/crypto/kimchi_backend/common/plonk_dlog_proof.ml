@@ -230,9 +230,10 @@ module Make (Inputs : Inputs_intf) = struct
     }
 
   let lookup_eval_of_backend
-      ({ sorted; aggreg; table; runtime } : 'f Kimchi_types.lookup_evaluations)
-      : _ Pickles_types.Plonk_types.Evals.Lookup.t =
-    { sorted; aggreg; table; runtime }
+      ({ sorted; aggreg = _; table; runtime } :
+        'f Kimchi_types.lookup_evaluations ) :
+      _ Pickles_types.Plonk_types.Evals.Lookup.t =
+    { sorted; table; runtime }
 
   let eval_of_backend
       ({ w
@@ -270,6 +271,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; foreign_field_mul_selector
     ; xor_selector
     ; rot_selector
+    ; lookup_aggregation = Option.map lookup ~f:(fun { aggreg; _ } -> aggreg)
     ; lookup = Option.map ~f:lookup_eval_of_backend lookup
     }
 
@@ -307,10 +309,12 @@ module Make (Inputs : Inputs_intf) = struct
         }
       ~openings:{ proof; evals; ft_eval1 = t.ft_eval1 }
 
-  let lookup_eval_to_backend
-      { Pickles_types.Plonk_types.Evals.Lookup.sorted; aggreg; table; runtime }
-      : 'f Kimchi_types.lookup_evaluations =
-    { sorted; aggreg; table; runtime }
+  let lookup_eval_to_backend ~aggreg
+      { Pickles_types.Plonk_types.Evals.Lookup.sorted; table; runtime } :
+      'f Kimchi_types.lookup_evaluations option =
+    let open Option.Let_syntax in
+    let%map aggreg = aggreg in
+    { Kimchi_types.sorted; aggreg; table; runtime }
 
   let eval_to_backend
       { Pickles_types.Plonk_types.Evals.w
@@ -329,6 +333,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; foreign_field_mul_selector
       ; xor_selector
       ; rot_selector
+      ; lookup_aggregation
       ; lookup
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
@@ -347,7 +352,10 @@ module Make (Inputs : Inputs_intf) = struct
     ; foreign_field_mul_selector
     ; xor_selector
     ; rot_selector
-    ; lookup = Option.map ~f:lookup_eval_to_backend lookup
+    ; lookup =
+        Option.bind
+          ~f:(lookup_eval_to_backend ~aggreg:lookup_aggregation)
+          lookup
     }
 
   let vec_to_array (type t elt)
