@@ -251,6 +251,8 @@ module Snark_worker = struct
     snark_worker_process
 
   let start t =
+    O1trace.thread "snark_worker"
+    @@ fun () ->
     match t.processes.snark_worker with
     | `On ({ process = process_ivar; kill_ivar; _ }, _) ->
         [%log' debug t.config.logger] !"Starting snark worker process" ;

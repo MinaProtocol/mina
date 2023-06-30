@@ -159,7 +159,8 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
   every ~start:(after five_slots) ~continue_on_error:true five_slots
   @@ fun () ->
   don't_wait_for
-  @@
+  @@ O1trace.thread "node_status_service"
+  @@ fun () ->
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       [%log info] "Transition frontier not available for node status service" ;

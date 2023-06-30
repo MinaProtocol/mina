@@ -32,6 +32,7 @@
    mina_block
    mina_state
    consensus
+   o1trace
    )
   (preprocess (pps ppx_jane ppx_deriving.std ppx_mina ppx_version))
   (instrumentation (backend bisect_ppx))
