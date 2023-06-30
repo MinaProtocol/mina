@@ -5,6 +5,7 @@ import (
 	itn "block_producers_uptime/itn_uptime_analyzer"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -14,6 +15,10 @@ import (
 )
 
 func main() {
+
+	// Get the time of execution
+	// currentTime := itn.GetCurrentTime()
+	currentTime := time.Date(2023, 06, 23, 13, 00, 0, 0, time.UTC)
 
 	// Setting up logging for application
 
@@ -51,20 +56,21 @@ func main() {
 		log.Fatalf("Error creating Sheets service: %v", err)
 	}
 
-	sheetTitle, err := itn.IdentifyWeek(appCfg, sheetsService, log)
+	sheetTitle, err := itn.IdentifyWeek(appCfg, sheetsService, log, currentTime)
 	if err != nil {
 		log.Fatalf("Error identifying week: %v", err)
 	}
 
-	identities := itn.CreateIdentities(appCfg, sheetsService, awsctx, log, sheetTitle)
-
-	fmt.Println(identities)
+	identities := itn.CreateIdentities(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime)
 
 	// Go over identities and calculate uptime
 
 	for _, identity := range identities {
-
-		identity.GetUptime(appCfg, sheetsService, awsctx, log, sheetTitle)
+		if itn.IsFirstHalfOfTheDay(currentTime) {
+			identity.GetUptimeOfTwoDays(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime)
+		} else {
+			identity.GetUptimeOfToday(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime)
+		}
 
 		exactMatch, rowIndex, firstEmptyRow := identity.GetCell(appCfg, sheetsService, log, sheetTitle)
 
@@ -80,6 +86,6 @@ func main() {
 		}
 	}
 
-	itn.MarkExecution(appCfg, sheetsService, log, sheetTitle)
+	itn.MarkExecution(appCfg, sheetsService, log, sheetTitle, currentTime)
 
 }

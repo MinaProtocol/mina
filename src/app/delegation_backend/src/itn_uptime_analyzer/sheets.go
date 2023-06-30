@@ -186,12 +186,11 @@ func GetSheets(config AppConfig, client *sheets.Service, log *logging.ZapEventLo
 
 // Tracks the date of execution on the top row of the spreadsheet
 
-func MarkExecution(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string) {
+func MarkExecution(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time) {
 	readRange := fmt.Sprintf("%s!A%d:Z%d", sheetTitle, 1, 1)
 	spId := config.AnalyzerOutputGsheetId
 
-	currentTime := GetCurrentTime()
-	lastExecutionTime := GetLastExecutionTime(config, client, log, sheetTitle)
+	lastExecutionTime := GetLastExecutionTime(config, client, log, sheetTitle, currentTime)
 
 	timeInterval := strings.Join([]string{lastExecutionTime.Format(time.RFC3339), currentTime.Format(time.RFC3339)}, " - ")
 
