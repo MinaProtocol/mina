@@ -283,6 +283,15 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
   let%bind () = after (Time.Span.of_sec initial_delay_sec) in
   retry num_tries
 
+let unlock_account ~logger node_uri ~public_key ~password =
+  let unlock_account_obj =
+    Graphql.Unlock_account.(
+      make
+      @@ makeVariables ~password ~public_key ())
+  in
+  exec_graphql_request ~logger ~node_uri ~initial_delay_sec:0.
+    ~query_name:"unlock_sender_account_graphql" unlock_account_obj
+
 let get_peer_id ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
@@ -605,16 +614,7 @@ let send_online_payment ~logger node_uri ~sender_pub_key ~receiver_pub_key
   in
   [%log info] "send_payment: unlocking account"
     ~metadata:[ ("sender_pk", `String sender_pk_str) ] ;
-  let unlock_sender_account_graphql () =
-    let unlock_account_obj =
-      Graphql.Unlock_account.(
-        make
-        @@ makeVariables ~password:node_password ~public_key:sender_pub_key ())
-    in
-    exec_graphql_request ~logger ~node_uri ~initial_delay_sec:0.
-      ~query_name:"unlock_sender_account_graphql" unlock_account_obj
-  in
-  let%bind _ = unlock_sender_account_graphql () in
+  let%bind _ = unlock_account ~logger node_uri ~password:node_password ~public_key:sender_pub_key in
   let send_payment_graphql () =
     let input =
       Mina_graphql.Types.Input.SendPaymentInput.make_input ~from:sender_pub_key
@@ -740,17 +740,7 @@ let send_delegation ~logger node_uri ~sender_pub_key ~receiver_pub_key ~fee =
   in
   [%log info] "send_delegation: unlocking account"
     ~metadata:[ ("sender_pk", `String sender_pk_str) ] ;
-  let unlock_sender_account_graphql () =
-    let unlock_account_obj =
-      Graphql.Unlock_account.(
-        make
-        @@ makeVariables ~password:"naughty blue worm"
-             ~public_key:sender_pub_key ())
-    in
-    exec_graphql_request ~logger ~node_uri
-      ~query_name:"unlock_sender_account_graphql" unlock_account_obj
-  in
-  let%bind _ = unlock_sender_account_graphql () in
+  let%bind _ = unlock_account ~logger node_uri ~password:node_password ~public_key:sender_pub_key in
   let send_delegation_graphql () =
     let input =
       Mina_graphql.Types.Input.SendDelegationInput.make_input
@@ -777,6 +767,13 @@ let send_delegation ~logger node_uri ~sender_pub_key ~receiver_pub_key ~fee =
       ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
       ] ;
   res
+
+let get_nonce ~logger node_uri ~public_key = 
+  let open Deferred.Let_syntax in
+  let%bind querry_result =
+      get_account_data ~logger node_uri ~account_id:(Mina_base.Account_id.of_public_key public_key)
+  in
+  Deferred.return (Or_error.map querry_result ~f:(fun querry_result -> querry_result.nonce))
 
 let must_send_delegation ~logger node_uri ~sender_pub_key
     ~(receiver_pub_key : Account.key) ~fee =

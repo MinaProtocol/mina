@@ -16,8 +16,13 @@
    base_quickcheck
    ppx_inline_test.config
    graphql-async
+   integers
+   uri
+   logger
    ;;local libraries
    pickles
+   integration_test_lib
+   unsigned_extended
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    random_oracle

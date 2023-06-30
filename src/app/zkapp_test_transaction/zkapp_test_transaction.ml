@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 open Mina_base
+open Signature_lib
 open Cli_lib.Arg_type
 open Zkapp_test_transaction_lib.Commands
 
@@ -617,6 +618,184 @@ let test_zkapp_with_genesis_ledger =
        in
        test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file ))
 
+
+let gen_keys count =
+  Quickcheck.random_value ~seed:`Nondeterministic
+    (Quickcheck.Generator.list_with_length count Public_key.Compressed.gen)
+
+let output_keys =
+  let open Command.Let_syntax in
+  Command.basic ~summary:"Generate the given number of public keys on stdout"
+    (let%map_open count =
+       flag "--count" ~aliases:[ "count" ] ~doc:"NUM Number of keys to generate"
+         (required int)
+     in
+     fun () ->
+       List.iter (gen_keys count) ~f:(fun pk ->
+           Format.printf "%s@." (Public_key.Compressed.to_base58_check pk) ) )
+
+let output_cmds =
+  let open Command.Let_syntax in
+  Command.basic ~summary:"Generate the given number of public keys on stdout"
+    (let%map_open count =
+       flag "--count" ~aliases:[ "count" ] ~doc:"NUM Number of keys to generate"
+         (required int)
+     and txns_per_block =
+       flag "--txn-capacity-per-block"
+         ~aliases:[ "txn-capacity-per-block" ]
+         ~doc:
+           "NUM Transaction capacity per block. Used for rate limiting. \
+            (default: 128)"
+         (optional_with_default 128 int)
+     and slot_time =
+       flag "--slot-time" ~aliases:[ "slot-time" ]
+         ~doc:
+           "NUM_MILLISECONDS Slot duration in milliseconds. (default: 180000)"
+         (optional_with_default 180000 int)
+     and fill_rate =
+       flag "--fill-rate" ~aliases:[ "fill-rate" ]
+         ~doc:"FILL_RATE Fill rate (default: 0.75)"
+         (optional_with_default 0.75 float)
+     and rate_limit =
+       flag "--apply-rate-limit" ~aliases:[ "apply-rate-limit" ]
+         ~doc:
+           "TRUE/FALSE Whether to emit sleep commands between commands to \
+            enforce sleeps (default: true)"
+         (optional_with_default true bool)
+     and rate_limit_level =
+       flag "--rate-limit-level" ~aliases:[ "rate-limit-level" ]
+         ~doc:
+           "NUM Number of transactions that can be sent in a time interval \
+            before hitting the rate limit (default: 200)"
+         (optional_with_default 200 int)
+     and rate_limit_interval =
+       flag "--rate-limit-interval" ~aliases:[ "rate-limit-interval" ]
+         ~doc:
+           "NUM_MILLISECONDS Interval that the rate-limiter is applied over \
+            (default: 300000)"
+         (optional_with_default 300000 int)
+     and sender_key =
+       flag "--sender-pk" ~aliases:[ "sender-pk" ]
+         ~doc:"PUBLIC_KEY Public key to send the transactions from"
+         (required string)
+     in
+     fun () ->
+       let rate_limit =
+         if rate_limit then
+           let slot_limit =
+             Float.(
+               of_int txns_per_block /. of_int slot_time *. fill_rate
+               *. of_int rate_limit_interval)
+           in
+           let limit = min (Float.to_int slot_limit) rate_limit_level in
+           Some limit
+         else None
+       in
+       let batch_count = ref 0 in
+       List.iter (gen_keys count) ~f:(fun pk ->
+           Option.iter rate_limit ~f:(fun rate_limit ->
+               if !batch_count >= rate_limit then (
+                 Format.printf "sleep %f@."
+                   Float.(of_int rate_limit_interval /. 1000.) ;
+                 batch_count := 0 )
+               else incr batch_count ) ;
+           Format.printf
+             "mina client send-payment --amount 1 --receiver %s --sender %s@."
+             (Public_key.Compressed.to_base58_check pk)
+             sender_key ) )
+
+let output_there_and_back_cmds =
+  let open Command.Let_syntax in
+  Command.async
+    ~summary:
+      "Generate commands to send funds from a single account to many accounts, \
+       then transfer them back again. The 'back again' commands are expressed \
+       as GraphQL commands, so that we can pass a signature, rather than \
+       having to load the secret key for each account"
+    (let%map_open num_txn_per_acct =
+       flag "--num-txn-per-acct" ~aliases:[ "num-txn-per-acct" ]
+         ~doc:"NUM Number of transactions to run for each generated key"
+         (required int)
+     and txns_per_block =
+       flag "--txn-capacity-per-block"
+         ~aliases:[ "txn-capacity-per-block" ]
+         ~doc:
+           "NUM Number of transaction that a single block can hold.  Used for \
+            rate limiting (default: 128)"
+         (optional_with_default 128 int)
+     and txn_fee_option =
+       flag "--txn-fee" ~aliases:[ "txn-fee" ]
+         ~doc:
+           "FEE_AMOUNT Fee to set, a default is provided if this is not present"
+         (optional string)
+     and slot_time =
+       flag "--slot-time" ~aliases:[ "slot-time" ]
+         ~doc:
+           "NUM_MILLISECONDS Slot duration in milliseconds. Used for rate \
+            limiting (default: 180000)"
+         (optional_with_default 180000 int)
+     and fill_rate =
+       flag "--fill-rate" ~aliases:[ "fill-rate" ]
+         ~doc:
+           "FILL_RATE The average rate of blocks per slot. Used for rate \
+            limiting (default: 0.75)"
+         (optional_with_default 0.75 float)
+     and rate_limit =
+       flag "--apply-rate-limit" ~aliases:[ "apply-rate-limit" ]
+         ~doc:
+           "TRUE/FALSE Whether to emit sleep commands between commands to \
+            enforce sleeps (default: true)"
+         (optional_with_default true bool)
+     and rate_limit_level =
+       flag "--rate-limit-level" ~aliases:[ "rate-limit-level" ]
+         ~doc:
+           "NUM Number of transactions that can be sent in a time interval \
+            before hitting the rate limit. Used for rate limiting (default: \
+            200)"
+         (optional_with_default 200 int)
+     and rate_limit_interval =
+       flag "--rate-limit-interval" ~aliases:[ "rate-limit-interval" ]
+         ~doc:
+           "NUM_MILLISECONDS Interval that the rate-limiter is applied over. \
+            Used for rate limiting (default: 300000)"
+         (optional_with_default 300000 int)
+     and origin_sender_secret_key_path =
+       flag "--origin-sender-sk-path"
+         ~aliases:[ "origin-sender-sk-path" ]
+         ~doc:"PRIVATE_KEY Path to Private key to send the transactions from"
+         (required string)
+     and origin_sender_secret_key_pw_option =
+       flag "--origin-sender-sk-pw" ~aliases:[ "origin-sender-sk-pw" ]
+         ~doc:
+           "PRIVATE_KEY Password to Private key to send the transactions from, \
+            if this is not present then we use the env var MINA_PRIVKEY_PASS"
+         (optional string)
+     and returner_secret_key_path =
+       flag "--returner-sk-path" ~aliases:[ "returner-sk-path" ]
+         ~doc:
+           "PRIVATE_KEY Path to Private key of account that returns the \
+            transactions"
+         (required string)
+     and returner_secret_key_pw_option =
+       flag "--returner-sk-pw" ~aliases:[ "returner-sk-pw" ]
+         ~doc:
+           "PRIVATE_KEY Password to Private key account that returns the \
+            transactions, if this is not present then we use the env var \
+            MINA_PRIVKEY_PASS"
+         (optional string)
+     and graphql_target_node_option =
+       flag "--graphql-target-node" ~aliases:[ "graphql-target-node" ]
+         ~doc:
+           "URL The graphql node to send graphl commands to.  must be in \
+            format `<ip>:<port>`.  default is `127.0.0.1:3085`"
+         (optional string)
+     in
+     there_and_back_again ~num_txn_per_acct ~txns_per_block ~txn_fee_option
+       ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
+       ~origin_sender_secret_key_path ~origin_sender_secret_key_pw_option
+       ~returner_secret_key_path ~returner_secret_key_pw_option
+       ~graphql_target_node_option )
+
 let txn_commands =
   [ ("create-zkapp-account", create_zkapp_account)
   ; ("upgrade-zkapp", upgrade_zkapp)
@@ -631,7 +810,25 @@ let txn_commands =
   ; ("test-zkapp-with-genesis-ledger", test_zkapp_with_genesis_ledger)
   ]
 
+let load_commands  =
+       [ ("gen-keys", output_keys)
+       ; ("gen-txns", output_cmds)
+       ; ("gen-there-and-back-txns", output_there_and_back_cmds)
+       ]
+
+let commands =
+  [ ( "zkapps"
+    , Command.group ~summary:"zkapps related commands"
+    txn_commands )
+    ; ( "load"
+    , Command.group ~summary:"load related commands"
+    load_commands )
+  ]
+
+
+
+
 let () =
   Command.run
     (Command.group ~summary:"ZkApp test transaction"
-       ~preserve_subcommand_order:() txn_commands )
+       ~preserve_subcommand_order:() commands )
