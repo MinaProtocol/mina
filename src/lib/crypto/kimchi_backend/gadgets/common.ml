@@ -186,7 +186,8 @@ let field_of_hex (type f)
   bignum_bigint_to_field (module Circuit) @@ bignum_bigint_of_hex hex
 
 (* Negative test helper *)
-let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
+let is_error (func : unit -> _) =
+  Result.is_error (Or_error.try_with ~here:[%here] func)
 
 (*********)
 (* Tests *)
