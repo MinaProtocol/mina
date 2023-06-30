@@ -72,8 +72,8 @@ func IdentifyWeek(config AppConfig, client *sheets.Service, log *logging.ZapEven
 
 	var lastFilledColumn int = len(resp.Values[0]) - 1
 
-	currentDate := currentTime.Format("2006-01-02")
-	oneWeekLater := currentTime.Add(7 * 24 * time.Hour).Format("2006-01-02")
+	currentDate := currentTime.UTC().Format("2006-01-02")
+	oneWeekLater := currentTime.Add(7 * 24 * time.Hour).UTC().Format("2006-01-02")
 	sheetTitle := strings.Join([]string{currentDate, oneWeekLater}, " - ")
 
 	if lastFilledColumn >= 14 {

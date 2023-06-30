@@ -20,7 +20,7 @@ import (
 
 func (identity Identity) GetUptimeOfToday(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, syncPeriod int, executionInterval int) {
 
-	currentDate := currentTime.Format("2006-01-02")
+	currentDate := currentTime.UTC().Format("2006-01-02")
 	lastExecutionTime := GetLastExecutionTime(config, sheet, log, sheetTitle, currentTime)
 
 	numberOfSubmissionsNeeded := (60 / syncPeriod) * executionInterval
@@ -141,13 +141,13 @@ func (identity Identity) GetUptimeOfToday(config AppConfig, sheet *sheets.Servic
 // today and 12 hours and enters the folder for the previous day aswell
 func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, syncPeriod int, executionInterval int) {
 
-	currentDate := currentTime.Format("2006-01-02")
+	currentDate := currentTime.UTC().Format("2006-01-02")
 	executionDifference, err := time.ParseDuration("12h")
 	if err != nil {
 		log.Fatalf("Failed to parse duration of execution interval: %v", err)
 	}
 	yesterdaysTime := currentTime.Add(-executionDifference)
-	yesterdaysDate := yesterdaysTime.Format("2006-01-02")
+	yesterdaysDate := yesterdaysTime.UTC().Format("2006-01-02")
 
 	numberOfSubmissionsNeeded := (60 / syncPeriod) * executionInterval
 

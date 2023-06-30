@@ -192,7 +192,7 @@ func MarkExecution(config AppConfig, client *sheets.Service, log *logging.ZapEve
 
 	lastExecutionTime := GetLastExecutionTime(config, client, log, sheetTitle, currentTime)
 
-	timeInterval := strings.Join([]string{lastExecutionTime.Format(time.RFC3339), currentTime.Format(time.RFC3339)}, " - ")
+	timeInterval := strings.Join([]string{lastExecutionTime.UTC().Format(time.RFC3339), currentTime.UTC().Format(time.RFC3339)}, " - ")
 
 	resp, err := client.Spreadsheets.Values.Get(spId, readRange).Do()
 	if err != nil {

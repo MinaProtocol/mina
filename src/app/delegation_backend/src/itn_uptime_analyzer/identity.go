@@ -22,7 +22,7 @@ type Identity map[string]string
 
 func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time) map[string]Identity {
 
-	currentDate := currentTime.Format("2006-01-02")
+	currentDate := currentTime.UTC().Format("2006-01-02")
 	lastExecutionTime := GetLastExecutionTime(config, sheet, log, sheetTitle, currentTime)
 
 	prefixCurrent := strings.Join([]string{ctx.Prefix, "submissions", currentDate}, "/")
