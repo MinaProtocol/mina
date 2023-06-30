@@ -12,6 +12,7 @@
    async_kernel
    uri
    integers
+   base.caml
    ;; local libraries
    network_peer
    mina_base

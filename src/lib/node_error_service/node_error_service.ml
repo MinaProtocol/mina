@@ -69,7 +69,7 @@ let send_node_error_report ~logger ~url report =
       Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
     in
     match%map
-      Async.try_with (fun () ->
+      Async.try_with ~here:[%here] (fun () ->
           Cohttp_async.Client.post ~headers
             ~body:(Cohttp_async.Body.of_string json_string)
             url )

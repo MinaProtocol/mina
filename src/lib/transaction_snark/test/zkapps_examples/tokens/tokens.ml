@@ -131,7 +131,7 @@ let%test_module "Tokens test" =
              }
       in
       match
-        Or_error.try_with (fun () ->
+        Or_error.try_with ~here:[%here] (fun () ->
             Async.Thread_safe.block_on_async_exn
             @@ Zkapps_tokens.child_forest pk token_id subtree )
       with
