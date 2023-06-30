@@ -509,7 +509,9 @@ let genesis_breadcrumb_creator ~context:(module Context : CONTEXT) prover =
   let genesis_breadcrumb_ivar = Ivar.create () in
   fun () ->
     if !started then Ivar.read genesis_breadcrumb_ivar
-    else (
+    else
+      O1trace.thread "genesis_breadcrumb_creator"
+      @@ fun () ->
       started := true ;
       let max_num_retries = 3 in
       let rec go retries =
@@ -534,13 +536,15 @@ let genesis_breadcrumb_creator ~context:(module Context : CONTEXT) prover =
               Ivar.fill genesis_breadcrumb_ivar (Error err) ;
               return (Error err) )
       in
-      go max_num_retries )
+      go max_num_retries
 
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
     ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
     ~block_reward_threshold ~block_produced_bvar
     (scheduled_time, block_data, winner_pubkey) =
+  O1trace.thread "produce"
+  @@ fun () ->
   let module Breadcrumb = Transition_frontier.Breadcrumb in
   let open Context in
   let rejected_blocks_logger =
@@ -875,25 +879,37 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
     ~vrf_evaluator ~time_controller ~coinbase_receiver ~frontier_reader
     ~set_next_producer_timing ~transition_frontier ~vrf_evaluation_state
     ~epoch_data_for_vrf ~ledger_snapshot i slot =
-  O1trace.thread "block_producer_iteration"
+  O1trace.thread
+    ( "block_producer_iteration "
+    ^ Unsigned.UInt32.to_string i
+    ^ " "
+    ^ Mina_numbers.Global_slot_since_hard_fork.to_string slot )
   @@ fun () ->
   let consensus_state =
+    O1trace.sync_thread "block_producer_iteration: sync 0"
+    @@ fun () ->
     Transition_frontier.(
       best_tip transition_frontier |> Breadcrumb.consensus_state)
   in
   let i' =
+    O1trace.sync_thread "block_producer_iteration: sync 1"
+    @@ fun () ->
     Mina_numbers.Length.succ
       epoch_data_for_vrf.Consensus.Data.Epoch_data_for_vrf.epoch
   in
   let new_global_slot = epoch_data_for_vrf.global_slot in
   let open Context in
   let%bind () =
+    O1trace.thread "block_producer_iteration: 1"
+    @@ fun () ->
     if Mina_numbers.Length.(i' > i) then
       Vrf_evaluation_state.update_epoch_data ~vrf_evaluator ~epoch_data_for_vrf
         ~logger vrf_evaluation_state
     else Deferred.unit
   in
   let%bind () =
+    O1trace.thread "block_producer_iteration: 2"
+    @@ fun () ->
     (*Poll once every slot if the evaluation for the epoch is not completed or the evaluation is completed*)
     if
       Mina_numbers.Global_slot_since_hard_fork.(new_global_slot > slot)
@@ -926,14 +942,17 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
           schedule_next_check epoch_end_time
       | At last_slot ->
           set_next_producer_timing (`Evaluating_vrf last_slot) consensus_state ;
-          poll ()
+          O1trace.thread "block_producer_iteration: poll 1" @@ fun () -> poll ()
       | Start ->
           set_next_producer_timing (`Evaluating_vrf new_global_slot)
             consensus_state ;
-          poll () )
+          O1trace.thread "block_producer_iteration: poll 2" @@ fun () -> poll ()
+      )
   | Some slot_won -> (
       let winning_global_slot = slot_won.global_slot in
       let slot, epoch =
+        O1trace.sync_thread "bp_sync_0"
+        @@ fun () ->
         let t =
           Consensus.Data.Consensus_time.of_global_slot winning_global_slot
             ~constants:consensus_constants
@@ -947,20 +966,28 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
                 to_yojson @@ of_uint32 slot) )
           ; ("epoch", Mina_numbers.Length.to_yojson epoch)
           ] ;
-      let now = Block_time.now time_controller in
-      let curr_global_slot =
-        Consensus.Data.Consensus_time.(
-          of_time_exn ~constants:consensus_constants now |> to_global_slot)
+      let now, curr_global_slot, winner_pk, data =
+        O1trace.sync_thread "bp_sync_1"
+        @@ fun () ->
+        let now = Block_time.now time_controller in
+        let curr_global_slot =
+          Consensus.Data.Consensus_time.(
+            of_time_exn ~constants:consensus_constants now |> to_global_slot)
+        in
+        let winner_pk = fst slot_won.delegator in
+        let data =
+          Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
+            ~coinbase_receiver:!coinbase_receiver
+        in
+        (now, curr_global_slot, winner_pk, data)
       in
-      let winner_pk = fst slot_won.delegator in
-      let data =
-        Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
-          ~coinbase_receiver:!coinbase_receiver
-      in
-      if
+      let eq_global_slots =
+        O1trace.sync_thread "bp_sync_2"
+        @@ fun () ->
         Mina_numbers.Global_slot_since_hard_fork.(
           curr_global_slot = winning_global_slot)
-      then (
+      in
+      if eq_global_slots then (
         (*produce now*)
         [%log info] "Producing a block now" ;
         set_next_producer_timing
@@ -973,10 +1000,13 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
         in
         dispatch_now (now, data, winner_pk) )
       else
-        match
+        let global_slot_diff =
+          O1trace.sync_thread "bp_sync_3"
+          @@ fun () ->
           Mina_numbers.Global_slot_since_hard_fork.diff winning_global_slot
             curr_global_slot
-        with
+        in
+        match global_slot_diff with
         | None ->
             [%log warn]
               "Skipping block production for global slot $slot_won because it \
@@ -991,46 +1021,54 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
                 ] ;
             next_check_now ()
         | Some slot_diff ->
-            [%log info] "Producing a block in $slots slots"
-              ~metadata:
-                [ ("slots", Mina_numbers.Global_slot_span.to_yojson slot_diff) ] ;
             let time =
+              O1trace.sync_thread "bp_sync_4"
+              @@ fun () ->
+              [%log info] "Producing a block in $slots slots"
+                ~metadata:
+                  [ ("slots", Mina_numbers.Global_slot_span.to_yojson slot_diff)
+                  ] ;
               Consensus.Data.Consensus_time.(
                 start_time ~constants:consensus_constants
                   (of_global_slot ~constants:consensus_constants
                      winning_global_slot ))
               |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
             in
-            set_next_producer_timing
-              (`Produce (time, data, winner_pk))
-              consensus_state ;
-            Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
+            O1trace.sync_thread "bp_sync_5" (fun () ->
+                set_next_producer_timing
+                  (`Produce (time, data, winner_pk))
+                  consensus_state ;
+                Mina_metrics.(Counter.inc_one Block_producer.slots_won) ) ;
             let scheduled_time = time_of_ms time in
             don't_wait_for
-              ((* Attempt to generate a genesis proof in the slot
-                  immediately before we'll actually need it, so that
-                  it isn't limiting our block production time in the
-                  won slot.
-                  This also allows non-genesis blocks to be received
-                  in the meantime and alleviate the need to produce
-                  one at all, if this won't have block height 1.
-               *)
-               let scheduled_genesis_time =
-                 time_of_ms
-                   Int64.(
-                     time - of_int constraint_constants.block_window_duration_ms)
-               in
-               let span_till_time =
-                 Block_time.diff scheduled_genesis_time
-                   (Block_time.now time_controller)
-                 |> Block_time.Span.to_time_span
-               in
-               let%bind () = after span_till_time in
-               generate_genesis_proof_if_needed ~genesis_breadcrumb
-                 ~frontier_reader () ) ;
+              ( (* Attempt to generate a genesis proof in the slot
+                   immediately before we'll actually need it, so that
+                   it isn't limiting our block production time in the
+                   won slot.
+                   This also allows non-genesis blocks to be received
+                   in the meantime and alleviate the need to produce
+                   one at all, if this won't have block height 1.
+                *)
+                O1trace.thread "bp_3"
+              @@ fun () ->
+              let scheduled_genesis_time =
+                time_of_ms
+                  Int64.(
+                    time - of_int constraint_constants.block_window_duration_ms)
+              in
+              let span_till_time =
+                Block_time.diff scheduled_genesis_time
+                  (Block_time.now time_controller)
+                |> Block_time.Span.to_time_span
+              in
+              let%bind () = after span_till_time in
+              generate_genesis_proof_if_needed ~genesis_breadcrumb
+                ~frontier_reader () ) ;
             schedule_dispatch (scheduled_time, data, winner_pk) )
 
 let schedule ~time_controller time =
+  O1trace.thread "block_producer_schedule"
+  @@ fun () ->
   let span_till_time = Block_time.diff time (Block_time.now time_controller) in
   Block_time.Timeout.create time_controller span_till_time ~f:Fn.id
   |> Block_time.Timeout.to_deferred
@@ -1045,13 +1083,6 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
   @@ fun () ->
   let genesis_breadcrumb =
     genesis_breadcrumb_creator ~context:(module Context) prover
-  in
-  let produce =
-    produce ~prover ~verifier ~trust_system ~get_completed_work
-      ~transaction_resource_pool ~transition_writer ~log_block_creation
-      ~block_reward_threshold ~block_produced_bvar ~genesis_breadcrumb
-      ~context:(module Context)
-      ~frontier_reader ~time_controller
   in
   let module Breadcrumb = Transition_frontier.Breadcrumb in
   let iteration_wrapped (slot, i) =
@@ -1088,7 +1119,14 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     ~local_state:consensus_local_state
                    = None ) ; *)
         let next_check_now () = return (new_global_slot, i') in
-        let dispatch_now data = produce data >>| const (new_global_slot, i') in
+        let dispatch_now data =
+          produce ~prover ~verifier ~trust_system ~get_completed_work
+            ~transaction_resource_pool ~transition_writer ~log_block_creation
+            ~block_reward_threshold ~block_produced_bvar ~genesis_breadcrumb
+            ~context:(module Context)
+            ~frontier_reader ~time_controller data
+          >>| const (new_global_slot, i')
+        in
         let schedule_next_check time =
           let%map _ = schedule ~time_controller time in
           (new_global_slot, i')
