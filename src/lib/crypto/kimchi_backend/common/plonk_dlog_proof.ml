@@ -240,13 +240,16 @@ module Make (Inputs : Inputs_intf) = struct
        ; mul_selector
        ; emul_selector
        ; endomul_scalar_selector
-       ; lookup
        ; range_check0_selector
        ; range_check1_selector
        ; foreign_field_add_selector
        ; foreign_field_mul_selector
        ; xor_selector
        ; rot_selector
+       ; lookup_aggregation
+       ; lookup_table
+       ; lookup_sorted
+       ; runtime_lookup_table
        } :
         Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
     { w = tuple15_to_vec w
@@ -265,14 +268,12 @@ module Make (Inputs : Inputs_intf) = struct
     ; foreign_field_mul_selector
     ; xor_selector
     ; rot_selector
-    ; lookup_aggregation = Option.map lookup ~f:(fun { aggreg; _ } -> aggreg)
-    ; lookup_table = Option.map lookup ~f:(fun { table; _ } -> table)
+    ; lookup_aggregation
+    ; lookup_table
     ; lookup_sorted =
         Array.init 5 ~f:(fun i ->
-            Option.bind lookup ~f:(fun { sorted; _ } ->
-                Option.try_with (fun () -> sorted.(i)) ) )
-    ; runtime_lookup_table =
-        Option.bind lookup ~f:(fun { runtime; _ } -> runtime)
+            Option.try_with_join (fun () -> lookup_sorted.(i)) )
+    ; runtime_lookup_table
     }
 
   let of_backend (t : Backend.t) : t =
@@ -347,18 +348,12 @@ module Make (Inputs : Inputs_intf) = struct
     ; foreign_field_mul_selector
     ; xor_selector
     ; rot_selector
-    ; lookup =
-        (let open Option.Let_syntax in
-        let%map aggreg = lookup_aggregation and table = lookup_table in
-        let sorted =
-          let stop = ref false in
-          Array.filter_map lookup_sorted ~f:(fun x ->
-              if !stop then None
-              else (
-                stop := Option.is_none x ;
-                x ) )
-        in
-        { Kimchi_types.aggreg; table; sorted; runtime = runtime_lookup_table })
+    ; lookup_aggregation
+    ; lookup_table
+    ; lookup_sorted =
+        Array.init 5 ~f:(fun i ->
+            Option.try_with_join (fun () -> lookup_sorted.(i)) )
+    ; runtime_lookup_table
     }
 
   let vec_to_array (type t elt)
