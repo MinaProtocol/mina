@@ -230,10 +230,10 @@ module Make (Inputs : Inputs_intf) = struct
     }
 
   let lookup_eval_of_backend
-      ({ sorted; aggreg = _; table = _; runtime } :
+      ({ sorted; aggreg = _; table = _; runtime = _ } :
         'f Kimchi_types.lookup_evaluations ) :
       _ Pickles_types.Plonk_types.Evals.Lookup.t =
-    { sorted; runtime }
+    { sorted }
 
   let eval_of_backend
       ({ w
@@ -273,6 +273,8 @@ module Make (Inputs : Inputs_intf) = struct
     ; rot_selector
     ; lookup_aggregation = Option.map lookup ~f:(fun { aggreg; _ } -> aggreg)
     ; lookup_table = Option.map lookup ~f:(fun { table; _ } -> table)
+    ; runtime_lookup_table =
+        Option.bind lookup ~f:(fun { runtime; _ } -> runtime)
     ; lookup = Option.map ~f:lookup_eval_of_backend lookup
     }
 
@@ -310,8 +312,8 @@ module Make (Inputs : Inputs_intf) = struct
         }
       ~openings:{ proof; evals; ft_eval1 = t.ft_eval1 }
 
-  let lookup_eval_to_backend ~aggreg ~table
-      { Pickles_types.Plonk_types.Evals.Lookup.sorted; runtime } :
+  let lookup_eval_to_backend ~aggreg ~table ~runtime
+      { Pickles_types.Plonk_types.Evals.Lookup.sorted } :
       'f Kimchi_types.lookup_evaluations option =
     let open Option.Let_syntax in
     let%map aggreg = aggreg and table = table in
@@ -336,6 +338,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; rot_selector
       ; lookup_aggregation
       ; lookup_table
+      ; runtime_lookup_table
       ; lookup
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
@@ -358,7 +361,7 @@ module Make (Inputs : Inputs_intf) = struct
         Option.bind
           ~f:
             (lookup_eval_to_backend ~aggreg:lookup_aggregation
-               ~table:lookup_table )
+               ~table:lookup_table ~runtime:runtime_lookup_table )
           lookup
     }
 

@@ -24,5 +24,6 @@ let create ~of_int =
     ; rot_selector = None
     ; lookup_aggregation = None
     ; lookup_table = None
+    ; runtime_lookup_table = None
     ; lookup = None
     }

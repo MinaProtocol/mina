@@ -192,10 +192,10 @@ end
 
 module Evals : sig
   module Lookup : sig
-    type 'f t = { sorted : 'f array; runtime : 'f option }
+    type 'f t = { sorted : 'f array }
 
     module In_circuit : sig
-      type ('f, 'bool) t = { sorted : 'f array; runtime : ('f, 'bool) Opt.t }
+      type ('f, 'bool) t = { sorted : 'f array }
     end
   end
 
@@ -220,6 +220,7 @@ module Evals : sig
       ; lookup_aggregation : ('f, 'bool) Opt.t
       ; lookup_table : ('f, 'bool) Opt.t
       ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
+      ; runtime_lookup_table : ('f, 'bool) Opt.t
       }
 
     (** {4 Accessors} *)
@@ -266,6 +267,7 @@ module Evals : sig
     ; lookup_aggregation : 'a option
     ; lookup_table : 'a option
     ; lookup : 'a Lookup.t option
+    ; runtime_lookup_table : 'a option
     }
 
   (** {4 Iterators} *)

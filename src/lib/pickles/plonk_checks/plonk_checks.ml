@@ -318,7 +318,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     | LookupAggreg ->
         get_eval (Opt.value_exn e.lookup_aggregation)
     | LookupRuntimeTable ->
-        get_eval (Opt.value_exn (Opt.value_exn e.lookup).runtime)
+        get_eval (Opt.value_exn e.runtime_lookup_table)
     | LookupKindIndex (Lookup | Xor | RangeCheck | ForeignFieldMul) ->
         failwith "Lookup kind index should have been linearized away"
     | LookupRuntimeSelector ->

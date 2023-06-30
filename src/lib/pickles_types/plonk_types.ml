@@ -351,51 +351,37 @@ module Evals = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'f t = { sorted : 'f array; runtime : 'f option }
+        type 'f t = { sorted : 'f array }
         [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
       end
     end]
 
     let sorted_length = 5
 
-    let dummy ~runtime z =
-      { sorted = Array.create ~len:sorted_length z
-      ; runtime = Option.some_if runtime z
-      }
+    let dummy z = { sorted = Array.create ~len:sorted_length z }
 
-    let map { sorted; runtime } ~f =
-      { sorted = Array.map ~f sorted; runtime = Option.map ~f runtime }
+    let map { sorted } ~f = { sorted = Array.map ~f sorted }
 
-    let map2 t1 t2 ~f =
-      { sorted = Array.map2_exn ~f t1.sorted t2.sorted
-      ; runtime = Option.map2 ~f t1.runtime t2.runtime
-      }
+    let map2 t1 t2 ~f = { sorted = Array.map2_exn ~f t1.sorted t2.sorted }
 
     module In_circuit = struct
-      type ('f, 'bool) t = { sorted : 'f array; runtime : ('f, 'bool) Opt.t }
-      [@@deriving hlist, fields]
+      type ('f, 'bool) t = { sorted : 'f array } [@@deriving hlist, fields]
 
-      let map { sorted; runtime } ~f =
-        { sorted = Array.map ~f sorted; runtime = Opt.map ~f runtime }
+      let map { sorted } ~f = { sorted = Array.map ~f sorted }
     end
 
-    let to_in_circuit (type f bool) ({ sorted; runtime } : f t) :
-        (f, bool) In_circuit.t =
-      { sorted; runtime = Opt.of_option runtime }
+    let to_in_circuit (type f bool) ({ sorted } : f t) : (f, bool) In_circuit.t
+        =
+      { sorted }
 
-    let typ impl e ~runtime_tables ~dummy =
+    let typ e =
       Snarky_backendless.Typ.of_hlistable
-        [ Snarky_backendless.Typ.array ~length:sorted_length e
-        ; Opt.typ impl runtime_tables e ~dummy
-        ]
+        [ Snarky_backendless.Typ.array ~length:sorted_length e ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ impl ({ lookup; runtime_tables; _ } : Opt.Flag.t Features.t)
-        ~dummy:z elt =
-      Opt.typ impl lookup
-        ~dummy:(dummy z ~runtime:(Opt.Flag.equal runtime_tables Yes))
-        (typ impl ~runtime_tables ~dummy:z elt)
+    let opt_typ impl ({ lookup; _ } : Opt.Flag.t Features.t) ~dummy:z elt =
+      Opt.typ impl lookup ~dummy:(dummy z) (typ elt)
   end
 
   [%%versioned
@@ -421,6 +407,7 @@ module Evals = struct
         ; lookup_aggregation : 'a option
         ; lookup_table : 'a option
         ; lookup : 'a Lookup.Stable.V1.t option
+        ; runtime_lookup_table : 'a option
         }
       [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
     end
@@ -445,6 +432,7 @@ module Evals = struct
       ; rot_selector
       ; lookup_aggregation
       ; lookup_table
+      ; runtime_lookup_table
       ; lookup
       } : _ list =
     let always_present =
@@ -470,16 +458,18 @@ module Evals = struct
         ; rot_selector
         ; lookup_aggregation
         ; lookup_table
+        ; runtime_lookup_table
         ]
     in
     let lookup =
       match lookup with
       | None ->
           []
-      | Some { Lookup.runtime; sorted } ->
-          Array.to_list sorted @ Option.to_list runtime
+      | Some { Lookup.sorted } ->
+          Array.to_list sorted
     in
     always_present @ optional_gates @ lookup
+    @ Option.to_list runtime_lookup_table
 
   module In_circuit = struct
     type ('f, 'bool) t =
@@ -502,6 +492,7 @@ module Evals = struct
       ; lookup_aggregation : ('f, 'bool) Opt.t
       ; lookup_table : ('f, 'bool) Opt.t
       ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
+      ; runtime_lookup_table : ('f, 'bool) Opt.t
       }
     [@@deriving hlist, fields]
 
@@ -525,6 +516,7 @@ module Evals = struct
          ; lookup_aggregation
          ; lookup_table
          ; lookup
+         ; runtime_lookup_table
          } :
           (a, bool) t ) ~(f : a -> b) : (b, bool) t =
       { w = Vector.map w ~f
@@ -546,6 +538,7 @@ module Evals = struct
       ; lookup_aggregation = Opt.map ~f lookup_aggregation
       ; lookup_table = Opt.map ~f lookup_table
       ; lookup = Opt.map ~f:(Lookup.In_circuit.map ~f) lookup
+      ; runtime_lookup_table = Opt.map ~f runtime_lookup_table
       }
 
     let to_list
@@ -568,6 +561,7 @@ module Evals = struct
         ; lookup_aggregation
         ; lookup_table
         ; lookup
+        ; runtime_lookup_table
         } =
       let some x = Opt.Some x in
       let always_present =
@@ -607,11 +601,11 @@ module Evals = struct
           | Some _ | Maybe _ ->
               [ lookup_table ] )
         @
-        match lookup.runtime with
+        match runtime_lookup_table with
         | None ->
             []
         | Some _ | Maybe _ ->
-            [ lookup.runtime ]
+            [ runtime_lookup_table ]
       in
       match lookup with
       | None ->
@@ -641,6 +635,7 @@ module Evals = struct
         ; lookup_aggregation
         ; lookup_table
         ; lookup
+        ; runtime_lookup_table
         } : _ Opt.Early_stop_sequence.t =
       let always_present =
         [ z
@@ -671,13 +666,13 @@ module Evals = struct
         match lookup with
         | None ->
             []
-        | Some { Lookup.In_circuit.runtime; sorted } ->
-            List.map ~f:some (Array.to_list sorted) @ [ runtime ]
-        | Maybe (b, { Lookup.In_circuit.runtime; sorted }) ->
+        | Some { Lookup.In_circuit.sorted } ->
+            List.map ~f:some (Array.to_list sorted)
+        | Maybe (b, { Lookup.In_circuit.sorted }) ->
             List.map ~f:(fun x -> Opt.Maybe (b, x)) (Array.to_list sorted)
-            @ [ runtime ]
       in
-      List.map ~f:some always_present @ optional_gates @ lookup
+      List.map ~f:some always_present
+      @ optional_gates @ lookup @ [ runtime_lookup_table ]
   end
 
   let to_in_circuit (type bool a)
@@ -700,6 +695,7 @@ module Evals = struct
        ; lookup_aggregation
        ; lookup_table
        ; lookup
+       ; runtime_lookup_table
        } :
         a t ) : (a, bool) In_circuit.t =
     { w
@@ -721,6 +717,7 @@ module Evals = struct
     ; lookup_aggregation = Opt.of_option lookup_aggregation
     ; lookup_table = Opt.of_option lookup_table
     ; lookup = Opt.of_option (Option.map ~f:Lookup.to_in_circuit lookup)
+    ; runtime_lookup_table = Opt.of_option runtime_lookup_table
     }
 
   let map (type a b)
@@ -743,6 +740,7 @@ module Evals = struct
        ; lookup_aggregation
        ; lookup_table
        ; lookup
+       ; runtime_lookup_table
        } :
         a t ) ~(f : a -> b) : b t =
     { w = Vector.map w ~f
@@ -764,6 +762,7 @@ module Evals = struct
     ; lookup_aggregation = Option.map ~f lookup_aggregation
     ; lookup_table = Option.map ~f lookup_table
     ; lookup = Option.map ~f:(Lookup.map ~f) lookup
+    ; runtime_lookup_table = Option.map ~f runtime_lookup_table
     }
 
   let map2 (type a b c) (t1 : a t) (t2 : b t) ~(f : a -> b -> c) : c t =
@@ -795,6 +794,8 @@ module Evals = struct
         Option.map2 ~f t1.lookup_aggregation t2.lookup_aggregation
     ; lookup_table = Option.map2 ~f t1.lookup_table t2.lookup_table
     ; lookup = Option.map2 t1.lookup t2.lookup ~f:(Lookup.map2 ~f)
+    ; runtime_lookup_table =
+        Option.map2 ~f t1.runtime_lookup_table t2.runtime_lookup_table
     }
 
   (*
@@ -837,6 +838,7 @@ module Evals = struct
       ; lookup_aggregation
       ; lookup_table
       ; lookup
+      ; runtime_lookup_table
       } =
     let always_present =
       [ z
@@ -869,7 +871,7 @@ module Evals = struct
         @ Array.to_list lookup.sorted
         @ Option.to_list lookup_aggregation
         @ Option.to_list lookup_table
-        @ Option.to_list lookup.runtime
+        @ Option.to_list runtime_lookup_table
 
   let typ (type f a_var a)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -899,6 +901,7 @@ module Evals = struct
       ; opt feature_flags.lookup (* TODO: Fixme *)
       ; opt feature_flags.lookup (* TODO: Fixme *)
       ; lookup_typ
+      ; opt feature_flags.runtime_tables
       ]
       ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
