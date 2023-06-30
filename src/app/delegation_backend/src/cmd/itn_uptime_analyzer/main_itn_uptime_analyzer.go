@@ -65,12 +65,12 @@ func main() {
 		log.Fatalf("Error identifying week: %v", err)
 	}
 
-	identities := itn.CreateIdentities(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime)
+	identities := itn.CreateIdentities(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime, syncPeriod)
 
 	// Go over identities and calculate uptime
 
 	for _, identity := range identities {
-		if itn.IsFirstHalfOfTheDay(currentTime) {
+		if itn.IsSyncPeriodEnough(currentTime, syncPeriod) {
 			identity.GetUptimeOfTwoDays(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime, syncPeriod, executionInterval)
 		} else {
 			identity.GetUptimeOfToday(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime, syncPeriod, executionInterval)
@@ -90,6 +90,6 @@ func main() {
 		}
 	}
 
-	itn.MarkExecution(appCfg, sheetsService, log, sheetTitle, currentTime)
+	itn.MarkExecution(appCfg, sheetsService, log, sheetTitle, currentTime, syncPeriod)
 
 }

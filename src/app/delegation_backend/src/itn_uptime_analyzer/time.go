@@ -15,7 +15,7 @@ func GetCurrentTime() time.Time {
 }
 
 // Get last execution time of application
-func GetLastExecutionTime(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time) time.Time {
+func GetLastExecutionTime(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, syncPeriod int) time.Time {
 	readRange := fmt.Sprintf("%s!A%d:Z%d", sheetTitle, 1, 1)
 	spId := config.AnalyzerOutputGsheetId
 
@@ -25,6 +25,7 @@ func GetLastExecutionTime(config AppConfig, client *sheets.Service, log *logging
 	}
 
 	var lastFilledColumn int = len(resp.Values[0]) - 1
+	var lastExecutionBasedOnSheetsAsTime time.Time
 
 	readRange = fmt.Sprintf("%s!%s%d", sheetTitle, string(lastFilledColumn+65), 1)
 
@@ -32,22 +33,26 @@ func GetLastExecutionTime(config AppConfig, client *sheets.Service, log *logging
 
 	stringSplit := strings.SplitAfter(fmt.Sprint(lastTimeWindow), " - ")
 	lastExecutionBasedOnSheets := stringSplit[len(stringSplit)-1]
-
-	lastExecutionBasedOnSheetsAsTime, err := time.Parse(time.RFC3339, lastExecutionBasedOnSheets)
-	if err != nil {
-		log.Fatalf("Unable to parse string to time: %v", err)
+	if !strings.HasPrefix(lastExecutionBasedOnSheets, "Node") {
+		lastExecutionBasedOnSheetsAsTime, err = time.Parse(time.RFC3339, lastExecutionBasedOnSheets)
+		if err != nil {
+			log.Fatalf("Unable to parse string to time: %v", err)
+		}
+	} else {
+		pastTime := currentTime.Add(-time.Duration(syncPeriod) * time.Hour)
+		return pastTime
 	}
 
 	timeDiffHours := time.Since(lastExecutionBasedOnSheetsAsTime).Hours()
 
-	if !strings.HasPrefix(lastExecutionBasedOnSheets, "Node") && (lastExecutionBasedOnSheets != "") && (timeDiffHours > time.Since(currentTime.Add(-11*time.Hour)).Hours()) && (timeDiffHours <= time.Since(currentTime.Add(-12*time.Hour)).Hours()) {
+	if (lastExecutionBasedOnSheets != "") && (timeDiffHours > time.Since(currentTime.Add(-time.Duration(syncPeriod-1)*time.Hour)).Hours()) && (timeDiffHours <= time.Since(currentTime.Add(-time.Duration(syncPeriod)*time.Hour)).Hours()) {
 		pastTime, err := time.Parse(time.RFC3339, lastExecutionBasedOnSheets)
 		if err != nil {
 			log.Fatalf("Unable to parse string to time: %v", err)
 		}
 		return pastTime
 	} else {
-		pastTime := currentTime.Add(-12 * time.Hour)
+		pastTime := currentTime.Add(-time.Duration(syncPeriod) * time.Hour)
 		return pastTime
 	}
 
@@ -88,10 +93,10 @@ func IdentifyWeek(config AppConfig, client *sheets.Service, log *logging.ZapEven
 	}
 }
 
-func IsFirstHalfOfTheDay(currentTime time.Time) bool {
-	if currentTime.Hour() < 12 {
+func IsSyncPeriodEnough(currentTime time.Time, syncPeriod int) bool {
+	if currentTime.Hour() < syncPeriod {
 		return true
-	} else if currentTime.Hour() >= 12 {
+	} else if currentTime.Hour() >= syncPeriod {
 		return false
 	}
 
