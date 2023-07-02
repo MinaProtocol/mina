@@ -21,11 +21,15 @@
    mina_numbers
    snark_params
    unsigned_extended
+   integration_test_lib
+   logger
+
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps 
               ppx_version 
               ppx_let 
+              ppx_coda
               graphql_ppx --
                -extend-query Graphql_lib.Serializing.ExtendQuery
                -extend-mutation Graphql_lib.Serializing.ExtendQuery

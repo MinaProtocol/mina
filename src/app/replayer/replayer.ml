@@ -37,8 +37,6 @@ type output =
   }
 [@@deriving yojson]
 
-type command_type = [ `Internal_command | `User_command | `Snapp_command ]
-
 module type Get_command_ids = sig
   val run :
        Caqti_async.connection
@@ -63,20 +61,21 @@ let json_ledger_hash_of_ledger ledger =
   Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
 let create_ledger_as_list ledger =
-  List.map (Ledger.to_list ledger) ~f:(fun acc ->
+  let%map accounts = Ledger.to_list ledger in
+  List.map accounts ~f:(fun acc ->
       Genesis_ledger_helper.Accounts.Single.of_account acc None )
 
 let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
     ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
     (input_genesis_ledger : Runtime_config.Ledger.t) =
-  let genesis_ledger_as_list = create_ledger_as_list ledger in
+  let%bind genesis_ledger_as_list = create_ledger_as_list ledger in
   let target_genesis_ledger =
     { input_genesis_ledger with base = Accounts genesis_ledger_as_list }
   in
-  let staking_epoch_ledger_as_list =
+  let%bind staking_epoch_ledger_as_list =
     create_ledger_as_list staking_epoch_ledger
   in
-  let next_epoch_ledger_as_list = create_ledger_as_list next_epoch_ledger in
+  let%map next_epoch_ledger_as_list = create_ledger_as_list next_epoch_ledger in
   let target_staking_epoch_data : Runtime_config.Epoch_data.Data.t =
     let ledger =
       { input_genesis_ledger with base = Accounts staking_epoch_ledger_as_list }
@@ -98,8 +97,9 @@ let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
   ; target_epoch_data
   }
 
-let create_replayer_checkpoint ~ledger ~start_slot_since_genesis : input =
-  let accounts = create_ledger_as_list ledger in
+let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
+    input Deferred.t =
+  let%map accounts = create_ledger_as_list ledger in
   let genesis_ledger : Runtime_config.Ledger.t =
     { base = Accounts accounts
     ; num_accounts = None
@@ -201,47 +201,6 @@ let user_command_to_balance_block_data (user_cmd : Sql.User_command.t) =
   ; secondary_sequence_no = 0
   }
 
-let epoch_staking_id_of_state_hash ~logger pool state_hash =
-  match%map
-    Caqti_async.Pool.use
-      (fun db -> Sql.Epoch_data.get_staking_epoch_data_id db state_hash)
-      pool
-  with
-  | Ok staking_epoch_data_id ->
-      [%log info] "Found staking epoch data id for state hash %s" state_hash ;
-      staking_epoch_data_id
-  | Error msg ->
-      failwithf
-        "Error retrieving staking epoch data id for state hash %s, error: %s"
-        state_hash (Caqti_error.show msg) ()
-
-let epoch_next_id_of_state_hash ~logger pool state_hash =
-  match%map
-    Caqti_async.Pool.use
-      (fun db -> Sql.Epoch_data.get_next_epoch_data_id db state_hash)
-      pool
-  with
-  | Ok next_epoch_data_id ->
-      [%log info] "Found next epoch data id for state hash %s" state_hash ;
-      next_epoch_data_id
-  | Error msg ->
-      failwithf
-        "Error retrieving next epoch data id for state hash %s, error: %s"
-        state_hash (Caqti_error.show msg) ()
-
-let epoch_data_of_id ~logger pool epoch_data_id =
-  match%map
-    Caqti_async.Pool.use
-      (fun db -> Sql.Epoch_data.get_epoch_data db epoch_data_id)
-      pool
-  with
-  | Ok { epoch_ledger_hash; epoch_data_seed } ->
-      [%log info] "Found epoch data for id %d" epoch_data_id ;
-      ({ epoch_ledger_hash; epoch_data_seed } : Sql.Epoch_data.epoch_data)
-  | Error msg ->
-      failwithf "Error retrieving epoch data for epoch data id %d, error: %s"
-        epoch_data_id (Caqti_error.show msg) ()
-
 let process_block_infos_of_state_hash ~logger pool ~state_hash ~start_slot ~f =
   match%bind
     Caqti_async.Pool.use
@@ -268,7 +227,7 @@ let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
       name
       (Ledger_hash.to_base58_check epoch_ledger_hash) ;
     (* Ledger.copy doesn't actually copy, roll our own here *)
-    let accounts = Ledger.to_list ledger in
+    let%map accounts = Ledger.to_list ledger in
     let epoch_ledger = Ledger.create ~depth:(Ledger.depth ledger) () in
     List.iter accounts ~f:(fun account ->
         let pk = Account.public_key account in
@@ -292,7 +251,7 @@ let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
                 * (string * Token_id.t)]
             |> Error.raise ) ;
     epoch_ledger )
-  else epoch_ledger
+  else return epoch_ledger
 
 let update_staking_epoch_data ~logger pool ~ledger ~last_block_id
     ~staking_epoch_ledger =
@@ -306,12 +265,12 @@ let update_staking_epoch_data ~logger pool ~ledger ~last_block_id
       ~f:(fun db -> Sql.Epoch_data.get_staking_epoch_data_id db state_hash)
       ~item:"staking epoch id"
   in
-  let%map { epoch_ledger_hash; epoch_data_seed } =
+  let%bind { epoch_ledger_hash; epoch_data_seed } =
     query_db pool
       ~f:(fun db -> Sql.Epoch_data.get_epoch_data db staking_epoch_id)
       ~item:"staking epoch data"
   in
-  let ledger =
+  let%map ledger =
     update_epoch_ledger ~logger ~name:"staking" ~ledger
       ~epoch_ledger:staking_epoch_ledger epoch_ledger_hash
   in
@@ -329,12 +288,12 @@ let update_next_epoch_data ~logger pool ~ledger ~last_block_id
       ~f:(fun db -> Sql.Epoch_data.get_next_epoch_data_id db state_hash)
       ~item:"next epoch id"
   in
-  let%map { epoch_ledger_hash; epoch_data_seed } =
+  let%bind { epoch_ledger_hash; epoch_data_seed } =
     query_db pool
       ~f:(fun db -> Sql.Epoch_data.get_epoch_data db next_epoch_id)
       ~item:"next epoch data"
   in
-  let ledger =
+  let%map ledger =
     update_epoch_ledger ~logger ~name:"next" ~ledger
       ~epoch_ledger:next_epoch_ledger epoch_ledger_hash
   in
@@ -981,19 +940,14 @@ let try_slot ~logger pool slot =
   in
   go ~slot ~tries_left:num_tries
 
-let unquoted_string_of_yojson json =
-  (* Yojson.Safe.to_string produces double-quoted strings
-     remove those quotes for SQL queries
-  *)
-  let s = Yojson.Safe.to_string json in
-  String.sub s ~pos:1 ~len:(String.length s - 2)
-
 let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis =
   (* start replaying at the slot after the one we've just finished with *)
   let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
-  let replayer_checkpoint =
-    create_replayer_checkpoint ~ledger ~start_slot_since_genesis
-    |> input_to_yojson |> Yojson.Safe.pretty_to_string
+  let%bind replayer_checkpoint =
+    let%map input =
+      create_replayer_checkpoint ~ledger ~start_slot_since_genesis
+    in
+    input_to_yojson input |> Yojson.Safe.pretty_to_string
   in
   let checkpoint_file =
     sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
@@ -1230,6 +1184,24 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             in
             [%compare: int64 * int] (tuple uc1) (tuple uc2) )
       in
+      let checkpoint_interval_i64 =
+        Option.map checkpoint_interval ~f:Int64.of_int
+      in
+      let checkpoint_target =
+        ref
+          (Option.map checkpoint_interval_i64 ~f:(fun interval ->
+               Int64.(input.start_slot_since_genesis + interval) ) )
+      in
+      let incr_checkpoint_target () =
+        Option.iter !checkpoint_target ~f:(fun target ->
+            match checkpoint_interval_i64 with
+            | Some interval ->
+                [%log info] "Checkpoint target was %Ld, setting to %Ld" target
+                  Int64.(target + interval) ;
+                checkpoint_target := Some Int64.(target + interval)
+            | None ->
+                failwith "Expected a checkpoint interval" )
+      in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
           (user_cmds : Sql.User_command.t list) ~last_global_slot_since_genesis
@@ -1277,15 +1249,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
              $state_hash at global slot since genesis %Ld"
             curr_global_slot_since_genesis
         in
-        let checkpoint_interval_i64 =
-          Option.map checkpoint_interval ~f:Int64.of_int
-        in
-        let write_checkpoint_file curr_global_slot_since_genesis =
-          Option.iter checkpoint_interval_i64 ~f:(fun interval ->
-              if Int64.(last_global_slot_since_genesis % interval = 0L) then
+        let write_checkpoint_file () =
+          Option.iter !checkpoint_target ~f:(fun target ->
+              if Int64.(last_global_slot_since_genesis >= target) then (
+                incr_checkpoint_target () ;
                 Async.don't_wait_for
                   (write_replayer_checkpoint ~logger ~ledger
-                     ~last_global_slot_since_genesis ) )
+                     ~last_global_slot_since_genesis ) ) )
         in
         let run_actions_on_slot_change curr_global_slot_since_genesis =
           if
@@ -1294,7 +1264,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
           then (
             log_ledger_hash_after_last_slot () ;
             log_state_hash_on_next_slot curr_global_slot_since_genesis ;
-            write_checkpoint_file curr_global_slot_since_genesis )
+            write_checkpoint_file () )
         in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
@@ -1338,11 +1308,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
         | [], [] ->
             log_ledger_hash_after_last_slot () ;
             Deferred.return
-              ( last_global_slot_since_genesis
-              , staking_epoch_ledger
-              , staking_seed
-              , next_epoch_ledger
-              , next_seed )
+              (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
         | [], uc :: ucs ->
             run_actions_on_slot_change uc.global_slot_since_genesis ;
             let%bind () =
@@ -1401,24 +1367,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             ; ( "available_start_slot"
               , `String (Int64.to_string start_slot_since_genesis) )
             ] ;
-      let%bind last_block_id =
-        if Int64.equal input.start_slot_since_genesis 0L then
-          query_db pool
-            ~f:(fun db -> Sql.Block.genesis_block_id db)
-            ~item:"Genesis block id"
-        else
-          query_db pool
-            ~f:(fun db -> Sql.Block.parent_block_id db oldest_block_id)
-            ~item:"Parent block id"
-      in
       [%log info] "At start global slot %Ld, ledger hash"
         start_slot_since_genesis
         ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ] ;
-      let%bind ( last_global_slot_since_genesis
-               , staking_epoch_ledger
-               , staking_seed
-               , next_epoch_ledger
-               , next_seed ) =
+      let%bind staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed
+          =
         apply_commands sorted_internal_cmds sorted_user_cmds
           ~last_global_slot_since_genesis:start_slot_since_genesis
           ~last_block_id:oldest_block_id ~staking_epoch_ledger:ledger
@@ -1426,8 +1379,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       in
       match input.target_epoch_ledgers_state_hash with
       | None ->
-          write_replayer_checkpoint ~logger ~ledger
-            ~last_global_slot_since_genesis
+          [%log info] "No target epoch ledger supplied, not writing output" ;
+          return ()
       | Some target_epoch_ledgers_state_hash -> (
           match output_file_opt with
           | None ->
@@ -1437,13 +1390,15 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               if Int.equal !error_count 0 then (
                 [%log info] "Writing output to $output_file"
                   ~metadata:[ ("output_file", `String output_file) ] ;
-                let output =
-                  create_output ~target_epoch_ledgers_state_hash
-                    ~target_fork_state_hash:
-                      (State_hash.of_base58_check_exn target_state_hash)
-                    ~ledger ~staking_epoch_ledger ~staking_seed
-                    ~next_epoch_ledger ~next_seed input.genesis_ledger
-                  |> output_to_yojson |> Yojson.Safe.pretty_to_string
+                let%bind output =
+                  let%map output =
+                    create_output ~target_epoch_ledgers_state_hash
+                      ~target_fork_state_hash:
+                        (State_hash.of_base58_check_exn target_state_hash)
+                      ~ledger ~staking_epoch_ledger ~staking_seed
+                      ~next_epoch_ledger ~next_seed input.genesis_ledger
+                  in
+                  output_to_yojson output |> Yojson.Safe.pretty_to_string
                 in
                 return
                 @@ Out_channel.with_file output_file ~f:(fun oc ->

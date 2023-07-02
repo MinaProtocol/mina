@@ -4,6 +4,8 @@ type t = ..
 
 type id = string [@@deriving equal, yojson, sexp]
 
+module Set = String.Set
+
 let id_of_string s = s
 
 let string_of_id s = s

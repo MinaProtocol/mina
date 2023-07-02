@@ -6,6 +6,10 @@ output "seeds_release" {
   value = helm_release.seeds
 }
 
+output "archive_nodes_release" {
+  value = helm_release.archive_node
+}
+
 output "block_producers_release" {
   value = helm_release.block_producers
 }

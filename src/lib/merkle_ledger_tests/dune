@@ -15,6 +15,7 @@
    ppx_inline_test.config
    result
    async_kernel
+   async_unix
    async
    core_kernel
    ;; local libraries

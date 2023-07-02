@@ -55,7 +55,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            pub_key_of_node delegation_sender
          in
          let%bind { hash; _ } =
-           Network.Node.must_send_delegation ~logger delegation_sender
+           Integration_test_lib.Graphql_requests.must_send_delegation ~logger
+             (Network.Node.get_ingress_uri delegation_sender)
              ~sender_pub_key:delegation_sender_pub_key
              ~receiver_pub_key:delegation_receiver_pub_key ~fee
          in
