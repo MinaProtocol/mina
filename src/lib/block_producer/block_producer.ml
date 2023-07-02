@@ -1066,12 +1066,17 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
                 ~frontier_reader () ) ;
             schedule_dispatch (scheduled_time, data, winner_pk) )
 
-let schedule ~time_controller time =
+let schedule ~logger ~time_controller time =
   O1trace.thread "block_producer_schedule"
   @@ fun () ->
   let span_till_time = Block_time.diff time (Block_time.now time_controller) in
-  Block_time.Timeout.create time_controller span_till_time ~f:Fn.id
-  |> Block_time.Timeout.to_deferred
+  [%log info] "schedule: waiting for %s"
+    (Block_time.Span.to_string_hum span_till_time) ;
+  Block_time.Span.to_time_ns_span span_till_time
+  |> Async_kernel.after
+  >>| fun () ->
+  [%log info] "schedule: ended waiting for %s"
+    (Block_time.Span.to_string_hum span_till_time)
 
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
@@ -1128,11 +1133,11 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
           >>| const (new_global_slot, i')
         in
         let schedule_next_check time =
-          let%map _ = schedule ~time_controller time in
+          let%map () = schedule ~logger ~time_controller time in
           (new_global_slot, i')
         in
         let schedule_dispatch (time, data, winner) =
-          let%bind _ = schedule ~time_controller time in
+          let%bind () = schedule ~logger ~time_controller time in
           dispatch_now (time, data, winner)
         in
         iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
@@ -1162,7 +1167,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
         ]
       "Node started before genesis: waiting $time_till_genesis milliseconds \
        before starting block producer" ;
-    upon (schedule ~time_controller genesis_state_timestamp) start )
+    upon (schedule ~logger ~time_controller genesis_state_timestamp) start )
 
 let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks =
