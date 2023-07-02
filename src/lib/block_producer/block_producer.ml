@@ -569,6 +569,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
       in
       let crumb = Transition_frontier.best_tip frontier in
       let crumb =
+        O1trace.sync_thread "produce_sync_1"
+        @@ fun () ->
         let crumb_global_slot_since_genesis =
           Breadcrumb.protocol_state crumb
           |> Protocol_state.consensus_state
@@ -599,6 +601,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
         @@ Mina_block.header (With_hash.data previous_transition)
       in
       let%bind previous_protocol_state_proof =
+        O1trace.thread "produce_1"
+        @@ fun () ->
         if
           Consensus.Data.Consensus_state.is_genesis_state
             (Protocol_state.consensus_state previous_protocol_state)
@@ -625,6 +629,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
       in
       [%log internal] "Generate_next_state" ;
       let%bind next_state_opt =
+        O1trace.thread "produce_2"
+        @@ fun () ->
         generate_next_state ~constraint_constants ~scheduled_time ~block_data
           ~previous_protocol_state ~time_controller
           ~staged_ledger:(Breadcrumb.staged_ledger crumb)
@@ -657,6 +663,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
           Internal_tracing.with_state_hash protocol_state_hashes.state_hash
           @@ fun () ->
           Debug_assert.debug_assert (fun () ->
+              O1trace.sync_thread "produce_sync_2"
+              @@ fun () ->
               [%test_result: [ `Take | `Keep ]]
                 (Consensus.Hooks.select
                    ~context:(module Context)
@@ -682,6 +690,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                   "newly generated consensus states should be selected over \
                    the tf root" ) ;
           let emit_breadcrumb () =
+            O1trace.thread "produce_3"
+            @@ fun () ->
             let open Deferred.Result.Let_syntax in
             [%log internal]
               ~metadata:[ ("transactions_count", `Int transactions_count) ]
@@ -709,6 +719,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
             in
             [%log internal] "Produce_chain_transition_proof" ;
             let delta_block_chain_proof =
+              O1trace.sync_thread "produce_sync_3"
+              @@ fun () ->
               Transition_chain_prover.prove
                 ~length:(Mina_numbers.Length.to_int consensus_constants.delta)
                 ~frontier previous_state_hash
@@ -716,6 +728,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
             in
             [%log internal] "Produce_validated_transition" ;
             let%bind transition =
+              O1trace.thread "produce_4"
+              @@ fun () ->
               let open Result.Let_syntax in
               Validation.wrap
                 { With_hash.hash = protocol_state_hashes
@@ -752,6 +766,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
             in
             let transition_receipt_time = Some (Time.now ()) in
             let%bind breadcrumb =
+              O1trace.thread "produce_5"
+              @@ fun () ->
               time ~logger ~time_controller "Build breadcrumb on produced block"
                 (fun () ->
                   Breadcrumb.build ~logger ~precomputed_values ~verifier
@@ -771,6 +787,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                      | `Prover_error _ ) as err ->
                        err )
             in
+            O1trace.sync_thread "produce_sync_4"
+            @@ fun () ->
             [%log internal] "@block_metadata"
               ~metadata:
                 [ ( "blockchain_length"
@@ -792,7 +810,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                   @@ Block_time.to_time_exn scheduled_time)) ;
             [%log internal] "Send_breadcrumb_to_transition_frontier" ;
             let%bind.Async.Deferred () =
-              Strict_pipe.Writer.write transition_writer breadcrumb
+              O1trace.thread "produce_6"
+              @@ fun () -> Strict_pipe.Writer.write transition_writer breadcrumb
             in
             let metadata =
               [ ( "state_hash"
@@ -802,27 +821,28 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
             [%log internal] "Wait_for_confirmation" ;
             [%log debug] ~metadata
               "Waiting for block $state_hash to be inserted into frontier" ;
-            Deferred.choose
-              [ Deferred.choice
-                  (Transition_registry.register transition_registry
-                     protocol_state_hashes.state_hash )
-                  (Fn.const (Ok `Transition_accepted))
-              ; Deferred.choice
-                  ( Block_time.Timeout.create time_controller
-                      (* We allow up to 20 seconds for the transition
-                         to make its way from the transition_writer to
-                         the frontier.
-                         This value is chosen to be reasonably
-                         generous. In theory, this should not take
-                         terribly long. But long cycles do happen in
-                         our system, and with medium curves those long
-                         cycles can be substantial.
-                      *)
-                      (Block_time.Span.of_ms 20000L)
-                      ~f:(Fn.const ())
-                  |> Block_time.Timeout.to_deferred )
-                  (Fn.const (Ok `Timed_out))
-              ]
+            O1trace.thread "produce_7" (fun () ->
+                Deferred.choose
+                  [ Deferred.choice
+                      (Transition_registry.register transition_registry
+                         protocol_state_hashes.state_hash )
+                      (Fn.const (Ok `Transition_accepted))
+                  ; Deferred.choice
+                      ( Block_time.Timeout.create time_controller
+                          (* We allow up to 20 seconds for the transition
+                             to make its way from the transition_writer to
+                             the frontier.
+                             This value is chosen to be reasonably
+                             generous. In theory, this should not take
+                             terribly long. But long cycles do happen in
+                             our system, and with medium curves those long
+                             cycles can be substantial.
+                          *)
+                          (Block_time.Span.of_ms 20000L)
+                          ~f:(Fn.const ())
+                      |> Block_time.Timeout.to_deferred )
+                      (Fn.const (Ok `Timed_out))
+                  ] )
             >>= function
             | `Transition_accepted ->
                 [%log internal] "Transition_accepted" ;
@@ -857,6 +877,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 return ()
           in
           let%bind res = emit_breadcrumb () in
+          O1trace.sync_thread "produce_sync_5"
+          @@ fun () ->
           let span = Block_time.diff (Block_time.now time_controller) start in
           handle_block_production_errors ~logger ~rejected_blocks_logger
             ~time_taken:span ~previous_protocol_state ~protocol_state res )
