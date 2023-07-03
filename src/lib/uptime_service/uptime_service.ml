@@ -10,15 +10,6 @@ module Blake2 = Blake2.Make ()
 
 module Uptime_snark_worker = Uptime_snark_worker
 
-type block_data =
-  { block : string
-  ; created_at : string
-  ; peer_id : string
-  ; snark_work : string option [@default None]
-  ; graphql_control_port : int option [@default None]
-  }
-[@@deriving to_yojson]
-
 module Proof_data = struct
   (* NB: this type is unversioned, so the verifier on the backend
      will need to be using the same code
@@ -31,36 +22,12 @@ module Proof_data = struct
   [@@deriving bin_io_unversioned]
 end
 
-let sign_blake2_hash ~private_key s =
-  let module Field = Snark_params.Tick.Field in
-  let blake2 = Blake2.digest_string s in
-  let field_elements = [||] in
-  let bitstrings =
-    [| Blake2.to_raw_string blake2 |> Blake2.string_to_bits |> Array.to_list |]
-  in
-  let input : (Field.t, bool) Random_oracle.Legacy.Input.t =
-    { field_elements; bitstrings }
-  in
-  Schnorr.Legacy.sign private_key input
-
 let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     ~state_hash ~produced block_data =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
-  let block_data_json = block_data_to_yojson block_data in
-  let block_data_string = Yojson.Safe.to_string block_data_json in
-  let signature =
-    sign_blake2_hash ~private_key:submitter_keypair.private_key
-      block_data_string
-  in
-  let json =
-    (* JSON structure in issue #9110 *)
-    `Assoc
-      [ ("data", block_data_json)
-      ; ("signature", Signature.to_yojson signature)
-      ; ("submitter", Public_key.to_yojson submitter_keypair.public_key)
-      ]
-  in
+  let request = Payload.create_request block_data submitter_keypair in
+  let json = Payload.request_to_yojson request in
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
@@ -201,7 +168,7 @@ let block_base64_of_breadcrumb breadcrumb =
 
 let send_produced_block_at ~logger ~interruptor ~url ~peer_id
     ~(submitter_keypair : Keypair.t) ~graphql_control_port ~block_produced_bvar
-    tm =
+    ~block_producer_version tm =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
   let timeout_min = 3.0 in
@@ -227,6 +194,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
         ; peer_id
         ; snark_work = None
         ; graphql_control_port
+        ; block_producer_version
         }
       in
       send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
@@ -234,7 +202,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
 
 let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
     ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
-    ~snark_work_fee ~graphql_control_port =
+    ~snark_work_fee ~graphql_control_port ~block_producer_version =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
@@ -268,6 +236,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
           ; peer_id
           ; snark_work = None
           ; graphql_control_port
+          ; block_producer_version
           }
         in
         send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
@@ -308,6 +277,8 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
               ; peer_id
               ; snark_work = None
               ; graphql_control_port
+              ; block_producer_version
+              ; built_with_commit_sha
               }
             in
             send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
@@ -351,7 +322,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                   ; peer_id
                   ; snark_work = None
                   ; graphql_control_port
-                  }
+                  ; block_producer_version
                 in
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
                   ~state_hash ~produced:false block_data
@@ -391,6 +362,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                       ; peer_id
                       ; snark_work = Some snark_work_base64
                       ; graphql_control_port
+                      ; block_producer_version
                       }
                     in
                     send_uptime_data ~logger ~interruptor ~submitter_keypair
@@ -399,7 +371,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
 let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
     ~time_controller ~block_produced_bvar ~uptime_submitter_keypair
     ~get_next_producer_timing ~get_snark_work_fee ~get_peer
-    ~graphql_control_port =
+    ~graphql_control_port ~block_producer_version =
   match uptime_url with
   | None ->
       [%log info] "Not running uptime service, no URL given" ;
@@ -491,7 +463,8 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                      block" ;
                   send_produced_block_at ~logger ~interruptor ~url ~peer_id
                     ~submitter_keypair ~graphql_control_port
-                    ~block_produced_bvar next_producer_time
+                    ~block_producer_version ~block_produced_bvar
+                    next_producer_time
                 in
                 let send_block_and_snark_work () =
                   [%log info]
@@ -500,6 +473,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                   send_block_and_transaction_snark ~logger ~interruptor ~url
                     ~snark_worker ~transition_frontier ~peer_id
                     ~submitter_keypair ~snark_work_fee ~graphql_control_port
+                    ~block_producer_version
                 in
                 match get_next_producer_time_opt () with
                 | None ->

@@ -1,9 +1,9 @@
 package delegation_backend
 
 import (
-	"encoding/json"
-	"golang.org/x/crypto/blake2b"
 	"testing"
+
+	"golang.org/x/crypto/blake2b"
 )
 
 func testVerifySig(pkStr string, sigStr string, data []byte, t *testing.T) {
@@ -22,19 +22,26 @@ func testVerifySig(pkStr string, sigStr string, data []byte, t *testing.T) {
 	}
 }
 
-func testVerifyRequest(name string, t *testing.T) {
+func testVerifyRequest(name string, networkId uint8, t *testing.T) {
 	body := readTestFile(name, t)
 	var req submitRequest
-	if err := json.Unmarshal(body, &req); err != nil {
+	var err error
+	req, err = unmarshalPayload(body)
+	if err != nil {
 		t.Log("failed decoding test file")
 		t.FailNow()
 	}
-	j, err := makeSignPayload(&req.Data)
+	j, err := req.GetData().MakeSignPayload()
 	if err != nil {
+		t.Log("failed making sign test file")
 		t.FailNow()
 	}
 	hash := blake2b.Sum256(j)
-	if !verifySig(&req.Submitter, &req.Sig, hash[:], 1) {
+	t.Logf("sign payload:\n%s", j)
+	submitter := req.GetSubmitter()
+	sig := req.GetSig()
+	if !verifySig(&submitter, &sig, hash[:], networkId) {
+		t.Log("signature verification failed")
 		t.FailNow()
 	}
 }
@@ -79,9 +86,13 @@ func TestVerifySig5(t *testing.T) {
 }
 
 func TestVerifyRequest1(t *testing.T) {
-	testVerifyRequest("req-with-snark", t)
+	testVerifyRequest("req-with-snark", 1, t)
 }
 
 func TestVerifyRequest2(t *testing.T) {
-	testVerifyRequest("req-no-snark", t)
+	testVerifyRequest("req-no-snark", 1, t)
+}
+
+func TestVerifyRequestV1(t *testing.T) {
+	testVerifyRequest("req-v1-with-snark", 0, t)
 }

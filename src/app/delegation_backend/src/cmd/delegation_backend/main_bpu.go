@@ -1,12 +1,14 @@
 package main
 
 import (
-	"context"
 	. "block_producers_uptime/delegation_backend"
+	"context"
 	"net/http"
 	"time"
 
-	"cloud.google.com/go/storage"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	logging "github.com/ipfs/go-log/v2"
 	"google.golang.org/api/option"
 	sheets "google.golang.org/api/sheets/v4"
@@ -25,20 +27,24 @@ func main() {
 
 	ctx := context.Background()
 
+	appCfg := LoadEnv(log)
+
+	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(appCfg.Aws.Region))
+	if err != nil {
+		log.Fatalf("Error loading AWS configuration: %v", err)
+	}
+
 	app := new(App)
 	app.Log = log
 	http.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
 		_, _ = rw.Write([]byte("delegation backend service"))
 	})
 	http.Handle("/v1/submit", app.NewSubmitH())
-	client, err1 := storage.NewClient(ctx)
-	if err1 != nil {
-		log.Fatalf("Error creating Cloud client: %v", err1)
-		return
-	}
-	gctx := GoogleContext{Bucket: client.Bucket(CloudBucketName()), Context: ctx, Log: log}
+	client := s3.NewFromConfig(awsCfg)
+
+	awsctx := AwsContext{Client: client, BucketName: aws.String(GetBucketName(appCfg)), Prefix: appCfg.NetworkName, Context: ctx, Log: log}
 	app.Save = func(objs ObjectsToSave) {
-		gctx.GoogleStorageSave(objs)
+		awsctx.S3Save(objs)
 	}
 	app.Now = func() time.Time { return time.Now() }
 	app.SubmitCounter = NewAttemptCounter(REQUESTS_PER_PK_HOURLY)
@@ -47,13 +53,13 @@ func main() {
 		log.Fatalf("Error creating Sheets service: %v", err2)
 		return
 	}
-	initWl := RetrieveWhitelist(sheetsService, log)
+	initWl := RetrieveWhitelist(sheetsService, log, appCfg)
 	wlMvar := new(WhitelistMVar)
 	wlMvar.Replace(&initWl)
 	app.Whitelist = wlMvar
 	go func() {
 		for {
-			wl := RetrieveWhitelist(sheetsService, log)
+			wl := RetrieveWhitelist(sheetsService, log, appCfg)
 			wlMvar.Replace(&wl)
 			time.Sleep(WHITELIST_REFRESH_INTERVAL)
 		}

@@ -4,96 +4,126 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"io"
+	"strconv"
 	"strings"
 	"time"
-	"cloud.google.com/go/storage"
+
 	dg "block_producers_uptime/delegation_backend"
+
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	logging "github.com/ipfs/go-log/v2"
-	"context"
-	"google.golang.org/api/iterator"
+	sheets "google.golang.org/api/sheets/v4"
 )
 
 type Identity map[string]string
 
 // Goes through each submission and adds an identity type to a map
+// Identity is constructed based on the payload that the BP sends which may hold pubkey, ip address and graphqlport
+func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, executionInterval int) map[string]Identity {
 
-func CreateIdentities(ctx context.Context, client *storage.Client, log *logging.ZapEventLogger) map[string]Identity {
+	currentDate := currentTime.Format("2006-01-02")
+	lastExecutionTime := GetLastExecutionTime(config, sheet, log, sheetTitle, currentTime, executionInterval)
 
-	currentTime := GetCurrentTime()
-	currentDateString := currentTime.Format(time.RFC3339)[:10]
-	lastExecutionTime := GetLastExecutionTime(currentTime)
-
-	prefixCurrent := strings.Join([]string{"submissions", currentDateString}, "/")
-	submissions := client.Bucket(dg.CloudBucketName()).Objects(ctx, &storage.Query{Prefix: prefixCurrent})
+	prefixCurrent := strings.Join([]string{ctx.Prefix, "submissions", currentDate}, "/")
 
 	identities := make(map[string]Identity) // Create a map for unique identities
-	
+
 	var submissionData dg.MetaToBeSaved
 
-	// Iterate over to find identities
+	input := &s3.ListObjectsV2Input{
+		Bucket: ctx.BucketName,
+		Prefix: &prefixCurrent,
+	}
 
-		for {
-			obj, err := submissions.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Fatalf("Failed to iterate over objects: %v", err)
-			}
-	
-			// Convert time of submission to time object for filtering
-	
-			submissionTimeString := obj.Name[23:43]
-			submissionTime, err := time.Parse(time.RFC3339, submissionTimeString)
+	// Paginate through ListObjects results
+
+	paginator := s3.NewListObjectsV2Paginator(ctx.Client, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx.Context)
+		if err != nil {
+			log.Fatalf("Getting next page of paginator (BPU bucket): %v\n", err)
+		}
+
+		for _, obj := range page.Contents {
+			submissionTime, err := time.Parse(time.RFC3339, (*obj.Key)[32:52])
 			if err != nil {
 				log.Fatalf("Error parsing time: %v\n", err)
 			}
-	
-			// Check if the submission is in the previous twelve hour window
-	
+
 			if (submissionTime.After(lastExecutionTime)) && (submissionTime.Before(currentTime)) {
-	
-				reader, err := client.Bucket(dg.CloudBucketName()).Object(obj.Name).NewReader(ctx)
+
+				var identity Identity
+
+				objHandle, err := ctx.Client.GetObject(ctx.Context, &s3.GetObjectInput{
+					Bucket: ctx.BucketName,
+					Key:    obj.Key,
+				})
+
+				if err != nil {
+					log.Fatalf("Error getting object from bucket: %v\n", err)
+				}
+
+				defer objHandle.Body.Close()
+
+				objContents, err := io.ReadAll(objHandle.Body)
 				if err != nil {
 					log.Fatalf("Error getting creating reader for json: %v\n", err)
 				}
-	
-				decoder := json.NewDecoder(reader)
-	
-				err = decoder.Decode(&submissionData)
+
+				err = json.Unmarshal(objContents, &submissionData)
 				if err != nil {
-					log.Fatalf("Error converting json to string: %v\n", err)
+					log.Fatalf("Error unmarshaling bucket content: %v\n", err)
 				}
-		
-				identity := GetIdentity(submissionData.Submitter.String(), submissionData.RemoteAddr) // change the IP back to submissionData["remote_addr"]
+
+				if submissionData.GraphqlControlPort != 0 {
+					identity = GetFullIdentity(submissionData.Submitter.String(), submissionData.RemoteAddr, strconv.Itoa(submissionData.GraphqlControlPort))
+				} else {
+					identity = GetPartialIdentity(submissionData.Submitter.String(), submissionData.RemoteAddr)
+				}
+
 				if _, inMap := identities[identity["id"]]; !inMap {
 					AddIdentity(identity, identities)
 				}
-	
-				reader.Close()
-	
 			}
 		}
+	}
 	return identities
 }
 
-// Returns and Identity type identified by a hash value as an id 
+// Returns an Identity type identified by a hash value as an id
+// The identity returned by this is fully unique
+func GetFullIdentity(pubKey string, ip string, graphqlPort string) Identity {
+	s := strings.Join([]string{pubKey, ip, graphqlPort}, "-")
+	id := md5.Sum([]byte(s)) // Create a hash value and use it as id
 
-func GetIdentity(pubKey string, ip string) Identity {
+	identity := map[string]string{
+		"id":           hex.EncodeToString(id[:]),
+		"public-key":   pubKey,
+		"public-ip":    ip,
+		"graphql-port": graphqlPort,
+	}
+
+	return identity
+}
+
+// Returns an Identity type identified by a hash value as an id
+// The identity returned by this is partially unique
+func GetPartialIdentity(pubKey string, ip string) Identity {
 	s := strings.Join([]string{pubKey, ip}, "-")
 	id := md5.Sum([]byte(s)) // Create a hash value and use it as id
 
 	identity := map[string]string{
-		"id": hex.EncodeToString(id[:]),
+		"id":         hex.EncodeToString(id[:]),
 		"public-key": pubKey,
-		"public-ip": ip,
+		"public-ip":  ip,
 	}
 
 	return identity
 }
 
 // Adds an identity to the map
-
 func AddIdentity(identity Identity, identities map[string]Identity) {
 	identities[identity["id"]] = identity
 }

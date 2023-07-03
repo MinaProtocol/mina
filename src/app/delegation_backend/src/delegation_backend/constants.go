@@ -10,50 +10,22 @@ const REQUESTS_PER_PK_HOURLY = 120
 const DELEGATION_BACKEND_LISTEN_TO = ":8080"
 const TIME_DIFF_DELTA time.Duration = -5 * 60 * 1000000000 // -5m
 const WHITELIST_REFRESH_INTERVAL = 10 * 60 * 1000000000    // 10m
-const DELEGATION_WHITELIST_LIST = "Sheet1"
+const DELEGATION_WHITELIST_LIST = "Form Responses 1"
 const DELEGATION_WHITELIST_COLUMN = "E"
-
-// Production
-const PROD_WHITELIST_SPREADSHEET_ID = "1k-0kseheD5ruSCyxK1RQUIhEA09TJ999Gyw9unT0ZDY"
-const PROD_CLOUD_BUCKET_NAME = "itn-uptime"
-
-const TEST_WHITELIST_SPREADSHEET_ID = "130pLQL40WE8WjYinzS4RxuLqixk98aGBrMQW6kdbs10"
-const TEST_CLOUD_BUCKET_NAME = "georgeee-uptime-itn-test-1"
-
-// Incentivized testnet
-const ITN_WHITELIST_SPREADSHEET_ID = "1k-0kseheD5ruSCyxK1RQUIhEA09TJ999Gyw9unT0ZDY"
-const ITN_CLOUD_BUCKET_NAME = "itn-uptime"
-
-func CloudBucketName() string {
-	if os.Getenv("TEST") == "" {
-		if os.Getenv("NETWORK") == "itn" {
-			return ITN_CLOUD_BUCKET_NAME
-		}
-		return PROD_CLOUD_BUCKET_NAME
-	} else {
-		return TEST_CLOUD_BUCKET_NAME
-	}
-}
-
-func WhitelistSpreadsheetId() string {
-	if os.Getenv("TEST") == "" {
-		if os.Getenv("NETWORK") == "itn" {
-			return ITN_WHITELIST_SPREADSHEET_ID
-		}
-		return PROD_WHITELIST_SPREADSHEET_ID
-	}
-	return TEST_WHITELIST_SPREADSHEET_ID
-}
 
 var PK_PREFIX = [...]byte{1, 1}
 var SIG_PREFIX = [...]byte{1}
 var BLOCK_HASH_PREFIX = [...]byte{1}
 
 func NetworkId() uint8 {
-	if os.Getenv("NETWORK") == "" {
+	if os.Getenv("NETWORK") == "mainnet" {
 		return 1
 	}
 	return 0
+}
+
+func GetBucketName(config AppConfig) string {
+	return config.Aws.AccountId + "-block-producers-uptime"
 }
 
 const PK_LENGTH = 33  // one field element (32B) + 1 bit (encoded as full byte)
