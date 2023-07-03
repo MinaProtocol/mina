@@ -95,7 +95,7 @@ module Base
         if BC.is_expired cb then Deferred.return None
         else
           let summary = `String (Diff.summary @@ Envelope.Incoming.data env) in
-          [%log' debug logger] "Verifying $diff from $sender"
+          [%log debug] "Verifying $diff from $sender"
             ~metadata:
               [ ("diff", summary)
               ; ("sender", Envelope.Sender.to_yojson env.sender)
@@ -105,19 +105,25 @@ module Base
               ~score:(Diff.score env.data)
           with
           | `Capacity_exceeded ->
-              [%log' debug logger]
+              [%log debug]
                 ~metadata:
                   [ ("sender", Envelope.Sender.to_yojson env.sender)
                   ; ("diff", summary)
                   ]
                 "exceeded capacity from $sender" ;
               BC.error (Error.of_string "exceeded capacity") cb ;
+              Diff.log_internal ~logger "dropped_rate_limit" env ;
               Deferred.return None
           | `Within_capacity ->
               O1trace.thread verify_diffs_thread_label (fun () ->
                   match%map Diff.verify resource_pool env with
-                  | Error err ->
-                      [%log' debug logger]
+                  | Error ver_err ->
+                      Diff.log_internal ~logger
+                        ( "rejected"
+                        ^ Intf.Verification_error.to_short_string ver_err )
+                        env ;
+                      let err = Intf.Verification_error.to_error ver_err in
+                      [%log debug]
                         "Refusing to rebroadcast $diff. Verification error: \
                          $error"
                         ~metadata:
@@ -128,7 +134,7 @@ module Base
                       BC.error err cb ;
                       None
                   | Ok verified_diff ->
-                      [%log' debug logger] "Verified diff: $verified_diff"
+                      [%log debug] "Verified diff: $verified_diff"
                         ~metadata:
                           [ ( "verified_diff"
                             , Diff.verified_to_yojson
@@ -157,10 +163,10 @@ module Base
         let%bind () = on_push () in
         let env' = Msg.convert msg in
         let cb' = Msg.convert_callback cb in
+        Diff.log_internal ~logger "received" env' ;
         ( match cb' with
         | BC.External cb'' ->
-            Diff.update_metrics env' cb''
-              (Option.some_if log_gossip_heard logger) ;
+            Diff.update_metrics env' cb'' ~log_gossip_heard ~logger ;
             don't_wait_for
               ( match%map Mina_net2.Validation_callback.await cb'' with
               | None ->
@@ -173,8 +179,9 @@ module Base
                   () )
         | _ ->
             () ) ;
-        if Throttle.num_jobs_waiting_to_start throttle > max_waiting_jobs then
-          [%log warn] "Ignoring push to %s: throttle is full" trace_label
+        if Throttle.num_jobs_waiting_to_start throttle > max_waiting_jobs then (
+          Diff.log_internal ~logger "dropped_throttle_full" env' ;
+          [%log warn] "Ignoring push to %s: throttle is full" trace_label )
         else
           don't_wait_for
             (Throttle.enqueue throttle (fun () ->

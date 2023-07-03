@@ -774,11 +774,17 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
         in
         O1trace.sync_thread "produce_sync_4"
         @@ fun () ->
+        let txs =
+          Mina_block.transactions ~constraint_constants
+            (Breadcrumb.block breadcrumb)
+          |> List.map ~f:Transaction.yojson_summary_with_status
+        in
         [%log internal] "@block_metadata"
           ~metadata:
             [ ( "blockchain_length"
               , Mina_numbers.Length.to_yojson @@ Mina_block.blockchain_length
                 @@ Breadcrumb.block breadcrumb )
+            ; ("transactions", `List txs)
             ] ;
         [%str_log info]
           ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson breadcrumb) ]

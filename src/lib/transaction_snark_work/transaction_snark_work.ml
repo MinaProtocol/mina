@@ -59,7 +59,9 @@ module Statement = struct
 
   let compact_json t =
     `List
-      ( One_or_two.map ~f:(fun s -> `Int (Transaction_snark.Statement.hash s)) t
+      ( One_or_two.map
+          ~f:(fun s -> `Int (Transaction_snark.Statement.work_id s))
+          t
       |> One_or_two.to_list )
 
   let work_ids t : int One_or_two.t =

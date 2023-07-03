@@ -80,6 +80,7 @@ let%test_module "Epoch ledger sync tests" =
           ; time_controller
           ; consensus_constants
           ; genesis_constants = precomputed_values.genesis_constants
+          ; constraint_constants
           }
       in
       let pids = Child_processes.Termination.create_pid_table () in
