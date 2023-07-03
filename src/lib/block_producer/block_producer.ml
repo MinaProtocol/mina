@@ -877,29 +877,27 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
     ^ Mina_numbers.Global_slot_since_hard_fork.to_string slot )
   @@ fun () ->
   let consensus_state =
-    O1trace.sync_thread "block_producer_iteration: sync 0"
-    @@ fun () ->
     Transition_frontier.(best_tip frontier |> Breadcrumb.consensus_state)
   in
+  O1trace.thread "bp_0"
+  @@ fun () ->
   let i' =
-    O1trace.sync_thread "block_producer_iteration: sync 1"
-    @@ fun () ->
     Mina_numbers.Length.succ
       epoch_data_for_vrf.Consensus.Data.Epoch_data_for_vrf.epoch
   in
+  O1trace.thread "bp_1"
+  @@ fun () ->
   let new_global_slot = epoch_data_for_vrf.global_slot in
   let open Context in
   let%bind () =
-    O1trace.thread "block_producer_iteration: 1"
-    @@ fun () ->
     if Mina_numbers.Length.(i' > i) then
       Vrf_evaluation_state.update_epoch_data ~vrf_evaluator ~epoch_data_for_vrf
         ~logger vrf_evaluation_state
     else Deferred.unit
   in
+  O1trace.thread "bp_2"
+  @@ fun () ->
   let%bind () =
-    O1trace.thread "block_producer_iteration: 2"
-    @@ fun () ->
     (*Poll once every slot if the evaluation for the epoch is not completed or the evaluation is completed*)
     if
       Mina_numbers.Global_slot_since_hard_fork.(new_global_slot > slot)
@@ -907,8 +905,12 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
     then Vrf_evaluation_state.poll ~vrf_evaluator ~logger vrf_evaluation_state
     else Deferred.unit
   in
+  O1trace.thread "bp_3"
+  @@ fun () ->
   match Core.Queue.dequeue vrf_evaluation_state.queue with
   | None -> (
+      O1trace.thread "bp_4"
+      @@ fun () ->
       (*Keep trying until we get some slots*)
       let poll () =
         let%bind () =
@@ -939,10 +941,10 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
           O1trace.thread "block_producer_iteration: poll 2" @@ fun () -> poll ()
       )
   | Some slot_won -> (
+      O1trace.thread "bp_5"
+      @@ fun () ->
       let winning_global_slot = slot_won.global_slot in
       let slot, epoch =
-        O1trace.sync_thread "bp_sync_0"
-        @@ fun () ->
         let t =
           Consensus.Data.Consensus_time.of_global_slot winning_global_slot
             ~constants:consensus_constants
@@ -956,28 +958,24 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
                 to_yojson @@ of_uint32 slot) )
           ; ("epoch", Mina_numbers.Length.to_yojson epoch)
           ] ;
-      let now, curr_global_slot, winner_pk, data =
-        O1trace.sync_thread "bp_sync_1"
-        @@ fun () ->
-        let now = Block_time.now time_controller in
-        let curr_global_slot =
-          Consensus.Data.Consensus_time.(
-            of_time_exn ~constants:consensus_constants now |> to_global_slot)
-        in
-        let winner_pk = fst slot_won.delegator in
-        let data =
-          Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
-            ~coinbase_receiver:!coinbase_receiver
-        in
-        (now, curr_global_slot, winner_pk, data)
+      O1trace.thread "bp_6"
+      @@ fun () ->
+      let now = Block_time.now time_controller in
+      let curr_global_slot =
+        Consensus.Data.Consensus_time.(
+          of_time_exn ~constants:consensus_constants now |> to_global_slot)
       in
-      let eq_global_slots =
-        O1trace.sync_thread "bp_sync_2"
-        @@ fun () ->
+      let winner_pk = fst slot_won.delegator in
+      let data =
+        Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
+          ~coinbase_receiver:!coinbase_receiver
+      in
+      if
         Mina_numbers.Global_slot_since_hard_fork.(
           curr_global_slot = winning_global_slot)
-      in
-      if eq_global_slots then (
+      then (
+        O1trace.thread "bp_7"
+        @@ fun () ->
         (*produce now*)
         [%log info] "Producing a block now" ;
         set_next_producer_timing
@@ -986,6 +984,8 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
         Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
         dispatch_now (now, data, winner_pk) )
       else
+        O1trace.thread "bp_8"
+        @@ fun () ->
         let global_slot_diff =
           O1trace.sync_thread "bp_sync_3"
           @@ fun () ->
@@ -994,6 +994,8 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
         in
         match global_slot_diff with
         | None ->
+            O1trace.thread "bp_9"
+            @@ fun () ->
             [%log warn]
               "Skipping block production for global slot $slot_won because it \
                has passed. Current global slot is $curr_slot"
@@ -1007,6 +1009,8 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
                 ] ;
             next_check_now ()
         | Some slot_diff ->
+            O1trace.thread "bp_10"
+            @@ fun () ->
             let time =
               O1trace.sync_thread "bp_sync_4"
               @@ fun () ->
