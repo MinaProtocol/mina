@@ -4,14 +4,12 @@ open Pipe_lib
 module Best_tip_diff = Best_tip_diff
 module Root_history = Root_history
 module Snark_pool_refcount = Snark_pool_refcount
-module Transition_registry = Transition_registry
 module New_breadcrumbs = New_breadcrumbs
 
 type t =
   { root_history : Root_history.Broadcasted.t
   ; snark_pool_refcount : Snark_pool_refcount.Broadcasted.t
   ; best_tip_diff : Best_tip_diff.Broadcasted.t
-  ; transition_registry : Transition_registry.Broadcasted.t
   ; new_breadcrumbs : New_breadcrumbs.Broadcasted.t
   }
 [@@deriving fields]
@@ -27,19 +25,10 @@ let create ~logger frontier : t Deferred.t =
   let%bind best_tip_diff =
     Best_tip_diff.(Broadcasted.create (create ~logger frontier))
   in
-  let%bind transition_registry =
-    Transition_registry.(Broadcasted.create (create ~logger frontier))
-  in
   let%bind new_breadcrumbs =
     New_breadcrumbs.(Broadcasted.create (create ~logger frontier))
   in
-  return
-    { root_history
-    ; snark_pool_refcount
-    ; best_tip_diff
-    ; transition_registry
-    ; new_breadcrumbs
-    }
+  return { root_history; snark_pool_refcount; best_tip_diff; new_breadcrumbs }
 
 (* HACK: A way to ensure that all the pipes are closed in a type-safe manner *)
 let close t : unit =
@@ -52,8 +41,6 @@ let close t : unit =
     ~snark_pool_refcount:
       (close_extension (module Snark_pool_refcount.Broadcasted))
     ~best_tip_diff:(close_extension (module Best_tip_diff.Broadcasted))
-    ~transition_registry:
-      (close_extension (module Transition_registry.Broadcasted))
     ~new_breadcrumbs:(close_extension (module New_breadcrumbs.Broadcasted))
 
 let notify (t : t) ~logger ~frontier ~diffs_with_mutants =
@@ -74,7 +61,6 @@ let notify (t : t) ~logger ~frontier ~diffs_with_mutants =
        ~root_history:(update (module Root_history.Broadcasted))
        ~snark_pool_refcount:(update (module Snark_pool_refcount.Broadcasted))
        ~best_tip_diff:(update (module Best_tip_diff.Broadcasted))
-       ~transition_registry:(update (module Transition_registry.Broadcasted))
        ~new_breadcrumbs:(update (module New_breadcrumbs.Broadcasted)) )
 
 type ('ext, 'view) access =
@@ -82,8 +68,6 @@ type ('ext, 'view) access =
   | Snark_pool_refcount
       : (Snark_pool_refcount.t, Snark_pool_refcount.view) access
   | Best_tip_diff : (Best_tip_diff.t, Best_tip_diff.view) access
-  | Transition_registry
-      : (Transition_registry.t, Transition_registry.view) access
   | New_breadcrumbs : (New_breadcrumbs.t, New_breadcrumbs.view) access
 
 type ('ext, 'view) broadcasted_extension =
@@ -98,12 +82,8 @@ type ('ext, 'view) broadcasted_extension =
 let get :
     type ext view. t -> (ext, view) access -> (ext, view) broadcasted_extension
     =
- fun { root_history
-     ; snark_pool_refcount
-     ; best_tip_diff
-     ; transition_registry
-     ; new_breadcrumbs
-     } -> function
+ fun { root_history; snark_pool_refcount; best_tip_diff; new_breadcrumbs } ->
+   function
   | Root_history ->
       Broadcasted_extension ((module Root_history.Broadcasted), root_history)
   | Snark_pool_refcount ->
@@ -111,9 +91,6 @@ let get :
         ((module Snark_pool_refcount.Broadcasted), snark_pool_refcount)
   | Best_tip_diff ->
       Broadcasted_extension ((module Best_tip_diff.Broadcasted), best_tip_diff)
-  | Transition_registry ->
-      Broadcasted_extension
-        ((module Transition_registry.Broadcasted), transition_registry)
   | New_breadcrumbs ->
       Broadcasted_extension
         ((module New_breadcrumbs.Broadcasted), new_breadcrumbs)

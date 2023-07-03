@@ -352,6 +352,7 @@ module type Transition_router_intf = sig
           -> Transaction_snark_work.Checked.t option )
     -> catchup_mode:[ `Normal | `Super ]
     -> notify_online:(unit -> unit Deferred.t)
+    -> block_producer_report_finalized:(State_hash.t -> unit)
     -> unit
     -> ( [ `Transition of Mina_block.Validated.t ]
        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]

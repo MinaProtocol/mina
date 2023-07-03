@@ -541,7 +541,7 @@ let genesis_breadcrumb_creator ~context:(module Context : CONTEXT) prover =
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
     ~frontier ~time_controller ~transition_writer ~log_block_creation
-    ~block_reward_threshold ~block_produced_bvar
+    ~block_reward_threshold ~block_produced_bvar ~wait_for_finalization
     (scheduled_time, block_data, winner_pubkey) =
   O1trace.thread "produce"
   @@ fun () ->
@@ -556,10 +556,6 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
   Internal_tracing.with_slot global_slot
   @@ fun () ->
   [%log internal] "Begin_block_production" ;
-  let open Transition_frontier.Extensions in
-  let transition_registry =
-    get_extension (Transition_frontier.extensions frontier) Transition_registry
-  in
   let crumb = Transition_frontier.best_tip frontier in
   let crumb =
     O1trace.sync_thread "produce_sync_1"
@@ -808,29 +804,22 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
         [%log internal] "Wait_for_confirmation" ;
         [%log debug] ~metadata
           "Waiting for block $state_hash to be inserted into frontier" ;
-        O1trace.thread "produce_7" (fun () ->
-            Deferred.choose
-              [ Deferred.choice
-                  (Transition_registry.register transition_registry
-                     protocol_state_hashes.state_hash )
-                  (Fn.const (Ok `Transition_accepted))
-              ; Deferred.choice
-                  ( Block_time.Timeout.create time_controller
-                      (* We allow up to 20 seconds for the transition
-                         to make its way from the transition_writer to
-                         the frontier.
-                         This value is chosen to be reasonably
-                         generous. In theory, this should not take
-                         terribly long. But long cycles do happen in
-                         our system, and with medium curves those long
-                         cycles can be substantial.
-                      *)
-                      (Block_time.Span.of_ms 20000L)
-                      ~f:(Fn.const ())
-                  |> Block_time.Timeout.to_deferred )
-                  (Fn.const (Ok `Timed_out))
-              ] )
-        >>= function
+        O1trace.thread "produce_7"
+        @@ fun () ->
+        (* We allow up to 20 seconds for the transition
+           to make its way from the transition_writer to
+           the frontier.
+           This value is chosen to be reasonably
+           generous. In theory, this should not take
+           terribly long. But long cycles do happen in
+           our system, and with medium curves those long
+           cycles can be substantial.
+        *)
+        match%bind.Deferred
+          wait_for_finalization
+            (Time_ns.Span.of_int_sec 20)
+            protocol_state_hashes.state_hash
+        with
         | `Transition_accepted ->
             [%log internal] "Transition_accepted" ;
             [%log info] ~metadata
@@ -1048,7 +1037,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
-    ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state =
+    ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state
+    ~wait_for_finalization =
   let open Context in
   O1trace.sync_thread "block_producer_run"
   @@ fun () ->
@@ -1114,7 +1104,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             ~transaction_resource_pool ~transition_writer ~log_block_creation
             ~block_reward_threshold ~block_produced_bvar ~genesis_breadcrumb
             ~context:(module Context)
-            ~frontier ~time_controller
+            ~frontier ~time_controller ~wait_for_finalization
         in
         let dispatch_now data =
           produce_do frontier data >>| const (new_global_slot, i')
@@ -1164,7 +1154,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     upon (schedule ~logger ~time_controller genesis_state_timestamp) start )
 
 let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
-    ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks =
+    ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks
+    ~wait_for_finalization =
   let open Context in
   let log_bootstrap_mode () =
     [%log info] "Pausing block production while bootstrapping"
@@ -1200,12 +1191,6 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     | None ->
         log_bootstrap_mode () ; return ()
     | Some frontier ->
-        let open Transition_frontier.Extensions in
-        let transition_registry =
-          get_extension
-            (Transition_frontier.extensions frontier)
-            Transition_registry
-        in
         let crumb = Transition_frontier.best_tip frontier in
         [%log trace]
           ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson crumb) ]
@@ -1319,19 +1304,11 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           in
           [%log debug] ~metadata
             "Waiting for block $state_hash to be inserted into frontier" ;
-          Deferred.choose
-            [ Deferred.choice
-                (Transition_registry.register transition_registry
-                   protocol_state_hashes.state_hash )
-                (Fn.const (Ok `Transition_accepted))
-            ; Deferred.choice
-                ( Block_time.Timeout.create time_controller
-                    (Block_time.Span.of_ms 20000L)
-                    ~f:(Fn.const ())
-                |> Block_time.Timeout.to_deferred )
-                (Fn.const (Ok `Timed_out))
-            ]
-          >>= function
+          match%bind.Deferred
+            wait_for_finalization
+              (Time_ns.Span.of_int_sec 20)
+              protocol_state_hashes.state_hash
+          with
           | `Transition_accepted ->
               [%log info] ~metadata
                 "Generated transition $state_hash was accepted into transition \

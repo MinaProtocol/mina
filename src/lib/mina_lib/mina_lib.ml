@@ -118,6 +118,7 @@ type t =
   ; block_production_status :
       [ `Producing | `Producing_in_ms of float | `Free ] ref
   ; vrf_evaluation_state : Block_producer.Vrf_evaluation_state.t
+  ; block_producer_reporter : Block_producer_reporter.t
   }
 [@@deriving fields]
 
@@ -1264,7 +1265,9 @@ let start t =
       ~log_block_creation:t.config.log_block_creation
       ~block_reward_threshold:t.config.block_reward_threshold
       ~block_produced_bvar:t.components.block_produced_bvar
-      ~vrf_evaluation_state:t.vrf_evaluation_state ;
+      ~vrf_evaluation_state:t.vrf_evaluation_state
+      ~wait_for_finalization:
+        (Block_producer_reporter.wait_for_finalization t.block_producer_reporter) ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -1302,6 +1305,8 @@ let start_with_precomputed_blocks t blocks =
       ~frontier_reader:t.components.transition_frontier
       ~transition_writer:t.pipes.producer_transition_writer
       ~precomputed_blocks:blocks
+      ~wait_for_finalization:
+        (Block_producer_reporter.wait_for_finalization t.block_producer_reporter)
   in
   start t
 
@@ -1354,6 +1359,7 @@ let create ?wallets (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
+  let block_producer_reporter = Block_producer_reporter.create () in
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
@@ -1903,7 +1909,11 @@ let create ?wallets (config : Config.t) =
                 (Fn.compose
                    (Network_pool.Snark_pool.get_completed_work snark_pool)
                    Transaction_snark_work.Statement_with_hash.create )
-              ~notify_online ()
+              ~notify_online
+              ~block_producer_report_finalized:
+                (Block_producer_reporter.report_finalized
+                   block_producer_reporter )
+              ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -2165,6 +2175,7 @@ let create ?wallets (config : Config.t) =
             ; block_production_status = ref `Free
             ; vrf_evaluation_state =
                 Block_producer.Vrf_evaluation_state.create ()
+            ; block_producer_reporter
             } ) )
 
 let net { components = { net; _ }; _ } = net

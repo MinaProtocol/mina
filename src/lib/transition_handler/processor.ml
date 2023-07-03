@@ -44,7 +44,8 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
-    ~valid_cb cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
+    ~valid_cb ~(precomputed_values : Precomputed_values.t)
+    ?(report_finalized = Fn.ignore) cached_breadcrumb =
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb
@@ -102,6 +103,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   else (
     Writer.write processed_transition_writer
       (`Transition transition, `Source source, `Valid_cb valid_cb) ;
+    report_finalized @@ Mina_block.Validated.state_hash transition ;
     Catchup_scheduler.notify catchup_scheduler
       ~hash:(Mina_block.Validated.state_hash transition) )
 
@@ -286,7 +288,8 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
        , unit )
-       Writer.t ) ~processed_transition_writer =
+       Writer.t ) ~processed_transition_writer ~block_producer_report_finalized
+    =
   let open Context in
   let catchup_scheduler =
     Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
@@ -406,6 +409,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                     match%map
                       add_and_finalize ~logger ~only_if_present:false
                         ~source:`Internal breadcrumb ~valid_cb:None
+                        ~report_finalized:block_producer_report_finalized
                     with
                     | Ok () ->
                         [%log internal] "Breadcrumb_integrated" ;
@@ -519,7 +523,8 @@ let%test_module "Transition_handler.Processor tests" =
                   ~primary_transition_reader:valid_transition_reader
                   ~producer_transition_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-                  ~processed_transition_writer ;
+                  ~processed_transition_writer
+                  ~block_producer_report_finalized:Fn.ignore ;
                 List.iter branch ~f:(fun breadcrumb ->
                     let b =
                       downcast_breadcrumb breadcrumb
