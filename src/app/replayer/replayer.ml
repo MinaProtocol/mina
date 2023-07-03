@@ -569,7 +569,26 @@ let try_slot ~logger pool slot =
   in
   go ~slot ~tries_left:num_tries
 
-let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
+let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis =
+  (* start replaying at the slot after the one we've just finished with *)
+  let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
+  let%bind replayer_checkpoint =
+    let%map input =
+      create_replayer_checkpoint ~ledger ~start_slot_since_genesis
+    in
+    input_to_yojson input |> Yojson.Safe.pretty_to_string
+  in
+  let checkpoint_file =
+    sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
+  in
+  [%log info] "Writing checkpoint file"
+    ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
+  return
+  @@ Out_channel.with_file checkpoint_file ~f:(fun oc ->
+         Out_channel.output_string oc replayer_checkpoint )
+
+let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
+    ~checkpoint_interval () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -839,6 +858,24 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
               (sc.global_slot_since_genesis, sc.sequence_no)
             in
             [%compare: int64 * int] (tuple sc1) (tuple sc2) )
+      in
+      let checkpoint_interval_i64 =
+        Option.map checkpoint_interval ~f:Int64.of_int
+      in
+      let checkpoint_target =
+        ref
+          (Option.map checkpoint_interval_i64 ~f:(fun interval ->
+               Int64.(input.start_slot_since_genesis + interval) ) )
+      in
+      let incr_checkpoint_target () =
+        Option.iter !checkpoint_target ~f:(fun target ->
+            match checkpoint_interval_i64 with
+            | Some interval ->
+                [%log info] "Checkpoint target was %Ld, setting to %Ld" target
+                  Int64.(target + interval) ;
+                checkpoint_target := Some Int64.(target + interval)
+            | None ->
+                failwith "Expected a checkpoint interval" )
       in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands ~last_global_slot_since_genesis ~last_block_id
@@ -1130,6 +1167,14 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         (* a sequence is a command type, slot, sequence number triple *)
         let get_internal_cmd_sequence (ic : Sql.Internal_command.t) =
           (`Internal_command, ic.global_slot_since_genesis, ic.sequence_no)
+        in
+        let _write_checkpoint_file () =
+          Option.iter !checkpoint_target ~f:(fun target ->
+              if Int64.(last_global_slot_since_genesis >= target) then (
+                incr_checkpoint_target () ;
+                Async.don't_wait_for
+                  (write_replayer_checkpoint ~logger ~ledger
+                     ~last_global_slot_since_genesis ) ) )
         in
         let get_user_cmd_sequence (uc : Sql.User_command.t) =
           (`User_command, uc.global_slot_since_genesis, uc.sequence_no)
@@ -1454,5 +1499,10 @@ let () =
          and continue_on_error =
            Param.flag "--continue-on-error"
              ~doc:"Continue processing after errors" Param.no_arg
+         and checkpoint_interval =
+           Param.flag "--checkpoint-interval"
+             ~doc:"NN Write checkpoint file every NN slots"
+             Param.(optional int)
          in
-         main ~input_file ~output_file_opt ~archive_uri ~continue_on_error )))
+         main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
+           ~continue_on_error )))
