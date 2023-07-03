@@ -1,5 +1,4 @@
 (* TODO: remove these openings *)
-open Sponge
 open Unsigned.Size_t
 
 (* TODO: open Core here instead of opening it multiple times below *)
@@ -764,7 +763,7 @@ module Make
     *)
     (Gates : Gate_vector_intf with type field := Fp.t)
     (Params : sig
-      val params : Fp.t Params.t
+      val params : Fp.t Sponge.Params.t
     end) : sig
   open Core_kernel
 
