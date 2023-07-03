@@ -671,7 +671,9 @@ let%test_unit "bitwise shift gadgets" =
     let _cs = test_shift "256" 20 Right "0" in
     let _cs = test_shift "6510615555426900570" 16 Right "99344109427290" in
     (* All 1's word *)
-    let cs_allone = test_shift "18446744073709551615" 15 Left "18446744073709518848" in
+    let cs_allones =
+      test_shift "18446744073709551615" 15 Left "18446744073709518848"
+    in
     (* Random value ADCC7E30EDCAC126 -> ADCC7E30 -> EDCAC12600000000*)
     let _cs = test_shift "12523523412423524646" 32 Right "2915860016" in
     let _cs =
@@ -681,7 +683,8 @@ let%test_unit "bitwise shift gadgets" =
     (* Negatve tests *)
     assert (Common.is_error (fun () -> test_shift "0" 1 Left "1")) ;
     assert (Common.is_error (fun () -> test_shift "1" 64 Left "1")) ;
-    assert (Common.is_error (fun () -> test_shift ~cs:cs_allone "0" 0 Left "0")) ) ;
+    assert (Common.is_error (fun () -> test_shift ~cs:cs_allones "0" 0 Left "0"))
+    ) ;
   ()
 
 let%test_unit "bitwise xor gadget" =
