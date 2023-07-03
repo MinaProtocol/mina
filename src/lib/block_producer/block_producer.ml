@@ -818,7 +818,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
         match%bind.Deferred
           wait_for_finalization
             (Time_ns.Span.of_int_sec 20)
-            protocol_state_hashes.state_hash
+            (Breadcrumb.block_with_hash breadcrumb)
         with
         | `Transition_accepted ->
             [%log internal] "Transition_accepted" ;

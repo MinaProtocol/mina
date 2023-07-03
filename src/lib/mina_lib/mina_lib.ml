@@ -1266,8 +1266,37 @@ let start t =
       ~block_reward_threshold:t.config.block_reward_threshold
       ~block_produced_bvar:t.components.block_produced_bvar
       ~vrf_evaluation_state:t.vrf_evaluation_state
-      ~wait_for_finalization:
-        (Block_producer_reporter.wait_for_finalization t.block_producer_reporter) ;
+      ~wait_for_finalization:(fun span block ->
+        let%bind res =
+          Block_producer_reporter.wait_for_finalization
+            t.block_producer_reporter span
+            (State_hash.With_state_hashes.state_hash block)
+        in
+        match res with
+        | `Timed_out ->
+            Deferred.return res
+        | `Transition_accepted -> (
+            let consensus_state =
+              With_hash.data block |> Mina_block.header |> Header.protocol_state
+              |> Mina_state.Protocol_state.consensus_state
+            in
+            let now =
+              let open Block_time in
+              now t.config.time_controller |> to_span_since_epoch |> Span.to_ms
+            in
+            let consensus_constants =
+              t.config.precomputed_values.consensus_constants
+            in
+            match
+              Consensus.Hooks.received_at_valid_time
+                ~constants:consensus_constants ~time_received:now
+                consensus_state
+            with
+            | Ok () ->
+                Mina_networking.broadcast_state t.components.net block
+                >>| const res
+            | _ ->
+                Deferred.return res ) ) ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -1991,9 +2020,6 @@ let create ?wallets (config : Config.t) =
                             valid_cb
                       | `Internal ->
                           (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
-                          don't_wait_for
-                            (Mina_networking.broadcast_state net
-                               (Mina_block.Validated.forget transition) ) ;
                           Option.iter
                             ~f:
                               (Fn.flip
