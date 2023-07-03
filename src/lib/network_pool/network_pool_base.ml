@@ -116,12 +116,13 @@ end)
       ~capacity:
         (Resource_pool.Diff.max_per_15_seconds, `Per (Time.Span.of_sec 15.0))
 
-  let apply_and_broadcast t
+  let apply_and_broadcast ({ logger; _ } as t)
       (diff : Resource_pool.Diff.verified Envelope.Incoming.t) cb =
+    let env = Envelope.Incoming.map ~f:Resource_pool.Diff.t_of_verified diff in
     let rebroadcast (diff', rejected) =
       let open Broadcast_callback in
       if Resource_pool.Diff.is_empty diff' then (
-        [%log' trace t.logger]
+        [%log trace]
           "Refusing to rebroadcast $diff. Pool diff apply feedback: empty diff"
           ~metadata:
             [ ( "diff"
@@ -130,22 +131,27 @@ end)
             ] ;
         drop diff' rejected cb )
       else (
-        [%log' debug t.logger] "Rebroadcasting diff %s"
-          (Resource_pool.Diff.summary diff') ;
+        [%log debug] "Rebroadcasting diff %s" (Resource_pool.Diff.summary diff') ;
         forward t.write_broadcasts diff' rejected cb )
     in
     O1trace.sync_thread apply_and_broadcast_thread_label (fun () ->
         match Resource_pool.Diff.unsafe_apply t.resource_pool diff with
         | Ok (`Accept, accepted, rejected) ->
+            Resource_pool.Diff.log_internal ~logger "accepted" env ;
             rebroadcast (accepted, rejected)
         | Ok (`Reject, accepted, rejected) ->
+            Resource_pool.Diff.log_internal ~logger "rejected"
+              ~reason:"not_applied" env ;
             Broadcast_callback.reject accepted rejected cb
         | Error (`Locally_generated res) ->
+            Resource_pool.Diff.log_internal ~logger "rejected"
+              ~reason:"locally_generated" env ;
             rebroadcast res
         | Error (`Other e) ->
             [%log' debug t.logger]
               "Refusing to rebroadcast. Pool diff apply feedback: $error"
               ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+            Resource_pool.Diff.log_internal ~logger "rejected" env ;
             Broadcast_callback.error e cb )
 
   let log_rate_limiter_occasionally t rl =
