@@ -1,6 +1,3 @@
-(* TODO: remove these openings *)
-open Unsigned.Size_t
-
 (* TODO: open Core here instead of opening it multiple times below *)
 
 module Kimchi_gate_type = struct
