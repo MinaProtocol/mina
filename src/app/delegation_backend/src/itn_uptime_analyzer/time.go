@@ -10,12 +10,12 @@ import (
 )
 
 func GetCurrentTime() time.Time {
-	currentTime := time.Now()
+	currentTime := time.Now().UTC()
 	return currentTime
 }
 
 // Get last execution time of application
-func GetLastExecutionTime(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, syncPeriod int) time.Time {
+func GetLastExecutionTime(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, executionInterval int) time.Time {
 	readRange := fmt.Sprintf("%s!A%d:Z%d", sheetTitle, 1, 1)
 	spId := config.AnalyzerOutputGsheetId
 
@@ -39,20 +39,20 @@ func GetLastExecutionTime(config AppConfig, client *sheets.Service, log *logging
 			log.Fatalf("Unable to parse string to time: %v", err)
 		}
 	} else {
-		pastTime := currentTime.Add(-time.Duration(syncPeriod) * time.Hour)
+		pastTime := currentTime.Add(-time.Duration(executionInterval) * time.Hour)
 		return pastTime
 	}
 
 	timeDiffHours := time.Since(lastExecutionBasedOnSheetsAsTime).Hours()
 
-	if (lastExecutionBasedOnSheets != "") && (timeDiffHours > time.Since(currentTime.Add(-time.Duration(syncPeriod-1)*time.Hour)).Hours()) && (timeDiffHours <= time.Since(currentTime.Add(-time.Duration(syncPeriod)*time.Hour)).Hours()) {
+	if (lastExecutionBasedOnSheets != "") && (timeDiffHours > time.Since(currentTime.Add(-time.Duration(executionInterval-1)*time.Hour)).Hours()) && (timeDiffHours <= time.Since(currentTime.Add(-time.Duration(executionInterval+1)*time.Hour)).Hours()) {
 		pastTime, err := time.Parse(time.RFC3339, lastExecutionBasedOnSheets)
 		if err != nil {
 			log.Fatalf("Unable to parse string to time: %v", err)
 		}
 		return pastTime
 	} else {
-		pastTime := currentTime.Add(-time.Duration(syncPeriod) * time.Hour)
+		pastTime := currentTime.Add(-time.Duration(executionInterval) * time.Hour)
 		return pastTime
 	}
 
@@ -77,8 +77,8 @@ func IdentifyWeek(config AppConfig, client *sheets.Service, log *logging.ZapEven
 
 	var lastFilledColumn int = len(resp.Values[0]) - 1
 
-	currentDate := currentTime.UTC().Format("2006-01-02")
-	oneWeekLater := currentTime.Add(7 * 24 * time.Hour).UTC().Format("2006-01-02")
+	currentDate := currentTime.Format("2006-01-02")
+	oneWeekLater := currentTime.Add(7 * 24 * time.Hour).Format("2006-01-02")
 	sheetTitle := strings.Join([]string{currentDate, oneWeekLater}, " - ")
 
 	if lastFilledColumn >= 14 {
@@ -93,10 +93,10 @@ func IdentifyWeek(config AppConfig, client *sheets.Service, log *logging.ZapEven
 	}
 }
 
-func IsSyncPeriodEnough(currentTime time.Time, syncPeriod int) bool {
-	if currentTime.Hour() < syncPeriod {
+func IsSyncPeriodEnough(currentTime time.Time, executionInterval int) bool {
+	if currentTime.Hour() < executionInterval {
 		return true
-	} else if currentTime.Hour() >= syncPeriod {
+	} else if currentTime.Hour() >= executionInterval {
 		return false
 	}
 

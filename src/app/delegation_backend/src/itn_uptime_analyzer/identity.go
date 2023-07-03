@@ -20,10 +20,10 @@ type Identity map[string]string
 
 // Goes through each submission and adds an identity type to a map
 
-func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, syncPeriod int) map[string]Identity {
+func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, executionInterval int) map[string]Identity {
 
-	currentDate := currentTime.UTC().Format("2006-01-02")
-	lastExecutionTime := GetLastExecutionTime(config, sheet, log, sheetTitle, currentTime, syncPeriod)
+	currentDate := currentTime.Format("2006-01-02")
+	lastExecutionTime := GetLastExecutionTime(config, sheet, log, sheetTitle, currentTime, executionInterval)
 
 	prefixCurrent := strings.Join([]string{ctx.Prefix, "submissions", currentDate}, "/")
 
