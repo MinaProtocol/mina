@@ -2,10 +2,10 @@
 type rot_mode = Left | Right
 
 (** 64-bit rotation of rot_bits to the `mode` side
- * - check64: whether to check the input word is at most 64 bits (default is false)
- * - word of maximum 64 bits to be rotated
- * - rot_bits: number of bits to be rotated
- * - mode: Left or Right
+ * @param check64  whether to check the input word is at most 64 bits (default is false)
+ * @param word  word of maximum 64 bits to be rotated
+ * @param bits  number of bits to be rotated
+ * @param mode  Left or Right
  * Returns rotated word
  *)
 val rot64 :
@@ -18,9 +18,9 @@ val rot64 :
 
 (** 64-bit bitwise logical shift left of bits to the `mode` side
  * Inputs
- *  - check64: whether to check the input word is at most 64 bits (default is false)
- *  - word of maximum 64 bits to be shifted
- *  - bits: number of bits to be shifted
+ *  @param check64  whether to check the input word is at most 64 bits (default is false)
+ *  @param word  word of maximum 64 bits to be shifted
+ *  @param bits  number of bits to be shifted
  * Output: left shifted word (with bits 0s at the least significant positions)
  *)
 val lsl64 :
@@ -32,9 +32,9 @@ val lsl64 :
 
 (** 64-bit bitwise logical shift of bits to the right side
  * Inputs
- *  - check64: whether to check the input word is at most 64 bits (default is false)
- *  - word of maximum 64 bits to be shifted
- *  - bits: number of bits to be shifted
+ *  @param check64   whether to check the input word is at most 64 bits (default is false)
+ *  @param word  word of maximum 64 bits to be shifted
+ *  @param bits  number of bits to be shifted
  * Output: right shifted word (with bits 0s at the most significant positions)
  *)
 val lsr64 :
