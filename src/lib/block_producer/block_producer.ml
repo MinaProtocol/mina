@@ -355,7 +355,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
       (`Prover_error
         ( err
         , ( previous_protocol_state_proof
-          , _internal_transition
+          , internal_transition
           , pending_coinbase_witness ) ) ) ->
       let msg : (_, unit, string, unit) format4 =
         "Prover failed to prove freshly generated transition: $error"
@@ -365,9 +365,8 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
         ; ("prev_state", Protocol_state.value_to_yojson previous_protocol_state)
         ; ("prev_state_proof", Proof.to_yojson previous_protocol_state_proof)
         ; ("next_state", Protocol_state.value_to_yojson protocol_state)
-          (* Commented out because for large blocks it's an oversized log *)
-          (* ; ( "internal_transition"
-             , Internal_transition.to_yojson internal_transition ) *)
+        ; ( "internal_transition"
+          , Internal_transition.to_yojson internal_transition )
         ; ( "pending_coinbase_witness"
           , Pending_coinbase_witness.to_yojson pending_coinbase_witness )
         ; time_metadata
@@ -586,7 +585,7 @@ let genesis_breadcrumb_creator ~context:(module Context : CONTEXT) prover =
 
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
-    ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
+    ~frontier ~time_controller ~transition_writer ~log_block_creation
     ~block_reward_threshold ~block_produced_bvar ~slot_tx_end ~slot_chain_end
     ~net ~zkapp_cmd_limit_hardcap (scheduled_time, block_data, winner_pubkey) =
   let open Context in
@@ -594,11 +593,6 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
   let rejected_blocks_logger =
     Logger.create ~id:Logger.Logger_id.rejected_blocks ()
   in
-  match Broadcast_pipe.Reader.peek frontier_reader with
-  | None ->
-      log_bootstrap_mode ~logger () ;
-      return ()
-  | Some frontier -> (
       let global_slot =
         Consensus.Data.Block_data.global_slot_since_genesis block_data
       in
@@ -919,31 +913,21 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
           let%bind res = emit_breadcrumb () in
           let span = Block_time.diff (Block_time.now time_controller) start in
           handle_block_production_errors ~logger ~rejected_blocks_logger
-            ~time_taken:span ~previous_protocol_state ~protocol_state res )
-
-let generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader () =
-  match Broadcast_pipe.Reader.peek frontier_reader with
-  | Some transition_frontier ->
-      let consensus_state =
-        Transition_frontier.best_tip transition_frontier
-        |> Transition_frontier.Breadcrumb.consensus_state
-      in
-      if Consensus.Data.Consensus_state.is_genesis_state consensus_state then
-        genesis_breadcrumb () |> Deferred.ignore_m
-      else Deferred.return ()
-  | None ->
-      Deferred.return ()
+            ~time_taken:span ~previous_protocol_state ~protocol_state res
 
 let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
-    ~next_check_now ~genesis_breadcrumb ~context:(module Context : CONTEXT)
-    ~vrf_evaluator ~time_controller ~coinbase_receiver ~frontier_reader
-    ~set_next_producer_timing ~transition_frontier ~vrf_evaluation_state
-    ~epoch_data_for_vrf ~ledger_snapshot i slot =
-  O1trace.thread "block_producer_iteration"
+    ~next_check_now ~context:(module Context : CONTEXT) ~vrf_evaluator
+    ~time_controller ~coinbase_receiver ~set_next_producer_timing ~frontier
+    ~vrf_evaluation_state ~epoch_data_for_vrf ~ledger_snapshot i slot =
+  O1trace.thread
+    ( "block_producer_iteration "
+    ^ Unsigned.UInt32.to_string i
+    ^ " "
+    ^ Mina_numbers.Global_slot_since_hard_fork.to_string slot )
   @@ fun () ->
   let consensus_state =
     Transition_frontier.(
-      best_tip transition_frontier |> Breadcrumb.consensus_state)
+      best_tip frontier |> Breadcrumb.consensus_state)
   in
   let i' =
     Mina_numbers.Length.succ
@@ -1030,10 +1014,6 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
           (`Produce_now (data, winner_pk))
           consensus_state ;
         Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-        let%bind () =
-          generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader
-            ()
-        in
         dispatch_now (now, data, winner_pk) )
       else
         match
@@ -1067,30 +1047,8 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
             set_next_producer_timing
               (`Produce (time, data, winner_pk))
               consensus_state ;
-            Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
+            Mina_metrics.(Counter.inc_one Block_producer.slots_won)  ;
             let scheduled_time = time_of_ms time in
-            don't_wait_for
-              ((* Attempt to generate a genesis proof in the slot
-                  immediately before we'll actually need it, so that
-                  it isn't limiting our block production time in the
-                  won slot.
-                  This also allows non-genesis blocks to be received
-                  in the meantime and alleviate the need to produce
-                  one at all, if this won't have block height 1.
-               *)
-               let scheduled_genesis_time =
-                 time_of_ms
-                   Int64.(
-                     time - of_int constraint_constants.block_window_duration_ms)
-               in
-               let span_till_time =
-                 Block_time.diff scheduled_genesis_time
-                   (Block_time.now time_controller)
-                 |> Block_time.Span.to_time_span
-               in
-               let%bind () = after span_till_time in
-               generate_genesis_proof_if_needed ~genesis_breadcrumb
-                 ~frontier_reader () ) ;
             schedule_dispatch (scheduled_time, data, winner_pk) )
 
 let schedule ~logger ~time_controller time =
@@ -1114,20 +1072,31 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       let genesis_breadcrumb =
         genesis_breadcrumb_creator ~context:(module Context) prover
       in
+      (* Wait for frontier to be initialized and pre-emptively create genesis if best tip is genesis
+         This will only be executed on the very start of the network. Preemptive execution is needed
+         to ensire first block creation won't be delayed. *)
+      don't_wait_for
+        ( O1trace.thread "create_genesis"
+        @@ fun () ->
+        Broadcast_pipe.Reader.iter_until frontier_reader ~f:(function
+          | None ->
+              return false
+          | Some frontier ->
+              let consensus_state =
+                Transition_frontier.(
+                  best_tip frontier |> Breadcrumb.consensus_state)
+              in
+              let%map () =
+                if Consensus.Data.Consensus_state.is_genesis_state consensus_state
+                then genesis_breadcrumb () |> Deferred.ignore_m
+                else Deferred.unit
+              in
+              true ) ) ;
       let slot_tx_end =
         Runtime_config.slot_tx_end precomputed_values.runtime_config
       in
       let slot_chain_end =
         Runtime_config.slot_chain_end precomputed_values.runtime_config
-      in
-      let produce =
-        produce ~genesis_breadcrumb
-          ~context:(module Context : CONTEXT)
-          ~prover ~verifier ~trust_system ~get_completed_work
-          ~transaction_resource_pool ~frontier_reader ~time_controller
-          ~transition_writer ~log_block_creation ~block_reward_threshold
-          ~block_produced_bvar ~slot_tx_end ~slot_chain_end ~net
-          ~zkapp_cmd_limit_hardcap
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let iteration_wrapped (slot, i) =
@@ -1140,10 +1109,9 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                 ~f:(Fn.compose Deferred.return Option.is_some)
             in
             (slot, i)
-        | Some transition_frontier ->
+        | Some frontier ->
             let consensus_state =
-              Transition_frontier.best_tip transition_frontier
-              |> Breadcrumb.consensus_state
+              Transition_frontier.best_tip frontier |> Breadcrumb.consensus_state
             in
             let now = Block_time.now time_controller in
             let epoch_data_for_vrf, ledger_snapshot =
@@ -1195,8 +1163,17 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     ~local_state:consensus_local_state
                    = None ) ; *)
             let next_check_now () = return (new_global_slot, i') in
+            let produce_do frontier =
+              produce  ~genesis_breadcrumb
+              ~context:(module Context : CONTEXT)
+              ~prover ~verifier ~trust_system ~get_completed_work
+              ~transaction_resource_pool ~frontier ~time_controller
+              ~transition_writer ~log_block_creation ~block_reward_threshold
+              ~block_produced_bvar ~slot_tx_end ~slot_chain_end ~net
+              ~zkapp_cmd_limit_hardcap
+            in
             let dispatch_now data =
-              produce data >>| const (new_global_slot, i')
+              produce_do frontier data >>| const (new_global_slot, i')
             in
             let schedule_next_check time =
               let%map () = schedule ~logger ~time_controller time in
@@ -1204,14 +1181,21 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             in
             let schedule_dispatch (time, data, winner) =
               let%bind () = schedule ~logger ~time_controller time in
-              dispatch_now (time, data, winner)
+              let%map () =
+                match Broadcast_pipe.Reader.peek frontier_reader with
+                | None ->
+                    Deferred.return @@ log_bootstrap_mode ~logger ()
+                | Some frontier' ->
+                    produce_do frontier' (time, data, winner)
+              in
+              (new_global_slot, i')
             in
             iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
-              ~next_check_now ~genesis_breadcrumb
+              ~next_check_now
               ~context:(module Context)
               ~vrf_evaluator ~time_controller ~coinbase_receiver
-              ~frontier_reader ~set_next_producer_timing ~transition_frontier
-              ~vrf_evaluation_state ~epoch_data_for_vrf ~ledger_snapshot i slot
+              ~set_next_producer_timing ~frontier ~vrf_evaluation_state
+              ~epoch_data_for_vrf ~ledger_snapshot i slot
       in
       let start _ =
         Deferred.forever
@@ -1241,6 +1225,9 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
 let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks =
   let open Context in
+  let log_bootstrap_mode () =
+    [%log info] "Pausing block production while bootstrapping"
+  in
   let rejected_blocks_logger =
     Logger.create ~id:Logger.Logger_id.rejected_blocks ()
   in
@@ -1270,7 +1257,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     in
     match Broadcast_pipe.Reader.peek frontier_reader with
     | None ->
-        log_bootstrap_mode ~logger () ;
+        log_bootstrap_mode () ;
         return ()
     | Some frontier ->
         let open Transition_frontier.Extensions in
@@ -1430,7 +1417,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     (* Begin checking for the ability to produce a block *)
     match Broadcast_pipe.Reader.peek frontier_reader with
     | None ->
-        log_bootstrap_mode ~logger () ;
+        log_bootstrap_mode () ;
         let%bind () =
           Broadcast_pipe.Reader.iter_until frontier_reader
             ~f:(Fn.compose Deferred.return Option.is_some)
