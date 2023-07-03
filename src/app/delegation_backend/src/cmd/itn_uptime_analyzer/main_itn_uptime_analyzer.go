@@ -4,7 +4,6 @@ import (
 	dg "block_producers_uptime/delegation_backend"
 	itn "block_producers_uptime/itn_uptime_analyzer"
 	"context"
-	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -25,7 +24,6 @@ func main() {
 	executionInterval := 12
 
 	// Setting up logging for application
-
 	logging.SetupLogging(logging.Config{
 		Format: logging.JSONOutput,
 		Stderr: true,
@@ -34,17 +32,17 @@ func main() {
 		File:   "",
 	})
 	log := logging.Logger("itn availability script")
-	log.Infof("itn availability script has the following logging subsystems active: %v", logging.GetSubsystems())
+	log.Infof("itn availability script has the following logging subsystems active: %v\n", logging.GetSubsystems())
 
 	// Empty context object and initializing memory for application
-
 	ctx := context.Background()
 
+	// Load environment variables
 	appCfg := itn.LoadEnv(log)
 
 	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(appCfg.Aws.Region))
 	if err != nil {
-		log.Fatalf("Error loading AWS configuration: %v", err)
+		log.Fatalf("Error loading AWS configuration: %v\n", err)
 	}
 
 	app := new(dg.App)
@@ -57,20 +55,19 @@ func main() {
 
 	sheetsService, err := sheets.NewService(ctx)
 	if err != nil {
-		log.Fatalf("Error creating Sheets service: %v", err)
+		log.Fatalf("Error creating Sheets service: %v\n", err)
 	}
 
 	sheetTitle, err := itn.IdentifyWeek(appCfg, sheetsService, log, currentTime)
 	if err != nil {
-		log.Fatalf("Error identifying week: %v", err)
+		log.Fatalf("Error identifying week: %v\n", err)
 	}
 
 	identities := itn.CreateIdentities(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime, executionInterval)
 
 	// Go over identities and calculate uptime
-
 	for _, identity := range identities {
-		if itn.IsSyncPeriodEnough(currentTime, executionInterval) {
+		if itn.IsExecutionIntervalEnough(currentTime, executionInterval) {
 			identity.GetUptimeOfTwoDays(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime, syncPeriod, executionInterval)
 		} else {
 			identity.GetUptimeOfToday(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime, syncPeriod, executionInterval)
@@ -78,9 +75,9 @@ func main() {
 
 		exactMatch, rowIndex, firstEmptyRow := identity.GetCell(appCfg, sheetsService, log, sheetTitle)
 
+		// Decide where to insert the calculated uptime
 		if exactMatch {
 			identity.AppendUptime(appCfg, sheetsService, log, sheetTitle, rowIndex)
-			fmt.Println("Added exact match")
 		} else if (!exactMatch) && (rowIndex == 0) {
 			identity.AppendNext(appCfg, sheetsService, log, sheetTitle)
 			identity.AppendUptime(appCfg, sheetsService, log, sheetTitle, firstEmptyRow)
@@ -90,6 +87,7 @@ func main() {
 		}
 	}
 
+	// Mark the execution of the script with a timestamp
 	itn.MarkExecution(appCfg, sheetsService, log, sheetTitle, currentTime, executionInterval)
 
 }

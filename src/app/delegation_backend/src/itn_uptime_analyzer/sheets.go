@@ -10,11 +10,9 @@ import (
 )
 
 // This function returns true if the identity is present
-// and the row index
-// If the identity is not present it returns false and searches for the
-// closest relative of the identity (same pubkey or same ip)
+// It also returns the row index
+// If the identity is not present it returns false and searches for the closest relative of the identity (same pubkey or same ip)
 // If nothing was found it returns false and 0 as the row index
-
 func (identity Identity) GetCell(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string) (exactMatch bool, rowIndex int, firstEmptyRow int) {
 	exactMatch = false
 	rowIndex = 0
@@ -44,7 +42,7 @@ func (identity Identity) GetCell(config AppConfig, client *sheets.Service, log *
 
 	if !exactMatch {
 		for index, row := range resp.Values {
-			str := fmt.Sprintf("%v", row[0])
+			str := fmt.Sprintf("%v\n", row[0])
 			if strings.Split(str, "-")[0] == identity["public-key"] {
 				rowIndex = index + 1
 				exactMatch = false
@@ -56,7 +54,6 @@ func (identity Identity) GetCell(config AppConfig, client *sheets.Service, log *
 }
 
 // Appends the identity string of the node to the first column
-
 func (identity Identity) AppendNext(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string) {
 	col := IDENTITY_COLUMN
 	readRange := sheetTitle + "!" + col + ":" + col
@@ -77,12 +74,11 @@ func (identity Identity) AppendNext(config AppConfig, client *sheets.Service, lo
 
 	_, err := client.Spreadsheets.Values.Append(spId, readRange, &valueRange).ValueInputOption("USER_ENTERED").Do()
 	if err != nil {
-		log.Fatalf("Unable to append data to sheet: %v", err)
+		log.Fatalf("Unable to append data to sheet: %v\n", err)
 	}
 }
 
 // Inserts the identity string of the node in the first column under rowIndex
-
 func (identity Identity) InsertBelow(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string, rowIndex int) {
 	col := IDENTITY_COLUMN
 	readRange := fmt.Sprintf("%s!%s%d:%s%d", sheetTitle, col, rowIndex+1, col, rowIndex+1)
@@ -103,12 +99,11 @@ func (identity Identity) InsertBelow(config AppConfig, client *sheets.Service, l
 
 	_, err := client.Spreadsheets.Values.Append(spId, readRange, &valueRange).ValueInputOption("USER_ENTERED").InsertDataOption("INSERT_ROWS").Do()
 	if err != nil {
-		log.Fatalf("Unable to insert data in sheet: %v", err)
+		log.Fatalf("Unable to insert data in sheet: %v\n", err)
 	}
 }
 
-// Finds the first empty column on the row specified and puts up or not up
-
+// Finds the first empty column on the row specified and puts the percentage of uptime of the identity
 func (identity Identity) AppendUptime(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string, rowIndex int) {
 	readRange := fmt.Sprintf("%s!A%d:Z%d", sheetTitle, 1, 1)
 	spId := config.AnalyzerOutputGsheetId
@@ -134,6 +129,7 @@ func (identity Identity) AppendUptime(config AppConfig, client *sheets.Service, 
 	}
 }
 
+// Creates a sheet with the title sheetTitle
 func CreateSheet(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string) error {
 	spId := config.AnalyzerOutputGsheetId
 
@@ -165,17 +161,18 @@ func CreateSheet(config AppConfig, client *sheets.Service, log *logging.ZapEvent
 
 	_, err = client.Spreadsheets.Values.Append(spId, updateRange, &valueRange).ValueInputOption("USER_ENTERED").Do()
 	if err != nil {
-		log.Fatalf("Unable to insert data in sheet: %v", err)
+		log.Fatalf("Unable to insert data in sheet: %v\n", err)
 	}
 
 	return nil
 }
 
+// Returns the sheets of the specified spreadsheet
 func GetSheets(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger) ([]*sheets.Sheet, error) {
 	// Retrieve the spreadsheet
 	spreadsheet, err := client.Spreadsheets.Get(config.AnalyzerOutputGsheetId).Do()
 	if err != nil {
-		log.Fatalf("failed to retrieve spreadsheet: %v", err)
+		log.Fatalf("failed to retrieve spreadsheet: %v\n", err)
 	}
 
 	// Get the sheets from the spreadsheet
@@ -185,7 +182,6 @@ func GetSheets(config AppConfig, client *sheets.Service, log *logging.ZapEventLo
 }
 
 // Tracks the date of execution on the top row of the spreadsheet
-
 func MarkExecution(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, executionInterval int) {
 	readRange := fmt.Sprintf("%s!A%d:Z%d", sheetTitle, 1, 1)
 	spId := config.AnalyzerOutputGsheetId
@@ -196,7 +192,7 @@ func MarkExecution(config AppConfig, client *sheets.Service, log *logging.ZapEve
 
 	resp, err := client.Spreadsheets.Values.Get(spId, readRange).Do()
 	if err != nil {
-		log.Fatalf("Unable to retrieve data from sheet: %v", err)
+		log.Fatalf("Unable to retrieve data from sheet: %v\n", err)
 	}
 
 	var nextEmptyColumn int = len(resp.Values[0])
@@ -211,6 +207,6 @@ func MarkExecution(config AppConfig, client *sheets.Service, log *logging.ZapEve
 
 	_, err = client.Spreadsheets.Values.Append(spId, updateRange, &valueRange).ValueInputOption("USER_ENTERED").Do()
 	if err != nil {
-		log.Fatalf("Unable to insert data in sheet: %v", err)
+		log.Fatalf("Unable to insert data in sheet: %v\n", err)
 	}
 }
