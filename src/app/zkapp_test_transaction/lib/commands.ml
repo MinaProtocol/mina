@@ -296,15 +296,19 @@ module Util = struct
     else printf "%s\n%!" (graphql_zkapp_command zkapp_command)
 
   let send_snapp_transaction ~send_to zkapp_command = 
+    let open Deferred.Let_syntax in
     match send_to with 
      | Some endpoint ->
-        let logger = Logger.create () in
+        (let logger = Logger.create () in
         let sender = Tx_sender.from_string ~endpoint ~logger in 
-        Tx_sender.send_zkapp sender ~zkapp_command |> Deferred.Or_error.map ~f:(fun status ->
+        match%bind Tx_sender.send_zkapp sender ~zkapp_command |> Deferred.Or_error.map ~f:(fun status ->
           printf !"Transaction send succesfully %s" status;
-        )
-
-     | None -> (Deferred.Or_error.ok_unit)
+        ) with 
+        | Ok _ -> return ()
+        | Error error -> 
+            printf "Error while sending transaction: %s" (Error.to_string_hum error);         
+            return ())
+      | None -> return ()
 
   let memo =
     Option.value_map ~default:Signed_command_memo.empty ~f:(fun m ->
