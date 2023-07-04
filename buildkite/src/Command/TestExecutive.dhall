@@ -28,8 +28,8 @@ in
             
             [
               -- Cache test-executive binary
-              Cmd.run "artifact-cache-helper.sh test_executive.exe --upload",
-              Cmd.run "artifact-cache-helper.sh logproc.exe --upload"
+            --   Cmd.run "artifact-cache-helper.sh test_executive.exe --upload",
+            --   Cmd.run "artifact-cache-helper.sh logproc.exe --upload"
             ],
         label = "Build test-executive",
         key = "build-test-executive",
@@ -43,8 +43,8 @@ in
         commands =
             [
               -- Download test dependencies
-              Cmd.run "artifact-cache-helper.sh test_executive.exe && chmod +x test_executive.exe",
-              Cmd.run "artifact-cache-helper.sh logproc.exe && chmod +x logproc.exe",
+            --   Cmd.run "artifact-cache-helper.sh test_executive.exe && chmod +x test_executive.exe",
+            --   Cmd.run "artifact-cache-helper.sh logproc.exe && chmod +x logproc.exe",
 
               -- Execute test based on BUILD image
               Cmd.run "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive.sh ${testName}"
@@ -68,7 +68,7 @@ in
 
             [
               -- Cache js test archive
-              Cmd.run "artifact-cache-helper.sh snarkyjs_test.tar.gz --upload"
+            --   Cmd.run "artifact-cache-helper.sh snarkyjs_test.tar.gz --upload"
             ],
         label = "Build JS integration tests",
         key = "build-js-tests",
@@ -82,9 +82,9 @@ in
         commands =
             [
               -- Download test dependencies
-              Cmd.run "artifact-cache-helper.sh test_executive.exe && chmod +x test_executive.exe",
-              Cmd.run "artifact-cache-helper.sh logproc.exe && chmod +x logproc.exe",
-              Cmd.run "artifact-cache-helper.sh snarkyjs_test.tar.gz && tar -xzf snarkyjs_test.tar.gz",
+            --   Cmd.run "artifact-cache-helper.sh test_executive.exe && chmod +x test_executive.exe",
+            --   Cmd.run "artifact-cache-helper.sh logproc.exe && chmod +x logproc.exe",
+            --   Cmd.run "artifact-cache-helper.sh snarkyjs_test.tar.gz && tar -xzf snarkyjs_test.tar.gz",
 
               -- Execute test based on BUILD image
               Cmd.run "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive.sh ${testName}"
