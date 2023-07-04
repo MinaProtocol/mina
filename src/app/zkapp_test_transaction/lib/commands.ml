@@ -1,6 +1,10 @@
 open Core
 open Async
 open Mina_base
+open Signature_lib
+open Unsigned
+open Mina_base
+open Integration_test_lib
 module Ledger = Mina_ledger.Ledger
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
@@ -290,6 +294,17 @@ module Util = struct
       printf "Zkapp transaction graphQL input %s\n\n%!"
         (graphql_zkapp_command zkapp_command) )
     else printf "%s\n%!" (graphql_zkapp_command zkapp_command)
+
+  let send_snapp_transaction ~send_to zkapp_command = 
+    match send_to with 
+     | Some endpoint ->
+        let logger = Logger.create () in
+        let sender = Tx_sender.from_string ~endpoint ~logger in 
+        Tx_sender.send_zkapp sender ~zkapp_command |> Deferred.Or_error.map ~f:(fun status ->
+          printf !"Transaction send succesfully %s" status;
+        )
+
+     | None -> (Deferred.Or_error.ok_unit)
 
   let memo =
     Option.value_map ~default:Signed_command_memo.empty ~f:(fun m ->
@@ -798,3 +813,216 @@ let%test_module "ZkApps test transaction" =
           | Signed_command _ ->
               failwith "Expected a Zkapp_command command" )
   end )
+
+let gen_keys count =
+  Quickcheck.random_value ~seed:`Nondeterministic
+    (Quickcheck.Generator.list_with_length count Public_key.Compressed.gen)
+
+let pub_key_to_string pub_key =
+  pub_key |> Public_key.compress |> Public_key.Compressed.to_base58_check
+
+let ingress_uri ~graphql_target_node =
+  let target = Str.split (Str.regexp ":") graphql_target_node in
+  let host =
+    match List.nth target 0 with Some data -> data | None -> "127.0.0.1"
+  in
+  let port =
+    match List.nth target 1 with
+    | Some data ->
+        int_of_string data
+    | None ->
+        3085
+  in
+  let path = "/graphql" in
+  Uri.make ~scheme:"http" ~host ~path ~port ()
+
+(* helper function for getting a keypair from a local path *)
+let get_keypair ~logger path pw_option =
+  let%bind keypair =
+    match pw_option with
+    | Some s ->
+        Secrets.Keypair.read_exn ~privkey_path:path
+          ~password:(s |> Bytes.of_string |> Deferred.return |> Lazy.return)
+    | None ->
+        Secrets.Keypair.read_exn' path
+  in
+  [%log info] "txn burst tool: successfully got keypair.  pub_key= %s "
+    (pub_key_to_string keypair.public_key) ;
+  return keypair
+
+let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
+    ~txn_fee_option ~rate_limit ~rate_limit_level ~rate_limit_interval
+    ~origin_sender_secret_key_path
+    ~(origin_sender_secret_key_pw_option : string option)
+    ~returner_secret_key_path ~(returner_secret_key_pw_option : string option)
+    ~graphql_target_node_option () =
+  let open Deferred.Let_syntax in
+  (* define the rate limiting function *)
+  let open Logger in
+  let logger = Logger.create () in
+  let limit_level =
+    let slot_limit =
+      Float.(
+        of_int txns_per_block /. of_int slot_time *. fill_rate
+        *. of_int rate_limit_interval)
+    in
+    min (Float.to_int slot_limit) rate_limit_level
+  in
+  let batch_count = ref 0 in
+  let limit =
+    (* call this function after a transaction happens *)
+    (* TODO, in the current state of things, this function counts to limit_level of transactions, and then slaps a pause after it.  This happens even if the transactions themselves took far longer than the pause.  It thereby makes the rate slower and more conservative than would appear.  In future, perhaps implement with some sort of Timer *)
+    if rate_limit then ( fun () ->
+      incr batch_count ;
+      if !batch_count >= limit_level then
+        let%bind () =
+          Deferred.return
+            ([%log info]
+               "txn burst tool: rate limiting, pausing for %d milliseconds... "
+               rate_limit_interval
+               ~metadata:
+                 [ ( "rate_limit_interval"
+                   , rate_limit_interval |> Int.to_string
+                     |> Yojson.Safe.from_string )
+                 ] )
+        in
+        let%bind () =
+          Async.after (Time.Span.create ~ms:rate_limit_interval ())
+        in
+        Deferred.return (batch_count := 0)
+      else Deferred.return () )
+    else fun () -> Deferred.return ()
+  in
+
+  (* contants regarding send amount and fees *)
+  let base_send_amount = Currency.Amount.of_mina_string_exn "0" in
+  let fee_amount =
+    match txn_fee_option with
+    | None ->
+        Currency.Amount.to_fee
+          (Option.value_exn
+             (Currency.Amount.scale
+                (Currency.Amount.of_fee Mina_base.Signed_command.minimum_fee)
+                10 ) )
+    | Some f ->
+        Currency.Amount.to_fee (Currency.Amount.of_mina_string_exn f)
+  in
+  (* let acct_creation_fee = Currency.Amount.of_mina_string_exn "1" in *)
+  let initial_send_amount =
+    (* min_fee*num_txn_per_accts + base_send_amount*num_txn_per_accts + acct_creation_fee*num_accounts *)
+    let total_send_value =
+      Option.value_exn (Currency.Amount.scale base_send_amount num_txn_per_acct)
+    in
+    let total_fees =
+      Option.value_exn
+        (Currency.Amount.scale
+           (Currency.Amount.of_fee fee_amount)
+           num_txn_per_acct )
+    in
+    (* let total_acct_creation_fee =
+         Option.value_exn
+         (Currency.Amount.scale
+            ( acct_creation_fee)
+            num_accts)
+       in *)
+    Option.value_exn (Currency.Amount.add total_send_value total_fees)
+  in
+
+  let graphql_target_node =
+    match graphql_target_node_option with Some s -> s | None -> "127.0.0.1"
+  in
+  let node_ingress_uri = ingress_uri ~graphql_target_node in
+
+  (* get the keypairs from files *)
+  let%bind origin_keypair =
+    get_keypair ~logger origin_sender_secret_key_path
+      origin_sender_secret_key_pw_option
+  in
+  let%bind returner_keypair =
+    get_keypair ~logger returner_secret_key_path returner_secret_key_pw_option
+  in
+
+  (* helper function that sends a transaction*)
+  let do_txn ~(sender_kp : Keypair.t) ~(receiver_kp : Keypair.t) ~nonce =
+    let receiver_pub_key =
+      receiver_kp.public_key |> Signature_lib.Public_key.compress
+    in
+    [%log info]
+      "txn burst tool: sending txn from sender= %s (nonce=%d) to receiver= %s \
+       with amount=%s and fee=%s"
+      (pub_key_to_string sender_kp.public_key)
+      (UInt32.to_int nonce)
+      (pub_key_to_string receiver_kp.public_key)
+      (Currency.Amount.to_string initial_send_amount)
+      (Currency.Fee.to_string fee_amount) ;
+    let%bind res =
+      Graphql_requests.sign_and_send_payment ~logger node_ingress_uri
+        ~sender_keypair:sender_kp ~receiver_pub_key ~amount:base_send_amount
+        ~fee:fee_amount ~nonce ~memo:""
+        ~valid_until:Mina_numbers.Global_slot_since_genesis.max_value
+    in
+    let%bind () =
+      match res with
+      | Ok _ ->
+          return ([%log info] "txn burst tool: txn sent successfully!")
+      | Error e ->
+          return
+            ([%log info] "txn burst tool: txn failed with error %s"
+               (Error.to_string_hum e) )
+    in
+    limit ()
+  in
+
+  let get_nonce ~public_key = 
+    let open Deferred.Let_syntax in
+    [%log info] "txn burst tool: Getting account balance and nonce"
+    ~metadata:
+      [ ("pub_key", Signature_lib.Public_key.to_yojson public_key)
+      ; ("ingress_uri", `String (Uri.to_string node_ingress_uri))
+      ] ;
+      let%bind origin_nonce = Integration_test_lib.Graphql_requests.get_nonce ~logger node_ingress_uri ~public_key in
+      match origin_nonce with 
+      | Ok nonce -> 
+        [%log info] "txn burst tool: nonce obtained, nonce= %d" (UInt32.to_int nonce) ;
+        return nonce
+      | Error err -> 
+        [%log error] "txn burst tool: could not get nonce of pk"
+            ~metadata:
+              [ ("pub_key", Signature_lib.Public_key.to_yojson public_key)
+              ; ("ingress_uri", `String (Uri.to_string node_ingress_uri))
+              ; ("error", `String (Error.to_string_hum err))
+              ] ;
+        exit 1
+  in
+
+  (* there... *)
+  let%bind () =
+    (* in a previous version of the code there could be multiple returners, thus the iter.  keeping this structure in case we decide to change back later *)
+    Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
+        let%bind nonce = get_nonce ~public_key:origin_keypair.public_key in
+        (* we could also get the origin nonce outside the iter and then just increment by 1 every iter *)
+        do_txn ~sender_kp:origin_keypair ~receiver_kp:kp ~nonce
+    )
+
+  in
+
+  (* and back again... *)
+  let%bind () =
+    Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
+        let%bind returner_nonce =
+          get_nonce ~public_key:kp.public_key
+        in
+        let rec do_command n : unit Deferred.t =
+          (* nce = returner_nonce + ( num_txn_per_acct - n ) *)
+          let nce =
+            UInt32.add returner_nonce (UInt32.of_int (num_txn_per_acct - n))
+          in
+          let%bind () =
+            do_txn ~sender_kp:kp ~receiver_kp:origin_keypair ~nonce:nce
+          in
+          if n > 1 then do_command (n - 1) else return ()
+        in
+        do_command num_txn_per_acct )
+  in
+
+  return ()
