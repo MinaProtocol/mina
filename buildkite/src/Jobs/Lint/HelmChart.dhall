@@ -1,38 +1,41 @@
-let Prelude = ../../External/Prelude.dhall
+-- CI step is being disabled, as it is not functional and can allow broken chart pushes
+-- the connected helm-ci.sh script does not test chart/node functionality
 
-let S = ../../Lib/SelectFiles.dhall
-let Cmd = ../../Lib/Cmds.dhall
+-- let Prelude = ../../External/Prelude.dhall
 
-let Pipeline = ../../Pipeline/Dsl.dhall
-let JobSpec = ../../Pipeline/JobSpec.dhall
+-- let S = ../../Lib/SelectFiles.dhall
+-- let Cmd = ../../Lib/Cmds.dhall
 
-let Command = ../../Command/Base.dhall
-let Docker = ../../Command/Docker/Type.dhall
-let Size = ../../Command/Size.dhall
+-- let Pipeline = ../../Pipeline/Dsl.dhall
+-- let JobSpec = ../../Pipeline/JobSpec.dhall
 
-in
+-- let Command = ../../Command/Base.dhall
+-- let Docker = ../../Command/Docker/Type.dhall
+-- let Size = ../../Command/Size.dhall
 
-Pipeline.build
-  Pipeline.Config::{
-    spec = JobSpec::{
-      dirtyWhen = [
-        S.contains "helm/",
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/HelmChart"),
-        -- trigger on HelmRelease job change due to dependency
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease"),
-        S.exactly "buildkite/scripts/helm-ci" "sh"
-      ],
-      path = "Lint",
-      name = "HelmChart"
-    },
-    steps = [
-      Command.build
-        Command.Config::{
-          commands = [ Cmd.run "HELM_LINT=true buildkite/scripts/helm-ci.sh" ]
-          , label = "Helm chart lint steps"
-          , key = "lint-helm-chart"
-          , target = Size.Small
-          , docker = None Docker.Type
-        }
-    ]
-  }
+-- in
+
+-- Pipeline.build
+--   Pipeline.Config::{
+--     spec = JobSpec::{
+--       dirtyWhen = [
+--         S.contains "helm/",
+--         S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/HelmChart"),
+--         -- trigger on HelmRelease job change due to dependency
+--         S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease"),
+--         S.exactly "buildkite/scripts/helm-ci" "sh"
+--       ],
+--       path = "Lint",
+--       name = "HelmChart"
+--     },
+--     steps = [
+--       Command.build
+--         Command.Config::{
+--           commands = [ Cmd.run "HELM_LINT=true buildkite/scripts/helm-ci.sh" ]
+--           , label = "Helm chart lint steps"
+--           , key = "lint-helm-chart"
+--           , target = Size.Small
+--           , docker = None Docker.Type
+--         }
+--     ]
+--   }
