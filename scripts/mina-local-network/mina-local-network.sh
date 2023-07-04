@@ -749,8 +749,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     echo "Set up zkapp account"
     printf "\n"
 
-    QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce 0 --sender-key ${SENDER_KEY_FILE} --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --fee 5 | sed 1,7d)
-    python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+    ${ZKAPP_EXE} zkapps create-zkapp-account --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce 0 --sender-key ${SENDER_KEY_FILE} --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --fee 5 --send-to ${REST_SERVER} 
   fi
 
   if ${VALUE_TRANSFER}; then
@@ -773,13 +772,11 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     fi
 
     if ${ZKAPP_TRANSACTIONS}; then
-      QUERY=$(${ZKAPP_EXE} transfer-funds-one-receiver --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --sender-key ${SENDER_KEY_FILE} --sender-nonce $sender_nonce --receiver-amount 1 --fee 5 --receiver $ZKAPP_ACCOUNT_PUB_KEY | sed 1,5d)
-      python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+      ${ZKAPP_EXE} zkapps transfer-funds-one-receiver --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --sender-key ${SENDER_KEY_FILE} --sender-nonce $sender_nonce --receiver-amount 1 --fee 5 --receiver $ZKAPP_ACCOUNT_PUB_KEY --send-to ${REST_SERVER}
       let fee_payer_nonce++
       let sender_nonce++
 
-      QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state --fee 5 | sed 1,5d)
-      python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+      ${ZKAPP_EXE} zkapps update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state --fee 5 --send-to ${REST_SERVER}
       let fee_payer_nonce++
       let state++
     fi
