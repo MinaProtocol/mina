@@ -133,45 +133,41 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_yojson
            |> Yojson.Safe.to_string ) ) ;
-    (* setup code, creating a signed txn which we'll use to make a successful txn, and then use the same txn in a replay attack which should fail *)
+    (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
+    let amount = Currency.Amount.of_mina_string_exn "10" in
+    let fee = Currency.Fee.of_mina_string_exn "1" in
     let receiver_pub_key =
       receiver.public_key |> Signature_lib.Public_key.compress
     in
+      fish1.keypair.public_key |> Signature_lib.Public_key.compress
+    in
+    let sender_pub_key =
+      fish2.keypair.public_key |> Signature_lib.Public_key.compress
+    in
+    (* hardcoded copy of extra_genesis_accounts[0] and extra_genesis_accounts[1], update here if they change *)
+    let receiver_original_balance = Currency.Amount.of_mina_string_exn "100" in
+    let sender_original_balance = Currency.Amount.of_mina_string_exn "100" in
+    let sender_account_id = Account_id.create sender_pub_key Token_id.default in
     let receiver_account_id =
       Account_id.create receiver_pub_key Token_id.default
     in
-    let sender_pub_key =
-      sender.public_key |> Signature_lib.Public_key.compress
-    in
-    let sender_account_id = Account_id.create sender_pub_key Token_id.default in
     let%bind { nonce = sender_current_nonce; _ } =
       Integration_test_lib.Graphql_requests.must_get_account_data ~logger
         (Network.Node.get_ingress_uri untimed_node_b)
         ~account_id:sender_account_id
     in
-    let amount = Currency.Amount.of_mina_string_exn "10" in
-    let fee = Currency.Fee.of_mina_string_exn "1" in
-    let memo = "" in
-    let valid_until = Mina_numbers.Global_slot_since_genesis.max_value in
-    let payload =
-      let payment_payload =
-        { Payment_payload.Poly.receiver_pk = receiver_pub_key; amount }
-      in
-      let body = Signed_command_payload.Body.Payment payment_payload in
-      let common =
-        { Signed_command_payload.Common.Poly.fee
-        ; fee_payer_pk = sender_pub_key
-        ; nonce = sender_current_nonce
-        ; valid_until
-        ; memo = Signed_command_memo.create_from_string_exn memo
-        }
-      in
-      { Signed_command_payload.Poly.common; body }
-    in
-    let raw_signature =
-      Signed_command.sign_payload sender.private_key payload
-      |> Signature.Raw.encode
-    in
+    let signed_tx: Command_spec.signed_tx = {
+      tx = { amount  = Currency.Amount.of_mina_string_exn "10"
+        ; fee = Currency.Fee.of_mina_string_exn "1"
+        ; receiver_pub_key =  fish1.keypair.public_key
+        ; sender_pub_key =  fish2.keypair.public_key
+        ; memo = ""
+        ; nonce = Some sender_current_nonce
+        ; valid_until = Mina_numbers.Global_slot_since_genesis.max_value
+        ;
+      };
+      sender_priv_key = fish2.keypair.private_key 
+    } in
     (* setup complete *)
     let%bind () =
       section "send a single signed payment between 2 fish accounts"
@@ -360,6 +356,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.get_ingress_uri timed_node_c)
              ~account_id:sender_account_id
          in
+       
          [%log info] "timed_node_c total balance: %s"
            (Currency.Balance.to_mina_string timed_node_c_total) ;
          [%log info]

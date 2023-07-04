@@ -87,42 +87,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let send_payment_from_zkapp_account ?expected_failure
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~logger
-      ~node_uri (sender : Signature_lib.Keypair.t) nonce =
-    let sender_pk = Signature_lib.Public_key.compress sender.public_key in
-    let receiver_pk = payment_receiver in
-    let amount =
-      Currency.Amount.of_fee constraint_constants.account_creation_fee
-    in
-    let memo = "" in
-    let valid_until = Mina_numbers.Global_slot_since_genesis.max_value in
-    let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
-    let payload =
-      let common =
-        { Signed_command_payload.Common.Poly.fee
-        ; fee_payer_pk = sender_pk
-        ; nonce
-        ; valid_until
-        ; memo = Signed_command_memo.empty
-        }
-      in
-      let payment_payload = { Payment_payload.Poly.receiver_pk; amount } in
-      let body = Signed_command_payload.Body.Payment payment_payload in
-      { Signed_command_payload.Poly.common; body }
-    in
-    let raw_signature =
-      Signed_command.sign_payload sender.private_key payload
-      |> Signature.Raw.encode
+      ~node (sender : Signature_lib.Keypair.t) nonce =
+    let spec: Command_spec.signed_tx = {
+        tx = {
+          sender_pub_key = sender.public_key
+          ;receiver_pub_key = Signature_lib.Public_key.decompress_exn payment_receiver
+          ; amount = Currency.Amount.of_fee constraint_constants.account_creation_fee
+          ; fee = Currency.Fee.of_nanomina_int_exn 1_000_000
+          ; nonce = Some nonce
+          ; memo  = ""
+          ; valid_until = Mina_numbers.Global_slot_since_genesis.max_value
+        };
+         sender_priv_key = sender.private_key
+      }
     in
     match expected_failure with
     | Some failure ->
-        send_invalid_payment ~logger ~sender_pub_key:sender_pk
-          ~receiver_pub_key:receiver_pk ~amount ~fee ~nonce ~memo ~valid_until
-          ~raw_signature ~expected_failure:failure node_uri
+        Network.Node.tx_sender node ~logger |>
+        Tx_sender.send_invalid_payment ~spec ~expected_failure:failure
     | None ->
         incr transactions_sent ;
-        Integration_test_lib.Graphql_requests.must_send_payment_with_raw_sig
-          ~logger ~sender_pub_key:sender_pk ~receiver_pub_key:receiver_pk
-          ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature node_uri
+        Network.Node.must_send_payment_with_raw_sig ~logger node spec
         |> Malleable_error.ignore_m
 
   let run network t =
