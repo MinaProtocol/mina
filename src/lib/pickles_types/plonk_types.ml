@@ -55,6 +55,15 @@ module Opt = struct
 
   module Flag = struct
     type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
+
+    let ( ||| ) x y =
+      match (x, y) with
+      | Yes, _ | _, Yes ->
+          Yes
+      | Maybe, _ | _, Maybe ->
+          Maybe
+      | No, No ->
+          No
   end
 
   let map t ~f =
@@ -803,8 +812,23 @@ module Evals = struct
       =
     let open Impl in
     let opt flag = Opt.typ Impl.Boolean.typ flag e ~dummy in
+    let uses_lookup =
+      let { Features.range_check0
+          ; range_check1
+          ; foreign_field_add = _ (* Doesn't use lookup *)
+          ; foreign_field_mul
+          ; xor
+          ; rot
+          ; lookup
+          ; runtime_tables = _ (* Fixme *)
+          } =
+        feature_flags
+      in
+      Array.reduce_exn ~f:Opt.Flag.( ||| )
+        [| range_check0; range_check1; foreign_field_mul; xor; rot; lookup |]
+    in
     let lookup_sorted =
-      match feature_flags.lookup (* Fixme *) with
+      match uses_lookup with
       | Opt.Flag.No ->
           Opt.Flag.No
       | Yes | Maybe ->
@@ -827,8 +851,8 @@ module Evals = struct
       ; opt feature_flags.foreign_field_mul
       ; opt feature_flags.xor
       ; opt feature_flags.rot
-      ; opt feature_flags.lookup (* TODO: Fixme *)
-      ; opt feature_flags.lookup (* TODO: Fixme *)
+      ; opt uses_lookup
+      ; opt uses_lookup
       ; Typ.array ~length:5 (opt lookup_sorted) (* TODO: Fixme *)
       ; opt feature_flags.runtime_tables
       ]

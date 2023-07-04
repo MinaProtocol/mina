@@ -570,7 +570,6 @@ let%test_module "gate finalization" =
           ; range_check1 = true
           ; foreign_field_add = true
           ; foreign_field_mul = true
-          ; lookup = true
           }
       end) )
 
@@ -584,7 +583,6 @@ let%test_module "gate finalization" =
           { Plonk_types.Features.none_bool with
             range_check0 = true
           ; range_check1 = true
-          ; lookup = true
           }
       end) )
 
@@ -595,10 +593,7 @@ let%test_module "gate finalization" =
             Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check0
 
         let actual_feature_flags =
-          { Plonk_types.Features.none_bool with
-            range_check0 = true
-          ; lookup = true
-          }
+          { Plonk_types.Features.none_bool with range_check0 = true }
       end) )
 
     let%test_module "xor" =
@@ -607,7 +602,7 @@ let%test_module "gate finalization" =
           public_input_2 Kimchi_bindings.Protocol.Proof.Fp.example_with_xor
 
         let actual_feature_flags =
-          { Plonk_types.Features.none_bool with xor = true; lookup = true }
+          { Plonk_types.Features.none_bool with xor = true }
       end) )
 
     let%test_module "rot" =
@@ -619,7 +614,6 @@ let%test_module "gate finalization" =
           { Plonk_types.Features.none_bool with
             range_check0 = true
           ; rot = true
-          ; lookup = true
           }
       end) )
 
@@ -633,7 +627,6 @@ let%test_module "gate finalization" =
             range_check0 = true
           ; range_check1 = true
           ; foreign_field_add = true
-          ; lookup = true
           }
       end) )
   end )
