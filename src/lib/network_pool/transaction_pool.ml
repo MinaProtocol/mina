@@ -433,7 +433,7 @@ struct
           else true
 
     let diff_error_of_indexed_pool_error :
-        Indexed_pool.Command_error.t -> Diff_versioned.Diff_error.t = function
+        Command_error.t -> Diff_versioned.Diff_error.t = function
       | Invalid_nonce _ ->
           Invalid_nonce
       | Insufficient_funds _ ->
@@ -450,7 +450,7 @@ struct
           Expired
 
     let indexed_pool_error_metadata = function
-      | Indexed_pool.Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
+      | Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
           let nonce_json = Account.Nonce.to_yojson in
           [ ( "between"
             , `Assoc [ ("low", nonce_json low); ("hi", nonce_json hi) ] )
@@ -993,7 +993,7 @@ struct
         (diff_error_of_indexed_pool_error e, indexed_pool_error_metadata e)
 
       let report_command_error ~logger ~is_sender_local tx
-          (e : Indexed_pool.Command_error.t) =
+          (e : Command_error.t) =
         let diff_err, error_extra = of_indexed_pool_error e in
         if is_sender_local then
           [%str_log error]

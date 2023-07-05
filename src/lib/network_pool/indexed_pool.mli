@@ -9,30 +9,6 @@ open Mina_base
 open Mina_transaction
 open Mina_numbers
 
-module Command_error : sig
-  type t =
-    | Invalid_nonce of
-        [ `Expected of Account.Nonce.t
-        | `Between of Account.Nonce.t * Account.Nonce.t ]
-        * Account.Nonce.t
-    | Insufficient_funds of
-        [ `Balance of Currency.Amount.t ] * Currency.Amount.t
-    | (* NOTE: don't punish for this, attackers can induce nodes to banlist
-          each other that way! *)
-        Insufficient_replace_fee of
-        [ `Replace_fee of Currency.Fee.t ] * Currency.Fee.t
-    | Overflow
-    | Bad_token
-    | Expired of
-        [ `Valid_until of Mina_numbers.Global_slot_since_genesis.t ]
-        * [ `Global_slot_since_genesis of
-            Mina_numbers.Global_slot_since_genesis.t ]
-    | Unwanted_fee_token of Mina_base.Token_id.t
-  [@@deriving sexp, to_yojson]
-
-  val grounds_for_diff_rejection : t -> bool
-end
-
 val replace_fee : Currency.Fee.t
 
 module Config : sig
