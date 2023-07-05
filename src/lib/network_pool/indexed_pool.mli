@@ -136,7 +136,7 @@ val global_slot_since_genesis : t -> Mina_numbers.Global_slot_since_genesis.t
 module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception
       there is a bug. *)
-  val assert_invariants : t -> unit
+  val assert_pool_consistency : t -> unit
 
   val applicable_by_fee :
        t

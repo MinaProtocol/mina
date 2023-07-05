@@ -23,7 +23,7 @@ let time_controller = Block_time.Controller.basic ~logger
 
 let empty = empty ~constraint_constants ~consensus_constants ~time_controller
 
-let empty_invariants () = assert_invariants empty
+let empty_invariants () = assert_pool_consistency empty
 
 let singleton_properties () =
   Quickcheck.test (gen_cmd ()) ~f:(fun cmd ->
@@ -44,7 +44,7 @@ let singleton_properties () =
       else
         match add_res with
         | Ok (_, pool', dropped) ->
-            assert_invariants pool' ;
+            assert_pool_consistency pool' ;
             assert (Sequence.is_empty dropped) ;
             [%test_eq: int] (size pool') 1 ;
             [%test_eq:
@@ -112,7 +112,7 @@ let sequential_adds_all_valid () =
                 [%test_eq:
                   Transaction_hash.User_command_with_valid_signature.t
                   Sequence.t] dropped Sequence.empty ;
-                assert_invariants pool' ;
+                assert_pool_consistency pool' ;
                 pool := pool' ;
                 go rest
             | Error (Invalid_nonce (`Expected want, got)) ->
@@ -255,6 +255,7 @@ let replacement () =
         List.fold_left setup_cmds ~init:empty ~f:(fun t cmd ->
             match add_from_gossip_exn t cmd init_nonce init_balance with
             | Ok (_, t', removed) ->
+                assert_pool_consistency t' ;
                 [%test_eq:
                   Transaction_hash.User_command_with_valid_signature.t
                   Sequence.t] removed Sequence.empty ;
@@ -312,9 +313,9 @@ let replacement () =
         match add_res with
         | Ok (_, t', dropped) ->
             assert (not (Sequence.is_empty dropped)) ;
-            assert_invariants t'
-        | Error _ ->
-            failwith "adding command failed"
+            assert_pool_consistency t'
+        | Error e ->
+            Command_error.sexp_of_t e |> Sexp.to_string_hum |> failwith
       else
         match add_res with
         | Error (Insufficient_funds _) ->
@@ -429,7 +430,7 @@ let add_to_pool ~nonce ~balance pool cmd =
   in
   [%test_eq: Transaction_hash.User_command_with_valid_signature.t Sequence.t]
     dropped Sequence.empty ;
-  assert_invariants pool' ;
+  assert_pool_consistency pool' ;
   pool'
 
 let init_permissionless_ledger ledger account_info =
@@ -500,7 +501,7 @@ let commit_to_pool ledger pool cmd expected_drops =
   [%test_eq: Transaction_hash.t list]
     (lower (Sequence.to_list dropped))
     (lower expected_drops) ;
-  assert_invariants pool ;
+  assert_pool_consistency pool ;
   pool
 
 let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
@@ -682,12 +683,15 @@ let transactions_from_single_sender_ordered_by_nonce () =
     (sender, txns))
     ~f:(fun (sender, txns) ->
       let account_map = accounts_map [ sender ] in
-      let pool = pool_of_transactions ~init:empty ~account_map txns |> rem_lowest_fee 5 in
+      let pool =
+        pool_of_transactions ~init:empty ~account_map txns |> rem_lowest_fee 5
+      in
+      assert_pool_consistency pool ;
       let txns = Sequence.to_list @@ Indexed_pool.transactions ~logger pool in
       with_accounts txns ~init:() ~account_map ~f:(fun () a t ->
           [%test_eq: Account_nonce.t] (txn_nonce t) a.nonce |> Result.return )
       |> Result.ok_or_failwith ;
-      assert_invariants pool )
+      assert_pool_consistency pool )
 
 let rec interleave_at_random queues =
   let open Quickcheck in
@@ -721,12 +725,14 @@ let gen_accounts_and_transactions =
 
 let transactions_from_many_senders_no_nonce_gaps () =
   Quickcheck.test gen_accounts_and_transactions ~f:(fun (account_map, txns) ->
-      let pool = pool_of_transactions ~init:empty ~account_map txns |> rem_lowest_fee 5 in
+      let pool =
+        pool_of_transactions ~init:empty ~account_map txns |> rem_lowest_fee 5
+      in
       let txns = Sequence.to_list @@ Indexed_pool.transactions ~logger pool in
       with_accounts txns ~init:() ~account_map ~f:(fun () a t ->
           [%test_eq: Account_nonce.t] (txn_nonce t) a.nonce |> Result.return )
       |> Result.ok_or_failwith ;
-      assert_invariants pool )
+      assert_pool_consistency pool )
 
 let revalidation_drops_nothing_unless_ledger_changed () =
   Quickcheck.test gen_accounts_and_transactions ~f:(fun (account_map, txns) ->
@@ -742,6 +748,7 @@ let revalidation_drops_nothing_unless_ledger_changed () =
       [%test_eq: Indexed_pool.t] pool pool' ;
       let to_apply = Indexed_pool.transactions ~logger pool in
       let to_apply' = Indexed_pool.transactions ~logger pool' in
+      assert_pool_consistency pool ;
       [%test_eq:
         Transaction_hash.User_command_with_valid_signature.t Sequence.t]
         to_apply to_apply' )
@@ -778,12 +785,15 @@ let application_invalidates_applied_transactions () =
     in
     (accounts, updated_accounts, txns, app_count))
     ~f:(fun (initial_accounts, updated_accounts, txns, app_count) ->
-      let pool = pool_of_transactions ~init:empty ~account_map:initial_accounts txns in
+      let pool =
+        pool_of_transactions ~init:empty ~account_map:initial_accounts txns
+      in
       let _pool', dropped =
         Indexed_pool.revalidate ~logger pool `Entire_pool (fun aid ->
             Public_key.Compressed.Map.find_exn updated_accounts
               (Account_id.public_key aid) )
       in
+      assert_pool_consistency pool ;
       [%test_eq: Transaction_hash.Set.t]
         ( Sequence.to_list dropped |> List.map ~f:txn_hash
         |> Transaction_hash.Set.of_list )
@@ -839,6 +849,7 @@ let transaction_replacement () =
                Sexp.to_string @@ Command_error.sexp_of_t e )
         |> Result.ok_or_failwith
       in
+      assert_pool_consistency pool ;
       [%test_eq: int] (Indexed_pool.size pool) (Indexed_pool.size pool') ;
       [%test_eq: int]
         (Indexed_pool.transactions ~logger pool |> Sequence.length)
@@ -907,5 +918,6 @@ let transaction_replacement_insufficient_balance () =
       in
       (* The last transaction gets discarded, because after the replacement,
          the account can't afford it anymore. *)
+      assert_pool_consistency pool ;
       [%test_eq: int] (Indexed_pool.size pool) 3 ;
       [%test_eq: int] (Indexed_pool.size pool') 2 )

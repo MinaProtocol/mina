@@ -91,7 +91,7 @@ let pool_of_transactions ~init ~account_map txns =
     ~init
     ~f:(fun p t ->
       let open Account.Poly in
-      Indexed_pool.For_tests.assert_invariants p ;
+      Indexed_pool.For_tests.assert_pool_consistency p ;
       let a = Public_key.Compressed.Map.find_exn account_map (sender_pk t) in
       Indexed_pool.add_from_gossip_exn p t a.nonce (Balance.to_amount a.balance)
       |> Result.map ~f:Tuple3.get2 )

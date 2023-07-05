@@ -992,8 +992,8 @@ struct
       let of_indexed_pool_error e =
         (diff_error_of_indexed_pool_error e, indexed_pool_error_metadata e)
 
-      let report_command_error ~logger ~is_sender_local tx
-          (e : Command_error.t) =
+      let report_command_error ~logger ~is_sender_local tx (e : Command_error.t)
+          =
         let diff_err, error_extra = of_indexed_pool_error e in
         if is_sender_local then
           [%str_log error]
@@ -1760,7 +1760,7 @@ let%test_module _ =
       assert (List.is_sorted txns ~compare)
 
     let assert_pool_txs test txs =
-      Indexed_pool.For_tests.assert_invariants test.txn_pool.pool ;
+      Indexed_pool.For_tests.assert_pool_consistency test.txn_pool.pool ;
       assert_locally_generated test.txn_pool ;
       assert_fee_wu_ordering test.txn_pool ;
       assert_user_command_sets_equal

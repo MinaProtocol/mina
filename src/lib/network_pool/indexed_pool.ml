@@ -101,150 +101,109 @@ let currency_consumed' :
   |> Result.of_option ~error:Command_error.Overflow
 
 module For_tests = struct
+  open Currency
+
   let currency_consumed = currency_consumed
 
   let applicable_by_fee { applicable_by_fee; _ } = applicable_by_fee
 
-  (* Check the invariants of the pool structure as listed in the comment above.
-  *)
-  let assert_invariants : t -> unit =
-   fun { applicable_by_fee
-       ; all_by_sender
-       ; all_by_fee
-       ; all_by_hash
-       ; size
-       ; config = { constraint_constants; _ }
-       ; _
-       } ->
-    let assert_all_by_fee tx =
-      if
-        Set.mem
-          (Map.find_exn all_by_fee
-             ( Transaction_hash.User_command_with_valid_signature.command tx
-             |> User_command.fee_per_wu ) )
-          tx
-      then ()
-      else
-        failwith
-        @@ sprintf
-             !"Not found in all_by_fee: %{sexp: \
-               Transaction_hash.User_command_with_valid_signature.t }"
-             tx
+  let assert_pool_consistency (pool : t) =
+    let map_to_set (type k w)
+        (module Map : Map.S
+          with type Key.t = k
+           and type Key.comparator_witness = w ) map =
+      List.fold_left (Map.data map)
+        ~init:Transaction_hash.User_command_with_valid_signature.Set.empty
+        ~f:Set.union
     in
-    let assert_all_by_hash tx =
-      [%test_eq: Transaction_hash.User_command_with_valid_signature.t] tx
-        (Map.find_exn all_by_hash
-           (Transaction_hash.User_command_with_valid_signature.hash tx) )
+    let open Transaction_hash.User_command_with_valid_signature in
+    let all_by_sender =
+      Set.of_list
+        (List.bind
+           ~f:(fun (cmds, _) -> F_sequence.to_list cmds)
+           (Account_id.Map.data pool.all_by_sender) )
     in
-    Map.iteri applicable_by_fee ~f:(fun ~key ~data ->
-        Set.iter data ~f:(fun tx ->
-            let unchecked =
-              Transaction_hash.User_command_with_valid_signature.command tx
-            in
-            [%test_eq: Currency.Fee_rate.t] key
-              (User_command.fee_per_wu unchecked) ;
-            let tx' =
-              Map.find_exn all_by_sender (User_command.fee_payer unchecked)
-              |> Tuple2.get1 |> F_sequence.head_exn
-            in
-            [%test_eq: Transaction_hash.User_command_with_valid_signature.t] tx
-              tx' ;
-            assert_all_by_fee tx ;
-            assert_all_by_hash tx ) ) ;
-    Map.iteri all_by_sender
-      ~f:(fun ~key:fee_payer ~data:(tx_seq, currency_reserved) ->
-        assert (F_sequence.length tx_seq > 0) ;
-        let check_consistent tx =
-          [%test_eq: Account_id.t]
-            ( Transaction_hash.User_command_with_valid_signature.command tx
-            |> User_command.fee_payer )
-            fee_payer ;
-          assert_all_by_fee tx ;
-          assert_all_by_hash tx
-        in
-        let applicable, inapplicables =
-          Option.value_exn (F_sequence.uncons tx_seq)
-        in
-        let applicable_unchecked =
-          Transaction_hash.User_command_with_valid_signature.command applicable
-        in
-        check_consistent applicable ;
-        assert (
-          Set.mem
-            (Map.find_exn applicable_by_fee
-               (User_command.fee_per_wu applicable_unchecked) )
-            applicable ) ;
-        let _last_nonce, currency_reserved' =
+    let all_by_fee = map_to_set (module Fee_rate.Map) pool.all_by_fee in
+    let all_by_hash =
+      Set.of_list @@ Transaction_hash.Map.data pool.all_by_hash
+    in
+    let by_expiration =
+      map_to_set
+        (module Global_slot_since_genesis.Map)
+        pool.transactions_with_expiration
+    in
+    let applicable_by_fee =
+      map_to_set (module Fee_rate.Map) pool.applicable_by_fee
+    in
+    let all_txns =
+      List.fold_left ~f:Set.union ~init:all_by_sender
+        [ all_by_fee; all_by_hash; by_expiration; applicable_by_fee ]
+    in
+    [%test_eq: int] pool.size Set.(length all_txns) ;
+    [%test_eq: Set.t] all_by_hash all_txns ;
+    [%test_eq: Set.t] all_by_sender all_txns ;
+    [%test_eq: Set.t] all_by_fee all_txns ;
+    [%test_eq: Set.t]
+      ( Account_id.Map.data pool.all_by_sender
+      |> List.map ~f:(fun (cmds, _) -> F_sequence.head_exn cmds)
+      |> Set.of_list )
+      applicable_by_fee ;
+    (* In each sender's queue nonces should be strictly increasing and the
+       reserved currency should be equal to the sum of amounts and fees of
+       all the commands in the queue. *)
+    Account_id.Map.iteri pool.all_by_sender
+      ~f:(fun ~key ~data:(queue, reserved_currency) ->
+        [%test_pred: Transaction_hash.User_command_with_valid_signature.t F_sequence.t]
+          (Fn.compose not F_sequence.is_empty)
+          queue ;
+        let _, reserved_currency' =
           F_sequence.foldl
-            (fun (curr_nonce, currency_acc) tx ->
-              let unchecked =
-                Transaction_hash.User_command_with_valid_signature.command tx
+            (fun (last_nonce, reserved) cmd ->
+              let sender =
+                Transaction_hash.User_command_with_valid_signature.command cmd
+                |> User_command.fee_payer
               in
-              [%test_eq: Account_nonce.t]
-                (User_command.applicable_at_nonce unchecked)
-                curr_nonce ;
-              check_consistent tx ;
-              ( User_command.expected_target_nonce unchecked
-              , Option.value_exn
-                  Currency.Amount.(
-                    Option.value_exn
-                      (currency_consumed ~constraint_constants tx)
-                    + currency_acc) ) )
-            ( User_command.expected_target_nonce applicable_unchecked
-            , Option.value_exn
-                (currency_consumed ~constraint_constants applicable) )
-            inapplicables
+              [%test_eq: Account_id.t] sender key ;
+              let nonce =
+                Transaction_hash.User_command_with_valid_signature.command cmd
+                |> User_command.applicable_at_nonce
+              in
+              [%test_pred: Account_nonce.t]
+                (* Last nonce is None only at the very beginning. *)
+                  (fun n ->
+                  Option.value_map last_nonce ~default:true
+                    ~f:Account_nonce.(( > ) n) )
+                nonce ;
+              let consumed =
+                currency_consumed_unchecked
+                  ~constraint_constants:pool.config.constraint_constants
+                  (Transaction_hash.User_command_with_valid_signature.command
+                     cmd )
+                |> Option.value_exn
+              in
+              (Some nonce, Option.value_exn Amount.(reserved + consumed)) )
+            (None, Currency.Amount.zero)
+            queue
         in
-        [%test_eq: Currency.Amount.t] currency_reserved currency_reserved' ) ;
-    let check_sender_applicable fee tx =
-      let unchecked =
-        Transaction_hash.User_command_with_valid_signature.command tx
-      in
-      [%test_eq: Currency.Fee.t] fee (User_command.fee unchecked) ;
-      let sender_txs, _currency_reserved =
-        Map.find_exn all_by_sender (User_command.fee_payer unchecked)
-      in
-      let applicable, _inapplicables =
-        Option.value_exn (F_sequence.uncons sender_txs)
-      in
-      assert (
-        Set.mem
-          (Map.find_exn applicable_by_fee
-             ( applicable
-             |> Transaction_hash.User_command_with_valid_signature.command
-             |> User_command.fee_per_wu ) )
-          applicable ) ;
-      let tx' =
-        F_sequence.find sender_txs ~f:(fun cmd ->
-            let applicable_at_nonce =
-              cmd |> Transaction_hash.User_command_with_valid_signature.command
-              |> User_command.applicable_at_nonce
-            in
-            Account_nonce.equal applicable_at_nonce
-            @@ User_command.applicable_at_nonce unchecked )
-        |> Option.value_exn
-      in
-      [%test_eq: Transaction_hash.User_command_with_valid_signature.t] tx tx'
+        [%test_eq: Currency.Amount.t] reserved_currency reserved_currency' ) ;
+    (* Check that commands are placed under correct keys. *)
+    let check_fee fee cmd =
+      [%test_eq: Currency.Fee_rate.t]
+        (User_command.fee_per_wu
+           (Transaction_hash.User_command_with_valid_signature.command cmd) )
+        fee
     in
-    Map.iteri all_by_fee ~f:(fun ~key:fee_per_wu ~data:tx_set ->
-        Set.iter tx_set ~f:(fun tx ->
-            let command =
-              Transaction_hash.User_command_with_valid_signature.command tx
-            in
-            let wu = User_command.weight command in
-            let fee =
-              Currency.Fee_rate.scale_exn fee_per_wu wu
-              |> Currency.Fee_rate.to_uint64_exn |> Currency.Fee.of_uint64
-            in
-            check_sender_applicable fee tx ;
-            assert_all_by_hash tx ) ) ;
-    Map.iter all_by_hash ~f:(fun tx ->
-        check_sender_applicable
-          (User_command.fee
-             (Transaction_hash.User_command_with_valid_signature.command tx) )
-          tx ;
-        assert_all_by_fee tx ) ;
-    [%test_eq: int] (Map.length all_by_hash) size
+    let is_not_empty = Fn.compose not Set.is_empty in
+    Currency.Fee_rate.Map.iteri pool.applicable_by_fee ~f:(fun ~key ~data ->
+        [%test_pred: Set.t] is_not_empty data ;
+        Set.iter data ~f:(check_fee key) ) ;
+    Currency.Fee_rate.Map.iteri pool.all_by_fee ~f:(fun ~key ~data ->
+        [%test_pred: Set.t] is_not_empty data ;
+        Set.iter data ~f:(check_fee key) ) ;
+    Transaction_hash.Map.iteri pool.all_by_hash ~f:(fun ~key ~data ->
+        [%test_eq: Transaction_hash.t]
+          (Transaction_hash.User_command_with_valid_signature.hash data)
+          key )
 end
 
 let empty ~constraint_constants ~consensus_constants ~time_controller : t =
