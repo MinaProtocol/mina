@@ -1,61 +1,58 @@
-import datetime;
-import google.auth
-import google.auth.transport.requests
 from google.cloud.sql.connector import Connector
-from sqlalchemy import create_engine
-from sqlalchemy.engine import Engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from google.cloud.sql.connector import Connector, IPTypes
+import google.auth
+import sqlalchemy
+import os
+from datetime import datetime
 
-credentials = service_account.Credentials.from_service_account_file(
-        env('GOOGLE_APPLICATION_CREDENTIALS'), scopes=SCOPES)
+credentials, project_id = google.auth.default()
+#connector = Connector(credentials=credentials,enable_iam_auth=True)
 
-def init_connection_pool(connector: Connector) -> Engine:
-
-    def getconn() -> pg8000.connections.Connection:
-        conn: pg8000.connections.Connection = connector.connect(
-            "o1labs-192920:us-central1-c:snark-transaction-profiler",
-            "pg8000",
-            credentials=credentials,
-            db="performance"
-        )
-        return conn
-
-    SQLALCHEMY_DATABASE_URL = "postgresql+pg8000://"
-
-    engine = create_engine(
-        SQLALCHEMY_DATABASE_URL , creator=getconn
-    )
-    return engine
-
-# initialize Cloud SQL Python Connector
+# initialize Connector object
 connector = Connector()
 
-# create connection pool engine
-engine = init_connection_pool(connector)
+# function to return the database connection object
+def getconn():
+    conn = connector.connect(
+        instance_connection_string="o1labs-192920:us-central1:snark-transaction-profiler",
+        driver="pg8000",
+        db="performance",
+        user="postgres",
+        password="postgres"
+ #   user="automated-validation@o1labs-192920.iam.gserviceaccount.com"
+    )
+    return conn
 
+# create connection pool with 'creator' argument to our connection object function
+pool = sqlalchemy.create_engine(
+    "postgresql+pg8000://",
+    creator=getconn,
+)
 
-inspector = inspect(engine)
-print(inspector.get_columns('measurement'))
+name = 'Snark Profiler'
+env = 'CI'
+build_id = os.environ['BUILDKITE_JOB_ID']
+now = datetime.now()
+dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
 
+# connect to connection pool
+with pool.connect() as db_conn:
 
-#name = ''
-#env = 'CI'
-#build_id = env('BUILDKITE_JOB_ID')
+  # insert data into our ratings table
+  insert_stmt = sqlalchemy.text(
+      "INSERT INTO measurement (test_id, env, value, timestamp, build_id) VALUES (:test_id, :env, :value, :timestamp, :build_id)",
+  )
 
+  # insert entries into table
+  db_conn.execute(insert_stmt, parameters={"test_id": name, "env": env, "value": 7.5, "timestamp": dt_string, "build_id": build_id })
+  db_conn.execute(insert_stmt, parameters={"test_id": name, "env": env, "value": 9.1, "timestamp": dt_string, "build_id": build_id })
+  db_conn.execute(insert_stmt, parameters={"test_id": name, "env": env, "value": 8.3, "timestamp": dt_string, "build_id": build_id })
 
-#('Snark Profiler','CI',1.00,'2019-07-10 08:25:59','01891b9b-cf69-400e-b6b6-8a08171cc373'),
-#('Snark Profiler','CI',1.00,'2019-07-10 04:25:59','01891b9b-cf69-400e-b6b6-8a08171cc373'),
-#('Snark Profiler','CI',20.00,'2017-07-10 04:55:59','01891b9b-cf69-400e-b6b6-8a08171cc373');
+  # commit transactions
+  db_conn.commit()
 
-#insert = 
+  # query and fetch ratings table
+  results = db_conn.execute(sqlalchemy.text("SELECT * FROM measurement")).fetchall()
 
-
-#now = datetime.now()
-#dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-
-
-#gcloud spanner databases execute-sql "example-db" \
-#    --instance=test-instance
-#     --sql=
+  # show results
+  for row in results:
+    print(row)
