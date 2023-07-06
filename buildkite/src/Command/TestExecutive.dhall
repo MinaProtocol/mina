@@ -23,7 +23,11 @@ in
               -- Execute test based on BUILD image
               Cmd.run "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive.sh ${testName} && ./buildkite/scripts/upload-test-results.sh ${testName} "
             ],
-        artifact_paths = [SelectFiles.exactly "." "${testName}.test.log"],
+        artifact_paths = 
+            [
+              SelectFiles.contains "${testName}.test.log",
+              SelectFiles.contains "test_result.xml"
+            ],
         label = "${testName} integration test",
         key = "integration-test-${testName}",
         target = Size.Integration,
