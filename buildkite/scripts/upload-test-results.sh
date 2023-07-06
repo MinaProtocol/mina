@@ -3,16 +3,11 @@ set -o pipefail -x
 
 TEST_NAME="$1"
 
-if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]]; then
-  echo "Skipping $TEST_NAME"
-  exit 0
-fi
-
-./test_reporter.exe test-result generate --log-file "$TEST_NAME.test.log" --format junit --output-file test_result.xml
+./test_reporter.exe test-result generate --log-file "$TEST_NAME.test.log" --format junit --output-file $TEST_NAME.junit.xml
 
 curl -X POST https://analytics-api.buildkite.com/v1/uploads -sv \
   -H "Authorization: Token token=\"$BUILDKITE_TEST_ANALYTICS_TOKEN\"" \
-  -F "data=@test_result.xml" \
+  -F "data=@$TEST_NAME.junit.xml" \
   -F "format=junit" \
   -F "run_env[CI]=buildkite" \
   -F "run_env[key]=$BUILDKITE_BUILD_ID" \

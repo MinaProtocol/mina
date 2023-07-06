@@ -24,8 +24,8 @@ module TestLogInfo = struct
     ; mutable coverage_files : string list
     ; mutable perf_measurements : PerfMeasurement.t list
     ; mutable test_result : TestResult.t
-    ; mutable test_start : float
-    ; mutable test_end : float
+    ; mutable test_start : Time.t option
+    ; mutable test_end : Time.t option
     ; mutable failure_reason : string option
     ; mutable failure_expanded : string list
     }
@@ -46,15 +46,15 @@ module TestLogInfo = struct
     ; mina_image = None
     ; coverage_files = []
     ; perf_measurements = []
-    ; test_result = TestResult.Skipped
+    ; test_result = TestResult.Passed
     ; failure_reason = None
     ; failure_expanded = []
-    ; test_start = 0.0
-    ; test_end = 0.0
+    ; test_start = None
+    ; test_end = None
     }
 
   let from_logs ~logger ~log_file =
-    let coverage_manager_ref : t ref = ref empty in
+    let result_ref : t ref = ref empty in
     let log_lines = In_channel.read_lines log_file in
     List.iter log_lines ~f:(fun line ->
         let json = Yojson.Safe.from_string line in
@@ -68,7 +68,7 @@ module TestLogInfo = struct
               let coverage_files_metadata =
                 get_metadata_key_or_fail msg.metadata "files"
               in
-              !coverage_manager_ref.coverage_files <-
+              !result_ref.coverage_files <-
                 String.split ~on:',' coverage_files_metadata
             else if String.is_substring msg.message ~substring:"Running test"
             then (
@@ -79,15 +79,19 @@ module TestLogInfo = struct
                 get_metadata_key_or_fail msg.metadata "test_name"
               in
               let mina_image = get_metadata_key_or_fail msg.metadata "image" in
-              !coverage_manager_ref.testnet_name <- Some testnet_name ;
-              !coverage_manager_ref.test_name <- Some test_name ;
-              !coverage_manager_ref.mina_image <- Some mina_image )
+              !result_ref.testnet_name <- Some testnet_name ;
+              !result_ref.test_name <- Some test_name ;
+              !result_ref.mina_image <- Some mina_image ;
+              !result_ref.test_start <- Some msg.timestamp )
+            else if
+              String.is_substring msg.message ~substring:"cleaning up testnet"
+            then !result_ref.test_end <- Some msg.timestamp
             else if
               String.is_substring msg.message
                 ~substring:"Contextualized Incident found"
             then
-              !coverage_manager_ref.failure_expanded <-
-                !coverage_manager_ref.failure_expanded
+              !result_ref.failure_expanded <-
+                !result_ref.failure_expanded
                 @ [ get_metadata_key_or_fail msg.metadata "message" ]
             else if String.is_substring msg.message ~substring:"Test Result:"
             then
@@ -100,8 +104,7 @@ module TestLogInfo = struct
                         let failure_text =
                           get_metadata_key_or_fail msg.metadata "failure_text"
                         in
-                        !coverage_manager_ref.failure_reason <-
-                          Some failure_text ;
+                        !result_ref.failure_reason <- Some failure_text ;
                         test_result
                     | _ ->
                         test_result )
@@ -110,7 +113,7 @@ module TestLogInfo = struct
                       "cannot determine test result.. set Skipped by default" ;
                     TestResult.Skipped
               in
-              !coverage_manager_ref.test_result <- result
+              !result_ref.test_result <- result
             else if
               String.is_substring msg.message
                 ~substring:"Performance measurement"
@@ -130,8 +133,8 @@ module TestLogInfo = struct
               in
               let duration = get_metadata_key_or_fail msg.metadata "duration" in
               let start = get_metadata_key_or_fail msg.metadata "start" in
-              !coverage_manager_ref.perf_measurements <-
-                !coverage_manager_ref.perf_measurements
+              !result_ref.perf_measurements <-
+                !result_ref.perf_measurements
                 @ [ { name
                     ; start = float_of_string start
                     ; duration = float_of_string duration
@@ -140,5 +143,5 @@ module TestLogInfo = struct
             else ()
         | Error str ->
             [%log error] "%s" str ) ;
-    !coverage_manager_ref
+    !result_ref
 end
