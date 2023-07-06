@@ -233,6 +233,9 @@ check-format: ocaml_checks
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
 
+check-proof-systems-submodule:
+	./scripts/check-proof-systems-submodule.sh
+
 #######################################
 ## Environment setup
 
