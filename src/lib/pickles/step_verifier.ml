@@ -632,7 +632,11 @@ struct
                 ~polynomials:(without_degree_bound, []) )
         in
         let joint_combiner =
-          if lookup_verification_enabled then failwith "TODO" else None
+          if lookup_verification_enabled then
+            failwith
+              "lookup_verification_enabled unhandled by \
+               Step_verifier.incrementally_verify_proof"
+          else None
         in
         assert_eq_deferred_values
           { alpha = plonk.alpha
