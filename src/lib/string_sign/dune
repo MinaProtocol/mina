@@ -6,7 +6,8 @@
    ;; opam libraries
    core_kernel
    ppx_inline_test.config
-   sexplib0
+   result
+   yojson
    ;; local libraries
    kimchi_backend
    pickles.backend
@@ -18,6 +19,7 @@
    random_oracle
    pickles
    mina_signature_kind
+   mina_base
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

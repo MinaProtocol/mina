@@ -2,6 +2,7 @@
 
 module Inner_curve = Snark_params.Tick.Inner_curve
 open Signature_lib
+open Core_kernel
 
 let nybble_bits = function
   | 0x0 ->
@@ -113,15 +114,13 @@ let%test_module "Sign_string tests" =
            (verify ~signature_kind:(Other_network "Foo") signature
               keypair.public_key s )
 
-    let%test "Sign with legacy testnet, verify with berkeley" =
+    let%test "Sign with legacy mainnet, verify with mainnet" =
       let open Mina_signature_kind in
-      let s = "Some pills make you larger" in
+      let s = "Legacy signature for mainnet" in
       let signature =
-        Schnorr.Legacy.Signature.t_of_sexp
-          (Sexplib0.Sexp_conv.sexp_of_string
-             "(8656577108411870231873959711007058895648854959347229571516378429868010119492 \
-              12637423669555772237754655762936594625461387808042708417640256735175481405870)\n\
-             \      " )
+        "7mX3ZLNHk9CKtMd7hFLXYwEBXyiosDug9BLWDND1KJEdyfMWX9oWHscxGMT3q4P9DdYiXsXFynsfoLhooy3XJ5dgduPSHw5u"
+        |> Yojson.Safe.from_string |> Mina_base.Signature.of_yojson
+        |> Core_kernel.Or_error.ok |> Option.value_exn
       in
       verify ~signature_kind:Testnet signature keypair.public_key s
 
