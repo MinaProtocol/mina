@@ -41,7 +41,7 @@ in  Pipeline.build
             Command.Config::{
             , commands = commands
             , label =
-                "Fast lint steps; CODEOWNERs, RFCs, Check Snarky Submodule, Preprocessor Deps"
+                "Fast lint steps; CODEOWNERs, RFCs, Check Snarky & Proof-Systems submodules, Preprocessor Deps"
             , key = "lint"
             , target = Size.Small
             , docker = Some Docker::{
