@@ -14,7 +14,7 @@ There are three things to convert here:
 2. common (or generic) low-level types: polynomial commitments (Poly_comm), gates (Gates), etc. that are instantiated separately for the two curves (Fq_poly_comm, Fp_poly_comm).
 3. high-level types that describe the constraint system, the indexes, etc. that are instantiated separately for the two curves as well.
 
-For the most part, you can find these types defined in `kimchi_backend_common/*` and instantiated in `pasta/basic.ml` and `pasta/{pallas,vesta}_based_plonk.ml`.
+For the most part, you can find these types defined in `kimchi_backend/common/*` and instantiated in `pasta/basic.ml` and `pasta/{pallas,vesta}_based_plonk.ml`.
 
 ## File structure
 
