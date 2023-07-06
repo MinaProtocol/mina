@@ -46,7 +46,7 @@ spec:
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",
           {{- if $.Values.mina.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
+          "-config-file", "/root/config/daemon.json",
           {{- end }}
           {{- if $.Values.mina.logPrecomputedBlocks }}
           "-log-precomputed-blocks", "true",
@@ -77,7 +77,7 @@ spec:
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: GCLOUD_KEYFILE
-          value: "/gcloud/keyfile.json"
+          value: "/root/gcloud/keyfile.json"
         - name: NETWORK_NAME
           value: {{ $.Values.testnetName }}
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
@@ -108,9 +108,18 @@ spec:
         {{- end }}
         {{- if $.Values.mina.runtimeConfig }}
         - name: daemon-config
-          mountPath: "/config/"
+          mountPath: "/root/config/"
         {{- end }}
+        - name: config-dir
+          mountPath: "/root/.mina-config/"
       volumes:
+      - name: config-dir
+      {{- if $.Values.persist_working_dir }}
+        persistentVolumeClaim:
+          claimName: pvc-{{ $.Values.name }}
+      {{- else}}
+        emptyDir: {}
+      {{- end }}
       {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
         configMap:
@@ -146,4 +155,18 @@ spec:
     targetPort: {{ $.Values.mina.ports.graphql }}
 {{- end }}
 ---
-
+{{- if $.Values.persist_working_dir }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-{{ $.Values.name }}
+spec:
+  accessModes:
+      - {{ $.Values.storage.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ $.Values.storage.size | quote }}
+  storageClassName: "{{ $.Values.storage.storageClass }}"
+---
+{{ end }}
+---

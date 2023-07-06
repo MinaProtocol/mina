@@ -19,7 +19,7 @@ module "kubernetes_testnet" {
   mina_agent_image   = var.mina_agent_image
   mina_bots_image    = var.mina_bots_image
   mina_points_image  = var.mina_points_image
-
+  enable_working_dir_persitence = var.enable_working_dir_persitence
   log_level             = "Trace"
   log_snark_work_gossip = true
 
@@ -46,6 +46,7 @@ module "kubernetes_testnet" {
       snark_worker_fee      = var.snark_worker_fee
       snark_worker_public_key = var.snark_coordinator_config.public_key
       snark_coordinators_host_port = local.snark_worker_host_port
+      persist_working_dir = var.enable_working_dir_persitence
     }
   ]
 
@@ -68,6 +69,7 @@ module "kubernetes_testnet" {
       enable_peer_exchange   = true
       enableArchive          = var.archive_node_count > 0
       archiveAddress         = element(local.archive_node_names, index)
+      persist_working_dir    = var.enable_working_dir_persitence
     }
   ]
 
