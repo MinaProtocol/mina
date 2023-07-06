@@ -2,16 +2,15 @@ open Core_kernel
 open Async
 open Pipe_lib
 open Network_peer
-module Statement_table = Transaction_snark_work.Statement.Table
 
 module Snark_tables = struct
   type t =
     { all :
         Ledger_proof.t One_or_two.t Priced_proof.t
-        Transaction_snark_work.Statement.Table.t
+        Transaction_snark_work.Statement.Map.t
     ; rebroadcastable :
         (Ledger_proof.t One_or_two.t Priced_proof.t * Core.Time.t)
-        Transaction_snark_work.Statement.Table.t
+        Transaction_snark_work.Statement.Map.t
     }
   [@@deriving sexp]
 end
@@ -107,7 +106,7 @@ struct
         | `New_best_tip of Base_ledger.t ]
 
       type t =
-        { snark_tables : Snark_tables.t
+        { snark_tables : Snark_tables.t ref
         ; frontier : (unit -> Transition_frontier.t option[@sexp.opaque])
         ; config : Config.t
         ; logger : (Logger.t[@sexp.opaque])
@@ -135,7 +134,7 @@ struct
 
       let snark_pool_json t : Yojson.Safe.t =
         `List
-          (Statement_table.fold ~init:[] t.snark_tables.all
+          (Map.fold ~init:[] !(t.snark_tables).all
              ~f:(fun ~key ~data:{ proof = _; fee = { fee; prover } } acc ->
                let work_ids =
                  Transaction_snark_work.Statement.compact_json key
@@ -150,7 +149,7 @@ struct
                :: acc ) )
 
       let all_completed_work (t : t) : Transaction_snark_work.Info.t list =
-        Statement_table.fold ~init:[] t.snark_tables.all
+        Map.fold ~init:[] !(t.snark_tables).all
           ~f:(fun ~key ~data:{ proof = _; fee = { fee; prover } } acc ->
             let work_ids = Transaction_snark_work.Statement.work_ids key in
             { Transaction_snark_work.Info.statements = key
@@ -167,7 +166,7 @@ struct
         let open Mina_base in
         let open Signature_lib in
         let prover_account_ids =
-          t.snark_tables.all |> Statement_table.data
+          !(t.snark_tables).all |> Map.data
           |> List.map ~f:(fun { Priced_proof.fee = { prover; _ }; _ } ->
                  prover )
           |> List.dedup_and_sort ~compare:Public_key.Compressed.compare
@@ -181,7 +180,7 @@ struct
           |> Base_ledger.location_of_account_batch ledger
           |> Account_id.Map.of_alist_exn
         in
-        Statement_table.iteri t.snark_tables.all
+        Map.iteri !(t.snark_tables).all
           ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } ->
             let prover_account_exists =
               prover
@@ -192,21 +191,28 @@ struct
             let keep =
               fee_is_sufficient t ~fee ~account_exists:prover_account_exists
             in
-            if not keep then (
-              Hashtbl.remove t.snark_tables.all key ;
-              Hashtbl.remove t.snark_tables.rebroadcastable key ) )
+            if not keep then
+              t.snark_tables :=
+                { all = Map.remove !(t.snark_tables).all key
+                ; rebroadcastable =
+                    Map.remove !(t.snark_tables).rebroadcastable key
+                } )
 
       let handle_refcount_update t
           ({ removed_work } : Extensions.Snark_pool_refcount.view) =
         [%log' trace t.logger]
           "Handling snark refcount table: $num_removed works were removed"
           ~metadata:[ ("num_removed", `Int (List.length removed_work)) ] ;
-        List.iter removed_work ~f:(fun work ->
-            Hashtbl.remove t.snark_tables.rebroadcastable work ;
-            Hashtbl.remove t.snark_tables.all work ) ;
+        t.snark_tables :=
+          { all =
+              List.fold ~init:!(t.snark_tables).all ~f:Map.remove removed_work
+          ; rebroadcastable =
+              List.fold ~init:!(t.snark_tables).rebroadcastable ~f:Map.remove
+                removed_work
+          } ;
         Mina_metrics.(
           Gauge.set Snark_work.snark_pool_size
-            (Float.of_int @@ Hashtbl.length t.snark_tables.all))
+            (Float.of_int @@ Map.length !(t.snark_tables).all))
 
       let handle_transition_frontier_diff u t =
         match u with
@@ -249,9 +255,10 @@ struct
           ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
         let t =
           { snark_tables =
-              { all = Statement_table.create ()
-              ; rebroadcastable = Statement_table.create ()
-              }
+              ref
+                { Snark_tables.all = Transaction_snark_work.Statement.Map.empty
+                ; rebroadcastable = Transaction_snark_work.Statement.Map.empty
+                }
           ; frontier =
               (fun () -> Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
           ; batcher = Batcher.Snark_pool.create config.verifier
@@ -268,22 +275,25 @@ struct
 
       let get_logger t = t.logger
 
-      let request_proof t = Statement_table.find t.snark_tables.all
+      let request_proof t = Map.find !(t.snark_tables).all
 
       let add_snark ?(is_local = false) t ~work
           ~(proof : Ledger_proof.t One_or_two.t) ~fee =
         if work_is_referenced t work then (
           (*Note: fee against existing proofs and the new proofs are checked in
             Diff.unsafe_apply which calls this function*)
-          Hashtbl.set t.snark_tables.all ~key:work ~data:{ proof; fee } ;
-          if is_local then
-            Hashtbl.set t.snark_tables.rebroadcastable ~key:work
-              ~data:({ proof; fee }, Time.now ())
-          else
-            (* Stop rebroadcasting locally generated snarks if they are
-               overwritten. No-op if there is no rebroadcastable SNARK with that
-               statement. *)
-            Hashtbl.remove t.snark_tables.rebroadcastable work ;
+          t.snark_tables :=
+            { all = Map.set !(t.snark_tables).all ~key:work ~data:{ proof; fee }
+            ; rebroadcastable =
+                ( if is_local then
+                  Map.set !(t.snark_tables).rebroadcastable ~key:work
+                    ~data:({ proof; fee }, Time.now ())
+                else
+                  (* Stop rebroadcasting locally generated snarks if they are
+                     overwritten. No-op if there is no rebroadcastable SNARK with that
+                     statement. *)
+                  Map.remove !(t.snark_tables).rebroadcastable work )
+            } ;
           (*when snark work is added to the pool*)
           Mina_metrics.(
             Gauge.set Snark_work.useful_snark_work_received_time_sec
@@ -291,7 +301,7 @@ struct
                 let x = now () |> to_span_since_epoch |> Span.to_sec in
                 x -. Mina_metrics.time_offset_sec) ;
             Gauge.set Snark_work.snark_pool_size
-              (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
+              (Float.of_int @@ Map.length !(t.snark_tables).all) ;
             Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
               ( fee.Mina_base.Fee_with_prover.fee
               |> Currency.Fee.to_nanomina_int |> Float.of_int )) ;
@@ -479,15 +489,17 @@ struct
       | None ->
           []
       | Some best_tips ->
-          Hashtbl.to_alist t.snark_tables.rebroadcastable
+          Map.to_alist !(t.snark_tables).rebroadcastable
           |> List.filter_map ~f:(fun (stmt, (snark, _time)) ->
                  if Hash_set.mem best_tips stmt then
                    Some (Diff.Add_solved_work (stmt, snark))
                  else None )
 
     let remove_solved_work t work =
-      Statement_table.remove t.snark_tables.all work ;
-      Statement_table.remove t.snark_tables.rebroadcastable work
+      t.snark_tables :=
+        { all = Map.remove !(t.snark_tables).all work
+        ; rebroadcastable = Map.remove !(t.snark_tables).rebroadcastable work
+        }
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
