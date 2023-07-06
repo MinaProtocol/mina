@@ -28,11 +28,13 @@ module Statement = struct
       let (_ : (t, Arg.Stable.V2.t) Type_equal.t) = Type_equal.T
 
       include Hashable.Make_binable (Arg.Stable.V2)
+      include Comparable.Make_binable (Arg.Stable.V2)
     end
   end]
 
   type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson, equal]
 
+  include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make (Stable.Latest)
 
   let gen = One_or_two.gen Transaction_snark.Statement.gen
