@@ -25,8 +25,8 @@ in
             ],
         artifact_paths = 
             [
-              SelectFiles.contains "${testName}.test.log",
-              SelectFiles.contains "test_result.xml"
+              SelectFiles.contains "${testName}",
+              SelectFiles.contains "test_result"
             ],
         label = "${testName} integration test",
         key = "integration-test-${testName}",
