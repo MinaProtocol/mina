@@ -30,18 +30,7 @@ module Snark_tables = struct
         (Ledger_proof.t One_or_two.t Priced_proof.t * Core.Time.t)
         Transaction_snark_work.Statement.Table.t
     }
-  [@@deriving sexp]
-
-  let compare t1 t2 =
-    let p t = (Hashtbl.to_alist t.all, Hashtbl.to_alist t.rebroadcastable) in
-    [%compare:
-      ( Transaction_snark_work.Statement.t
-      * Ledger_proof.t One_or_two.t Priced_proof.t )
-      list
-      * ( Transaction_snark_work.Statement.t
-        * (Ledger_proof.t One_or_two.t Priced_proof.t * Core.Time.t) )
-        list]
-      (p t1) (p t2)
+  [@@deriving sexp, equal]
 
   let of_serializable (t : Serializable.t) : t =
     { all = Hashtbl.map t ~f:fst
@@ -856,7 +845,7 @@ let%test_module "random set test" =
       let s1 =
         Snark_tables.to_serializable s0 |> Snark_tables.of_serializable
       in
-      [%test_eq: Snark_tables.t] s0 s1
+      assert (Snark_tables.equal s0 s1)
 
     let%test_unit "Invalid proofs are not accepted" =
       let open Quickcheck.Generator.Let_syntax in
