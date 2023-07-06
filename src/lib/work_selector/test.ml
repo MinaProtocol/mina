@@ -12,8 +12,6 @@ struct
   module Lib = Work_lib.Make (T)
   module Selection_method = Make_selection_method (T) (Lib)
 
-  let stmt_of_work_spec = One_or_two.map ~f:Lib.Work_spec.statement
-
   let gen_staged_ledger =
     (*Staged_ledger for tests is a list of work specs*)
     Quickcheck.Generator.list
@@ -63,9 +61,7 @@ struct
         | None ->
             all_work
         | Some work ->
-            go
-              ( One_or_two.to_list (T.Transaction_snark_work.With_hash.data work)
-              @ all_work )
+            go (One_or_two.to_list work @ all_work)
       in
       go []
     in
@@ -97,12 +93,7 @@ struct
           add_works rest
     in
     let%map () =
-      add_works
-        (List.map
-           ~f:
-             (Fn.compose T.Transaction_snark_work.Statement_with_hash.create
-                stmt_of_work_spec )
-           works )
+      add_works (List.map ~f:(One_or_two.map ~f:Lib.Work_spec.statement) works)
     in
     snark_pool
 
@@ -128,10 +119,8 @@ struct
     Quickcheck.test g
       ~sexp_of:
         [%sexp_of:
-          (int, Fee.t) Lib.Work_spec.t list
-          * ( T.Transaction_snark_work.Statement_with_hash.t
-            , Currency.Fee.t )
-            Hashtbl.t] ~trials:100 ~f:(fun (sl, snark_pool) ->
+          (int, Fee.t) Lib.Work_spec.t list * Fee.t T.Snark_pool.Work.Table.t]
+      ~trials:100 ~f:(fun (sl, snark_pool) ->
         Async.Thread_safe.block_on_async_exn (fun () ->
             let open Deferred.Let_syntax in
             let%bind work_state = init_state sl reassignment_wait logger in
@@ -146,14 +135,11 @@ struct
               | None ->
                   return ()
               | Some job ->
-                  let job' =
-                    T.Transaction_snark_work.With_hash.map ~f:stmt_of_work_spec
-                      job
-                  in
                   [%test_result: Bool.t]
                     ~message:"Should not get any cheap jobs" ~expect:true
                     (Lib.For_tests.does_not_have_better_fee ~snark_pool
-                       ~fee:my_fee job' ) ;
+                       ~fee:my_fee
+                       (One_or_two.map job ~f:Lib.Work_spec.statement) ) ;
                   go (i + 1)
             in
             go 0 ) )

@@ -270,14 +270,14 @@ module type Snark_resource_pool_intf = sig
   val add_snark :
        ?is_local:bool
     -> t
-    -> work:Transaction_snark_work.Statement_with_hash.t
+    -> work:Transaction_snark_work.Statement.t
     -> proof:Ledger_proof.t One_or_two.t
     -> fee:Fee_with_prover.t
     -> [ `Added | `Statement_not_referenced ]
 
   val request_proof :
        t
-    -> Transaction_snark_work.Statement_with_hash.t
+    -> Transaction_snark_work.Statement.t
     -> Ledger_proof.t One_or_two.t Priced_proof.t option
 
   val verify_and_act :

@@ -1,6 +1,6 @@
 open Core_kernel
 open Frontier_base
-module Work = Transaction_snark_work.Statement_with_hash
+module Work = Transaction_snark_work.Statement
 
 (* TODO: best tip table should be a separate extension *)
 
@@ -29,16 +29,11 @@ module T = struct
 
   let add_to_table table t =
     List.iter (get_work t)
-      ~f:
-        (Fn.compose
-           (Work.Table.update table
-              ~f:(Option.value_map ~default:1 ~f:(( + ) 1)) )
-           Work.create )
+      ~f:(Work.Table.update table ~f:(Option.value_map ~default:1 ~f:(( + ) 1)))
 
   (** Returns the elements that were removed from the table. *)
   let remove_from_table table t : Work.t list =
     List.filter_map (get_work t) ~f:(fun work ->
-        let work = Work.create work in
         match Work.Table.find table work with
         | Some 1 ->
             Work.Table.remove table work ;
@@ -100,9 +95,7 @@ module T = struct
                       |> Staged_ledger.all_work_statements_exn
                     with _ -> []
                   in
-                  List.iter
-                    ~f:(Fn.compose (Hash_set.add t.best_tip_table) Work.create)
-                    statements ;
+                  List.iter ~f:(Hash_set.add t.best_tip_table) statements ;
                   if blocks_remaining > 0 then
                     update_best_tip_table (blocks_remaining - 1)
                       (Breadcrumb.parent_hash breadcrumb)

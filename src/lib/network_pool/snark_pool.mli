@@ -9,8 +9,7 @@ module type S = sig
       Intf.Snark_resource_pool_intf
         with type transition_frontier := transition_frontier
 
-    val remove_solved_work :
-      t -> Transaction_snark_work.Statement_with_hash.t -> unit
+    val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
     module Diff : Intf.Snark_pool_diff_intf with type resource_pool := t
   end
@@ -35,7 +34,7 @@ module type S = sig
 
   val get_completed_work :
        t
-    -> Transaction_snark_work.Statement_with_hash.t
+    -> Transaction_snark_work.Statement.t
     -> Transaction_snark_work.Checked.t option
 end
 
@@ -61,11 +60,9 @@ module type Transition_frontier_intf = sig
     -> Transition_frontier.Extensions.Snark_pool_refcount.view
        Pipe_lib.Broadcast_pipe.Reader.t
 
-  val work_is_referenced :
-    t -> Transaction_snark_work.Statement_with_hash.t -> bool
+  val work_is_referenced : t -> Transaction_snark_work.Statement.t -> bool
 
-  val best_tip_table :
-    t -> Transaction_snark_work.Statement_with_hash.Hash_set.t
+  val best_tip_table : t -> Transaction_snark_work.Statement.Hash_set.t
 end
 
 module Make

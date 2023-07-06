@@ -14,19 +14,23 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       Time.Span.( > ) delta max_age
   end
 
-  let stmt_of_work_spec = One_or_two.map ~f:Work_spec.statement
-
   module State = struct
+    module Seen_key = struct
+      module T = struct
+        type t = Transaction_snark.Statement.t One_or_two.t
+        [@@deriving compare, sexp, to_yojson, hash]
+      end
+
+      include T
+      include Comparable.Make (T)
+    end
+
     type t =
       { mutable available_jobs :
           (Inputs.Transaction_witness.t, Inputs.Ledger_proof.t) Work_spec.t
           One_or_two.t
-          Inputs.Transaction_snark_work.With_hash.t
           list
-      ; jobs_seen :
-          ( Inputs.Transaction_snark_work.Statement_with_hash.t
-          , Job_status.t )
-          Hashtbl.t
+      ; jobs_seen : (Seen_key.t, Job_status.t) Hashtbl.t
       ; reassignment_wait : int
       }
 
@@ -40,9 +44,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
      fun ~reassignment_wait ~frontier_broadcast_pipe ~logger ->
       let t =
         { available_jobs = []
-        ; jobs_seen =
-            Hashtbl.create
-              (module Inputs.Transaction_snark_work.Statement_with_hash)
+        ; jobs_seen = Hashtbl.create (module Seen_key)
         ; reassignment_wait
         }
       in
@@ -80,12 +82,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                                 ( Time.diff end_time start_time
                                 |> Time.Span.to_ms ) )
                           ] ;
-                      t.available_jobs <-
-                        List.map
-                          ~f:
-                            (Inputs.Transaction_snark_work.With_hash.create
-                               ~f:stmt_of_work_spec )
-                          new_available_jobs )
+                      t.available_jobs <- new_available_jobs )
               |> Deferred.don't_wait_for ) ;
           Deferred.unit )
       |> Deferred.don't_wait_for ;
@@ -93,12 +90,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
     let all_unseen_works t ~logger =
       let unseen_works =
-        List.filter t.available_jobs ~f:(fun job ->
-            let stmt =
-              Inputs.Transaction_snark_work.With_hash.map ~f:stmt_of_work_spec
-                job
-            in
-            not (Hashtbl.mem t.jobs_seen stmt) )
+        List.filter t.available_jobs ~f:(fun js ->
+            not
+            @@ Hashtbl.mem t.jobs_seen
+                 (One_or_two.map ~f:Work_spec.statement js) )
       in
       [%log debug]
         ~metadata:
@@ -118,11 +113,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                   ~reassignment_wait:t.reassignment_wait
               then (
                 [%log info]
-                  ~metadata:
-                    [ ( "work"
-                      , Inputs.Transaction_snark_work.Statement_with_hash
-                        .to_yojson work )
-                    ]
+                  ~metadata:[ ("work", Seen_key.to_yojson work) ]
                   "Waited too long to get work for $work. Ready to be \
                    reassigned" ;
                 Mina_metrics.(
@@ -131,17 +122,16 @@ module Make (Inputs : Intf.Inputs_intf) = struct
               else true ) )
 
     let remove t x =
-      Hashtbl.remove t.jobs_seen
-        (Inputs.Transaction_snark_work.With_hash.map ~f:stmt_of_work_spec x)
+      Hashtbl.remove t.jobs_seen (One_or_two.map ~f:Work_spec.statement x)
 
     let set t x =
       Hashtbl.set t.jobs_seen
-        ~key:
-          (Inputs.Transaction_snark_work.With_hash.map ~f:stmt_of_work_spec x)
+        ~key:(One_or_two.map ~f:Work_spec.statement x)
         ~data:(Job_status.Assigned (Time.now ()))
   end
 
-  let does_not_have_better_fee ~snark_pool ~fee statements : bool =
+  let does_not_have_better_fee ~snark_pool ~fee
+      (statements : Inputs.Transaction_snark_work.Statement.t) : bool =
     Option.value_map ~default:true
       (Inputs.Snark_pool.get_completed_work snark_pool statements)
       ~f:(fun priced_proof ->
@@ -153,32 +143,21 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   end
 
   let get_expensive_work ~snark_pool ~fee
-      (jobs :
-        ('a, 'b) Work_spec.t One_or_two.t
-        Inputs.Transaction_snark_work.With_hash.t
-        list ) :
-      ('a, 'b) Work_spec.t One_or_two.t
-      Inputs.Transaction_snark_work.With_hash.t
-      list =
+      (jobs : ('a, 'b) Work_spec.t One_or_two.t list) :
+      ('a, 'b) Work_spec.t One_or_two.t list =
     O1trace.sync_thread "work_lib_get_expensive_work" (fun () ->
-        List.filter jobs
-          ~f:
-            (Fn.compose
-               (does_not_have_better_fee ~snark_pool ~fee)
-               (Inputs.Transaction_snark_work.With_hash.map ~f:stmt_of_work_spec) ) )
+        List.filter jobs ~f:(fun job ->
+            does_not_have_better_fee ~snark_pool ~fee
+              (One_or_two.map job ~f:Work_spec.statement) ) )
 
-  let all_pending_work ~snark_pool =
-    let f =
-      Fn.compose Option.is_none
-      @@ Inputs.Snark_pool.get_completed_work snark_pool
-    in
-    List.filter ~f
+  let all_pending_work ~snark_pool statements =
+    List.filter statements ~f:(fun st ->
+        Option.is_none (Inputs.Snark_pool.get_completed_work snark_pool st) )
 
   (*Seen/Unseen jobs that are not in the snark pool yet*)
   let pending_work_statements ~snark_pool ~fee_opt (state : State.t) =
     let all_todo_statements =
-      List.map state.available_jobs
-        ~f:(Inputs.Transaction_snark_work.With_hash.map ~f:stmt_of_work_spec)
+      List.map state.available_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
     in
     let expensive_work statements ~fee =
       List.filter statements ~f:(does_not_have_better_fee ~snark_pool ~fee)

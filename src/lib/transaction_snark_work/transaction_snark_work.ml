@@ -2,26 +2,6 @@ open Core_kernel
 open Currency
 open Signature_lib
 
-module With_hash = struct
-  type 'a t = { hash : int; data : 'a }
-
-  let create ~f data =
-    O1trace.sync_thread "snark_work_with_hash_create"
-    @@ fun () ->
-    { hash =
-        Ppx_hash_lib.Std.Hash.of_fold
-          (One_or_two.hash_fold_t Transaction_snark.Statement.hash_fold_t)
-          (f data)
-    ; data
-    }
-
-  let hash { hash; _ } = hash
-
-  let map ~f { hash; data } = { hash; data = f data }
-
-  let data { data; _ } = data
-end
-
 module Statement = struct
   module Arg = struct
     [%%versioned
@@ -66,37 +46,6 @@ module Statement = struct
 
   let work_ids t : int One_or_two.t =
     One_or_two.map t ~f:Transaction_snark.Statement.work_id
-end
-
-module Statement_with_hash = struct
-  module T = struct
-    type t = Statement.t With_hash.t
-
-    let hash = With_hash.hash
-
-    let hash_fold_t st With_hash.{ hash; _ } = Int.hash_fold_t st hash
-
-    let equal With_hash.{ data = d1; _ } With_hash.{ data = d2; _ } =
-      Statement.equal d1 d2
-
-    let compare With_hash.{ data = d1; _ } With_hash.{ data = d2; _ } =
-      Statement.compare d1 d2
-
-    let create = With_hash.create ~f:Fn.id
-
-    let t_of_sexp =
-      Fn.compose create
-        (One_or_two.t_of_sexp Transaction_snark.Statement.t_of_sexp)
-
-    let sexp_of_t With_hash.{ data; _ } =
-      One_or_two.sexp_of_t Transaction_snark.Statement.sexp_of_t data
-
-    let to_yojson With_hash.{ data; _ } =
-      One_or_two.to_yojson Transaction_snark.Statement.to_yojson data
-  end
-
-  include T
-  include Hashable.Make (T)
 end
 
 module Info = struct

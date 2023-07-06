@@ -14,8 +14,7 @@ module Staged_ledger = struct
 end
 
 module Transition_frontier = struct
-  type table = int Transaction_snark_work.Statement_with_hash.Table.t
-  [@@deriving sexp]
+  type table = int Transaction_snark_work.Statement.Table.t [@@deriving sexp]
 
   type diff = Extensions.Snark_pool_refcount.view [@@deriving sexp]
 
@@ -29,7 +28,7 @@ module Transition_frontier = struct
 
   type t =
     { refcount_table : table
-    ; best_tip_table : Transaction_snark_work.Statement_with_hash.Hash_set.t
+    ; best_tip_table : Transaction_snark_work.Statement.Hash_set.t
     ; mutable ledger : Base_ledger.t
     ; diff_writer : (diff Broadcast_pipe.Writer.t[@sexp.opaque])
     ; diff_reader : (diff Broadcast_pipe.Reader.t[@sexp.opaque])
@@ -38,8 +37,7 @@ module Transition_frontier = struct
 
   let add_statements table stmts =
     List.iter stmts ~f:(fun s ->
-        Transaction_snark_work.Statement_with_hash.Table.change table s
-          ~f:(function
+        Transaction_snark_work.Statement.Table.change table s ~f:(function
           | None ->
               Some 1
           | Some count ->
@@ -47,12 +45,8 @@ module Transition_frontier = struct
 
   (*Create tf with some statements referenced to be able to add snark work for those statements to the pool*)
   let create _stmts : t =
-    let refcount_table =
-      Transaction_snark_work.Statement_with_hash.Table.create ()
-    in
-    let best_tip_table =
-      Transaction_snark_work.Statement_with_hash.Hash_set.create ()
-    in
+    let refcount_table = Transaction_snark_work.Statement.Table.create () in
+    let best_tip_table = Transaction_snark_work.Statement.Hash_set.create () in
     (*add_statements table stmts ;*)
     let diff_reader, diff_writer =
       Broadcast_pipe.create { Extensions.Snark_pool_refcount.removed_work = [] }
@@ -84,9 +78,6 @@ module Transition_frontier = struct
   (*Adds statements to the table of referenced work. Snarks for only the referenced statements are added to the pool*)
   let refer_statements (t : t) stmts =
     let open Deferred.Let_syntax in
-    let stmts =
-      List.map ~f:Transaction_snark_work.Statement_with_hash.create stmts
-    in
     add_statements t.refcount_table stmts ;
     List.iter ~f:(Hash_set.add t.best_tip_table) stmts ;
     let%bind () =

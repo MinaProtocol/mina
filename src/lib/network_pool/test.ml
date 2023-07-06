@@ -76,7 +76,6 @@ let%test_module "network pool test" =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
           let pool = Mock_snark_pool.resource_pool network_pool in
-          let work = Transaction_snark_work.Statement_with_hash.create work in
           match Mock_snark_pool.Resource_pool.request_proof pool work with
           | Some { proof; fee = _ } ->
               assert (

@@ -2,14 +2,16 @@ open Core_kernel
 open Async
 open Pipe_lib
 open Network_peer
-module Statement_table = Transaction_snark_work.Statement_with_hash.Table
+module Statement_table = Transaction_snark_work.Statement.Table
 
 module Snark_tables = struct
   type t =
-    { all : Ledger_proof.t One_or_two.t Priced_proof.t Statement_table.t
+    { all :
+        Ledger_proof.t One_or_two.t Priced_proof.t
+        Transaction_snark_work.Statement.Table.t
     ; rebroadcastable :
         (Ledger_proof.t One_or_two.t Priced_proof.t * Core.Time.t)
-        Statement_table.t
+        Transaction_snark_work.Statement.Table.t
     }
   [@@deriving sexp]
 end
@@ -22,8 +24,7 @@ module type S = sig
       Intf.Snark_resource_pool_intf
         with type transition_frontier := transition_frontier
 
-    val remove_solved_work :
-      t -> Transaction_snark_work.Statement_with_hash.t -> unit
+    val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
     module Diff : Intf.Snark_pool_diff_intf with type resource_pool := t
   end
@@ -48,7 +49,7 @@ module type S = sig
 
   val get_completed_work :
        t
-    -> Transaction_snark_work.Statement_with_hash.t
+    -> Transaction_snark_work.Statement.t
     -> Transaction_snark_work.Checked.t option
 end
 
@@ -74,11 +75,9 @@ module type Transition_frontier_intf = sig
     -> Transition_frontier.Extensions.Snark_pool_refcount.view
        Pipe_lib.Broadcast_pipe.Reader.t
 
-  val work_is_referenced :
-    t -> Transaction_snark_work.Statement_with_hash.t -> bool
+  val work_is_referenced : t -> Transaction_snark_work.Statement.t -> bool
 
-  val best_tip_table :
-    t -> Transaction_snark_work.Statement_with_hash.Hash_set.t
+  val best_tip_table : t -> Transaction_snark_work.Statement.Hash_set.t
 end
 
 module Make
@@ -139,8 +138,7 @@ struct
           (Statement_table.fold ~init:[] t.snark_tables.all
              ~f:(fun ~key ~data:{ proof = _; fee = { fee; prover } } acc ->
                let work_ids =
-                 Transaction_snark_work.Statement.compact_json
-                   (Transaction_snark_work.With_hash.data key)
+                 Transaction_snark_work.Statement.compact_json key
                in
                `Assoc
                  [ ("work_ids", work_ids)
@@ -154,9 +152,8 @@ struct
       let all_completed_work (t : t) : Transaction_snark_work.Info.t list =
         Statement_table.fold ~init:[] t.snark_tables.all
           ~f:(fun ~key ~data:{ proof = _; fee = { fee; prover } } acc ->
-            let key_ = Transaction_snark_work.With_hash.data key in
-            let work_ids = Transaction_snark_work.Statement.work_ids key_ in
-            { Transaction_snark_work.Info.statements = key_
+            let work_ids = Transaction_snark_work.Statement.work_ids key in
+            { Transaction_snark_work.Info.statements = key
             ; work_ids
             ; fee
             ; prover
@@ -306,7 +303,7 @@ struct
             ~metadata:
               [ ( "stmt"
                 , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
-                    (Transaction_snark_work.With_hash.data work) )
+                    work )
               ] ;
           `Statement_not_referenced
 
@@ -362,7 +359,6 @@ struct
                   Error (Invalid e) )
           in
           let work = One_or_two.map proofs ~f:snd in
-          let work_ = Transaction_snark_work.Statement_with_hash.create work in
           let account_opt =
             let open Mina_base in
             let open Option.Let_syntax in
@@ -409,7 +405,7 @@ struct
                         .receive )
                 :: metadata ) ;
             invalid "prover not permitted to receive fees" )
-          else if not (work_is_referenced t work_) then (
+          else if not (work_is_referenced t work) then (
             [%log' debug t.logger] "Work $stmt not referenced"
               ~metadata:
                 ( ( "stmt"
@@ -486,9 +482,7 @@ struct
           Hashtbl.to_alist t.snark_tables.rebroadcastable
           |> List.filter_map ~f:(fun (stmt, (snark, _time)) ->
                  if Hash_set.mem best_tips stmt then
-                   Some
-                     (Diff.Add_solved_work
-                        (Transaction_snark_work.With_hash.data stmt, snark) )
+                   Some (Diff.Add_solved_work (stmt, snark))
                  else None )
 
     let remove_solved_work t work =
@@ -753,8 +747,7 @@ let%test_module "random set test" =
               let fee_upper_bound = Currency.Fee.min fee_1.fee fee_2.fee in
               let { Priced_proof.fee = { fee; _ }; _ } =
                 Option.value_exn
-                  (Mock_snark_pool.Resource_pool.request_proof t
-                     (Transaction_snark_work.Statement_with_hash.create work) )
+                  (Mock_snark_pool.Resource_pool.request_proof t work)
               in
               assert (Currency.Fee.(fee <= fee_upper_bound)) ) )
 
@@ -779,8 +772,7 @@ let%test_module "random set test" =
               let%bind () =
                 Mocks.Transition_frontier.refer_statements tf [ work ]
               in
-              Mock_snark_pool.Resource_pool.remove_solved_work t
-                (Transaction_snark_work.Statement_with_hash.create work) ;
+              Mock_snark_pool.Resource_pool.remove_solved_work t work ;
               let expensive_fee = Fee_with_prover.max fee_1 fee_2
               and cheap_fee = Fee_with_prover.min fee_1 fee_2 in
               let%bind _ = apply_diff t work cheap_fee in
@@ -789,8 +781,7 @@ let%test_module "random set test" =
               assert (
                 Currency.Fee.equal cheap_fee.fee
                   (Option.value_exn
-                     (Mock_snark_pool.Resource_pool.request_proof t
-                        (Transaction_snark_work.Statement_with_hash.create work) ) )
+                     (Mock_snark_pool.Resource_pool.request_proof t work) )
                     .fee
                     .fee ) ) )
 
@@ -833,9 +824,7 @@ let%test_module "random set test" =
                ~f:(fun _ ->
                  let pool = Mock_snark_pool.resource_pool network_pool in
                  ( match
-                     Mock_snark_pool.Resource_pool.request_proof pool
-                       (Transaction_snark_work.Statement_with_hash.create
-                          fake_work )
+                     Mock_snark_pool.Resource_pool.request_proof pool fake_work
                    with
                  | Some { proof; fee = _ } ->
                      assert (
@@ -1046,8 +1035,7 @@ let%test_module "random set test" =
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           (* Mark best tip as not including stmt3. *)
           let%bind () =
-            Mocks.Transition_frontier.remove_from_best_tip tf
-              [ Transaction_snark_work.Statement_with_hash.create stmt3 ]
+            Mocks.Transition_frontier.remove_from_best_tip tf [ stmt3 ]
           in
           let rebroadcastable5 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool

@@ -2,19 +2,6 @@ open Core_kernel
 open Currency
 open Signature_lib
 
-module With_hash : sig
-  type 'a t = { hash : int; data : 'a }
-
-  val create :
-    f:('a -> Transaction_snark.Statement.t One_or_two.t) -> 'a -> 'a t
-
-  val hash : 'a t -> int
-
-  val map : f:('a -> 'b) -> 'a t -> 'b t
-
-  val data : 'a t -> 'a
-end
-
 module Statement : sig
   type t = Transaction_snark.Statement.t One_or_two.t
   [@@deriving compare, sexp, yojson, equal]
@@ -35,15 +22,6 @@ module Statement : sig
   val compact_json : t -> Yojson.Safe.t
 
   val work_ids : t -> int One_or_two.t
-end
-
-module Statement_with_hash : sig
-  type t = Transaction_snark.Statement.t One_or_two.t With_hash.t
-  [@@deriving compare, sexp, to_yojson, equal]
-
-  val create : Statement.t -> t
-
-  include Hashable.S with type t := t
 end
 
 module Info : sig
