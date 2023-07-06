@@ -1,0 +1,21 @@
+(tests
+  (names runtime_table)
+  (instrumentation (backend bisect_ppx))
+  (preprocess (pps ppx_version ppx_jane))
+  (libraries
+    alcotest
+    core_kernel
+    ;; local libraries
+    kimchi_backend
+    kimchi_backend.common
+    kimchi_backend.pasta
+    kimchi_backend.pasta.basic
+    kimchi_backend.pasta.constraint_system
+    kimchi_bindings
+    kimchi_types
+    kimchi_gadgets_test_runner
+    mina_stdlib
+    snarky.intf
+    snarky.backendless
+  )
+)
