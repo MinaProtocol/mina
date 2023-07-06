@@ -12,19 +12,24 @@ CREATE TABLE TEST
 CREATE TABLE BENCHMARK
 (
   id serial PRIMARY KEY,
-  test_id serial FOREIGN KEY(TEST),
   value numeric(10,2) NOT NULL,
   timestamp timestamp without time zone NOT NULL,
   build_id character(200),
+  CONSTRAINT fk_test
+    FOREIGN KEY(test_id) 
+	    REFERENCES TEST(id)
 );
 
 CREATE TABLE THRESHOLD
 (
   id serial PRIMARY KEY,
-  test_id serial FOREIGN KEY(TEST), 
   from_build_id character(200),
   red float not null,
-  yellow float not null
+  yellow float not null,
+  comment character(200),
+  CONSTRAINT fk_test
+    FOREIGN KEY(test_id) 
+	    REFERENCES TEST(id)
 );
 
 CREATE TABLE CONFIG
