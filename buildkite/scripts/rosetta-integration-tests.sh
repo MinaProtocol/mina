@@ -237,6 +237,7 @@ EOF
   cd "$zkapp_path"
   npm install --no-progress ${OLDPWD}/src/lib/snarkyjs --no-audit
   npm install --no-progress --no-audit
+  zk deploy sandbox -y
   txn=$(zk deploy sandbox -y | sed -ne "s/https:\/\/berkeley.minaexplorer.com\/transaction\///p")
   deploy_txs+=txn
   cd -
