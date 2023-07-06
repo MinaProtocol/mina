@@ -204,53 +204,11 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let work_id = hash
 
-      let optimized =
-        match Sys.getenv "MINA_PARTIAL_STATEMENT_HASH" with
-        | Some _ ->
-            true
-        | None ->
-            false
-
       (* Override hash functions with faster partial versions.
        * The assumption here is that the combination of source and target ledger
        * hashes is unique enough to differentiate between statements, so
        * there will be no clashes.
        *)
-
-      let hash_fold_t =
-        if optimized then fun state (t : t) ->
-          let { source =
-                  { first_pass_ledger = source_first_pass_ledger
-                  ; second_pass_ledger = source_second_pass_ledger
-                  ; pending_coinbase_stack = _
-                  ; local_state = _
-                  }
-              ; target =
-                  { first_pass_ledger = target_first_pass_ledger
-                  ; second_pass_ledger = target_second_pass_ledger
-                  ; pending_coinbase_stack = _
-                  ; local_state = _
-                  }
-              ; connecting_ledger_left = _
-              ; connecting_ledger_right = _
-              ; supply_increase = _
-              ; fee_excess = _
-              ; sok_digest = ()
-              } =
-            t
-          in
-          let hash_fold_t hash state =
-            Frozen_ledger_hash.Stable.V1.hash_fold_t state hash
-          in
-          state
-          |> hash_fold_t source_first_pass_ledger
-          |> hash_fold_t source_second_pass_ledger
-          |> hash_fold_t target_first_pass_ledger
-          |> hash_fold_t target_second_pass_ledger
-        else hash_fold_t
-
-      let hash =
-        if optimized then Ppx_hash_lib.Std.Hash.of_fold hash_fold_t else hash
     end
   end]
 
