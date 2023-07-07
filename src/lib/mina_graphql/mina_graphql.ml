@@ -4411,182 +4411,181 @@ module Mutations = struct
         ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
           return
           @@
-          match (with_seq_no, input) with
-          | false, _ ->
-              Error "Missing sequence information"
-          | true, Error err ->
-              Error (sprintf "Invalid input to payment scheduler: %s" err)
-          | true, Ok payment_details ->
-              let max_memo_len = Signed_command_memo.max_input_length in
-              if List.is_empty payment_details.senders then
-                Error "Empty list of senders"
-              else if String.length payment_details.memo > max_memo_len then
-                Error
-                  (sprintf "Memo too long, limited to %d characters"
-                     max_memo_len )
-              else if
-                Currency.Fee.( < ) payment_details.fee_max
-                  payment_details.fee_min
-              then Error "Maximum fee less than mininum fee"
-              else
-                let logger = Mina_lib.top_level_logger mina in
-                let senders = payment_details.senders |> Array.of_list in
-                let num_senders = Array.length senders in
-                let sources =
-                  Array.map senders ~f:(fun sender ->
-                      Signature_lib.Public_key.of_private_key_exn sender
-                      |> Signature_lib.Public_key.compress )
-                in
-                Option.value_map (get_ledger_and_breadcrumb mina)
-                  ~default:(Error "Could not get best tip ledger")
-                  ~f:(fun (ledger, _tip) ->
-                    let nonce_opts =
-                      Array.map sources ~f:(fun source ->
-                          let open Option.Let_syntax in
-                          let acct_id =
-                            Account_id.create source Token_id.default
-                          in
-                          let%bind loc =
-                            Ledger.location_of_account ledger acct_id
-                          in
-                          let%map { nonce; _ } = Ledger.get ledger loc in
-                          nonce )
-                      |> Array.zip_exn sources
-                    in
-                    let missing_nonces =
-                      Array.filter nonce_opts ~f:(fun (_source, nonce_opt) ->
-                          Option.is_none nonce_opt )
-                    in
-                    if not @@ Array.is_empty missing_nonces then
-                      let missing_nonce_pks =
-                        Array.to_list missing_nonces
-                        |> List.map ~f:(fun (source, _nonce_opt) ->
-                               Signature_lib.Public_key.Compressed.to_yojson
-                                 source
-                               |> Yojson.Safe.to_string )
-                      in
-                      Error
-                        (sprintf "Could not get nonces for accounts: %s"
-                           (String.concat ~sep:"," missing_nonce_pks) )
-                    else
-                      let nonces =
-                        Array.map nonce_opts ~f:(fun (_source, nonce_opt) ->
-                            Option.value_exn nonce_opt )
-                      in
-                      let memo =
-                        Signed_command_memo.create_from_string_exn
-                          payment_details.memo
-                      in
-                      let uuid = Uuid.create_random Random.State.default in
-                      let ivar = Ivar.create () in
-                      ( match
-                          Uuid.Table.add scheduler_tbl ~key:uuid ~data:ivar
-                        with
-                      | `Ok ->
-                          ()
-                      | `Duplicate ->
-                          failwith
-                            "Unexpected duplicate scheduled payments handle" ) ;
-                      let wait_span =
-                        1. /. payment_details.transactions_per_second
-                        |> Time.Span.of_sec
-                      in
-                      let duration_span =
-                        Time.Span.of_min
-                          (Float.of_int payment_details.duration_in_minutes)
-                      in
-                      let tm_start = Time.now () in
-                      let tm_end = Time.add tm_start duration_span in
-                      let rec go ndx tm_next =
-                        if Time.( >= ) (Time.now ()) tm_end then (
-                          [%log info]
-                            "Scheduled payments with handle %s has expired"
-                            (Uuid.to_string uuid) ;
-                          Uuid.Table.remove scheduler_tbl uuid ;
-                          Deferred.unit )
-                        else if Ivar.is_full ivar then (
-                          [%log info]
-                            "Stopping scheduled payments with handle %s"
-                            (Uuid.to_string uuid) ;
-                          Uuid.Table.remove scheduler_tbl uuid ;
-                          Deferred.unit )
-                        else
-                          let sender = senders.(ndx) in
-                          let source_pk =
-                            Signature_lib.Public_key.of_private_key_exn sender
-                            |> Signature_lib.Public_key.compress
-                          in
-                          let receiver_pk = payment_details.receiver in
-                          let fee =
-                            Quickcheck.random_value ~seed:`Nondeterministic
-                            @@ Currency.Fee.gen_incl payment_details.fee_min
-                                 payment_details.fee_max
-                          in
-                          let body =
-                            Signed_command_payload.Body.Payment
-                              { receiver_pk; amount = payment_details.amount }
-                          in
-                          let valid_until = None in
-                          let nonce = nonces.(ndx) in
-                          let payload =
-                            Signed_command_payload.create ~fee
-                              ~fee_payer_pk:source_pk ~nonce ~valid_until ~memo
-                              ~body
-                          in
-                          let signature =
-                            Ok (Signed_command.sign_payload sender payload)
-                          in
-                          [%log info]
-                            "Payment scheduler with handle %s is sending a \
-                             payment from sender %s"
-                            (Uuid.to_string uuid)
-                            ( Signature_lib.Public_key.Compressed.to_yojson
-                                source_pk
-                            |> Yojson.Safe.to_string )
-                            ~metadata:
-                              [ ( "receiver"
-                                , Signature_lib.Public_key.Compressed.to_yojson
-                                    receiver_pk )
-                              ; ("nonce", Account.Nonce.to_yojson nonce)
-                              ; ("fee", Currency.Fee.to_yojson fee)
-                              ; ( "amount"
-                                , Currency.Amount.to_yojson
-                                    payment_details.amount )
-                              ; ("memo", `String payment_details.memo)
-                              ] ;
-                          let%bind () =
-                            let fee = Currency.Fee.to_uint64 fee in
-                            let memo = Some payment_details.memo in
-                            match%bind
-                              send_signed_user_command ~mina
-                                ~nonce_opt:(Some nonce) ~signer:source_pk ~memo
-                                ~fee ~fee_payer_pk:source_pk ~valid_until ~body
-                                ~signature
-                            with
-                            | Ok _cmd_with_status ->
-                                Deferred.unit
-                            | Error err ->
-                                [%log error]
-                                  "Payment scheduler with handle %s got error \
-                                   when sending payment from sender %s"
-                                  (Uuid.to_string uuid)
-                                  ( Signature_lib.Public_key.Compressed.to_yojson
-                                      source_pk
-                                  |> Yojson.Safe.to_string )
-                                  ~metadata:[ ("error", `String err) ] ;
-                                Deferred.unit
-                          in
-                          (* next nonce for this sender *)
-                          nonces.(ndx) <- Account.Nonce.succ nonce ;
-                          let%bind () = Async_unix.at tm_next in
-                          let next_tm_next = Time.add tm_next wait_span in
-                          go ((ndx + 1) mod num_senders) next_tm_next
-                      in
-                      [%log info] "Starting payment scheduler with handle %s"
-                        (Uuid.to_string uuid) ;
-                      let tm_next = Time.add tm_start wait_span in
-                      don't_wait_for @@ go 0 tm_next ;
-                      Ok (Uuid.to_string uuid) ) )
+          O1trace.sync_thread "itn_schedule_payments" @@ fun () ->
+          let%bind.Result () =
+               Result.ok_if_true with_seq_no
+                 ~error:"Missing sequence information"
+             in
+             let%bind.Result payment_details =
+               Result.map_error
+                 ~f:(sprintf "Invalid input to payment scheduler: %s")
+                 input
+             in
+             let max_memo_len = Signed_command_memo.max_input_length in
+             let%bind.Result () =
+               Result.ok_if_true ~error:"Empty list of senders"
+               @@ not
+               @@ List.is_empty payment_details.senders
+             in
+             let%bind.Result () =
+               Result.ok_if_true
+                 ~error:
+                   (sprintf "Memo too long, limited to %d characters"
+                      max_memo_len )
+                 (String.length payment_details.memo <= max_memo_len)
+             in
+             let%bind.Result () =
+               let open Currency.Fee in
+               Result.ok_if_true ~error:"Maximum fee less than mininum fee"
+                 (payment_details.fee_max >= payment_details.fee_min)
+             in
+             let logger = Mina_lib.top_level_logger mina in
+             let senders = payment_details.senders |> Array.of_list in
+             let num_senders = Array.length senders in
+             let sources =
+               Array.map senders ~f:(fun sender ->
+                   Signature_lib.Public_key.of_private_key_exn sender
+                   |> Signature_lib.Public_key.compress )
+             in
+             let%bind.Result ledger, _tip =
+               Result.of_option ~error:"Could not get best tip ledger"
+                 (get_ledger_and_breadcrumb mina)
+             in
+             let nonce_opts =
+               Array.map sources ~f:(fun source ->
+                   let open Option.Let_syntax in
+                   let acct_id = Account_id.create source Token_id.default in
+                   let%bind loc = Ledger.location_of_account ledger acct_id in
+                   let%map { nonce; _ } = Ledger.get ledger loc in
+                   nonce )
+               |> Array.zip_exn sources
+             in
+             let missing_nonces =
+               Array.filter nonce_opts ~f:(fun (_source, nonce_opt) ->
+                   Option.is_none nonce_opt )
+             in
+             let%bind.Result () =
+               if Array.is_empty missing_nonces then Ok ()
+               else
+                 let missing_nonce_pks =
+                   Array.to_list missing_nonces
+                   |> List.map ~f:(fun (source, _nonce_opt) ->
+                          Signature_lib.Public_key.Compressed.to_yojson source
+                          |> Yojson.Safe.to_string )
+                 in
+                 Error
+                   (sprintf "Could not get nonces for accounts: %s"
+                      (String.concat ~sep:"," missing_nonce_pks) )
+             in
+             let nonces =
+               Array.map nonce_opts ~f:(fun (_source, nonce_opt) ->
+                   Option.value_exn nonce_opt )
+             in
+             let memo =
+               Signed_command_memo.create_from_string_exn payment_details.memo
+             in
+             let uuid = Uuid.create_random Random.State.default in
+             let ivar = Ivar.create () in
+             ( match Uuid.Table.add scheduler_tbl ~key:uuid ~data:ivar with
+             | `Ok ->
+                 ()
+             | `Duplicate ->
+                 failwith "Unexpected duplicate scheduled payments handle" ) ;
+             let wait_span =
+               1. /. payment_details.transactions_per_second |> Time.Span.of_sec
+             in
+             let duration_span =
+               Time.Span.of_min
+                 (Float.of_int payment_details.duration_in_minutes)
+             in
+             let tm_start = Time.now () in
+             let tm_end = Time.add tm_start duration_span in
+             let send_payments ndx =
+               O1trace.thread "itn_send_scheduled_payments"
+               @@ fun () ->
+               let sender = senders.(ndx) in
+               let source_pk =
+                 Signature_lib.Public_key.of_private_key_exn sender
+                 |> Signature_lib.Public_key.compress
+               in
+               let receiver_pk = payment_details.receiver in
+               let fee =
+                 Quickcheck.random_value ~seed:`Nondeterministic
+                 @@ Currency.Fee.gen_incl payment_details.fee_min
+                      payment_details.fee_max
+               in
+               let body =
+                 Signed_command_payload.Body.Payment
+                   { receiver_pk; amount = payment_details.amount }
+               in
+               let valid_until = None in
+               let nonce = nonces.(ndx) in
+               let payload =
+                 Signed_command_payload.create ~fee ~fee_payer_pk:source_pk
+                   ~nonce ~valid_until ~memo ~body
+               in
+               let signature =
+                 Ok (Signed_command.sign_payload sender payload)
+               in
+               [%log info]
+                 "Payment scheduler with handle %s is sending a payment from \
+                  sender %s"
+                 (Uuid.to_string uuid)
+                 ( Signature_lib.Public_key.Compressed.to_yojson source_pk
+                 |> Yojson.Safe.to_string )
+                 ~metadata:
+                   [ ( "receiver"
+                     , Signature_lib.Public_key.Compressed.to_yojson receiver_pk
+                     )
+                   ; ("nonce", Account.Nonce.to_yojson nonce)
+                   ; ("fee", Currency.Fee.to_yojson fee)
+                   ; ("amount", Currency.Amount.to_yojson payment_details.amount)
+                   ; ("memo", `String payment_details.memo)
+                   ] ;
+               let fee = Currency.Fee.to_uint64 fee in
+               let memo = Some payment_details.memo in
+               match%bind
+                 send_signed_user_command ~mina ~nonce_opt:(Some nonce)
+                   ~signer:source_pk ~memo ~fee ~fee_payer_pk:source_pk
+                   ~valid_until ~body ~signature
+               with
+               | Ok _cmd_with_status ->
+                   Deferred.return (Some nonce)
+               | Error err ->
+                   [%log error]
+                     "Payment scheduler with handle %s got error when sending \
+                      payment from sender %s"
+                     (Uuid.to_string uuid)
+                     ( Signature_lib.Public_key.Compressed.to_yojson source_pk
+                     |> Yojson.Safe.to_string )
+                     ~metadata:[ ("error", `String err) ] ;
+                   Deferred.return None
+             in
+             let rec go ndx tm_next =
+               if Time.( >= ) (Time.now ()) tm_end then (
+                 [%log info] "Scheduled payments with handle %s has expired"
+                   (Uuid.to_string uuid) ;
+                 Uuid.Table.remove scheduler_tbl uuid ;
+                 Deferred.unit )
+               else if Ivar.is_full ivar then (
+                 [%log info] "Stopping scheduled payments with handle %s"
+                   (Uuid.to_string uuid) ;
+                 Uuid.Table.remove scheduler_tbl uuid ;
+                 Deferred.unit )
+               else
+                 let%bind nonce_opt = send_payments ndx in
+                 (* next nonce for this sender *)
+                 Option.iter nonce_opt ~f:(fun nonce ->
+                     nonces.(ndx) <- Account.Nonce.succ nonce ) ;
+                 let%bind () = Async_unix.at tm_next in
+                 let next_tm_next = Time.add tm_next wait_span in
+                 go ((ndx + 1) mod num_senders) next_tm_next
+             in
+             [%log info] "Starting payment scheduler with handle %s"
+               (Uuid.to_string uuid) ;
+             let tm_next = Time.add tm_start wait_span in
+             don't_wait_for @@ go 0 tm_next ;
+             Ok (Uuid.to_string uuid) )
 
     let account_of_id id ledger =
       Mina_ledger.Ledger.location_of_account ledger id
@@ -4601,6 +4600,8 @@ module Mutations = struct
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
         ~constraint_constants ~logger ~memo_prefix ~wait_span ~stop_signal
         ~stop_time ~uuid keypairs =
+      O1trace.thread "itn_deploy_zkapps"
+      @@ fun () ->
       let fee_payer_accounts =
         Array.map fee_payer_array ~f:(fun key -> account_of_kp key ledger)
       in
@@ -4752,6 +4753,7 @@ module Mutations = struct
           else
             return
             @@
+          O1trace.sync_thread "itn_schedule_zkapp_commands" @@ fun () ->
             match input with
             | Error err ->
                 Error
@@ -4872,6 +4874,8 @@ module Mutations = struct
                             else
                               let fee_payer = fee_payer_array.(ndx) in
                               let%bind () =
+                                O1trace.thread "itn_send_zkapp_commands"
+                                @@ fun () ->
                                 match get_ledger_and_breadcrumb mina with
                                 | None ->
                                     [%log info]
@@ -5041,6 +5045,7 @@ module Mutations = struct
           let logger = Mina_lib.top_level_logger mina in
           if not with_seq_no then return @@ Error "Missing sequence information"
           else
+          O1trace.sync_thread "itn_stop_scheduled_transactions" @@ fun () ->
             try
               let uuid = Uuid.of_string handle in
               match Uuid.Table.find scheduler_tbl uuid with
@@ -5076,6 +5081,8 @@ module Mutations = struct
             ]
         ~typ:(non_null string)
         ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
+          O1trace.thread "itn_update_gating"
+          @@ fun () ->
           if not with_seq_no then return @@ Error "Missing sequence information"
           else
             let%bind.Deferred.Result { trusted_peers
@@ -5145,6 +5152,8 @@ module Mutations = struct
             ]
         ~typ:(non_null string)
         ~resolve:(fun { ctx = with_seq_no, _; _ } () end_log_id ->
+          O1trace.thread "itn_flush_internal_logs"
+          @@ fun () ->
           if not with_seq_no then return @@ Error "Missing sequence information"
           else
             let n = Itn_logger.flush_queue end_log_id in
@@ -6189,7 +6198,8 @@ module Queries = struct
         ~doc:"Slots won by a block producer for current epoch"
         ~resolve:(fun { ctx = with_seq_no, mina; _ } () ->
           Io.return
-          @@
+          @@ O1trace.sync_thread "itn_slots_won"
+          @@ fun () ->
           if not with_seq_no then Error "Missing sequence information"
           else
             let bp_keys = Mina_lib.block_production_pubkeys mina in
@@ -6218,7 +6228,8 @@ module Queries = struct
         ~doc:"Internal logs generated by the daemon"
         ~resolve:(fun { ctx = with_seq_no, _mina; _ } _ start_log_id ->
           Io.return
-          @@
+          @@ O1trace.sync_thread "itn_internal_logs"
+          @@ fun () ->
           if not with_seq_no then Error "Missing sequence information"
           else Ok (Itn_logger.get_logs start_log_id) )
 
