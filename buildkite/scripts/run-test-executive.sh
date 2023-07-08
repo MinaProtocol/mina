@@ -28,4 +28,9 @@ mina-test-executive cloud "$TEST_NAME" \
   --archive-image "$ARCHIVE_IMAGE" \
   --mina-automation-location ./automation \
   | tee "$TEST_NAME.test.log" \
-  | mina-logproc -i inline -f '!(.level in ["Debug", "Spam"])'
+  | mina-logproc.exe -i inline -f '!(.level in ["Debug", "Spam"])' 
+
+EXIT_CODE="$?"
+
+./buildkite/scripts/upload-test-results.sh ${testName}
+
