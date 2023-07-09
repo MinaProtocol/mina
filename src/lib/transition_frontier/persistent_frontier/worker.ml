@@ -61,8 +61,8 @@ module Worker = struct
     | `Not_found (`Arcs hash) ->
         Printf.sprintf "arcs not found for %s" (State_hash.to_base58_check hash)
 
-  let apply_diff (type mutant) (t : t) (diff : mutant Diff.Lite.t) :
-      (mutant, apply_diff_error) Result.t =
+  let apply_diff (type mutant) ~arcs_cache (t : t) (diff : mutant Diff.Lite.t) :
+      (Database.batch_t -> unit, apply_diff_error) Result.t =
     let map_error result ~diff_type ~diff_type_name =
       Result.map_error result ~f:(fun err ->
           [%log' error t.logger] "error applying %s diff: %s" diff_type_name
@@ -72,8 +72,8 @@ module Worker = struct
     match diff with
     | New_node (Lite transition) -> (
         let r =
-          ( Database.add t.db ~transition
-            :> (mutant, apply_diff_error_internal) Result.t )
+          ( Database.add ~arcs_cache t.db ~transition
+            :> (Database.batch_t -> unit, apply_diff_error_internal) Result.t )
         in
         match r with
         | Ok x ->
@@ -89,7 +89,7 @@ module Worker = struct
                          (Mina_block.Validated.state_hash transition) ) )
                 ; ("parent", `String (State_hash.to_base58_check h))
                 ] ;
-            Ok ()
+            Ok ignore
         | _ ->
             map_error ~diff_type:`New_node ~diff_type_name:"New_node" r )
     | Root_transitioned
@@ -101,17 +101,9 @@ module Worker = struct
         map_error ~diff_type:`Root_transitioned
           ~diff_type_name:"Root_transitioned"
           ( Database.move_root t.db ~new_root ~garbage
-            :> (mutant, apply_diff_error_internal) Result.t )
+            :> (Database.batch_t -> unit, apply_diff_error_internal) Result.t )
     | Best_tip_changed best_tip_hash ->
-        map_error ~diff_type:`Best_tip_changed
-          ~diff_type_name:"Best_tip_changed"
-          ( Database.set_best_tip t.db best_tip_hash
-            :> (mutant, apply_diff_error_internal) Result.t )
-
-  let handle_diff t (Diff.Lite.E.E diff) =
-    let open Result.Let_syntax in
-    let%map _mutant = apply_diff t diff in
-    ()
+        Result.return (Database.set_best_tip t.db best_tip_hash)
 
   (* result equivalent of Deferred.Or_error.List.fold *)
   let rec deferred_result_list_fold ls ~init ~f =
@@ -124,21 +116,58 @@ module Worker = struct
         deferred_result_list_fold t ~init ~f
 
   let perform t input =
+    let arcs_cache = State_hash.Table.create () in
     O1trace.thread "persistent_frontier_write_to_disk" (fun () ->
-        match%map
-          [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
-            (List.length input) ;
-          (* Iterating over the diff application in this way
-             * effectively allows the scheduler to scheduler
-             * other tasks in between diff applications.
-             * If implemented otherwise, all diffs would be
-             * applied during the same scheduler cycle.
-          *)
-          deferred_result_list_fold input ~init:() ~f:(fun () diff ->
-              Deferred.return (handle_diff t diff) )
-        with
-        | Ok () ->
-            ()
+        [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
+          (List.length input) ;
+        let best_tip_cnt, root_cnt =
+          List.fold input ~init:(0, 0) ~f:(fun (b, r) -> function
+            | Diff.Lite.E.E (Root_transitioned _) ->
+                (b, r + 1)
+            | E (Best_tip_changed _) ->
+                (b + 1, r)
+            | _ ->
+                (b, r) )
+        in
+        let best_tip_cnt = ref best_tip_cnt in
+        let root_cnt = ref root_cnt in
+        let garbage_prev = ref [] in
+        let input =
+          List.filter_map input ~f:(function
+            | Diff.Lite.E.E (Best_tip_changed _) as diff ->
+                best_tip_cnt := !best_tip_cnt - 1 ;
+                Option.some_if (!best_tip_cnt = 0) diff
+            | E
+                (Root_transitioned
+                  ({ new_root; garbage = Lite garbage_this; _ } as r) ) ->
+                root_cnt := !root_cnt - 1 ;
+                if !root_cnt = 0 then
+                  Some
+                    (E
+                       (Root_transitioned
+                          { r with
+                            garbage = Lite (!garbage_prev @ garbage_this)
+                          } ) )
+                else (
+                  garbage_prev :=
+                    (Root_data.Limited.hashes new_root).state_hash
+                    :: garbage_this
+                    @ !garbage_prev ;
+                  None )
+            | diff ->
+                Some diff )
+        in
+        let fs_res =
+          List.map
+            ~f:(fun (Diff.Lite.E.E diff) -> apply_diff ~arcs_cache t diff)
+            input
+          |> Result.all
+        in
+        let%map () = Scheduler.yield () in
+        match fs_res with
+        | Ok fs ->
+            Database.with_batch t.db ~f:(fun batch ->
+                List.iter fs ~f:(fun f -> f batch) )
         (* TODO: log the diff that failed *)
         | Error (`Apply_diff _) ->
             failwith
