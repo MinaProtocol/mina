@@ -76,7 +76,7 @@ module type Transition_frontier_intf = sig
 
   val work_is_referenced : t -> Transaction_snark_work.Statement.t -> bool
 
-  val best_tip_table : t -> Transaction_snark_work.Statement.Hash_set.t
+  val best_tip_table : t -> Transaction_snark_work.Statement.Set.t
 end
 
 module Make
@@ -500,7 +500,7 @@ struct
       | Some best_tips ->
           Map.to_alist !(t.snark_tables).rebroadcastable
           |> List.filter_map ~f:(fun (stmt, (snark, _time)) ->
-                 if Hash_set.mem best_tips stmt then
+                 if Set.mem best_tips stmt then
                    Some (Diff.Add_solved_work (stmt, snark))
                  else None )
 
