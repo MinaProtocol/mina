@@ -165,7 +165,7 @@ func (p *Params) Generate(round int) GeneratedRound {
 	zkappsKeysDir := fmt.Sprintf("%s/round-%d/zkapps", p.FundKeyPrefix, round)
 	paymentsKeysDir := fmt.Sprintf("%s/round-%d/payments", p.FundKeyPrefix, round)
 	tps := sampleTps(p.BaseTps, p.StressTps)
-	experimentName := fmt.Sprintf("%s (round %d)", p.ExperimentName, round)
+	experimentName := fmt.Sprintf("%s-%d", p.ExperimentName, round)
 	zkappTps := tps * p.ZkappRatio
 	zkappParams := lib.ZkappSubParams{
 		ExperimentName:    experimentName,
@@ -288,6 +288,7 @@ func main() {
 	flag.StringVar(&p.FundKeyPrefix, "fund-keys-dir", "./fund-keys", "Dir for generated fund key prefixes")
 	flag.StringVar(&p.PasswordEnv, "password-env", "", "Name of environment variable to read privkey password from")
 	flag.StringVar((*string)(&p.PaymentReceiver), "payment-receiver", "", "Mina PK receiving payments")
+	flag.StringVar(&p.ExperimentName, "experiment-name", "exp-0", "Name of experiment")
 	flag.Parse()
 	p.Privkeys = strings.Split(privkeys, ",")
 	switch mode {
