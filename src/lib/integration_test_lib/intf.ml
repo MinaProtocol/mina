@@ -178,6 +178,11 @@ module Dsl = struct
       ; global_slot : int
       ; snarked_ledgers_generated : int
       ; blocks_generated : int
+      ; num_transition_frontier_loaded : int
+      ; num_persisted_frontier_loaded : int
+      ; num_persisted_frontier_fresh_boot : int
+      ; num_bootstrap_required : int
+      ; num_persisted_frontier_dropped : int
       ; node_initialization : bool String.Map.t
       ; gossip_received : Gossip_state.t String.Map.t
       ; best_tips_by_node : State_hash.t String.Map.t
@@ -211,6 +216,9 @@ module Dsl = struct
       | Signed_command_to_be_included_in_frontier
       | Ledger_proofs_emitted_since_genesis
       | Block_height_growth
+      | Zkapp_to_be_included_in_frontier
+      | Persisted_frontier_loaded
+      | Transition_frontier_loaded
 
     val wait_condition_id : t -> wait_condition_id
 
@@ -237,6 +245,13 @@ module Dsl = struct
 
     val ledger_proofs_emitted_since_genesis :
       test_config:Test_config.t -> num_proofs:int -> t
+
+    val zkapp_to_be_included_in_frontier :
+      has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
+
+    val persisted_frontier_loaded : Engine.Network.Node.t -> t
+
+    val transition_frontier_loaded : fresh_data:bool -> sync_needed:bool -> t
   end
 
   module type S = sig

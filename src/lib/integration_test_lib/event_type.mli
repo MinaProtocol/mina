@@ -79,6 +79,36 @@ module Breadcrumb_added : sig
   include Event_type_intf with type t := t
 end
 
+module Transition_frontier_loaded : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
+module Persisted_frontier_loaded : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
+module Persisted_frontier_fresh_boot : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
+module Bootstrap_required : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
+module Persisted_frontier_dropped : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
 module Gossip : sig
   module Direction : sig
     type t = Sent | Received [@@deriving yojson]
@@ -126,6 +156,12 @@ type 'a t =
   | Block_gossip : Gossip.Block.t t
   | Snark_work_gossip : Gossip.Snark_work.t t
   | Transactions_gossip : Gossip.Transactions.t t
+  | Snark_work_failed : Snark_work_failed.t t
+  | Transition_frontier_loaded : Transition_frontier_loaded.t t
+  | Persisted_frontier_loaded : Persisted_frontier_loaded.t t
+  | Persisted_frontier_fresh_boot : Persisted_frontier_fresh_boot.t t
+  | Persisted_frontier_dropped : Persisted_frontier_dropped.t t
+  | Bootstrap_required : Bootstrap_required.t t
 
 val to_string : 'a t -> string
 
