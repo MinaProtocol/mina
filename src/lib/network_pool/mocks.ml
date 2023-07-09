@@ -28,7 +28,7 @@ module Transition_frontier = struct
 
   type t =
     { refcount_table : table
-    ; best_tip_table : Transaction_snark_work.Statement.Hash_set.t
+    ; mutable best_tip_table : Transaction_snark_work.Statement.Set.t
     ; mutable ledger : Base_ledger.t
     ; diff_writer : (diff Broadcast_pipe.Writer.t[@sexp.opaque])
     ; diff_reader : (diff Broadcast_pipe.Reader.t[@sexp.opaque])
@@ -46,13 +46,12 @@ module Transition_frontier = struct
   (*Create tf with some statements referenced to be able to add snark work for those statements to the pool*)
   let create _stmts : t =
     let refcount_table = Transaction_snark_work.Statement.Table.create () in
-    let best_tip_table = Transaction_snark_work.Statement.Hash_set.create () in
     (*add_statements table stmts ;*)
     let diff_reader, diff_writer =
       Broadcast_pipe.create { Extensions.Snark_pool_refcount.removed_work = [] }
     in
     { refcount_table
-    ; best_tip_table
+    ; best_tip_table = Transaction_snark_work.Statement.Set.empty
     ; ledger = Mina_ledger.Ledger.create_ephemeral ~depth:10 ()
     ; diff_writer
     ; diff_reader
@@ -79,7 +78,7 @@ module Transition_frontier = struct
   let refer_statements (t : t) stmts =
     let open Deferred.Let_syntax in
     add_statements t.refcount_table stmts ;
-    List.iter ~f:(Hash_set.add t.best_tip_table) stmts ;
+    t.best_tip_table <- List.fold ~f:Set.add ~init:t.best_tip_table stmts ;
     let%bind () =
       Broadcast_pipe.Writer.write t.diff_writer
         { Transition_frontier.Extensions.Snark_pool_refcount.removed_work = [] }
@@ -87,7 +86,7 @@ module Transition_frontier = struct
     Async.Scheduler.yield_until_no_jobs_remain ()
 
   let remove_from_best_tip (t : t) stmts =
-    List.iter ~f:(Hash_set.remove t.best_tip_table) stmts ;
+    t.best_tip_table <- List.fold ~f:Set.remove ~init:t.best_tip_table stmts ;
     let%bind () =
       Broadcast_pipe.Writer.write t.diff_writer
         { Transition_frontier.Extensions.Snark_pool_refcount.removed_work = [] }
