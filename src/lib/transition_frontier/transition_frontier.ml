@@ -63,6 +63,19 @@ type Structured_log_events.t += Applying_diffs of { diffs : Yojson.Safe.t list }
 type Structured_log_events.t += Persisted_frontier_loaded
   [@@deriving register_event]
 
+type Structured_log_events.t += Transition_frontier_loaded
+  [@@deriving register_event]
+
+type Structured_log_events.t += Persisted_frontier_fresh_boot
+  [@@deriving
+    register_event { msg = "Persistent frontier database does not exist" }]
+
+type Structured_log_events.t += Bootstrap_required
+  [@@deriving register_event { msg = "Bootstrap required" }]
+
+type Structured_log_events.t += Persisted_frontier_dropped
+  [@@deriving register_event { msg = "Persistent frontier dropped" }]
+
 let genesis_root_data ~precomputed_values =
   let transition =
     Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
@@ -202,6 +215,7 @@ let rec load_with_max_length :
             [ ("error", `String "SNARKed ledger mismatch on load from disk")
             ; ("expected_snarked_ledger_hash", snarked_ledger_hash_json)
             ] ;
+        [%str_log debug] Persisted_frontier_dropped ;
         let%map () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
         in
@@ -223,6 +237,7 @@ let rec load_with_max_length :
               | `Failure msg ->
                   sprintf "Failure: %s" msg
               | `Bootstrap_required ->
+                  [%str_log info] Bootstrap_required ;
                   "Bootstrap required"
               (* next two cases aren't reachable, needed for types to work out *)
               | `Snarked_ledger_mismatch | `Persistent_frontier_malformed ->
@@ -233,7 +248,7 @@ let rec load_with_max_length :
                 [ ("error", `String err_str)
                 ; ("expected_snarked_ledger_hash", snarked_ledger_hash_json)
                 ] ;
-
+            [%str_log debug] Persisted_frontier_dropped ;
             let%map () =
               Persistent_frontier.Instance.destroy persistent_frontier_instance
             in
@@ -245,8 +260,9 @@ let rec load_with_max_length :
   in
   let reset_and_continue ?(destroy_frontier_instance = true) () =
     let%bind () =
-      if destroy_frontier_instance then
-        Persistent_frontier.Instance.destroy persistent_frontier_instance
+      if destroy_frontier_instance then (
+        [%str_log debug] Persisted_frontier_dropped ;
+        Persistent_frontier.Instance.destroy persistent_frontier_instance )
       else return ()
     in
     let%bind () =
@@ -277,7 +293,7 @@ let rec load_with_max_length :
       (* TODO: this case can be optimized to not create the
          * database twice through rocks -- currently on clean bootup,
          * this code path will reinitialize the rocksdb twice *)
-      [%log info] "persistent frontier database does not exist" ;
+      [%str_log info] Persisted_frontier_fresh_boot ;
       reset_and_continue ()
   | Error `Invalid_version ->
       [%log info] "persistent frontier database out of date" ;
@@ -301,6 +317,7 @@ let rec load_with_max_length :
       if retry_with_fresh_db then (
         (* should retry be on by default? this could be unnecessarily destructive *)
         [%log info] "destroying old persistent frontier database " ;
+        [%str_log debug] Persisted_frontier_dropped ;
         let%bind () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
         in
@@ -334,6 +351,7 @@ let rec load_with_max_length :
           *)
           reset_and_continue ~destroy_frontier_instance:false ()
       | res ->
+          [%str_log trace] Transition_frontier_loaded ;
           return res )
 
 let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
