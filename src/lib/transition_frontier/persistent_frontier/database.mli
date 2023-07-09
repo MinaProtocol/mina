@@ -14,6 +14,10 @@ open Frontier_base
 
 type t
 
+type batch_t
+
+val with_batch : t -> f:(batch_t -> 'a) -> 'a
+
 module Error : sig
   type not_found_member =
     [ `Root
@@ -66,9 +70,10 @@ val check :
 val initialize : t -> root_data:Root_data.Limited.t -> unit
 
 val add :
-     t
+     arcs_cache:State_hash.t list State_hash.Table.t
+  -> t
   -> transition:Mina_block.Validated.t
-  -> ( unit
+  -> ( batch_t -> unit
      , [> `Not_found of
           [> `Parent_transition of State_hash.t | `Arcs of State_hash.t ] ] )
      Result.t
@@ -77,7 +82,7 @@ val move_root :
      t
   -> new_root:Root_data.Limited.t
   -> garbage:State_hash.t list
-  -> ( State_hash.t
+  -> ( batch_t -> unit
      , [> `Not_found of [> `New_root_transition | `Old_root_transition ] ] )
      Result.t
 
@@ -107,10 +112,7 @@ val get_root_hash : t -> (State_hash.t, [> `Not_found of [> `Root ] ]) Result.t
 val get_best_tip :
   t -> (State_hash.t, [> `Not_found of [> `Best_tip ] ]) Result.t
 
-val set_best_tip :
-     t
-  -> State_hash.t
-  -> (State_hash.t, [> `Not_found of [> `Best_tip ] ]) Result.t
+val set_best_tip : t -> State_hash.t -> batch_t -> unit
 
 val crawl_successors :
      t
