@@ -39,7 +39,7 @@ struct
     | Block_height_growth
     | Zkapp_to_be_included_in_frontier
     | Persisted_frontier_loaded
-    | Transition_frontier_loaded
+    | Transition_frontier_loaded_from_persistence
 
   type t =
     { id : wait_condition_id
@@ -104,14 +104,14 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
-  let transition_frontier_loaded ~fresh_data ~sync_needed =
+  let transition_frontier_loaded_from_persistence ~fresh_data ~sync_needed =
     let init state =
       Predicate_continuation
         ( state.num_persisted_frontier_loaded
         , state.num_persisted_frontier_fresh_boot
         , state.num_bootstrap_required
         , state.num_persisted_frontier_dropped
-        , state.num_transition_frontier_loaded )
+        , state.num_transition_frontier_loaded_from_persistence )
     in
 
     let check init state =
@@ -119,7 +119,7 @@ struct
           , num_init_persisted_frontier_fresh_boot
           , num_init_bootstrap_required
           , num_init_persisted_frontier_dropped
-          , num_init_transition_frontier_loaded ) =
+          , num_init_transition_frontier_loaded_from_persistence ) =
         init
       in
 
@@ -141,17 +141,18 @@ struct
         else state.num_bootstrap_required = num_init_bootstrap_required
       in
       Printf.printf
-          "fresh_data_condition:%b sync_needed_condition:%b state.num_persisted_frontier_loaded: %b state.num_transition_frontier_loaded: %b" 
-          fresh_data_condition 
-          sync_needed_condition
-          state.num_persisted_frontier_loaded
-          state.num_transition_frontier_loaded;
+        "fresh_data_condition:%b sync_needed_condition:%b \
+         state.num_persisted_frontier_loaded: %d \
+         state.num_transition_frontier_loaded_from_persistence: %d"
+        fresh_data_condition sync_needed_condition
+        state.num_persisted_frontier_loaded
+        state.num_transition_frontier_loaded_from_persistence ;
       if
         fresh_data_condition && sync_needed_condition
         && state.num_persisted_frontier_loaded
            > num_init_persisted_frontier_loaded
-        && state.num_transition_frontier_loaded
-           > num_init_transition_frontier_loaded
+        && state.num_transition_frontier_loaded_from_persistence
+           > num_init_transition_frontier_loaded_from_persistence
       then Predicate_passed
       else
         Predicate_continuation
@@ -159,9 +160,9 @@ struct
           , state.num_persisted_frontier_fresh_boot
           , state.num_bootstrap_required
           , state.num_persisted_frontier_dropped
-          , state.num_transition_frontier_loaded )
+          , state.num_transition_frontier_loaded_from_persistence )
     in
-    { id = Transition_frontier_loaded
+    { id = Transition_frontier_loaded_from_persistence
     ; description =
         sprintf
           "Transition frontier loaded with 'fresh_data' set to %b and \

@@ -26,7 +26,7 @@ type Structured_log_events.t += Added_breadcrumb_user_commands
 type Structured_log_events.t += Applying_diffs of { diffs : Yojson.Safe.t list }
   [@@deriving register_event]
 
-type Structured_log_events.t += Transition_frontier_loaded
+type Structured_log_events.t += Transition_frontier_loaded_from_persistence
   [@@deriving register_event]
 
 type Structured_log_events.t += Persisted_frontier_loaded

@@ -31,7 +31,7 @@ module Make
     | Block_height_growth
     | Zkapp_to_be_included_in_frontier
     | Persisted_frontier_loaded
-    | Transition_frontier_loaded
+    | Transition_frontier_loaded_from_persistence
 
   type t =
     { id : wait_condition_id

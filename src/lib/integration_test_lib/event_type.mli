@@ -79,7 +79,7 @@ module Breadcrumb_added : sig
   include Event_type_intf with type t := t
 end
 
-module Transition_frontier_loaded : sig
+module Transition_frontier_loaded_from_persistence : sig
   type t = unit
 
   include Event_type_intf with type t := t
@@ -157,7 +157,8 @@ type 'a t =
   | Snark_work_gossip : Gossip.Snark_work.t t
   | Transactions_gossip : Gossip.Transactions.t t
   | Snark_work_failed : Snark_work_failed.t t
-  | Transition_frontier_loaded : Transition_frontier_loaded.t t
+  | Transition_frontier_loaded_from_persistence
+      : Transition_frontier_loaded_from_persistence.t t
   | Persisted_frontier_loaded : Persisted_frontier_loaded.t t
   | Persisted_frontier_fresh_boot : Persisted_frontier_fresh_boot.t t
   | Persisted_frontier_dropped : Persisted_frontier_dropped.t t
