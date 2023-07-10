@@ -214,8 +214,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     end in
     Type1.derive_plonk
       (module Field)
-      ~feature_flags ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
-      tick_combined_evals
+      ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
   and new_bulletproof_challenges, b =
     let prechals =
       Array.map (O.opening_prechallenges o) ~f:(fun x ->
@@ -423,12 +422,6 @@ let%test_module "gate finalization" =
             plonk =
               { deferred_values.plonk with
                 lookup = Opt.to_option_unsafe deferred_values.plonk.lookup
-              ; optional_column_scalars =
-                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                  .In_circuit
-                  .Optional_column_scalars
-                  .map ~f:Opt.to_option
-                    deferred_values.plonk.optional_column_scalars
               }
           }
       (* Prepare all of the evaluations (i.e. all of the columns in the proof that we open)
@@ -898,11 +891,6 @@ let wrap
                         lookup =
                           (* TODO: This assumes wrap circuits do not use lookup *)
                           None
-                      ; optional_column_scalars =
-                          (* TODO: This assumes that wrap circuits do not use
-                             optional gates.
-                          *)
-                          { lookup_gate = None; runtime_tables = None }
                       }
                   }
               }
