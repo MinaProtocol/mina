@@ -2,8 +2,9 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 let tests_enabled = true
 
-(* Looks up three values (at most 12 bits each) 
- * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses the 12-bit lookup table for it to work 
+(* Looks up three values (at most 12 bits each)
+ * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses
+   the 12-bit lookup table for it to work
  *)
 let three_12bit (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -28,7 +29,8 @@ let three_12bit (type f)
   ()
 
 (* Check that one value is at most X bits (at most 12), default is 12.
- * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses the 12-bit lookup table for it to work 
+ * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses
+   the 12-bit lookup table for it to work
  *)
 let less_than_bits (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -85,9 +87,8 @@ let%test_unit "lookup gadget" =
       cs
     in
 
-    (* TEST generic mul gadget *)
     (* Positive tests *)
-    let cs12 = test_lookup ~bits:12 4095 in
+    let cs12 = test_lookup ~bits:11 4095 in
     let cs8 = test_lookup ~bits:8 255 in
     let cs1 = test_lookup ~bits:1 0 in
     let _cs = test_lookup ~cs:cs1 ~bits:1 1 in
