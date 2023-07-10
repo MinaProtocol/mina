@@ -171,7 +171,6 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     srs: CamlFpSrs,
-    indexed: bool,
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlFp,
@@ -232,7 +231,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
             // create queries into our runtime lookup table
             let lookup_cols = &mut lookup_cols[1..];
             for chunk in lookup_cols.chunks_mut(2) {
-                chunk[0][row] = if indexed { 1u32.into() } else { 9u32.into() }; // index
+                chunk[0][row] = 9u32.into(); // index
                 chunk[1][row] = 2u32.into(); // value
             }
         }
