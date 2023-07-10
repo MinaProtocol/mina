@@ -442,23 +442,12 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
-
-[[package]]
-name = "internal-tracing"
-version = "0.1.0"
-dependencies = [
- "ocaml",
- "ocaml-gen",
-]
 
 [[package]]
 name = "itertools"
@@ -487,7 +476,6 @@ dependencies = [
  "disjoint-set",
  "groupmap",
  "hex",
- "internal-tracing",
  "itertools",
  "mina-curves",
  "mina-poseidon",
@@ -795,7 +783,6 @@ dependencies = [
  "rand",
  "rand_core",
  "rayon",
- "rmp-serde 1.1.1",
  "serde",
  "serde_with",
  "thiserror",

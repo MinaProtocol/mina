@@ -76,6 +76,11 @@ type nonrec 'caml_f proof_evaluations =
   ; lookup_table : 'caml_f array point_evaluations option
   ; lookup_sorted : 'caml_f array point_evaluations option array
   ; runtime_lookup_table : 'caml_f array point_evaluations option
+  ; runtime_lookup_table_selector : 'caml_f array point_evaluations option
+  ; xor_lookup_selector : 'caml_f array point_evaluations option
+  ; lookup_gate_lookup_selector : 'caml_f array point_evaluations option
+  ; range_check_lookup_selector : 'caml_f array point_evaluations option
+  ; foreign_field_mul_lookup_selector : 'caml_f array point_evaluations option
   }
 
 type nonrec 'caml_g poly_comm =

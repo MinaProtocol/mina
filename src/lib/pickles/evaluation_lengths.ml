@@ -26,4 +26,9 @@ let create ~of_int =
     ; lookup_table = None
     ; lookup_sorted = Array.init 5 ~f:(fun _ -> None)
     ; runtime_lookup_table = None
+    ; runtime_lookup_table_selector = None
+    ; xor_lookup_selector = None
+    ; lookup_gate_lookup_selector = None
+    ; range_check_lookup_selector = None
+    ; foreign_field_mul_lookup_selector = None
     }
