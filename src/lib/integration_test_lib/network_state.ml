@@ -28,7 +28,7 @@ module Make
     ; global_slot : int
     ; snarked_ledgers_generated : int
     ; blocks_generated : int
-    ; num_transition_frontier_loaded : int
+    ; num_transition_frontier_loaded_from_persistence : int
     ; num_persisted_frontier_loaded : int
     ; num_persisted_frontier_fresh_boot : int
     ; num_bootstrap_required : int
@@ -73,7 +73,7 @@ module Make
     ; blocks_produced_by_node = String.Map.empty
     ; blocks_seen_by_node = String.Map.empty
     ; blocks_including_txn = Transaction_hash.Map.empty
-    ; num_transition_frontier_loaded = 0
+    ; num_transition_frontier_loaded_from_persistence = 0
     ; num_persisted_frontier_loaded = 0
     ; num_persisted_frontier_fresh_boot = 0
     ; num_bootstrap_required = 0
@@ -251,7 +251,8 @@ module Make
         : _ Event_router.event_subscription ) ;
     (* handle_transition frontier loaded *)
     ignore
-      ( Event_router.on event_router Event_type.Transition_frontier_loaded
+      ( Event_router.on event_router
+          Event_type.Transition_frontier_loaded_from_persistence
           ~f:(fun node () ->
             update ~f:(fun state ->
                 [%log debug]
@@ -259,8 +260,8 @@ module Make
                    event of $node"
                   ~metadata:[ ("node", `String (Node.id node)) ] ;
                 { state with
-                  num_transition_frontier_loaded =
-                    state.num_transition_frontier_loaded + 1
+                  num_transition_frontier_loaded_from_persistence =
+                    state.num_transition_frontier_loaded_from_persistence + 1
                 } ) )
         : _ Event_router.event_subscription ) ;
     (* handle_node_offline *)

@@ -63,7 +63,7 @@ type Structured_log_events.t += Applying_diffs of { diffs : Yojson.Safe.t list }
 type Structured_log_events.t += Persisted_frontier_loaded
   [@@deriving register_event]
 
-type Structured_log_events.t += Transition_frontier_loaded
+type Structured_log_events.t += Transition_frontier_loaded_from_persistence
   [@@deriving register_event]
 
 type Structured_log_events.t += Persisted_frontier_fresh_boot
@@ -351,7 +351,7 @@ let rec load_with_max_length :
           *)
           reset_and_continue ~destroy_frontier_instance:false ()
       | res ->
-          [%str_log trace] Transition_frontier_loaded ;
+          [%str_log trace] Transition_frontier_loaded_from_persistence ;
           return res )
 
 let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
