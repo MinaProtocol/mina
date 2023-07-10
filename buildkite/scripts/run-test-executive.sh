@@ -32,5 +32,5 @@ mina-test-executive cloud "$TEST_NAME" \
 
 EXIT_CODE="$?"
 
-./buildkite/scripts/upload-test-results.sh ${testName}
+./buildkite/scripts/upload-test-results.sh $TEST_NAME
 
