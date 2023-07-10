@@ -1,0 +1,173 @@
+---
+name: 1 - Pull Requests
+
+on:
+  pull_request:
+  push:
+    branches: [3-create-base-workflows-for-the-5-tiers]
+
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+jobs:
+
+  unit-tests-daemon:
+    name: Run Unit Tests Daemon
+    runs-on: minafoundation-default-runners
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Run Unit Tests Daemon
+        run: |
+          echo "Run Unit Tests Daemon"
+
+  unit-tests-libp2p:
+    name: Run Unit Tests Libp2p
+    runs-on: minafoundation-default-runners
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Run Unit Tests Libp2p
+        run: |
+          echo "Run Unit Tests Libp2p"
+
+  unit-tests-archive:
+    name: Run Unit Tests Archive
+    runs-on: minafoundation-default-runners
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Run Unit Tests Archive
+        run: |
+          echo "Run Unit Tests Archive"
+
+  unit-tests-rosetta:
+    name: Run Unit Tests Rosetta
+    runs-on: minafoundation-default-runners
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Run Unit Tests Rosetta
+        run: |
+          echo "Run Unit Tests Rosetta"
+
+  build-libp2p-helper:
+    name: Build Libp2p Helper
+    runs-on: minafoundation-default-runners
+    needs:
+      - unit-tests-libp2p
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Build Libp2p Helper
+        run: |
+          echo "Build Libp2p Helper"
+
+  build-mina-daemon-light:
+    name: Build Mina Daemon Light
+    runs-on: minafoundation-default-runners
+    needs:
+      - unit-tests-daemon
+      - build-libp2p-helper
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Build Mina Daemon Light
+        run: |
+          echo "Build Mina Daemon Light"
+
+  build-mina-archive:
+    name: Build Mina Archive
+    runs-on: minafoundation-default-runners
+    needs:
+      - unit-tests-archive
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Build Mina Archive
+        run: |
+          echo "Build Mina Archive"
+
+  build-integration-tests-daemon:
+    name: Build Integration Tests Daemon
+    runs-on: minafoundation-default-runners
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Build Integration Tests Daemon
+        run: |
+          echo "Build Integration Tests Daemon"
+
+  build-integration-tests-archive:
+    name: Build Integration Tests Archive
+    runs-on: minafoundation-default-runners
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Build Integration Tests Archive
+        run: |
+          echo "Build Integration Tests Archive"
+
+  build-integration-tests-rosetta:
+    name: Build Integration Tests Rosetta
+    runs-on: minafoundation-default-runners
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Build Integration Tests Rosetta
+        run: |
+          echo "Build Integration Tests Rosetta"
+
+  build-mina-rosetta:
+    name: Build Mina Rosetta
+    needs:
+      - unit-tests-rosetta
+      - build-mina-daemon-light
+      - build-mina-archive
+    runs-on: minafoundation-default-runners
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Build Mina Rosetta
+        run: |
+          echo "Build Mina Rosetta"
+
+  integration-tests-daemon:
+    name: Run Integration Tests Daemon
+    runs-on: minafoundation-default-runners
+    needs:
+      - build-mina-daemon-light
+      - build-integration-tests-daemon
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Run Integration Tests Daemon
+        run: |
+          echo "Run Integration Tests Daemon"
+
+  integration-tests-archive:
+    name: Run Integration Tests Archive
+    runs-on: minafoundation-default-runners
+    needs:
+      - build-mina-archive
+      - build-integration-tests-archive
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Run Integration Tests Archive
+        run: |
+          echo "Run Integration Tests Archive"
+
+  integration-tests-rosetta:
+    name: Run Integration Tests Rosetta
+    runs-on: minafoundation-default-runners
+    needs:
+      - build-mina-rosetta
+      - build-integration-tests-rosetta
+    steps:
+      - name: Checkout MinaFoundation/mina
+        uses: actions/checkout@v3
+      - name: Run Integration Tests Archive
+        run: |
+          echo "Run Integration Tests Archive"
