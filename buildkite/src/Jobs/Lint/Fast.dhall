@@ -30,6 +30,7 @@ in  Pipeline.build
       Pipeline.Config::{
         spec = JobSpec::{
         , dirtyWhen = [
+            S.strictly (S.contains "Makefile"),
             S.strictlyStart (S.contains "src/"),
             S.strictlyStart (S.contains "rfcs/")
           ]
