@@ -140,17 +140,6 @@ struct
           state.num_bootstrap_required >= num_init_bootstrap_required
         else state.num_bootstrap_required = num_init_bootstrap_required
       in
-      Printf.printf
-        "fresh_data_condition:%b sync_needed_condition:%b \
-         state.num_persisted_frontier_loaded: %d \
-         state.num_transition_frontier_loaded_from_persistence: %d \
-         num_init_persisted_frontier_loaded: %d \
-         num_init_transition_frontier_loaded_from_persistence: %d "
-        fresh_data_condition sync_needed_condition
-        state.num_persisted_frontier_loaded
-        state.num_transition_frontier_loaded_from_persistence
-        num_init_persisted_frontier_loaded
-        num_init_transition_frontier_loaded_from_persistence ;
       if
         fresh_data_condition && sync_needed_condition
         && state.num_persisted_frontier_loaded
