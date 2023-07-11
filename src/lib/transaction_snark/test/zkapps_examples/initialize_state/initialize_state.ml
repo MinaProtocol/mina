@@ -281,7 +281,7 @@ let%test_module "Initialize state test" =
 
     let%test_unit "Initialize without deploy fails" =
       let account =
-        Or_error.try_with ~here:[%here] (fun () ->
+        Or_error.try_with (fun () ->
             (* Raises an exception due to verifying a proof without a valid vk
                in the account.
             *)

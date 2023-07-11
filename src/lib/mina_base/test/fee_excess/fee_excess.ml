@@ -39,7 +39,7 @@ let combine_checked_unchecked_consistent () =
   Quickcheck.test (Quickcheck.Generator.tuple2 gen gen) ~f:(fun (fe1, fe2) ->
       let fe = combine fe1 fe2 in
       let fe_checked =
-        Or_error.try_with ~here:[%here] (fun () ->
+        Or_error.try_with (fun () ->
             Test_util.checked_to_unchecked
               Typ.(typ * typ)
               typ
