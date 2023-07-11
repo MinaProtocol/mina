@@ -484,8 +484,7 @@ let handle_push_message t push_message =
                 "incoming stream for protocol we don't know about?" )
   (* Received a message on some stream *)
   | StreamMessageReceived m ->
-      handle "stream_message_received"
-        (fun () ->
+      handle "stream_message_received" (fun () ->
           let open StreamMessageReceived in
           let open StreamMessage in
           let msg = msg_get m in
