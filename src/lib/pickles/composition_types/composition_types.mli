@@ -993,7 +993,158 @@ module Step : sig
 
   module Proof_state : sig
     module Deferred_values : sig
-      module Plonk = Wrap.Proof_state.Deferred_values.Plonk
+      module Plonk : sig
+        module Minimal : sig
+          (** Challenges from the PLONK IOP. These, plus the evaluations
+              that are already in the proof, are all that's needed to derive
+              all the values in the {!module:In_circuit} version below.
+
+              See src/lib/pickles/plonk_checks/plonk_checks.ml for the
+              computation of the {!module:In_circuit} value from the
+              {!module:Minimal} value. *)
+          type ('challenge, 'scalar_challenge, 'bool) t =
+                ( 'challenge
+                , 'scalar_challenge
+                , 'bool )
+                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                .Deferred_values
+                .Plonk
+                .Minimal
+                .V1
+                .t =
+            { alpha : 'scalar_challenge
+            ; beta : 'challenge
+            ; gamma : 'challenge
+            ; zeta : 'scalar_challenge
+            ; joint_combiner : 'scalar_challenge option
+            ; feature_flags : 'bool Plonk_types.Features.t
+            }
+          [@@deriving sexp, compare, yojson, hlist, hash, equal]
+        end
+
+        module In_circuit : sig
+          module Lookup : sig
+            type 'scalar_challenge t =
+                  'scalar_challenge
+                  Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t =
+              { joint_combiner : 'scalar_challenge }
+            [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
+
+            val to_struct : 'a t -> ('a * unit) Hlist.HlistId.t
+
+            val of_struct : ('a * unit) Hlist.HlistId.t -> 'a t
+
+            val typ :
+                 ( 'a
+                 , 'b
+                 , 'f
+                 , ( unit
+                   , 'f )
+                   Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
+                 Snarky_backendless.Types.Typ.t
+              -> ('a t, 'b t, 'f) Snarky_backendless.Typ.t
+          end
+
+          (** All scalar values deferred by a verifier circuit.
+
+              The values in [vbmul], [complete_add], [endomul],
+              [endomul_scalar], [perm], and are all scalars which will have
+              been used to scale selector polynomials during the computation of
+              the linearized polynomial commitment.
+
+              Then, we expose them so the next guy (who can do scalar
+              arithmetic) can check that they were computed correctly from the
+              evaluations in the proof and the challenges.  *)
+          type ( 'challenge
+               , 'scalar_challenge
+               , 'fp
+               , 'fp_opt
+               , 'lookup_opt
+               , 'bool )
+               t =
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'fp_opt
+                , 'lookup_opt
+                , 'bool )
+                Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t =
+            { alpha : 'scalar_challenge
+            ; beta : 'challenge
+            ; gamma : 'challenge
+            ; zeta : 'scalar_challenge
+            ; zeta_to_srs_length : 'fp
+            ; zeta_to_domain_size : 'fp
+            ; perm : 'fp
+                  (** scalar used on one of the permutation polynomial commitments. *)
+            ; feature_flags : 'bool Plonk_types.Features.t
+            ; lookup : 'lookup_opt
+            }
+          [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
+
+          val map_challenges :
+               ('a, 'b, 'c, 'fp_opt, ('b Lookup.t, 'e) Opt.t, 'bool) t
+            -> f:('a -> 'f)
+            -> scalar:('b -> 'g)
+            -> ('f, 'g, 'c, 'fp_opt, ('g Lookup.t, 'e) Opt.t, 'bool) t
+
+          val map_fields :
+               ('a, 'b, 'c, ('c, 'e) Opt.t, ('d Lookup.t, 'e) Opt.t, 'bool) t
+            -> f:('c -> 'f)
+            -> ('a, 'b, 'f, ('f, 'e) Opt.t, ('d Lookup.t, 'e) Opt.t, 'bool) t
+
+          val typ :
+               'f Spec.impl
+            -> dummy_scalar:'a
+            -> dummy_scalar_challenge:'b Scalar_challenge.t
+            -> challenge:
+                 ( 'c
+                 , 'd
+                 , 'f
+                 , ( unit
+                   , 'f )
+                   Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
+                 Snarky_backendless.Types.Typ.t
+            -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+            -> bool:
+                 ( ('f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
+                    as
+                    'boolean )
+                 , bool
+                 , 'f )
+                 Snarky_backendless.Typ.t
+            -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+            -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
+            -> ( ( 'c
+                 , 'e Scalar_challenge.t
+                 , 'fp
+                 , ('fp, 'boolean) Plonk_types.Opt.t
+                 , ('e Scalar_challenge.t Lookup.t, 'boolean) Plonk_types.Opt.t
+                 , 'boolean )
+                 t
+               , ( 'd
+                 , 'b Scalar_challenge.t
+                 , 'a
+                 , 'a option
+                 , 'b Scalar_challenge.t Lookup.t option
+                 , bool )
+                 t
+               , 'f )
+               Snarky_backendless.Typ.t
+        end
+
+        val to_minimal :
+             ( 'challenge
+             , 'scalar_challenge
+             , 'fp
+             , 'fp_opt
+             , 'lookup_opt
+             , 'bool )
+             In_circuit.t
+          -> to_option:
+               ('lookup_opt -> 'scalar_challenge In_circuit.Lookup.t option)
+          -> ('challenge, 'scalar_challenge, 'bool) Minimal.t
+      end
 
       (** All the scalar-field values needed to finalize the verification of a
           proof by checking that the correct values were used in the "group
