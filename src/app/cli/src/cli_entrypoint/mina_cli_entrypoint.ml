@@ -430,6 +430,12 @@ let setup_daemon logger =
          for the associated private key that is being tracked by this daemon. \
          You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
+  and slot_tx_end =
+    flag "--slot-tx-end" ~aliases:[ "slot-tx-end" ]
+      ~doc:
+        "Slot after which the node will stop accepting transactions. (default: \
+         disabled)"
+      (optional int)
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -1301,7 +1307,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~log_block_creation ~precomputed_values ~start_time
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~stop_time ~node_status_url () )
+                 ~uptime_submitter_keypair ~stop_time ~node_status_url ()
+                 ~slot_tx_end )
           in
           { Coda_initialization.coda
           ; client_trustlist
