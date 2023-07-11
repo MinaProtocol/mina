@@ -3,6 +3,8 @@ use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSrs};
 use ark_poly::EvaluationDomain;
 use kimchi::circuits::lookup::runtime_tables::caml::CamlRuntimeTableCfg;
 use kimchi::circuits::lookup::runtime_tables::RuntimeTableCfg;
+use kimchi::circuits::lookup::tables::caml::CamlLookupTable;
+use kimchi::circuits::lookup::tables::LookupTable;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{Fp, Pallas, Vesta, VestaParameters};
@@ -42,6 +44,7 @@ impl ocaml::custom::Custom for CamlPastaFpPlonkIndex {
 pub fn caml_pasta_fp_plonk_index_create(
     gates: CamlPastaFpPlonkGateVectorPtr,
     public: ocaml::Int,
+    lookup_tables: Vec<CamlLookupTable<CamlFp>>,
     runtime_tables: Vec<CamlRuntimeTableCfg<CamlFp>>,
     prev_challenges: ocaml::Int,
     srs: CamlFpSrs,
@@ -60,10 +63,13 @@ pub fn caml_pasta_fp_plonk_index_create(
     let runtime_tables: Vec<RuntimeTableCfg<Fp>> =
         runtime_tables.into_iter().map(Into::into).collect();
 
+    let lookup_tables: Vec<LookupTable<Fp>> = lookup_tables.into_iter().map(Into::into).collect();
+
     // create constraint system
     let cs = match ConstraintSystem::<Fp>::create(gates)
         .public(public as usize)
         .prev_challenges(prev_challenges as usize)
+        .lookup(lookup_tables)
         .runtime(if runtime_tables.is_empty() {
             None
         } else {
