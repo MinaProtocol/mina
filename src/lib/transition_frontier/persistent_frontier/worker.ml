@@ -61,49 +61,20 @@ module Worker = struct
     | `Not_found (`Arcs hash) ->
         Printf.sprintf "arcs not found for %s" (State_hash.to_base58_check hash)
 
-  let apply_diff (type mutant) ~arcs_cache (t : t) (diff : mutant Diff.Lite.t) :
-      (Database.batch_t -> unit, apply_diff_error) Result.t =
-    let map_error result ~diff_type ~diff_type_name =
-      Result.map_error result ~f:(fun err ->
-          [%log' error t.logger] "error applying %s diff: %s" diff_type_name
-            (apply_diff_error_internal_to_string err) ;
-          `Apply_diff diff_type )
-    in
+  let apply_diff (type mutant) ~old_root ~arcs_cache (t : t)
+      (diff : mutant Diff.Lite.t) : Database.batch_t -> unit =
     match diff with
-    | New_node (Lite transition) -> (
-        let r =
-          ( Database.add ~arcs_cache t.db ~transition
-            :> (Database.batch_t -> unit, apply_diff_error_internal) Result.t )
-        in
-        match r with
-        | Ok x ->
-            Ok x
-        | Error (`Not_found (`Parent_transition h | `Arcs h)) ->
-            [%log' trace t.logger]
-              "Did not add node $hash to DB. Its $parent has already been \
-               thrown away"
-              ~metadata:
-                [ ( "hash"
-                  , `String
-                      (State_hash.to_base58_check
-                         (Mina_block.Validated.state_hash transition) ) )
-                ; ("parent", `String (State_hash.to_base58_check h))
-                ] ;
-            Ok ignore
-        | _ ->
-            map_error ~diff_type:`New_node ~diff_type_name:"New_node" r )
+    | New_node (Lite transition) ->
+        Database.add ~arcs_cache ~transition
     | Root_transitioned
         { new_root; garbage = Lite garbage; just_emitted_a_proof } ->
         if just_emitted_a_proof then (
           [%log' info t.logger] "Dequeued a snarked ledger" ;
           Persistent_root.Instance.dequeue_snarked_ledger
             t.persistent_root_instance ) ;
-        map_error ~diff_type:`Root_transitioned
-          ~diff_type_name:"Root_transitioned"
-          ( Database.move_root t.db ~new_root ~garbage
-            :> (Database.batch_t -> unit, apply_diff_error_internal) Result.t )
+        Database.move_root ~old_root ~new_root ~garbage
     | Best_tip_changed best_tip_hash ->
-        Result.return (Database.set_best_tip t.db best_tip_hash)
+        Database.set_best_tip best_tip_hash
 
   (* result equivalent of Deferred.Or_error.List.fold *)
   let rec deferred_result_list_fold ls ~init ~f =
@@ -120,58 +91,91 @@ module Worker = struct
     O1trace.thread "persistent_frontier_write_to_disk" (fun () ->
         [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
           (List.length input) ;
-        let best_tip_cnt, root_cnt =
-          List.fold input ~init:(0, 0) ~f:(fun (b, r) -> function
-            | Diff.Lite.E.E (Root_transitioned _) ->
-                (b, r + 1)
-            | E (Best_tip_changed _) ->
-                (b + 1, r)
+        let all_root_transitioned =
+          List.rev_filter_map input ~f:(function
+            | Diff.Lite.E.E (Root_transitioned _ as r) ->
+                Some r
             | _ ->
-                (b, r) )
+                None )
         in
-        let best_tip_cnt = ref best_tip_cnt in
-        let root_cnt = ref root_cnt in
-        let garbage_prev = ref [] in
-        let input =
+        (* We merge all Root_transitioned events into the last one *)
+        let last_root_transitioned =
+          match all_root_transitioned with
+          | Root_transitioned ({ garbage = Lite garbage; _ } as r) :: rest ->
+              (* Order of garbage is not fuilly preserved, but this doesn't matter for persistent frontier handling *)
+              let more_garbage =
+                List.concat_map rest ~f:(function
+                  | Root_transitioned { new_root; garbage = Lite garbage; _ } ->
+                      (Root_data.Limited.hashes new_root).state_hash :: garbage
+                  | _ ->
+                      [] )
+              in
+              Some
+                (Diff.Lite.E.E
+                   (Root_transitioned
+                      { r with garbage = Lite (more_garbage @ garbage) } ) )
+          | _ ->
+              None
+        in
+        let append_best_tip diff = function
+          | acc, `Best_tip false, root ->
+              (diff :: acc, `Best_tip true, root)
+          | x ->
+              x
+        in
+        let append_root = function
+          | acc, bt, `Root false ->
+              ( Option.value_map ~default:ident ~f:List.cons
+                  last_root_transitioned acc
+              , bt
+              , `Root true )
+          | x ->
+              x
+        in
+        let append diff (acc, bt, root) = (diff :: acc, bt, root) in
+        let input, _, _ =
+          List.fold_right
+            ~init:([], `Best_tip false, `Root false)
+            input
+            ~f:(function
+              | E (Best_tip_changed _) as diff ->
+                  append_best_tip diff
+              | E (Root_transitioned _) ->
+                  append_root
+              | diff ->
+                  append diff )
+        in
+        let parent_hashes =
           List.filter_map input ~f:(function
-            | Diff.Lite.E.E (Best_tip_changed _) as diff ->
-                best_tip_cnt := !best_tip_cnt - 1 ;
-                Option.some_if (!best_tip_cnt = 0) diff
-            | E
-                (Root_transitioned
-                  ({ new_root; garbage = Lite garbage_this; _ } as r) ) ->
-                root_cnt := !root_cnt - 1 ;
-                if !root_cnt = 0 then
-                  Some
-                    (E
-                       (Root_transitioned
-                          { r with
-                            garbage = Lite (!garbage_prev @ garbage_this)
-                          } ) )
-                else (
-                  garbage_prev :=
-                    (Root_data.Limited.hashes new_root).state_hash
-                    :: garbage_this
-                    @ !garbage_prev ;
-                  None )
-            | diff ->
-                Some diff )
+            | E (New_node (Lite transition)) ->
+                Mina_block.Validated.header transition
+                |> Header.protocol_state
+                |> Mina_state.Protocol_state.previous_state_hash |> Option.some
+            | _ ->
+                None )
         in
         let fs_res =
+          let%map.Result old_root =
+            Database.find_arcs_and_root t.db ~arcs_cache ~parent_hashes
+          in
           List.map
-            ~f:(fun (Diff.Lite.E.E diff) -> apply_diff ~arcs_cache t diff)
+            ~f:(fun (Diff.Lite.E.E diff) ->
+              apply_diff ~old_root ~arcs_cache t diff )
             input
-          |> Result.all
         in
-        let%map () = Scheduler.yield () in
         match fs_res with
-        | Ok fs ->
-            Database.with_batch t.db ~f:(fun batch ->
-                List.iter fs ~f:(fun f -> f batch) )
-        (* TODO: log the diff that failed *)
-        | Error (`Apply_diff _) ->
+        | Error (`Not_found (`Arcs h)) ->
+            [%log' warn t.logger]
+              "Did not add node to DB. Its $parent has already been thrown away"
+              ~metadata:[ ("parent", `String (State_hash.to_base58_check h)) ] ;
+            Deferred.unit
+        | Error (`Not_found `Old_root_transition) ->
             failwith
-              "Failed to apply a diff to the persistent transition frontier" )
+              "Failed to apply a diff to the persistent transition frontier"
+        | Ok fs ->
+            let%map () = Scheduler.yield () in
+            Database.with_batch t.db ~f:(fun batch ->
+                List.iter fs ~f:(fun f -> f batch) ) )
 end
 
 include Worker_supervisor.Make (Worker)
