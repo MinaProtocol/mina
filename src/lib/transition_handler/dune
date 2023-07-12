@@ -53,6 +53,7 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    internal_tracing
+   transition_frontier_extensions
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane)))
