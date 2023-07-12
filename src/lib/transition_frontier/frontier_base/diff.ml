@@ -65,9 +65,14 @@ module Node_list = struct
 end
 
 module Root_transition = struct
+  type 'repr root_transition_scan_state =
+    | Lite : lite root_transition_scan_state
+    | Full : Staged_ledger.Scan_state.t -> full root_transition_scan_state
+
   type 'repr t =
     { new_root: Root_data.Limited.Stable.V2.t
     ; garbage: 'repr Node_list.t
+    ; old_root_scan_state: 'repr root_transition_scan_state
     ; just_emitted_a_proof: bool }
 
   type 'repr root_transition = 'repr t
@@ -131,7 +136,7 @@ module Root_transition = struct
           let of_binable
               ({new_root; garbage; just_emitted_a_proof} :
                 Binable_arg.Stable.V3.t) : t =
-            {new_root; garbage; just_emitted_a_proof}
+            {new_root; garbage; old_root_scan_state = Lite; just_emitted_a_proof}
         end
 
         include Binable.Of_binable (Binable_arg.Stable.V3) (T_nonbinable)
@@ -154,7 +159,7 @@ module Root_transition = struct
               ({new_root; garbage; just_emitted_a_proof} :
                 Binable_arg.Stable.V2.t) : t =
             let new_root = Root_data.Limited.Stable.V1.to_latest new_root in
-            {new_root; garbage; just_emitted_a_proof}
+            {new_root; garbage; old_root_scan_state = Lite; just_emitted_a_proof}
         end
 
         include Binable.Of_binable (Binable_arg.Stable.V2) (T_nonbinable)
@@ -211,10 +216,11 @@ let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
     let external_transition = External_transition.Validated.lift @@ Breadcrumb.validated_transition breadcrumb in
       New_node (Lite (External_transition.Validated.Stable.V1.of_v2 external_transition ))
   | Root_transitioned
-      {new_root; garbage= Full garbage_nodes; just_emitted_a_proof} ->
+      {new_root; garbage= Full garbage_nodes; old_root_scan_state= Full _; just_emitted_a_proof} ->
       Root_transitioned
         { new_root
         ; garbage= Lite (Node_list.to_lite garbage_nodes)
+        ; old_root_scan_state = Lite
         ; just_emitted_a_proof }
   | Best_tip_changed b ->
       Best_tip_changed b
