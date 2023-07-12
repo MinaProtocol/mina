@@ -63,6 +63,14 @@ type ComplexValue struct {
 	Name string
 }
 
+func LocalComplexValue(step int, name string) ComplexValue {
+	return ComplexValue{
+		Type: "output",
+		Step: step,
+		Name: name,
+	}
+}
+
 func ResolveParam(config ResolutionConfig, step int, raw json.RawMessage) (json.RawMessage, error) {
 	var val ComplexValue
 	if err := json.Unmarshal(raw, &val); err != nil {
