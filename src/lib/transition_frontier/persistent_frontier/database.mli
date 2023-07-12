@@ -69,22 +69,26 @@ val check :
 
 val initialize : t -> root_data:Root_data.Limited.t -> unit
 
+val find_arcs_and_root :
+     t
+  -> arcs_cache:State_hash.t list State_hash.Table.t
+  -> parent_hashes:State_hash.t list
+  -> ( Root_data.Minimal.t
+     , [> `Not_found of [> `Arcs of State_hash.t | `Old_root_transition ] ] )
+     result
+
 val add :
      arcs_cache:State_hash.t list State_hash.Table.t
-  -> t
   -> transition:Mina_block.Validated.t
-  -> ( batch_t -> unit
-     , [> `Not_found of
-          [> `Parent_transition of State_hash.t | `Arcs of State_hash.t ] ] )
-     Result.t
+  -> batch_t
+  -> unit
 
 val move_root :
-     t
+     old_root:Root_data.Minimal.t
   -> new_root:Root_data.Limited.t
   -> garbage:State_hash.t list
-  -> ( batch_t -> unit
-     , [> `Not_found of [> `New_root_transition | `Old_root_transition ] ] )
-     Result.t
+  -> batch_t
+  -> unit
 
 val get_transition :
      t
@@ -112,7 +116,7 @@ val get_root_hash : t -> (State_hash.t, [> `Not_found of [> `Root ] ]) Result.t
 val get_best_tip :
   t -> (State_hash.t, [> `Not_found of [> `Best_tip ] ]) Result.t
 
-val set_best_tip : t -> State_hash.t -> batch_t -> unit
+val set_best_tip : State_hash.t -> batch_t -> unit
 
 val crawl_successors :
      t

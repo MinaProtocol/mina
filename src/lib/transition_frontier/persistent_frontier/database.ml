@@ -317,20 +317,39 @@ let initialize t ~root_data =
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:(protocol_states root_data |> List.map ~f:With_hash.data) )
 
-let add ~arcs_cache t ~transition =
+let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
+    ~parent_hashes =
+  let f h = Some_key.Some_key (Arcs h) in
+  let values =
+    get_batch t.db ~keys:(Some_key Root :: List.map parent_hashes ~f)
+  in
+  let populate res parent_hash arc_opt =
+    let%bind.Result () = res in
+    match arc_opt with
+    | Some (Some_key.Some_key_value (Arcs _, (data : State_hash.t list))) ->
+        State_hash.Table.set arcs_cache ~key:parent_hash ~data ;
+        Result.return ()
+    | _ ->
+        Error (`Not_found (`Arcs parent_hash))
+  in
+  match values with
+  | Some (Some_key_value (Root, (old_root : Root_data.Minimal.Stable.V2.t)))
+    :: arcs ->
+      let%map.Result () =
+        List.fold2_exn ~init:(Result.return ()) ~f:populate parent_hashes arcs
+      in
+      old_root
+  | _ ->
+      Error (`Not_found `Old_root_transition)
+
+let add ~arcs_cache ~transition =
   let transition = Mina_block.Validated.forget transition in
   let hash = State_hash.With_state_hashes.state_hash transition in
   let parent_hash =
     With_hash.data transition |> Mina_block.header |> Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
-  let%map parent_arcs =
-    match State_hash.Table.find arcs_cache parent_hash with
-    | None ->
-        get t.db ~key:(Arcs parent_hash) ~error:(`Not_found (`Arcs parent_hash))
-    | Some p ->
-        Ok p
-  in
+  let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
   State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
   State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
   fun batch ->
@@ -338,11 +357,11 @@ let add ~arcs_cache t ~transition =
     Batch.set batch ~key:(Arcs hash) ~data:[] ;
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
-let move_root t ~new_root ~garbage =
+let move_root ~old_root ~new_root ~garbage =
   let open Root_data.Limited in
-  let%map old_root =
-    get t.db ~key:Root ~error:(`Not_found `Old_root_transition)
-  in
+  (* let%map old_root =
+       get t.db ~key:Root ~error:(`Not_found `Old_root_transition)
+     in *)
   let old_root_hash = Root_data.Minimal.hash old_root in
   (* TODO: Result compatible rocksdb batch transaction *)
   fun batch ->
@@ -392,7 +411,7 @@ let get_root_hash t =
 
 let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 
-let set_best_tip t data = Batch.set ~key:Best_tip ~data
+let set_best_tip data = Batch.set ~key:Best_tip ~data
 
 let rec crawl_successors t hash ~init ~f =
   let open Deferred.Result.Let_syntax in
