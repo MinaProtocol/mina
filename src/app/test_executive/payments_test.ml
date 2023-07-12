@@ -67,7 +67,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; account_name = "snark-node-key1"
           ; worker_nodes = 4
           }
-    ; snark_worker_fee = "0.0001"
+    ; snark_worker_fee = "0.0002"
     ; num_archive_nodes = 1
     ; proof_config =
         { proof_config_default with
@@ -475,15 +475,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard
         "change snark worker key from snark-node-key1 to snark-node-key2"
-        (let%bind () =
-           Integration_test_lib.Graphql_requests.must_set_snark_worker ~logger
-             (Network.Node.get_ingress_uri snark_coordinator)
-             ~new_snark_pub_key:
-               ( snark_node_key2.keypair.public_key
-               |> Signature_lib.Public_key.compress )
-         in
-         (* adding a wait for 3 minutes so that the new snark worker can start.  this is a temporary solution to what's essentially a race condition causing lots of flakiness/non-determinism for this test *)
-         Malleable_error.lift (Async.after (Time.Span.of_int_sec 180)) )
+        (Integration_test_lib.Graphql_requests.must_set_snark_worker ~logger
+           (Network.Node.get_ingress_uri snark_coordinator)
+           ~new_snark_pub_key:
+             ( snark_node_key2.keypair.public_key
+             |> Signature_lib.Public_key.compress ) )
+    in
+    let%bind () =
+      section_hard "change snark work fee from 0.0002 to 0.0001"
+        (Integration_test_lib.Graphql_requests.must_set_snark_work_fee ~logger
+           (Network.Node.get_ingress_uri snark_coordinator)
+           ~new_snark_work_fee:1 )
     in
     let%bind () =
       section_hard

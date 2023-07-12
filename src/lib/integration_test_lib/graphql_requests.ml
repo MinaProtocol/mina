@@ -105,6 +105,16 @@ module Graphql = struct
     }
   |}]
 
+  module Set_snark_work_fee =
+  [%graphql
+  {|
+    mutation ($fee: UInt64!) @encoders(module: "Encoders"){
+      setSnarkWorkFee(input: {fee: $fee}) {
+        lastFee
+      }
+    }
+  |}]
+
   module Get_account_data =
   [%graphql
   {|
@@ -594,8 +604,39 @@ let set_snark_worker ~logger node_uri ~new_snark_pub_key =
     ~metadata:[ ("lastSnarkWorker", `String last_snark_worker) ] ;
   ()
 
+let set_snark_work_fee ~logger node_uri ~new_snark_work_fee =
+  [%log info] "Changing snark work fee"
+    ~metadata:
+      [ ("new_snark_work_fee", `Int new_snark_work_fee)
+      ; ("node_uri", `String (Uri.to_string node_uri))
+      ] ;
+  let open Deferred.Or_error.Let_syntax in
+  let set_snark_work_fee_graphql () =
+    let set_snark_work_fee_obj =
+      Graphql.Set_snark_work_fee.(
+        make
+        @@ makeVariables ~fee:(Unsigned.UInt64.of_int new_snark_work_fee) ())
+    in
+    exec_graphql_request ~logger ~node_uri
+      ~query_name:"set_snark_work_fee_graphql" set_snark_work_fee_obj
+  in
+  let%map result_obj = set_snark_work_fee_graphql () in
+  let last_snark_work_fee =
+    Currency.Fee.to_string result_obj.setSnarkWorkFee.lastFee
+  in
+  [%log info] "snark work fee changed, lastSnarkWorkFee: %s" last_snark_work_fee
+    ~metadata:
+      [ ("lastSnarkWorkFee", `String last_snark_work_fee)
+      ; ("node_uri", `String (Uri.to_string node_uri))
+      ] ;
+  ()
+
 let must_set_snark_worker ~logger t ~new_snark_pub_key =
   set_snark_worker ~logger t ~new_snark_pub_key
+  |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+let must_set_snark_work_fee ~logger t ~new_snark_work_fee =
+  set_snark_work_fee ~logger t ~new_snark_work_fee
   |> Deferred.bind ~f:Malleable_error.or_hard_error
 
 let get_metrics ~logger node_uri =
