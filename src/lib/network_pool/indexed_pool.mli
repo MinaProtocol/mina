@@ -143,6 +143,12 @@ module For_tests : sig
     -> Transaction_hash.User_command_with_valid_signature.Set.t
        Currency.Fee_rate.Map.t
 
+  val all_by_sender :
+       t
+    -> ( Transaction_hash.User_command_with_valid_signature.t F_sequence.t
+       * Currency.Amount.t )
+       Account_id.Map.t
+
   val currency_consumed :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> Transaction_hash.User_command_with_valid_signature.t

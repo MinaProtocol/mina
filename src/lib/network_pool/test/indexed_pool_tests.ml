@@ -850,6 +850,26 @@ let transaction_replacement () =
         |> Result.ok_or_failwith
       in
       assert_pool_consistency pool ;
+      let queue, _ =
+        let open Account.Poly in
+        Public_key.decompress sender.public_key
+        |> Option.value_exn |> Account_id.of_public_key
+        |> Account_id.Map.find_exn (Indexed_pool.For_tests.all_by_sender pool')
+      in
+      let eq = Transaction_hash.User_command_with_valid_signature.equal in
+      let repl =
+        Signed_command replacement
+        |> Transaction_hash.User_command_with_valid_signature.create
+      in
+      List.iteri (F_sequence.to_list queue) ~f:(fun i txn ->
+          [%test_pred: Transaction_hash.User_command_with_valid_signature.t]
+            (fun t ->
+              let ith =
+                Signed_command (List.nth_exn txns i)
+                |> Transaction_hash.User_command_with_valid_signature.create
+              in
+              eq t ith || eq t repl )
+            txn ) ;
       [%test_eq: int] (Indexed_pool.size pool) (Indexed_pool.size pool') ;
       [%test_eq: int]
         (Indexed_pool.transactions ~logger pool |> Sequence.length)

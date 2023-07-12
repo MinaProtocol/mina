@@ -107,6 +107,8 @@ module For_tests = struct
 
   let applicable_by_fee { applicable_by_fee; _ } = applicable_by_fee
 
+  let all_by_sender { all_by_sender; _ } = all_by_sender
+
   let assert_pool_consistency (pool : t) =
     let map_to_set (type k w)
         (module Map : Map.S
@@ -153,7 +155,8 @@ module For_tests = struct
        all the commands in the queue. *)
     Account_id.Map.iteri pool.all_by_sender
       ~f:(fun ~key ~data:(queue, reserved_currency) ->
-        [%test_pred: Transaction_hash.User_command_with_valid_signature.t F_sequence.t]
+        [%test_pred:
+          Transaction_hash.User_command_with_valid_signature.t F_sequence.t]
           (Fn.compose not F_sequence.is_empty)
           queue ;
         let _, reserved_currency' =
