@@ -253,6 +253,8 @@ module Snark_worker = struct
     snark_worker_process
 
   let start t =
+    O1trace.thread "snark_worker"
+    @@ fun () ->
     match t.processes.snark_worker with
     | `On ({ process = process_ivar; kill_ivar; _ }, _) ->
         [%log' debug t.config.logger] !"Starting snark worker process" ;
@@ -1784,14 +1786,14 @@ let create ?wallets (config : Config.t) =
               ~trust_system:config.trust_system
               ~disk_location:config.snark_pool_disk_location
           in
-          let%bind snark_pool, snark_remote_sink, snark_local_sink =
-            Network_pool.Snark_pool.load ~config:snark_pool_config
+          let snark_pool, snark_remote_sink, snark_local_sink =
+            Network_pool.Snark_pool.create ~config:snark_pool_config
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~on_remote_push:notify_online
               ~log_gossip_heard:
-                config.net_config.log_gossip_heard.snark_pool_diff ()
+                config.net_config.log_gossip_heard.snark_pool_diff
           in
           let block_reader, block_sink =
             Transition_handler.Block_sink.create
