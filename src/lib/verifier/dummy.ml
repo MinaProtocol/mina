@@ -75,7 +75,7 @@ let verify_transaction_snarks _ ts =
       (Or_error.error_string "Transaction_snark.verify: Mismatched sok_message")
 
 let get_blockchain_verification_key { proof_level; constraint_constants } =
-  Deferred.Or_error.try_with (fun () ->
+  Deferred.Or_error.try_with ~here:[%here] (fun () ->
       let module T = Transaction_snark.Make (struct
         let constraint_constants = constraint_constants
 

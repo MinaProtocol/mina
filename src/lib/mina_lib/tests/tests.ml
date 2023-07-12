@@ -535,7 +535,7 @@ let%test_module "Epoch ledger sync tests" =
     *)
     let%test_unit "Sync genesis ledgers to empty ledgers, should fail" =
       let f () =
-        Monitor.try_with (fun () ->
+        Monitor.try_with ~here:[%here] (fun () ->
             let%bind (module Context) = make_context () in
             let staking_epoch_ledger =
               make_genesis_ledger (module Context) (List.take test_accounts 10)
