@@ -961,29 +961,30 @@ struct
                 Opt_sponge.absorb opt_sponge (keep, chal) ) ) ;
         Opt_sponge.squeeze opt_sponge
       in
-      Sponge.absorb sponge (`Field challenge_digest) ;
-      Sponge.absorb sponge (`Field ft_eval1) ;
-      Sponge.absorb sponge (`Field (fst evals.public_input)) ;
-      Sponge.absorb sponge (`Field (snd evals.public_input)) ;
+
+      let absorb elt = Sponge.absorb sponge (`Field elt) in
+      let p1, p2 = evals.public_input in
+      absorb challenge_digest ;
+      absorb ft_eval1 ;
+      absorb p1 ;
+      absorb p2 ;
+
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
+
+      let absorb = Array.iter ~f:absorb in
       Plonk_types.Opt.Early_stop_sequence.fold field_array_if xs ~init:()
-        ~f:(fun () (x1, x2) ->
-          let absorb =
-            Array.iter ~f:(fun x -> Sponge.absorb sponge (`Field x))
-          in
-          absorb x1 ; absorb x2 )
+        ~f:(fun () (x1, x2) -> absorb x1 ; absorb x2)
         ~finish:(fun () -> Array.copy sponge.state)
     in
     sponge.state <- sponge_state ;
     let squeeze () = squeeze_challenge sponge in
     let xi_actual = squeeze () in
     let r_actual = squeeze () in
-    let xi_correct =
-      Field.equal xi_actual
-        (match xi with { Import.Scalar_challenge.inner = xi } -> xi)
-    in
+    let xi_correct = Field.equal xi_actual xi.Import.Scalar_challenge.inner in
     let xi = scalar xi in
+    (* u is xi is polyscale *)
     let r = scalar (Import.Scalar_challenge.create r_actual) in
+    (* r is evalscale *)
     let plonk_minimal =
       Plonk.to_minimal plonk ~to_option:Opt.to_option_unsafe
     in
