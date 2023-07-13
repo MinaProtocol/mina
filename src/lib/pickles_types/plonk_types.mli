@@ -289,13 +289,19 @@ end
 
 module Openings : sig
   module Bulletproof : sig
-    type ('g, 'fq) t =
-      { lr : ('g * 'g) array
-      ; z_1 : 'fq
-      ; z_2 : 'fq
-      ; delta : 'g
-      ; challenge_polynomial_commitment : 'g
-      }
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type ('g, 'fq) t =
+          { lr : ('g * 'g) array
+          ; z_1 : 'fq
+          ; z_2 : 'fq
+          ; delta : 'g
+          ; challenge_polynomial_commitment : 'g
+          }
+        [@@deriving compare, sexp, yojson, hash, equal]
+      end
+    end]
 
     val typ :
          ( 'a

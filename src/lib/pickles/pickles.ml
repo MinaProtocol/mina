@@ -1841,7 +1841,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 }
                             } )
                     in
-                    ( { proof = next_proof
+                    ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof
                       ; statement =
                           Types.Wrap.Statement.to_minimal
                             ~to_option:Plonk_types.Opt.to_option next_statement

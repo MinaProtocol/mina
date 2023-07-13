@@ -897,7 +897,7 @@ let wrap
           } )
   in
   [%log internal] "Pickles_wrap_proof_done" ;
-  ( { proof = next_proof
+  ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof
     ; statement =
         Types.Wrap.Statement.to_minimal next_statement
           ~to_option:Opt.to_option_unsafe
