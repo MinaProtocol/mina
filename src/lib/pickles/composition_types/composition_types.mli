@@ -1033,7 +1033,7 @@ module Step : sig
               Then, we expose them so the next guy (who can do scalar
               arithmetic) can check that they were computed correctly from the
               evaluations in the proof and the challenges.  *)
-          type ('challenge, 'scalar_challenge, 'fp, 'fp_opt, 'bool) t =
+          type ('challenge, 'scalar_challenge, 'fp) t =
             { alpha : 'scalar_challenge
             ; beta : 'challenge
             ; gamma : 'challenge
@@ -1048,7 +1048,7 @@ module Step : sig
           val to_wrap :
                opt_none:'lookup_opt
             -> false_:'bool
-            -> ('challenge, 'scalar_challenge, 'fp, 'fp_opt, 'bool) t
+            -> ('challenge, 'scalar_challenge, 'fp) t
             -> ( 'challenge
                , 'scalar_challenge
                , 'fp
@@ -1067,18 +1067,15 @@ module Step : sig
                , 'lookup_opt
                , 'bool )
                Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
-            -> ('challenge, 'scalar_challenge, 'fp, 'fp_opt, 'bool) t
+            -> ('challenge, 'scalar_challenge, 'fp) t
 
           val map_challenges :
-               ('a, 'b, 'c, 'fp_opt, 'bool) t
+               ('a, 'b, 'c) t
             -> f:('a -> 'f)
             -> scalar:('b -> 'g)
-            -> ('f, 'g, 'c, 'fp_opt, 'bool) t
+            -> ('f, 'g, 'c) t
 
-          val map_fields :
-               ('a, 'b, 'c, ('c, 'e) Opt.t, 'bool) t
-            -> f:('c -> 'f)
-            -> ('a, 'b, 'f, ('f, 'e) Opt.t, 'bool) t
+          val map_fields : ('a, 'b, 'c) t -> f:('c -> 'f) -> ('a, 'b, 'f) t
 
           val typ :
                'f Spec.impl
@@ -1102,20 +1099,15 @@ module Step : sig
                  Snarky_backendless.Typ.t
             -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
             -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
-            -> ( ( 'c
-                 , 'e Scalar_challenge.t
-                 , 'fp
-                 , ('fp, 'boolean) Plonk_types.Opt.t
-                 , 'boolean )
-                 t
-               , ('d, 'b Scalar_challenge.t, 'a, 'a option, bool) t
+            -> ( ('c, 'e Scalar_challenge.t, 'fp) t
+               , ('d, 'b Scalar_challenge.t, 'a) t
                , 'f )
                Snarky_backendless.Typ.t
         end
 
         val to_minimal :
              false_:'bool
-          -> ('challenge, 'scalar_challenge, 'fp, 'fp_opt, 'bool) In_circuit.t
+          -> ('challenge, 'scalar_challenge, 'fp) In_circuit.t
           -> ('challenge, 'scalar_challenge, 'bool) Minimal.t
       end
 
@@ -1158,19 +1150,8 @@ module Step : sig
       end
 
       module In_circuit : sig
-        type ( 'challenge
-             , 'scalar_challenge
-             , 'fq
-             , 'fq_opt
-             , 'bool
-             , 'bulletproof_challenges )
-             t =
-          ( ( 'challenge
-            , 'scalar_challenge
-            , 'fq
-            , 'fq_opt
-            , 'bool )
-            Plonk.In_circuit.t
+        type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
+          ( ('challenge, 'scalar_challenge, 'fq) Plonk.In_circuit.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges )
@@ -1244,16 +1225,13 @@ module Step : sig
         type ( 'challenge
              , 'scalar_challenge
              , 'fq
-             , 'fq_opt
              , 'bulletproof_challenges
              , 'digest
              , 'bool )
              t =
           ( ( 'challenge
             , 'scalar_challenge
-            , 'fq
-            , 'fq_opt
-            , 'bool )
+            , 'fq )
             Deferred_values.Plonk.In_circuit.t
           , 'scalar_challenge
           , 'fq
@@ -1324,7 +1302,7 @@ module Step : sig
              Spec.T.t
 
         val to_data :
-             ('a, 'b, 'c, 'fp_opt, 'e, 'f, 'g) t
+             ('a, 'b, 'c, 'e, 'f, 'g) t
           -> ( ('c, Nat.N5.n) Vector.t
              * ( ('f, Nat.N1.n) Vector.t
                * ( ('a, Nat.N2.n) Vector.t
@@ -1339,7 +1317,7 @@ module Step : sig
                  * ( ('d, Nat.N3.n) Vector.t
                    * ('e * (('f, Nat.N1.n) Vector.t * unit)) ) ) ) )
              Hlist.HlistId.t
-          -> ('c, 'd, 'a, 'fp_opt2, 'e, 'b, 'f) t
+          -> ('c, 'd, 'a, 'e, 'b, 'f) t
       end
 
       val typ :
@@ -1360,10 +1338,6 @@ module Step : sig
         -> ( ( 'a Limb_vector.Challenge.t
              , 'a Limb_vector.Challenge.t Scalar_challenge.t
              , 'b
-             , ( 'b
-               , 'a Snarky_backendless.Cvar.t
-                 Snarky_backendless__Snark_intf.Boolean0.t )
-               Opt.t
              , ( 'a Limb_vector.Challenge.t Scalar_challenge.t
                  Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
@@ -1376,7 +1350,6 @@ module Step : sig
            , ( Limb_vector.Challenge.Constant.t
              , Limb_vector.Challenge.Constant.t Scalar_challenge.t
              , 'c
-             , 'c option
              , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
                  Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
@@ -1429,10 +1402,6 @@ module Step : sig
       -> ( ( ( ( 'f Limb_vector.Challenge.t
                , 'f Limb_vector.Challenge.t Scalar_challenge.t
                , 'b
-               , ( 'b
-                 , 'f Snarky_backendless.Cvar.t
-                   Snarky_backendless__Snark_intf.Boolean0.t )
-                 Opt.t
                , ( 'f Limb_vector.Challenge.t Scalar_challenge.t
                    Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
@@ -1449,7 +1418,6 @@ module Step : sig
          , ( ( ( Limb_vector.Challenge.Constant.t
                , Limb_vector.Challenge.Constant.t Scalar_challenge.t
                , 'a
-               , 'a option
                , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
                    Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
@@ -1485,7 +1453,6 @@ module Step : sig
          ( ( ( 'a
              , 'b
              , 'c
-             , 'fp_opt
              , 'e Hlist0.Id.t
              , 'f
              , 'g )
@@ -1520,7 +1487,6 @@ module Step : sig
       -> ( ( ( 'c
              , 'd
              , 'a
-             , 'fp_opt2
              , 'e Hlist0.Id.t
              , 'b
              , 'f )

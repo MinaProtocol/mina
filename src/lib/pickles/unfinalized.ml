@@ -14,7 +14,6 @@ type t =
   ( Field.t
   , Field.t Scalar_challenge.t
   , Other_field.t Shifted_value.t
-  , (Other_field.t Shifted_value.t, Boolean.var) Plonk_types.Opt.t
   , ( Field.t Scalar_challenge.t Bulletproof_challenge.t
     , Tock.Rounds.n )
     Pickles_types.Vector.t
@@ -32,7 +31,6 @@ module Constant = struct
     ( Challenge.Constant.t
     , Challenge.Constant.t Scalar_challenge.t
     , Tock.Field.t Shifted_value.t
-    , Tock.Field.t Shifted_value.t option
     , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
       , Tock.Rounds.n )
       Vector.t

@@ -1226,7 +1226,6 @@ struct
         , _ Shifted_value.Type2.t
         , _
         , _
-        , _
         , _ )
         Types.Step.Proof_state.Per_proof.In_circuit.t ) =
     let public_input :

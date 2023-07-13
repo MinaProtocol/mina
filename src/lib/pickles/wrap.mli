@@ -115,8 +115,6 @@ val wrap :
      , ( ( Impls.Wrap.Challenge.Constant.t
          , Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
          , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
-         , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
-           option
          , ( Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
              Import.Types.Bulletproof_challenge.t
            , Backend.Tock.Rounds.n )

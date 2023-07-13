@@ -824,8 +824,6 @@ struct
         ( _
         , _
         , _ Shifted_value.Type2.t
-        , _
-        , _
         , _ )
         Types.Step.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =

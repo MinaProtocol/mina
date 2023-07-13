@@ -934,7 +934,7 @@ module Step = struct
               Then, we expose them so the next guy (who can do scalar arithmetic) can check that they
               were computed correctly from the evaluations in the proof and the challenges.
           *)
-          type ('challenge, 'scalar_challenge, 'fp, 'fp_opt, 'bool) t =
+          type ('challenge, 'scalar_challenge, 'fp) t =
             { alpha : 'scalar_challenge
             ; beta : 'challenge
             ; gamma : 'challenge
@@ -1054,9 +1054,9 @@ module Step = struct
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         end
 
-        let to_minimal (type challenge scalar_challenge fp fp_opt) ~false_
-            (t : (challenge, scalar_challenge, fp, fp_opt, 'bool) In_circuit.t)
-            : (challenge, scalar_challenge, 'bool) Minimal.t =
+        let to_minimal (type challenge scalar_challenge fp) ~false_
+            (t : (challenge, scalar_challenge, fp) In_circuit.t) :
+            (challenge, scalar_challenge, 'bool) Minimal.t =
           { alpha = t.alpha
           ; beta = t.beta
           ; zeta = t.zeta
@@ -1105,19 +1105,8 @@ module Step = struct
       end
 
       module In_circuit = struct
-        type ( 'challenge
-             , 'scalar_challenge
-             , 'fq
-             , 'fq_opt
-             , 'bool
-             , 'bulletproof_challenges )
-             t =
-          ( ( 'challenge
-            , 'scalar_challenge
-            , 'fq
-            , 'fq_opt
-            , 'bool )
-            Plonk.In_circuit.t
+        type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
+          ( ('challenge, 'scalar_challenge, 'fq) Plonk.In_circuit.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges )
@@ -1191,16 +1180,13 @@ module Step = struct
         type ( 'challenge
              , 'scalar_challenge
              , 'fq
-             , 'fq_opt
              , 'bulletproof_challenges
              , 'digest
              , 'bool )
              t =
           ( ( 'challenge
             , 'scalar_challenge
-            , 'fq
-            , 'fq_opt
-            , 'bool )
+            , 'fq )
             Deferred_values.Plonk.In_circuit.t
           , 'scalar_challenge
           , 'fq

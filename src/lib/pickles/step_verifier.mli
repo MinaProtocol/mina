@@ -174,7 +174,6 @@ val verify :
   -> ( Step_main_inputs.Impl.Field.t
      , Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
      , Other_field.t Pickles_types.Shifted_value.Type2.t
-     , _
      , ( Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
          Import.Bulletproof_challenge.t
        , 'd )
