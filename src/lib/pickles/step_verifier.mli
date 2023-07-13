@@ -64,7 +64,7 @@ val finalize_other_proof :
        Composition_types.Opt.t
      , ( Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Import.Scalar_challenge.t
-         Import.Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+         Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
        , Step_main_inputs.Impl.Boolean.var )
        Composition_types.Opt.t
      , ( Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
@@ -175,7 +175,6 @@ val verify :
      , Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
      , Other_field.t Pickles_types.Shifted_value.Type2.t
      , _
-     , _ Plonk_types.Opt.t
      , ( Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
          Import.Bulletproof_challenge.t
        , 'd )

@@ -926,26 +926,6 @@ module Step = struct
         open Pickles_types
 
         module In_circuit = struct
-          module Lookup = struct
-            type 'scalar_challenge t =
-                  'scalar_challenge
-                  Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t =
-              { joint_combiner : 'scalar_challenge }
-            [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
-
-            let to_struct l = Hlist.HlistId.[ l.joint_combiner ]
-
-            let of_struct Hlist.HlistId.[ joint_combiner ] = { joint_combiner }
-
-            let map ~f { joint_combiner } =
-              { joint_combiner = f joint_combiner }
-
-            let typ (type f fp) scalar_challenge =
-              Snarky_backendless.Typ.of_hlistable ~var_to_hlist:to_hlist
-                ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-                ~value_of_hlist:of_hlist [ scalar_challenge ]
-          end
-
           (** All scalar values deferred by a verifier circuit.
               The values in [vbmul], [complete_add], [endomul], [endomul_scalar], and [perm]
               are all scalars which will have been used to scale selector polynomials during the
@@ -954,13 +934,7 @@ module Step = struct
               Then, we expose them so the next guy (who can do scalar arithmetic) can check that they
               were computed correctly from the evaluations in the proof and the challenges.
           *)
-          type ( 'challenge
-               , 'scalar_challenge
-               , 'fp
-               , 'fp_opt
-               , 'lookup_opt
-               , 'bool )
-               t =
+          type ('challenge, 'scalar_challenge, 'fp, 'fp_opt, 'bool) t =
             { alpha : 'scalar_challenge
             ; beta : 'challenge
             ; gamma : 'challenge
@@ -1080,16 +1054,9 @@ module Step = struct
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         end
 
-        let to_minimal (type challenge scalar_challenge fp fp_opt lookup_opt)
-            ~false_
-            (t :
-              ( challenge
-              , scalar_challenge
-              , fp
-              , fp_opt
-              , lookup_opt
-              , 'bool )
-              In_circuit.t ) : (challenge, scalar_challenge, 'bool) Minimal.t =
+        let to_minimal (type challenge scalar_challenge fp fp_opt) ~false_
+            (t : (challenge, scalar_challenge, fp, fp_opt, 'bool) In_circuit.t)
+            : (challenge, scalar_challenge, 'bool) Minimal.t =
           { alpha = t.alpha
           ; beta = t.beta
           ; zeta = t.zeta
@@ -1149,7 +1116,6 @@ module Step = struct
             , 'scalar_challenge
             , 'fq
             , 'fq_opt
-            , ('scalar_challenge Plonk.In_circuit.Lookup.t, 'bool) Opt.t
             , 'bool )
             Plonk.In_circuit.t
           , 'scalar_challenge
@@ -1226,7 +1192,6 @@ module Step = struct
              , 'scalar_challenge
              , 'fq
              , 'fq_opt
-             , 'lookup_opt
              , 'bulletproof_challenges
              , 'digest
              , 'bool )
@@ -1235,7 +1200,6 @@ module Step = struct
             , 'scalar_challenge
             , 'fq
             , 'fq_opt
-            , 'lookup_opt
             , 'bool )
             Deferred_values.Plonk.In_circuit.t
           , 'scalar_challenge

@@ -107,7 +107,7 @@ struct
         , Tick.Field.t Shifted_value.Type1.t
         , Tick.Field.t Shifted_value.Type1.t option
         , Challenge.Constant.t Scalar_challenge.t
-          Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
           option
         , bool
         , Digest.Constant.t
