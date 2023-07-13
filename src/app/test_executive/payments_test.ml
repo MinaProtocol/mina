@@ -522,7 +522,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                |> Signature_lib.Public_key.compress )
          in
          let key_2_balance_expected =
-           Currency.Amount.of_formatted_string config.snark_worker_fee
+           Currency.Amount.of_formatted_string "0.0001"
          in
          if
            Currency.Amount.( >= )
