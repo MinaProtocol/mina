@@ -70,6 +70,25 @@ module Wrap : sig
           ; branch_data : 'branch_data
           }
       end
+
+      module Minimal : sig
+        module V1 : sig
+          type ( 'challenge
+               , 'scalar_challenge
+               , 'fp
+               , 'bool
+               , 'bulletproof_challenges
+               , 'branch_data )
+               t =
+            { plonk : ('challenge, 'scalar_challenge, 'bool) Plonk.Minimal.V1.t
+            ; combined_inner_product : 'fp
+            ; b : 'fp
+            ; xi : 'scalar_challenge
+            ; bulletproof_challenges : 'bulletproof_challenges
+            ; branch_data : 'branch_data
+            }
+        end
+      end
     end
 
     module V1 : sig
@@ -91,6 +110,31 @@ module Wrap : sig
         ; sponge_digest_before_evaluations : 'digest
         ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
         }
+    end
+
+    module Minimal : sig
+      module V1 : sig
+        type ( 'challenge
+             , 'scalar_challenge
+             , 'fp
+             , 'bool
+             , 'messages_for_next_wrap_proof
+             , 'digest
+             , 'bp_chals
+             , 'index )
+             t =
+          { deferred_values :
+              ( 'challenge
+              , 'scalar_challenge
+              , 'fp
+              , 'bool
+              , 'bp_chals
+              , 'index )
+              Deferred_values.Minimal.V1.t
+          ; sponge_digest_before_evaluations : 'digest
+          ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
+          }
+      end
     end
   end
 
@@ -123,25 +167,25 @@ module Wrap : sig
         type ( 'challenge
              , 'scalar_challenge
              , 'fp
-             , 'feature_flags
+             , 'bool
              , 'messages_for_next_wrap_proof
              , 'digest
              , 'messages_for_next_step_proof
              , 'bp_chals
              , 'index )
              t =
-          ( ( 'challenge
-            , 'scalar_challenge
-            , 'feature_flags )
-            Proof_state.Deferred_values.Plonk.Minimal.V1.t
-          , 'scalar_challenge
-          , 'fp
-          , 'messages_for_next_wrap_proof
-          , 'digest
-          , 'messages_for_next_step_proof
-          , 'bp_chals
-          , 'index )
-          V1.t
+          { proof_state :
+              ( 'challenge
+              , 'scalar_challenge
+              , 'fp
+              , 'bool
+              , 'messages_for_next_wrap_proof
+              , 'digest
+              , 'bp_chals
+              , 'index )
+              Proof_state.Minimal.V1.t
+          ; messages_for_next_step_proof : 'messages_for_next_step_proof
+          }
       end
     end
   end

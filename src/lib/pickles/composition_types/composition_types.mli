@@ -74,6 +74,12 @@ module Wrap : sig
               val to_latest : 'a -> 'a
             end
           end]
+
+          val map_challenges :
+               ('challenge, 'scalar_challenge, 'bool) t
+            -> f:('challenge -> 'challenge2)
+            -> scalar:('scalar_challenge -> 'scalar_challenge2)
+            -> ('challenge2, 'scalar_challenge2, 'bool) t
         end
 
         module In_circuit : sig
@@ -244,7 +250,10 @@ module Wrap : sig
             , 'fp
             , 'bulletproof_challenges
             , 'branch_data )
-            Stable.Latest.t =
+            Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+            .Deferred_values
+            .V1
+            .t =
         { plonk : 'plonk
         ; combined_inner_product : 'fp
         ; b : 'fp
@@ -274,20 +283,59 @@ module Wrap : sig
         -> ('a, 'f, 'fp, 'c, 'd) t
 
       module Minimal : sig
-        type ( 'challenge
+        [%%versioned:
+        module Stable : sig
+          module V1 : sig
+            type ( 'challenge
+                 , 'scalar_challenge
+                 , 'fp
+                 , 'bool
+                 , 'bulletproof_challenges
+                 , 'branch_data )
+                 t =
+                  ( 'challenge
+                  , 'scalar_challenge
+                  , 'fp
+                  , 'bool
+                  , 'bulletproof_challenges
+                  , 'branch_data )
+                  Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                  .Deferred_values
+                  .Minimal
+                  .V1
+                  .t =
+              { plonk :
+                  ( 'challenge
+                  , 'scalar_challenge
+                  , 'bool )
+                  Plonk.Minimal.Stable.V1.t
+              ; combined_inner_product : 'fp
+              ; b : 'fp
+              ; xi : 'scalar_challenge
+              ; bulletproof_challenges : 'bulletproof_challenges
+              ; branch_data : 'branch_data
+              }
+            [@@deriving sexp, compare, yojson, hash, equal]
+          end
+        end]
+
+        val map_challenges :
+             ( 'challenge
              , 'scalar_challenge
              , 'fp
              , 'bool
              , 'bulletproof_challenges
-             , 'index )
-             t =
-          ( ('challenge, 'scalar_challenge, 'bool) Plonk.Minimal.t
-          , 'scalar_challenge
-          , 'fp
-          , 'bulletproof_challenges
-          , 'index )
-          Stable.Latest.t
-        [@@deriving sexp, compare, yojson, hash, equal]
+             , 'branch_data )
+             t
+          -> f:('challenge -> 'challenge2)
+          -> scalar:('scalar_challenge -> 'scalar_challenge2)
+          -> ( 'challenge2
+             , 'scalar_challenge2
+             , 'fp
+             , 'bool
+             , 'bulletproof_challenges
+             , 'branch_data )
+             t
       end
 
       module In_circuit : sig
@@ -496,24 +544,46 @@ module Wrap : sig
     end
 
     module Minimal : sig
-      type ( 'challenge
-           , 'scalar_challenge
-           , 'fp
-           , 'bool
-           , 'messages_for_next_wrap_proof
-           , 'digest
-           , 'bp_chals
-           , 'index )
-           t =
-        ( ('challenge, 'scalar_challenge, 'bool) Deferred_values.Plonk.Minimal.t
-        , 'scalar_challenge
-        , 'fp
-        , 'messages_for_next_wrap_proof
-        , 'digest
-        , 'bp_chals
-        , 'index )
-        Stable.Latest.t
-      [@@deriving sexp, compare, yojson, hash, equal]
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type ( 'challenge
+               , 'scalar_challenge
+               , 'fp
+               , 'bool
+               , 'messages_for_next_wrap_proof
+               , 'digest
+               , 'bp_chals
+               , 'index )
+               t =
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'messages_for_next_wrap_proof
+                , 'digest
+                , 'bp_chals
+                , 'index )
+                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                .Minimal
+                .V1
+                .t =
+            { deferred_values :
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'bp_chals
+                , 'index )
+                Deferred_values.Minimal.Stable.V1.t
+            ; sponge_digest_before_evaluations : 'digest
+            ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
+                  (** Parts of the statement not needed by the other circuit. Represented as a hash inside the
+              circuit which is then "unhashed". *)
+            }
+          [@@deriving sexp, compare, yojson, hash, equal]
+        end
+      end]
     end
 
     module In_circuit : sig
@@ -795,18 +865,30 @@ module Wrap : sig
                , 'bp_chals
                , 'index )
                t =
-            ( ( 'challenge
-              , 'scalar_challenge
-              , 'bool )
-              Proof_state.Deferred_values.Plonk.Minimal.Stable.V1.t
-            , 'scalar_challenge
-            , 'fp
-            , 'messages_for_next_wrap_proof
-            , 'digest
-            , 'messages_for_next_step_proof
-            , 'bp_chals
-            , 'index )
-            Stable.V1.t
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'messages_for_next_wrap_proof
+                , 'digest
+                , 'messages_for_next_step_proof
+                , 'bp_chals
+                , 'index )
+                Mina_wire_types.Pickles_composition_types.Wrap.Statement.Minimal
+                .V1
+                .t =
+            { proof_state :
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'messages_for_next_wrap_proof
+                , 'digest
+                , 'bp_chals
+                , 'index )
+                Proof_state.Minimal.Stable.V1.t
+            ; messages_for_next_step_proof : 'messages_for_next_step_proof
+            }
           [@@deriving compare, yojson, sexp, hash, equal, bin_shape, bin_io]
 
           include Pickles_types.Sigs.VERSIONED

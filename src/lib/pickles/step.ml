@@ -264,27 +264,36 @@ struct
                   statement.messages_for_next_step_proof )
                ~app_state:to_field_elements )
         ; proof_state =
-            { statement.proof_state with
-              deferred_values =
-                { statement.proof_state.deferred_values with
-                  plonk =
-                    { plonk with
-                      zeta = plonk0.zeta
-                    ; alpha = plonk0.alpha
-                    ; beta = plonk0.beta
-                    ; gamma = plonk0.gamma
-                    ; lookup =
-                        Option.map (Opt.to_option_unsafe plonk.lookup)
-                          ~f:(fun l ->
-                            { Composition_types.Wrap.Proof_state.Deferred_values
-                              .Plonk
-                              .In_circuit
-                              .Lookup
-                              .joint_combiner =
-                                Option.value_exn plonk0.joint_combiner
-                            } )
-                    }
-                }
+            { deferred_values =
+                (let deferred_values = statement.proof_state.deferred_values in
+                 { plonk =
+                     { plonk with
+                       zeta = plonk0.zeta
+                     ; alpha = plonk0.alpha
+                     ; beta = plonk0.beta
+                     ; gamma = plonk0.gamma
+                     ; lookup =
+                         Option.map (Opt.to_option_unsafe plonk.lookup)
+                           ~f:(fun l ->
+                             { Composition_types.Wrap.Proof_state
+                               .Deferred_values
+                               .Plonk
+                               .In_circuit
+                               .Lookup
+                               .joint_combiner =
+                                 Option.value_exn plonk0.joint_combiner
+                             } )
+                     }
+                 ; combined_inner_product =
+                     deferred_values.combined_inner_product
+                 ; b = deferred_values.b
+                 ; xi = deferred_values.xi
+                 ; bulletproof_challenges =
+                     deferred_values.bulletproof_challenges
+                 ; branch_data = deferred_values.branch_data
+                 } )
+            ; sponge_digest_before_evaluations =
+                statement.proof_state.sponge_digest_before_evaluations
             ; messages_for_next_wrap_proof =
                 Wrap_hack.hash_messages_for_next_wrap_proof
                   Local_max_proofs_verified.n

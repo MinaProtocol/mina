@@ -64,6 +64,15 @@ module Wrap = struct
               let to_latest = Fn.id
             end
           end]
+
+          let map_challenges t ~f ~scalar =
+            { t with
+              alpha = scalar t.alpha
+            ; beta = f t.beta
+            ; gamma = f t.gamma
+            ; zeta = scalar t.zeta
+            ; joint_combiner = Option.map ~f:scalar t.joint_combiner
+            }
         end
 
         open Pickles_types
@@ -264,20 +273,57 @@ module Wrap = struct
       [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
       module Minimal = struct
-        type ( 'challenge
-             , 'scalar_challenge
-             , 'fp
-             , 'bool
-             , 'bulletproof_challenges
-             , 'index )
-             t =
-          ( ('challenge, 'scalar_challenge, 'bool) Plonk.Minimal.t
-          , 'scalar_challenge
-          , 'fp
-          , 'bulletproof_challenges
-          , 'index )
-          Stable.Latest.t
-        [@@deriving sexp, compare, yojson, hash, equal]
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type ( 'challenge
+                 , 'scalar_challenge
+                 , 'fp
+                 , 'bool
+                 , 'bulletproof_challenges
+                 , 'branch_data )
+                 t =
+                  ( 'challenge
+                  , 'scalar_challenge
+                  , 'fp
+                  , 'bool
+                  , 'bulletproof_challenges
+                  , 'branch_data )
+                  Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                  .Deferred_values
+                  .Minimal
+                  .V1
+                  .t =
+              { plonk :
+                  ( 'challenge
+                  , 'scalar_challenge
+                  , 'bool )
+                  Plonk.Minimal.Stable.V1.t
+              ; combined_inner_product : 'fp
+              ; b : 'fp
+              ; xi : 'scalar_challenge
+              ; bulletproof_challenges : 'bulletproof_challenges
+              ; branch_data : 'branch_data
+              }
+            [@@deriving sexp, compare, yojson, hash, equal]
+          end
+        end]
+
+        let map_challenges
+            { plonk
+            ; combined_inner_product
+            ; b
+            ; xi
+            ; bulletproof_challenges
+            ; branch_data
+            } ~f ~scalar =
+          { xi = scalar xi
+          ; combined_inner_product
+          ; b
+          ; plonk = Plonk.Minimal.map_challenges ~f ~scalar plonk
+          ; bulletproof_challenges
+          ; branch_data
+          }
       end
 
       let map_challenges
@@ -343,8 +389,22 @@ module Wrap = struct
             ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
       end
 
-      let to_minimal (t : _ In_circuit.t) ~to_option : _ Minimal.t =
-        { t with plonk = Plonk.to_minimal ~to_option t.plonk }
+      let to_minimal
+          ({ plonk
+           ; combined_inner_product
+           ; b
+           ; xi
+           ; bulletproof_challenges
+           ; branch_data
+           } :
+            _ In_circuit.t ) ~to_option : _ Minimal.t =
+        { plonk = Plonk.to_minimal ~to_option plonk
+        ; combined_inner_product
+        ; b
+        ; xi
+        ; bulletproof_challenges
+        ; branch_data
+        }
     end
 
     (** The component of the proof accumulation state that is only computed on by the
@@ -419,24 +479,46 @@ module Wrap = struct
     end]
 
     module Minimal = struct
-      type ( 'challenge
-           , 'scalar_challenge
-           , 'fp
-           , 'bool
-           , 'messages_for_next_wrap_proof
-           , 'digest
-           , 'bp_chals
-           , 'index )
-           t =
-        ( ('challenge, 'scalar_challenge, 'bool) Deferred_values.Plonk.Minimal.t
-        , 'scalar_challenge
-        , 'fp
-        , 'messages_for_next_wrap_proof
-        , 'digest
-        , 'bp_chals
-        , 'index )
-        Stable.Latest.t
-      [@@deriving sexp, compare, yojson, hash, equal]
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type ( 'challenge
+               , 'scalar_challenge
+               , 'fp
+               , 'bool
+               , 'messages_for_next_wrap_proof
+               , 'digest
+               , 'bp_chals
+               , 'index )
+               t =
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'messages_for_next_wrap_proof
+                , 'digest
+                , 'bp_chals
+                , 'index )
+                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                .Minimal
+                .V1
+                .t =
+            { deferred_values :
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'bp_chals
+                , 'index )
+                Deferred_values.Minimal.Stable.V1.t
+            ; sponge_digest_before_evaluations : 'digest
+            ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
+                  (** Parts of the statement not needed by the other circuit. Represented as a hash inside the
+              circuit which is then "unhashed". *)
+            }
+          [@@deriving sexp, compare, yojson, hash, equal]
+        end
+      end]
     end
 
     module In_circuit = struct
@@ -485,10 +567,15 @@ module Wrap = struct
           ~value_of_hlist:of_hlist
     end
 
-    let to_minimal (t : _ In_circuit.t) ~to_option : _ Minimal.t =
-      { t with
-        deferred_values =
-          Deferred_values.to_minimal ~to_option t.deferred_values
+    let to_minimal
+        ({ deferred_values
+         ; sponge_digest_before_evaluations
+         ; messages_for_next_wrap_proof
+         } :
+          _ In_circuit.t ) ~to_option : _ Minimal.t =
+      { deferred_values = Deferred_values.to_minimal ~to_option deferred_values
+      ; sponge_digest_before_evaluations
+      ; messages_for_next_wrap_proof
       }
   end
 
@@ -653,18 +740,30 @@ module Wrap = struct
                , 'bp_chals
                , 'index )
                t =
-            ( ( 'challenge
-              , 'scalar_challenge
-              , 'bool )
-              Proof_state.Deferred_values.Plonk.Minimal.Stable.V1.t
-            , 'scalar_challenge
-            , 'fp
-            , 'messages_for_next_wrap_proof
-            , 'digest
-            , 'messages_for_next_step_proof
-            , 'bp_chals
-            , 'index )
-            Stable.V1.t
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'messages_for_next_wrap_proof
+                , 'digest
+                , 'messages_for_next_step_proof
+                , 'bp_chals
+                , 'index )
+                Mina_wire_types.Pickles_composition_types.Wrap.Statement.Minimal
+                .V1
+                .t =
+            { proof_state :
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'messages_for_next_wrap_proof
+                , 'digest
+                , 'bp_chals
+                , 'index )
+                Proof_state.Minimal.Stable.V1.t
+            ; messages_for_next_step_proof : 'messages_for_next_step_proof
+            }
           [@@deriving compare, yojson, sexp, hash, equal]
         end
       end]
@@ -862,8 +961,12 @@ module Wrap = struct
         }
     end
 
-    let to_minimal (t : _ In_circuit.t) ~to_option : _ Minimal.t =
-      { t with proof_state = Proof_state.to_minimal ~to_option t.proof_state }
+    let to_minimal
+        ({ proof_state; messages_for_next_step_proof } : _ In_circuit.t)
+        ~to_option : _ Minimal.t =
+      { proof_state = Proof_state.to_minimal ~to_option proof_state
+      ; messages_for_next_step_proof
+      }
   end
 end
 

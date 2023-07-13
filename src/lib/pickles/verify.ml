@@ -77,15 +77,17 @@ let verify_heterogenous (ts : Instance.t list) =
           SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar
         in
         Timer.clock __LOC__ ;
-        let { Deferred_values.xi
-            ; plonk = plonk0
+        let plonk0 = statement.proof_state.deferred_values.plonk in
+        let { Deferred_values.Minimal.xi
+            ; plonk = _
             ; combined_inner_product
             ; branch_data
             ; bulletproof_challenges
             ; b
             } =
-          Deferred_values.map_challenges ~f:Challenge.Constant.to_tick_field
-            ~scalar:sc statement.proof_state.deferred_values
+          Deferred_values.Minimal.map_challenges
+            ~f:Challenge.Constant.to_tick_field ~scalar:sc
+            statement.proof_state.deferred_values
         in
         let zeta = sc plonk0.zeta in
         let alpha = sc plonk0.alpha in
@@ -321,9 +323,21 @@ let verify_heterogenous (ts : Instance.t list) =
                    ~dlog_plonk_index:key.commitments
                    { t.statement.messages_for_next_step_proof with app_state } )
           ; proof_state =
-              { t.statement.proof_state with
-                deferred_values =
-                  { t.statement.proof_state.deferred_values with plonk }
+              { deferred_values =
+                  (let deferred_values =
+                     t.statement.proof_state.deferred_values
+                   in
+                   { plonk
+                   ; combined_inner_product =
+                       deferred_values.combined_inner_product
+                   ; b = deferred_values.b
+                   ; xi = deferred_values.xi
+                   ; bulletproof_challenges =
+                       deferred_values.bulletproof_challenges
+                   ; branch_data = deferred_values.branch_data
+                   } )
+              ; sponge_digest_before_evaluations =
+                  t.statement.proof_state.sponge_digest_before_evaluations
               ; messages_for_next_wrap_proof =
                   Wrap_hack.hash_messages_for_next_wrap_proof
                     Max_proofs_verified.n
