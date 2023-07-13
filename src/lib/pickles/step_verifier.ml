@@ -916,7 +916,7 @@ struct
       SC.to_field_checked (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
     in
     let plonk =
-      Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
+      Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
         ~f:Fn.id ~scalar plonk
     in
     let domain =
@@ -1258,7 +1258,10 @@ struct
         ~xi ~verification_key:wrap_verification_key ~sponge ~sponge_after_index
         ~public_input ~sg_old
         ~advice:{ b; combined_inner_product }
-        ~proof ~plonk:unfinalized.deferred_values.plonk
+        ~proof
+        ~plonk:
+          (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+           .to_wrap unfinalized.deferred_values.plonk )
     in
     with_label __LOC__ (fun () ->
         with_label __LOC__ (fun () ->

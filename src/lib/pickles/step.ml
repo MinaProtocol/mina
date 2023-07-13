@@ -504,6 +504,8 @@ struct
           (module Field)
           ~env:tock_env ~shift:Shifts.tock2 tock_plonk_minimal
           tock_combined_evals
+        |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+           .of_wrap
       in
       let shifted_value =
         Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2

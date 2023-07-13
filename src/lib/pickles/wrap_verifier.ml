@@ -469,7 +469,7 @@ struct
     let (T max) = Nat.of_int max in
     Vector.to_array (ones_vector (module Impl) ~first_zero:length max)
 
-  module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
+  module Plonk = Types.Step.Proof_state.Deferred_values.Plonk
 
   (* Just for exhaustiveness over fields *)
   let iter2 ~chal ~scalar_chal
@@ -1029,7 +1029,10 @@ struct
           (* This proof is a wrap proof; no need to consider features. *)
           Plonk_checks.checked
             (module Impl)
-            ~env ~shift:shift2 plonk combined_evals )
+            ~env ~shift:shift2
+            (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+             .to_wrap plonk )
+            combined_evals )
     in
     print_bool "xi_correct" xi_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;

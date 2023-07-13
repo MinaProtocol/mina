@@ -114,6 +114,8 @@ module Constant = struct
            type nonrec bool = bool
          end in
          Plonk_checks.derive_plonk (module Field) ~env ~shift chals evals
+         |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+            .of_wrap
        in
        { deferred_values =
            { plonk = { plonk with alpha; beta; gamma; zeta; lookup = None }

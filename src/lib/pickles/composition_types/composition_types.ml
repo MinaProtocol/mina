@@ -984,6 +984,10 @@ module Step = struct
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
+          let to_wrap = Fn.id
+
+          let of_wrap = Fn.id
+
           let map_challenges t ~f ~scalar =
             { t with
               alpha = scalar t.alpha

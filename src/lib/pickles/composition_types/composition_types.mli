@@ -1062,13 +1062,6 @@ module Step : sig
                , 'lookup_opt
                , 'bool )
                t =
-                ( 'challenge
-                , 'scalar_challenge
-                , 'fp
-                , 'fp_opt
-                , 'lookup_opt
-                , 'bool )
-                Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t =
             { alpha : 'scalar_challenge
             ; beta : 'challenge
             ; gamma : 'challenge
@@ -1081,6 +1074,38 @@ module Step : sig
             ; lookup : 'lookup_opt
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
+
+          val to_wrap :
+               ( 'challenge
+               , 'scalar_challenge
+               , 'fp
+               , 'fp_opt
+               , 'lookup_opt
+               , 'bool )
+               t
+            -> ( 'challenge
+               , 'scalar_challenge
+               , 'fp
+               , 'fp_opt
+               , 'lookup_opt
+               , 'bool )
+               Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+
+          val of_wrap :
+               ( 'challenge
+               , 'scalar_challenge
+               , 'fp
+               , 'fp_opt
+               , 'lookup_opt
+               , 'bool )
+               Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+            -> ( 'challenge
+               , 'scalar_challenge
+               , 'fp
+               , 'fp_opt
+               , 'lookup_opt
+               , 'bool )
+               t
 
           val map_challenges :
                ('a, 'b, 'c, 'fp_opt, ('b Lookup.t, 'e) Opt.t, 'bool) t
