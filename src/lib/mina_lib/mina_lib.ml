@@ -1344,7 +1344,7 @@ let start t =
       ~log_block_creation:t.config.log_block_creation
       ~block_reward_threshold:t.config.block_reward_threshold
       ~block_produced_bvar:t.components.block_produced_bvar
-      ~vrf_evaluation_state:t.vrf_evaluation_state ;
+      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -2056,9 +2056,6 @@ let create ?wallets (config : Config.t) =
                             valid_cb
                       | `Internal ->
                           (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
-                          don't_wait_for
-                            (Mina_networking.broadcast_state net
-                               (Mina_block.Validated.forget transition) ) ;
                           Option.iter
                             ~f:
                               (Fn.flip
