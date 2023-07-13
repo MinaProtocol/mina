@@ -899,28 +899,26 @@ module Step = struct
                   See src/lib/pickles/plonk_checks/plonk_checks.ml for the computation of the [In_circuit] value
                   from the [Minimal] value.
               *)
-              type ('challenge, 'scalar_challenge, 'bool) t =
-                    ( 'challenge
-                    , 'scalar_challenge
-                    , 'bool )
-                    Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                    .Deferred_values
-                    .Plonk
-                    .Minimal
-                    .V1
-                    .t =
+              type ('challenge, 'scalar_challenge) t =
                 { alpha : 'scalar_challenge
                 ; beta : 'challenge
                 ; gamma : 'challenge
                 ; zeta : 'scalar_challenge
-                ; joint_combiner : 'scalar_challenge option
-                ; feature_flags : 'bool Plonk_types.Features.Stable.V1.t
                 }
               [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
               let to_latest = Fn.id
             end
           end]
+
+          let to_wrap ~feature_flags { alpha; beta; gamma; zeta } :
+              _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.t =
+            { alpha; beta; gamma; zeta; joint_combiner = None; feature_flags }
+
+          let of_wrap
+              ({ alpha; beta; gamma; zeta; joint_combiner = _; feature_flags } :
+                _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.t ) =
+            { alpha; beta; gamma; zeta }
         end
 
         open Pickles_types
@@ -1054,17 +1052,10 @@ module Step = struct
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         end
 
-        let to_minimal (type challenge scalar_challenge fp) ~false_
+        let to_minimal (type challenge scalar_challenge fp)
             (t : (challenge, scalar_challenge, fp) In_circuit.t) :
-            (challenge, scalar_challenge, 'bool) Minimal.t =
-          { alpha = t.alpha
-          ; beta = t.beta
-          ; zeta = t.zeta
-          ; gamma = t.gamma
-          ; joint_combiner = None
-          ; feature_flags =
-              Plonk_types.Features.(map ~f:(Fn.const false_) none_bool)
-          }
+            (challenge, scalar_challenge) Minimal.t =
+          { alpha = t.alpha; beta = t.beta; zeta = t.zeta; gamma = t.gamma }
       end
 
       (** All the scalar-field values needed to finalize the verification of a proof
@@ -1090,13 +1081,8 @@ module Step = struct
       [@@deriving sexp, compare, yojson]
 
       module Minimal = struct
-        type ( 'challenge
-             , 'scalar_challenge
-             , 'bool
-             , 'fq
-             , 'bulletproof_challenges )
-             t =
-          ( ('challenge, 'scalar_challenge, 'bool) Plonk.Minimal.t
+        type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
+          ( ('challenge, 'scalar_challenge) Plonk.Minimal.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges )
@@ -1163,10 +1149,7 @@ module Step = struct
              , 'digest
              , 'bool )
              t =
-          ( ( 'challenge
-            , 'scalar_challenge
-            , 'bool )
-            Deferred_values.Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges

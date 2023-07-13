@@ -1002,24 +1002,28 @@ module Step : sig
               See src/lib/pickles/plonk_checks/plonk_checks.ml for the
               computation of the {!module:In_circuit} value from the
               {!module:Minimal} value. *)
-          type ('challenge, 'scalar_challenge, 'bool) t =
-                ( 'challenge
-                , 'scalar_challenge
-                , 'bool )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                .Deferred_values
-                .Plonk
-                .Minimal
-                .V1
-                .t =
+          type ('challenge, 'scalar_challenge) t =
             { alpha : 'scalar_challenge
             ; beta : 'challenge
             ; gamma : 'challenge
             ; zeta : 'scalar_challenge
-            ; joint_combiner : 'scalar_challenge option
-            ; feature_flags : 'bool Plonk_types.Features.t
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+          val to_wrap :
+               feature_flags:'bool Plonk_types.Features.t
+            -> ('challenge, 'scalar_challenge) t
+            -> ( 'challenge
+               , 'scalar_challenge
+               , 'bool )
+               Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+
+          val of_wrap :
+               ( 'challenge
+               , 'scalar_challenge
+               , 'bool )
+               Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+            -> ('challenge, 'scalar_challenge) t
         end
 
         module In_circuit : sig
@@ -1106,9 +1110,8 @@ module Step : sig
         end
 
         val to_minimal :
-             false_:'bool
-          -> ('challenge, 'scalar_challenge, 'fp) In_circuit.t
-          -> ('challenge, 'scalar_challenge, 'bool) Minimal.t
+             ('challenge, 'scalar_challenge, 'fp) In_circuit.t
+          -> ('challenge, 'scalar_challenge) Minimal.t
       end
 
       (** All the scalar-field values needed to finalize the verification of a
@@ -1135,13 +1138,8 @@ module Step : sig
       [@@deriving sexp, compare, yojson]
 
       module Minimal : sig
-        type ( 'challenge
-             , 'scalar_challenge
-             , 'bool
-             , 'fq
-             , 'bulletproof_challenges )
-             t =
-          ( ('challenge, 'scalar_challenge, 'bool) Plonk.Minimal.t
+        type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
+          ( ('challenge, 'scalar_challenge) Plonk.Minimal.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges )
@@ -1208,10 +1206,7 @@ module Step : sig
              , 'digest
              , 'bool )
              t =
-          ( ( 'challenge
-            , 'scalar_challenge
-            , 'bool )
-            Deferred_values.Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges

@@ -469,7 +469,7 @@ struct
     let (T max) = Nat.of_int max in
     Vector.to_array (ones_vector (module Impl) ~first_zero:length max)
 
-  module Plonk = Types.Step.Proof_state.Deferred_values.Plonk
+  module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
   (* Just for exhaustiveness over fields *)
   let iter2 ~chal ~scalar_chal
@@ -827,6 +827,7 @@ struct
         , _ )
         Types.Step.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
+    let module Plonk = Types.Step.Proof_state.Deferred_values.Plonk in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
@@ -903,7 +904,11 @@ struct
     let xi = scalar_to_field xi in
     (* TODO: r actually does not need to be a scalar challenge. *)
     let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
-    let plonk_minimal = Plonk.to_minimal ~false_:Boolean.false_ plonk in
+    let plonk_minimal =
+      plonk |> Plonk.to_minimal
+      |> Plonk.Minimal.to_wrap
+           ~feature_flags:Features.(map ~f:Boolean.var_of_value none_bool)
+    in
     let combined_evals =
       let n = Common.Max_degree.wrap_log2 in
       (* TODO: zeta_n is recomputed in [env] below *)

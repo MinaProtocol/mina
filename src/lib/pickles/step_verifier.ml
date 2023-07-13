@@ -344,12 +344,12 @@ struct
         ( 'a
         , Inputs.Impl.Field.t Import.Scalar_challenge.t
         , _ )
-        Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t )
+        Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t )
       (m2 :
         ( Inputs.Impl.Field.t
         , Inputs.Impl.Field.t Import.Scalar_challenge.t
         , _ )
-        Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t ) =
+        Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t ) =
     let open Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
     let scalar_chal
