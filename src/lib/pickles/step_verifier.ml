@@ -1261,7 +1261,8 @@ struct
         ~proof
         ~plonk:
           (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-           .to_wrap unfinalized.deferred_values.plonk )
+           .to_wrap ~opt_none:Opt.None ~false_:Boolean.false_
+             unfinalized.deferred_values.plonk )
     in
     with_label __LOC__ (fun () ->
         with_label __LOC__ (fun () ->

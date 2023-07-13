@@ -961,13 +961,6 @@ module Step = struct
                , 'lookup_opt
                , 'bool )
                t =
-                ( 'challenge
-                , 'scalar_challenge
-                , 'fp
-                , 'fp_opt
-                , 'lookup_opt
-                , 'bool )
-                Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t =
             { alpha : 'scalar_challenge
             ; beta : 'challenge
             ; gamma : 'challenge
@@ -979,14 +972,80 @@ module Step = struct
             ; zeta_to_domain_size : 'fp
             ; perm : 'fp
                   (** scalar used on one of the permutation polynomial commitments. *)
-            ; feature_flags : 'bool Plonk_types.Features.t
-            ; lookup : 'lookup_opt
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
-          let to_wrap = Fn.id
+          let to_wrap ~opt_none ~false_
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              } : _ Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t =
+            { alpha
+            ; beta
+            ; gamma
+            ; zeta
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; perm
+            ; feature_flags =
+                { range_check0 = false_
+                ; range_check1 = false_
+                ; foreign_field_add = false_
+                ; foreign_field_mul = false_
+                ; xor = false_
+                ; rot = false_
+                ; lookup = false_
+                ; runtime_tables = false_
+                }
+            ; lookup = opt_none
+            }
 
-          let of_wrap = Fn.id
+          let of_wrap ~assert_none ~assert_false
+              ({ alpha
+               ; beta
+               ; gamma
+               ; zeta
+               ; zeta_to_srs_length
+               ; zeta_to_domain_size
+               ; perm
+               ; feature_flags
+               ; lookup
+               } :
+                _ Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
+            let () =
+              let { Plonk_types.Features.range_check0
+                  ; range_check1
+                  ; foreign_field_add
+                  ; foreign_field_mul
+                  ; xor
+                  ; rot
+                  ; lookup
+                  ; runtime_tables
+                  } =
+                feature_flags
+              in
+              assert_false range_check0 ;
+              assert_false range_check1 ;
+              assert_false foreign_field_add ;
+              assert_false foreign_field_mul ;
+              assert_false xor ;
+              assert_false rot ;
+              assert_false lookup ;
+              assert_false runtime_tables
+            in
+            assert_none lookup ;
+            { alpha
+            ; beta
+            ; gamma
+            ; zeta
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; perm
+            }
 
           let map_challenges t ~f ~scalar =
             { t with
@@ -994,7 +1053,6 @@ module Step = struct
             ; beta = f t.beta
             ; gamma = f t.gamma
             ; zeta = scalar t.zeta
-            ; lookup = Opt.map ~f:(Lookup.map ~f:scalar) t.lookup
             }
 
           let map_fields t ~f =
@@ -1009,27 +1067,6 @@ module Step = struct
                 with type field = f ) ~dummy_scalar ~dummy_scalar_challenge
               ~challenge ~scalar_challenge ~bool ~feature_flags
               (fp : (fp, _, f) Snarky_backendless.Typ.t) =
-            let uses_lookup =
-              let { Plonk_types.Features.range_check0
-                  ; range_check1
-                  ; foreign_field_add = _ (* Doesn't use lookup *)
-                  ; foreign_field_mul
-                  ; xor
-                  ; rot
-                  ; lookup
-                  ; runtime_tables = _ (* Fixme *)
-                  } =
-                feature_flags
-              in
-              Array.reduce_exn ~f:Opt.Flag.( ||| )
-                [| range_check0
-                 ; range_check1
-                 ; foreign_field_mul
-                 ; xor
-                 ; rot
-                 ; lookup
-                |]
-            in
             Snarky_backendless.Typ.of_hlistable
               [ Scalar_challenge.typ scalar_challenge
               ; challenge
@@ -1038,16 +1075,13 @@ module Step = struct
               ; fp
               ; fp
               ; fp
-              ; Plonk_types.Features.typ ~feature_flags bool
-              ; Plonk_types.Opt.typ Impl.Boolean.typ uses_lookup
-                  ~dummy:{ joint_combiner = dummy_scalar_challenge }
-                  (Lookup.typ (Scalar_challenge.typ scalar_challenge))
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         end
 
         let to_minimal (type challenge scalar_challenge fp fp_opt lookup_opt)
+            ~false_
             (t :
               ( challenge
               , scalar_challenge
@@ -1055,18 +1089,14 @@ module Step = struct
               , fp_opt
               , lookup_opt
               , 'bool )
-              In_circuit.t )
-            ~(to_option :
-               lookup_opt -> scalar_challenge In_circuit.Lookup.t option ) :
-            (challenge, scalar_challenge, 'bool) Minimal.t =
+              In_circuit.t ) : (challenge, scalar_challenge, 'bool) Minimal.t =
           { alpha = t.alpha
           ; beta = t.beta
           ; zeta = t.zeta
           ; gamma = t.gamma
-          ; joint_combiner =
-              Option.map (to_option t.lookup) ~f:(fun l ->
-                  l.In_circuit.Lookup.joint_combiner )
-          ; feature_flags = t.feature_flags
+          ; joint_combiner = None
+          ; feature_flags =
+              Plonk_types.Features.(map ~f:(Fn.const false_) none_bool)
           }
       end
 
@@ -1218,35 +1248,7 @@ module Step = struct
 
         (** A layout of the raw data in this value, which is needed for
           representing it inside the circuit. *)
-        let spec impl bp_log2 lookup feature_flags =
-          let feature_flags_spec =
-            let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =
-              (* Ensure that layout is the same *)
-              Plonk_types.Features.to_data feature_flags
-            in
-            let constant x =
-              Spec.T.Constant (x, (fun x y -> assert (Bool.equal x y)), B Bool)
-            in
-            let maybe_constant flag =
-              match flag with
-              | Plonk_types.Opt.Flag.Yes ->
-                  constant true
-              | Plonk_types.Opt.Flag.No ->
-                  constant false
-              | Plonk_types.Opt.Flag.Maybe ->
-                  Spec.T.B Bool
-            in
-            Spec.T.Struct
-              [ maybe_constant f1
-              ; maybe_constant f2
-              ; maybe_constant f3
-              ; maybe_constant f4
-              ; maybe_constant f5
-              ; maybe_constant f6
-              ; maybe_constant f7
-              ; maybe_constant f8
-              ]
-          in
+        let spec bp_log2 =
           Spec.T.Struct
             [ Vector (B Field, Nat.N5.n)
             ; Vector (B Digest, Nat.N1.n)
@@ -1254,8 +1256,6 @@ module Step = struct
             ; Vector (Scalar Challenge, Nat.N3.n)
             ; Vector (B Bulletproof_challenge, bp_log2)
             ; Vector (B Bool, Nat.N1.n)
-            ; feature_flags_spec
-            ; Wrap.Lookup_parameters.opt_spec impl lookup
             ]
 
         let to_data
@@ -1272,14 +1272,12 @@ module Step = struct
                      ; zeta_to_srs_length
                      ; zeta_to_domain_size
                      ; perm
-                     ; feature_flags
-                     ; lookup
                      }
                  }
              ; should_finalize
              ; sponge_digest_before_evaluations
              } :
-              _ t ) ~option_map ~to_opt =
+              _ t ) =
           let open Vector in
           let fq =
             [ combined_inner_product
@@ -1300,9 +1298,6 @@ module Step = struct
           ; scalar_challenge
           ; bulletproof_challenges
           ; bool
-          ; Plonk_types.Features.to_data feature_flags
-          ; option_map lookup
-              ~f:Deferred_values.Plonk.In_circuit.Lookup.to_struct
           ]
 
         let of_data
@@ -1319,10 +1314,7 @@ module Step = struct
               ; Vector.[ alpha; zeta; xi ]
               ; bulletproof_challenges
               ; Vector.[ should_finalize ]
-              ; feature_flags
-              ; lookup
-              ] ~feature_flags:flags ~option_map ~of_opt : _ t =
-          let feature_flags = Plonk_types.Features.of_data feature_flags in
+              ] : _ t =
           { deferred_values =
               { xi
               ; bulletproof_challenges
@@ -1336,47 +1328,18 @@ module Step = struct
                   ; zeta_to_srs_length
                   ; zeta_to_domain_size
                   ; perm
-                  ; feature_flags
-                  ; lookup =
-                      option_map lookup
-                        ~f:Deferred_values.Plonk.In_circuit.Lookup.of_struct
                   }
               }
           ; should_finalize
           ; sponge_digest_before_evaluations
           }
-
-        let map_lookup (t : _ t) ~f =
-          { t with
-            deferred_values =
-              { t.deferred_values with
-                plonk =
-                  { t.deferred_values.plonk with
-                    lookup = f t.deferred_values.plonk.lookup
-                  }
-              }
-          }
       end
 
-      let typ impl fq ~assert_16_bits ~zero ~feature_flags =
-        let open Deferred_values.Plonk.In_circuit.Lookup in
-        let lookup_config =
-          { Wrap.Lookup_parameters.use =
-              feature_flags.Plonk_types.Features.lookup
-          ; zero
-          }
-        in
+      let typ impl fq ~assert_16_bits ~zero =
         let open In_circuit in
-        Spec.typ impl fq ~assert_16_bits
-          (spec impl Backend.Tock.Rounds.n lookup_config feature_flags)
-        |> Snarky_backendless.Typ.transport
-             ~there:(to_data ~option_map:Option.map ~to_opt:Fn.id)
-             ~back:
-               (of_data ~option_map:Option.map ~feature_flags
-                  ~of_opt:Opt.to_option )
-        |> Snarky_backendless.Typ.transport_var
-             ~there:(to_data ~option_map:Opt.map ~to_opt:Opt.to_option_unsafe)
-             ~back:(of_data ~option_map:Opt.map ~feature_flags ~of_opt:Fn.id)
+        Spec.typ impl fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
+        |> Snarky_backendless.Typ.transport ~there:to_data ~back:of_data
+        |> Snarky_backendless.Typ.transport_var ~there:to_data ~back:of_data
     end
 
     type ('unfinalized_proofs, 'messages_for_next_step_proof) t =
@@ -1417,7 +1380,7 @@ module Step = struct
         , _ )
         Snarky_backendless.Typ.t =
       let per_proof feature_flags =
-        Per_proof.typ impl fq ~feature_flags ~assert_16_bits ~zero
+        Per_proof.typ impl fq ~assert_16_bits ~zero
       in
       let unfinalized_proofs =
         Vector.typ' (Vector.map proofs_verified ~f:per_proof)
@@ -1447,10 +1410,10 @@ module Step = struct
     let to_data
         { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
         ; messages_for_next_wrap_proof
-        } ~option_map ~to_opt =
+        } =
       let open Hlist.HlistId in
       [ Vector.map unfinalized_proofs
-          ~f:(Proof_state.Per_proof.In_circuit.to_data ~option_map ~to_opt)
+          ~f:Proof_state.Per_proof.In_circuit.to_data
       ; messages_for_next_step_proof
       ; messages_for_next_wrap_proof
       ]
@@ -1460,22 +1423,18 @@ module Step = struct
           [ unfinalized_proofs
           ; messages_for_next_step_proof
           ; messages_for_next_wrap_proof
-          ] ~feature_flags ~option_map ~of_opt =
+          ] =
       { proof_state =
           { unfinalized_proofs =
               Vector.map unfinalized_proofs
-                ~f:
-                  (Proof_state.Per_proof.In_circuit.of_data ~feature_flags
-                     ~option_map ~of_opt )
+                ~f:Proof_state.Per_proof.In_circuit.of_data
           ; messages_for_next_step_proof
           }
       ; messages_for_next_wrap_proof
       }
 
-    let spec impl proofs_verified bp_log2 lookup feature_flags =
-      let per_proof =
-        Proof_state.Per_proof.In_circuit.spec impl bp_log2 lookup feature_flags
-      in
+    let spec proofs_verified bp_log2 =
+      let per_proof = Proof_state.Per_proof.In_circuit.spec bp_log2 in
       Spec.T.Struct
         [ Vector (per_proof, proofs_verified)
         ; B Digest

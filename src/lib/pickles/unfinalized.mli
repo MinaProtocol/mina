@@ -38,10 +38,6 @@ type t =
   , Impls.Step.Boolean.var )
   Import.Types.Step.Proof_state.Per_proof.In_circuit.t
 
-val typ :
-     wrap_rounds:'a
-  -> feature_flags:
-       Pickles_types.Plonk_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
-  -> (t, Constant.t) Impls.Step.Typ.t
+val typ : wrap_rounds:'a -> (t, Constant.t) Impls.Step.Typ.t
 
 val dummy : unit -> t

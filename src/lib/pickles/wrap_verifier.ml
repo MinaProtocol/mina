@@ -905,9 +905,7 @@ struct
     let xi = scalar_to_field xi in
     (* TODO: r actually does not need to be a scalar challenge. *)
     let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
-    let plonk_minimal =
-      Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option_unsafe
-    in
+    let plonk_minimal = Plonk.to_minimal ~false_:Boolean.false_ plonk in
     let combined_evals =
       let n = Common.Max_degree.wrap_log2 in
       (* TODO: zeta_n is recomputed in [env] below *)
@@ -1031,7 +1029,8 @@ struct
             (module Impl)
             ~env ~shift:shift2
             (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-             .to_wrap plonk )
+             .to_wrap ~opt_none:Plonk_types.Opt.None ~false_:Boolean.false_
+               plonk )
             combined_evals )
     in
     print_bool "xi_correct" xi_correct ;

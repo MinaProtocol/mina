@@ -506,6 +506,8 @@ struct
           tock_combined_evals
         |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
            .of_wrap
+             ~assert_none:(fun x -> assert (Option.is_none (Opt.to_option x)))
+             ~assert_false:(fun x -> assert (not x))
       in
       let shifted_value =
         Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2
@@ -518,15 +520,6 @@ struct
                 ; alpha = plonk0.alpha
                 ; beta = chal plonk0.beta
                 ; gamma = chal plonk0.gamma
-                ; lookup =
-                    Option.map (Opt.to_option_unsafe plonk.lookup) ~f:(fun l ->
-                        { Composition_types.Wrap.Proof_state.Deferred_values
-                          .Plonk
-                          .In_circuit
-                          .Lookup
-                          .joint_combiner =
-                            Option.value_exn plonk0.joint_combiner
-                        } )
                 }
             ; combined_inner_product = shifted_value combined_inner_product
             ; xi

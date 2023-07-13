@@ -116,9 +116,12 @@ module Constant = struct
          Plonk_checks.derive_plonk (module Field) ~env ~shift chals evals
          |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
             .of_wrap
+              ~assert_none:(fun x ->
+                assert (Option.is_none (Plonk_types.Opt.to_option x)) )
+              ~assert_false:(fun x -> assert (not x))
        in
        { deferred_values =
-           { plonk = { plonk with alpha; beta; gamma; zeta; lookup = None }
+           { plonk = { plonk with alpha; beta; gamma; zeta }
            ; combined_inner_product = Shifted_value (tock ())
            ; xi = Scalar_challenge.create one_chal
            ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
@@ -129,8 +132,8 @@ module Constant = struct
        } )
 end
 
-let typ ~wrap_rounds ~feature_flags : (t, Constant.t) Typ.t =
-  Types.Step.Proof_state.Per_proof.typ ~feature_flags
+let typ ~wrap_rounds : (t, Constant.t) Typ.t =
+  Types.Step.Proof_state.Per_proof.typ
     (module Impl)
     (Shifted_value.typ Other_field.typ)
     ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
@@ -140,7 +143,6 @@ let dummy : unit -> t =
   Memo.unit (fun () ->
       let (Typ { var_of_fields; value_to_fields; _ }) =
         typ ~wrap_rounds:Backend.Tock.Rounds.n
-          ~feature_flags:Plonk_types.Features.none
       in
       let xs, aux = value_to_fields (Lazy.force Constant.dummy) in
       var_of_fields (Array.map ~f:Field.constant xs, aux) )
