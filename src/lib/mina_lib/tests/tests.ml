@@ -101,17 +101,17 @@ let%test_module "Epoch ledger sync tests" =
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
           ~log_gossip_heard:false
       in
-      let%bind snark_remote_sink =
+      let snark_remote_sink =
         let config =
           Network_pool.Snark_pool.Resource_pool.make_config ~verifier
             ~trust_system
             ~disk_location:(make_dirname "snark_pool_config")
         in
-        let%map _snark_pool, snark_remote_sink, _snark_local_sink =
-          Network_pool.Snark_pool.load ~allow_multiple_instances_for_tests:true
-            ~config ~constraint_constants ~consensus_constants ~time_controller
-            ~logger ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-            ~on_remote_push ~log_gossip_heard:false ()
+        let _snark_pool, snark_remote_sink, _snark_local_sink =
+          Network_pool.Snark_pool.create ~config ~constraint_constants
+            ~consensus_constants ~time_controller ~logger
+            ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
+            ~log_gossip_heard:false
         in
         snark_remote_sink
       in

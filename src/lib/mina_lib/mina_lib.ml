@@ -1344,7 +1344,7 @@ let start t =
       ~log_block_creation:t.config.log_block_creation
       ~block_reward_threshold:t.config.block_reward_threshold
       ~block_produced_bvar:t.components.block_produced_bvar
-      ~vrf_evaluation_state:t.vrf_evaluation_state ;
+      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -1786,14 +1786,14 @@ let create ?wallets (config : Config.t) =
               ~trust_system:config.trust_system
               ~disk_location:config.snark_pool_disk_location
           in
-          let%bind snark_pool, snark_remote_sink, snark_local_sink =
-            Network_pool.Snark_pool.load ~config:snark_pool_config
+          let snark_pool, snark_remote_sink, snark_local_sink =
+            Network_pool.Snark_pool.create ~config:snark_pool_config
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~on_remote_push:notify_online
               ~log_gossip_heard:
-                config.net_config.log_gossip_heard.snark_pool_diff ()
+                config.net_config.log_gossip_heard.snark_pool_diff
           in
           let block_reader, block_sink =
             Transition_handler.Block_sink.create
@@ -2056,9 +2056,6 @@ let create ?wallets (config : Config.t) =
                             valid_cb
                       | `Internal ->
                           (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
-                          don't_wait_for
-                            (Mina_networking.broadcast_state net
-                               (Mina_block.Validated.forget transition) ) ;
                           Option.iter
                             ~f:
                               (Fn.flip

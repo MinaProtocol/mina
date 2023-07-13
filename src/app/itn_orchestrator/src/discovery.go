@@ -2,6 +2,7 @@ package itn_orchestrator
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -25,8 +26,10 @@ type Node struct {
 
 type DiscoveryParams struct {
 	OffsetMin          int
-	Limit              int
-	OnlyBlockProducers bool `json:"omitempty"`
+	Limit              int  `json:",omitempty"`
+	OnlyBlockProducers bool `json:",omitempty"`
+	NoBlockProducers   bool `json:",omitempty"`
+	Exactly            bool `json:",omitempty"`
 }
 
 func DiscoverParticipants(config Config, params DiscoveryParams, output func(NodeAddress)) error {
@@ -64,9 +67,12 @@ func DiscoverParticipants(config Config, params DiscoveryParams, output func(Nod
 		if _, has := cache[addr]; has {
 			continue
 		}
-		_, err = config.GetGqlClient(ctx, addr)
+		_, _, err = GetGqlClient(config, addr)
 		if err != nil {
 			log.Errorf("Error on auth for %s: %v", addr, err)
+			continue
+		}
+		if config.NodeData[addr].IsBlockProducer && params.NoBlockProducers {
 			continue
 		}
 		if !config.NodeData[addr].IsBlockProducer && params.OnlyBlockProducers {
@@ -78,12 +84,15 @@ func DiscoverParticipants(config Config, params DiscoveryParams, output func(Nod
 			break
 		}
 	}
+	if len(cache) != params.Limit && params.Exactly {
+		return errors.New("failed to discover the exact number of nodes")
+	}
 	return nil
 }
 
-type DiscoverParticipantsAction struct{}
+type DiscoveryAction struct{}
 
-func (DiscoverParticipantsAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
+func (DiscoveryAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
 	var params DiscoveryParams
 	if err := json.Unmarshal(rawParams, &params); err != nil {
 		return err
@@ -93,4 +102,6 @@ func (DiscoverParticipantsAction) Run(config Config, rawParams json.RawMessage, 
 	})
 }
 
-var _ Action = DiscoverParticipantsAction{}
+func (DiscoveryAction) Name() string { return "discovery" }
+
+var _ Action = DiscoveryAction{}
