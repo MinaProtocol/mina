@@ -516,7 +516,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~account_id:(get_account_id snark_node_key2.keypair.public_key)
          in
          let key_2_balance_expected =
-           Currency.Amount.of_mina_string_exn config.snark_worker_fee
+           Currency.Amount.of_mina_string_exn "0.0001"
          in
          if
            Currency.Amount.( >= )
