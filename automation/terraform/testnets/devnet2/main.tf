@@ -88,7 +88,7 @@ module "testnet_east" {
   mina_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
   mina_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
   mina_points_image  = "codaprotocol/coda-points-hack:32b.4"
-  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
+  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.13"
 
   archive_node_count  = 3
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fd3980820fb82c7355af49462ffefe6718800b77/src/app/archive/create_schema.sql" 
