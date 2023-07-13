@@ -298,4 +298,6 @@ func (AllocateSlotsAction) Run(config Config, rawParams json.RawMessage, output 
 	})
 }
 
+func (AllocateSlotsAction) Name() string { return "allocate-slots" }
+
 var _ Action = AllocateSlotsAction{}
