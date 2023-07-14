@@ -17,7 +17,7 @@ func Isolate(config Config, params IsolateParams) error {
 		host := string(address[:strings.IndexRune(string(address), ':')])
 		nd, has := config.NodeData[address]
 		if !has {
-			_, err := config.GetGqlClient(config.Ctx, address)
+			_, _, err := GetGqlClient(config, address)
 			if err != nil {
 				return fmt.Errorf("failed to authenticate peer %s: %v", address, err)
 			}
@@ -30,14 +30,10 @@ func Isolate(config Config, params IsolateParams) error {
 		}
 	}
 	for i, address := range params.Participants {
-		client, err := config.GetGqlClient(config.Ctx, address)
-		if err != nil {
-			return fmt.Errorf("failed to create a client for %s: %v", address, err)
-		}
 		addedPeers := make([]NetworkPeer, len(peers)-1)
 		copy(addedPeers, peers[:i])
 		copy(addedPeers[i:], peers[i+1:])
-		_, err = UpdateGatingGql(config.Ctx, client, GatingUpdate{
+		err := UpdateGatingGql(config, address, GatingUpdate{
 			AddedPeers:      addedPeers,
 			Isolate:         true,
 			CleanAddedPeers: true,
@@ -45,7 +41,7 @@ func Isolate(config Config, params IsolateParams) error {
 			TrustedPeers:    addedPeers,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to update gating for %s: %v", address, err)
+			return err
 		}
 	}
 	return nil
@@ -60,6 +56,8 @@ func (IsolateAction) Run(config Config, rawParams json.RawMessage, output Output
 	}
 	return Isolate(config, params)
 }
+
+func (IsolateAction) Name() string { return "isolate" }
 
 var _ Action = IsolateAction{}
 
@@ -78,27 +76,19 @@ func ResetGating(config Config, params ResetGatingParams) error {
 			Host:       host,
 		})
 	}
+	gatingUpdate1 := GatingUpdate{
+		AddedPeers:      make([]NetworkPeer, 0),
+		Isolate:         false,
+		CleanAddedPeers: false,
+		BannedPeers:     make([]NetworkPeer, 0),
+		TrustedPeers:    make([]NetworkPeer, 0),
+	}
 	for _, address := range params.Participants {
-		client, err := config.GetGqlClient(config.Ctx, address)
-		if err != nil {
-			return fmt.Errorf("failed to create a client for %s: %v", address, err)
-		}
-		_, err = UpdateGatingGql(config.Ctx, client, GatingUpdate{
-			AddedPeers:      make([]NetworkPeer, 0),
-			Isolate:         false,
-			CleanAddedPeers: false,
-			BannedPeers:     make([]NetworkPeer, 0),
-			TrustedPeers:    make([]NetworkPeer, 0),
-		})
-		if err != nil {
+		if err := UpdateGatingGql(config, address, gatingUpdate1); err != nil {
 			return fmt.Errorf("failed to update gating for %s: %v", address, err)
 		}
 	}
 	for _, address := range params.Participants {
-		client, err := config.GetGqlClient(config.Ctx, address)
-		if err != nil {
-			return fmt.Errorf("failed to create a client for %s: %v", address, err)
-		}
 		var somePeers []NetworkPeer
 		if params.AddRandomPeers >= len(peers)-1 {
 			somePeers = peers
@@ -122,15 +112,15 @@ func ResetGating(config Config, params ResetGatingParams) error {
 				somePeers = append(somePeers, peers[ix])
 			}
 		}
-		_, err = UpdateGatingGql(config.Ctx, client, GatingUpdate{
+		gatingUpdate2 := GatingUpdate{
 			AddedPeers:      somePeers,
 			Isolate:         false,
 			CleanAddedPeers: false,
 			BannedPeers:     make([]NetworkPeer, 0),
 			TrustedPeers:    make([]NetworkPeer, 0),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update gating for %s: %v", address, err)
+		}
+		if err := UpdateGatingGql(config, address, gatingUpdate2); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -145,5 +135,7 @@ func (ResetGatingAction) Run(config Config, rawParams json.RawMessage, output Ou
 	}
 	return ResetGating(config, params)
 }
+
+func (ResetGatingAction) Name() string { return "reset-gating" }
 
 var _ Action = ResetGatingAction{}
