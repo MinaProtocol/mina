@@ -485,7 +485,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "change snark work fee from 0.0002 to 0.0001"
         (Integration_test_lib.Graphql_requests.must_set_snark_work_fee ~logger
            (Network.Node.get_ingress_uri snark_coordinator)
-           ~new_snark_work_fee:1 )
+           ~new_snark_work_fee:100000 )
     in
     let%bind () =
       section_hard
