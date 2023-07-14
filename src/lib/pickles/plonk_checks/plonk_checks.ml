@@ -109,7 +109,6 @@ type 'bool all_feature_flags =
   ; table_width_at_least_1 : 'bool Lazy.t
   ; table_width_at_least_2 : 'bool Lazy.t
   ; table_width_3 : 'bool Lazy.t
-  ; lookups_per_row_2 : 'bool Lazy.t
   ; lookups_per_row_3 : 'bool Lazy.t
   ; lookups_per_row_4 : 'bool Lazy.t
   ; lookup_pattern_xor : 'bool Lazy.t
@@ -142,7 +141,7 @@ let expand_feature_flags (type boolean)
   in
   (* Make sure these stay up-to-date with the layouts!! *)
   let table_width_3 =
-    (* Xor, ChaChaFinal have max_joint_size = 3 *)
+    (* Xor have max_joint_size = 3 *)
     lookup_pattern_xor
   in
   let table_width_at_least_2 =
@@ -150,7 +149,7 @@ let expand_feature_flags (type boolean)
     lazy (B.( ||| ) (Lazy.force table_width_3) lookup)
   in
   let table_width_at_least_1 =
-    (* RangeCheck, ForeignFieldMul have max_joint_size = 2 *)
+    (* RangeCheck, ForeignFieldMul have max_joint_size = 1 *)
     lazy
       (B.any
          [ Lazy.force table_width_at_least_2
@@ -159,20 +158,19 @@ let expand_feature_flags (type boolean)
          ] )
   in
   let lookups_per_row_4 =
-    (* Xor, ChaChaFinal, RangeCheckGate have max_lookups_per_row = 4 *)
+    (* Xor, RangeCheckGate, ForeignFieldMul, have max_lookups_per_row = 4 *)
     lazy
-      (B.( ||| )
-         (Lazy.force lookup_pattern_xor)
-         (Lazy.force lookup_pattern_range_check) )
+      (B.any
+         [ Lazy.force lookup_pattern_xor
+         ; Lazy.force lookup_pattern_range_check
+         ; foreign_field_mul
+         ] )
   in
   let lookups_per_row_3 =
     (* Lookup has max_lookups_per_row = 3 *)
     lazy (B.( ||| ) (Lazy.force lookups_per_row_4) lookup)
   in
-  let lookups_per_row_2 =
-    (* ForeignFieldMul has max_lookups_per_row = 2 *)
-    lazy (B.( ||| ) (Lazy.force lookups_per_row_3) foreign_field_mul)
-  in
+
   { lookup_tables
   ; table_width_at_least_1
   ; table_width_at_least_2
@@ -245,10 +243,8 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
       None
   | LookupsPerRow 4 ->
       Some (Lazy.force feature_flags.lookups_per_row_4)
-  | LookupsPerRow 3 ->
+  | LookupsPerRow i when i <= 3 ->
       Some (Lazy.force feature_flags.lookups_per_row_3)
-  | LookupsPerRow i when i <= 2 ->
-      Some (Lazy.force feature_flags.lookups_per_row_2)
   | LookupsPerRow _ ->
       None
   | LookupPattern Lookup ->
