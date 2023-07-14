@@ -61,6 +61,18 @@ let verify_heterogenous (ts : Instance.t list) =
                  } ) )
          ->
         Timer.start __LOC__ ;
+        let non_chunking =
+          let single_chunk = ref true in
+          let _unit_evals =
+            Pickles_types.Plonk_types.Evals.map evals.evals.evals
+              ~f:(fun (x, y) ->
+                single_chunk :=
+                  !single_chunk && Array.length x = 1 && Array.length y = 1 )
+          in
+          !single_chunk
+        in
+        check (lazy "only uses single chunks", non_chunking) ;
+        Timer.start __LOC__ ;
         let open Types.Wrap.Proof_state in
         let step_domain =
           Branch_data.domain proof_state.deferred_values.branch_data
