@@ -479,11 +479,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ( snark_node_key2.keypair.public_key
              |> Signature_lib.Public_key.compress ) )
     in
+    let new_snark_work_fee = Currency.Amount.of_mina_string_exn "0.0001" in
     let%bind () =
       section_hard "change snark work fee from 0.0002 to 0.0001"
         (Integration_test_lib.Graphql_requests.must_set_snark_work_fee ~logger
            (Network.Node.get_ingress_uri snark_coordinator)
-           ~new_snark_work_fee:100000 )
+           ~new_snark_work_fee:(Currency.Amount.to_nanomina_int new_snark_work_fee) )
     in
     let%bind () =
       section_hard
@@ -515,13 +516,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.get_ingress_uri untimed_node_a)
              ~account_id:(get_account_id snark_node_key2.keypair.public_key)
          in
-         let key_2_balance_expected =
-           Currency.Amount.of_mina_string_exn "0.0001"
-         in
          if
            Currency.Amount.( >= )
              (Currency.Balance.to_amount key_2_balance_actual)
-             key_2_balance_expected
+             new_snark_work_fee
          then (
            [%log info]
              "balance check successful.  \n\
@@ -530,7 +528,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               snark-node-key2 expected balance: %s"
              (Currency.Balance.to_mina_string key_1_balance_actual)
              (Currency.Balance.to_mina_string key_2_balance_actual)
-             (Currency.Amount.to_mina_string key_2_balance_expected) ;
+             (Currency.Amount.to_mina_string new_snark_work_fee) ;
 
            Malleable_error.return () )
          else
@@ -541,7 +539,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               snark-node-key2 expected balance: %s"
              (Currency.Balance.to_mina_string key_1_balance_actual)
              (Currency.Balance.to_mina_string key_2_balance_actual)
-             (Currency.Amount.to_mina_string key_2_balance_expected) )
+             (Currency.Amount.to_mina_string new_snark_work_fee) )
     in
     section_hard "running replayer"
       (let%bind logs =
