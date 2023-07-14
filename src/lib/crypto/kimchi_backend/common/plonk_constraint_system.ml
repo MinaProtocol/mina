@@ -4,6 +4,11 @@ open Unsigned.Size_t
 
 (* TODO: open Core here instead of opening it multiple times below *)
 
+module RuntimeTableConfiguration = struct
+  type 'f t = 'f Kimchi_types.runtime_table_cfg =
+    { id : int32; first_column : 'f array }
+end
+
 module Kimchi_gate_type = struct
   (* Alias to allow deriving sexp *)
   type t = Kimchi_types.gate_type =
@@ -730,6 +735,7 @@ type ('f, 'rust_gates) t =
              as well.
         *)
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
+  ; runtime_table_cfgs : 'f RuntimeTableConfiguration.t list
   }
 
 let get_public_input_size sys = sys.public_input_size
@@ -916,6 +922,7 @@ end = struct
     ; pending_generic_gate = None
     ; cached_constants = Hashtbl.create (module Fp)
     ; union_finds = V.Table.create ()
+    ; runtime_table_cfgs = []
     }
 
   (** Returns the number of auxiliary inputs. *)
