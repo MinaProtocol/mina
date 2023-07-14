@@ -123,6 +123,7 @@ module Permuts_vec = Vector.Vector_7
 module Permuts = Nat.N7
 module Permuts_minus_1 = Nat.N6
 module Permuts_minus_1_vec = Vector.Vector_6
+module Lookup_sorted_vec = Vector.Vector_5
 
 module Messages : sig
   module Poly : sig
@@ -213,7 +214,7 @@ module Evals : sig
       ; rot_selector : ('f, 'bool) Opt.t
       ; lookup_aggregation : ('f, 'bool) Opt.t
       ; lookup_table : ('f, 'bool) Opt.t
-      ; lookup_sorted : ('f, 'bool) Opt.t array
+      ; lookup_sorted : ('f, 'bool) Opt.t Lookup_sorted_vec.t
       ; runtime_lookup_table : ('f, 'bool) Opt.t
       ; runtime_lookup_table_selector : ('f, 'bool) Opt.t
       ; xor_lookup_selector : ('f, 'bool) Opt.t
@@ -263,7 +264,7 @@ module Evals : sig
     ; rot_selector : 'a option
     ; lookup_aggregation : 'a option
     ; lookup_table : 'a option
-    ; lookup_sorted : 'a option array
+    ; lookup_sorted : 'a option Lookup_sorted_vec.t
     ; runtime_lookup_table : 'a option
     ; runtime_lookup_table_selector : 'a option
     ; xor_lookup_selector : 'a option

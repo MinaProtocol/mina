@@ -276,7 +276,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; lookup_aggregation
     ; lookup_table
     ; lookup_sorted =
-        Array.init 5 ~f:(fun i ->
+        Vector.init Nat.N5.n ~f:(fun i ->
             Option.try_with_join (fun () -> lookup_sorted.(i)) )
     ; runtime_lookup_table
     ; runtime_lookup_table_selector
@@ -365,9 +365,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; rot_selector
     ; lookup_aggregation
     ; lookup_table
-    ; lookup_sorted =
-        Array.init 5 ~f:(fun i ->
-            Option.try_with_join (fun () -> lookup_sorted.(i)) )
+    ; lookup_sorted = Vector.to_array lookup_sorted
     ; runtime_lookup_table
     ; runtime_lookup_table_selector
     ; xor_lookup_selector

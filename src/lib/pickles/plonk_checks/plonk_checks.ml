@@ -310,7 +310,8 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     | LookupTable ->
         get_eval (Opt.value_exn e.lookup_table)
     | LookupSorted i ->
-        get_eval (Opt.value_exn e.lookup_sorted.(i))
+        get_eval
+          (Opt.value_exn (Option.value_exn (Vector.nth e.lookup_sorted i)))
     | LookupAggreg ->
         get_eval (Opt.value_exn e.lookup_aggregation)
     | LookupRuntimeTable ->
