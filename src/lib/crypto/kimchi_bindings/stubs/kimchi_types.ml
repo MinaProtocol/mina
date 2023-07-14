@@ -186,7 +186,12 @@ module VerifierIndex = struct
     type nonrec lookup_info =
       { max_per_row : int; max_joint_size : int; features : lookup_features }
 
-    type nonrec 't lookup_selectors = { lookup : 't option } [@@boxed]
+    type nonrec 't lookup_selectors =
+      { lookup : 't option
+      ; xor : 't option
+      ; range_check : 't option
+      ; ffmul : 't option
+      }
 
     type nonrec 'poly_comm t =
       { joint_lookup_used : bool
