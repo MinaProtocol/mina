@@ -611,8 +611,7 @@ module Protocol_circuits = struct
     ()
 
   let blockchain () : unit =
-    let expected = "86b438a7a0876894739663a91c0d3c79" in
-
+    let expected = "3bfa747c59356e008201cc8e6af10f77" in
     let digest =
       Blockchain_snark.Blockchain_snark_state.constraint_system_digests
     in
@@ -628,7 +627,7 @@ module Protocol_circuits = struct
 
   let transaction () : unit =
     let expected1 = "b8879f677f622a1d86648030701f43e1" in
-    let expected2 = "de7b52316bf9a5feaef2bf4295294ee9" in
+    let expected2 = "dc5ff6a480ceb21b1e0333d2b0262b67" in
     let digest =
       Transaction_snark.constraint_system_digests ~constraint_constants ()
     in
