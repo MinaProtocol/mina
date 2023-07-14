@@ -31,6 +31,9 @@ pub enum CamlLookupsUsed {
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlLookupSelectors<T> {
     pub lookup: Option<T>,
+    pub xor: Option<T>,
+    pub range_check: Option<T>,
+    pub ffmul: Option<T>,
 }
 
 impl<G, CamlPolyComm> From<LookupSelectors<PolyComm<G>>> for CamlLookupSelectors<CamlPolyComm>
@@ -40,13 +43,16 @@ where
 {
     fn from(val: LookupSelectors<PolyComm<G>>) -> Self {
         let LookupSelectors {
-            xor: _,
+            xor,
             lookup,
-            range_check: _,
-            ffmul: _,
+            range_check,
+            ffmul,
         } = val;
         CamlLookupSelectors {
             lookup: lookup.map(From::from),
+            xor: xor.map(From::from),
+            range_check: range_check.map(From::from),
+            ffmul: ffmul.map(From::from),
         }
     }
 }
@@ -57,12 +63,17 @@ where
     PolyComm<G>: From<CamlPolyComm>,
 {
     fn from(val: CamlLookupSelectors<CamlPolyComm>) -> Self {
-        let CamlLookupSelectors { lookup } = val;
+        let CamlLookupSelectors {
+            xor,
+            lookup,
+            range_check,
+            ffmul,
+        } = val;
         LookupSelectors {
-            xor: None,
             lookup: lookup.map(From::from),
-            range_check: None,
-            ffmul: None,
+            xor: xor.map(From::from),
+            range_check: range_check.map(From::from),
+            ffmul: ffmul.map(From::from),
         }
     }
 }
