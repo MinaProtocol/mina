@@ -536,7 +536,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               snark-worker-fee: %s"
              (Currency.Balance.to_formatted_string key_1_balance_actual)
              (Currency.Balance.to_formatted_string key_2_balance_actual)
-             config.snark_worker_fee ;
+             (Currency.Amount.to_formatted_string key_2_balance_expected) ;
 
            Malleable_error.return () )
          else
@@ -547,7 +547,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               snark-worker-fee: %s"
              (Currency.Balance.to_formatted_string key_1_balance_actual)
              (Currency.Balance.to_formatted_string key_2_balance_actual)
-             config.snark_worker_fee )
+             (Currency.Amount.to_formatted_string key_2_balance_expected) )
     in
     section_hard "running replayer"
       (let%bind logs =
