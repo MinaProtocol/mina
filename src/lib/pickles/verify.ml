@@ -72,6 +72,11 @@ let verify_heterogenous (ts : Instance.t list) =
           !single_chunk
         in
         check (lazy "only uses single chunks", non_chunking) ;
+        check
+          ( lazy "feature flags are consistent with evaluations"
+          , Pickles_types.Plonk_types.Evals.validate_feature_flags
+              ~feature_flags:proof_state.deferred_values.plonk.feature_flags
+              evals.evals.evals ) ;
         Timer.start __LOC__ ;
         let open Types.Wrap.Proof_state in
         let step_domain =

@@ -391,6 +391,69 @@ module Evals = struct
     end
   end]
 
+  let validate_feature_flags ~feature_flags:(f : bool Features.t)
+      { w = _
+      ; coefficients = _
+      ; z = _
+      ; s = _
+      ; generic_selector = _
+      ; poseidon_selector = _
+      ; complete_add_selector = _
+      ; mul_selector = _
+      ; emul_selector = _
+      ; endomul_scalar_selector = _
+      ; range_check0_selector
+      ; range_check1_selector
+      ; foreign_field_add_selector
+      ; foreign_field_mul_selector
+      ; xor_selector
+      ; rot_selector
+      ; lookup_aggregation
+      ; lookup_table
+      ; lookup_sorted
+      ; runtime_lookup_table
+      ; runtime_lookup_table_selector
+      ; xor_lookup_selector
+      ; lookup_gate_lookup_selector
+      ; range_check_lookup_selector
+      ; foreign_field_mul_lookup_selector
+      } =
+    let enable_if x flag = Bool.(Option.is_some x = flag) in
+    let range_check_lookup = f.range_check0 || f.range_check1 || f.rot in
+    let lookups_per_row_4 = f.xor || range_check_lookup in
+    let lookups_per_row_3 = lookups_per_row_4 || f.lookup in
+    let lookups_per_row_2 = lookups_per_row_3 || f.foreign_field_mul in
+    Array.reduce_exn ~f:( && )
+      [| enable_if range_check0_selector f.range_check0
+       ; enable_if range_check1_selector f.range_check1
+       ; enable_if foreign_field_add_selector f.foreign_field_add
+       ; enable_if foreign_field_mul_selector f.foreign_field_mul
+       ; enable_if xor_selector f.xor
+       ; enable_if rot_selector f.rot
+       ; enable_if lookup_aggregation lookups_per_row_2
+       ; enable_if lookup_table lookups_per_row_2
+       ; Vector.foldi lookup_sorted ~init:true ~f:(fun i acc x ->
+             let flag =
+               (* NB: lookups_per_row + 1 in sorted, due to the lookup table. *)
+               match i with
+               | 0 | 1 | 2 ->
+                   lookups_per_row_2
+               | 3 ->
+                   lookups_per_row_3
+               | 4 ->
+                   lookups_per_row_4
+               | _ ->
+                   assert false
+             in
+             acc && enable_if x flag )
+       ; enable_if runtime_lookup_table f.runtime_tables
+       ; enable_if runtime_lookup_table_selector f.runtime_tables
+       ; enable_if xor_lookup_selector f.xor
+       ; enable_if lookup_gate_lookup_selector f.lookup
+       ; enable_if range_check_lookup_selector range_check_lookup
+       ; enable_if foreign_field_mul_lookup_selector f.foreign_field_mul
+      |]
+
   let to_absorption_sequence
       { w
       ; coefficients

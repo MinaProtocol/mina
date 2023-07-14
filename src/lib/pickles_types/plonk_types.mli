@@ -273,6 +273,10 @@ module Evals : sig
     ; foreign_field_mul_lookup_selector : 'a option
     }
 
+  (** {4 Generic helpers} *)
+
+  val validate_feature_flags : feature_flags:bool Features.t -> 'a t -> bool
+
   (** {4 Iterators} *)
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
