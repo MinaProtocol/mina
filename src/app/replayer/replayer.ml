@@ -118,31 +118,14 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
 let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t =
   Int64.Table.create ()
 
-(* the starting slot may not have a block, so there may not be an entry in the table
-    of hashes
-   look at the predecessor slots until we find an entry
-   this search should only happen on the start slot, all other slots
-    come from commands in blocks, for which we have an entry in the table
-*)
 let get_slot_hashes ~logger slot =
-  let rec go curr_slot =
-    if Int64.is_negative curr_slot then (
+  match Hashtbl.find global_slot_hashes_tbl slot with
+  | None ->
       [%log fatal]
-        "Could not find state and ledger hashes for slot %Ld, despite trying \
-         all predecessor slots"
-        slot ;
-      Core.exit 1 ) ;
-    match Hashtbl.find global_slot_hashes_tbl curr_slot with
-    | None ->
-        [%log info]
-          "State and ledger hashes not available at slot since genesis %Ld, \
-           will try predecessor slot"
-          curr_slot ;
-        go (Int64.pred curr_slot)
-    | Some hashes ->
-        hashes
-  in
-  go slot
+        "State and ledger hashes not available at slot since genesis %Ld" slot ;
+      Core.exit 1
+  | Some hashes ->
+      hashes
 
 (* cache of account keys *)
 let pk_tbl : (int, Account.key) Hashtbl.t = Int.Table.create ()
@@ -1215,27 +1198,36 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             ~next_epoch_ledger
         in
         let log_ledger_hash_after_last_slot () =
-          let _state_hash, expected_ledger_hash =
-            get_slot_hashes ~logger last_global_slot_since_genesis
-          in
-          if Ledger_hash.equal (Ledger.merkle_root ledger) expected_ledger_hash
+          (* don't check for matching ledger hash at start of replay, we haven't replayed
+             anything
+          *)
+          if
+            Int64.( > ) last_global_slot_since_genesis
+              input.start_slot_since_genesis
           then
-            [%log info]
-              "Applied all commands at global slot since genesis %Ld, got \
-               expected ledger hash"
-              ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ]
-              last_global_slot_since_genesis
-          else (
-            [%log error]
-              "Applied all commands at global slot since genesis %Ld, ledger \
-               hash differs from expected ledger hash"
-              ~metadata:
-                [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
-                ; ( "expected_ledger_hash"
-                  , Ledger_hash.to_yojson expected_ledger_hash )
-                ]
-              last_global_slot_since_genesis ;
-            if continue_on_error then incr error_count else Core_kernel.exit 1 )
+            let _state_hash, expected_ledger_hash =
+              get_slot_hashes ~logger last_global_slot_since_genesis
+            in
+            if
+              Ledger_hash.equal (Ledger.merkle_root ledger) expected_ledger_hash
+            then
+              [%log info]
+                "Applied all commands at global slot since genesis %Ld, got \
+                 expected ledger hash"
+                ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ]
+                last_global_slot_since_genesis
+            else (
+              [%log error]
+                "Applied all commands at global slot since genesis %Ld, ledger \
+                 hash differs from expected ledger hash"
+                ~metadata:
+                  [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
+                  ; ( "expected_ledger_hash"
+                    , Ledger_hash.to_yojson expected_ledger_hash )
+                  ]
+                last_global_slot_since_genesis ;
+              if continue_on_error then incr error_count else Core_kernel.exit 1
+              )
         in
         let log_state_hash_on_next_slot curr_global_slot_since_genesis =
           let state_hash, _ledger_hash =
@@ -1308,7 +1300,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
         | [], [] ->
             log_ledger_hash_after_last_slot () ;
             Deferred.return
-              (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
+              ( last_global_slot_since_genesis
+              , staking_epoch_ledger
+              , staking_seed
+              , next_epoch_ledger
+              , next_seed )
         | [], uc :: ucs ->
             run_actions_on_slot_change uc.global_slot_since_genesis ;
             let%bind () =
@@ -1370,8 +1366,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       [%log info] "At start global slot %Ld, ledger hash"
         start_slot_since_genesis
         ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ] ;
-      let%bind staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed
-          =
+      let%bind ( last_global_slot_since_genesis
+               , staking_epoch_ledger
+               , staking_seed
+               , next_epoch_ledger
+               , next_seed ) =
         apply_commands sorted_internal_cmds sorted_user_cmds
           ~last_global_slot_since_genesis:start_slot_since_genesis
           ~last_block_id:oldest_block_id ~staking_epoch_ledger:ledger
@@ -1379,8 +1378,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       in
       match input.target_epoch_ledgers_state_hash with
       | None ->
-          [%log info] "No target epoch ledger supplied, not writing output" ;
-          return ()
+          write_replayer_checkpoint ~logger ~ledger
+            ~last_global_slot_since_genesis
       | Some target_epoch_ledgers_state_hash -> (
           match output_file_opt with
           | None ->
