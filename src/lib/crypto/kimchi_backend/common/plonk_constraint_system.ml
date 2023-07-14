@@ -308,6 +308,7 @@ module Plonk_constraint = struct
           ; bound_crumb7 : 'v
           ; (* Coefficients *) two_to_rot : 'f (* Rotation scalar 2^rot *)
           }
+      | RegisterRuntimeTable of { id : int32; first_column : 'v array }
       | Raw of
           { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
     [@@deriving sexp]
@@ -613,6 +614,8 @@ module Plonk_constraint = struct
             ; bound_crumb7 = f bound_crumb7
             ; (* Coefficients *) two_to_rot
             }
+      | RegisterRuntimeTable { id; first_column } ->
+          RegisterRuntimeTable { id; first_column = Array.map ~f first_column }
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
 
@@ -2086,6 +2089,7 @@ end = struct
           |]
         in
         add_row sys vars_curr Rot64 [| two_to_rot |]
+    | Plonk_constraint.T (RegisterRuntimeTable {id; first_column}) ->
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->
