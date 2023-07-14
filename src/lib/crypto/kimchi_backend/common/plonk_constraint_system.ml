@@ -728,6 +728,7 @@ type ('f, 'rust_gates) t =
              as well.
         *)
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
+  ; runtime_table_cfgs : 'f Kimchi_types.runtime_table_cfg list
   }
 
 let get_public_input_size sys = sys.public_input_size
@@ -759,6 +760,8 @@ module Make
   type nonrec t = (Fp.t, Gates.t) t
 
   val create : unit -> t
+
+  val get_runtime_table_cfgs : t -> Fp.t Kimchi_types.runtime_table_cfg array
 
   val get_public_input_size : t -> int Set_once.t
 
@@ -913,7 +916,10 @@ end = struct
     ; pending_generic_gate = None
     ; cached_constants = Hashtbl.create (module Fp)
     ; union_finds = V.Table.create ()
+    ; runtime_table_cfgs = []
     }
+
+  let get_runtime_table_cfgs sys = Array.of_list sys.runtime_table_cfgs
 
   (** Returns the number of auxiliary inputs. *)
   let get_auxiliary_input_size t = t.auxiliary_input_size

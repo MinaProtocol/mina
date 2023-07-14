@@ -3,7 +3,11 @@ open Core_kernel
 module type With_accessors = sig
   type t
 
+  type fp
+
   val create : unit -> t
+
+  val get_runtime_table_cfgs : t -> fp Kimchi_types.runtime_table_cfg array
 
   val get_public_input_size : t -> int Set_once.t
 
@@ -28,8 +32,6 @@ end
 
 module type Full = sig
   include With_accessors
-
-  type fp
 
   type gates
 

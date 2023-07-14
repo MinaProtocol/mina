@@ -47,6 +47,9 @@ module type Inputs_intf = sig
   module Constraint_system : sig
     type t
 
+    val get_runtime_table_cfgs :
+      t -> Scalar_field.t Kimchi_types.runtime_table_cfg array
+
     val get_primary_input_size : t -> int
 
     val get_prev_challenges : t -> int option
@@ -182,13 +185,14 @@ module Make (Inputs : Inputs_intf) = struct
           assert (prev_challenges = prev_challenges') ;
           prev_challenges'
     in
-    (* TODO(dw) pass runtime table cfg info *)
-    let runtime_table_cfg = [||] in
+    let runtime_table_cfgs =
+      Inputs.Constraint_system.get_runtime_table_cfgs cs
+    in
     (* TODO(dw) pass lookup tables info *)
     let lookup_tables = [||] in
     let index =
       Inputs.Index.create gates public_input_size lookup_tables
-        runtime_table_cfg prev_challenges (load_urs ())
+        runtime_table_cfgs prev_challenges (load_urs ())
     in
     { index; cs }
 
