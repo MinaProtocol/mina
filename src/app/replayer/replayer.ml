@@ -118,14 +118,7 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
 let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t =
   Int64.Table.create ()
 
-let get_slot_hashes ~logger slot =
-  match Hashtbl.find global_slot_hashes_tbl slot with
-  | None ->
-      [%log fatal]
-        "State and ledger hashes not available at slot since genesis %Ld" slot ;
-      Core.exit 1
-  | Some hashes ->
-      hashes
+let get_slot_hashes slot = Hashtbl.find global_slot_hashes_tbl slot
 
 (* cache of account keys *)
 let pk_tbl : (int, Account.key) Hashtbl.t = Int.Table.create ()
@@ -1198,48 +1191,60 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             ~next_epoch_ledger
         in
         let log_ledger_hash_after_last_slot () =
-          (* don't check for matching ledger hash at start of replay, we haven't replayed
-             anything
-          *)
-          if
-            Int64.( > ) last_global_slot_since_genesis
-              input.start_slot_since_genesis
-          then
-            let _state_hash, expected_ledger_hash =
-              get_slot_hashes ~logger last_global_slot_since_genesis
-            in
-            if
-              Ledger_hash.equal (Ledger.merkle_root ledger) expected_ledger_hash
-            then
-              [%log info]
-                "Applied all commands at global slot since genesis %Ld, got \
-                 expected ledger hash"
-                ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ]
-                last_global_slot_since_genesis
-            else (
-              [%log error]
-                "Applied all commands at global slot since genesis %Ld, ledger \
-                 hash differs from expected ledger hash"
-                ~metadata:
-                  [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
-                  ; ( "expected_ledger_hash"
-                    , Ledger_hash.to_yojson expected_ledger_hash )
-                  ]
-                last_global_slot_since_genesis ;
-              if continue_on_error then incr error_count else Core_kernel.exit 1
-              )
+          match get_slot_hashes last_global_slot_since_genesis with
+          | None ->
+              if
+                Int64.equal last_global_slot_since_genesis
+                  input.start_slot_since_genesis
+              then
+                [%log info]
+                  "No ledger hash information at start slot, not checking \
+                   against ledger"
+              else (
+                [%log fatal]
+                  "Missing ledger hash information for last global slot, which \
+                   is not the start slot" ;
+                Core.exit 1 )
+          | Some (_state_hash, expected_ledger_hash) ->
+              if
+                Ledger_hash.equal
+                  (Ledger.merkle_root ledger)
+                  expected_ledger_hash
+              then
+                [%log info]
+                  "Applied all commands at global slot since genesis %Ld, got \
+                   expected ledger hash"
+                  ~metadata:
+                    [ ("ledger_hash", json_ledger_hash_of_ledger ledger) ]
+                  last_global_slot_since_genesis
+              else (
+                [%log error]
+                  "Applied all commands at global slot since genesis %Ld, \
+                   ledger hash differs from expected ledger hash"
+                  ~metadata:
+                    [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
+                    ; ( "expected_ledger_hash"
+                      , Ledger_hash.to_yojson expected_ledger_hash )
+                    ]
+                  last_global_slot_since_genesis ;
+                if continue_on_error then incr error_count
+                else Core_kernel.exit 1 )
         in
         let log_state_hash_on_next_slot curr_global_slot_since_genesis =
-          let state_hash, _ledger_hash =
-            get_slot_hashes ~logger curr_global_slot_since_genesis
-          in
-          [%log info]
-            ~metadata:
-              [ ("state_hash", `String (State_hash.to_base58_check state_hash))
-              ]
-            "Starting processing of commands in block with state_hash \
-             $state_hash at global slot since genesis %Ld"
-            curr_global_slot_since_genesis
+          match get_slot_hashes curr_global_slot_since_genesis with
+          | None ->
+              [%log fatal]
+                "Missing state hash information for current global slot" ;
+              Core.exit 1
+          | Some (state_hash, _ledger_hash) ->
+              [%log info]
+                ~metadata:
+                  [ ( "state_hash"
+                    , `String (State_hash.to_base58_check state_hash) )
+                  ]
+                "Starting processing of commands in block with state_hash \
+                 $state_hash at global slot since genesis %Ld"
+                curr_global_slot_since_genesis
         in
         let write_checkpoint_file () =
           Option.iter !checkpoint_target ~f:(fun target ->
