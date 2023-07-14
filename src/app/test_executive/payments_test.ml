@@ -527,10 +527,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "balance check successful.  \n\
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
-              snark-worker-fee: %s"
+              snark-node-key2 expected balance: %s"
              (Currency.Balance.to_mina_string key_1_balance_actual)
              (Currency.Balance.to_mina_string key_2_balance_actual)
-             config.snark_worker_fee ;
+             (Currency.Amount.to_mina_string key_2_balance_expected) ;
 
            Malleable_error.return () )
          else
@@ -538,10 +538,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Error with balance of snark-node-key2.  \n\
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
-              snark-worker-fee: %s"
+              snark-node-key2 expected balance: %s"
              (Currency.Balance.to_mina_string key_1_balance_actual)
              (Currency.Balance.to_mina_string key_2_balance_actual)
-             config.snark_worker_fee )
+             (Currency.Amount.to_mina_string key_2_balance_expected) )
     in
     section_hard "running replayer"
       (let%bind logs =
