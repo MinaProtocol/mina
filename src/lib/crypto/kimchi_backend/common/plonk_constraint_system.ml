@@ -689,6 +689,8 @@ type ('f, 'rust_gates) circuit =
     and a list of gates that corresponds to the circuit.
   *)
 
+(* TODO(dw) save the runtime tables configurations here *)
+
 (** The constraint system. *)
 type ('f, 'rust_gates) t =
   { (* Map of cells that share the same value (enforced by to the permutation). *)
@@ -901,6 +903,7 @@ end = struct
     V.Internal v
 
   (* Initializes a constraint system. *)
+  (* TODO(dw) save the runtable table config here *)
   let create () : t =
     { public_input_size = Set_once.create ()
     ; prev_challenges = Set_once.create ()
