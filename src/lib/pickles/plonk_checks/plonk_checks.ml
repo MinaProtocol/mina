@@ -175,7 +175,6 @@ let expand_feature_flags (type boolean)
   ; table_width_at_least_1
   ; table_width_at_least_2
   ; table_width_3
-  ; lookups_per_row_2
   ; lookups_per_row_3
   ; lookups_per_row_4
   ; lookup_pattern_xor
