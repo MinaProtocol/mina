@@ -121,7 +121,7 @@ input PaymentsDetails {
   tps: Float!
 
   """Memo, up to 32 characters"""
-  memo: String!
+  memoPrefix: String!
 
   """Maximum fee"""
   maxFee: Fee!

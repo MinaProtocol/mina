@@ -43,7 +43,7 @@ func schedulePaymentsDo(config Config, params PaymentParams, nodeAddress NodeAdd
 	paymentInput := PaymentsDetails{
 		DurationMin: params.DurationMin,
 		Tps:         tps,
-		Memo:        fmt.Sprintf("%s-%d", params.ExperimentName, batchIx),
+		MemoPrefix:  fmt.Sprintf("%s-%d", params.ExperimentName, batchIx),
 		MaxFee:      params.MaxFee,
 		MinFee:      params.MinFee,
 		Amount:      params.Amount,

@@ -3143,7 +3143,7 @@ module Types = struct
           ; amount : Currency.Amount.t
           ; min_fee : Currency.Fee.t
           ; max_fee : Currency.Fee.t
-          ; memo : string
+          ; memo_prefix : string
           ; tps : float
           ; duration_min : int
           }
@@ -3151,7 +3151,7 @@ module Types = struct
         let arg_typ =
           obj "PaymentsDetails"
             ~doc:"Keys and other information for scheduling payments"
-            ~coerce:(fun senders receiver amount min_fee max_fee memo tps
+            ~coerce:(fun senders receiver amount min_fee max_fee memo_prefix tps
                          duration_min ->
               Result.return
                 { senders
@@ -3159,13 +3159,13 @@ module Types = struct
                 ; amount
                 ; min_fee
                 ; max_fee
-                ; memo
+                ; memo_prefix
                 ; tps
                 ; duration_min
                 } )
             ~split:(fun f (t : input) ->
-              f t.senders t.receiver t.amount t.min_fee t.max_fee t.memo t.tps
-                t.duration_min )
+              f t.senders t.receiver t.amount t.min_fee t.max_fee t.memo_prefix
+                t.tps t.duration_min )
             ~fields:
               Arg.
                 [ arg "senders"
@@ -3179,7 +3179,7 @@ module Types = struct
                     ~doc:"Amount for payments"
                 ; arg "minFee" ~typ:(non_null Fee.arg_typ) ~doc:"Minimum fee"
                 ; arg "maxFee" ~typ:(non_null Fee.arg_typ) ~doc:"Maximum fee"
-                ; arg "memo" ~doc:"Memo, up to 32 characters"
+                ; arg "memoPrefix" ~doc:"Memo, up to 32 characters"
                     ~typ:(non_null string)
                 ; arg "tps"
                     ~doc:"Frequency of transactions (transactions per second)"
@@ -4433,10 +4433,11 @@ module Mutations = struct
             @@ List.is_empty payment_details.senders
           in
           let%bind.Result () =
+            (* TODO subtract expected length of suffix from the memo prefix length check *)
             Result.ok_if_true
               ~error:
                 (sprintf "Memo too long, limited to %d characters" max_memo_len)
-              (String.length payment_details.memo <= max_memo_len)
+              (String.length payment_details.memo_prefix <= max_memo_len)
           in
           let%bind.Result () =
             let open Currency.Fee in
@@ -4485,9 +4486,6 @@ module Mutations = struct
             Array.map nonce_opts ~f:(fun (_source, nonce_opt) ->
                 Option.value_exn nonce_opt )
           in
-          let memo =
-            Signed_command_memo.create_from_string_exn payment_details.memo
-          in
           let uuid = Uuid.create_random Random.State.default in
           let ivar = Ivar.create () in
           ( match Uuid.Table.add scheduler_tbl ~key:uuid ~data:ivar with
@@ -4502,7 +4500,8 @@ module Mutations = struct
           in
           let tm_start = Time.now () in
           let tm_end = Time.add tm_start duration_span in
-          let send_payments ndx =
+          let send_payments counter =
+            let ndx = counter mod num_senders in
             O1trace.thread "itn_send_scheduled_payments"
             @@ fun () ->
             let sender = senders.(ndx) in
@@ -4522,9 +4521,12 @@ module Mutations = struct
             in
             let valid_until = None in
             let nonce = nonces.(ndx) in
+            let memo = sprintf "%s-%d" payment_details.memo_prefix counter in
             let payload =
               Signed_command_payload.create ~fee ~fee_payer_pk:source_pk ~nonce
-                ~valid_until ~memo ~body
+                ~valid_until
+                ~memo:(Signed_command_memo.create_from_string_exn memo)
+                ~body
             in
             let signature = Ok (Signed_command.sign_payload sender payload) in
             [%log info]
@@ -4539,17 +4541,17 @@ module Mutations = struct
                 ; ("nonce", Account.Nonce.to_yojson nonce)
                 ; ("fee", Currency.Fee.to_yojson fee)
                 ; ("amount", Currency.Amount.to_yojson payment_details.amount)
-                ; ("memo", `String payment_details.memo)
+                ; ("memo", `String memo)
                 ] ;
             let fee = Currency.Fee.to_uint64 fee in
-            let memo = Some payment_details.memo in
-            match%bind
+            match%map
               send_signed_user_command ~mina ~nonce_opt:(Some nonce)
-                ~signer:source_pk ~memo ~fee ~fee_payer_pk:source_pk
+                ~signer:source_pk ~memo:(Some memo) ~fee ~fee_payer_pk:source_pk
                 ~valid_until ~body ~signature
             with
             | Ok _cmd_with_status ->
-                Deferred.return (Some nonce)
+                (* next nonce for this sender *)
+                nonces.(ndx) <- Account.Nonce.succ nonce
             | Error err ->
                 [%log error]
                   "Payment scheduler with handle %s got error when sending \
@@ -4557,10 +4559,9 @@ module Mutations = struct
                   (Uuid.to_string uuid)
                   ( Signature_lib.Public_key.Compressed.to_yojson source_pk
                   |> Yojson.Safe.to_string )
-                  ~metadata:[ ("error", `String err) ] ;
-                Deferred.return None
+                  ~metadata:[ ("error", `String err) ]
           in
-          let rec go ndx tm_next =
+          let rec go counter tm_next =
             let open Time in
             if now () >= tm_end then (
               [%log info] "Scheduled payments with handle %s has expired"
@@ -4573,10 +4574,7 @@ module Mutations = struct
               Uuid.Table.remove scheduler_tbl uuid ;
               Deferred.unit )
             else
-              let%bind nonce_opt = send_payments ndx in
-              (* next nonce for this sender *)
-              Option.iter nonce_opt ~f:(fun nonce ->
-                  nonces.(ndx) <- Account.Nonce.succ nonce ) ;
+              let%bind () = send_payments counter in
               let%bind () = Async_unix.at tm_next in
               let next_tm_next = add tm_next wait_span in
               let now = now () in
@@ -4592,7 +4590,7 @@ module Mutations = struct
                   add now additive
                 else next_tm_next
               in
-              go ((ndx + 1) mod num_senders) next_tm_next
+              go (counter + 1) next_tm_next
           in
           [%log info] "Starting payment scheduler with handle %s"
             (Uuid.to_string uuid) ;
@@ -4621,29 +4619,33 @@ module Mutations = struct
       let fee_payer_nonces =
         Array.map fee_payer_accounts ~f:(fun account -> ref account.nonce)
       in
-      let ndx = ref 0 in
       let num_fee_payers = Array.length fee_payer_array in
-      Deferred.List.iter keypairs ~f:(fun kp ->
-          if Time.(now () >= stop_time) then (
-            [%log info]
-              "Scheduled zkapp commands with handle %s has expired, stop \
-               deployment of zkapp accounts"
-              (Uuid.to_string uuid) ;
-            Uuid.Table.remove scheduler_tbl uuid ;
-            return () )
-          else if Ivar.is_full stop_signal then (
-            [%log info]
-              "Scheduled zkapp commands with handle %s received stop signal, \
-               stop deployment of zkapp accounts"
-              (Uuid.to_string uuid) ;
-            Uuid.Table.remove scheduler_tbl uuid ;
-            return () )
+      let finished () =
+        if Time.(now () >= stop_time) then (
+          [%log info]
+            "Scheduled zkapp commands with handle %s has expired, stop \
+             deployment of zkapp accounts"
+            (Uuid.to_string uuid) ;
+          Uuid.Table.remove scheduler_tbl uuid ;
+          true )
+        else if Ivar.is_full stop_signal then (
+          [%log info]
+            "Scheduled zkapp commands with handle %s received stop signal, \
+             stop deployment of zkapp accounts"
+            (Uuid.to_string uuid) ;
+          Uuid.Table.remove scheduler_tbl uuid ;
+          true )
+        else false
+      in
+      Deferred.List.iteri keypairs ~f:(fun i kp ->
+          let ndx = i mod num_fee_payers in
+          if finished () then Deferred.unit
           else
-            let fee_payer_keypair = fee_payer_array.(!ndx) in
-            let memo = sprintf "%s-%s" memo_prefix (Int.to_string !ndx) in
+            let fee_payer_keypair = fee_payer_array.(ndx) in
+            let memo = sprintf "%s-%d" memo_prefix i in
             let spec =
               { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
-                  (fee_payer_keypair, !(fee_payer_nonces.(!ndx)))
+                  (fee_payer_keypair, !(fee_payer_nonces.(ndx)))
               ; fee = deployment_fee
               ; fee_payer = None
               ; amount = init_balance
@@ -4668,19 +4670,21 @@ module Mutations = struct
                 spec
             in
             let%bind () = after wait_span in
-            let rec go () =
+            Deferred.repeat_until_finished ()
+            @@ fun () ->
+            if finished () then Deferred.return (`Finished ())
+            else
               match%bind send_zkapp_command mina zkapp_command with
               | Ok _ ->
-                  fee_payer_nonces.(!ndx) :=
-                    Account.Nonce.succ !(fee_payer_nonces.(!ndx)) ;
-                  ndx := (!ndx + 1) mod num_fee_payers ;
+                  fee_payer_nonces.(ndx) :=
+                    Account.Nonce.succ !(fee_payer_nonces.(ndx)) ;
                   [%log info]
                     "Successfully submitted zkApp command that creates a zkApp \
                      account"
                     ~metadata:
                       [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
                       ] ;
-                  Deferred.unit
+                  Deferred.return (`Finished ())
               | Error err ->
                   [%log info] "Failed to setup a zkApp account, try again"
                     ~metadata:
@@ -4688,9 +4692,7 @@ module Mutations = struct
                       ; ("error", `String err)
                       ] ;
                   let%bind () = after wait_span in
-                  go ()
-            in
-            go () )
+                  Deferred.return (`Repeat ()) )
 
     let is_zkapp_deployed kp ledger =
       match
@@ -4870,7 +4872,8 @@ module Mutations = struct
                                 ~key:(Account.identifier a) ~data:(a, role)
                             else ()
                           in
-                          let rec go ~account_state_tbl ~ndx ~tm_next ~counter =
+                          let rec go ~account_state_tbl ~tm_next ~counter =
+                            let ndx = counter mod num_fee_payers in
                             if Time.( >= ) (Time.now ()) tm_end then (
                               [%log info]
                                 "Scheduled zkApp commands with handle %s has \
@@ -4919,19 +4922,10 @@ module Mutations = struct
                                       number_of_accounts_generated
                                       < zkapp_command_details.num_new_accounts
                                     in
-                                    let (fee_payer_account : Account.t), _ =
-                                      Account_id.Table.find_exn
-                                        account_state_tbl
-                                        (Account_id.of_public_key
-                                           fee_payer.public_key )
-                                    in
                                     let memo =
-                                      Printf.sprintf "%s-%s-%s-%s"
+                                      sprintf "%s-%d"
                                         zkapp_command_details.memo_prefix
-                                        (Int.to_string_hum ndx)
-                                        (Mina_numbers.Account_nonce.to_string
-                                           fee_payer_account.nonce )
-                                        (Int.to_string_hum counter)
+                                        counter
                                     in
                                     let zkapp_command_with_dummy_auth =
                                       Quickcheck.Generator.generate
@@ -5024,9 +5018,8 @@ module Mutations = struct
                                   add now additive
                                 else next_tm_next
                               in
-                              go ~account_state_tbl
-                                ~ndx:((ndx + 1) mod num_fee_payers)
-                                ~tm_next:next_tm_next ~counter:(counter + 1)
+                              go ~account_state_tbl ~tm_next:next_tm_next
+                                ~counter:(counter + 1)
                           in
 
                           upon
@@ -5059,8 +5052,9 @@ module Mutations = struct
                                     Time.add (Time.now ()) wait_span
                                   in
                                   don't_wait_for
-                                  @@ go ~account_state_tbl ~ndx:0 ~tm_next
-                                       ~counter:0 ) ;
+                                  @@ go ~account_state_tbl ~tm_next
+                                       ~counter:
+                                         (List.length zkapp_account_keypairs) ) ;
 
                           Ok (Uuid.to_string uuid) ) ) )
 
