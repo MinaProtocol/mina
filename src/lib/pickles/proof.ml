@@ -131,10 +131,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
     { statement =
         { proof_state =
             { deferred_values =
-                { xi = scalar_chal ()
-                ; combined_inner_product = Shifted_value (tick ())
-                ; b = Shifted_value (tick ())
-                ; branch_data =
+                { branch_data =
                     { proofs_verified =
                         ( match most_recent_width with
                         | Z ->

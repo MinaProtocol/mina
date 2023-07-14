@@ -93,9 +93,6 @@ module Wrap = struct
                , 'branch_data )
                t =
             { plonk : ('challenge, 'scalar_challenge, 'bool) Plonk.Minimal.V1.t
-            ; combined_inner_product : 'fp
-            ; b : 'fp
-            ; xi : 'scalar_challenge
             ; bulletproof_challenges : 'bulletproof_challenges
             ; branch_data : 'branch_data
             }

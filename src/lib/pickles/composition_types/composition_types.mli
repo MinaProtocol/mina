@@ -309,9 +309,6 @@ module Wrap : sig
                   , 'scalar_challenge
                   , 'bool )
                   Plonk.Minimal.Stable.V1.t
-              ; combined_inner_product : 'fp
-              ; b : 'fp
-              ; xi : 'scalar_challenge
               ; bulletproof_challenges : 'bulletproof_challenges
               ; branch_data : 'branch_data
               }

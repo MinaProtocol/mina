@@ -239,6 +239,12 @@ struct
           statement.proof_state.messages_for_next_wrap_proof
             .old_bulletproof_challenges
       in
+      let deferred_values_computed =
+        Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
+          ~old_bulletproof_challenges:
+            statement.messages_for_next_step_proof.old_bulletproof_challenges
+          ~proof_state:statement.proof_state
+      in
       let prev_statement_with_hashes :
           ( _
           , _
@@ -265,7 +271,7 @@ struct
                ~app_state:to_field_elements )
         ; proof_state =
             { deferred_values =
-                (let deferred_values = statement.proof_state.deferred_values in
+                (let deferred_values = deferred_values_computed in
                  { plonk =
                      { plonk with
                        zeta = plonk0.zeta
@@ -289,7 +295,8 @@ struct
                  ; b = deferred_values.b
                  ; xi = deferred_values.xi
                  ; bulletproof_challenges =
-                     deferred_values.bulletproof_challenges
+                     statement.proof_state.deferred_values
+                       .bulletproof_challenges
                  ; branch_data = deferred_values.branch_data
                  } )
             ; sponge_digest_before_evaluations =

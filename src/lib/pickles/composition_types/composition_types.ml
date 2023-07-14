@@ -299,9 +299,6 @@ module Wrap = struct
                   , 'scalar_challenge
                   , 'bool )
                   Plonk.Minimal.Stable.V1.t
-              ; combined_inner_product : 'fp
-              ; b : 'fp
-              ; xi : 'scalar_challenge
               ; bulletproof_challenges : 'bulletproof_challenges
               ; branch_data : 'branch_data
               }
@@ -309,18 +306,9 @@ module Wrap = struct
           end
         end]
 
-        let map_challenges
-            { plonk
-            ; combined_inner_product
-            ; b
-            ; xi
-            ; bulletproof_challenges
-            ; branch_data
-            } ~f ~scalar =
-          { xi = scalar xi
-          ; combined_inner_product
-          ; b
-          ; plonk = Plonk.Minimal.map_challenges ~f ~scalar plonk
+        let map_challenges { plonk; bulletproof_challenges; branch_data } ~f
+            ~scalar =
+          { plonk = Plonk.Minimal.map_challenges ~f ~scalar plonk
           ; bulletproof_challenges
           ; branch_data
           }
@@ -399,9 +387,6 @@ module Wrap = struct
            } :
             _ In_circuit.t ) ~to_option : _ Minimal.t =
         { plonk = Plonk.to_minimal ~to_option plonk
-        ; combined_inner_product
-        ; b
-        ; xi
         ; bulletproof_challenges
         ; branch_data
         }

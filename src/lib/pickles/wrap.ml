@@ -102,7 +102,7 @@ type deferred_values_and_hints =
   }
 
 let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
-    ~feature_flags ~actual_feature_flags
+    ~actual_feature_flags
     ~(prev_challenges : ((Backend.Tick.Field.t, _) Vector.t, n) Vector.t)
     ~(step_vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
     ~(public_input : Backend.Tick.Field.t list) ~(proof : Backend.Tick.Proof.t)
@@ -385,9 +385,8 @@ let%test_module "gate finalization" =
           compute those values correctly inside the circuit.  Special thanks to Matthew Ryan for
           explaining this in detail. *)
       let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
-        deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
-          ~prev_challenges:[] ~step_vk:vk ~public_input ~proof
-          ~actual_proofs_verified:Nat.N0.n
+        deferred_values ~actual_feature_flags ~sgs:[] ~prev_challenges:[]
+          ~step_vk:vk ~public_input ~proof ~actual_proofs_verified:Nat.N0.n
       in
 
       (* Define Typ.t for Deferred_values.t -- A Type.t defines how to convert a value of some type
@@ -805,7 +804,7 @@ let wrap
   [%log internal] "Wrap_compute_deferred_values" ;
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~sgs ~prev_challenges ~step_vk ~public_input ~proof
-      ~actual_proofs_verified ~feature_flags ~actual_feature_flags
+      ~actual_proofs_verified ~actual_feature_flags
   in
   [%log internal] "Wrap_compute_deferred_values_done" ;
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =
