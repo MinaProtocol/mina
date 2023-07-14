@@ -139,14 +139,20 @@ module Make (Inputs : Inputs_intf) :
     Kvdb.remove kvdb ~key:(Location.serialize ~ledger_depth:depth location)
 
   let get mdb location =
+    Util.trace "Db.get"
+    @@ fun () ->
     assert (Location.is_account location) ;
     get_bin mdb location Account.bin_read_t
 
   let get_batch mdb locations =
+    Util.trace "Db.get_batch"
+    @@ fun () ->
     assert (List.for_all locations ~f:Location.is_account) ;
     List.zip_exn locations (get_bin_batch mdb locations Account.bin_read_t)
 
   let get_hash mdb location =
+    Util.trace "Db.get_hash"
+    @@ fun () ->
     assert (Location.is_hash location) ;
     match get_bin mdb location Hash.bin_read_t with
     | Some hash ->
@@ -169,9 +175,12 @@ module Make (Inputs : Inputs_intf) :
     List.map locations_accounts_bin ~f:(fun (_location_bin, account_bin) ->
         account_bin_read account_bin ~pos_ref:(ref 0) )
 
-  let to_list mdb = account_list_bin mdb Account.bin_read_t
+  let to_list mdb =
+    Util.trace "Db.to_list" @@ fun () -> account_list_bin mdb Account.bin_read_t
 
   let accounts mdb =
+    Util.trace "Db.accounts"
+    @@ fun () ->
     to_list mdb |> List.map ~f:Account.identifier |> Account_id.Set.of_list
 
   let set_raw { kvdb; depth; _ } location bin =
@@ -328,10 +337,14 @@ module Make (Inputs : Inputs_intf) :
   end
 
   let get_at_index_exn mdb index =
+    Util.trace "Db.get_at_index_exn"
+    @@ fun () ->
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
     get mdb (Location.Account addr) |> Option.value_exn
 
   let all_accounts (t : t) =
+    Util.trace "Db.all_accounts"
+    @@ fun () ->
     match Account_location.last_location_address t with
     | None ->
         Sequence.empty
@@ -340,7 +353,7 @@ module Make (Inputs : Inputs_intf) :
         |> Sequence.map ~f:(fun i -> get_at_index_exn t i)
 
   let iteri (t : t) ~(f : int -> Account.t -> unit) =
-    Sequence.iteri (all_accounts t) ~f
+    Util.trace "Db.iteri" @@ fun () -> Sequence.iteri (all_accounts t) ~f
 
   (** The tokens associated with each public key.
 
@@ -479,6 +492,8 @@ module Make (Inputs : Inputs_intf) :
   end
 
   let location_of_account t key =
+    Util.trace "Db.location_of_account"
+    @@ fun () ->
     match Account_location.get t key with
     | Error _ ->
         None
@@ -486,11 +501,14 @@ module Make (Inputs : Inputs_intf) :
         Some location
 
   let location_of_account_batch t keys =
-    List.zip_exn keys (Account_location.get_batch t keys)
+    Util.trace "Db.location_of_account_batch"
+    @@ fun () -> List.zip_exn keys (Account_location.get_batch t keys)
 
   let last_filled t = Account_location.last_location t
 
   let token_owners (t : t) : Account_id.Set.t =
+    Util.trace "Db.token_owners"
+    @@ fun () ->
     Tokens.Owner.all_owners t
     |> Sequence.fold ~init:Account_id.Set.empty ~f:(fun acc (_, owner) ->
            Set.add acc owner )
@@ -500,6 +518,8 @@ module Make (Inputs : Inputs_intf) :
   let tokens = Tokens.get
 
   include Util.Make (struct
+    let ledger_name = "Db"
+
     module Key = Key
     module Token_id = Token_id
     module Account_id = Account_id
@@ -568,7 +588,8 @@ module Make (Inputs : Inputs_intf) :
   end)
 
   let set_hash mdb location new_hash =
-    set_hash_batch mdb [ (location, new_hash) ]
+    Util.trace "Db.set_hash"
+    @@ fun () -> set_hash_batch mdb [ (location, new_hash) ]
 
   module For_tests = struct
     let gen_account_location ~ledger_depth =
@@ -584,21 +605,29 @@ module Make (Inputs : Inputs_intf) :
   end
 
   let set mdb location account =
+    Util.trace "Db.set"
+    @@ fun () ->
     set_bin mdb location Account.bin_size_t Account.bin_write_t account ;
     set_hash mdb
       (Location.Hash (Location.to_path_exn location))
       (Hash.hash_account account)
 
   let index_of_account_exn mdb account_id =
+    Util.trace "Db.index_of_account_exn"
+    @@ fun () ->
     let location = location_of_account mdb account_id |> Option.value_exn in
     let addr = Location.to_path_exn location in
     Addr.to_int addr
 
   let set_at_index_exn mdb index account =
+    Util.trace "Db.set_at_index_exn"
+    @@ fun () ->
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
     set mdb (Location.Account addr) account
 
   let get_or_create_account mdb account_id account =
+    Util.trace "Db.get_or_create_account"
+    @@ fun () ->
     match Account_location.get mdb account_id with
     | Error Account_location_not_found -> (
         match Account_location.allocate mdb account_id with
@@ -615,6 +644,8 @@ module Make (Inputs : Inputs_intf) :
         Ok (`Existed, location)
 
   let num_accounts t =
+    Util.trace "Db.num_accounts"
+    @@ fun () ->
     match Account_location.last_location_address t with
     | None ->
         0
@@ -625,6 +656,8 @@ module Make (Inputs : Inputs_intf) :
      maybe use that here, instead of loading all accounts into memory See Issue
      #1191 *)
   let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
+    Util.trace "Db.foldi_with_ignored_accounts"
+    @@ fun () ->
     let f' index accum account =
       f (Addr.of_int_exn ~ledger_depth:(depth t) index) accum account
     in
@@ -645,7 +678,8 @@ module Make (Inputs : Inputs_intf) :
         |> Sequence.foldi ~init ~f:f'
 
   let foldi t ~init ~f =
-    foldi_with_ignored_accounts t Account_id.Set.empty ~init ~f
+    Util.trace "Db.foldi"
+    @@ fun () -> foldi_with_ignored_accounts t Account_id.Set.empty ~init ~f
 
   module C : Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
@@ -668,6 +702,8 @@ module Make (Inputs : Inputs_intf) :
   let merkle_root mdb = get_hash mdb Location.root_hash
 
   let remove_accounts_exn t keys =
+    Util.trace "Db.remove_accounts_exn"
+    @@ fun () ->
     let locations =
       (* if we don't have a location for all keys, raise an exception *)
       let rec loop keys accum =
@@ -694,6 +730,8 @@ module Make (Inputs : Inputs_intf) :
         set_hash t hash_loc Hash.empty_account )
 
   let merkle_path mdb location =
+    Util.trace "Db.merkle_path"
+    @@ fun () ->
     let location =
       if Location.is_account location then
         Location.Hash (Location.to_path_exn location)

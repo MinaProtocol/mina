@@ -1,6 +1,16 @@
 open Core_kernel
 
+let trace_logging_enabled = ref false
+
+let trace name f =
+  if !trace_logging_enabled then [%log' warn (Logger.create ())] "ENTER %s" name ;
+  let r = f () in
+  if !trace_logging_enabled then [%log' warn (Logger.create ())] "EXIT %s" name ;
+  r
+
 module type Inputs_intf = sig
+  val ledger_name : string
+
   module Location : Location_intf.S
 
   module Location_binable : Hashable.S_binable with type t := Location.t
@@ -68,6 +78,8 @@ module Make (Inputs : Inputs_intf) : sig
     Inputs.Base.t -> Inputs.Location.Addr.t -> Inputs.Account.t list -> unit
 end = struct
   let get_all_accounts_rooted_at_exn t address =
+    trace (sprintf "%s.get_all_accounts_rooted_at_exn" Inputs.ledger_name)
+    @@ fun () ->
     let open Inputs in
     let result =
       Location.Addr.Range.fold
@@ -85,6 +97,9 @@ end = struct
           Some (addr, account) )
 
   let rec compute_affected_locations_and_hashes t locations_and_hashes acc =
+    trace
+      (sprintf "%s.compute_affected_locations_and_hashes" Inputs.ledger_name)
+    @@ fun () ->
     let ledger_depth = Inputs.ledger_depth t in
     if not @@ List.is_empty locations_and_hashes then
       let height =
@@ -146,16 +161,22 @@ end = struct
     else acc
 
   let set_hash_batch t locations_and_hashes =
+    trace (sprintf "%s.set_hash_batch" Inputs.ledger_name)
+    @@ fun () ->
     Inputs.set_raw_hash_batch t
       (compute_affected_locations_and_hashes t locations_and_hashes
          locations_and_hashes )
 
   let compute_last_index addresses =
+    trace (sprintf "%s.compute_last_index" Inputs.ledger_name)
+    @@ fun () ->
     Mina_stdlib.Nonempty_list.map addresses
       ~f:(Fn.compose Inputs.Location.Addr.to_int Inputs.Location.to_path_exn)
     |> Mina_stdlib.Nonempty_list.max_elt ~compare:Int.compare
 
   let set_raw_addresses t addresses_and_accounts =
+    trace (sprintf "%s.set_raw_addresses" Inputs.ledger_name)
+    @@ fun () ->
     let ledger_depth = Inputs.ledger_depth t in
     Option.iter (Mina_stdlib.Nonempty_list.of_list_opt addresses_and_accounts)
       ~f:(fun nonempty_addresses_and_accounts ->
@@ -189,6 +210,8 @@ end = struct
   (* TODO: When we do batch on a database, we should add accounts, locations and hashes
      simulatenously for full atomicity. *)
   let set_batch t locations_and_accounts =
+    trace (sprintf "%s.set_batch" Inputs.ledger_name)
+    @@ fun () ->
     set_raw_addresses t locations_and_accounts ;
     Inputs.set_raw_account_batch t locations_and_accounts ;
     set_hash_batch t
@@ -197,11 +220,15 @@ end = struct
            , Inputs.Hash.hash_account account ) )
 
   let set_batch_accounts t addresses_and_accounts =
+    trace (sprintf "%s.set_batch_accounts" Inputs.ledger_name)
+    @@ fun () ->
     set_batch t
     @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
            (Inputs.location_of_account_addr addr, account) )
 
   let set_all_accounts_rooted_at_exn t address accounts =
+    trace (sprintf "%s.set_all_accounts_rooted_at_exn" Inputs.ledger_name)
+    @@ fun () ->
     let addresses =
       Sequence.to_list
       @@ Inputs.Location.Addr.Range.subtree_range_seq

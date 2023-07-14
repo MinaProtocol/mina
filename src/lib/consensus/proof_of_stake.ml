@@ -82,16 +82,19 @@ module Make_str (A : Wire_types.Concrete) = struct
     outer_table
 
   let compute_delegatee_table_sparse_ledger keys ledger =
-    compute_delegatee_table keys ~iter_accounts:(fun f ->
-        Mina_ledger.Sparse_ledger.iteri ledger ~f:(fun i acct -> f i acct) )
+    O1trace.sync_thread "compute_delegatee_table_sparse_ledger" (fun () ->
+        compute_delegatee_table keys ~iter_accounts:(fun f ->
+            Mina_ledger.Sparse_ledger.iteri ledger ~f:(fun i acct -> f i acct) ) )
 
   let compute_delegatee_table_ledger_db keys ledger =
-    compute_delegatee_table keys ~iter_accounts:(fun f ->
-        Mina_ledger.Ledger.Db.iteri ledger ~f:(fun i acct -> f i acct) )
+    O1trace.sync_thread "compute_delegatee_table_ledger_db" (fun () ->
+        compute_delegatee_table keys ~iter_accounts:(fun f ->
+            Mina_ledger.Ledger.Db.iteri ledger ~f:(fun i acct -> f i acct) ) )
 
   let compute_delegatee_table_genesis_ledger keys ledger =
-    compute_delegatee_table keys ~iter_accounts:(fun f ->
-        Mina_ledger.Ledger.iteri ledger ~f:(fun i acct -> f i acct) )
+    O1trace.sync_thread "compute_delegatee_table_genesis_ledger" (fun () ->
+        compute_delegatee_table keys ~iter_accounts:(fun f ->
+            Mina_ledger.Ledger.iteri ledger ~f:(fun i acct -> f i acct) ) )
 
   module Typ = Snark_params.Tick.Typ
 

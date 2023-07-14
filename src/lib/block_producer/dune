@@ -68,6 +68,7 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    internal_tracing
+   merkle_ledger
  )
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_register_event))

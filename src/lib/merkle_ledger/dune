@@ -29,6 +29,7 @@
    mina_stdlib
    visualization
    ppx_version.runtime
+   logger
  )
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))

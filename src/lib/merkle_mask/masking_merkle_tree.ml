@@ -2,6 +2,7 @@
    RFC 0004 and docs/specs/merkle_tree.md *)
 
 open Core
+module Util = Merkle_ledger.Util
 
 (* builds a Merkle tree mask; it's a Merkle tree, with some additional
    operations *)
@@ -170,6 +171,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* a read does a lookup in the account_tbl; if that fails, delegate to
        parent *)
     let get t location =
+      Util.trace "Mask.get"
+      @@ fun () ->
       assert_is_attached t ;
       match self_find_account t location with
       | Some account ->
@@ -178,6 +181,8 @@ module Make (Inputs : Inputs_intf.S) = struct
           Base.get (get_parent t) location
 
     let get_batch t locations =
+      Util.trace "Mask.get_batch"
+      @@ fun () ->
       assert_is_attached t ;
       let found_accounts, leftover_locations =
         List.partition_map locations ~f:(fun location ->
@@ -218,6 +223,8 @@ module Make (Inputs : Inputs_intf.S) = struct
        mask *)
 
     let merkle_path_at_addr_exn t address =
+      Util.trace "Mask.merkle_path_at_addr_exn"
+      @@ fun () ->
       assert_is_attached t ;
       let parent_merkle_path =
         Base.merkle_path_at_addr_exn (get_parent t) address
@@ -225,6 +232,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       fixup_merkle_path t parent_merkle_path address
 
     let merkle_path_at_index_exn t index =
+      Util.trace "Mask.merkle_path_at_index_exn"
+      @@ fun () ->
       assert_is_attached t ;
       let address = Addr.of_int_exn ~ledger_depth:t.depth index in
       let parent_merkle_path =
@@ -233,6 +242,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       fixup_merkle_path t parent_merkle_path address
 
     let merkle_path t location =
+      Util.trace "Mask.merkle_path"
+      @@ fun () ->
       assert_is_attached t ;
       let address = Location.to_path_exn location in
       let parent_merkle_path = Base.merkle_path (get_parent t) location in
@@ -243,6 +254,8 @@ module Make (Inputs : Inputs_intf.S) = struct
        along the path from the account address to root *)
     let addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
         starting_hash : (Addr.t * Hash.t) list =
+      Util.trace "Mask.addresses_and_hashes_from_merkle_path_exn"
+      @@ fun () ->
       let get_addresses_hashes height accum node =
         let last_address, last_hash = List.hd_exn accum in
         let next_address = Addr.parent_exn last_address in
@@ -261,6 +274,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
+      Util.trace "Mask.merkle_root"
+      @@ fun () ->
       assert_is_attached t ;
       match self_find_hash t (Addr.root ()) with
       | Some hash ->
@@ -269,6 +284,8 @@ module Make (Inputs : Inputs_intf.S) = struct
           Base.merkle_root (get_parent t)
 
     let remove_account_and_update_hashes t location =
+      Util.trace "Mask.remove_account_and_update_hashes"
+      @@ fun () ->
       assert_is_attached t ;
       (* remove account and key from tables *)
       let account = Option.value_exn (self_find_account t location) in
@@ -302,6 +319,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* a write writes only to the mask, parent is not involved need to update
        both account and hash pieces of the mask *)
     let set t location account =
+      Util.trace "Mask.set"
+      @@ fun () ->
       assert_is_attached t ;
       self_set_account t location account ;
       (* Update token info. *)
@@ -323,6 +342,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* if the mask's parent sets an account, we can prune an entry in the mask
        if the account in the parent is the same in the mask *)
     let parent_set_notify t account =
+      Util.trace "Mask.parent_set_notify"
+      @@ fun () ->
       assert_is_attached t ;
       match self_find_location t (Account.identifier account) with
       | None ->
@@ -338,6 +359,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* as for accounts, we see if we have it in the mask, else delegate to
        parent *)
     let get_hash t addr =
+      Util.trace "Mask.get_hash"
+      @@ fun () ->
       assert_is_attached t ;
       match self_find_hash t addr with
       | Some hash ->
@@ -352,11 +375,15 @@ module Make (Inputs : Inputs_intf.S) = struct
        for speed *)
     (* NB: rocksdb does not support batch reads; should we offer this? *)
     let get_batch_exn t locations =
+      Util.trace "Mask.get_batch_exn"
+      @@ fun () ->
       assert_is_attached t ;
       List.map locations ~f:(fun location -> get t location)
 
     (* NB: rocksdb does not support batch reads; is this needed? *)
     let get_hash_batch_exn t addrs =
+      Util.trace "Mask.get_hash_batch_exn"
+      @@ fun () ->
       assert_is_attached t ;
       List.map addrs ~f:(fun addr ->
           match self_find_hash t addr with
@@ -368,6 +395,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
+      Util.trace "Mask.commit"
+      @@ fun () ->
       assert_is_attached t ;
       let old_root_hash = merkle_root t in
       let account_data = Location_binable.Table.to_alist t.account_tbl in
@@ -388,6 +417,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* copy tables in t; use same parent *)
     let copy t =
+      Util.trace "Mask.copy"
+      @@ fun () ->
       { uuid = Uuid_unix.create ()
       ; parent = Ok (get_parent t)
       ; detached_parent_signal = Async.Ivar.create ()
@@ -400,6 +431,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       }
 
     let last_filled t =
+      Util.trace "Mask.last_filled"
+      @@ fun () ->
       assert_is_attached t ;
       Option.value_map
         (Base.last_filled (get_parent t))
@@ -423,6 +456,8 @@ module Make (Inputs : Inputs_intf.S) = struct
                      and mask" ) )
 
     include Merkle_ledger.Util.Make (struct
+      let ledger_name = "Mask"
+
       module Location = Location
       module Location_binable = Location_binable
       module Key = Key
@@ -469,16 +504,22 @@ module Make (Inputs : Inputs_intf.S) = struct
     end)
 
     let set_batch_accounts t addresses_and_accounts =
+      Util.trace "Mask.set_batch_accounts"
+      @@ fun () ->
       assert_is_attached t ;
       set_batch_accounts t addresses_and_accounts
 
     (* set accounts in mask *)
     let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
+      Util.trace "Mask.set_all_accounts_rooted_at_exn"
+      @@ fun () ->
       assert_is_attached t ;
       set_all_accounts_rooted_at_exn t address accounts
 
     (* keys from this mask and all ancestors *)
     let accounts t =
+      Util.trace "Mask.accounts"
+      @@ fun () ->
       assert_is_attached t ;
       let mask_keys =
         Location_binable.Table.data t.account_tbl
@@ -489,6 +530,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       Account_id.Set.union parent_keys mask_keys
 
     let token_owner (t : t) (tid : Token_id.t) : Account_id.t option =
+      Util.trace "Mask.token_owner"
+      @@ fun () ->
       assert_is_attached t ;
       match Token_id.Table.find t.token_owners tid with
       | Some id ->
@@ -497,6 +540,8 @@ module Make (Inputs : Inputs_intf.S) = struct
           Base.token_owner (get_parent t) tid
 
     let token_owners (t : t) : Account_id.Set.t =
+      Util.trace "Mask.token_owners"
+      @@ fun () ->
       assert_is_attached t ;
       let mask_owners =
         Hashtbl.fold t.token_owners ~init:Account_id.Set.empty
@@ -505,6 +550,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       Set.union mask_owners (Base.token_owners (get_parent t))
 
     let tokens t pk =
+      Util.trace "Mask.tokens"
+      @@ fun () ->
       assert_is_attached t ;
       let mask_tokens =
         Account_id.Table.keys t.location_tbl
@@ -517,6 +564,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       Set.union mask_tokens (Base.tokens (get_parent t) pk)
 
     let num_accounts t =
+      Util.trace "Mask.num_accounts"
+      @@ fun () ->
       assert_is_attached t ;
       match t.current_location with
       | None ->
@@ -530,6 +579,8 @@ module Make (Inputs : Inputs_intf.S) = struct
           )
 
     let location_of_account t account_id =
+      Util.trace "Mask.location_of_account"
+      @@ fun () ->
       assert_is_attached t ;
       let mask_result = self_find_location t account_id in
       match mask_result with
@@ -539,6 +590,8 @@ module Make (Inputs : Inputs_intf.S) = struct
           Base.location_of_account (get_parent t) account_id
 
     let location_of_account_batch t account_ids =
+      Util.trace "Mask.location_of_account_batch"
+      @@ fun () ->
       assert_is_attached t ;
       let found_locations, leftover_account_ids =
         List.partition_map account_ids ~f:(fun account_id ->
@@ -553,15 +606,21 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for t =
+      Util.trace "Mask.make_space_for"
+      @@ fun () ->
       assert_is_attached t ;
       Base.make_space_for (get_parent t)
 
     let get_inner_hash_at_addr_exn t address =
+      Util.trace "Mask.get_inner_hash_at_addr_exn"
+      @@ fun () ->
       assert_is_attached t ;
       assert (Addr.depth address <= t.depth) ;
       get_hash t address |> Option.value_exn
 
     let remove_accounts_exn t keys =
+      Util.trace "Mask.remove_account_exn"
+      @@ fun () ->
       assert_is_attached t ;
       let rec loop keys parent_keys mask_locations =
         match keys with
@@ -603,22 +662,30 @@ module Make (Inputs : Inputs_intf.S) = struct
       Async.Ivar.fill_if_empty t.detached_parent_signal ()
 
     let index_of_account_exn t key =
+      Util.trace "Mask.index_of_account_exn"
+      @@ fun () ->
       assert_is_attached t ;
       let location = location_of_account t key |> Option.value_exn in
       let addr = Location.to_path_exn location in
       Addr.to_int addr
 
     let get_at_index_exn t index =
+      Util.trace "Mask.get_at_index_exn"
+      @@ fun () ->
       assert_is_attached t ;
       let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
       get t (Location.Account addr) |> Option.value_exn
 
     let set_at_index_exn t index account =
+      Util.trace "Mask.set_at_index_exn"
+      @@ fun () ->
       assert_is_attached t ;
       let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
       set t (Location.Account addr) account
 
     let to_list t =
+      Util.trace "Mask.to_list"
+      @@ fun () ->
       assert_is_attached t ;
       accounts t |> Set.to_list
       |> List.map ~f:(fun key ->
@@ -633,6 +700,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       |> List.map ~f:(fun (_, account) -> account)
 
     let iteri t ~f =
+      Util.trace "Mask.iteri"
+      @@ fun () ->
       let account_ids = accounts t |> Account_id.Set.to_list in
       let idx_account_pairs_unsorted =
         List.map account_ids ~f:(fun acct_id ->
@@ -672,6 +741,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       List.iter idx_account_pairs ~f:(fun (idx, acct) -> f idx acct)
 
     let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
+      Util.trace "Mask.foldi_with_ignored_accounts"
+      @@ fun () ->
       assert_is_attached t ;
       let locations_and_accounts =
         Location_binable.Table.to_alist t.account_tbl
@@ -701,6 +772,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       List.fold locations_and_accounts ~init:parent_result ~f:f'
 
     let foldi t ~init ~f =
+      Util.trace "Mask.foldi"
+      @@ fun () ->
       assert_is_attached t ;
       foldi_with_ignored_accounts t Account_id.Set.empty ~init ~f
 
@@ -728,6 +801,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* leftmost location *)
     let first_location ~ledger_depth =
+      Util.trace "Mask.first_location"
+      @@ fun () ->
       Location.Account
         ( Addr.of_directions
         @@ List.init ledger_depth ~f:(fun _ -> Direction.Left) )
@@ -739,6 +814,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =
+      Util.trace "Mask.get_or_create_account"
+      @@ fun () ->
       assert_is_attached t ;
       match self_find_location t account_id with
       | None -> (

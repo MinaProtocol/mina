@@ -865,6 +865,7 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
     ~next_check_now ~context:(module Context : CONTEXT) ~vrf_evaluator
     ~time_controller ~coinbase_receiver ~set_next_producer_timing ~frontier
     ~vrf_evaluation_state ~epoch_data_for_vrf ~ledger_snapshot i slot =
+  Merkle_ledger.Util.trace_logging_enabled := true ;
   O1trace.thread
     ( "block_producer_iteration "
     ^ Unsigned.UInt32.to_string i
@@ -926,13 +927,16 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
           in
           set_next_producer_timing (`Check_again epoch_end_time) consensus_state ;
           [%log info] "No more slots won in this epoch" ;
+          Merkle_ledger.Util.trace_logging_enabled := false ;
           schedule_next_check epoch_end_time
       | At last_slot ->
           set_next_producer_timing (`Evaluating_vrf last_slot) consensus_state ;
+          Merkle_ledger.Util.trace_logging_enabled := false ;
           O1trace.thread "block_producer_iteration: poll 1" @@ fun () -> poll ()
       | Start ->
           set_next_producer_timing (`Evaluating_vrf new_global_slot)
             consensus_state ;
+          Merkle_ledger.Util.trace_logging_enabled := false ;
           O1trace.thread "block_producer_iteration: poll 2" @@ fun () -> poll ()
       )
   | Some slot_won -> (
@@ -977,6 +981,7 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
           (`Produce_now (data, winner_pk))
           consensus_state ;
         Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
+        Merkle_ledger.Util.trace_logging_enabled := false ;
         dispatch_now (now, data, winner_pk) )
       else
         O1trace.thread "bp_8"
@@ -1002,6 +1007,7 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
                   , Mina_numbers.Global_slot_since_hard_fork.to_yojson
                       curr_global_slot )
                 ] ;
+            Merkle_ledger.Util.trace_logging_enabled := false ;
             next_check_now ()
         | Some slot_diff ->
             O1trace.thread "bp_10"
@@ -1025,6 +1031,7 @@ let iteration ~schedule_next_check ~dispatch_now ~schedule_dispatch
                   consensus_state ;
                 Mina_metrics.(Counter.inc_one Block_producer.slots_won) ) ;
             let scheduled_time = time_of_ms time in
+            Merkle_ledger.Util.trace_logging_enabled := false ;
             schedule_dispatch (scheduled_time, data, winner_pk) )
 
 let schedule ~logger ~time_controller time =
