@@ -286,7 +286,7 @@ Side-Car - InternalTraceService: container
 - name: internal-trace
   image: {{ .internalTrace.image }}
   imagePullPolicy: Always
-  args: ["consumer", "serve", "--trace-file", "/mina-logs/internal-tracing/internal-trace.jsonl", "--port", "8000"]
+  args: ["consumer", "serve", "--trace-file", "/mina-logs/internal-tracing/internal-trace.jsonl", "--db-path", "/mina-logs/internal-tracing/traces.db", "--port", "8000"]
   env:
   - name: POD
     valueFrom:
