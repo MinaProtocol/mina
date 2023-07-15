@@ -830,7 +830,9 @@ end = struct
     let res = Relative_position.Table.create () in
     Hashtbl.iter equivalence_classes ~f:(fun ps ->
         let rotate_left = function [] -> [] | x :: xs -> xs @ [ x ] in
-        let ps = Hash_set.to_list ps in
+        let ps =
+          Hash_set.to_list ps |> List.sort ~compare:[%compare: Row.t Position.t]
+        in
         List.iter2_exn ps (rotate_left ps) ~f:(fun input output ->
             Hashtbl.add_exn res ~key:input ~data:output ) ) ;
     res
