@@ -602,7 +602,7 @@ module Plonk_constraint = struct
           ; (* Coefficients *) two_to_rot
           } ->
           Rot64
-            { (* Current row *) word = f word
+            { word = f word
             ; rotated = f rotated
             ; excess = f excess
             ; bound_limb0 = f bound_limb0
@@ -2034,7 +2034,7 @@ end = struct
         add_row sys vars_next Zero [||]
     | Plonk_constraint.T
         (Rot64
-          { (* Current row *) word
+          { word
           ; rotated
           ; excess
           ; bound_limb0
