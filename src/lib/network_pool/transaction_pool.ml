@@ -758,7 +758,8 @@ struct
       Mina_metrics.(
         Gauge.set Transaction_pool.pool_size
           (Float.of_int (Indexed_pool.size pool))) ;
-      t.pool <- pool
+      t.pool <- pool ;
+      Deferred.unit
 
     let create ~constraint_constants ~consensus_constants ~time_controller
         ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
@@ -1365,7 +1366,7 @@ struct
         in
         (decision, accepted, rejected)
 
-      let unsafe_apply (t : pool) (diff : verified Envelope.Incoming.t) :
+      let unsafe_apply' (t : pool) (diff : verified Envelope.Incoming.t) :
           ([ `Accept | `Reject ] * t * rejected, _) Result.t =
         match apply t diff with
         | Ok (decision, accepted, rejected) ->
@@ -1385,6 +1386,8 @@ struct
               , List.map ~f:(Tuple2.map_fst ~f:forget_cmd) rejected )
         | Error e ->
             Error (`Other e)
+
+      let unsafe_apply t diff = Deferred.return (unsafe_apply' t diff)
 
       type Structured_log_events.t +=
         | Transactions_received of { txns : t; sender : Envelope.Sender.t }
@@ -2021,14 +2024,14 @@ let%test_module _ =
                ~libp2p_port:8302 )
       in
       let tm0 = Time.now () in
-      let%map verified =
+      let%bind verified =
         Test.Resource_pool.Diff.verify test.txn_pool
           (Envelope.Incoming.wrap
              ~data:(List.map ~f:User_command.forget_check cs)
              ~sender )
         >>| Or_error.ok_exn
       in
-      let result =
+      let%map result =
         Test.Resource_pool.Diff.unsafe_apply test.txn_pool verified
       in
       let tm1 = Time.now () in
