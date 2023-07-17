@@ -720,7 +720,7 @@ let profile_zkapps ~verifier ledger zkapp_commands =
         let%map () =
           let mask = Mina_ledger.Ledger.copy ledger in
           match%map
-            Async_kernel.Monitor.try_with (fun () ->
+            Async_kernel.Monitor.try_with ~here:[%here] (fun () ->
                 Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn
                   ~ignore_outside_snark:true mask [ zkapp_command ] )
           with

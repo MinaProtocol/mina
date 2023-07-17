@@ -122,6 +122,7 @@ func LoadPrivateKeyFiles(log logging.StandardLogger, params KeyloaderParams, out
 
 type KeyloaderAction struct{}
 
+func (KeyloaderAction) Name() string { return "load-keys" }
 func (KeyloaderAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
 	var params KeyloaderParams
 	if err := json.Unmarshal(rawParams, &params); err != nil {
