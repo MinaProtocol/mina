@@ -481,13 +481,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ( snark_node_key2.keypair.public_key
              |> Signature_lib.Public_key.compress ) )
     in
-    let new_snark_work_fee = Currency.Amount.of_mina_string_exn "0.0001" in
+    let new_snark_work_fee = Currency.Amount.of_formatted_string "0.0001" in
     let%bind () =
       section_hard "change snark work fee from 0.0002 to 0.0001"
         (Integration_test_lib.Graphql_requests.must_set_snark_work_fee ~logger
            (Network.Node.get_ingress_uri snark_coordinator)
-           ~new_snark_work_fee:
-             (Currency.Amount.to_nanomina_int new_snark_work_fee) )
+           ~new_snark_work_fee:(Currency.Amount.to_int new_snark_work_fee) )
     in
     let%bind () =
       section_hard
