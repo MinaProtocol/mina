@@ -289,19 +289,6 @@ module Plonk_constraint = struct
           ; bound_crumb5 : 'v
           ; bound_crumb6 : 'v
           ; bound_crumb7 : 'v
-          ; (* Next row *) shifted : 'v
-          ; shifted_limb0 : 'v
-          ; shifted_limb1 : 'v
-          ; shifted_limb2 : 'v
-          ; shifted_limb3 : 'v
-          ; shifted_crumb0 : 'v
-          ; shifted_crumb1 : 'v
-          ; shifted_crumb2 : 'v
-          ; shifted_crumb3 : 'v
-          ; shifted_crumb4 : 'v
-          ; shifted_crumb5 : 'v
-          ; shifted_crumb6 : 'v
-          ; shifted_crumb7 : 'v
           ; (* Coefficients *) two_to_rot : 'f (* Rotation scalar 2^rot *)
           }
       | Raw of
@@ -559,23 +546,10 @@ module Plonk_constraint = struct
           ; bound_crumb5
           ; bound_crumb6
           ; bound_crumb7
-          ; (* Next row *) shifted
-          ; shifted_limb0
-          ; shifted_limb1
-          ; shifted_limb2
-          ; shifted_limb3
-          ; shifted_crumb0
-          ; shifted_crumb1
-          ; shifted_crumb2
-          ; shifted_crumb3
-          ; shifted_crumb4
-          ; shifted_crumb5
-          ; shifted_crumb6
-          ; shifted_crumb7
           ; (* Coefficients *) two_to_rot
           } ->
           Rot64
-            { (* Current row *) word = f word
+            { word = f word
             ; rotated = f rotated
             ; excess = f excess
             ; bound_limb0 = f bound_limb0
@@ -590,19 +564,6 @@ module Plonk_constraint = struct
             ; bound_crumb5 = f bound_crumb5
             ; bound_crumb6 = f bound_crumb6
             ; bound_crumb7 = f bound_crumb7
-            ; (* Next row *) shifted = f shifted
-            ; shifted_limb0 = f shifted_limb0
-            ; shifted_limb1 = f shifted_limb1
-            ; shifted_limb2 = f shifted_limb2
-            ; shifted_limb3 = f shifted_limb3
-            ; shifted_crumb0 = f shifted_crumb0
-            ; shifted_crumb1 = f shifted_crumb1
-            ; shifted_crumb2 = f shifted_crumb2
-            ; shifted_crumb3 = f shifted_crumb3
-            ; shifted_crumb4 = f shifted_crumb4
-            ; shifted_crumb5 = f shifted_crumb5
-            ; shifted_crumb6 = f shifted_crumb6
-            ; shifted_crumb7 = f shifted_crumb7
             ; (* Coefficients *) two_to_rot
             }
       | Raw { kind; values; coeffs } ->
@@ -1844,7 +1805,7 @@ end = struct
            ; Some (reduce_to_v out_3)
           |]
         in
-        (* The generic gate after a Xor16 gate is a Const to check that all values are zero.
+        (* The raw gate after a Xor16 gate is a Const to check that all values are zero.
            For that, the first coefficient is 1 and the rest will be zero.
            This will be included in the gadget for a chain of Xors, not here.*)
         add_row sys curr_row Xor16 [||]
@@ -1924,26 +1885,26 @@ end = struct
           ; product1_hi_0
           } ) ->
         (*
-        //! | Gate   | `ForeignFieldMul`            | `Zero`                    |
-        //! | ------ | ---------------------------- | ------------------------- |
-        //! | Column | `Curr`                       | `Next`                    |
-        //! | ------ | ---------------------------- | ------------------------- |
-        //! |      0 | `left_input0`         (copy) | `remainder0`       (copy) |
-        //! |      1 | `left_input1`         (copy) | `remainder1`       (copy) |
-        //! |      2 | `left_input2`         (copy) | `remainder2`       (copy) |
-        //! |      3 | `right_input0`        (copy) | `quotient_bound01` (copy) |
-        //! |      4 | `right_input1`        (copy) | `quotient_bound2`  (copy) |
-        //! |      5 | `right_input2`        (copy) | `product1_lo`      (copy) |
-        //! |      6 | `carry1_lo`           (copy) | `product1_hi_0`    (copy) |
-        //! |      7 | `carry1_hi`        (plookup) |                           |
-        //! |      8 | `carry0`                     |                           |
-        //! |      9 | `quotient0`                  |                           |
-        //! |     10 | `quotient1`                  |                           |
-        //! |     11 | `quotient2`                  |                           |
-        //! |     12 | `quotient_bound_carry`       |                           |
-        //! |     13 | `product1_hi_1`              |                           |
-        //! |     14 |                              |                           |
-        *)
+  //! | Gate   | `ForeignFieldMul`            | `Zero`                    |
+  //! | ------ | ---------------------------- | ------------------------- |
+  //! | Column | `Curr`                       | `Next`                    |
+  //! | ------ | ---------------------------- | ------------------------- |
+  //! |      0 | `left_input0`         (copy) | `remainder0`       (copy) |
+  //! |      1 | `left_input1`         (copy) | `remainder1`       (copy) |
+  //! |      2 | `left_input2`         (copy) | `remainder2`       (copy) |
+  //! |      3 | `right_input0`        (copy) | `quotient_bound01` (copy) |
+  //! |      4 | `right_input1`        (copy) | `quotient_bound2`  (copy) |
+  //! |      5 | `right_input2`        (copy) | `product1_lo`      (copy) |
+  //! |      6 | `carry1_lo`           (copy) | `product1_hi_0`    (copy) |
+  //! |      7 | `carry1_hi`        (plookup) |                           |
+  //! |      8 | `carry0`                     |                           |
+  //! |      9 | `quotient0`                  |                           |
+  //! |     10 | `quotient1`                  |                           |
+  //! |     11 | `quotient2`                  |                           |
+  //! |     12 | `quotient_bound_carry`       |                           |
+  //! |     13 | `product1_hi_1`              |                           |
+  //! |     14 |                              |                           |
+  *)
         let vars_curr =
           [| (* Current row *) Some (reduce_to_v left_input0)
            ; Some (reduce_to_v left_input1)
@@ -1984,7 +1945,7 @@ end = struct
         add_row sys vars_next Zero [||]
     | Plonk_constraint.T
         (Rot64
-          { (* Current row *) word
+          { word
           ; rotated
           ; excess
           ; bound_limb0
@@ -1999,41 +1960,28 @@ end = struct
           ; bound_crumb5
           ; bound_crumb6
           ; bound_crumb7
-          ; (* Next row *) shifted
-          ; shifted_limb0
-          ; shifted_limb1
-          ; shifted_limb2
-          ; shifted_limb3
-          ; shifted_crumb0
-          ; shifted_crumb1
-          ; shifted_crumb2
-          ; shifted_crumb3
-          ; shifted_crumb4
-          ; shifted_crumb5
-          ; shifted_crumb6
-          ; shifted_crumb7
           ; (* Coefficients *) two_to_rot
           } ) ->
         (*
-        //! | Gate   | `Rot64`             | `RangeCheck0`    |
-        //! | ------ | ------------------- | ---------------- |
-        //! | Column | `Curr`              | `Next`           |
-        //! | ------ | ------------------- | ---------------- |
-        //! |      0 | copy `word`         |`shifted`         |
-        //! |      1 | copy `rotated`      | 0                |
-        //! |      2 |      `excess`       | 0                |
-        //! |      3 |      `bound_limb0`  | `shifted_limb0`  |
-        //! |      4 |      `bound_limb1`  | `shifted_limb1`  |
-        //! |      5 |      `bound_limb2`  | `shifted_limb2`  |
-        //! |      6 |      `bound_limb3`  | `shifted_limb3`  |
-        //! |      7 |      `bound_crumb0` | `shifted_crumb0` |
-        //! |      8 |      `bound_crumb1` | `shifted_crumb1` |
-        //! |      9 |      `bound_crumb2` | `shifted_crumb2` |
-        //! |     10 |      `bound_crumb3` | `shifted_crumb3` |
-        //! |     11 |      `bound_crumb4` | `shifted_crumb4` |
-        //! |     12 |      `bound_crumb5` | `shifted_crumb5` |
-        //! |     13 |      `bound_crumb6` | `shifted_crumb6` |
-        //! |     14 |      `bound_crumb7` | `shifted_crumb7` |
+        //! | Gate   | `Rot64`             | `RangeCheck0` gadgets (designer's duty)                   |
+        //! | ------ | ------------------- | --------------------------------------------------------- |
+        //! | Column | `Curr`              | `Next`           | `Next` + 1      | `Next`+ 2, if needed |
+        //! | ------ | ------------------- | ---------------- | --------------- | -------------------- |
+        //! |      0 | copy `word`         |`shifted`         |   copy `excess` |    copy      `word`  |
+        //! |      1 | copy `rotated`      | 0                |              0  |                  0   |
+        //! |      2 |      `excess`       | 0                |              0  |                  0   |
+        //! |      3 |      `bound_limb0`  | `shifted_limb0`  |  `excess_limb0` |        `word_limb0`  |
+        //! |      4 |      `bound_limb1`  | `shifted_limb1`  |  `excess_limb1` |        `word_limb1`  |
+        //! |      5 |      `bound_limb2`  | `shifted_limb2`  |  `excess_limb2` |        `word_limb2`  |
+        //! |      6 |      `bound_limb3`  | `shifted_limb3`  |  `excess_limb3` |        `word_limb3`  |
+        //! |      7 |      `bound_crumb0` | `shifted_crumb0` | `excess_crumb0` |       `word_crumb0`  |
+        //! |      8 |      `bound_crumb1` | `shifted_crumb1` | `excess_crumb1` |       `word_crumb1`  | 
+        //! |      9 |      `bound_crumb2` | `shifted_crumb2` | `excess_crumb2` |       `word_crumb2`  | 
+        //! |     10 |      `bound_crumb3` | `shifted_crumb3` | `excess_crumb3` |       `word_crumb3`  | 
+        //! |     11 |      `bound_crumb4` | `shifted_crumb4` | `excess_crumb4` |       `word_crumb4`  |
+        //! |     12 |      `bound_crumb5` | `shifted_crumb5` | `excess_crumb5` |       `word_crumb5`  |
+        //! |     13 |      `bound_crumb6` | `shifted_crumb6` | `excess_crumb6` |       `word_crumb6`  |
+        //! |     14 |      `bound_crumb7` | `shifted_crumb7` | `excess_crumb7` |       `word_crumb7`  |
         *)
         let vars_curr =
           [| (* Current row *) Some (reduce_to_v word)
@@ -2053,28 +2001,7 @@ end = struct
            ; Some (reduce_to_v bound_crumb7)
           |]
         in
-        let vars_next =
-          [| (* Next row *) Some (reduce_to_v shifted)
-           ; None
-           ; None
-           ; Some (reduce_to_v shifted_limb0)
-           ; Some (reduce_to_v shifted_limb1)
-           ; Some (reduce_to_v shifted_limb2)
-           ; Some (reduce_to_v shifted_limb3)
-           ; Some (reduce_to_v shifted_crumb0)
-           ; Some (reduce_to_v shifted_crumb1)
-           ; Some (reduce_to_v shifted_crumb2)
-           ; Some (reduce_to_v shifted_crumb3)
-           ; Some (reduce_to_v shifted_crumb4)
-           ; Some (reduce_to_v shifted_crumb5)
-           ; Some (reduce_to_v shifted_crumb6)
-           ; Some (reduce_to_v shifted_crumb7)
-          |]
-        in
-        let compact = Fp.zero in
-        add_row sys vars_curr Rot64 [| two_to_rot |] ;
-        add_row sys vars_next RangeCheck0
-          [| compact (* Standard 3-limb mode *) |]
+        add_row sys vars_curr Rot64 [| two_to_rot |]
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->
