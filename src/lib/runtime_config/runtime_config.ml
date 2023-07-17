@@ -111,6 +111,20 @@ module Json_layout = struct
             | _ ->
                 Error
                   "Runtime_config.Json_Account.Single.Permissions.Auth_Required.t"
+
+          let of_account_perm = function
+            | Mina_base.Permissions.Auth_required.None ->
+                None
+            | Either ->
+                Either
+            | Proof ->
+                Proof
+            | Signature ->
+                Signature
+            | Both ->
+                Both
+            | Impossible ->
+                Impossible
         end
 
         type t =
@@ -223,6 +237,86 @@ module Json_layout = struct
         ; voting_for = None
         ; snapp = None
         ; permissions = None
+        }
+
+      let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
+        let open Result.Let_syntax in
+        let open Signature_lib in
+        let%map snapp =
+          match a.snapp with
+          | None ->
+              return None
+          | Some snapp ->
+              let state = Mina_base.Snapp_state.V.to_list snapp.app_state in
+              let%map verification_key =
+                match snapp.verification_key with
+                | None ->
+                    return None
+                | Some vk ->
+                    Binable.to_string
+                      (module Pickles.Side_loaded.Verification_key.Stable.Latest)
+                      vk.With_hash.data
+                    |> Base64.encode ~alphabet:Base64.uri_safe_alphabet
+                    |> Result.map ~f:Option.return
+                    |> Result.map_error ~f:(fun (`Msg m) -> m)
+              in
+              Some Snapp_account.{ state; verification_key }
+        in
+        { pk = Some (Public_key.Compressed.to_base58_check a.public_key)
+        ; sk = None
+        ; balance = a.balance
+        ; delegate =
+            Option.map a.delegate ~f:(fun pk ->
+                Public_key.Compressed.to_base58_check pk )
+        ; timing =
+            ( match a.timing with
+            | Untimed ->
+                None
+            | Timed t ->
+                let open Timed in
+                Some
+                  { initial_minimum_balance = t.initial_minimum_balance
+                  ; cliff_time = t.cliff_time
+                  ; cliff_amount = t.cliff_amount
+                  ; vesting_period = t.vesting_period
+                  ; vesting_increment = t.vesting_increment
+                  } )
+        ; token = Some (Mina_base.Token_id.to_uint64 a.token_id)
+        ; token_permissions =
+            Some
+              ( match a.token_permissions with
+              | Token_owned { disable_new_accounts } ->
+                  { token_owned = true
+                  ; account_disabled = false
+                  ; disable_new_accounts
+                  }
+              | Not_owned { account_disabled } ->
+                  { token_owned = false
+                  ; account_disabled
+                  ; disable_new_accounts = false
+                  } )
+        ; nonce = a.nonce
+        ; receipt_chain_hash =
+            Some
+              (Mina_base.Receipt.Chain_hash.to_base58_check a.receipt_chain_hash)
+        ; voting_for = Some (Mina_base.State_hash.to_base58_check a.voting_for)
+        ; snapp
+        ; permissions =
+            Some
+              Permissions.
+                { stake = a.permissions.stake
+                ; edit_state =
+                    Auth_required.of_account_perm a.permissions.edit_state
+                ; send = Auth_required.of_account_perm a.permissions.send
+                ; receive = Auth_required.of_account_perm a.permissions.receive
+                ; set_delegate =
+                    Auth_required.of_account_perm a.permissions.set_delegate
+                ; set_permissions =
+                    Auth_required.of_account_perm a.permissions.set_permissions
+                ; set_verification_key =
+                    Auth_required.of_account_perm
+                      a.permissions.set_verification_key
+                }
         }
     end
 
@@ -661,6 +755,21 @@ module Proof_keys = struct
     }
   [@@deriving bin_io_unversioned]
 
+  let make ?level ?sub_window_per_window ?ledger_depth ?work_delay
+      ?block_window_duration_ms ?transaction_capacity ?coinbase_amount
+      ?supercharged_coinbase_factor ?account_creation_fee ?fork () =
+    { level
+    ; sub_windows_per_window = sub_window_per_window
+    ; ledger_depth
+    ; work_delay
+    ; block_window_duration_ms
+    ; transaction_capacity
+    ; coinbase_amount
+    ; supercharged_coinbase_factor
+    ; account_creation_fee
+    ; fork
+    }
+
   let to_json_layout
       { level
       ; sub_windows_per_window
@@ -858,6 +967,9 @@ type t =
   ; epoch_data : Epoch_data.t option
   }
 [@@deriving bin_io_unversioned]
+
+let make ?daemon ?genesis ?proof ?ledger ?epoch_data () =
+  { daemon; genesis; proof; ledger; epoch_data }
 
 let to_json_layout { daemon; genesis; proof; ledger; epoch_data } =
   { Json_layout.daemon = Option.map ~f:Daemon.to_json_layout daemon
