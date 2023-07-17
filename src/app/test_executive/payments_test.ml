@@ -484,7 +484,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "change snark work fee from 0.0002 to 0.0001"
         (Integration_test_lib.Graphql_requests.must_set_snark_work_fee ~logger
            (Network.Node.get_ingress_uri snark_coordinator)
-           ~new_snark_work_fee:(Currency.Amount.to_nanomina_int new_snark_work_fee) )
+           ~new_snark_work_fee:
+             (Currency.Amount.to_nanomina_int new_snark_work_fee) )
     in
     let%bind () =
       section_hard
@@ -525,7 +526,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "balance check successful.  \n\
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
-              snark-node-key2 expected balance: %s"
+              new-snark-work-fee: %s"
              (Currency.Balance.to_mina_string key_1_balance_actual)
              (Currency.Balance.to_mina_string key_2_balance_actual)
              (Currency.Amount.to_mina_string new_snark_work_fee) ;
@@ -536,7 +537,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Error with balance of snark-node-key2.  \n\
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
-              snark-node-key2 expected balance: %s"
+              new-snark-work-fee: %s"
              (Currency.Balance.to_mina_string key_1_balance_actual)
              (Currency.Balance.to_mina_string key_2_balance_actual)
              (Currency.Amount.to_mina_string new_snark_work_fee) )
