@@ -429,93 +429,6 @@ module Call_forest = struct
 
   let deferred_mapi = Tree.deferred_mapi_forest
 
-  let%test_unit "Account_update_or_stack.of_zkapp_command_list" =
-    let zkapp_command_list_1 = [ 0; 0; 0; 0 ] in
-    let node i calls =
-      { With_stack_hash.elt =
-          { Tree.calls; account_update = i; account_update_digest = () }
-      ; stack_hash = ()
-      }
-    in
-    let zkapp_command_list_1_res : (int, unit, unit) t =
-      let n0 = node 0 [] in
-      [ n0; n0; n0; n0 ]
-    in
-    let f_index = mapi ~f:(fun i _p -> i) in
-    [%test_eq: (int, unit, unit) t]
-      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_1)
-      zkapp_command_list_1_res ;
-    let zkapp_command_list1_index : (int, unit, unit) t =
-      let n i = node i [] in
-      [ n 0; n 1; n 2; n 3 ]
-    in
-    [%test_eq: (int, unit, unit) t]
-      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_1
-      |> f_index )
-      zkapp_command_list1_index ;
-    [%test_eq: int list]
-      (to_account_updates
-         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_1) )
-      zkapp_command_list_1 ;
-    let zkapp_command_list_2 = [ 0; 0; 1; 1 ] in
-    let zkapp_command_list_2_res =
-      [ node 0 []; node 0 [ node 1 []; node 1 [] ] ]
-    in
-    let zkapp_command_list_2_index =
-      [ node 0 []; node 1 [ node 2 []; node 3 [] ] ]
-    in
-    [%test_eq: (int, unit, unit) t]
-      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_2)
-      zkapp_command_list_2_res ;
-    [%test_eq: (int, unit, unit) t]
-      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_2
-      |> f_index )
-      zkapp_command_list_2_index ;
-    [%test_eq: int list]
-      (to_account_updates
-         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_2) )
-      zkapp_command_list_2 ;
-    let zkapp_command_list_3 = [ 0; 0; 1; 0 ] in
-    let zkapp_command_list_3_res =
-      [ node 0 []; node 0 [ node 1 [] ]; node 0 [] ]
-    in
-    let zkapp_command_list_3_index =
-      [ node 0 []; node 1 [ node 2 [] ]; node 3 [] ]
-    in
-    [%test_eq: (int, unit, unit) t]
-      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_3)
-      zkapp_command_list_3_res ;
-    [%test_eq: (int, unit, unit) t]
-      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_3
-      |> f_index )
-      zkapp_command_list_3_index ;
-    [%test_eq: int list]
-      (to_account_updates
-         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_3) )
-      zkapp_command_list_3 ;
-    let zkapp_command_list_4 = [ 0; 1; 2; 3; 2; 1; 0 ] in
-    let zkapp_command_list_4_res =
-      [ node 0 [ node 1 [ node 2 [ node 3 [] ]; node 2 [] ]; node 1 [] ]
-      ; node 0 []
-      ]
-    in
-    let zkapp_command_list_4_index =
-      [ node 0 [ node 1 [ node 2 [ node 3 [] ]; node 4 [] ]; node 5 [] ]
-      ; node 6 []
-      ]
-    in
-    [%test_eq: (int, unit, unit) t]
-      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4)
-      zkapp_command_list_4_res ;
-    [%test_eq: (int, unit, unit) t]
-      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4
-      |> f_index )
-      zkapp_command_list_4_index ;
-    [%test_eq: int list]
-      (to_account_updates
-         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4) )
-      zkapp_command_list_4
-
   let to_zkapp_command_with_hashes_list (xs : _ t) =
     let rec collect (xs : _ t) acc =
       match xs with
@@ -932,16 +845,6 @@ let to_simple (t : t) : Simple.t =
                  }
              } )
   }
-
-let%test_unit "wire embedded in t" =
-  let module Wire = Stable.Latest.Wire in
-  Quickcheck.test ~trials:10 ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
-      [%test_eq: Wire.t] (to_wire (of_wire w)) w )
-
-let%test_unit "wire embedded in graphql" =
-  let module Wire = Stable.Latest.Wire in
-  Quickcheck.test ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
-      [%test_eq: Wire.t] (Wire.of_graphql_repr (Wire.to_graphql_repr w)) w )
 
 let all_account_updates (t : t) : _ Call_forest.t =
   let p = t.fee_payer in
@@ -1945,6 +1848,17 @@ module Update_group = Make_update_group (struct
         failwith "zkapp_segment_of_controls: Unsupported combination"
 end)
 
+let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
+    ~(genesis_constants : Genesis_constants.t) () =
+  (*10.26*np + 10.08*n2 + 9.14*n1 < 69.45*)
+  let proof_cost = genesis_constants.zkapp_proof_update_cost in
+  let signed_pair_cost = genesis_constants.zkapp_signed_pair_update_cost in
+  let signed_single_cost = genesis_constants.zkapp_signed_single_update_cost in
+  Float.(
+    (proof_cost * of_int proof_segments)
+    + (signed_pair_cost * of_int signed_pair_segments)
+    + (signed_single_cost * of_int signed_single_segments))
+
 (* Zkapp_command transactions are filtered using this predicate
    - when adding to the transaction pool
    - in incoming blocks
@@ -1975,7 +1889,7 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
       ( [ ((), (), ()) ]
       :: [ ((), (), ()) :: List.map all_updates ~f:(fun _ -> ((), (), ())) ] )
   in
-  let proof_segments, signed_singles, signed_pairs =
+  let proof_segments, signed_single_segments, signed_pair_segments =
     List.fold ~init:(0, 0, 0) groups
       ~f:(fun (proof_segments, signed_singles, signed_pairs) { spec; _ } ->
         match spec with
@@ -1986,18 +1900,13 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
         | Signed_pair ->
             (proof_segments, signed_singles, signed_pairs + 1) )
   in
-  let proof_cost = genesis_constants.zkapp_proof_update_cost in
-  let signed_pair_cost = genesis_constants.zkapp_signed_pair_update_cost in
-  let signed_single_cost = genesis_constants.zkapp_signed_single_update_cost in
   let cost_limit = genesis_constants.zkapp_transaction_cost_limit in
   let max_event_elements = genesis_constants.max_event_elements in
   let max_action_elements = genesis_constants.max_action_elements in
-  (*10.26*np + 10.08*n2 + 9.14*n1 < 69.45*)
   let zkapp_cost_within_limit =
     Float.(
-      (proof_cost * of_int proof_segments)
-      + (signed_pair_cost * of_int signed_pairs)
-      + (signed_single_cost * of_int signed_singles)
+      zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
+        ~genesis_constants ()
       < cost_limit)
   in
   let valid_event_elements = num_event_elements <= max_event_elements in
@@ -2031,6 +1940,14 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
       |> String.concat ~sep:"; "
     in
     Error (Error.of_string err_msg)
+
+let has_zero_vesting_period t =
+  Call_forest.exists t.account_updates ~f:(fun p ->
+      match p.body.update.timing with
+      | Keep ->
+          false
+      | Set { vesting_period; _ } ->
+          Mina_numbers.Global_slot_span.(equal zero) vesting_period )
 
 let get_transaction_commitments (zkapp_command : t) =
   let memo_hash = Signed_command_memo.hash zkapp_command.memo in
@@ -2081,22 +1998,8 @@ module For_tests = struct
     }
 end
 
-let%test_module "Test" =
-  ( module struct
-    module Fd = Fields_derivers_zkapps.Derivers
-
-    let full = deriver @@ Fd.o ()
-
-    let%test_unit "json roundtrip dummy" =
-      [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
-
-    let%test_unit "full circuit" =
-      Run_in_thread.block_on_async_exn
-      @@ fun () -> Fields_derivers_zkapps.Test.Loop.run full dummy
-
-    let%test "latest zkApp version" =
-      (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
-         for latest version, then update this test
-      *)
-      Stable.Latest.version = 1
-  end )
+let%test "latest zkApp version" =
+  (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
+     for latest version, then update this test
+  *)
+  Stable.Latest.version = 1

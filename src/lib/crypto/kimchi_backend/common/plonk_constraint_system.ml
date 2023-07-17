@@ -168,6 +168,8 @@ module Plonk_constraint = struct
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
       | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
+      | Lookup of
+          { w0 : 'v; w1 : 'v; w2 : 'v; w3 : 'v; w4 : 'v; w5 : 'v; w6 : 'v }
       | RangeCheck0 of
           { v0 : 'v (* Value to constrain to 88-bits *)
           ; v0p0 : 'v (* MSBs *)
@@ -250,6 +252,7 @@ module Plonk_constraint = struct
           ; (* Coefficients *) foreign_field_modulus0 : 'f
           ; foreign_field_modulus1 : 'f
           ; foreign_field_modulus2 : 'f
+          ; sign : 'f
           }
       | ForeignFieldMul of
           { (* Current row *)
@@ -338,6 +341,16 @@ module Plonk_constraint = struct
           EC_endoscalar
             { state =
                 Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
+            }
+      | Lookup { w0; w1; w2; w3; w4; w5; w6 } ->
+          Lookup
+            { w0 = f w0
+            ; w1 = f w1
+            ; w2 = f w2
+            ; w3 = f w3
+            ; w4 = f w4
+            ; w5 = f w5
+            ; w6 = f w6
             }
       | RangeCheck0
           { v0
@@ -485,6 +498,7 @@ module Plonk_constraint = struct
           ; (* Coefficients *) foreign_field_modulus0
           ; foreign_field_modulus1
           ; foreign_field_modulus2
+          ; sign
           } ->
           ForeignFieldAdd
             { left_input_lo = f left_input_lo
@@ -498,6 +512,7 @@ module Plonk_constraint = struct
             ; (* Coefficients *) foreign_field_modulus0
             ; foreign_field_modulus1
             ; foreign_field_modulus2
+            ; sign
             }
       | ForeignFieldMul
           { (* Current row *) left_input0
@@ -815,7 +830,9 @@ end = struct
     let res = Relative_position.Table.create () in
     Hashtbl.iter equivalence_classes ~f:(fun ps ->
         let rotate_left = function [] -> [] | x :: xs -> xs @ [ x ] in
-        let ps = Hash_set.to_list ps in
+        let ps =
+          Hash_set.to_list ps |> List.sort ~compare:[%compare: Row.t Position.t]
+        in
         List.iter2_exn ps (rotate_left ps) ~f:(fun input output ->
             Hashtbl.add_exn res ~key:input ~data:output ) ) ;
     res
@@ -1657,6 +1674,18 @@ end = struct
           ~f:
             (Fn.compose add_endoscale_scalar_round
                (Endoscale_scalar_round.map ~f:reduce_to_v) )
+    | Plonk_constraint.T (Lookup { w0; w1; w2; w3; w4; w5; w6 }) ->
+        let vars =
+          [| Some (reduce_to_v w0)
+           ; Some (reduce_to_v w1)
+           ; Some (reduce_to_v w2)
+           ; Some (reduce_to_v w3)
+           ; Some (reduce_to_v w4)
+           ; Some (reduce_to_v w5)
+           ; Some (reduce_to_v w6)
+          |]
+        in
+        add_row sys vars Lookup [||]
     | Plonk_constraint.T
         (RangeCheck0
           { v0
@@ -1830,7 +1859,7 @@ end = struct
            ; Some (reduce_to_v out_3)
           |]
         in
-        (* The generic gate after a Xor16 gate is a Const to check that all values are zero.
+        (* The raw gate after a Xor16 gate is a Const to check that all values are zero.
            For that, the first coefficient is 1 and the rest will be zero.
            This will be included in the gadget for a chain of Xors, not here.*)
         add_row sys curr_row Xor16 [||]
@@ -1847,6 +1876,7 @@ end = struct
           ; (* Coefficients *) foreign_field_modulus0
           ; foreign_field_modulus1
           ; foreign_field_modulus2
+          ; sign
           } ) ->
         (*
         //! | Gate   | `ForeignFieldAdd`        | Circuit/gadget responsibility  |
@@ -1891,6 +1921,7 @@ end = struct
           [| foreign_field_modulus0
            ; foreign_field_modulus1
            ; foreign_field_modulus2
+           ; sign
           |]
     | Plonk_constraint.T
         (ForeignFieldMul
@@ -2008,25 +2039,25 @@ end = struct
           ; (* Coefficients *) two_to_rot
           } ) ->
         (*
-        //! | Gate   | `Rot64`             | `RangeCheck0` gadget designer's duty |
-        //! | ------ | ------------------- | ------------------------------------ |
-        //! | Column | `Curr`              | `Next`           |
-        //! | ------ | ------------------- | ---------------- |
-        //! |      0 | copy `word`         |`shifted`         |
-        //! |      1 | copy `rotated`      | 0                |
-        //! |      2 |      `excess`       | 0                |
-        //! |      3 |      `bound_limb0`  | `shifted_limb0`  |
-        //! |      4 |      `bound_limb1`  | `shifted_limb1`  |
-        //! |      5 |      `bound_limb2`  | `shifted_limb2`  |
-        //! |      6 |      `bound_limb3`  | `shifted_limb3`  |
-        //! |      7 |      `bound_crumb0` | `shifted_crumb0` |
-        //! |      8 |      `bound_crumb1` | `shifted_crumb1` |
-        //! |      9 |      `bound_crumb2` | `shifted_crumb2` |
-        //! |     10 |      `bound_crumb3` | `shifted_crumb3` |
-        //! |     11 |      `bound_crumb4` | `shifted_crumb4` |
-        //! |     12 |      `bound_crumb5` | `shifted_crumb5` |
-        //! |     13 |      `bound_crumb6` | `shifted_crumb6` |
-        //! |     14 |      `bound_crumb7` | `shifted_crumb7` |
+        //! | Gate   | `Rot64`             | `RangeCheck0` gadgets (designer's duty)                   |
+        //! | ------ | ------------------- | --------------------------------------------------------- |
+        //! | Column | `Curr`              | `Next`           | `Next` + 1      | `Next`+ 2, if needed |
+        //! | ------ | ------------------- | ---------------- | --------------- | -------------------- |
+        //! |      0 | copy `word`         |`shifted`         |   copy `excess` |    copy      `word`  |
+        //! |      1 | copy `rotated`      | 0                |              0  |                  0   |
+        //! |      2 |      `excess`       | 0                |              0  |                  0   |
+        //! |      3 |      `bound_limb0`  | `shifted_limb0`  |  `excess_limb0` |        `word_limb0`  |
+        //! |      4 |      `bound_limb1`  | `shifted_limb1`  |  `excess_limb1` |        `word_limb1`  |
+        //! |      5 |      `bound_limb2`  | `shifted_limb2`  |  `excess_limb2` |        `word_limb2`  |
+        //! |      6 |      `bound_limb3`  | `shifted_limb3`  |  `excess_limb3` |        `word_limb3`  |
+        //! |      7 |      `bound_crumb0` | `shifted_crumb0` | `excess_crumb0` |       `word_crumb0`  |
+        //! |      8 |      `bound_crumb1` | `shifted_crumb1` | `excess_crumb1` |       `word_crumb1`  | 
+        //! |      9 |      `bound_crumb2` | `shifted_crumb2` | `excess_crumb2` |       `word_crumb2`  | 
+        //! |     10 |      `bound_crumb3` | `shifted_crumb3` | `excess_crumb3` |       `word_crumb3`  | 
+        //! |     11 |      `bound_crumb4` | `shifted_crumb4` | `excess_crumb4` |       `word_crumb4`  |
+        //! |     12 |      `bound_crumb5` | `shifted_crumb5` | `excess_crumb5` |       `word_crumb5`  |
+        //! |     13 |      `bound_crumb6` | `shifted_crumb6` | `excess_crumb6` |       `word_crumb6`  |
+        //! |     14 |      `bound_crumb7` | `shifted_crumb7` | `excess_crumb7` |       `word_crumb7`  |
         *)
         let vars_curr =
           [| (* Current row *) Some (reduce_to_v word)

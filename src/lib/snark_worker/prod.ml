@@ -138,8 +138,8 @@ module Inputs = struct
                           in
                           let log_base_snark f ~statement ~spec ~all_inputs =
                             match%map.Deferred
-                              Deferred.Or_error.try_with (fun () ->
-                                  f ~statement ~spec )
+                              Deferred.Or_error.try_with ~here:[%here]
+                                (fun () -> f ~statement ~spec)
                             with
                             | Ok p ->
                                 Ok p

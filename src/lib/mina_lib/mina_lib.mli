@@ -194,7 +194,7 @@ val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
 
-val get_ledger : t -> State_hash.t option -> Account.t list Or_error.t
+val get_ledger : t -> State_hash.t option -> Account.t list Deferred.Or_error.t
 
 val get_snarked_ledger :
   t -> State_hash.t option -> Account.t list Deferred.Or_error.t
@@ -217,8 +217,14 @@ val net : t -> Mina_networking.t
 
 val runtime_config : t -> Runtime_config.t
 
+val start_filtered_log : t -> string list -> unit Or_error.t
+
+val get_filtered_log_entries : t -> int -> string list * bool
+
 val verifier : t -> Verifier.t
 
 val vrf_evaluator : t -> Vrf_evaluator.t
 
 val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t
+
+val vrf_evaluation_state : t -> Block_producer.Vrf_evaluation_state.t

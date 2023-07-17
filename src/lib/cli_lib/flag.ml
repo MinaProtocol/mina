@@ -324,6 +324,16 @@ module Log = struct
     in
     flag "--file-log-level" ~aliases:[ "file-log-level" ] ~doc
       (optional_with_default Logger.Level.Trace log_level)
+
+  let file_log_rotations =
+    let open Command.Param in
+    flag "--file-log-rotations"
+      ~doc:
+        (Printf.sprintf
+           "Number of file log rotations before overwriting old logs (default: \
+            %d)"
+           Default.file_log_rotations )
+      (optional_with_default Default.file_log_rotations int)
 end
 
 type signed_command_common =
@@ -346,8 +356,7 @@ let signed_command_common : signed_command_common Command.Param.t =
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_mina_string
-              Mina_compile_config.default_transaction_fee )
+           (Currency.Fee.to_mina_string Currency.Fee.default_transaction_fee)
            (Currency.Fee.to_mina_string Mina_base.Signed_command.minimum_fee) )
       (optional txn_fee)
   and nonce =
@@ -362,7 +371,7 @@ let signed_command_common : signed_command_common Command.Param.t =
       ~doc:"STRING Memo accompanying the transaction" (optional string)
   in
   { sender
-  ; fee = Option.value fee ~default:Mina_compile_config.default_transaction_fee
+  ; fee = Option.value fee ~default:Currency.Fee.default_transaction_fee
   ; nonce
   ; memo
   }
@@ -393,8 +402,7 @@ module Signed_command = struct
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_mina_string
-              Mina_compile_config.default_transaction_fee )
+           (Currency.Fee.to_mina_string Currency.Fee.default_transaction_fee)
            (Currency.Fee.to_mina_string Mina_base.Signed_command.minimum_fee) )
       (optional txn_fee)
 

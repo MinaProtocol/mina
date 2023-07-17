@@ -39,6 +39,8 @@ locals {
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
       exposeGraphql        = var.expose_graphql
     }
+    
+    persist_working_dir = var.enable_working_dir_persitence
 
     seedConfigs = [
       for index, config in var.seed_configs : {
@@ -121,18 +123,12 @@ locals {
         archiveAddress       = config.archiveAddress
       }
     ]
+    persist_working_dir = var.enable_working_dir_persitence
   }
 
   archive_vars = [for item in var.archive_configs : {
     testnetName = var.testnet_name
-    mina        = {
-      image         = var.mina_image
-      useCustomEntrypoint  = var.use_custom_entrypoint
-      customEntrypoint     = var.custom_entrypoint
-      seedPeers     = var.additional_peers
-      runtimeConfig = var.runtime_config
-      # seedPeersURL  = var.seed_peers_url
-    }
+    mina        = local.daemon
     healthcheck = local.healthcheck_vars
     archive     = item
     postgresql = {
@@ -162,6 +158,7 @@ locals {
         }
       }
     }
+    persist_working_dir = var.enable_working_dir_persitence
   }]
 
   snark_vars = [
@@ -178,12 +175,13 @@ locals {
       coordinatorHostName = "${snark.snark_coordinator_name}.${var.testnet_name}"
       coordinatorRpcPort = 8301
       coordinatorHostPort = snark.snark_coordinators_host_port
-      publicKey =snark.snark_worker_public_key
+      publicKey = snark.snark_worker_public_key
       snarkFee = snark.snark_worker_fee
       workSelectionAlgorithm = "seq"
 
-      workerCpuRequest = var.worker_cpu_request
-      workerMemRequest= var.worker_mem_request
+      workerCpuRequest    = var.worker_cpu_request
+      workerMemRequest    = var.worker_mem_request
+      persist_working_dir = var.enable_working_dir_persitence
     }
   ]
 
@@ -193,6 +191,7 @@ locals {
       mina        = local.daemon
       healthcheck = local.healthcheck_vars
       name = node.name
+      persist_working_dir = var.enable_working_dir_persitence
     }
   ]
 

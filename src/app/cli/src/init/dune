@@ -54,6 +54,7 @@
    user_command_input
    network_peer
    logger
+   itn_logger
    coda_genesis_proof
    data_hash_lib
    currency

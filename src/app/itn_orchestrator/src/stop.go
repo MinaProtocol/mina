@@ -2,21 +2,25 @@ package itn_orchestrator
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 )
 
 type StopParams struct {
 	Receipts []ScheduledPaymentsReceipt
 }
 
-func StopScheduledTransactions(config Config, params StopParams) error {
+func StopTransactions(config Config, params StopParams) error {
+	errs := []error{}
 	for _, receipt := range params.Receipts {
-		client, err := config.GetGqlClient(config.Ctx, receipt.Address)
-		if err != nil {
-			return fmt.Errorf("failed to created client for %s: %v", receipt.Address, err)
+		resp, err := StopTransactionsGql(config, receipt.Address, receipt.Handle)
+		if err == nil {
+			config.Log.Infof("stopped scheduled transactions at %s on %s: %s", receipt.Handle, receipt.Address, resp)
+		} else {
+			errs = append(errs, err)
 		}
-		resp, err := StopPayments(config.Ctx, client, receipt.Handle)
-		config.Log.Infof("stopPayments on %s: %s (%v)", receipt.Address, resp, err)
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 	return nil
 }
@@ -28,7 +32,9 @@ func (StopAction) Run(config Config, rawParams json.RawMessage, output OutputF) 
 	if err := json.Unmarshal(rawParams, &params); err != nil {
 		return err
 	}
-	return StopScheduledTransactions(config, params)
+	return StopTransactions(config, params)
 }
+
+func (StopAction) Name() string { return "stop" }
 
 var _ Action = StopAction{}

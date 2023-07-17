@@ -49,7 +49,7 @@ module Transaction_with_witness = struct
             (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
         ; second_pass_ledger_witness :
             (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
-        ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
+        ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
       [@@deriving sexp, to_yojson]
 
@@ -969,7 +969,6 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
             ; transaction_commitment = t.local_state.transaction_commitment
             ; full_transaction_commitment =
                 t.local_state.full_transaction_commitment
-            ; token_id = t.local_state.token_id
             ; excess = t.local_state.excess
             ; supply_increase = t.local_state.supply_increase
             ; ledger

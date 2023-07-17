@@ -4,7 +4,7 @@ open Currency
 open Signature_lib
 open Mina_transaction
 module Zkapp_command_logic = Zkapp_command_logic
-module Global_slot = Mina_numbers.Global_slot
+module Global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis
 
 module Transaction_applied = struct
   module UC = Signed_command
@@ -337,7 +337,7 @@ module type S = sig
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
-      ; block_global_slot : Mina_numbers.Global_slot.t
+      ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
             (* Slot of block when the transaction is applied. NOTE: This is at least 1 slot after the protocol_state's view, which is for the *previous* slot. *)
       }
   end
@@ -355,7 +355,6 @@ module type S = sig
         ; local_state :
             ( Stack_frame.value
             , Stack_frame.value list
-            , Token_id.t
             , Amount.Signed.t
             , ledger
             , bool
@@ -381,14 +380,14 @@ module type S = sig
 
   val apply_user_command :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_global_slot:Global_slot.t
+    -> txn_global_slot:Global_slot_since_genesis.t
     -> ledger
     -> Signed_command.With_valid_signature.t
     -> Transaction_applied.Signed_command_applied.t Or_error.t
 
   val apply_user_command_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_global_slot:Global_slot.t
+    -> txn_global_slot:Global_slot_since_genesis.t
     -> ledger
     -> Signed_command.t
     -> Transaction_applied.Signed_command_applied.t Or_error.t
@@ -396,20 +395,20 @@ module type S = sig
   val update_action_state :
        Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
     -> Zkapp_account.Actions.t
-    -> txn_global_slot:Global_slot.t
-    -> last_action_slot:Global_slot.t
-    -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t * Global_slot.t
+    -> txn_global_slot:Global_slot_since_genesis.t
+    -> last_action_slot:Global_slot_since_genesis.t
+    -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
+       * Global_slot_since_genesis.t
 
   val apply_zkapp_command_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Zkapp_command.t
     -> ( Transaction_applied.Zkapp_command_applied.t
        * ( ( Stack_frame.value
            , Stack_frame.value list
-           , Token_id.t
            , Amount.Signed.t
            , ledger
            , bool
@@ -436,7 +435,7 @@ module type S = sig
   *)
   val apply_zkapp_command_unchecked_aux :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> init:'acc
     -> f:
@@ -444,7 +443,6 @@ module type S = sig
           -> Global_state.t
              * ( Stack_frame.value
                , Stack_frame.value list
-               , Token_id.t
                , Amount.Signed.t
                , ledger
                , bool
@@ -461,7 +459,7 @@ module type S = sig
 
   val apply_zkapp_command_first_pass_aux :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> init:'acc
     -> f:
@@ -469,7 +467,6 @@ module type S = sig
           -> Global_state.t
              * ( Stack_frame.value
                , Stack_frame.value list
-               , Token_id.t
                , Amount.Signed.t
                , ledger
                , bool
@@ -492,7 +489,6 @@ module type S = sig
           -> Global_state.t
              * ( Stack_frame.value
                , Stack_frame.value list
-               , Token_id.t
                , Amount.Signed.t
                , ledger
                , bool
@@ -507,21 +503,21 @@ module type S = sig
 
   val apply_fee_transfer :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_global_slot:Global_slot.t
+    -> txn_global_slot:Global_slot_since_genesis.t
     -> ledger
     -> Fee_transfer.t
     -> Transaction_applied.Fee_transfer_applied.t Or_error.t
 
   val apply_coinbase :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_global_slot:Global_slot.t
+    -> txn_global_slot:Global_slot_since_genesis.t
     -> ledger
     -> Coinbase.t
     -> Transaction_applied.Coinbase_applied.t Or_error.t
 
   val apply_transaction_first_pass :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Global_slot.t
+    -> global_slot:Global_slot_since_genesis.t
     -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Transaction.t
@@ -534,14 +530,14 @@ module type S = sig
 
   val apply_transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Transaction.t list
     -> Transaction_applied.t list Or_error.t
 
   val has_locked_tokens :
-       global_slot:Global_slot.t
+       global_slot:Global_slot_since_genesis.t
     -> account_id:Account_id.t
     -> ledger
     -> bool Or_error.t
@@ -550,13 +546,13 @@ module type S = sig
     val validate_timing_with_min_balance :
          account:Account.t
       -> txn_amount:Amount.t
-      -> txn_global_slot:Global_slot.t
+      -> txn_global_slot:Global_slot_since_genesis.t
       -> (Account.Timing.t * [> `Min_balance of Balance.t ]) Or_error.t
 
     val validate_timing :
          account:Account.t
       -> txn_amount:Amount.t
-      -> txn_global_slot:Global_slot.t
+      -> txn_global_slot:Global_slot_since_genesis.t
       -> Account.Timing.t Or_error.t
   end
 end
@@ -643,17 +639,17 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
   let nsf_error kind =
     Or_error.errorf
       !"For %s account, the requested transaction for amount %{sexp: Amount.t} \
-        at global slot %{sexp: Global_slot.t}, the balance %{sexp: Balance.t} \
-        is insufficient"
+        at global slot %{sexp: Global_slot_since_genesis.t}, the balance \
+        %{sexp: Balance.t} is insufficient"
       kind txn_amount txn_global_slot account.Account.Poly.balance
     |> Or_error.tag ~tag:nsf_tag
   in
   let min_balance_error min_balance =
     Or_error.errorf
       !"For timed account, the requested transaction for amount %{sexp: \
-        Amount.t} at global slot %{sexp: Global_slot.t}, applying the \
-        transaction would put the balance below the calculated minimum balance \
-        of %{sexp: Balance.t}"
+        Amount.t} at global slot %{sexp: Global_slot_since_genesis.t}, \
+        applying the transaction would put the balance below the calculated \
+        minimum balance of %{sexp: Balance.t}"
       txn_amount txn_global_slot min_balance
     |> Or_error.tag ~tag:min_balance_tag
   in
@@ -733,9 +729,9 @@ module Make (L : Ledger_intf.S) :
 
   let validate_time ~valid_until ~current_global_slot =
     check
-      Global_slot.(current_global_slot <= valid_until)
-      !"Current global slot %{sexp: Global_slot.t} greater than transaction \
-        expiry slot %{sexp: Global_slot.t}"
+      Global_slot_since_genesis.(current_global_slot <= valid_until)
+      !"Current global slot %{sexp: Global_slot_since_genesis.t} greater than \
+        transaction expiry slot %{sexp: Global_slot_since_genesis.t}"
       current_global_slot valid_until
 
   module Transaction_applied = struct
@@ -878,15 +874,16 @@ module Make (L : Ledger_intf.S) :
       pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
     in
     let%bind () =
-      if
-        Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
-          fee_payer_account
-        && Account.has_permission ~control:Control.Tag.Signature ~to_:`Send
-             fee_payer_account
-      then Ok ()
+      if Account.has_permission_to_send fee_payer_account then Ok ()
       else
         Or_error.error_string
           Transaction_status.Failure.(describe Update_not_permitted_balance)
+    in
+    let%bind () =
+      if Account.has_permission_to_increment_nonce fee_payer_account then Ok ()
+      else
+        Or_error.error_string
+          Transaction_status.Failure.(describe Update_not_permitted_nonce)
     in
     (* Charge the fee. This must happen, whether or not the command itself
        succeeds, to ensure that the network is compensated for processing this
@@ -895,7 +892,6 @@ module Make (L : Ledger_intf.S) :
     let%bind () =
       set_with_location ledger fee_payer_location fee_payer_account
     in
-    let source = Signed_command.source user_command in
     let receiver = Signed_command.receiver user_command in
     let exception Reject of Error.t in
     let ok_or_reject = function Ok x -> x | Error err -> raise (Reject err) in
@@ -910,120 +906,78 @@ module Make (L : Ledger_intf.S) :
             (* Check that receiver account exists. *)
             get_with_location ledger receiver |> ok_or_reject
           in
-          let source_location, source_account =
-            get_with_location ledger source |> ok_or_reject
-          in
           let%bind () =
-            if
-              Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
-                source_account
-              && Account.has_permission ~control:Control.Tag.Signature
-                   ~to_:`Set_delegate source_account
-            then Ok ()
-            else Error Transaction_status.Failure.Update_not_permitted_delegate
-          in
-          let%bind () =
-            match (source_location, receiver_location) with
-            | `Existing _, `Existing _ ->
+            match receiver_location with
+            | `Existing _ ->
                 return ()
-            | `New, _ ->
-                Result.fail Transaction_status.Failure.Source_not_present
-            | _, `New ->
+            | `New ->
                 Result.fail Transaction_status.Failure.Receiver_not_present
           in
-          let previous_delegate = source_account.delegate in
+          let%bind () =
+            Result.ok_if_true
+              (Account.has_permission_to_set_delegate fee_payer_account)
+              ~error:Transaction_status.Failure.Update_not_permitted_delegate
+          in
+          let previous_delegate = fee_payer_account.delegate in
           (* Timing is always valid, but we need to record any switch from
              timed to untimed here to stay in sync with the snark.
           *)
-          let%map timing =
-            validate_timing ~txn_amount:Amount.zero
-              ~txn_global_slot:current_global_slot ~account:source_account
-            |> Result.map_error ~f:timing_error_to_user_command_status
-          in
-          let source_account =
-            { source_account with
+          let%map fee_payer_account =
+            let%map timing =
+              validate_timing ~txn_amount:Amount.zero
+                ~txn_global_slot:current_global_slot ~account:fee_payer_account
+              |> Result.map_error ~f:timing_error_to_user_command_status
+            in
+            { fee_payer_account with
               delegate = Some (Account_id.public_key receiver)
             ; timing
             }
           in
-          ( [ (source_location, source_account) ]
+          ( [ (fee_payer_location, fee_payer_account) ]
           , Transaction_applied.Signed_command_applied.Body.Stake_delegation
               { previous_delegate } )
       | Payment { amount; _ } ->
-          let receiver_location, receiver_account =
-            get_with_location ledger receiver |> ok_or_reject
-          in
-          let%bind () =
-            if
-              Account.has_permission ~control:Control.Tag.None_given
-                ~to_:`Access receiver_account
-              && Account.has_permission ~control:Control.Tag.None_given
-                   ~to_:`Receive receiver_account
-            then Ok ()
-            else Error Transaction_status.Failure.Update_not_permitted_balance
-          in
-          let%bind source_location, source_account =
+          let%bind fee_payer_account =
             let ret =
-              if Account_id.equal source receiver then
-                (*just check if the timing needs updating*)
-                let%bind location, account =
-                  match receiver_location with
-                  | `Existing _ ->
-                      return (receiver_location, receiver_account)
-                  | `New ->
-                      Result.fail Transaction_status.Failure.Source_not_present
-                in
-                let%map timing =
-                  validate_timing ~txn_amount:amount
-                    ~txn_global_slot:current_global_slot ~account
-                  |> Result.map_error ~f:timing_error_to_user_command_status
-                in
-                (location, { account with timing })
-              else
-                let location, account =
-                  get_with_location ledger source |> ok_or_reject
-                in
-                let%bind () =
-                  match location with
-                  | `Existing _ ->
-                      return ()
-                  | `New ->
-                      Result.fail Transaction_status.Failure.Source_not_present
-                in
-                let%bind timing =
-                  validate_timing ~txn_amount:amount
-                    ~txn_global_slot:current_global_slot ~account
-                  |> Result.map_error ~f:timing_error_to_user_command_status
-                in
-                let%map balance =
-                  Result.map_error (sub_amount account.balance amount)
-                    ~f:(fun _ ->
-                      Transaction_status.Failure.Source_insufficient_balance )
-                in
-                (location, { account with timing; balance })
+              let%bind balance =
+                Result.map_error (sub_amount fee_payer_account.balance amount)
+                  ~f:(fun _ ->
+                    Transaction_status.Failure.Source_insufficient_balance )
+              in
+              let%map timing =
+                validate_timing ~txn_amount:amount
+                  ~txn_global_slot:current_global_slot
+                  ~account:fee_payer_account
+                |> Result.map_error ~f:timing_error_to_user_command_status
+              in
+              { fee_payer_account with balance; timing }
             in
-            if Account_id.equal fee_payer source then
-              (* Don't process transactions with insufficient balance from the
-                 fee-payer.
-              *)
-              match ret with
-              | Ok x ->
-                  Ok x
-              | Error failure ->
-                  raise
-                    (Reject
-                       (Error.createf "%s"
-                          (Transaction_status.Failure.describe failure) ) )
-            else ret
+            (* Don't accept transactions with insufficient balance from the fee-payer.
+               TODO: eliminate this condition and accept transaction with failed status
+            *)
+            match ret with
+            | Ok x ->
+                Ok x
+            | Error failure ->
+                raise
+                  (Reject
+                     (Error.createf "%s"
+                        (Transaction_status.Failure.describe failure) ) )
+          in
+          let receiver_location, receiver_account =
+            if Account_id.equal fee_payer receiver then
+              (fee_payer_location, fee_payer_account)
+            else get_with_location ledger receiver |> ok_or_reject
           in
           let%bind () =
-            if
-              Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
-                source_account
-              && Account.has_permission ~control:Control.Tag.Signature
-                   ~to_:`Send source_account
-            then Ok ()
-            else Error Transaction_status.Failure.Update_not_permitted_balance
+            Result.ok_if_true
+              (Account.has_permission_to_send fee_payer_account)
+              ~error:Transaction_status.Failure.Update_not_permitted_balance
+          in
+          let%bind () =
+            Result.ok_if_true
+              (Account.has_permission_to_receive receiver_account)
+              ~error:Transaction_status.Failure.Update_not_permitted_balance
           in
           (* Charge the account creation fee. *)
           let%bind receiver_amount =
@@ -1047,9 +1001,16 @@ module Make (L : Ledger_intf.S) :
             | `New ->
                 [ receiver ]
           in
-          ( [ (receiver_location, receiver_account)
-            ; (source_location, source_account)
-            ]
+          let updated_accounts =
+            if Account_id.equal fee_payer receiver then
+              (* [receiver_account] at this point has all the updates*)
+              [ (receiver_location, receiver_account) ]
+            else
+              [ (receiver_location, receiver_account)
+              ; (fee_payer_location, fee_payer_account)
+              ]
+          in
+          ( updated_accounts
           , Transaction_applied.Signed_command_applied.Body.Payment
               { new_accounts } )
     in
@@ -1103,7 +1064,7 @@ module Make (L : Ledger_intf.S) :
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
-      ; block_global_slot : Global_slot.t
+      ; block_global_slot : Global_slot_since_genesis.t
       }
 
     let first_pass_ledger { first_pass_ledger; _ } =
@@ -1144,7 +1105,6 @@ module Make (L : Ledger_intf.S) :
         ; local_state :
             ( Stack_frame.value
             , Stack_frame.value list
-            , Token_id.t
             , Amount.Signed.t
             , L.t
             , bool
@@ -1336,8 +1296,14 @@ module Make (L : Ledger_intf.S) :
         Permissions.Auth_required.check perm tag
     end
 
-    module Global_slot = struct
-      include Mina_numbers.Global_slot
+    module Global_slot_since_genesis = struct
+      include Mina_numbers.Global_slot_since_genesis
+
+      let if_ = value_if
+    end
+
+    module Global_slot_span = struct
+      include Mina_numbers.Global_slot_span
 
       let if_ = value_if
     end
@@ -1820,7 +1786,6 @@ module Make (L : Ledger_intf.S) :
       type t =
         ( Stack_frame.t
         , Call_stack.t
-        , Token_id.t
         , Amount.Signed.t
         , Ledger.t
         , Bool.t
@@ -1874,7 +1839,6 @@ module Make (L : Ledger_intf.S) :
       ; local_state :
           ( Stack_frame.t
           , Call_stack.t
-          , Token_id.t
           , Amount.Signed.t
           , L.t
           , bool
@@ -1979,7 +1943,6 @@ module Make (L : Ledger_intf.S) :
         ; call_stack = []
         ; transaction_commitment = Inputs.Transaction_commitment.empty
         ; full_transaction_commitment = Inputs.Transaction_commitment.empty
-        ; token_id = Token_id.default
         ; excess = Currency.Amount.(Signed.of_unsigned zero)
         ; supply_increase = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger = L.empty ~depth:0 ()
@@ -2043,19 +2006,22 @@ module Make (L : Ledger_intf.S) :
       (*get the original states of all the accounts in each pass.
         If an account updated in the first pass is referenced in account
         updates, then retain the value before first pass application*)
-      let account_states = Account_id.Table.create () in
-      List.iter
-        ~f:(fun (id, acc_opt) ->
-          Account_id.Table.update account_states id
-            ~f:(Option.value ~default:acc_opt) )
-        ( c.original_first_pass_account_states
-        @ List.map (Zkapp_command.accounts_referenced c.command) ~f:(fun id ->
-              ( id
-              , Option.Let_syntax.(
-                  let%bind loc = L.location_of_account ledger id in
-                  let%map a = L.get ledger loc in
-                  (loc, a)) ) ) ) ;
-      Account_id.Table.to_alist account_states
+      (* IMPORTANT: this account list must be sorted by Account_id in increasing order,
+         if this ordering changes the scan state hash will be affected and made
+         incompatible. *)
+      Account_id.Map.to_alist ~key_order:`Increasing
+      @@ List.fold ~init:Account_id.Map.empty
+           ~f:(fun account_states (id, acc_opt) ->
+             Account_id.Map.update account_states id
+               ~f:(Option.value ~default:acc_opt) )
+           ( c.original_first_pass_account_states
+           @ List.map (Zkapp_command.accounts_referenced c.command)
+               ~f:(fun id ->
+                 ( id
+                 , Option.Let_syntax.(
+                     let%bind loc = L.location_of_account ledger id in
+                     let%map a = L.get ledger loc in
+                     (loc, a)) ) ) )
     in
     let rec step_all (user_acc : user_acc)
         ( (g_state : Inputs.Global_state.t)
@@ -2220,8 +2186,7 @@ module Make (L : Ledger_intf.S) :
         ( init_account
         , `Added
         , `Has_permission_to_receive
-            (Account.has_permission ~control:Control.Tag.None_given
-               ~to_:`Receive init_account ) )
+            (Account.has_permission_to_receive init_account) )
     | Some loc -> (
         match get ledger loc with
         | None ->
@@ -2230,8 +2195,7 @@ module Make (L : Ledger_intf.S) :
             ( receiver_account
             , `Existed
             , `Has_permission_to_receive
-                (Account.has_permission ~control:Control.Tag.None_given
-                   ~to_:`Receive receiver_account ) ) )
+                (Account.has_permission_to_receive receiver_account) ) )
 
   let no_failure = []
 
@@ -2740,10 +2704,10 @@ module For_tests = struct
           { fee
           ; fee_payer_pk = sender_pk
           ; nonce = sender_nonce
-          ; valid_until = Global_slot.max_value
+          ; valid_until = Global_slot_since_genesis.max_value
           ; memo = Signed_command_memo.dummy
           }
-      ; body = Payment { source_pk = sender_pk; receiver_pk = receiver; amount }
+      ; body = Payment { receiver_pk = receiver; amount }
       }
     |> Signed_command.forget_check
 
@@ -2897,7 +2861,7 @@ module For_tests = struct
                       (hide_rc a1) (hide_rc a2) ) ) )
     |> Or_error.combine_errors_unit
 
-  let txn_global_slot = Global_slot.zero
+  let txn_global_slot = Global_slot_since_genesis.zero
 
   let iter_err ts ~f =
     List.fold_until ts
@@ -2922,7 +2886,6 @@ module For_tests = struct
     { snarked_ledger_hash = h
     ; blockchain_length = len
     ; min_window_density = len
-    ; last_vrf_output = ()
     ; total_currency = a
     ; global_slot_since_genesis = txn_global_slot
     ; staking_epoch_data = epoch_data

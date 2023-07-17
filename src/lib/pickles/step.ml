@@ -799,9 +799,7 @@ struct
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n ~feature_flags
       in
-      let { Domains.h } =
-        List.nth_exn (Vector.to_list step_domains) branch_data.index
-      in
+      let { Domains.h } = Vector.nth_exn step_domains branch_data.index in
       ksprintf Common.time "step-prover %d (%d)" branch_data.index
         (Domain.size h)
         (fun () ->

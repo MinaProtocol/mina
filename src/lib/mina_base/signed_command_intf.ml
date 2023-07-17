@@ -13,8 +13,8 @@ module type Gen_intf = sig
   module Gen : sig
     (** Generate a single transaction between
      * Generate random keys for sender and receiver
-     * for fee $\in [Mina_compile_config.minimum_user_command_fee,
-     * Mina_compile_config.minimum_user_command_fee+fee_range]$
+     * for fee $\in [Currency.Fee.minimum_user_command_fee,
+     * Currency.Fee.minimum_user_command_fee+fee_range]$
      * and an amount $\in [1,max_amount]$
     *)
     val payment :
@@ -30,8 +30,8 @@ module type Gen_intf = sig
 
     (** Generate a single transaction between
      * $a, b \in keys$
-     * for fee $\in [Mina_compile_config.minimum_user_command_fee,
-     * Mina_compile_config.minimum_user_command_fee+fee_range]$
+     * for fee $\in [Currency.Fee.minimum_user_command_fee,
+     * Currency.Fee.minimum_user_command_fee+fee_range]$
      * and an amount $\in [1,max_amount]$
     *)
     val payment_with_random_participants :
@@ -102,10 +102,6 @@ module type S = sig
 
   val token : t -> Token_id.t
 
-  val source_pk : t -> Public_key.Compressed.t
-
-  val source : t -> Account_id.t
-
   val receiver_pk : t -> Public_key.Compressed.t
 
   val receiver : t -> Account_id.t
@@ -116,7 +112,7 @@ module type S = sig
 
   val memo : t -> Signed_command_memo.t
 
-  val valid_until : t -> Global_slot.t
+  val valid_until : t -> Global_slot_since_genesis.t
 
   (* for filtering *)
   val minimum_fee : Currency.Fee.t
@@ -234,7 +230,7 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
+    [@@@with_top_version_tag]
 
     module V2 : sig
       type t =

@@ -1,4 +1,5 @@
 let Prelude = ../External/Prelude.dhall
+let B = ../External/Buildkite.dhall
 
 let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
@@ -8,6 +9,8 @@ let RunInToolchain = ../Command/RunInToolchain.dhall
 
 let Cmd = ../Lib/Cmds.dhall
 let SelectFiles = ../Lib/SelectFiles.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in
 
@@ -91,6 +94,7 @@ in
         key = "integration-test-${testName}",
         target = Size.Integration,
         depends_on = dependsOn,
-        `if` = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'"
+        `if` = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'",
+        soft_fail = Some (B/SoftFail.Boolean True)
       }
 }

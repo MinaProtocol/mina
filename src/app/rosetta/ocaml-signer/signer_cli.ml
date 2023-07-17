@@ -149,10 +149,10 @@ let hex_of_private_key_file =
 let convert_signature_command =
   let open Command.Let_syntax in
   let%map_open field_str =
-      flag "--field" ~doc:"Field string in decimal (from client-sdk)"
+      flag "--field" ~doc:"Field string in decimal (from mina-signer)"
         (required string)
   and scalar_str =
-      flag "--scalar" ~doc:"Scalar string in decimal (from client-sdk)"
+      flag "--scalar" ~doc:"Scalar string in decimal (from mina-signer)"
         (required string)
   in
   fun () ->

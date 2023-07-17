@@ -251,7 +251,6 @@ module Account_update_under_construction = struct
                   { snarked_ledger_hash = Ignore
                   ; blockchain_length = Ignore
                   ; min_window_density = Ignore
-                  ; last_vrf_output = ()
                   ; total_currency = Ignore
                   ; global_slot_since_genesis = Ignore
                   ; staking_epoch_data =
@@ -286,10 +285,14 @@ module Account_update_under_construction = struct
             Token_id.(Checked.equal t.token_id (Checked.constant default))
         ; may_use_token = t.may_use_token
         ; authorization_kind =
-            { is_signed = t.authorization_kind.is_signed
-            ; is_proved = t.authorization_kind.is_proved
-            ; verification_key_hash = Option.value ~default:Field.zero t.vk_hash
-            }
+            (let dummy_vk_hash =
+               Field.constant (Zkapp_account.dummy_vk_hash ())
+             in
+             { is_signed = t.authorization_kind.is_signed
+             ; is_proved = t.authorization_kind.is_proved
+             ; verification_key_hash =
+                 Option.value ~default:dummy_vk_hash t.vk_hash
+             } )
         }
       in
       let calls =

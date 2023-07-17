@@ -1,10 +1,10 @@
 package itn_orchestrator
 
 import (
-	"context"
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -13,36 +13,41 @@ import (
 	"github.com/Khan/genqlient/graphql"
 )
 
-func Auth(ctx context.Context, client graphql.Client) (string, uint16, error) {
-	resp, err := auth(ctx, client)
-	if err != nil {
-		return "", 0, err
-	}
-	return resp.Auth.ServerUuid, resp.Auth.SignerSequenceNumber, nil
+type DoerWithStatus struct {
+	Doer           graphql.Doer
+	LastStatusCode int
 }
 
 type Authenticator struct {
 	sk    ed25519.PrivateKey
 	pkStr string
-	doer  graphql.Doer
+	doer  DoerWithStatus
+}
+
+func (doer *DoerWithStatus) Do(req *http.Request) (*http.Response, error) {
+	resp, err := doer.Doer.Do(req)
+	if err == nil {
+		doer.LastStatusCode = resp.StatusCode
+	}
+	return resp, err
 }
 
 type SequentialAuthenticator struct {
-	Authenticator
-	uuid  string
-	seqno uint16
+	authenticator *Authenticator
+	uuid          string
+	seqno         uint16
 }
 
 func NewAuthenticator(sk ed25519.PrivateKey, doer graphql.Doer) *Authenticator {
 	pk := sk.Public().(ed25519.PublicKey)
 	return &Authenticator{
-		sk: sk, doer: doer, pkStr: base64.StdEncoding.EncodeToString(pk),
+		sk: sk, doer: DoerWithStatus{Doer: doer}, pkStr: base64.StdEncoding.EncodeToString(pk),
 	}
 }
 
 func NewSequentialAuthenticator(uuid string, seqno uint16, authenticator *Authenticator) *SequentialAuthenticator {
 	return &SequentialAuthenticator{
-		Authenticator: *authenticator,
+		authenticator: authenticator,
 		uuid:          uuid,
 		seqno:         seqno,
 	}
@@ -80,11 +85,11 @@ func (client *SequentialAuthenticator) Do(req *http.Request) (*http.Response, er
 	binary.BigEndian.PutUint16(msg, client.seqno)
 	copy(msg[2:], uuid)
 	copy(msg[2+len(uuid):], body)
-	sig := ed25519.Sign(client.sk, msg)
+	sig := ed25519.Sign(client.authenticator.sk, msg)
 	sigStr := base64.StdEncoding.EncodeToString(sig)
 	header := strings.Join([]string{
 		"Signature",
-		client.pkStr,
+		client.authenticator.pkStr,
 		sigStr,
 		"; Sequencing",
 		client.uuid,
@@ -92,23 +97,106 @@ func (client *SequentialAuthenticator) Do(req *http.Request) (*http.Response, er
 	}, " ")
 	req.Header.Set("Authorization", header)
 	client.seqno++
-	return client.doer.Do(req)
+	return client.authenticator.doer.Do(req)
 }
 
 var _ graphql.Doer = (*SequentialAuthenticator)(nil)
 
-func SchedulePayments(ctx context.Context, client graphql.Client, input PaymentsDetails) (string, error) {
-	resp, err := schedulePayments(ctx, client, input)
-	if err != nil {
-		return "", err
+func GetGqlClient(config Config, addr NodeAddress) (graphql.Client, *int, error) {
+	authenticator := NewAuthenticator(config.Sk, http.DefaultClient)
+	if entry, has := config.NodeData[addr]; has {
+		return entry.Client, entry.LastStatusCode, nil
 	}
-	return resp.SchedulePayments, nil
+	url := "http://" + string(addr) + "/graphql"
+	authClient := graphql.NewClient(url, authenticator)
+	resp, err := auth(config.Ctx, authClient)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to authorize client %s: %v", addr, err)
+	}
+	seqAuthenticator := NewSequentialAuthenticator(resp.Auth.ServerUuid, resp.Auth.SignerSequenceNumber, authenticator)
+	client := graphql.NewClient(url, seqAuthenticator)
+	config.NodeData[addr] = NodeEntry{
+		Client:          client,
+		Libp2pPort:      resp.Auth.Libp2pPort,
+		PeerId:          resp.Auth.PeerId,
+		IsBlockProducer: resp.Auth.IsBlockProducer,
+		LastStatusCode:  &authenticator.doer.LastStatusCode,
+	}
+	return client, &authenticator.doer.LastStatusCode, nil
 }
 
-func StopPayments(ctx context.Context, client graphql.Client, handle string) (string, error) {
-	resp, err := stopPayments(ctx, client, handle)
+func wrapGqlRequest(config Config, nodeAddress NodeAddress, perform func(client graphql.Client) (any, error)) (any, error) {
+	client, lastCode, err := GetGqlClient(config, nodeAddress)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create a client for %s: %v", nodeAddress, err)
 	}
-	return resp.StopPayments, nil
+	resp, err := perform(client)
+	if err != nil && *lastCode == 412 {
+		config.Log.Infof("received sequencing error code (412), retrying request to %s, error: %v", nodeAddress, err)
+		delete(config.NodeData, nodeAddress)
+		var client graphql.Client
+		client, _, err = GetGqlClient(config, nodeAddress)
+		if err != nil {
+			return "", fmt.Errorf("failed to create a replacement client for %s: %v", nodeAddress, err)
+		}
+		resp, err = perform(client)
+	}
+	return resp, err
+}
+
+func SchedulePaymentsGql(config Config, nodeAddress NodeAddress, input PaymentsDetails) (string, error) {
+	resp, err := wrapGqlRequest(config, nodeAddress, func(client graphql.Client) (any, error) {
+		return schedulePayments(config.Ctx, client, input)
+	})
+	if err != nil {
+		return "", fmt.Errorf("error scheduling payments to %s: %v", nodeAddress, err)
+	}
+	return resp.(*schedulePaymentsResponse).SchedulePayments, nil
+}
+
+func StopTransactionsGql(config Config, nodeAddress NodeAddress, handle string) (string, error) {
+	resp, err := wrapGqlRequest(config, nodeAddress, func(client graphql.Client) (any, error) {
+		return stopScheduledTransactions(config.Ctx, client, handle)
+	})
+	if err != nil {
+		return "", fmt.Errorf("error stoping transactions at %s on %s: %v", handle, nodeAddress, err)
+	}
+	return resp.(*stopScheduledTransactionsResponse).StopScheduledTransactions, nil
+}
+
+func ScheduleZkappCommands(config Config, nodeAddress NodeAddress, input ZkappCommandsDetails) (string, error) {
+	resp, err := wrapGqlRequest(config, nodeAddress, func(client graphql.Client) (any, error) {
+		return scheduleZkappCommands(config.Ctx, client, input)
+	})
+	if err != nil {
+		return "", fmt.Errorf("error scheduling zkapp txs to %s: %v", nodeAddress, err)
+	}
+	return resp.(*scheduleZkappCommandsResponse).ScheduleZkappCommands, nil
+}
+
+func SlotsWonGql(config Config, nodeAddress NodeAddress) ([]int, bool, error) {
+	resp, err := wrapGqlRequest(config, nodeAddress, func(client graphql.Client) (any, error) {
+		if config.NodeData[nodeAddress].IsBlockProducer {
+			return slotsWon(config.Ctx, client)
+		}
+		return nil, nil
+	})
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to get slots for %s: %v", nodeAddress, err)
+	}
+	if resp == nil {
+		return nil, false, nil
+	}
+	return resp.(*slotsWonResponse).SlotsWon, true, nil
+}
+
+func UpdateGatingGql(config Config, nodeAddress NodeAddress, input GatingUpdate) error {
+	_, err := wrapGqlRequest(config, nodeAddress, func(client graphql.Client) (any, error) {
+		return updateGating(config.Ctx, client, input)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update gating for %s: %v", nodeAddress, err)
+	}
+	// TODO do something with resp.UpdateGating?
+	return nil
 }

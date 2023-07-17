@@ -21,7 +21,9 @@
    sexplib0
    ppx_deriving_yojson.runtime
    graphql_parser
+   splittable_random
    ;; local libraries
+   mina_generators
    mina_wire_types
    network_pool
    cli_lib
@@ -100,6 +102,9 @@
    kimchi_backend
    sgn_type
    mina_transaction_logic
+   zkapp_command_builder
+   gossip_net
+   itn_logger
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)

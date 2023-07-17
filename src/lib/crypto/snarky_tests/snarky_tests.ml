@@ -36,7 +36,7 @@ let check_json ~input_typ ~return_typ ~circuit filename () =
 (* monadic API tests *)
 
 (** Both the monadic and imperative API will produce the same circuit hash. *)
-let expected = "5357346d161dcccaa547c7999b8148db"
+let expected = "ec45af854f3d3e14367bb8394c2ed0d7"
 
 module MonadicAPI = struct
   module Impl = Snarky_backendless.Snark.Make (struct
@@ -216,9 +216,9 @@ end
 module InvalidWitness = struct
   open Impl
 
-  (** A bit of a contrived circuit. 
+  (** A bit of a contrived circuit.
       Here only a single constraint will be generated (due to constant unification),
-      but we still want all [compute] closures to be checked when generating the witness. 
+      but we still want all [compute] closures to be checked when generating the witness.
       Thus, this circuit should fail due to an invalid witness. *)
   let circuit _ =
     let one = constant Field.typ Field.Constant.one in
@@ -599,14 +599,6 @@ module Improper_calls = struct
     ]
 end
 
-(* run tests *)
-
-let api_tests =
-  [ ("generate witness", `Quick, generate_witness)
-  ; ("compile imperative API", `Quick, get_hash_of_circuit)
-  ; ("compile monadic API", `Quick, MonadicAPI.get_hash_of_circuit)
-  ]
-
 (* Tests that check that the hashes of the protocol circuits remain the same *)
 module Protocol_circuits = struct
   (* Full because we want to be sure nothing changes *)
@@ -619,8 +611,7 @@ module Protocol_circuits = struct
     ()
 
   let blockchain () : unit =
-    let expected = "ffd9c62ea5e15076a6fff9fdbd87ffa0" in
-
+    let expected = "3bfa747c59356e008201cc8e6af10f77" in
     let digest =
       Blockchain_snark.Blockchain_snark_state.constraint_system_digests
     in
@@ -629,18 +620,18 @@ module Protocol_circuits = struct
     let _, hash = List.hd_exn digest in
     let digest = Md5.to_hex hash in
 
-    let check = String.(digest = expected) in
-    print_hash (not check) expected digest ;
-    assert check ;
+    let digests_match = String.(digest = expected) in
+    print_hash (not digests_match) expected digest ;
+    assert digests_match ;
     ()
 
   let transaction () : unit =
-    let expected1 = "31e96945d5bf7c8d4b1089c59c3b878b" in
-    let expected2 = "d3263b914dd19aaeeffe244410b7539d" in
-
+    let expected1 = "b8879f677f622a1d86648030701f43e1" in
+    let expected2 = "dc5ff6a480ceb21b1e0333d2b0262b67" in
     let digest =
       Transaction_snark.constraint_system_digests ~constraint_constants ()
     in
+    (* these are for the Base and Merge branches, if more branches were added to the digest this line should be updated *)
     let hash1, hash2 =
       match digest with
       | [ (_, a); (_, b) ] ->
@@ -648,7 +639,6 @@ module Protocol_circuits = struct
       | _ ->
           failwith "should have been length 2"
     in
-    (* let _, hash = List.hd_exn digest in *)
     let digest1 = Core.Md5.to_hex hash1 in
     let digest2 = Core.Md5.to_hex hash2 in
 
@@ -667,6 +657,12 @@ module Protocol_circuits = struct
 end
 
 (* run tests *)
+
+let api_tests =
+  [ ("generate witness", `Quick, generate_witness)
+  ; ("compile imperative API", `Quick, get_hash_of_circuit)
+  ; ("compile monadic API", `Quick, MonadicAPI.get_hash_of_circuit)
+  ]
 
 let () =
   let range_checks =

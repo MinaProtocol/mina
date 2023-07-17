@@ -363,7 +363,7 @@ module Metadata = struct
             , Amount.to_yojson
                 (Amount_of.mina
                    (Mina_currency.Fee.to_uint64
-                      Mina_compile_config.minimum_user_command_fee)) )
+                      Mina_currency.Fee.minimum_user_command_fee)) )
           ]
       in
       let receiver_exists =
@@ -646,21 +646,19 @@ module Parse = struct
                             which)
                        (`Json_parse (Some (Core_kernel.Error.to_string_hum e))))
             in
-            let%bind source_pk = parse_pk ~which:"source" payment.from in
+            let%bind fee_payer_pk = parse_pk ~which:"source" payment.from in
             let%bind receiver_pk = parse_pk ~which:"receiver" payment.to_ in
             let body =
               Signed_command_payload.Body.Payment
-                { source_pk
-                ; receiver_pk
+                { receiver_pk
                 ; amount = Mina_currency.Amount.of_uint64 payment.amount
                 }
             in
-            let fee_payer_pk = source_pk in
             let fee = Mina_currency.Fee.of_uint64 payment.fee in
             let signer = fee_payer_pk in
             let valid_until =
               Option.map payment.valid_until
-                ~f:Mina_numbers.Global_slot.of_uint32
+                ~f:Mina_numbers.Global_slot_since_genesis.of_uint32
             in
             let nonce = payment.nonce in
             let%map memo =
@@ -681,7 +679,10 @@ module Parse = struct
             let signature_kind : Mina_signature_kind.t =
               if String.equal network_identifier.network "mainnet" then
                 Mainnet
-              else Testnet
+              else if String.equal network_identifier.network "testnet" then
+                Testnet
+              else
+                Other_network network_identifier.network
             in
             Option.is_some @@
               Signed_command.create_with_signature_checked ~signature_kind
@@ -691,7 +692,7 @@ module Parse = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let check_sufficient_fee (type a) (payment : a -> Transaction.Unsigned.Rendered.Payment.t option) (transaction : a) : (unit, Errors.t) Result.t = 
+    let check_sufficient_fee (type a) (payment : a -> Transaction.Unsigned.Rendered.Payment.t option) (transaction : a) : (unit, Errors.t) Result.t =
       match payment transaction with
     | Some pay -> if Transaction.Unsigned.Rendered.Payment.is_fee_sufficient pay then Ok () else  Result.fail @@ Errors.create `Transaction_submit_fee_small
     | None -> Ok ()

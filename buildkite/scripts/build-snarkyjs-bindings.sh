@@ -4,7 +4,7 @@ set -eo pipefail
 source ~/.profile
 
 echo "Install NPM dependencies..."
-cd src/lib/snarky_js_bindings/snarkyjs
+cd src/lib/snarkyjs
 npm install --no-progress
 cd -
 

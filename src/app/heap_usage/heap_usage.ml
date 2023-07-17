@@ -4,16 +4,22 @@ open Core_kernel
 open Async
 
 let print_heap_usage name v =
+  (* word_size is in bits *)
+  let bytes_per_word = Sys.word_size / 8 in
   let repr = Obj.repr v in
   (* reachable_words may be 0, so it doesn't include size *)
   let words = Obj.size repr + Obj.reachable_words repr in
-  Format.printf "Data of type %-36s uses %6d heap words = %8d bytes@." name
-    words (words * Sys.word_size)
+  Format.printf "Data of type %-46s uses %6d heap words = %8d bytes@." name
+    words (words * bytes_per_word)
 
 let main () =
   let open Values in
   print_heap_usage "Account.t (w/ zkapp)" account ;
   print_heap_usage "Zkapp_command.t" zkapp_command ;
+  print_heap_usage "Pickles.Side_loaded.Proof.t" zkapp_proof ;
+  print_heap_usage "Mina_base.Side_loaded_verification_key.t" verification_key ;
+  print_heap_usage "Dummy Pickles.Side_loaded.Proof.t" dummy_proof ;
+  print_heap_usage "Dummy Mina_base.Side_loaded_verification_key.t" dummy_vk ;
   print_heap_usage "Ledger.Db.path.t" merkle_path ;
   print_heap_usage "Protocol_state.t" protocol_state ;
   print_heap_usage "Pending_coinbase.t" pending_coinbase ;

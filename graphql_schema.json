@@ -280,6 +280,15 @@
           "description": null,
           "fields": [
             {
+              "name": "cleanAddedPeers",
+              "description":
+                "If true, resets added peers to an empty list (including seeds)",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "isolate",
               "description":
                 "If true, no connections will be allowed unless they are from a trusted peer",
@@ -347,6 +356,13 @@
             }
           ],
           "inputFields": [
+            {
+              "name": "cleanAddedPeers",
+              "description":
+                "If true, resets added peers to an empty list (including seeds)",
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "defaultValue": null
+            },
             {
               "name": "isolate",
               "description":
@@ -711,7 +727,11 @@
               "name": "validUntil",
               "description": null,
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "GlobalSlotSinceGenesis",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -760,7 +780,11 @@
             {
               "name": "validUntil",
               "description": null,
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "GlobalSlotSinceGenesis",
+                "ofType": null
+              },
               "defaultValue": null
             },
             {
@@ -1358,7 +1382,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalSlot",
+                  "name": "GlobalSlotSinceGenesis",
                   "ofType": null
                 }
               },
@@ -1390,7 +1414,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalSlot",
+                  "name": "GlobalSlotSpan",
                   "ofType": null
                 }
               },
@@ -1437,7 +1461,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalSlot",
+                  "name": "GlobalSlotSinceGenesis",
                   "ofType": null
                 }
               },
@@ -1465,7 +1489,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalSlot",
+                  "name": "GlobalSlotSpan",
                   "ofType": null
                 }
               },
@@ -2103,7 +2127,7 @@
               "args": [],
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "GlobalSlotIntervalInput",
+                "name": "GlobalSlotSinceGenesisIntervalInput",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -2184,7 +2208,7 @@
               "description": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "GlobalSlotIntervalInput",
+                "name": "GlobalSlotSinceGenesisIntervalInput",
                 "ofType": null
               },
               "defaultValue": null
@@ -2540,7 +2564,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "GlobalSlotIntervalInput",
+          "name": "GlobalSlotSinceGenesisIntervalInput",
           "description": null,
           "fields": [
             {
@@ -2552,7 +2576,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "GlobalSlotSinceGenesis",
                   "ofType": null
                 }
               },
@@ -2568,7 +2592,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "GlobalSlotSinceGenesis",
                   "ofType": null
                 }
               },
@@ -2585,7 +2609,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "GlobalSlotSinceGenesis",
                   "ofType": null
                 }
               },
@@ -2599,7 +2623,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "GlobalSlotSinceGenesis",
                   "ofType": null
                 }
               },
@@ -2653,7 +2677,7 @@
               "args": [],
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "GlobalSlotIntervalInput",
+                "name": "GlobalSlotSinceGenesisIntervalInput",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -2694,7 +2718,7 @@
               "description": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "GlobalSlotIntervalInput",
+                "name": "GlobalSlotSinceGenesisIntervalInput",
                 "ofType": null
               },
               "defaultValue": null
@@ -4415,6 +4439,46 @@
               "deprecationReason": "use createAccount instead"
             },
             {
+              "name": "startFilteredLog",
+              "description":
+                "TESTING ONLY: Start filtering and recording all structured events in memory",
+              "args": [
+                {
+                  "name": "filter",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "createAccount",
               "description":
                 "Create a new account - this will create a new keypair and store it in the daemon",
@@ -5814,7 +5878,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Globalslot",
+                  "name": "GlobalSlotSinceHardFork",
                   "ofType": null
                 }
               },
@@ -7274,7 +7338,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "GlobalSlotInterval",
+          "name": "GlobalSlotSinceGenesisInterval",
           "description": null,
           "fields": [
             {
@@ -7286,7 +7350,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "GlobalSlotSinceGenesis",
                   "ofType": null
                 }
               },
@@ -7302,7 +7366,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "GlobalSlotSinceGenesis",
                   "ofType": null
                 }
               },
@@ -7456,7 +7520,7 @@
               "args": [],
               "type": {
                 "kind": "OBJECT",
-                "name": "GlobalSlotInterval",
+                "name": "GlobalSlotSinceGenesisInterval",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -7543,7 +7607,7 @@
               "args": [],
               "type": {
                 "kind": "OBJECT",
-                "name": "GlobalSlotInterval",
+                "name": "GlobalSlotSinceGenesisInterval",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -7619,16 +7683,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "GlobalSlot",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "Timing",
           "description": null,
@@ -7658,7 +7712,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalSlot",
+                  "name": "GlobalSlotSinceGenesis",
                   "ofType": null
                 }
               },
@@ -7690,7 +7744,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalSlot",
+                  "name": "GlobalSlotSpan",
                   "ofType": null
                 }
               },
@@ -8421,6 +8475,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "GlobalSlotSinceGenesis",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "FeePayerBody",
           "description": null,
@@ -8457,7 +8521,11 @@
               "name": "validUntil",
               "description": null,
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "GlobalSlotSinceGenesis",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -8780,8 +8848,8 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "use source field instead"
             },
             {
               "name": "validUntil",
@@ -9164,8 +9232,8 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "use source field instead"
             },
             {
               "name": "validUntil",
@@ -11423,16 +11491,6 @@
         },
         {
           "kind": "SCALAR",
-          "name": "Boolean",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
           "name": "ChainHash",
           "description": "Base58Check-encoded chain hash",
           "fields": null,
@@ -11565,6 +11623,16 @@
         },
         {
           "kind": "SCALAR",
+          "name": "GlobalSlotSpan",
+          "description": "global slot span",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "Amount",
           "description": "amount",
           "fields": null,
@@ -11623,7 +11691,7 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "Globalslot",
+                "name": "GlobalSlotSpan",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -12059,6 +12127,68 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "Boolean",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "GetFilteredLogEntries",
+          "description": null,
+          "fields": [
+            {
+              "name": "logMessages",
+              "description": "Structured log messages since the given offset",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "isCapturing",
+              "description":
+                "Whether we are capturing structured log messages",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "Metrics",
           "description": null,
@@ -12371,6 +12501,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "Globalslot",
+          "description": "global slot",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "BlockProducerTimings",
           "description": null,
@@ -12459,8 +12599,8 @@
         },
         {
           "kind": "SCALAR",
-          "name": "Globalslot",
-          "description": "globalslot",
+          "name": "GlobalSlotSinceHardFork",
+          "description": "global slot since hard fork",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -12523,7 +12663,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Globalslot",
+                  "name": "GlobalSlotSinceHardFork",
                   "ofType": null
                 }
               },
@@ -13456,6 +13596,38 @@
               "description": "The version of the node (git commit hash)",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "getFilteredLogEntries",
+              "description":
+                "TESTING ONLY: Retrieve all new structured events in memory",
+              "args": [
+                {
+                  "name": "offset",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "GetFilteredLogEntries",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },

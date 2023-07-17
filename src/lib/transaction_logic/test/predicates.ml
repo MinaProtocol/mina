@@ -43,7 +43,8 @@ let verify_account_updates ~(ledger : Helpers.Ledger.t)
     Call_forest.fold txn.command.data.account_updates ~init:Amount.Signed.zero
       ~f:(fun acc upd ->
         if Public_key.Compressed.equal account.pk upd.body.public_key then
-          Option.value_exn @@ Amount.Signed.add acc upd.body.balance_change
+          let open Amount.Signed in
+          Option.value ~default:zero @@ add acc upd.body.balance_change
         else acc )
   in
   let balance_change =
@@ -76,3 +77,31 @@ let verify_balance_changes ~txn ~ledger accounts =
              verify_balance_change ~balance_change orig updt
          | _ ->
              false ) )
+
+let verify_balances_unchanged ~(ledger : Helpers.Ledger.t)
+    ~(txn :
+       Helpers.Transaction_logic.Transaction_applied.Zkapp_command_applied.t )
+    (accounts : Test_account.t list) =
+  let is_fee_payer account =
+    Public_key.Compressed.equal account.Test_account.pk
+      txn.command.data.fee_payer.body.public_key
+  in
+  let fee =
+    let open Amount in
+    of_fee txn.command.data.fee_payer.body.fee
+    |> Signed.of_unsigned |> Signed.negate
+  in
+  List.for_all accounts ~f:(fun account ->
+      verify_account_updates account ~ledger ~txn ~f:(fun _amt -> function
+        | Some orig, Some updt when is_fee_payer account ->
+            add_to_balance orig.balance fee
+            |> Option.value_map
+                 ~default:Balance.(equal updt.balance zero)
+                 ~f:(fun b -> Balance.equal updt.balance b)
+        | Some orig, Some updt ->
+            Balance.equal updt.balance orig.balance
+        | None, None ->
+            true
+        | _ ->
+            (* Account could have been neither created or destroyed. *)
+            false ) )

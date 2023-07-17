@@ -4,18 +4,20 @@
 
 # Mina
 
-Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. This is the main source code repository for the Mina project. It contains code for the OCaml protocol implementation, [website](https://minaprotocol.com), & wallet. Enjoy!
+Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. This is the main source code repository for the Mina project and contains code for the OCaml protocol implementation, the [Mina Protocol website](https://minaprotocol.com), and wallet. Enjoy!
 
 ## Notes
 
-- Mina is still under active development, and APIs are still evolving. If you do build upon the APIs, be aware that breaking changes may occur.
+Mina is still under active development and APIs are evolving. If you build on the APIs, be aware that breaking changes can occur.
+
+The Mina implementation of the Rosetta API offers a more stable and useful interface for retrieving the blockchain's state. Rosetta is run as a separate process and it relies on an archive being connected to a node. The source code for the archive and Rosetta implementation are in [src/app/archive](https://github.com/MinaProtocol/mina/tree/develop/src/app/archive) and [src/app/rosetta](https://github.com/MinaProtocol/mina/tree/develop/src/app/rosetta). Be sure to follow updates in the project if these resources are relocated. 
 
 ## What is Mina?
 
 ### Mina Walkthrough
 
-- [Docs](https://minaprotocol.com/docs/)
-- [Using a 3rd Party wallet] (https://docs.minaprotocol.com/using-mina/install-a-wallet)
+- [Mina Protocol](https://docs.minaprotocol.com/) documentation
+- [Installing and using a third-party wallet](https://docs.minaprotocol.com/using-mina/install-a-wallet)
 - [Sending a Payment using Mina's CLI](https://docs.minaprotocol.com/node-operators/sending-a-payment)
 - [Become a Node Operator](https://minaprotocol.com/docs/getting-started/)
 
@@ -29,13 +31,13 @@ Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. 
 
 ## Contributing
 
-Read the [Contributing Guide](https://docs.minaprotocol.com/node-developers/contributing) for information on how to make both technical and non-technical contributions.
+For information on how to make technical and non-technical contributions, see the repository contributing guidelines in [CONTRIBUTING](https://github.com/MinaProtocol/mina/blob/develop/CONTRIBUTING.md) and the [Contributing Guide](https://docs.minaprotocol.com/node-developers/contributing) docs.
 
 ## Developers
 
-The [Developer docs](https://docs.minaprotocol.com/node-developers) contain all the information needed to begin contributing code to Mina, and using Mina APIs to build applications.
+The [Node Developers](https://docs.minaprotocol.com/node-developers) docs contain helpful information about contributing code to Mina and using Mina APIs to build applications.
 
-#### Quick Links:
+### Quick Links
 
 - [Developer README](README-dev.md)
 - [Running a demo node](docs/demo.md)
@@ -43,19 +45,9 @@ The [Developer docs](https://docs.minaprotocol.com/node-developers) contain all 
 
 ## Community
 
-- Join the public [Discord server](https://bit.ly/MinaDiscord)! Please come by if you need help or have any questions.
-- Get the latest updates by [signing up for the Mina newsletter](https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+just+want+to+learn+more!).
-
-## Follow our work
-
-We use ZenHub to track our tasks and get metrics about our team's efforts. ZenHub is a third-party product that adds an abstraction layer with more functionalities on top of GitHub. You can follow our work in the following boards:
-
-- [zkApps](https://app.zenhub.com/workspaces/unified-zkapp-6244b2acba5b64001dfe6ba6/board)
-- [Core Crypto](https://app.zenhub.com/workspaces/core-crypto-621fcb82b7d49700156fd060/board)
-- [Velocity](https://app.zenhub.com/workspaces/velocity-62264fddc441a100183f7f86/board)
-- [Network Stability](https://app.zenhub.com/workspaces/network-stability-6205823c982b610013c514cd/board)
-- [Product](https://app.zenhub.com/workspaces/o1-product-61fc1ed4aeb5be00144a555c/board)
-- [Rosetta](https://app.zenhub.com/workspaces/rosetta-62546aa5cb3db30019d602c5/board)
+- Join the public Mina Protocol [Discord server](https://discord.gg/minaprotocol). Please come by if you need help or have any questions.
+- Participate in our [online communities](https://docs.minaprotocol.com/participate/online-communities).
+- Get the latest updates by signing up for the Mina newsletter. Select [SIGN UP FOR NEWSLETTER](https://minaprotocol.com/) on the home page of the Mina Protocol website.
 
 ## License
 
