@@ -52,6 +52,9 @@ type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
 type Structured_log_events.t += Transition_frontier_loaded_from_persistence
   [@@deriving register_event]
 
+type Structured_log_events.t += Persisted_frontier_loaded
+  [@@deriving register_event]
+
 type Structured_log_events.t += Persisted_frontier_fresh_boot
   [@@deriving
     register_event { msg = "Persistent frontier database does not exist" }]
@@ -181,6 +184,9 @@ let rec load_with_max_length :
   (* TODO: #3053 *)
   let continue persistent_frontier_instance ~ignore_consensus_local_state
       ~snarked_ledger_hash =
+    let snarked_ledger_hash_json =
+      Frozen_ledger_hash.to_yojson snarked_ledger_hash
+    in
     match
       Persistent_root.load_from_disk_exn persistent_root ~snarked_ledger_hash ~logger
     with
@@ -195,7 +201,7 @@ let rec load_with_max_length :
         let%map () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
         in
-        err
+        err_result
     | Ok persistent_root_instance -> (
         match%bind
           load_from_persistence_and_start ~logger ~verifier
@@ -205,6 +211,7 @@ let rec load_with_max_length :
             ignore_consensus_local_state
         with
         | Ok _ as result ->
+            [%str_log trace] Persisted_frontier_loaded ;
             return result
         | Error err as err_result ->
             let err_str =
@@ -228,7 +235,7 @@ let rec load_with_max_length :
               Persistent_frontier.Instance.destroy persistent_frontier_instance
             in
             Persistent_root.Instance.close persistent_root_instance ;
-            err )
+            err_result )
   in
   let persistent_frontier_instance =
     Persistent_frontier.create_instance_exn persistent_frontier
