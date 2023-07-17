@@ -1247,12 +1247,15 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                 curr_global_slot_since_genesis
         in
         let write_checkpoint_file () =
-          Option.iter !checkpoint_target ~f:(fun target ->
+          match !checkpoint_target with
+          | None ->
+              Deferred.unit
+          | Some target ->
               if Int64.(last_global_slot_since_genesis >= target) then (
                 incr_checkpoint_target () ;
-                Async.don't_wait_for
-                  (write_replayer_checkpoint ~logger ~ledger
-                     ~last_global_slot_since_genesis ) ) )
+                write_replayer_checkpoint ~logger ~ledger
+                  ~last_global_slot_since_genesis )
+              else Deferred.unit
         in
         let run_actions_on_slot_change curr_global_slot_since_genesis =
           if
@@ -1262,6 +1265,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             log_ledger_hash_after_last_slot () ;
             log_state_hash_on_next_slot curr_global_slot_since_genesis ;
             write_checkpoint_file () )
+          else Deferred.unit
         in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
@@ -1275,7 +1279,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               (* combining situation 2
                  two fee transfer commands with same global slot since genesis, sequence number
               *)
-              run_actions_on_slot_change ic.global_slot_since_genesis ;
+              let%bind () =
+                run_actions_on_slot_change ic.global_slot_since_genesis
+              in
               let%bind () =
                 apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces
                   ~repair_nonces ~continue_on_error ic ic2
@@ -1285,7 +1291,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                 ~last_block_id:ic.block_id ~staking_epoch_ledger
                 ~next_epoch_ledger
           | _ ->
-              run_actions_on_slot_change ic.global_slot_since_genesis ;
+              let%bind () =
+                run_actions_on_slot_change ic.global_slot_since_genesis
+              in
               let%bind () =
                 run_internal_command ~logger ~pool ~ledger ~set_nonces
                   ~repair_nonces ~continue_on_error ic
@@ -1304,14 +1312,12 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
         match (internal_cmds, user_cmds) with
         | [], [] ->
             log_ledger_hash_after_last_slot () ;
-            Deferred.return
-              ( last_global_slot_since_genesis
-              , staking_epoch_ledger
-              , staking_seed
-              , next_epoch_ledger
-              , next_seed )
+            let%map () = write_checkpoint_file () in
+            (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
         | [], uc :: ucs ->
-            run_actions_on_slot_change uc.global_slot_since_genesis ;
+            let%bind () =
+              run_actions_on_slot_change uc.global_slot_since_genesis
+            in
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~set_nonces ~repair_nonces
                 ~continue_on_error uc
@@ -1321,7 +1327,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               ~last_block_id:uc.block_id ~staking_epoch_ledger
               ~next_epoch_ledger
         | ic :: _, uc :: ucs when cmp_ic_uc ic uc > 0 ->
-            run_actions_on_slot_change uc.global_slot_since_genesis ;
+            let%bind () =
+              run_actions_on_slot_change uc.global_slot_since_genesis
+            in
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~set_nonces ~repair_nonces
                 ~continue_on_error uc
@@ -1371,11 +1379,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       [%log info] "At start global slot %Ld, ledger hash"
         start_slot_since_genesis
         ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ] ;
-      let%bind ( last_global_slot_since_genesis
-               , staking_epoch_ledger
-               , staking_seed
-               , next_epoch_ledger
-               , next_seed ) =
+      let%bind staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed
+          =
         apply_commands sorted_internal_cmds sorted_user_cmds
           ~last_global_slot_since_genesis:start_slot_since_genesis
           ~last_block_id:oldest_block_id ~staking_epoch_ledger:ledger
@@ -1383,8 +1388,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       in
       match input.target_epoch_ledgers_state_hash with
       | None ->
-          write_replayer_checkpoint ~logger ~ledger
-            ~last_global_slot_since_genesis
+          [%log info] "No target epoch ledger hash supplied, not writing output" ;
+          Deferred.unit
       | Some target_epoch_ledgers_state_hash -> (
           match output_file_opt with
           | None ->
