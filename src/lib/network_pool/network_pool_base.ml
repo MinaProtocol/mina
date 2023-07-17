@@ -70,7 +70,9 @@ end)
     let forward broadcast_pipe accepted rejected = function
       | Local f ->
           f (Ok (`Broadcasted, accepted, rejected)) ;
-          Linear_pipe.write broadcast_pipe accepted |> don't_wait_for
+          Linear_pipe.write broadcast_pipe
+            { With_nonce.message = accepted; nonce = 0 }
+          |> don't_wait_for
       | External cb ->
           fire_if_not_already_fired cb `Accept
   end
@@ -100,8 +102,8 @@ end)
   type t =
     { resource_pool : Resource_pool.t
     ; logger : Logger.t
-    ; write_broadcasts : Resource_pool.Diff.t Linear_pipe.Writer.t
-    ; read_broadcasts : Resource_pool.Diff.t Linear_pipe.Reader.t
+    ; write_broadcasts : Resource_pool.Diff.t With_nonce.t Linear_pipe.Writer.t
+    ; read_broadcasts : Resource_pool.Diff.t With_nonce.t Linear_pipe.Reader.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     }
 
@@ -243,9 +245,10 @@ end)
                      ~f:(fun d -> `String (Resource_pool.Diff.summary d))
                      rebroadcastable ) )
             ] ;
+      let nonce = Time_ns.to_int_ns_since_epoch (Time_ns.now ()) in
       let%bind () =
-        Deferred.List.iter rebroadcastable
-          ~f:(Linear_pipe.write t.write_broadcasts)
+        Deferred.List.iter rebroadcastable ~f:(fun message ->
+            Linear_pipe.write t.write_broadcasts With_nonce.{ message; nonce } )
       in
       let%bind () = Async.after rebroadcast_interval in
       go ()
