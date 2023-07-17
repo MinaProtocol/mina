@@ -34,9 +34,9 @@ struct
 
   type nonrec t = Field.t t
 
-  let state { state; _ } = Array.copy state
+  let _state { state; _ } = Array.copy state
 
-  let copy { state; params; sponge_state; needs_final_permute_if_empty } =
+  let _copy { state; params; sponge_state; needs_final_permute_if_empty } =
     { state = Array.copy state
     ; params
     ; sponge_state
@@ -45,15 +45,15 @@ struct
 
   let initial_state = Array.init m ~f:(fun _ -> Field.zero)
 
-  let of_sponge { Sponge.state; params; sponge_state } =
+  let of_sponge { Sponge.state; params; sponge_state; id = _ } =
     match sponge_state with
-    | Squeezed n ->
+    | Sponge.Squeezed n ->
         { sponge_state = Squeezed n
         ; state = Array.copy state
         ; needs_final_permute_if_empty = true
         ; params
         }
-    | Absorbed n -> (
+    | Sponge.Absorbed n -> (
         let abs i =
           { sponge_state = Absorbing { next_index = i; xs = [] }
           ; state = Array.copy state
