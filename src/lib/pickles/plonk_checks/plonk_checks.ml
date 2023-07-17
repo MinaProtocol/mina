@@ -268,7 +268,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     let get_eval =
       match (row : Scalars.curr_or_next) with Curr -> fst | Next -> snd
     in
-    match (col : Scalars.Column.t) with
+    match[@warning "-4"] (col : Scalars.Column.t) with
     | Witness i ->
         get_eval witness.(i)
     | Index Poseidon ->
