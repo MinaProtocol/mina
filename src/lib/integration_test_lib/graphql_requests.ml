@@ -622,7 +622,7 @@ let set_snark_work_fee ~logger node_uri ~new_snark_work_fee =
   in
   let%map result_obj = set_snark_work_fee_graphql () in
   let last_snark_work_fee =
-    Currency.Fee.to_string result_obj.setSnarkWorkFee.lastFee
+    Unsigned.UInt64.to_string result_obj.setSnarkWorkFee.lastFee
   in
   [%log info] "snark work fee changed, lastSnarkWorkFee: %s" last_snark_work_fee
     ~metadata:
