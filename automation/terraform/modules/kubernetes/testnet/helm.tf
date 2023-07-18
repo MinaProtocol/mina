@@ -33,9 +33,9 @@ resource "helm_release" "seeds" {
   ]
   wait    = false
   timeout = 600
-  depends_on = [
-    kubernetes_role_binding.helm_release
-  ]
+  #   depends_on = [
+  #     kubernetes_role_binding.helm_release
+  #   ]
 }
 
 # Block Producer
