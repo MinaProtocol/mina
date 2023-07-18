@@ -1175,20 +1175,29 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
           (Option.map checkpoint_interval_i64 ~f:(fun interval ->
                Int64.(input.start_slot_since_genesis + interval) ) )
       in
-      let incr_checkpoint_target () =
-        Option.iter !checkpoint_target ~f:(fun target ->
-            match checkpoint_interval_i64 with
-            | Some interval ->
-                [%log info] "Checkpoint target was %Ld, setting to %Ld" target
-                  Int64.(target + interval) ;
-                checkpoint_target := Some Int64.(target + interval)
-            | None ->
-                failwith "Expected a checkpoint interval" )
-      in
       let%bind max_canonical_slot =
         query_db pool
           ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
           ~item:"max canonical slot"
+      in
+      let incr_checkpoint_target () =
+        Option.iter !checkpoint_target ~f:(fun target ->
+            match checkpoint_interval_i64 with
+            | Some interval ->
+                let new_target = Int64.(target + interval) in
+                if Int64.( <= ) new_target max_canonical_slot then (
+                  [%log info] "Checkpoint target was %Ld, setting to %Ld" target
+                    new_target ;
+                  checkpoint_target := Some new_target )
+                else (
+                  (* set target so it can't be reached *)
+                  [%log info]
+                    "Checkpoint target was %Ld, new target would be at \
+                     noncanonical slot, set target to unreachable value"
+                    target ;
+                  checkpoint_target := Some Int64.max_value )
+            | None ->
+                failwith "Expected a checkpoint interval" )
       in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
