@@ -4,30 +4,35 @@
 /dockerfiles/ @MinaProtocol/infra-eng-reviewers
 /scripts/ @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /Makefile @MinaProtocol/infra-eng-reviewers
-/src/config/dev.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
-/src/config/testnet_postake_medium_curves.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
+/src/config/ @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers @MinaProtocol/protocol-qa-reviewers
 /CODE_OF_CONDUCT.md @aneesharaines
 /CONTRIBUTING.md @MinaProtocol/product-eng-reviewers
 /LICENSE @aneesharaines
 /README.md @MinaProtocol/product-eng-reviewers
-/README-dev.md @MinaProtocol/protocol-eng-reviewers
-/graphql_schema.json @MinaProtocol/product-eng-reviewers
+/README-dev.md @MinaProtocol/protocol-eng-reviewers @MinaProtocol/protocol-qa-reviewers
+/graphql_schema.json @MinaProtocol/product-eng-reviewers @MinaProtocol/protocol-qa-reviewers
 
 /src/external/ @bkase @psteckler @aneesharaines @mrmr1993
 
-/src/app/archive @MinaProtocol/product-eng-reviewers
-/src/app/cli/src/mina.ml @MinaProtocol/protocol-eng-reviewers
-/src/app/cli/src/init @MinaProtocol/protocol-eng-reviewers
-/src/app/libp2p_helper @MinaProtocol/protocol-eng-reviewers
+/src/app/archive @MinaProtocol/product-eng-reviewers @MinaProtocol/protocol-qa-reviewers @MinaProtocol/protocol-qa-reviewers
+/src/app/cli/src/mina.ml @MinaProtocol/protocol-eng-reviewers @MinaProtocol/protocol-qa-reviewers
+/src/app/cli/src/init @MinaProtocol/protocol-eng-reviewers @MinaProtocol/protocol-qa-reviewers
+/src/app/libp2p_helper @MinaProtocol/protocol-eng-reviewers @MinaProtocol/protocol-qa-reviewers
 /src/app/reformat/ @MinaProtocol/infra-eng-reviewers
 /src/app/trace-tool/ @MinaProtocol/protocol-eng-reviewers
-/src/app/runtime_genesis_ledger/ @MinaProtocol/protocol-eng-reviewers
-/src/app/archive_blocks/ @MinaProtocol/protocol-eng-reviewers
-/src/app/extract_blocks/ @MinaProtocol/protocol-eng-reviewers
-/src/app/patch_archive_test/ @MinaProtocol/protocol-eng-reviewers
+/src/app/runtime_genesis_ledger/ @MinaProtocol/protocol-eng-reviewers @MinaProtocol/protocol-qa-reviewers
+/src/app/archive_blocks/ @MinaProtocol/protocol-eng-reviewers @MinaProtocol/protocol-qa-reviewers
+/src/app/extract_blocks/ @MinaProtocol/protocol-eng-reviewers @MinaProtocol/protocol-qa-reviewers
+/src/app/patch_archive_test/ @MinaProtocol/protocol-eng-reviewers @MinaProtocol/protocol-qa-reviewers
+/src/app/replayer/ @MinaProtocol/protocol-eng-reviewers @MinaProtocol/protocol-qa-reviewers
+/src/app/itn_orchestrator/ @MinaProtocol/protocol-eng-reviewers
 /src/app/rosetta/ @MinaProtocol/mina-foundation-eng
+/src/app/test_executive/ @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-qa-reviewers
+/src/app/zkapp_test_transaction/ @MinaProtocol/protocol-qa-reviewers
 
-/src/lib/ @MinaProtocol/protocol-eng-reviewers
+/src/lib/ @MinaProtocol/protocol-eng-reviewers @MinaProtocol/protocol-qa-reviewers
+/src/libp2p_ipc/ @MinaProtocol/protocol-eng-reviewers @MinaProtocol/protocol-qa-reviewers
+/src/test/ @MinaProtocol/protocol-qa-reviewers
 
 /src/lib/blake2/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/cli_lib/ @MinaProtocol/product-eng-reviewers
