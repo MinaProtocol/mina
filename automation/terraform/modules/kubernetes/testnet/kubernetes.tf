@@ -17,6 +17,8 @@ provider "kubernetes" {
 # }
 
 resource "kubernetes_namespace" "testnet_namespace" {
+  provider = kubernetes.testnet_deploy
+
   metadata {
     name = var.testnet_name
   }
