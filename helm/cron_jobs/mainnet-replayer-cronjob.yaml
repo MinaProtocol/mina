@@ -6,7 +6,7 @@
 # - ALTER USER takes a password bracketed in single-quotes or $$s
 #   too hard to make the single-quotes work inside single-quotes, so use $$
 #   the space in the password makes sure a $ isn't applied to the following string
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: mainnet-replayer-cronjob
