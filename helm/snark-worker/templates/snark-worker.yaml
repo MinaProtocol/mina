@@ -72,7 +72,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: pvc-{{ $.Values.workerName }}
+  name: pvc-{{ $name }}
 spec:
   accessModes:
     - {{ $.Values.storage.accessMode | quote }}
@@ -81,4 +81,5 @@ spec:
       storage: {{ $.Values.storage.size | quote }}
   storageClassName: "{{ $.Values.storage.storageClass }}"
 ---
+{{ end }}
 {{ end }}

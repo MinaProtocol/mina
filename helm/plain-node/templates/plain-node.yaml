@@ -169,10 +169,6 @@ spec:
         {{- end }}
         - name: config-dir
           mountPath: "/root/.mina-config/"
-        {{- if $.Values.logs.enable }}
-        - name: {{ template "sideCar.logs.minaLogsVolumeName" }}
-          mountPath: "/root/.mina-config"
-        {{- end }}
         - name: scripts
           mountPath: "/scripts"
       volumes:
@@ -200,7 +196,6 @@ spec:
       - name: actual-libp2p
         emptyDir: {}
       {{ include "sideCar.bpfDebugger.volume" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
-      {{ include "sideCar.logs.minaLogsVolume" (dict "logs" $.Values.logs) | nindent 6 }}
       - name: scripts
         configMap:
           defaultMode: 0755
@@ -248,3 +243,4 @@ spec:
 ---
 {{ end }}
 ---
+{{ end }}
