@@ -742,8 +742,11 @@ type ('f, 'rust_gates) t =
              as well.
         *)
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
-  ; runtime_table_cfgs : 'f Kimchi_types.runtime_table_cfg list
+  ; mutable runtime_table_cfgs : 'f Kimchi_types.runtime_table_cfg list
   }
+
+let add_runtime_table_cfgs sys cfg =
+  sys.runtime_table_cfgs <- cfg :: sys.runtime_table_cfgs
 
 let get_public_input_size sys = sys.public_input_size
 
@@ -774,6 +777,8 @@ module Make
   type nonrec t = (Fp.t, Gates.t) t
 
   val create : unit -> t
+
+  val add_runtime_table_cfgs : t -> Fp.t Kimchi_types.runtime_table_cfg -> unit
 
   val get_runtime_table_cfgs : t -> Fp.t Kimchi_types.runtime_table_cfg array
 
@@ -932,6 +937,9 @@ end = struct
     ; union_finds = V.Table.create ()
     ; runtime_table_cfgs = []
     }
+
+  let add_runtime_table_cfgs sys cfg =
+    sys.runtime_table_cfgs <- cfg :: sys.runtime_table_cfgs
 
   let get_runtime_table_cfgs sys = Array.of_list sys.runtime_table_cfgs
 
