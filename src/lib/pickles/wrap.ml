@@ -872,12 +872,15 @@ let wrap
     Common.time "wrap proof" (fun () ->
         [%log internal] "Wrap_generate_witness_conv" ;
         Impls.Wrap.generate_witness_conv
-          ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
+          ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs
+                  ; public_inputs
+                  ; runtime_tables
+                  } () ->
             [%log internal] "Backend_tock_proof_create_async" ;
             let%map.Promise proof =
               (* TODO(dw) pass runtime tables *)
               Backend.Tock.Proof.create_async ~primary:public_inputs
-                ~auxiliary:auxiliary_inputs ~runtime_tables:[||] pk
+                ~auxiliary:auxiliary_inputs ~runtime_tables pk
                 ~message:next_accumulator
             in
             [%log internal] "Backend_tock_proof_create_async_done" ;

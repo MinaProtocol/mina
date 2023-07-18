@@ -19,14 +19,16 @@ let generate_and_verify_proof ?cs circuit =
   let prover_index = Tick.Keypair.pk proof_keypair in
   let proof, (() as _public_output) =
     Impl.generate_witness_conv
-      ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs }
-              next_statement_hashed ->
+      ~f:(fun { Impl.Proof_inputs.auxiliary_inputs
+              ; Impl.Proof_inputs.public_inputs
+              ; Impl.Proof_inputs.runtime_tables
+              } next_statement_hashed ->
         let proof =
           (* Only block_on_async for testing; do not do this in production!! *)
           Promise.block_on_async_exn (fun () ->
               (* TODO(dw) pass runtime tables *)
               Tick.Proof.create_and_verify_async ~primary:public_inputs
-                ~auxiliary:auxiliary_inputs ~runtime_tables:[||] ~message:[]
+                ~auxiliary:auxiliary_inputs ~runtime_tables ~message:[]
                 prover_index )
         in
         (proof, next_statement_hashed) )
