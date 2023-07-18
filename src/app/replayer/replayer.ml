@@ -907,32 +907,39 @@ let try_slot ~logger pool slot =
       Core_kernel.exit 1 ) ;
     match%bind find_canonical_chain ~logger pool slot with
     | None ->
-        go ~slot:(slot - 1) ~tries_left:(tries_left - 1)
+        go ~slot:(Int64.pred slot) ~tries_left:(tries_left - 1)
     | Some state_hash ->
         [%log info]
-          "Found possible canonical chain to target state hash %s at slot %d"
+          "Found possible canonical chain to target state hash %s at slot %Ld"
           state_hash slot ;
         return state_hash
   in
   go ~slot ~tries_left:num_tries
 
-let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis =
-  (* start replaying at the slot after the one we've just finished with *)
-  let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
-  let%bind replayer_checkpoint =
-    let%map input =
-      create_replayer_checkpoint ~ledger ~start_slot_since_genesis
+let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
+    ~max_canonical_slot =
+  if Int64.( <= ) last_global_slot_since_genesis max_canonical_slot then (
+    (* start replaying at the slot after the one we've just finished with *)
+    let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
+    let%map replayer_checkpoint =
+      let%map input =
+        create_replayer_checkpoint ~ledger ~start_slot_since_genesis
+      in
+      input_to_yojson input |> Yojson.Safe.pretty_to_string
     in
-    input_to_yojson input |> Yojson.Safe.pretty_to_string
-  in
-  let checkpoint_file =
-    sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
-  in
-  [%log info] "Writing checkpoint file"
-    ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
-  return
-  @@ Out_channel.with_file checkpoint_file ~f:(fun oc ->
-         Out_channel.output_string oc replayer_checkpoint )
+    let checkpoint_file =
+      sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
+    in
+    [%log info] "Writing checkpoint file"
+      ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
+    Out_channel.with_file checkpoint_file ~f:(fun oc ->
+        Out_channel.output_string oc replayer_checkpoint ) )
+  else (
+    [%log info] "Not writing checkpoint file at slot %Ld, because not canonical"
+      last_global_slot_since_genesis
+      ~metadata:
+        [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
+    Deferred.unit )
 
 let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
     ~checkpoint_interval ~continue_on_error () =
@@ -998,7 +1005,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                 ~f:(fun db -> Sql.Block.get_max_slot db ())
                 ~item:"max slot"
             in
-            [%log info] "Maximum global slot since genesis in blocks is %d"
+            [%log info] "Maximum global slot since genesis in blocks is %Ldd"
               max_slot ;
             try_slot ~logger pool max_slot
       in
@@ -1178,6 +1185,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             | None ->
                 failwith "Expected a checkpoint interval" )
       in
+      let%bind max_canonical_slot =
+        query_db pool
+          ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
+          ~item:"max canonical slot"
+      in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
           (user_cmds : Sql.User_command.t list) ~last_global_slot_since_genesis
@@ -1254,7 +1266,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               if Int64.(last_global_slot_since_genesis >= target) then (
                 incr_checkpoint_target () ;
                 write_replayer_checkpoint ~logger ~ledger
-                  ~last_global_slot_since_genesis )
+                  ~last_global_slot_since_genesis ~max_canonical_slot )
               else Deferred.unit
         in
         let run_actions_on_slot_change curr_global_slot_since_genesis =
@@ -1312,7 +1324,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
         match (internal_cmds, user_cmds) with
         | [], [] ->
             log_ledger_hash_after_last_slot () ;
-            let%map () = write_checkpoint_file () in
+            let%map () =
+              write_replayer_checkpoint ~logger ~ledger
+                ~last_global_slot_since_genesis ~max_canonical_slot
+            in
             (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
         | [], uc :: ucs ->
             let%bind () =
