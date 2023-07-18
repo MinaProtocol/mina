@@ -67,9 +67,6 @@ spec:
           {{- if $.Values.internalTrace.enable}}
           "-internal-tracing",
           {{- end -}}
-          {{- if $.Values.mina.exposeGraphql }}
-          "-insecure-rest-server",
-          {{- end -}}
           {{- if $.Values.mina.usePodIp }}
           "-external-ip", "$(DAEMON_POD_IP)",
           {{- end }}
@@ -153,10 +150,6 @@ spec:
           mountPath: /root/libp2p-keys
         - name: config-dir
           mountPath: /root/.mina-config/
-        {{- if $.Values.logs.enable }}
-        - name: {{ template "sideCar.logs.minaLogsVolumeName" }}
-          mountPath: "/root/.mina-config"
-        {{- end }}
         - name: scripts
           mountPath: "/scripts"
       {{ include "sideCar.resources.containerSpec" (dict "resources" $.Values.resources) | nindent 6 }}
@@ -172,8 +165,13 @@ spec:
       - name: actual-libp2p
         emptyDir: {}
       - name: config-dir
+      {{- if $.Values.persist_working_dir }}
+        persistentVolumeClaim:
+           claimName: pvc-{{ $.Values.coordinatorName }}
+      {{- else }} 
+        emptyDir: {}
+      {{ end }}
       {{ include "sideCar.bpfDebugger.volume" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
-      {{ include "sideCar.logs.minaLogsVolume" (dict "logs" $.Values.logs) | nindent 6 }}
       - name: scripts
         configMap:
           defaultMode: 0755
@@ -181,12 +179,7 @@ spec:
           items:
           - key: "unset-k8s-env.sh"
             path: "unset-k8s-env.sh"
-      {{- if $.Values.persist_working_dir }}
-        persistentVolumeClaim:
-           claimName: pvc-{{ $.Values.coordinatorName }}
-      {{- else }} 
-        emptyDir: {}
-      {{ end }}
+
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
 ---
 {{ include "sideCar.resources.service" (dict "name" .name "resources" $.Values.resources) }}
@@ -207,4 +200,5 @@ spec:
       storage: {{ $.Values.storage.size | quote }}
   storageClassName: "{{ $.Values.storage.storageClass }}"
 ---
+{{ end }}
 {{ end }}

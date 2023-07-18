@@ -204,11 +204,6 @@ spec:
 
 
 {{/*
-Side-Car - LogService: Mina logs volume name
-*/}}
-{{define "sideCar.logs.minaLogsVolumeName" }}config-dir{{ end }}
-
-{{/*
 Side-Car - LogService: container
 */}}
 {{- define "sideCar.logs.containerSpec" }}
@@ -235,7 +230,7 @@ Side-Car - LogService: container
     containerPort: 81
   volumeMounts:
   - mountPath: /mina-logs
-    name: {{ template "sideCar.logs.minaLogsVolumeName" }}
+    name: config-dir
   resources:
     requests:
       memory: {{ .logs.memory | default "0.1G" }}
@@ -243,16 +238,6 @@ Side-Car - LogService: container
     limits:
       memory: {{ .logs.memory | default "0.1G" }}
       cpu: {{ .logs.cpu | default "0.1" }}
-{{- end }}
-{{- end }}
-
-{{/*
-Side-Car - LogService: volume definition
-*/}}
-{{- define "sideCar.logs.minaLogsVolume" }}
-{{- if .logs.enable }}
-- name: {{ template "sideCar.logs.minaLogsVolumeName" }}
-  emptyDir: {}
 {{- end }}
 {{- end }}
 
@@ -304,7 +289,7 @@ Side-Car - InternalTraceService: container
     containerPort: 8000
   volumeMounts:
   - mountPath: /mina-logs
-    name: {{ template "sideCar.logs.minaLogsVolumeName" }}
+    name: config-dir
 {{- end }}
 {{- end }}
 
