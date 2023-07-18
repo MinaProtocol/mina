@@ -2,23 +2,15 @@
 kind: pipeline
 name: build-image
 type: docker
-clone:
-  disable: true
-
-environment:
-  OPENMINA_BRANCH: openmina-legacy-snark-workers
+trigger:
+  event:
+  - custom
 
 steps:
-
-- name: clone
-  image: alpine/git
-  commands:
-  - git clone $${MINA_REPO:-https://github.com/MinaProtocol/mina} --depth 1 -b $${MINA_BRANCH:-develop} .
 
 - name: prepare-dockerfiles
   image: busybox:latest
   commands:
-  - wget https://github.com/openmina/mina/raw/$${OPENMINA_BRANCH}/dockerfiles/stages/99-openmina-tail -O dockerfiles/stages/99-openmina-tail
   - sed -i -e "s/zlib1g-dev/zlib1g-dev jq/" dockerfiles/stages/1-build-deps
   - for f in 1-build-deps 2-opam-deps 3-builder 99-openmina-tail; do cat dockerfiles/stages/$$f; done > ./dockerfiles/stages/merged
   - echo "!dockerfiles/scripts/healthcheck-utilities.sh" >> .dockerignore
@@ -27,15 +19,17 @@ steps:
   image: plugins/docker
   settings:
     build_args:
-    - MINA_BRANCH=${MINA_BRANCH:-develop}
-    - MINA_REPO=${MINA_REPO:-https://github.com/MinaProtocol/mina}
+    - MINA_BRANCH=${DRONE_BRANCH}
+    # TODO: Revert change after testing!
+    - MINA_REPO=${MINA_REPO:-https://github.com/adonagy-ci-test/mina}
+    # - MINA_REPO=${MINA_REPO:-https://github.com/MinaProtocol/mina}
     dockerfile: ./dockerfiles/stages/merged
     password:
       from_secret: docker_hub_password
     repo: openmina/mina
     tags:
-    - mina-daily-${MINA_BRANCH:-develop}-${DRONE_BUILD_NUMBER}
-    - mina-daily-${MINA_BRANCH:-develop}-latest
+    - minaprotocol-mina-${DRONE_BRANCH}-${DRONE_BUILD_NUMBER}
+    - minaprotocol-mina-${DRONE_BRANCH}-latest
     username:
       from_secret: docker_hub_username
     cache_from: ${CACHE_IMAGE}
@@ -44,11 +38,11 @@ steps:
 kind: pipeline
 name: deploy-to-cluster
 type: docker
-clone:
-  disable: true
 depends_on:
 - build-image
-
+trigger:
+  event:
+  - custom
 
 environment:
   # path to openmina tooling
@@ -79,11 +73,6 @@ defs:
 
 steps:
 
-- name: clone
-  image: alpine/git
-  commands:
-  - git clone $${OPENMINA_REPO:-https://github.com/openmina/mina} --depth 1 -b $${OPENMINA_BRANCH:-openmina-legacy-snark-workers} .
-
 - name: prepare-kubeconfig
   image: alpine/k8s:1.26.1
   environment:
@@ -93,7 +82,7 @@ steps:
   commands:
   - umask 0077
   - echo "$DRONE_KUBECONFIG" > $${KUBECONFIG}
-  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet}
+  - kubectl config set-context --current --namespace $${NAMESPACE:-minaprotocol-ci-perftest}
 
 - name: delete-old-testnet
   image: alpine/k8s:1.26.1
@@ -141,7 +130,7 @@ steps:
   environment:
     KUBECONFIG: kube-config
   commands:
-  - export MINA_IMAGE="openmina/mina:mina-daily-$${MINA_BRANCH:-develop}-${DRONE_BUILD_NUMBER}"
+  - export MINA_IMAGE="openmina/mina:minaprotocol-mina-${DRONE_BRANCH}-${DRONE_BUILD_NUMBER}"
   - HELM_ARGS="--set=healthcheck.failureThreshold=1800 $${HELM_ARGS}"
   - $${OM}/deploy.sh deploy --seeds --force -- $${HELM_ARGS}
   - sleep 30 # handicap to other nodes so seed nodes to be up when they become needed
@@ -162,9 +151,9 @@ steps:
   environment:
     KUBECONFIG: kube-config
   commands:
-  - PORT="$$($${OM}/kube-utils.sh frontend-port $${NAMESPACE:-testnet})"
+  - PORT="$$($${OM}/kube-utils.sh frontend-port $${NAMESPACE:-minaprotocol-ci-perftest})"
   - 'echo "Frontend: http://1.k8.openmina.com:$PORT"'
-  - 'echo "Namespace: $${NAMESPACE:-testnet}"'
+  - 'echo "Namespace: $${NAMESPACE:-minaprotocol-ci-perftest}"'
   - echo
   - 'echo Seed nodes: $(kubectl get pods -l role=seed -o name | wc -l)'
   - 'echo Producer nodes: $(kubectl get pods -l role=block-producer -o name | wc -l)'
@@ -177,9 +166,10 @@ steps:
 kind: pipeline
 name: split-load
 type: docker
-clone:
-  disable: true
 depends_on: [ deploy-to-cluster ]
+trigger:
+  event:
+  - custom
 
 environment:
   SUFFIX: ${DRONE_BUILD_NUMBER}
@@ -197,11 +187,6 @@ defs:
 
 steps:
 
-- name: clone
-  image: alpine/git
-  commands:
-  - git clone $${OPENMINA_REPO:-https://github.com/openmina/mina} --depth 1 -b $${OPENMINA_BRANCH:-openmina-legacy-snark-workers} .
-
 - name: configure
   image: alpine/k8s:1.26.1
   environment:
@@ -211,7 +196,7 @@ steps:
   commands:
   - umask 0077
   - echo "$DRONE_KUBECONFIG" > "$KUBECONFIG"
-  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet}
+  - kubectl config set-context --current --namespace $${NAMESPACE:-minaprotocol-ci-perftest}
 
 - name: single-component
   image: openmina/mina-network-debugger:latest
@@ -260,14 +245,14 @@ steps:
   environment:
     KUBECONFIG: kube-config
   commands:
-  - $${OM}/kube-utils.sh mina-node-wait-for-epoch-slot deploy/prod2 $${NAMESPACE:-testnet} 0 10
+  - $${OM}/kube-utils.sh mina-node-wait-for-epoch-slot deploy/prod2 $${NAMESPACE:-minaprotocol-ci-perftest} 0 10
 
 - name: blockchain-split
   image: alpine/k8s:1.26.1
   environment:
     KUBECONFIG: kube-config
   commands:
-  - $${OM}/kube-utils.sh assert-different-history  deploy/prod2 $${NAMESPACE:-testnet} deploy/prod3 $${NAMESPACE:-testnet}
+  - $${OM}/kube-utils.sh assert-different-history  deploy/prod2 $${NAMESPACE:-minaprotocol-ci-perftest} deploy/prod3 $${NAMESPACE:-minaprotocol-ci-perftest}
 
 - name: disable-firewall
   image: openmina/mina-network-debugger:latest
@@ -283,7 +268,7 @@ steps:
   environment:
     KUBECONFIG: kube-config
   commands:
-  - $${OM}/kube-utils.sh mina-testnet-same-chain $${SAME_CHAIN_WAIT_RETRIES:-20} $${SAME_CHAIN_WAIT_PERIOD:-60} $${NAMESPACE:-testnet}
+  - $${OM}/kube-utils.sh mina-testnet-same-chain $${SAME_CHAIN_WAIT_RETRIES:-20} $${SAME_CHAIN_WAIT_PERIOD:-60} $${NAMESPACE:-minaprotocol-ci-perftest}
 
 - name: log-wait
   <<: *log
@@ -316,9 +301,10 @@ steps:
 kind: pipeline
 name: finish
 type: docker
-clone:
-  disable: true
 depends_on: [ split-load ]
+trigger:
+  event:
+  - custom
 
 environment:
   # path to openmina tooling
@@ -327,11 +313,6 @@ environment:
   MAX_HEIGHT: 20
 
 steps:
-
-- name: clone
-  image: alpine/git
-  commands:
-  - git clone $${OPENMINA_REPO:-https://github.com/openmina/mina} --depth 1 -b $${OPENMINA_BRANCH:-openmina-legacy-snark-workers} .
 
 - name: configure
   image: alpine/k8s:1.26.1
@@ -342,7 +323,7 @@ steps:
   commands:
   - umask 0077
   - echo "$DRONE_KUBECONFIG" > "$KUBECONFIG"
-  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet}
+  - kubectl config set-context --current --namespace $${NAMESPACE:-minaprotocol-ci-perftest}
 
 - name: wait-for-slot
   image: alpine/k8s:1.26.1
@@ -370,19 +351,15 @@ steps:
 kind: pipeline
 name: continuous-load
 type: docker
-clone:
-  disable: true
 depends_on: [ finish ]
+trigger:
+  event:
+  - custom
 
 environment:
   OM: helm/openmina-config
 
 steps:
-
-- name: clone
-  image: alpine/git
-  commands:
-  - git clone $${OPENMINA_REPO:-https://github.com/openmina/mina} --depth 1 -b $${OPENMINA_BRANCH:-openmina-legacy-snark-workers} .
 
 - name: configure
   image: alpine/k8s:1.26.1
@@ -393,7 +370,7 @@ steps:
   commands:
   - umask 0077
   - echo "$DRONE_KUBECONFIG" > "$KUBECONFIG"
-  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet}
+  - kubectl config set-context --current --namespace $${NAMESPACE:-minaprotocol-ci-perftest}
 
 - name: send-zkapp-txs
   image: alpine/k8s:1.26.1
