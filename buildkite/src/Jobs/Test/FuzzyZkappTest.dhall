@@ -23,11 +23,7 @@ let buildTestCmd : Text -> Text -> Natural -> Natural -> Size -> Command.Type = 
       target = cmd_target,
       docker = None Docker.Type,
       artifact_paths = [ S.contains "core_dumps/*" ],
-      retries = [
-              Command.Retry::{
-                exit_status = Command.ExitStatus.Code +1,
-                limit = Some 0
-              } ]
+      flake_retry_limit = Some 0
     }
 in
 
