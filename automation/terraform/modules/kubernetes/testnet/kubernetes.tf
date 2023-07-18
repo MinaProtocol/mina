@@ -3,7 +3,7 @@ data "google_client_config" "current" {}
 provider "kubernetes" {
   alias          = "testnet_deploy"
   config_context = var.k8s_context
-  config_path             = "~/.kube/config"  # Path to your K3s kubeconfig file
+  config_path    = "~/.kube/config" # Path to your K3s kubeconfig file
 }
 
 # provider "kubernetes" {
@@ -25,7 +25,3 @@ resource "kubernetes_namespace" "testnet_namespace" {
     delete = "15m"
   }
 }
-
-
-
-k3d cluster create buildkite-kubernetes --api-port 6444 --servers 1 --agents 1 --port "30500-31000:30500-31000@server:0"
