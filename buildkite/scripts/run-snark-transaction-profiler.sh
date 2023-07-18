@@ -8,7 +8,13 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y git apt-transport-https ca-certificates tzdata curl python3
 
-TESTNET_NAME="berkeley"
+case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
+  rampup|berkeley|release/2.0.0|develop)
+    TESTNET_NAME="berkeley"
+  ;;
+  *)
+    TESTNET_NAME="mainnet"
+esac
 
 git config --global --add safe.directory /workdir
 
