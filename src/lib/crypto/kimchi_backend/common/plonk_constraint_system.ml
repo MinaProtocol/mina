@@ -303,6 +303,10 @@ module Plonk_constraint = struct
           ; bound_crumb7 : 'v
           ; (* Coefficients *) two_to_rot : 'f (* Rotation scalar 2^rot *)
           }
+      (* Perform a runtime lookup in the runtime table with id [id]. Maximum 3
+         lookups at the same time. *)
+      | RuntimeLookup of
+          { id : 'v; c1 : 'v; d1 : 'v; c2 : 'v; d2 : 'v; c3 : 'v; d3 : 'v }
       | Raw of
           { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
     [@@deriving sexp]
@@ -607,6 +611,16 @@ module Plonk_constraint = struct
             ; bound_crumb6 = f bound_crumb6
             ; bound_crumb7 = f bound_crumb7
             ; (* Coefficients *) two_to_rot
+            }
+      | RuntimeLookup { id; c1; d1; c2; d2; c3; d3 } ->
+          RuntimeLookup
+            { id = f id
+            ; c1 = f c1
+            ; d1 = f d1
+            ; c2 = f c2
+            ; d2 = f d2
+            ; c3 = f c3
+            ; d3 = f d3
             }
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
@@ -2082,6 +2096,18 @@ end = struct
           |]
         in
         add_row sys vars_curr Rot64 [| two_to_rot |]
+    | Plonk_constraint.T (RuntimeLookup { id; c1; d1; c2; d2; c3; d3 }) ->
+        let vars =
+          [| Some (reduce_to_v id)
+           ; Some (reduce_to_v c1)
+           ; Some (reduce_to_v d1)
+           ; Some (reduce_to_v c2)
+           ; Some (reduce_to_v d2)
+           ; Some (reduce_to_v c3)
+           ; Some (reduce_to_v d3)
+          |]
+        in
+        add_row sys vars Lookup [||]
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->
