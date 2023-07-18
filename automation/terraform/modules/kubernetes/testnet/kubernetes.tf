@@ -3,7 +3,18 @@ data "google_client_config" "current" {}
 provider "kubernetes" {
   alias          = "testnet_deploy"
   config_context = var.k8s_context
+  config_path             = "~/.kube/config"  # Path to your K3s kubeconfig file
 }
+
+# provider "kubernetes" {
+#   alias                   = "testnet_deploy"
+#   config_path             = "~/.kube/config"  # Path to your K3s kubeconfig file
+
+#   config_context_overrides {
+#     "cluster"   = var.k8s_context  # Name of your K3s cluster context
+#     # "namespace" = "default"  # Namespace to use for Terraform-managed resources
+#   }
+# }
 
 resource "kubernetes_namespace" "testnet_namespace" {
   metadata {
@@ -14,3 +25,7 @@ resource "kubernetes_namespace" "testnet_namespace" {
     delete = "15m"
   }
 }
+
+
+
+k3d cluster create buildkite-kubernetes --api-port 6444 --servers 1 --agents 1 --port "30500-31000:30500-31000@server:0"

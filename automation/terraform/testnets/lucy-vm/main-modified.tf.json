@@ -21,7 +21,7 @@
       "integration_testnet": {
         "providers": { "google.gke": "google" },
         "source": "../../modules/o1-integration",
-        "k8s_context": "gke_o1labs-192920_us-west1_mina-integration-west1",
+        "k8s_context": "k3d-buildkite-kubernetes",
         "cluster_name": "mina-integration-west1",
         "cluster_region": "us-west1",
         "aws_route53_zone_id": "ZJPR9NA6W9M7F",
