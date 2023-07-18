@@ -466,6 +466,8 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
           Deferred.create (fun ivar -> interrupt_ivar := ivar)
       in
       let run_iteration next_block_tm : Block_time.t Deferred.t =
+        O1trace.thread "uptime_service"
+        @@ fun () ->
         let get_next_producer_time_opt () =
           match get_next_producer_timing () with
           | None ->

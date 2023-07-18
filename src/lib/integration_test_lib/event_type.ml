@@ -253,6 +253,20 @@ module Breadcrumb_added = struct
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
 
+module Transition_frontier_loaded_from_persistence = struct
+  type t = unit [@@deriving to_yojson]
+
+  let name = "Transition_frontier_loaded_from_persistence"
+
+  let structured_event_id =
+    Transition_frontier
+    .transition_frontier_loaded_from_persistence_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
 module Persisted_frontier_loaded = struct
   type t = unit [@@deriving to_yojson]
 
@@ -260,6 +274,45 @@ module Persisted_frontier_loaded = struct
 
   let structured_event_id =
     Transition_frontier.persisted_frontier_loaded_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
+module Persisted_frontier_fresh_boot = struct
+  type t = unit [@@deriving to_yojson]
+
+  let name = "persistent frontier database does not exist"
+
+  let structured_event_id =
+    Transition_frontier.persisted_frontier_fresh_boot_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
+module Bootstrap_required = struct
+  type t = unit [@@deriving to_yojson]
+
+  let name = "Bootstrap required"
+
+  let structured_event_id =
+    Transition_frontier.bootstrap_required_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
+module Persisted_frontier_dropped = struct
+  type t = unit [@@deriving to_yojson]
+
+  let name = "Persistent frontier dropped"
+
+  let structured_event_id =
+    Transition_frontier.persisted_frontier_dropped_structured_events_id
 
   let parse_func = Fn.const (Or_error.return ())
 
@@ -381,7 +434,12 @@ type 'a t =
   | Snark_work_gossip : Gossip.Snark_work.t t
   | Transactions_gossip : Gossip.Transactions.t t
   | Snark_work_failed : Snark_work_failed.t t
+  | Transition_frontier_loaded_from_persistence
+      : Transition_frontier_loaded_from_persistence.t t
   | Persisted_frontier_loaded : Persisted_frontier_loaded.t t
+  | Persisted_frontier_fresh_boot : Persisted_frontier_fresh_boot.t t
+  | Persisted_frontier_dropped : Persisted_frontier_dropped.t t
+  | Bootstrap_required : Bootstrap_required.t t
 
 type existential = Event_type : 'a t -> existential
 
@@ -406,8 +464,16 @@ let existential_to_string = function
       "Transactions_gossip"
   | Event_type Snark_work_failed ->
       "Snark_work_failed"
+  | Event_type Transition_frontier_loaded_from_persistence ->
+      "Transition_frontier_loaded_from_persistence"
   | Event_type Persisted_frontier_loaded ->
       "Persisted_frontier_loaded"
+  | Event_type Persisted_frontier_fresh_boot ->
+      "Persisted_frontier_fresh_boot"
+  | Event_type Persisted_frontier_dropped ->
+      "Persisted_frontier_dropped"
+  | Event_type Bootstrap_required ->
+      "Bootstrap_requied"
 
 let to_string e = existential_to_string (Event_type e)
 
@@ -434,6 +500,14 @@ let existential_of_string_exn = function
       Event_type Snark_work_failed
   | "Persisted_frontier_loaded" ->
       Event_type Persisted_frontier_loaded
+  | "Transition_frontier_loaded_from_persistence" ->
+      Event_type Transition_frontier_loaded_from_persistence
+  | "Persisted_frontier_fresh_boot" ->
+      Event_type Persisted_frontier_fresh_boot
+  | "Persisted_frontier_dropped" ->
+      Event_type Persisted_frontier_dropped
+  | "Bootstrap_requied" ->
+      Event_type Bootstrap_required
   | _ ->
       failwith "invalid event type string"
 
@@ -475,7 +549,11 @@ let all_event_types =
   ; Event_type Snark_work_gossip
   ; Event_type Transactions_gossip
   ; Event_type Snark_work_failed
+  ; Event_type Transition_frontier_loaded_from_persistence
   ; Event_type Persisted_frontier_loaded
+  ; Event_type Persisted_frontier_fresh_boot
+  ; Event_type Persisted_frontier_dropped
+  ; Event_type Bootstrap_required
   ]
 
 let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
@@ -500,8 +578,16 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
       (module Gossip.Transactions)
   | Snark_work_failed ->
       (module Snark_work_failed)
+  | Transition_frontier_loaded_from_persistence ->
+      (module Transition_frontier_loaded_from_persistence)
   | Persisted_frontier_loaded ->
       (module Persisted_frontier_loaded)
+  | Persisted_frontier_fresh_boot ->
+      (module Persisted_frontier_fresh_boot)
+  | Persisted_frontier_dropped ->
+      (module Persisted_frontier_dropped)
+  | Bootstrap_required ->
+      (module Bootstrap_required)
 
 let event_to_yojson event =
   let (Event (t, d)) = event in
@@ -622,7 +708,16 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
       h e
   | Snark_work_failed, Snark_work_failed ->
       h e
+  | ( Transition_frontier_loaded_from_persistence
+    , Transition_frontier_loaded_from_persistence ) ->
+      h e
   | Persisted_frontier_loaded, Persisted_frontier_loaded ->
+      h e
+  | Persisted_frontier_fresh_boot, Persisted_frontier_fresh_boot ->
+      h e
+  | Persisted_frontier_dropped, Persisted_frontier_dropped ->
+      h e
+  | Bootstrap_required, Bootstrap_required ->
       h e
   | _ ->
       failwithf "Mismatched event types: %s, %s" (to_string t1) (to_string t2)
