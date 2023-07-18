@@ -1,25 +1,22 @@
 ---
 kind: pipeline
-name: build-image-custom
+name: build-image
 type: docker
 clone:
   disable: true
-trigger:
-  event:
-  - custom
 
 environment:
-  OPENMINA_BRANCH: openmina-berkeley
+  OPENMINA_BRANCH: openmina-legacy-snark-workers
 
 steps:
 
 - name: clone
   image: alpine/git
   commands:
-  - git clone $${MINA_REPO:-$${DRONE_REPO_LINK}} --depth 1 -b $${MINA_BRANCH:-$${DRONE_BRANCH}} .
+  - git clone $${MINA_REPO:-https://github.com/MinaProtocol/mina} --depth 1 -b $${MINA_BRANCH:-develop} .
 
 - name: prepare-dockerfiles
-  image: busybox
+  image: busybox:latest
   commands:
   - wget https://github.com/openmina/mina/raw/$${OPENMINA_BRANCH}/dockerfiles/stages/99-openmina-tail -O dockerfiles/stages/99-openmina-tail
   - sed -i -e "s/zlib1g-dev/zlib1g-dev jq/" dockerfiles/stages/1-build-deps
@@ -30,34 +27,27 @@ steps:
   image: plugins/docker
   settings:
     build_args:
-    - MINA_BRANCH=${MINA_BRANCH:-${DRONE_BRANCH}}
-    - MINA_REPO=${MINA_REPO:-${DRONE_REPO_LINK}}
+    - MINA_BRANCH=${MINA_BRANCH:-develop}
+    - MINA_REPO=${MINA_REPO:-https://github.com/MinaProtocol/mina}
     dockerfile: ./dockerfiles/stages/merged
     password:
       from_secret: docker_hub_password
     repo: openmina/mina
     tags:
-    - ${MINA_BRANCH:-${DRONE_BRANCH}}-${DRONE_COMMIT_SHA:0:8}
-    - ${MINA_BRANCH:-${DRONE_BRANCH}}-latest
+    - mina-daily-${MINA_BRANCH:-develop}-${DRONE_BUILD_NUMBER}
+    - mina-daily-${MINA_BRANCH:-develop}-latest
     username:
       from_secret: docker_hub_username
-    cache_from: ${CACHE_IMAGE:-}
-
+    cache_from: ${CACHE_IMAGE}
 
 ---
 kind: pipeline
-name: deploy-to-cluster-custom
+name: deploy-to-cluster
 type: docker
 clone:
-  depth: 1
-trigger:
-  event:
-  - custom
+  disable: true
 depends_on:
-- build-image-custom
-volumes:
-- name: step-cache
-  temp: {}
+- build-image
 
 
 environment:
@@ -89,6 +79,11 @@ defs:
 
 steps:
 
+- name: clone
+  image: alpine/git
+  commands:
+  - git clone $${OPENMINA_REPO:-https://github.com/openmina/mina} --depth 1 -b $${OPENMINA_BRANCH:-openmina-legacy-snark-workers} .
+
 - name: prepare-kubeconfig
   image: alpine/k8s:1.26.1
   environment:
@@ -98,16 +93,7 @@ steps:
   commands:
   - umask 0077
   - echo "$DRONE_KUBECONFIG" > $${KUBECONFIG}
-  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet-default}
-
-- name: deployment-info
-  image: alpine/k8s:1.26.1
-  environment:
-    KUBECONFIG: kube-config
-  commands:
-  - PORT="$$($${OM}/kube-utils.sh frontend-port $${NAMESPACE:-testnet-default})"
-  - 'echo "Frontend: http://1.k8.openmina.com:$PORT"'
-  - 'echo "Namespace: $${NAMESPACE:-testnet-default}"'
+  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet}
 
 - name: delete-old-testnet
   image: alpine/k8s:1.26.1
@@ -122,6 +108,8 @@ steps:
         echo "Workaround for pods left running, force-delete pods $$PODS"
         kubectl delete --force pods $${PODS} || true
     fi
+  - helm delete zkapp-server-continuous --wait --timeout=1m || true
+  - helm delete zkapp-send-continuous --wait --timeout=5m || true
 
 - name: prepare-deamon-json
   image: alpine/k8s:1.26.1
@@ -132,21 +120,6 @@ steps:
   <<: *log
   environment:
     NAME: seed1
-
-- name: deploy-seeds
-  image: alpine/k8s:1.26.1
-  environment:
-    KUBECONFIG: kube-config
-  commands:
-  - export MINA_IMAGE=openmina/mina:$${MINA_BRANCH:-$${DRONE_BRANCH}}-${DRONE_COMMIT_SHA:0:8}
-  - $${OM}/deploy.sh deploy --seeds --force $${SET_ARGS}
-
-- name: seeds-are-ready
-  image: alpine/k8s:1.26.1
-  environment:
-    KUBECONFIG: kube-config
-  commands:
-  - kubectl wait $${SEEDS_WAIT_RESOURCE} --for=condition=Available --timeout=$${SEEDS_WAIT_TIMEOUT}
 
 - name: log-node
   <<: *log
@@ -168,8 +141,13 @@ steps:
   environment:
     KUBECONFIG: kube-config
   commands:
-  - export MINA_IMAGE=openmina/mina:$${MINA_BRANCH:-$${DRONE_BRANCH}}-${DRONE_COMMIT_SHA:0:8}
-  - $${OM}/deploy.sh deploy --producers --snarkers --nodes --force $${SET_ARGS}
+  - export MINA_IMAGE="openmina/mina:mina-daily-$${MINA_BRANCH:-develop}-${DRONE_BUILD_NUMBER}"
+  - HELM_ARGS="--set=healthcheck.failureThreshold=1800 $${HELM_ARGS}"
+  - $${OM}/deploy.sh deploy --seeds --force -- $${HELM_ARGS}
+  - sleep 30 # handicap to other nodes so seed nodes to be up when they become needed
+  - $${OM}/deploy.sh deploy --producers --nodes --force -- $${HELM_ARGS}
+  - $${OM}/deploy.sh deploy --snark-workers --force -- $${HELM_ARGS}
+  - $${OM}/update-frontend.sh -- --set=isVanilla=true
 
 - name: testnet-is-ready
   image: alpine/k8s:1.26.1
@@ -179,127 +157,50 @@ steps:
   - $${OM}/kube-utils.sh mina-testnet-available $${NODES_WAIT_TIMEOUT}
   - $${OM}/kube-utils.sh mina-testnet-same-height $${HEIGHT_WAIT_RETRIES} $${HEIGHT_WAIT_PERIOD}
 
----
-
-kind: pipeline
-name: split
-type: docker
-clone:
-  depth: 1
-depends_on: [ deploy-to-cluster-custom ]
-
-trigger:
-  event: [ custom ]
-
-steps:
-
-- name: split
-  image: openmina/mina-network-debugger:latest
-  environment:
-    URL: http://1.k8.openmina.com:31355
-  commands:
-  - sleep  10 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 1
-  - sleep  10 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 enable-firewall
-  - sleep  90 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 2
-  - sleep $$(($${SPLIT_DURATION:-30} * 60)) && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 disable-firewall # wait 30 minutes before disable firewall
-  - sleep 120 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 1
-
----
-
-kind: pipeline
-name: graphql-timeout-test
-type: docker
-clone:
-  depth: 1
-trigger:
-  event:
-  - custom
-depends_on: [ deploy-to-cluster-custom ]
-
-defs:
-- &wrk
+- name: deployment-info
   image: alpine/k8s:1.26.1
   environment:
     KUBECONFIG: kube-config
-    ENDPOINT_URL: http://localhost:3085/graphql
   commands:
-  - sleep $${SLEEP_SECONDS}
-  - apk add --no-cache openssl
-  - export POD_NAME=$(kubectl get pods -o json | jq '.items[] | select(.metadata.name | startswith(env.POD_PREFIX)) | .metadata.name' | tr -d '"')
-  - echo $${POD_NAME}
-  - kubectl cp scripts/drone/install_wrk2_and_run_test.sh -c mina $${POD_NAME}:/tmp/install_wrk2_and_run_test.sh
-  - kubectl cp scripts/drone/version-post.lua -c mina $${POD_NAME}:/tmp/version-post.lua
-  - kubectl exec $${POD_NAME} -c mina -- /bin/bash -c /tmp/install_wrk2_and_run_test.sh
-  - kubectl cp -c mina $${POD_NAME}:/tmp/wrk_output.txt wrk_output.txt
-  - cat wrk_output.txt
-  - export TIMEOUTS=$(grep 'Socket errors' wrk_output.txt | cut -d ' ' -f 12)
-  - if [ "$${TIMEOUTS:-0}" -gt 0 ]; then echo "There were $${TIMEOUTS} timeouts during the test"; exit 1; else echo "No timeouts occurred during the test"; fi
-
-steps:
-- name: prepare-kubeconfig
-  image: alpine/k8s:1.26.1
-  environment:
-    DRONE_KUBECONFIG:
-      from_secret: k8s_config
-    KUBECONFIG: kube-config
-  commands:
-  - umask 0077
-  - echo "$DRONE_KUBECONFIG" > $${KUBECONFIG}
-  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet-default}
-
-- name: run-test-in-snarker
-  <<: *wrk
-  environment:
-    POD_PREFIX: "snarker001"
-    SLEEP_SECONDS: 5
-
-- name: run-test-in-producer
-  <<: *wrk
-  environment:
-    POD_PREFIX: "prod01"
-    SLEEP_SECONDS: 10
-
-- name: run-test-in-seed
-  <<: *wrk
-  environment:
-    POD_PREFIX: "seed1"
-    SLEEP_SECONDS: 15
-
-- name: run-test-in-plain-node
-  <<: *wrk
-  environment:
-    POD_PREFIX: "node1"
-    SLEEP_SECONDS: 20
-
-- name: wait-for-all-tests
-  image: alpine/k8s:1.26.1
-  commands:
-    - exit 0
-  depends_on:
-    - run-test-in-snarker
-    - run-test-in-producer
-    - run-test-in-seed
-    - run-test-in-plain-node
+  - PORT="$$($${OM}/kube-utils.sh frontend-port $${NAMESPACE:-testnet})"
+  - 'echo "Frontend: http://1.k8.openmina.com:$PORT"'
+  - 'echo "Namespace: $${NAMESPACE:-testnet}"'
+  - echo
+  - 'echo Seed nodes: $(kubectl get pods -l role=seed -o name | wc -l)'
+  - 'echo Producer nodes: $(kubectl get pods -l role=block-producer -o name | wc -l)'
+  - 'echo Snark coordinator nodes: $(kubectl get pods -l role=snark-coordinator -o name | wc -l)'
+  - 'echo Snark worker nodes: $(kubectl get pods -l role=snark-worker -o name | wc -l)'
+  - 'echo Plain nodes: $(kubectl get pods -l role=plain-node -o name | wc -l)'
 
 ---
 
 kind: pipeline
-name: run-zkapps
+name: split-load
 type: docker
 clone:
-  depth: 1
-depends_on: [ graphql-timeout-test ]
-
-trigger:
-  event: [ custom ]
+  disable: true
+depends_on: [ deploy-to-cluster ]
 
 environment:
-  # path to openmina tooling
-  OM: helm/openmina-config
-  RELEASE_NAME: zkapps-drone-${DRONE_BUILD_NUMBER}
   SUFFIX: ${DRONE_BUILD_NUMBER}
+  NODES: "--nodes=8 --snarkers=4 --prods=3 --prod0s=3 --seeds=2"
+  OM: helm/openmina-config
+
+defs:
+- &log
+  image: alpine/k8s:1.26.1
+  detach: true
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - while ! kubectl logs $${NAME}-$${SUFFIX} --follow; do echo "waiting for $${NAME}-$${SUFFIX} to start..."; sleep 10; done
 
 steps:
+
+- name: clone
+  image: alpine/git
+  commands:
+  - git clone $${OPENMINA_REPO:-https://github.com/openmina/mina} --depth 1 -b $${OPENMINA_BRANCH:-openmina-legacy-snark-workers} .
 
 - name: configure
   image: alpine/k8s:1.26.1
@@ -310,66 +211,128 @@ steps:
   commands:
   - umask 0077
   - echo "$DRONE_KUBECONFIG" > "$KUBECONFIG"
-  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet-default}
+  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet}
 
+- name: single-component
+  image: openmina/mina-network-debugger:latest
+  environment:
+    URL: http://1.k8.openmina.com:31308
+  commands:
+  - sleep  10 && topology-tool --url=$URL $$NODES show-graph --expected-components 1 > /dev/null
 
-- name: start
+- name: enable-firewall
+  image: openmina/mina-network-debugger:latest
+  environment:
+    URL: http://1.k8.openmina.com:31308
+  commands:
+  - sleep  10 && topology-tool --url=$URL $$NODES enable-firewall
+  - sleep  240 && topology-tool --url=$URL $$NODES show-graph --expected-components 2 > /dev/null
+
+- name: log-server
+  <<: *log
+  environment:
+    NAME: deploy/zkapp-server
+
+- name: log-generate
+  <<: *log
+  environment:
+    NAME: job/zkapp-generate
+
+- name: log-send
+  <<: *log
+  environment:
+    NAME: job/zkapp-send
+
+- name: send-zkapp-txs
   image: alpine/k8s:1.26.1
   environment:
     KUBECONFIG: kube-config
   commands:
-  - helm install $${RELEASE_NAME} helm/zkapps --set=job=$${ZK_JOB:-sign-proof-x3} --set=count=$${COUNT:-512} $${WORKERS:+--set=workers=$${WORKERS}} --set=suffix=$${SUFFIX}
+  - helm install zkapp-server-$${SUFFIX} helm/zkapps/server --set=suffix=$${SUFFIX}
+  - kubectl wait deploy/zkapp-server-$${SUFFIX} --for=condition=available --timeout=1m
+  - helm install zkapp-generate-$${SUFFIX} helm/zkapps/generate --set=loadKind=$${ZK_JOB:-sign-x4} --set=workers=$${ZK_WORKERS:-8} --set=suffix=$${SUFFIX}
+  - kubectl wait job/zkapp-generate-$${SUFFIX} --for=condition=complete --timeout=30m
+  - helm install zkapp-send-$${SUFFIX} helm/zkapps/send --set=count=$${ZK_COUNT:-128} --set=workers=$${ZK_WORKERS:-8} --set=suffix=$${SUFFIX}
+  - kubectl wait job/zkapp-send-$${SUFFIX} --for=condition=complete --timeout=30m
 
-- name: run
+- name: wait-slot-0-10
   image: alpine/k8s:1.26.1
   environment:
     KUBECONFIG: kube-config
   commands:
-  - |
-    for t in $(seq 10); do
-        kubectl logs jobs/zkapp-worker-$${SUFFIX} --container=worker --follow && exit
-        echo "Waiting for worker container..."
-        sleep 5
-    done
-    echo "Failed to wait for worker container"
-    exit
+  - $${OM}/kube-utils.sh mina-node-wait-for-epoch-slot deploy/prod2 $${NAMESPACE:-testnet} 0 10
 
-- name: finish
+- name: blockchain-split
   image: alpine/k8s:1.26.1
   environment:
     KUBECONFIG: kube-config
   commands:
-  - $${OM}/kube-utils.sh wait-for-job-status job/zkapp-worker-$${SUFFIX} 60m
+  - $${OM}/kube-utils.sh assert-different-history  deploy/prod2 $${NAMESPACE:-testnet} deploy/prod3 $${NAMESPACE:-testnet}
 
-- name: clean-up
+- name: disable-firewall
+  image: openmina/mina-network-debugger:latest
+  environment:
+    URL: http://1.k8.openmina.com:31308
+  commands:
+  - topology-tool --url=$URL $$NODES show-graph --expected-components 2 > /dev/null
+  - topology-tool --url=$URL $$NODES disable-firewall
+  - sleep 240 && topology-tool --url=$URL $$NODES show-graph --expected-components 1 > /dev/null
+
+- name: blockchain-merged
   image: alpine/k8s:1.26.1
   environment:
     KUBECONFIG: kube-config
   commands:
-  - helm delete $${RELEASE_NAME}
+  - $${OM}/kube-utils.sh mina-testnet-same-chain $${SAME_CHAIN_WAIT_RETRIES:-20} $${SAME_CHAIN_WAIT_PERIOD:-60} $${NAMESPACE:-testnet}
+
+- name: log-wait
+  <<: *log
+  environment:
+    NAME: job/zkapp-wait
+
+- name: wait-zkapp-txs
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - helm install zkapp-wait-$${SUFFIX} helm/zkapps/wait --set=suffix=$${SUFFIX}
+  - kubectl wait job/zkapp-wait-$${SUFFIX} --for=condition=complete --timeout=180m
+
+- name: cleanup-zkapp
+  image: alpine/k8s:1.26.1
   when:
     status:
+    - failure
     - success
-    # - failure
-
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - helm delete zkapp-server-$${SUFFIX} || true
+  - helm delete zkapp-generate-$${SUFFIX} || true
+  - helm delete zkapp-send-$${SUFFIX} || true
+  - helm delete zkapp-wait-$${SUFFIX} || true
 
 ---
 kind: pipeline
 name: finish
 type: docker
 clone:
-  depth: 1
-depends_on: [ run-zkapps ]
-trigger:
-  event: [ custom ]
+  disable: true
+depends_on: [ split-load ]
 
 environment:
   # path to openmina tooling
   OM: helm/openmina-config
   # global slot to wait force
-  MAX_HEIGHT: 30
+  MAX_HEIGHT: 20
 
 steps:
+
+- name: clone
+  image: alpine/git
+  commands:
+  - git clone $${OPENMINA_REPO:-https://github.com/openmina/mina} --depth 1 -b $${OPENMINA_BRANCH:-openmina-legacy-snark-workers} .
+
 - name: configure
   image: alpine/k8s:1.26.1
   environment:
@@ -379,7 +342,7 @@ steps:
   commands:
   - umask 0077
   - echo "$DRONE_KUBECONFIG" > "$KUBECONFIG"
-  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet-default}
+  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet}
 
 - name: wait-for-slot
   image: alpine/k8s:1.26.1
@@ -388,8 +351,7 @@ steps:
   commands:
   - |
     while true; do
-      HEIGHT=$$()
-      HEIGHT=$$($${OM}/kube-utils.sh mina-node-chain-height deployment/node1)
+      HEIGHT=$$($${OM}/kube-utils.sh mina-node-chain-height deploy/node1)
       if [ -n "$HEIGHT" ] && [ "$HEIGHT" -ge "$MAX_HEIGHT" ]; then
         echo "Reached height $MAX_HEIGHT"
         exit
@@ -402,3 +364,45 @@ steps:
   image: busybox
   commands:
   - echo "Done"
+
+---
+
+kind: pipeline
+name: continuous-load
+type: docker
+clone:
+  disable: true
+depends_on: [ finish ]
+
+environment:
+  OM: helm/openmina-config
+
+steps:
+
+- name: clone
+  image: alpine/git
+  commands:
+  - git clone $${OPENMINA_REPO:-https://github.com/openmina/mina} --depth 1 -b $${OPENMINA_BRANCH:-openmina-legacy-snark-workers} .
+
+- name: configure
+  image: alpine/k8s:1.26.1
+  environment:
+    DRONE_KUBECONFIG:
+      from_secret: k8s_config
+    KUBECONFIG: kube-config
+  commands:
+  - umask 0077
+  - echo "$DRONE_KUBECONFIG" > "$KUBECONFIG"
+  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet}
+
+- name: send-zkapp-txs
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - helm install zkapp-server-continuous helm/zkapps/server --set=suffix=continuous
+  - kubectl wait deploy/zkapp-server-continuous --for=condition=available --timeout=1m
+  - helm install zkapp-generate-continuous helm/zkapps/generate --set=loadKind=$${ZK_JOB:-sign-x4} --set=workers=$${ZK_WORKERS:-8} --set=suffix=continuous
+  - kubectl wait job/zkapp-generate-continuous --for=condition=complete --timeout=30m
+  - helm delete zkapp-generate-continuous --wait --timeout=5m
+  - helm install zkapp-send-continuous helm/zkapps/send --set=count=0 --set=workers=$${ZK_WORKERS:-8} --set=suffix=continuous --set=continuous=true
