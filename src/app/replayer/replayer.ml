@@ -141,9 +141,11 @@ let get_slot_hashes ~logger slot =
   in
   go slot
 
-let process_block_infos_of_state_hash ~logger pool state_hash ~f =
+let process_block_infos_of_state_hash ~logger pool ~state_hash ~start_slot ~f =
   match%bind
-    Caqti_async.Pool.use (fun db -> Sql.Block_info.run db state_hash) pool
+    Caqti_async.Pool.use
+      (fun db -> Sql.Block_info.run db ~state_hash ~start_slot)
+      pool
   with
   | Ok block_infos ->
       f block_infos
@@ -654,8 +656,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       in
       [%log info] "Loading block information using target state hash" ;
       let%bind block_ids =
-        process_block_infos_of_state_hash ~logger pool target_state_hash
-          ~f:(fun block_infos ->
+        process_block_infos_of_state_hash ~logger pool
+          ~state_hash:target_state_hash
+          ~start_slot:input.start_slot_since_genesis ~f:(fun block_infos ->
             let ids = List.map block_infos ~f:(fun { id; _ } -> id) in
             (* build mapping from global slots to state and ledger hashes *)
             List.iter block_infos
@@ -668,19 +671,20 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                     , Ledger_hash.of_base58_check_exn ledger_hash ) ) ;
             return (Int.Set.of_list ids) )
       in
-      (* check that genesis block is in chain to target hash
-         assumption: genesis block occupies global slot 0
-      *)
-      if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
-        [%log info]
-          "Block chain leading to target state hash includes genesis block, \
-           length = %d"
-          (Int.Set.length block_ids)
-      else (
-        [%log fatal]
-          "Block chain leading to target state hash does not include genesis \
-           block" ;
-        Core_kernel.exit 1 ) ;
+      if Int64.equal input.start_slot_since_genesis 0L then
+        (* check that genesis block is in chain to target hash                                                                                                                                                                                          assumption: genesis block occupies global slot 0
+
+           if nonzero start slot, can't assume there's a block at that slot *)
+        if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
+          [%log info]
+            "Block chain leading to target state hash includes genesis block, \
+             length = %d"
+            (Int.Set.length block_ids)
+        else (
+          [%log fatal]
+            "Block chain leading to target state hash does not include genesis \
+             block" ;
+          Core_kernel.exit 1 ) ;
       (* some mutable state, less painful than passing epoch ledgers throughout *)
       let staking_epoch_ledger = ref ledger in
       let next_epoch_ledger = ref ledger in
@@ -748,7 +752,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             let open Deferred.Let_syntax in
             match%map
               Caqti_async.Pool.use
-                (fun db -> Sql.Internal_command.run db id)
+                (fun db ->
+                  Sql.Internal_command.run db
+                    ~start_slot:input.start_slot_since_genesis
+                    ~internal_cmd_id:id )
                 pool
             with
             | Ok [] ->
@@ -956,22 +963,23 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 if continue_on_error then incr error_count
                 else Core_kernel.exit 1 ) ) ;
           [%log info]
-            "Verifying balances and nonces for accounts accessed in block with \
-             global slot since genesis %Ld"
+            "Verifying accounts accessed in block with global slot since \
+             genesis %Ld"
             last_global_slot_since_genesis ;
           let%map accounts_accessed =
             Deferred.List.map accounts_accessed_db
               ~f:(Archive_lib.Load_data.get_account_accessed ~pool)
           in
-          List.iter accounts_accessed
-            ~f:(fun (index, { public_key; token_id; balance; nonce; _ }) ->
-              let account_id = Account_id.create public_key token_id in
+          List.iter accounts_accessed ~f:(fun (index, account) ->
+              let account_id =
+                Account_id.create account.public_key account.token_id
+              in
               let index_in_ledger =
                 Ledger.index_of_account_exn ledger account_id
               in
               if index <> index_in_ledger then (
                 [%log error]
-                  "Index in ledger does not match index in account accessed"
+                  "Account index in ledger does not match index in database"
                   ~metadata:
                     [ ("index_in_ledger", `Int index_in_ledger)
                     ; ("index_in_account_accessed", `Int index)
@@ -996,36 +1004,17 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                           "Account not in ledger, even though there's a \
                            location for it"
                   in
-                  let balance_in_ledger = account_in_ledger.balance in
-                  if not (Currency.Balance.equal balance balance_in_ledger) then (
+                  if not @@ Account.equal account account_in_ledger then
                     [%log error]
-                      "Balance in ledger does not match balance in account \
-                       accessed"
+                      "Account in ledger does not match account in database"
                       ~metadata:
                         [ ("account_id", Account_id.to_yojson account_id)
-                        ; ( "balance_in_ledger"
-                          , Currency.Balance.to_yojson balance_in_ledger )
-                        ; ( "balance_in_account_accessed"
-                          , Currency.Balance.to_yojson balance )
+                        ; ( "account_in_ledger"
+                          , Account.to_yojson account_in_ledger )
+                        ; ("account_in_database", Account.to_yojson account)
                         ] ;
-                    if continue_on_error then incr error_count
-                    else Core_kernel.exit 1 ) ;
-                  let nonce_in_ledger = account_in_ledger.nonce in
-                  if
-                    not (Mina_numbers.Account_nonce.equal nonce nonce_in_ledger)
-                  then (
-                    [%log error]
-                      "Nonce in ledger does not match nonce in account accessed"
-                      ~metadata:
-                        [ ("account_id", Account_id.to_yojson account_id)
-                        ; ( "nonce_in_ledger"
-                          , Mina_numbers.Account_nonce.to_yojson nonce_in_ledger
-                          )
-                        ; ( "nonce_in_account_accessed"
-                          , Mina_numbers.Account_nonce.to_yojson nonce )
-                        ] ;
-                    if continue_on_error then incr error_count
-                    else Core_kernel.exit 1 ) )
+                  if continue_on_error then incr error_count
+                  else Core_kernel.exit 1 )
         in
         let log_state_hash_on_next_slot curr_global_slot_since_genesis =
           let state_hash, _ledger_hash =
@@ -1042,6 +1031,14 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         let run_transactions_on_slot_change block_txns =
           let state_hash, _ledger_hash =
             get_slot_hashes ~logger last_global_slot_since_genesis
+          in
+          let write_checkpoint_file () =
+            Option.iter !checkpoint_target ~f:(fun target ->
+                if Int64.(last_global_slot_since_genesis >= target) then (
+                  incr_checkpoint_target () ;
+                  Async.don't_wait_for
+                    (write_replayer_checkpoint ~logger ~ledger
+                       ~last_global_slot_since_genesis ) ) )
           in
           let rec count_txns ~signed_count ~zkapp_count ~fee_transfer_count
               ~coinbase_count = function
@@ -1162,19 +1159,12 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             let%bind () = run_transactions () in
             check_ledger_hash_at_slot () ;
             let%map () = check_account_accessed () in
-            log_state_hash_on_next_slot last_global_slot_since_genesis
+            log_state_hash_on_next_slot last_global_slot_since_genesis ;
+            write_checkpoint_file ()
         in
         (* a sequence is a command type, slot, sequence number triple *)
         let get_internal_cmd_sequence (ic : Sql.Internal_command.t) =
           (`Internal_command, ic.global_slot_since_genesis, ic.sequence_no)
-        in
-        let _write_checkpoint_file () =
-          Option.iter !checkpoint_target ~f:(fun target ->
-              if Int64.(last_global_slot_since_genesis >= target) then (
-                incr_checkpoint_target () ;
-                Async.don't_wait_for
-                  (write_replayer_checkpoint ~logger ~ledger
-                     ~last_global_slot_since_genesis ) ) )
         in
         let get_user_cmd_sequence (uc : Sql.User_command.t) =
           (`User_command, uc.global_slot_since_genesis, uc.sequence_no)
@@ -1430,24 +1420,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       in
       match input.target_epoch_ledgers_state_hash with
       | None ->
-          (* start replaying at the slot after the one we've just finished with *)
-          let start_slot_since_genesis =
-            Int64.succ last_global_slot_since_genesis
-          in
-          let%bind replayer_checkpoint =
-            let%map input =
-              create_replayer_checkpoint ~ledger ~start_slot_since_genesis
-            in
-            input_to_yojson input |> Yojson.Safe.pretty_to_string
-          in
-          let checkpoint_file =
-            sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
-          in
-          [%log info] "Writing checkpoint file"
-            ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
-          return
-          @@ Out_channel.with_file checkpoint_file ~f:(fun oc ->
-                 Out_channel.output_string oc replayer_checkpoint )
+          write_replayer_checkpoint ~logger ~ledger
+            ~last_global_slot_since_genesis
       | Some target_epoch_ledgers_state_hash -> (
           match output_file_opt with
           | None ->
