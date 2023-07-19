@@ -60,6 +60,10 @@ module Concrete_ : sig
   end
 
   module Wrap_wire_proof : sig
+    type fp_point := Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
+
+    type fq_point := Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
+
     module Columns_vec = Pickles_types.Vector.Vector_15
     module Coefficients_vec = Pickles_types.Vector.Vector_15
     module Quotient_polynomial_vec = Pickles_types.Vector.Vector_7
@@ -68,13 +72,9 @@ module Concrete_ : sig
     module Commitments : sig
       module V1 : sig
         type t =
-          { w_comm :
-              (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t)
-              Columns_vec.Stable.V1.t
-          ; z_comm : Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
-          ; t_comm :
-              (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t)
-              Quotient_polynomial_vec.Stable.V1.t
+          { w_comm : fp_point Columns_vec.Stable.V1.t
+          ; z_comm : fp_point
+          ; t_comm : fp_point Quotient_polynomial_vec.Stable.V1.t
           }
       end
     end
@@ -82,22 +82,16 @@ module Concrete_ : sig
     module Evaluations : sig
       module V1 : sig
         type t =
-          { w :
-              (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t)
-              Columns_vec.Stable.V1.t
-          ; coefficients :
-              (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t)
-              Columns_vec.Stable.V1.t
-          ; z : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          ; s :
-              (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t)
-              Permuts_minus_1_vec.Stable.V1.t
-          ; generic_selector : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          ; poseidon_selector : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          ; complete_add_selector : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          ; mul_selector : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          ; emul_selector : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          ; endomul_scalar_selector : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
+          { w : fq_point Columns_vec.Stable.V1.t
+          ; coefficients : fq_point Columns_vec.Stable.V1.t
+          ; z : fq_point
+          ; s : fq_point Permuts_minus_1_vec.Stable.V1.t
+          ; generic_selector : fq_point
+          ; poseidon_selector : fq_point
+          ; complete_add_selector : fq_point
+          ; mul_selector : fq_point
+          ; emul_selector : fq_point
+          ; endomul_scalar_selector : fq_point
           }
       end
     end
@@ -108,7 +102,7 @@ module Concrete_ : sig
         ; evaluations : Evaluations.V1.t
         ; ft_eval1 : Pasta_bindings.Fq.t
         ; bulletproof :
-            ( Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
+            ( fp_point
             , Pasta_bindings.Fq.t )
             Pickles_types.Plonk_types.Openings.Bulletproof.Stable.V1.t
         }
@@ -120,7 +114,7 @@ module Concrete_ : sig
     type challenge_constant =
       Pickles_limb_vector.Constant.Make(Pickles_types.Nat.N2).t
 
-    type tock_affine = Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
+    type tock_affine = point
 
     type 'a step_bp_vec = 'a Kimchi_pasta.Basic.Rounds.Step_vector.Stable.V1.t
 
