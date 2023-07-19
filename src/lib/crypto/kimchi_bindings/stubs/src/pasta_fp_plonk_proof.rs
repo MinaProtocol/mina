@@ -273,6 +273,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     )
 }
 
+/*
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
@@ -395,7 +396,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
         CamlPastaFpPlonkIndex(Box::new(index)),
         (proof, vec![]).into(),
     )
-}
+}*/
 
 #[ocaml_gen::func]
 #[ocaml::func]
