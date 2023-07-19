@@ -27,7 +27,7 @@ spec:
             - name: AGGREGATOR_URL
               value: /aggregator
             - name: DRONE_URL
-              value: https://ci.openmina.com/{{ .Values.aggregator.ciRepo | default "openmina/mina-daily-testnet" }}
+              value: https://ci.o1.openmina.com/{{ .Values.aggregator.ciRepo | default "openmina/mina-daily-testnet" }}
           ports:
             - name: http
               containerPort: 80

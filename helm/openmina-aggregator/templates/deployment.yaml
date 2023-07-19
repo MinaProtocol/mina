@@ -50,6 +50,8 @@ spec:
               value: /home/aggregator/{{ .Release.Namespace }}.json
             - name: CI_REPO
               value: {{ .Values.aggregator.ciRepo | default "openmina/mina" }}
+            - name: CI_API_URL
+              value: {{ .Values.aggregator.ciApiUrl }}
           ports:
             - name: http-aggregator
               containerPort: 8000

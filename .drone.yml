@@ -20,9 +20,7 @@ steps:
   settings:
     build_args:
     - MINA_BRANCH=${DRONE_BRANCH}
-    # TODO: Revert change after testing!
-    - MINA_REPO=${MINA_REPO:-https://github.com/adonagy-ci-test/mina}
-    # - MINA_REPO=${MINA_REPO:-https://github.com/MinaProtocol/mina}
+    - MINA_REPO=${MINA_REPO:-https://github.com/MinaProtocol/mina}
     dockerfile: ./dockerfiles/stages/merged
     password:
       from_secret: docker_hub_password
@@ -201,14 +199,14 @@ steps:
 - name: single-component
   image: openmina/mina-network-debugger:latest
   environment:
-    URL: http://1.k8.openmina.com:31308
+    URL: http://1.k8.openmina.com:31411
   commands:
   - sleep  10 && topology-tool --url=$URL $$NODES show-graph --expected-components 1 > /dev/null
 
 - name: enable-firewall
   image: openmina/mina-network-debugger:latest
   environment:
-    URL: http://1.k8.openmina.com:31308
+    URL: http://1.k8.openmina.com:31411
   commands:
   - sleep  10 && topology-tool --url=$URL $$NODES enable-firewall
   - sleep  240 && topology-tool --url=$URL $$NODES show-graph --expected-components 2 > /dev/null
@@ -257,7 +255,7 @@ steps:
 - name: disable-firewall
   image: openmina/mina-network-debugger:latest
   environment:
-    URL: http://1.k8.openmina.com:31308
+    URL: http://1.k8.openmina.com:31411
   commands:
   - topology-tool --url=$URL $$NODES show-graph --expected-components 2 > /dev/null
   - topology-tool --url=$URL $$NODES disable-firewall
