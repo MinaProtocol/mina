@@ -164,6 +164,10 @@ module Pasta : sig
 
     val field_size : Pasta_bindings.BigInt256.t
 
+    module RuntimeTable : sig
+      type 'f t = 'f Kimchi_types.runtime_table
+    end
+
     module Verification_key = Kimchi_pasta.Pallas_based_plonk.Verification_key
 
     module R1CS_constraint_system =
@@ -194,6 +198,10 @@ module Pasta : sig
     module Bigint = Kimchi_pasta.Vesta_based_plonk.Bigint
 
     val field_size : Pasta_bindings.BigInt256.t
+
+    module RuntimeTable : sig
+      type 'f t = 'f Kimchi_types.runtime_table
+    end
 
     module Verification_key = Kimchi_pasta.Vesta_based_plonk.Verification_key
     module R1CS_constraint_system =

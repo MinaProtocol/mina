@@ -7,6 +7,10 @@ module Pallas_based_plonk : sig
 
   val field_size : Pasta_bindings.BigInt256.t
 
+  module RuntimeTable : sig
+    type 'f t = { id : int32; data : 'f array }
+  end
+
   module Verification_key = Pallas_based_plonk.Verification_key
   module R1CS_constraint_system = Pallas_based_plonk.R1CS_constraint_system
   module Rounds_vector = Pallas_based_plonk.Rounds_vector
@@ -23,6 +27,10 @@ module Vesta_based_plonk : sig
   module Bigint = Vesta_based_plonk.Bigint
 
   val field_size : Pasta_bindings.BigInt256.t
+
+  module RuntimeTable : sig
+    type 'f t = { id : int32; data : 'f array }
+  end
 
   module Verification_key = Vesta_based_plonk.Verification_key
   module R1CS_constraint_system = Vesta_based_plonk.R1CS_constraint_system

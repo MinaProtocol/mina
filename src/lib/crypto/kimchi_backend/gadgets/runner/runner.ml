@@ -20,10 +20,17 @@ let generate_and_verify_proof ?cs circuit =
   let proof, (() as _public_output) =
     Impl.generate_witness_conv
       ~f:(fun { Impl.Proof_inputs.auxiliary_inputs
-              ; Impl.Proof_inputs.public_inputs
-              ; Impl.Proof_inputs.runtime_tables
+              ; public_inputs
+              ; runtime_tables
               } next_statement_hashed ->
         let proof =
+          let runtime_tables =
+            Array.map
+              (fun (rt : Impl.RuntimeTable.t) ->
+                Tick.RuntimeTable.
+                  { id = rt.Impl.RuntimeTable.id; data = rt.data } )
+              runtime_tables
+          in
           (* Only block_on_async for testing; do not do this in production!! *)
           Promise.block_on_async_exn (fun () ->
               (* TODO(dw) pass runtime tables *)

@@ -16,6 +16,10 @@ end
 
 let field_size : Bigint.t = Field.size
 
+module RuntimeTable = struct
+  type 'f t = { id : int32; data : 'f array }
+end
+
 module Verification_key = struct
   type t =
     ( Pasta_bindings.Fq.t
