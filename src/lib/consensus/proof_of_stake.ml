@@ -296,11 +296,17 @@ module Make_str (A : Wire_types.Concrete) = struct
           let ledger_subset keys ledger =
             match ledger with
             | Genesis_epoch_ledger ledger ->
-                Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger keys
-            | Ledger_db ledger ->
-                Mina_ledger.(
-                  Sparse_ledger.of_any_ledger
-                  @@ Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+                Mina_base.Sparse_ledger.of_ledger_subset_exn ledger keys
+            | Ledger_db db_ledger ->
+                let open Mina_base in
+                let ledger = Ledger.of_database db_ledger in
+                let subset_ledger =
+                  Sparse_ledger.of_ledger_subset_exn ledger keys
+                in
+                ignore
+                  ( Ledger.unregister_mask_exn ~loc:__LOC__ ledger
+                    : Ledger.unattached_mask ) ;
+                subset_ledger
         end
 
         type t =
