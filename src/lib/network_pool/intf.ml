@@ -23,8 +23,7 @@ module type Resource_pool_base_intf = sig
   end
 
   (** Diff from a transition frontier extension that would update the resource pool*)
-  val handle_transition_frontier_diff :
-    transition_frontier_diff -> t -> unit Deferred.t
+  val handle_transition_frontier_diff : transition_frontier_diff -> t -> unit
 
   val create :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -93,7 +92,7 @@ module type Resource_pool_diff_intf = sig
     -> verified Envelope.Incoming.t
     -> ( [ `Accept | `Reject ] * t * rejected
        , [ `Locally_generated of t * rejected | `Other of Error.t ] )
-       Deferred.Result.t
+       Result.t
 
   val is_empty : t -> bool
 
@@ -137,7 +136,7 @@ module type Broadcast_callback = sig
          -> unit )
     | External of Mina_net2.Validation_callback.t
 
-  val drop : resource_pool_diff -> rejected_diff -> t -> unit Deferred.t
+  val drop : resource_pool_diff -> rejected_diff -> t -> unit
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
@@ -208,7 +207,7 @@ module type Network_pool_base_intf = sig
 
   val resource_pool : t -> resource_pool
 
-  val broadcasts : t -> resource_pool_diff Linear_pipe.Reader.t
+  val broadcasts : t -> resource_pool_diff With_nonce.t Linear_pipe.Reader.t
 
   val create_rate_limiter : unit -> Rate_limiter.t
 
@@ -216,7 +215,7 @@ module type Network_pool_base_intf = sig
        t
     -> resource_pool_diff_verified Envelope.Incoming.t
     -> Broadcast_callback.t
-    -> unit Deferred.t
+    -> unit
 end
 
 (** A [Snark_resource_pool_intf] is a superset of a
@@ -236,7 +235,7 @@ module type Snark_resource_pool_intf = sig
     -> work:Transaction_snark_work.Statement.t
     -> proof:Ledger_proof.t One_or_two.t
     -> fee:Fee_with_prover.t
-    -> [ `Added | `Statement_not_referenced ] Deferred.t
+    -> [ `Added | `Statement_not_referenced ]
 
   val request_proof :
        t

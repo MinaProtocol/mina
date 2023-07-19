@@ -2000,7 +2000,7 @@ let create ?wallets (config : Config.t) =
               log_rate_limiter_occasionally rl ~label:"broadcast_transactions" ;
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
-                ~f:(fun cmds ->
+                ~f:(fun Network_pool.With_nonce.{ message; nonce } ->
                   (* the commands had valid sizes when added to the transaction pool
                      don't need to check sizes again for broadcast
                   *)
@@ -2010,9 +2010,10 @@ let create ?wallets (config : Config.t) =
                         Network_pool.Transaction_pool.Resource_pool.Diff.score
                       ~max_per_15_seconds:
                         Network_pool.Transaction_pool.Resource_pool.Diff
-                        .max_per_15_seconds cmds
+                        .max_per_15_seconds message
                   in
-                  Mina_networking.broadcast_transaction_pool_diff net cmds ) ) ;
+                  Mina_networking.broadcast_transaction_pool_diff ~nonce net
+                    message ) ) ;
           O1trace.background_thread "broadcast_blocks" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
@@ -2136,16 +2137,16 @@ let create ?wallets (config : Config.t) =
               let rl = Network_pool.Snark_pool.create_rate_limiter () in
               log_rate_limiter_occasionally rl ~label:"broadcast_snark_work" ;
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
-                ~f:(fun x ->
+                ~f:(fun Network_pool.With_nonce.{ message; nonce } ->
                   let%bind () =
                     send_resource_pool_diff_or_wait ~rl
                       ~diff_score:
                         Network_pool.Snark_pool.Resource_pool.Diff.score
                       ~max_per_15_seconds:
                         Network_pool.Snark_pool.Resource_pool.Diff
-                        .max_per_15_seconds x
+                        .max_per_15_seconds message
                   in
-                  Mina_networking.broadcast_snark_pool_diff net x ) ) ;
+                  Mina_networking.broadcast_snark_pool_diff ~nonce net message ) ) ;
           Option.iter config.archive_process_location
             ~f:(fun archive_process_port ->
               [%log' info config.logger]
