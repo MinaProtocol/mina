@@ -266,9 +266,12 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
       (t, _, boolean) Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
     =
+  let open Pickles_types in
   let feature_flags = expand_feature_flags (module B) feature_flags in
-  let witness = Vector.to_array e.w.(chunk_index) in
-  let coefficients = Vector.to_array e.coefficients.(chunk_index) in
+  let witness = Vector.to_array (Chunks.get_exn e.w chunk_index) in
+  let coefficients =
+    Vector.to_array (Chunks.get_exn e.coefficients chunk_index)
+  in
   let var (col, row) =
     let get_eval =
       match (row : Scalars.curr_or_next) with Curr -> fst | Next -> snd
@@ -277,9 +280,9 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     | Witness i ->
         get_eval witness.(i)
     | Index Poseidon ->
-        get_eval e.poseidon_selector.(chunk_index)
+        get_eval @@ Chunks.get_exn e.poseidon_selector chunk_index
     | Index Generic ->
-        get_eval e.generic_selector.(chunk_index)
+        get_eval @@ Chunks.get_exn e.generic_selector chunk_index
     | Index i ->
         failwithf
           !"Index %{sexp:Scalars.Gate_type.t}\n\
@@ -415,8 +418,10 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let open Plonk_types.Evals.In_circuit in
     let e0 field = fst (field e) in
     let e1 field = snd (field e) in
-    let e0_s = Vector.map e.s.(chunk_index) ~f:fst in
-    let w0 = Vector.to_array e.w.(chunk_index) |> Array.map ~f:fst in
+    let e0_s = Vector.map (Chunks.get_exn e.s chunk_index) ~f:fst in
+    let w0 =
+      Vector.to_array (Chunks.get_exn e.w chunk_index) |> Array.map ~f:fst
+    in
 
     let zkp = env.zk_polynomial in
     let alpha_pow = env.alpha_pow in
@@ -477,8 +482,10 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         let alpha_pow = env.alpha_pow in
 
         (* FIXME: Arrays/num_chunks *)
-        let w0 = Vector.map e.w.(chunk_index) ~f:fst |> Vector.to_array in
-        let s0 = e.s.(chunk_index) in
+        let w0 =
+          Vector.map (Chunks.get_exn e.w chunk_index) ~f:fst |> Vector.to_array
+        in
+        let s0 = Chunks.get_exn e.s chunk_index in
 
         with_label __LOC__ (fun () ->
             Vector.foldi s0

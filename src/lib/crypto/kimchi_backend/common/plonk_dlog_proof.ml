@@ -255,13 +255,14 @@ module Make (Inputs : Inputs_intf) = struct
       ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
         Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
     let len = num_chunks in
-    let of_tuple15 e = Array.create ~len @@ tuple15_to_vec e in
+    let open Pickles_types in
+    let of_tuple15 e = Chunks.create ~len @@ tuple15_to_vec e in
     { w = of_tuple15 w
     ; coefficients = of_tuple15 coefficients
     ; z
-    ; s = Array.create ~len @@ tuple6_to_vec s
-    ; generic_selector = Array.create ~len generic_selector
-    ; poseidon_selector = Array.create ~len poseidon_selector
+    ; s = Chunks.create ~len @@ tuple6_to_vec s
+    ; generic_selector = Chunks.create ~len generic_selector
+    ; poseidon_selector = Chunks.create ~len poseidon_selector
     ; lookup = Option.map ~f:lookup_eval_of_backend lookup
     }
 
@@ -318,13 +319,14 @@ module Make (Inputs : Inputs_intf) = struct
       ; poseidon_selector
       ; lookup
       } : Evaluations_backend.t =
-    (* FIXME: Arrays *)
-    { w = tuple15_of_vec w.(0)
-    ; coefficients = tuple15_of_vec coefficients.(0)
+    let open Pickles_types in
+    (* FIXME: Use full chunks somehow *)
+    { w = tuple15_of_vec (Chunks.hd w)
+    ; coefficients = tuple15_of_vec (Chunks.hd coefficients)
     ; z
-    ; s = tuple6_of_vec s.(0)
-    ; generic_selector = generic_selector.(0)
-    ; poseidon_selector = poseidon_selector.(0)
+    ; s = tuple6_of_vec (Chunks.hd s)
+    ; generic_selector = Chunks.hd generic_selector
+    ; poseidon_selector = Chunks.hd poseidon_selector
     ; lookup = Option.map ~f:lookup_eval_to_backend lookup
     }
 

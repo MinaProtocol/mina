@@ -4,16 +4,16 @@ let create ~num_chunks ~of_int =
   let open Plonk_types in
   let vec =
     let v = Vector.init Columns.n ~f:(fun _ -> one) in
-    fun () -> Array.create ~len:num_chunks v
+    fun () -> Chunks.create ~len:num_chunks v
   in
   Evals.
     { w = vec ()
     ; coefficients = vec ()
     ; z = one
     ; s =
-        Array.create ~len:num_chunks
+        Chunks.create ~len:num_chunks
           (Vector.init Permuts_minus_1.n ~f:(fun _ -> one))
-    ; generic_selector = Array.create ~len:num_chunks one
-    ; poseidon_selector = Array.create ~len:num_chunks one
+    ; generic_selector = Chunks.create ~len:num_chunks one
+    ; poseidon_selector = Chunks.create ~len:num_chunks one
     ; lookup = None
     }

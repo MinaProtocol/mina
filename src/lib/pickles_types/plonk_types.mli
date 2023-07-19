@@ -207,12 +207,12 @@ module Evals : sig
 
   module In_circuit : sig
     type ('f, 'bool) t =
-      { w : 'f Columns_vec.t array
-      ; coefficients : 'f Columns_vec.t array
+      { w : 'f Columns_vec.t Chunks.t
+      ; coefficients : 'f Columns_vec.t Chunks.t
       ; z : 'f
-      ; s : 'f Permuts_minus_1_vec.t array
-      ; generic_selector : 'f array
-      ; poseidon_selector : 'f array
+      ; s : 'f Permuts_minus_1_vec.t Chunks.t
+      ; generic_selector : 'f Chunks.t
+      ; poseidon_selector : 'f Chunks.t
       ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
       }
     [@@deriving hlist, fields]
@@ -228,12 +228,12 @@ module Evals : sig
   end
 
   type 'a t =
-    { w : 'a Columns_vec.t array
-    ; coefficients : 'a Columns_vec.t array
+    { w : 'a Columns_vec.t Chunks.t
+    ; coefficients : 'a Columns_vec.t Chunks.t
     ; z : 'a
-    ; s : 'a Permuts_minus_1_vec.t array
-    ; generic_selector : 'a array
-    ; poseidon_selector : 'a array
+    ; s : 'a Permuts_minus_1_vec.t Chunks.t
+    ; generic_selector : 'a Chunks.t
+    ; poseidon_selector : 'a Chunks.t
     ; lookup : 'a Lookup.t option
     }
 
