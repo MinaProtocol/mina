@@ -5,6 +5,7 @@
    async_kernel
    async
    core
+   uri
    yojson
    core_kernel
    cmdliner

@@ -253,6 +253,8 @@ module Snark_worker = struct
     snark_worker_process
 
   let start t =
+    O1trace.thread "snark_worker"
+    @@ fun () ->
     match t.processes.snark_worker with
     | `On ({ process = process_ivar; kill_ivar; _ }, _) ->
         [%log' debug t.config.logger] !"Starting snark worker process" ;
@@ -1342,7 +1344,7 @@ let start t =
       ~log_block_creation:t.config.log_block_creation
       ~block_reward_threshold:t.config.block_reward_threshold
       ~block_produced_bvar:t.components.block_produced_bvar
-      ~vrf_evaluation_state:t.vrf_evaluation_state ;
+      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -1784,14 +1786,14 @@ let create ?wallets (config : Config.t) =
               ~trust_system:config.trust_system
               ~disk_location:config.snark_pool_disk_location
           in
-          let%bind snark_pool, snark_remote_sink, snark_local_sink =
-            Network_pool.Snark_pool.load ~config:snark_pool_config
+          let snark_pool, snark_remote_sink, snark_local_sink =
+            Network_pool.Snark_pool.create ~config:snark_pool_config
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~on_remote_push:notify_online
               ~log_gossip_heard:
-                config.net_config.log_gossip_heard.snark_pool_diff ()
+                config.net_config.log_gossip_heard.snark_pool_diff
           in
           let block_reader, block_sink =
             Transition_handler.Block_sink.create
@@ -1998,7 +2000,7 @@ let create ?wallets (config : Config.t) =
               log_rate_limiter_occasionally rl ~label:"broadcast_transactions" ;
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
-                ~f:(fun cmds ->
+                ~f:(fun Network_pool.With_nonce.{ message; nonce } ->
                   (* the commands had valid sizes when added to the transaction pool
                      don't need to check sizes again for broadcast
                   *)
@@ -2008,9 +2010,10 @@ let create ?wallets (config : Config.t) =
                         Network_pool.Transaction_pool.Resource_pool.Diff.score
                       ~max_per_15_seconds:
                         Network_pool.Transaction_pool.Resource_pool.Diff
-                        .max_per_15_seconds cmds
+                        .max_per_15_seconds message
                   in
-                  Mina_networking.broadcast_transaction_pool_diff net cmds ) ) ;
+                  Mina_networking.broadcast_transaction_pool_diff ~nonce net
+                    message ) ) ;
           O1trace.background_thread "broadcast_blocks" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
@@ -2054,9 +2057,6 @@ let create ?wallets (config : Config.t) =
                             valid_cb
                       | `Internal ->
                           (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
-                          don't_wait_for
-                            (Mina_networking.broadcast_state net
-                               (Mina_block.Validated.forget transition) ) ;
                           Option.iter
                             ~f:
                               (Fn.flip
@@ -2137,16 +2137,16 @@ let create ?wallets (config : Config.t) =
               let rl = Network_pool.Snark_pool.create_rate_limiter () in
               log_rate_limiter_occasionally rl ~label:"broadcast_snark_work" ;
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
-                ~f:(fun x ->
+                ~f:(fun Network_pool.With_nonce.{ message; nonce } ->
                   let%bind () =
                     send_resource_pool_diff_or_wait ~rl
                       ~diff_score:
                         Network_pool.Snark_pool.Resource_pool.Diff.score
                       ~max_per_15_seconds:
                         Network_pool.Snark_pool.Resource_pool.Diff
-                        .max_per_15_seconds x
+                        .max_per_15_seconds message
                   in
-                  Mina_networking.broadcast_snark_pool_diff net x ) ) ;
+                  Mina_networking.broadcast_snark_pool_diff ~nonce net message ) ) ;
           Option.iter config.archive_process_location
             ~f:(fun archive_process_port ->
               [%log' info config.logger]

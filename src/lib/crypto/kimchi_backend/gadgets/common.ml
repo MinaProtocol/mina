@@ -302,20 +302,25 @@ let bignum_bigint_sqrt_mod (x : Bignum_bigint.t) (modulus : Bignum_bigint.t) :
             else find_least_i (n * n mod modulus) (i + one)
           in
           let i = find_least_i t zero in
+          (* i = m can only happen in the first iteration, and implies
+             that t is a *primitive* root of unity and therefore not a square
+             (t is a root of unity by construction, t = n^Q)
+          *)
+          if equal i m then zero
+          else
+            (* b <- c^{2^{M - i - 1}} *)
+            let b = pow_mod c (pow_mod two (m - i - one)) in
+            (* M <- i *)
+            let m = i in
+            (* c <- b^2 *)
+            let c = b * b mod modulus in
+            (* t <- tb^2 *)
+            let t = t * c mod modulus in
+            (* R <- Rb *)
+            let r = r * b mod modulus in
 
-          (* b <- c^{2^{M - i - 1}} *)
-          let b = pow_mod c (pow_mod two (m - i - one)) in
-          (* M <- i *)
-          let m = i in
-          (* c <- b^2 *)
-          let c = b * b mod modulus in
-          (* t <- tb^2 *)
-          let t = t * c in
-          (* R <- Rb *)
-          let r = r * b in
-
-          (* Recurse *)
-          loop m c t r
+            (* Recurse *)
+            loop m c t r
       in
 
       (* M <- S *)
@@ -323,9 +328,9 @@ let bignum_bigint_sqrt_mod (x : Bignum_bigint.t) (modulus : Bignum_bigint.t) :
       (* c <- Z^Q *)
       let c = pow_mod z q in
       (* R <- n^{(Q + 1)/2} *)
-      let t = pow_mod x ((q + one) / two) in
+      let r = pow_mod x ((q + one) / two) in
       (* t <- x^Q *)
-      let r = pow_mod x q in
+      let t = pow_mod x q in
 
       Bignum_bigint.of_zarith_bigint @@ loop m c t r
 
