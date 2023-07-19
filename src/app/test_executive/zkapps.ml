@@ -77,8 +77,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind sender_pub_key = pub_key_of_node sender in
     let%bind receiver_pub_key = pub_key_of_node receiver in
     repeat_seq ~n ~f:(fun () ->
-        Network.Node.must_send_payment ~logger sender ~sender_pub_key
-          ~receiver_pub_key ~amount:Currency.Amount.one ~fee
+        Integration_test_lib.Graphql_requests.must_send_online_payment ~logger
+          (Network.Node.get_ingress_uri sender)
+          ~sender_pub_key ~receiver_pub_key ~amount:Currency.Amount.one ~fee
         >>| ignore )
 
   let payment_receiver =
@@ -86,7 +87,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let send_payment_from_zkapp_account ?expected_failure
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~logger
-      ~node (sender : Signature_lib.Keypair.t) nonce =
+      ~node_uri (sender : Signature_lib.Keypair.t) nonce =
     let sender_pk = Signature_lib.Public_key.compress sender.public_key in
     let receiver_pk = payment_receiver in
     let amount =
@@ -116,12 +117,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     | Some failure ->
         send_invalid_payment ~logger ~sender_pub_key:sender_pk
           ~receiver_pub_key:receiver_pk ~amount ~fee ~nonce ~memo ~valid_until
-          ~raw_signature ~expected_failure:failure node
+          ~raw_signature ~expected_failure:failure node_uri
     | None ->
         incr transactions_sent ;
-        Network.Node.must_send_payment_with_raw_sig ~logger
-          ~sender_pub_key:sender_pk ~receiver_pub_key:receiver_pk ~amount ~fee
-          ~nonce ~memo ~valid_until ~raw_signature node
+        Integration_test_lib.Graphql_requests.must_send_payment_with_raw_sig
+          ~logger ~sender_pub_key:sender_pk ~receiver_pub_key:receiver_pk
+          ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature node_uri
         |> Malleable_error.ignore_m
 
   let run network t =
@@ -664,7 +665,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "Send a zkApp transaction to create zkApp accounts"
-        (send_zkapp ~logger node zkapp_command_create_accounts)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_create_accounts )
     in
     let%bind () =
       section_hard
@@ -676,12 +679,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let sender = List.hd_exn zkapp_keypairs in
       let nonce = Account.Nonce.zero in
       section_hard "Send a valid payment from zkApp account"
-        (send_payment_from_zkapp_account ~constraint_constants ~node ~logger
-           sender nonce )
+        (send_payment_from_zkapp_account ~constraint_constants
+           ~node_uri:(Network.Node.get_ingress_uri node)
+           ~logger sender nonce )
     in
     let%bind () =
       section_hard "Send a zkApp transaction to update permissions"
-        (send_zkapp ~logger node zkapp_command_update_permissions)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_update_permissions )
     in
     let%bind () =
       section_hard
@@ -694,7 +700,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let nonce = Account.Nonce.of_int 1 in
       section_hard "Send an invalid payment from zkApp account"
         (send_payment_from_zkapp_account ~constraint_constants ~logger sender
-           nonce ~node
+           nonce
+           ~node_uri:(Network.Node.get_ingress_uri node)
            ~expected_failure:
              Network_pool.Transaction_pool.Diff_versioned.Diff_error.(
                to_string_name Fee_payer_not_permitted_to_send) )
@@ -705,7 +712,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              [%log info] "Verifying permissions for account"
                ~metadata:[ ("account_id", Account_id.to_yojson account_id) ] ;
              let%bind ledger_permissions =
-               get_account_permissions ~logger node account_id
+               get_account_permissions ~logger
+                 (Network.Node.get_ingress_uri node)
+                 account_id
              in
              if Permissions.equal ledger_permissions permissions_updated then (
                [%log info] "Ledger, updated permissions are equal" ;
@@ -725,44 +734,53 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "Send a zkapp with an insufficient fee"
-        (send_invalid_zkapp ~logger node zkapp_command_insufficient_fee
-           "Insufficient fee" )
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_insufficient_fee "Insufficient fee" )
     in
     (* Won't be accepted until the previous transactions are applied *)
     let%bind () =
       section_hard "Send a zkApp transaction to update all fields"
-        (send_zkapp ~logger node zkapp_command_update_all)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_update_all )
     in
     let%bind () =
       section_hard "Send a zkapp with an invalid proof"
-        (send_invalid_zkapp ~logger node zkapp_command_invalid_proof
-           "Verification_failed" )
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_invalid_proof "Verification_failed" )
     in
     let%bind () =
       section_hard "Send a zkapp with an insufficient replace fee"
-        (send_invalid_zkapp ~logger node zkapp_command_insufficient_replace_fee
-           "Insufficient_replace_fee" )
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_insufficient_replace_fee "Insufficient_replace_fee" )
     in
     let%bind () =
       section_hard "Send a zkApp transaction with an invalid nonce"
-        (send_invalid_zkapp ~logger node zkapp_command_invalid_nonce
-           "Invalid_nonce" )
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_invalid_nonce "Invalid_nonce" )
     in
     let%bind () =
       section_hard
         "Send a zkApp transaction with insufficient_funds, fee too high"
-        (send_invalid_zkapp ~logger node zkapp_command_insufficient_funds
-           "Insufficient_funds" )
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_insufficient_funds "Insufficient_funds" )
     in
     let%bind () =
       section_hard "Send a zkApp transaction with an invalid signature"
-        (send_invalid_zkapp ~logger node zkapp_command_invalid_signature
-           "Verification_failed" )
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_invalid_signature "Verification_failed" )
     in
     let%bind () =
       section_hard "Send a zkApp transaction with a nonexistent fee payer"
-        (send_invalid_zkapp ~logger node zkapp_command_nonexistent_fee_payer
-           "Fee_payer_account_not_found" )
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_nonexistent_fee_payer "Fee_payer_account_not_found" )
     in
     let%bind () =
       section_hard
@@ -772,19 +790,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "Send a zkApp transaction to mint token"
-        (send_zkapp ~logger node zkapp_command_mint_token)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_mint_token )
     in
     let%bind () =
       section_hard "Send a zkApp transaction to mint 2nd token"
-        (send_zkapp ~logger node zkapp_command_mint_token2)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_mint_token2 )
     in
     let%bind () =
       section_hard "Send a zkApp transaction to transfer tokens"
-        (send_zkapp ~logger node zkapp_command_token_transfer)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_token_transfer )
     in
     let%bind () =
       section_hard "Send a zkApp transaction to transfer tokens (2)"
-        (send_zkapp ~logger node zkapp_command_token_transfer2)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_token_transfer2 )
     in
     let%bind () =
       section_hard "Wait for zkApp transaction to mint token"
@@ -808,7 +834,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              [%log info] "Verifying updates for account"
                ~metadata:[ ("account_id", Account_id.to_yojson account_id) ] ;
              let%bind ledger_update =
-               get_account_update ~logger node account_id
+               get_account_update ~logger
+                 (Network.Node.get_ingress_uri node)
+                 account_id
              in
              if
                compatible_updates ~ledger_update
