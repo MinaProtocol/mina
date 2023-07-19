@@ -54,9 +54,6 @@ let verify_heterogenous (ts : Instance.t list) =
                      ; messages_for_next_step_proof =
                          { old_bulletproof_challenges; _ }
                      }
-                     (* TODO
-                        ; prev_x_hat = (x_hat1, _) as prev_x_hat
-                     *)
                  ; prev_evals = evals
                  } ) )
          ->
