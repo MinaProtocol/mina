@@ -191,7 +191,8 @@ let multi (type f)
  *)
 let compact_multi (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (v01 : Circuit.Field.t) (v2 : Circuit.Field.t) =
+    (v01 : Circuit.Field.t) (v2 : Circuit.Field.t) :
+    Circuit.Field.t * Circuit.Field.t =
   let open Circuit in
   (* Set up helper *)
   let bignum_bigint_to_field = Common.bignum_bigint_to_field (module Circuit) in
@@ -224,7 +225,9 @@ let compact_multi (type f)
     ~label:"compact_multi_range_check" ~is_compact:true v0 v0p0 v0p1 ;
   range_check1
     (module Circuit)
-    ~label:"compact_multi_range_check" v2p0 v2p1 v0p0 v0p1 v1 v01
+    ~label:"compact_multi_range_check" v2p0 v2p1 v0p0 v0p1 v1 v01 ;
+
+  (v0, v1)
 
 (*********)
 (* Tests *)
@@ -372,7 +375,8 @@ let%test_unit "compact_multi_range_check gadget" =
         let v01, v2 =
           exists Typ.(Field.typ * Field.typ) ~compute:(fun () -> (v01, v2))
         in
-        compact_multi (module Runner.Impl) v01 v2
+        let _v0, _v1 = compact_multi (module Runner.Impl) v01 v2 in
+        ()
       in
 
       (* Generate and verify first proof *)

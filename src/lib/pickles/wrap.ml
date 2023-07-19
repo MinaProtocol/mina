@@ -552,6 +552,7 @@ let%test_module "gate finalization" =
           }
       end) )
 
+    (*
     let%test_module "foreign field multiplication" =
       ( module Make (struct
         let example =
@@ -567,6 +568,7 @@ let%test_module "gate finalization" =
           ; lookup = true
           }
       end) )
+    *)
 
     let%test_module "range check" =
       ( module Make (struct

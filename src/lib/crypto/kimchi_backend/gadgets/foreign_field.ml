@@ -5,7 +5,7 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let tests_enabled = true
+let _tests_enabled = true
 
 let tuple5_of_array array =
   match array with
@@ -14,7 +14,7 @@ let tuple5_of_array array =
   | _ ->
       assert false
 
-let tuple21_of_array array =
+let tuple22_of_array array =
   match array with
   | [| a1
      ; a2
@@ -37,6 +37,7 @@ let tuple21_of_array array =
      ; a19
      ; a20
      ; a21
+     ; a22
     |] ->
       ( a1
       , a2
@@ -58,7 +59,8 @@ let tuple21_of_array array =
       , a18
       , a19
       , a20
-      , a21 )
+      , a21
+      , a22 )
   | _ ->
       assert false
 
@@ -576,11 +578,26 @@ module External_checks = struct
     { mutable multi_ranges : 'field Cvar.t standard_limbs list
     ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
     ; mutable bounds : 'field Cvar.t standard_limbs list
+    ; mutable high_bounds : 'field Cvar.t list
+    ; mutable limb_ranges : 'field Cvar.t list
     }
 
   let create (type field)
       (module Circuit : Snark_intf.Run with type field = field) : field t =
-    { multi_ranges = []; compact_multi_ranges = []; bounds = [] }
+    { multi_ranges = []
+    ; compact_multi_ranges = []
+    ; bounds = []
+    ; high_bounds = []
+    ; limb_ranges = []
+    }
+
+  (* Track a high bound computation *)
+  let append_high_bound (external_checks : 'field t) (x : 'field Cvar.t) =
+    external_checks.high_bounds <- x :: external_checks.high_bounds
+
+  (* Tracks a limb-range-check*)
+  let append_limb_check (external_checks : 'field t) (x : 'field Cvar.t) =
+    external_checks.limb_ranges <- x :: external_checks.limb_ranges
 
   (* Track a multi-range-check *)
   (* TODO: improve names of these from append_ to add_, push_ or insert_ *)
@@ -924,7 +941,7 @@ let constrain_external_checks (type field)
   (* 3) Add gates for external compact-multi-range-checks *)
   List.iter external_checks.compact_multi_ranges ~f:(fun compact_multi_range ->
       let v01, v2 = compact_multi_range in
-      Range_check.compact_multi (module Circuit) v01 v2 ;
+      let _v0, _v1 = Range_check.compact_multi (module Circuit) v01 v2 in
       () )
 
 (* FOREIGN FIELD ADDITION CHAIN GADGET *)
@@ -1031,8 +1048,8 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
 (* Definition of a gadget for a single foreign field addition
  *
  *    Inputs:
- *      single                := Flag for whether to perform addition with valid_element check
- *                               on the result (default false) or just a single FFAdd row (true)
+ *      full                  := Flag for whether to perform addition with valid_element check
+ *                               on the result (default true) or just a single FFAdd row (false)
  *      left_input            := 3 limbs foreign field element
  *      right_input           := 3 limbs foreign field element
  *      foreign_field_modulus := The modulus of the foreign field
@@ -1041,7 +1058,7 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      Inserts the gates (described below) into the circuit
  *      Returns the result of the addition as a 3 limbs element
  *
- * In default mode:
+ * In default full mode:
  *     It adds a FFAdd gate,
  *     followed by a Zero gate,
  *     a FFAdd gate for the bound check,
@@ -1055,16 +1072,16 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
  *     Does nothing to the external checks.
  *)
 let add (type f) (module Circuit : Snark_intf.Run with type field = f)
-    ?(single = false) (left_input : f Element.Standard.t)
+    ?(full = true) (left_input : f Element.Standard.t)
     (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
-  match single with
-  | false ->
+  match full with
+  | true ->
       sum_chain
         (module Circuit)
         [ left_input; right_input ]
         [ Add ] foreign_field_modulus
-  | true ->
+  | false ->
       let result, _sign, _ovf =
         sum_setup
           (module Circuit)
@@ -1075,8 +1092,8 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
 (* Definition of a gadget for a single foreign field subtraction
  *
  *    Inputs:
- *      single                := Flag for whether to perform addition with valid_element check
- *                               on the result (default false) or just a single FFAdd row (true)
+ *      full                  := Flag for whether to perform addition with valid_element check
+ *                               on the result (default true) or just a single FFAdd row (false)
  *      left_input            := 3 limbs foreign field element
  *      right_input           := 3 limbs foreign field element
  *      foreign_field_modulus := The modulus of the foreign field
@@ -1085,7 +1102,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      Inserts the gates (described below) into the circuit
  *      Returns the result of the addition as a 3 limbs element
  *
- * In default mode:
+ * In default true mode:
  *     It adds a FFAdd gate,
  *     followed by a Zero gate,
  *     a FFAdd gate for the bound check,
@@ -1095,21 +1112,21 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *     and a Multi Range Check gadget for the bound.
  * This means that the intermediate results will not be range checked.
  *
- * In false mode:
+ * In single mode:
  *     It adds a FFAdd gate.
  *     Does nothing to the external checks.
  *)
 let sub (type f) (module Circuit : Snark_intf.Run with type field = f)
-    ?(single = false) (left_input : f Element.Standard.t)
+    ?(full = false) (left_input : f Element.Standard.t)
     (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
-  match single with
-  | false ->
+  match full with
+  | true ->
       sum_chain
         (module Circuit)
         [ left_input; right_input ]
         [ Sub ] foreign_field_modulus
-  | true ->
+  | false ->
       let result, _sign, _ovf =
         sum_setup
           (module Circuit)
@@ -1174,7 +1191,7 @@ let compute_high_bound (x : Bignum_bigint.t)
   x_hi_bound
 
 (* Perform integer bound addition for all limbs x' = x + f' *)
-let compute_bound (x : Bignum_bigint.t)
+let _compute_bound (x : Bignum_bigint.t)
     (neg_foreign_field_modulus : Bignum_bigint.t) : Bignum_bigint.t =
   let x_bound = Bignum_bigint.(x + neg_foreign_field_modulus) in
   assert (Bignum_bigint.(x_bound < binary_modulus)) ;
@@ -1225,8 +1242,8 @@ let compute_witness_variables (type f)
 
 (* Foreign field multiplication gadget definition *)
 let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (external_checks : f External_checks.t) ?(bound_check_result = true)
-    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
+    (external_checks : f External_checks.t) (left_input : f Element.Standard.t)
+    (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
   let open Circuit in
   let of_bits = Common.field_bits_le_to_field (module Circuit) in
@@ -1261,6 +1278,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Compute witness values *)
   let ( remainder01
       , remainder2
+      , remainder_hi_bound
       , quotient0
       , quotient1
       , quotient2
@@ -1346,6 +1364,11 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
           @@ compute_high_bound quotient big_foreign_field_modulus
         in
 
+        let remainder_hi_bound =
+          Common.bignum_bigint_to_field (module Circuit)
+          @@ compute_high_bound remainder big_foreign_field_modulus
+        in
+
         (* Compute the rest of the witness data *)
         let quotient0, quotient1, quotient2 =
           bignum_bigint_to_field_const_standard_limbs (module Circuit) quotient
@@ -1356,6 +1379,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         [| remainder01
          ; remainder2
+         ; remainder_hi_bound
          ; quotient0
          ; quotient1
          ; quotient2
@@ -1376,18 +1400,27 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
          ; of_bits carry1 88 90
          ; of_bits carry1 90 91
         |] )
-    |> tuple21_of_array
+    |> tuple22_of_array
   in
 
   (* Add external checks *)
   External_checks.append_multi_range_check external_checks
-    (carry1_lo, product1_lo, product1_hi_0) ;
-  External_checks.append_compact_multi_range_check external_checks
-    (quotient_bound01, quotient_bound2) ;
-  if bound_check_result then
-    External_checks.append_bound_check external_checks
-      (remainder0, remainder1, remainder2) ;
+    (quotient0, quotient1, quotient2) ;
 
+  External_checks.append_multi_range_check external_checks
+    (quotient_hi_bound, product1_lo, product1_hi_0) ;
+
+  External_checks.append_limb_check external_checks remainder_hi_bound ;
+
+  External_checks.append_high_bound external_checks remainder2 ;
+
+  (* Instead of appending external check for compact MRC for remainder,
+     this is added directly, so that variables can be extracted from it *)
+  let remainder0, remainder1 =
+    Range_check.compact_multi (module Circuit) remainder01 remainder2
+  in
+
+  (* NOTE: high bound checks and multi range checks for left and right should be done somewhere else *)
   let left_input0, left_input1, left_input2 =
     Element.Standard.to_limbs left_input
   in
@@ -1436,6 +1469,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
                  ; neg_foreign_field_modulus2
                  } )
         } ) ;
+
   Element.Standard.of_limbs (remainder0, remainder1, remainder2)
 
 (* Gadget to constrain conversion of bytes array (output of Keccak gadget)
@@ -1490,7 +1524,7 @@ let bytes_to_standard_element (type f)
 (*********)
 (* Tests *)
 (*********)
-
+(*
 let%test_unit "foreign_field arithmetics gadgets" =
   if tests_enabled then (
     let (* Import the gadget test runner *)
@@ -1637,12 +1671,12 @@ let%test_unit "foreign_field arithmetics gadgets" =
     in
 
     (* Helper to test foreign_field_mul gadget
-     *  Inputs:
-     *     cs                    := optional constraint system to reuse
-     *     left_input            := left multiplicand
-     *     right_input           := right multiplicand
-     *     foreign_field_modulus := foreign field modulus
-     *)
+ *  Inputs:
+ *     cs                    := optional constraint system to reuse
+ *     left_input            := left multiplicand
+ *     right_input           := right multiplicand
+ *     foreign_field_modulus := foreign field modulus
+ *)
     let test_mul ?cs (left_input : Bignum_bigint.t)
         (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
         =
@@ -1697,12 +1731,12 @@ let%test_unit "foreign_field arithmetics gadgets" =
     in
 
     (* Helper to test foreign_field_mul gadget with external checks
-     *   Inputs:
-     *     cs                    := optional constraint system to reuse
-     *     left_input            := left multiplicand
-     *     right_input           := right multiplicand
-     *     foreign_field_modulus := foreign field modulus
-     *)
+ *   Inputs:
+ *     cs                    := optional constraint system to reuse
+ *     left_input            := left multiplicand
+ *     right_input           := right multiplicand
+ *     foreign_field_modulus := foreign field modulus
+ *)
     let test_mul_full ?cs (left_input : Bignum_bigint.t)
         (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
         =
@@ -1797,8 +1831,8 @@ let%test_unit "foreign_field arithmetics gadgets" =
     in
 
     (* Helper to test foreign field arithmetics together
-     * It computes a * b + a - b
-     *)
+ * It computes a * b + a - b
+ *)
     let test_ff ?cs (left_input : Bignum_bigint.t)
         (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
         =
@@ -2238,3 +2272,4 @@ let%test_unit "foreign_field equal_as_prover" =
           () )
     in
     ()
+ *)

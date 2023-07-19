@@ -159,9 +159,15 @@ module External_checks : sig
     { mutable multi_ranges : 'field Cvar.t standard_limbs list
     ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
     ; mutable bounds : 'field Cvar.t standard_limbs list
+    ; mutable high_bounds : 'field Cvar.t list
+    ; mutable limb_ranges : 'field Cvar.t list
     }
 
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
+
+  val append_high_bound : 'field t -> 'field Cvar.t -> unit
+
+  val append_limb_check : 'field t -> 'field Cvar.t -> unit
 
   val append_multi_range_check :
     'field t -> 'field Cvar.t standard_limbs -> unit
@@ -214,6 +220,7 @@ val constrain_external_checks :
 (** Gadget for a chain of foreign field sums (additions or subtractions)
  *
  *    Inputs:
+ *      full                  := whether to add checks for intermediate results (default: false)
  *      inputs                := All the inputs to the chain of sums
  *      operations            := List of operation modes Add or Sub indicating whether th
  *                               corresponding addition is a subtraction
@@ -224,12 +231,20 @@ val constrain_external_checks :
  *      Returns the final result of the chain of sums
  *
  *    For n+1 inputs, the gadget creates n foreign field addition gates, followed by a final
- *    foreign field addition gate for the bound check (i.e. valid_element check). For this, a
- *    an additional multi range check must also be performed.
+ *    foreign field addition gate for the bound check (i.e. valid_element check). For this, 
+ *    two additional multi range checks must also be performed (for value and bound).
  *    By default, the range check takes place right after the final Raw row.
+ * 
+ * NOTE:
+ *    This gadget does not create bound checks for the intermediate sums by default.
+ *    This assumes that the number of chained sums will not overflow the native field
+ *    in any limb. 
+ * TODO:
+ *    Understand if concatenating sums is possible with input limbs <2^88 with chunking
  *)
 val sum_chain :
      (module Snark_intf.Run with type field = 'f)
+  -> ?full:bool (*false*)
   -> 'f Element.Standard.t list (* inputs *)
   -> op_mode list (* operations *)
   -> 'f standard_limbs (* foreign_field_modulus *)
@@ -239,7 +254,7 @@ val sum_chain :
 (** Gadget for a single foreign field addition
  *
  *    Inputs:
- *      full                  := flag for whether to perform a full addition with valid_element check
+ *      full                  := Flag for whether to perform addition with valid_element check
  *                               on the result (default true) or just a single FFAdd row (false)
  *      left_input            := 3 limbs foreign field element
  *      right_input           := 3 limbs foreign field element
@@ -249,19 +264,22 @@ val sum_chain :
  *      Inserts the gates (described below) into the circuit
  *      Returns the result of the addition as a 3 limbs element
  *
- * In default mode:
+ * In default full mode:
  *     It adds a FFAdd gate,
  *     followed by a Zero gate,
  *     a FFAdd gate for the bound check,
  *     a Zero gate after this bound check,
- *     and a Multi Range Check gadget.
+ *     a Multi Range Check gadget for the result
+ *     and a Multi Range Check gadget for the bound.
+ * This means that the intermediate results will not be range checked.
  *
- * In false mode:
+ * In single mode:
  *     It adds a FFAdd gate.
+ *     Does nothing to the external checks.
  *)
 val add :
      (module Snark_intf.Run with type field = 'f)
-  -> ?full:bool (* full *)
+  -> ?full:bool (* false *)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
@@ -271,7 +289,7 @@ val add :
 (** Gadget for a single foreign field subtraction
  *
  *    Inputs:
- *      full                  := flag for whether to perform a full subtraction with valid_element check
+ *      full                  := Flag for whether to perform addition with valid_element check
  *                               on the result (default true) or just a single FFAdd row (false)
  *      left_input            := 3 limbs foreign field element
  *      right_input           := 3 limbs foreign field element
@@ -281,19 +299,23 @@ val add :
  *      Inserts the gates (described below) into the circuit
  *      Returns the result of the addition as a 3 limbs element
  *
- * In default mode:
+ * In default full mode:
  *     It adds a FFAdd gate,
  *     followed by a Zero gate,
  *     a FFAdd gate for the bound check,
  *     a Zero gate after this bound check,
  *     and a Multi Range Check gadget.
+ *     a Multi Range Check gadget for the result
+ *     and a Multi Range Check gadget for the bound.
+ * This means that the intermediate results will not be range checked.
  *
- * In false mode:
+ * In single mode:
  *     It adds a FFAdd gate.
+ *     Does nothing to the external checks.
  *)
 val sub :
      (module Snark_intf.Run with type field = 'f)
-  -> ?full:bool (* full *)
+  -> ?full:bool (* false *)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
@@ -329,7 +351,6 @@ val result_row :
 val mul :
      (module Snark_intf.Run with type field = 'f)
   -> 'f External_checks.t (* external_checks *)
-  -> ?bound_check_result:bool
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
