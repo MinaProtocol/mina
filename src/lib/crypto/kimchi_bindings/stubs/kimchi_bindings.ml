@@ -409,6 +409,14 @@ module Protocol = struct
              Kimchi_types.prover_proof
         = "caml_pasta_fp_plonk_proof_example_with_rot"
 
+      external example_with_foreign_field_mul :
+           SRS.Fp.t
+        -> Index.Fp.t
+           * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+             , Pasta_bindings.Fp.t )
+             Kimchi_types.prover_proof
+        = "caml_pasta_fp_plonk_proof_example_with_foreign_field_mul"
+
       external example_with_range_check :
            SRS.Fp.t
         -> Index.Fp.t
