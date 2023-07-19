@@ -117,11 +117,12 @@ internalTrace:
 
 aggregator:
   image: openmina/mina-aggregator:a461b7e3
-  ciRepo: openmina/mina-daily-testnet
+  ciRepo: MinaProtocol/mina
+  ciApiUrl: https://ci.o1.openmina.com/api
 
 ciFrontend:
   image: directcuteo/mina-ci-frontend:reports40
-  nodePort: 31309
+  nodePort: 31412
 
 nodeSelector:
   preemptible: false
