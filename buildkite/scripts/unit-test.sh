@@ -22,12 +22,5 @@ time make build
 echo "--- Build all targets"
 dune build "${path}" --profile="${profile}" -j16
 
-# Note: By attempting a re-run on failure here, we can avoid rebuilding and
-# skip running all of the tests that have already succeeded, since dune will
-# only retry those tests that failed.
 echo "--- Run unit tests"
-time dune runtest "${path}" --profile="${profile}" -j16 || \
-(./scripts/link-coredumps.sh && \
- echo "--- Retrying failed unit tests" && \
- time dune runtest "${path}" --profile="${profile}" -j16 || \
- (./scripts/link-coredumps.sh && false))
+time dune runtest "${path}" --profile="${profile}" -j16 || (./scripts/link-coredumps.sh)
