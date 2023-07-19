@@ -110,6 +110,15 @@ module Block = struct
   let get_max_slot (module Conn : Caqti_async.CONNECTION) () =
     Conn.find max_slot_query ()
 
+  let max_canonical_slot_query =
+    Caqti_request.find Caqti_type.unit Caqti_type.int64
+      {sql| SELECT MAX(global_slot_since_genesis) FROM blocks
+            WHERE chain_status = 'canonical'
+      |sql}
+
+  let get_max_canonical_slot (module Conn : Caqti_async.CONNECTION) () =
+    Conn.find max_canonical_slot_query ()
+
   let next_slot_query =
     Caqti_request.find_opt Caqti_type.int64 Caqti_type.int64
       {sql| SELECT global_slot_since_genesis FROM blocks
