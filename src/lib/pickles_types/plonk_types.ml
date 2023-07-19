@@ -421,7 +421,6 @@ module Evals = struct
         ; rot_selector
         ; lookup_aggregation
         ; lookup_table
-        ; runtime_lookup_table
         ]
     in
     always_present @ optional_gates
