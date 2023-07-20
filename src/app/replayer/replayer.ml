@@ -111,11 +111,52 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
   ; genesis_ledger
   }
 
-(* map from global slots (since genesis) to state hash, ledger hash pairs *)
-let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t =
+(* map from global slots (since genesis) to state hash, ledger hash, snarked ledger hash triples *)
+let global_slot_hashes_tbl :
+    (Int64.t, State_hash.t * Ledger_hash.t * Frozen_ledger_hash.t) Hashtbl.t =
   Int64.Table.create ()
 
 let get_slot_hashes slot = Hashtbl.find global_slot_hashes_tbl slot
+
+module First_pass_ledger_hashes = struct
+  (* ledger hashes after 1st pass, indexed by order of occurrence *)
+
+  module T = struct
+    type t = Ledger_hash.Stable.Latest.t * int
+    [@@deriving bin_io_unversioned, compare, sexp, hash]
+  end
+
+  include T
+  include Hashable.Make_binable (T)
+
+  let hash_set = Hash_set.create ()
+
+  let add =
+    let count = ref 0 in
+    fun ledger_hash ->
+      Format.eprintf "AT NDX %d, ADDING FIRST-PASS LEDGER: %s@." !count
+        (Ledger_hash.to_base58_check ledger_hash) ;
+      Base.Hash_set.add hash_set (ledger_hash, !count) ;
+      incr count
+
+  let find ledger_hash =
+    Base.Hash_set.find hash_set ~f:(fun (hash, _n) ->
+        Ledger_hash.equal hash ledger_hash )
+
+  (* once we find a snarked ledger hash corresponding to a ledger hash, don't need to store earlier ones *)
+  let flush ndx =
+    Format.eprintf "FLUSH@." ;
+    let elts = Base.Hash_set.to_list hash_set in
+    List.iter elts ~f:(fun ((_hash, n) as elt) ->
+        if n < ndx then Base.Hash_set.remove hash_set elt ) ;
+    Format.eprintf "END FLUSH@."
+
+  let get_last_snarked_hash, set_last_snarked_hash =
+    let last_snarked_hash = ref Ledger_hash.empty_hash in
+    let getter () = !last_snarked_hash in
+    let setter hash = last_snarked_hash := hash in
+    (getter, setter)
+end
 
 let process_block_infos_of_state_hash ~logger pool ~state_hash ~start_slot ~f =
   match%bind
@@ -644,14 +685,28 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
           ~start_slot:input.start_slot_since_genesis ~f:(fun block_infos ->
             let ids = List.map block_infos ~f:(fun { id; _ } -> id) in
             (* build mapping from global slots to state and ledger hashes *)
-            List.iter block_infos
-              ~f:(fun { global_slot_since_genesis; state_hash; ledger_hash; _ }
-                 ->
-                Hashtbl.add_exn global_slot_hashes_tbl
-                  ~key:global_slot_since_genesis
-                  ~data:
-                    ( State_hash.of_base58_check_exn state_hash
-                    , Ledger_hash.of_base58_check_exn ledger_hash ) ) ;
+            let%bind () =
+              Deferred.List.iter block_infos
+                ~f:(fun
+                     { global_slot_since_genesis
+                     ; state_hash
+                     ; ledger_hash
+                     ; snarked_ledger_hash_id
+                     ; _
+                     }
+                   ->
+                  let%map snarked_hash =
+                    query_db ~f:(fun db ->
+                        Sql.Snarked_ledger_hashes.run db snarked_ledger_hash_id )
+                  in
+
+                  Hashtbl.add_exn global_slot_hashes_tbl
+                    ~key:global_slot_since_genesis
+                    ~data:
+                      ( State_hash.of_base58_check_exn state_hash
+                      , Ledger_hash.of_base58_check_exn ledger_hash
+                      , Frozen_ledger_hash.of_base58_check_exn snarked_hash ) )
+            in
             return (Int.Set.of_list ids) )
       in
       if Int64.equal input.start_slot_since_genesis 0L then
@@ -676,7 +731,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         let least_slot =
           Option.value_exn @@ List.min_elt slots ~compare:Int64.compare
         in
-        let state_hash, _ledger_hash =
+        let state_hash, _ledger_hash, _snarked_hash =
           Int64.Table.find_exn global_slot_hashes_tbl least_slot
         in
         let%bind { staking_epoch_data_id; next_epoch_data_id; _ } =
@@ -1012,7 +1067,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               [%log fatal]
                 "Missing state hash information for current global slot" ;
               Core.exit 1
-          | Some (state_hash, _ledger_hash) ->
+          | Some (state_hash, _ledger_hash, _snarked_hash) ->
               [%log info]
                 ~metadata:
                   [ ( "state_hash"
@@ -1039,7 +1094,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                   "Missing ledger hash information for last global slot, which \
                    is not the start slot" ;
                 Core.exit 1 )
-          | Some (state_hash, ledger_hash) ->
+          | Some (state_hash, ledger_hash, snarked_hash) ->
               let write_checkpoint_file () =
                 let write_checkpoint () =
                   write_replayer_checkpoint ~logger ~ledger
@@ -1113,6 +1168,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                             ~txn_state_view ledger txn
                         with
                         | Ok partially_applied ->
+                            (* the current ledger may become a snarked ledger *)
+                            First_pass_ledger_hashes.add
+                              (Ledger.merkle_root ledger) ;
                             let%bind () =
                               update_staking_epoch_data ~logger pool
                                 ~last_block_id ~ledger ~staking_epoch_ledger
@@ -1175,6 +1233,27 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 in
                 apply_transaction_phases (List.rev block_txns)
               in
+              ( if
+                  Frozen_ledger_hash.equal snarked_hash
+                    (First_pass_ledger_hashes.get_last_snarked_hash ())
+                then
+                  [%log info]
+                    "Snarked ledger hash same as in the preceding block"
+                else
+                  Format.eprintf "LOOKING FOR SNARKED HASH: %s@."
+                    (Ledger_hash.to_base58_check snarked_hash) ;
+                match First_pass_ledger_hashes.find snarked_hash with
+                | None ->
+                    [%log error]
+                      "Current snarked ledger hash does not appear among \
+                       first-pass ledger hashes" ;
+                    if continue_on_error then incr error_count
+                    else Core_kernel.exit 1
+                | Some (_hash, n) ->
+                    [%log info]
+                      "Found snarked ledger hash among first-pass ledger hashes" ;
+                    First_pass_ledger_hashes.set_last_snarked_hash snarked_hash ;
+                    First_pass_ledger_hashes.flush n ) ;
               if List.is_empty block_txns then (
                 [%log info]
                   "No transactions to run for block with state hash $state_hash"

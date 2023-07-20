@@ -8,12 +8,13 @@ module Block_info = struct
     ; global_slot_since_genesis : int64
     ; state_hash : string
     ; ledger_hash : string
+    ; snarked_ledger_hash_id : int
     }
   [@@deriving hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int64; string; string ]
+      Caqti_type.[ int; int64; string; string; int ]
 
   (* find all blocks, working back from block with given state hash *)
   let query =
@@ -21,17 +22,17 @@ module Block_info = struct
       Caqti_type.(tup2 string int64)
       typ
       {sql| WITH RECURSIVE chain AS (
-              SELECT id,parent_id,global_slot_since_genesis,state_hash,ledger_hash FROM blocks b                                                                                                                                                           WHERE b.state_hash = $1
+              SELECT id,parent_id,global_slot_since_genesis,state_hash,ledger_hash, snarked_ledger_hash_id FROM blocks b                                                                                                                                                           WHERE b.state_hash = $1
 
               UNION ALL
 
-              SELECT b.id,b.parent_id,b.global_slot_since_genesis,b.state_hash,b.ledger_hash FROM blocks b
+              SELECT b.id,b.parent_id,b.global_slot_since_genesis,b.state_hash,b.ledger_hash, b.snarked_ledger_hash_id FROM blocks b
 
               INNER JOIN chain
 
               ON b.id = chain.parent_id AND chain.id <> chain.parent_id                                                                                                                                                                                 )
 
-           SELECT id,global_slot_since_genesis,state_hash,ledger_hash FROM chain c                                                                                                                                                                      WHERE c.global_slot_since_genesis >= $2                                                                                                                                                                                                 |sql}
+           SELECT id,global_slot_since_genesis,state_hash,ledger_hash, snarked_ledger_hash_id FROM chain c                                                                                                                                                                      WHERE c.global_slot_since_genesis >= $2                                                                                                                                                                                                 |sql}
 
   let run (module Conn : Caqti_async.CONNECTION) ~state_hash ~start_slot =
     Conn.collect_list query (state_hash, start_slot)
