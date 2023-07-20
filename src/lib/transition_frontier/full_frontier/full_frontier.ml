@@ -344,6 +344,8 @@ let calculate_root_transition_diff t heir =
     (Root_transitioned
        { new_root = new_root_data
        ; garbage = Full garbage_nodes
+       ; old_root_scan_state =
+           Full (Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
        ; just_emitted_a_proof
        } )
 
