@@ -212,8 +212,8 @@ echo "==================== PREPARE FEE PAYER CACHE ======================"
 zkapp_fee_payer_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key.pub)
 zkapp_fee_payer_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key" | sed -ne "s/Private key: //p")
 
-mkdir -p ~/.cache/zkapp-cli/keys
-echo -e "{\n    \"privateKey\": \"${zkapp_fee_payer_privkey}\",\n    \"publicKey\": \"${zkapp_fee_payer_pk}\"\n}" >"~/.cache/zkapp-cli/keys/sandbox.json"
+mkdir -p /root/.cache/zkapp-cli/keys
+echo -e "{\n    \"privateKey\": \"${zkapp_fee_payer_privkey}\",\n    \"publicKey\": \"${zkapp_fee_payer_pk}\"\n}" >/root/.cache/zkapp-cli/keys/sandbox.json
 
 # Deploy zkApps
 echo "==================== DEPLOYING ZKAPPS ======================"
