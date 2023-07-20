@@ -34,7 +34,9 @@ export MINA_PRIVKEY_PASS=${MINA_PRIVKEY_PASS:=''}
 export MINA_CONFIG_FILE=$HOME/${MINA_NETWORK}.json
 export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=$HOME/.mina-config}"
 export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
-export MINA_SNARKYJS_VERSION=${MINA_SNARKYJS_VERSION:=main}
+
+# Test variables
+export ROSETTA_INT_TEST_ZKAPPS_VERSION=${ROSETTA_INT_TEST_ZKAPPS_VERSION:=fix-rosetta-int-tests}
 
 # Nodejs variables
 export NVM_VERSION=0.39.3
@@ -65,7 +67,7 @@ ROSETTA_CLI_MAIN_CONFIG_FILE=${ROSETTA_CLI_MAIN_CONFIG_FILE:="config.json"}
 TRANSACTION_FREQUENCY=60
 
 # Fetch zkApps
-curl -Ls https://github.com/MinaProtocol/rosetta-integration-test-zkapps/tarball/$MINA_SNARKYJS_VERSION | tar xz -C /tmp
+curl -Ls https://github.com/MinaProtocol/rosetta-integration-test-zkapps/tarball/$ROSETTA_INT_TEST_ZKAPPS_VERSION | tar xz -C /tmp
 mv /tmp/MinaProtocol-rosetta-integration-test-zkapps-* $ZKAPP_PATH
 
 # Libp2p Keypair
@@ -100,9 +102,12 @@ EOF
 for zkapp_path in ${ZKAPP_PATH}/*/; do
   zkapp_path=${zkapp_path%/}
   zkapp=$(basename $zkapp_path)
-  mina-dev advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp}.key
-  zkapp_pk=$(cat $MINA_KEYS_PATH/zkapp-${zkapp}.key.pub)
-  line="[{ \"pk\": \"${zkapp_pk}\", \"balance\": \"10000\", \"delegate\": null, \"sk\": null }]"
+  # Generate zkApp account keypair
+  mina-dev advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key
+  # Generate zkApp fee payer keypair
+  mina-dev advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key
+  zkapp_fee_payer_pk=$(cat $MINA_KEYS_PATH/zkapp-${zkapp}-fee-payer.key.pub)
+  line="[{ \"pk\": \"${zkapp_fee_payer_pk}\", \"balance\": \"10000\", \"delegate\": null, \"sk\": null }]"
   jq ".ledger.accounts |= . + ${line}" $MINA_CONFIG_FILE >${MINA_CONFIG_FILE}.tmp
   mv ${MINA_CONFIG_FILE}.tmp $MINA_CONFIG_FILE
 done
@@ -202,6 +207,14 @@ send_payments() {
 }
 send_payments &
 
+# Fee payer cache creation
+echo "==================== PREPARE FEE PAYER CACHE ======================"
+zkapp_fee_payer_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key.pub)
+zkapp_fee_payer_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key" | sed -ne "s/Private key: //p")
+
+mkdir -p ~/.cache/zkapp-cli/keys
+echo -e "{\n    \"privateKey\": \"${zkapp_fee_payer_privkey}\",\n    \"publicKey\": \"${zkapp_fee_payer_pk}\"\n}" >"~/.cache/zkapp-cli/keys/sandbox.json"
+
 # Deploy zkApps
 echo "==================== DEPLOYING ZKAPPS ======================"
 deploy_txs=()
@@ -210,13 +223,11 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
   zkapp=$(basename $zkapp_path)
   echo "Deploying ${zkapp}..."
 
-  zkapp_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}.key.pub)
-  zkapp_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}.key" | sed -ne "s/Private key: //p")
-
-  mina-dev accounts unlock --public-key $zkapp_pk
+  zkapp_account_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key.pub)
+  zkapp_account_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key" | sed -ne "s/Private key: //p")
 
   mkdir -p ${zkapp_path}/keys
-  echo -e "{\n    \"privateKey\": \"${zkapp_privkey}\",\n    \"publicKey\": \"${zkapp_pk}\"\n}" >"${zkapp_path}/keys/sandbox.json"
+  echo -e "{\n    \"privateKey\": \"${zkapp_account_privkey}\",\n    \"publicKey\": \"${zkapp_account_pk}\"\n}" >"${zkapp_path}/keys/sandbox.json"
 
   cat <<EOF >"${zkapp_path}/config.json"
 {
@@ -225,6 +236,8 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
     "sandbox": {
       "url": "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql",
       "keyPath": "keys/sandbox.json",
+      "feepayerKeyPath": "/root/.cache/zkapp-cli/keys/sandbox.json",
+      "feepayerAlias": "sandbox",
       "fee": "1"
     }
   }
