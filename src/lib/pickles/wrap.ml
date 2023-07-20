@@ -568,7 +568,7 @@ let%test_module "gate finalization" =
           ; lookup = true
           }
       end) )
-    *)
+      *)
 
     let%test_module "range check" =
       ( module Make (struct
