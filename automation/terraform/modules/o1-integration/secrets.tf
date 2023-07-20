@@ -1,6 +1,7 @@
 resource "kubernetes_secret" "mina_account_keypairs" {
+  source     = "../kubernetes/testnet/kubernetes.tf"
   depends_on = [module.kubernetes_testnet.testnet_namespace]
-  for_each = {for config in var.block_producer_configs : config.name => config}
+  for_each   = { for config in var.block_producer_configs : config.name => config }
 
   metadata {
     name      = each.value.keypair.keypair_name
@@ -15,6 +16,7 @@ resource "kubernetes_secret" "mina_account_keypairs" {
 
 #this is entire for the seed peer
 resource "kubernetes_secret" "libp2p_discovery_keys" {
+  source     = "../kubernetes/testnet/kubernetes.tf"
   depends_on = [module.kubernetes_testnet.testnet_namespace]
 
   metadata {
