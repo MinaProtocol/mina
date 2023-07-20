@@ -14,7 +14,7 @@ type 'f t =
 
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run)
-    (P : Sponge.Intf.Permutation with type Field.t = Impl.Field.t) : sig
+    (_ : Sponge.Intf.Permutation with type Field.t = Impl.Field.t) : sig
   type nonrec t = Impl.Field.t t
 
   val create : ?init:Impl.Field.t array -> Impl.Field.t Sponge.Params.t -> t
