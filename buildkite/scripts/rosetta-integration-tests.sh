@@ -53,10 +53,6 @@ npm config set prefix '~/.npm-global'
 export PATH=~/.npm-global/bin:$PATH
 npm install --no-progress --global zkapp-cli
 
-# Debug on CI
-which zk
-perl -i -p -e "s~await sh('npm run build --silent');~await sh('npm run build');~g" ~/.npm-global/lib/node_modules/zkapp-cli/src/lib/deploy.js
-
 # Rosetta CLI variables
 # Files from ROSETTA_CLI_CONFIG_FILES will be read from
 # ROSETTA_CONFIGURATION_INPUT_DIR and some placeholders will be
@@ -235,7 +231,6 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
 }
 EOF
   cd "$zkapp_path"
-  # npm install --no-progress ${OLDPWD}/src/lib/snarkyjs --no-audit
   npm ci
   zk deploy sandbox -y
   txn=$(zk deploy sandbox -y | sed -ne "s/https:\/\/berkeley.minaexplorer.com\/transaction\///p")
