@@ -2,6 +2,10 @@ provider "google" {
   alias = "gke"
 }
 
+provider "kuberentes" {
+  alias = "testnet_deploy"
+}
+
 variable "deploy_graphql_ingress" {
   type = bool
 }
