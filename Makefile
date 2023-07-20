@@ -74,7 +74,7 @@ genesis_ledger: ocaml_checks
 	ulimit -s 65532 && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir $(GENESIS_DIR)
 	$(info Genesis ledger and genesis proof generated)
 
-# checks that every OCaml packages in the project build without issues
+# Checks that every OCaml packages in the project build without issues
 check: ocaml_checks libp2p_helper
 	dune build @src/check
 
@@ -232,6 +232,9 @@ check-format: ocaml_checks
 
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
+
+check-proof-systems-submodule:
+	./scripts/check-proof-systems-submodule.sh
 
 #######################################
 ## Environment setup
