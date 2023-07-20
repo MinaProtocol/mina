@@ -227,7 +227,8 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                       | (witness, spec, stmt) :: rest ->
                           let open Async.Deferred.Or_error.Let_syntax in
                           let%bind p1 =
-                            Async.Deferred.Or_error.try_with (fun () ->
+                            Async.Deferred.Or_error.try_with ~here:[%here]
+                              (fun () ->
                                 T.of_zkapp_command_segment_exn ~statement:stmt
                                   ~witness ~spec )
                           in
@@ -235,7 +236,8 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                             ~f:(fun acc (witness, spec, stmt) ->
                               let%bind prev = Async.Deferred.return acc in
                               let%bind curr =
-                                Async.Deferred.Or_error.try_with (fun () ->
+                                Async.Deferred.Or_error.try_with ~here:[%here]
+                                  (fun () ->
                                     T.of_zkapp_command_segment_exn
                                       ~statement:stmt ~witness ~spec )
                               in
