@@ -3,6 +3,10 @@
 set -eo pipefail
 source ~/.profile
 
+echo "Installing binaryen..."
+sudo apt-get update
+sudo apt-get install -y binaryen
+
 echo "Install NPM dependencies..."
 cd src/lib/snarkyjs
 npm install --no-progress
