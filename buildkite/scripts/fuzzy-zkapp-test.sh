@@ -24,8 +24,5 @@ then
   # only retry those tests that failed.
   echo "--- Run fuzzy zkapp tests"
   time dune exec "${path}" --profile="${profile}" -j16 -- --timeout "${timeout}" --individual-test-timeout "${individual_test_timeout}" --seed "${RANDOM}" || \
-  (./scripts/link-coredumps.sh && \
-   echo "--- Retrying failed unit tests" && \
-   time dune exec "${path}" --profile="${profile}" -j16 -- --timeout "${timeout}" --individual-test-timeout "${individual_test_timeout}" --seed "${RANDOM}" || \
-   (./scripts/link-coredumps.sh && false))
+  (./scripts/link-coredumps.sh)
 fi
