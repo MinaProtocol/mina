@@ -133,7 +133,7 @@ mina-dev accounts import --privkey-path $MINA_KEYS_PATH/snark-producer.key --con
 for zkapp_path in ${ZKAPP_PATH}/*/; do
   zkapp_path=${zkapp_path%/}
   zkapp=$(basename $zkapp_path)
-  mina-dev accounts import --privkey-path $MINA_KEYS_PATH/zkapp-${zkapp}.key --config-directory $MINA_CONFIG_DIR
+  mina-dev accounts import --privkey-path $MINA_KEYS_PATH/zkapp-${zkapp}-fee-payer.key --config-directory $MINA_CONFIG_DIR
 done
 
 # Postgres
