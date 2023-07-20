@@ -4,7 +4,7 @@ provider "kubernetes" {
   alias          = "testnet_deploy"
   config_context = var.k8s_context
   config_path    = "~/.kube/config" # Path to your K3s kubeconfig file
-  host           = "https://0.0.0.0:80"
+  host           = "https://0.0.0.0:6443"
 }
 
 # provider "kubernetes" {
