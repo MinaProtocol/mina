@@ -1,5 +1,5 @@
 module "kubernetes_testnet" {
-  providers = { kubernetes = kuberentes.testnet_deploy }
+  providers = { kubernetes = kubernetes.testnet_deploy }
   source    = "../kubernetes/testnet"
 
   use_local_charts    = true
