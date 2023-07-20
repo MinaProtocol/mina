@@ -1,7 +1,3 @@
-module "kubernetes_provider" {
-  source = "../kubernetes/testnet/kubernetes.tf"
-}
-
 resource "kubernetes_secret" "mina_account_keypairs" {
   depends_on = [module.kubernetes_testnet.testnet_namespace]
   for_each   = { for config in var.block_producer_configs : config.name => config }

@@ -1,5 +1,5 @@
-provider "google" {
-  alias = "gke"
+provider "kubernetes" {
+  alias = "testnet_deploy"
 }
 
 variable "deploy_graphql_ingress" {
@@ -47,7 +47,7 @@ variable "mina_points_image" {
 }
 
 variable "enable_working_dir_persitence" {
-  type = bool
+  type    = bool
   default = false
 }
 
@@ -67,10 +67,10 @@ variable "snark_worker_fee" {
 variable "snark_coordinator_config" {
   description = "configurations for the snark coordinator and its workers"
   type = object({
-      name = string,
-      public_key = string,
-      worker_nodes = number
-    })
+    name         = string,
+    public_key   = string,
+    worker_nodes = number
+  })
   default = null
 }
 
@@ -100,7 +100,7 @@ variable "mem_request" {
 
 variable "archive_configs" {
   description = "individual archive-node deployment configurations"
-  default = null
+  default     = null
 }
 
 variable "archive_node_count" {
@@ -121,9 +121,9 @@ variable "block_producer_configs" {
     object({
       name = string,
       keypair = object({
-        keypair_name = string
-        public_key = string
-        private_key = string,
+        keypair_name     = string
+        public_key       = string
+        private_key      = string,
         privkey_password = string
       }),
       libp2p_secret = string
