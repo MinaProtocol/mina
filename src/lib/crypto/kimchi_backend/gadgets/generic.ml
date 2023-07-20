@@ -35,38 +35,6 @@ let add (type f)
         } ;
       sum )
 
-(* Generic constant addition gadget (right operand is constant)
- *   Instead of constraining constant in separate generic gate, this gadget allows the constant
- *   to be specified as a coefficient of the generic addition gate; thus, savings a row.
- *)
-let add_const (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (left_input : Circuit.Field.t) (right_input : f) : Circuit.Field.t =
-  let open Circuit in
-  (* Witness computation; sum = left_input + right_input *)
-  let sum =
-    exists Field.typ ~compute:(fun () ->
-        let left_input = As_prover.read Field.typ left_input in
-        Field.Constant.add left_input right_input )
-  in
-
-  let neg_one = Field.Constant.(negate one) in
-  (* Set up generic add gate *)
-  with_label "generic_add_const_gadget" (fun () ->
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Basic
-                 { l = (Field.Constant.one, left_input)
-                 ; r = (Field.Constant.zero, Field.(constant Constant.zero))
-                 ; o = (neg_one, sum)
-                 ; m = Field.Constant.zero
-                 ; c = right_input
-                 } )
-        } ;
-      sum )
-
 (* Generic subtraction gate gadget *)
 let sub (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
