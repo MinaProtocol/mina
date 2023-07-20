@@ -1,6 +1,6 @@
 module "kubernetes_testnet" {
-  providers = kuberentes.testnet_deploy
-  source    = "../kubernetes/testnet/kubernetes.tf"
+  providers = { kubernetes = kuberentes.testnet_deploy }
+  source    = "../kubernetes/testnet"
 
   use_local_charts    = true
   expose_graphql      = var.deploy_graphql_ingress
