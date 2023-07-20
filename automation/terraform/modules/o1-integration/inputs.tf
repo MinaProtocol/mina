@@ -2,7 +2,7 @@ provider "google" {
   alias = "gke"
 }
 
-provider "kuberentes" {
+provider "kubernetes" {
   alias = "testnet_deploy"
 }
 
