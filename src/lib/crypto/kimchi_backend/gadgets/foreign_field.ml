@@ -894,10 +894,10 @@ let valid_element (type f) (module Circuit : Snark_intf.Run with type field = f)
       assert (Field.Constant.(equal sign one)) ;
       assert (Field.Constant.(equal ovf one)) ) ;
 
-  (* Set up copy constraints with overflow with the overflow check*)
+  (* Set up copy constraints with overflow with the overflow check *)
   Field.Assert.equal ovf Field.one ;
 
-  (* Check that the highest limb of right input is 2^88*)
+  (* Check that the highest limb of right input is 2^88 *)
   let two_to_88 = two_to_limb_field (module Circuit) in
   Field.Assert.equal (Field.constant two_to_88) offset2 ;
 
@@ -959,10 +959,10 @@ let check_result (type f) (module Circuit : Snark_intf.Run with type field = f)
   in
   let bound0, bound1, bound2 = Element.Standard.to_limbs bound in
 
-  (* Include Multi range check for the result right after *)
+  (* Include multi-range-check for the result *)
   Range_check.multi (module Circuit) result0 result1 result2 ;
 
-  (* Include Multi range check for the bound right after *)
+  (* Include multi-range-check for the bound *)
   Range_check.multi (module Circuit) bound0 bound1 bound2 ;
 
   ()
@@ -981,16 +981,16 @@ let check_result (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      Returns the final result of the chain of sums
  *
  *    For n+1 inputs, the gadget creates n foreign field addition gates, followed by a final
- *    foreign field addition gate for the bound check (i.e. valid_element check). For this, 
+ *    foreign field addition gate for the bound check (i.e. valid_element check). For this,
  *    two additional multi range checks must also be performed (for value and bound).
  *    By default, the range check takes place right after the final Raw row.
- * 
+ *
  * NOTE:
  *    This gadget does not create bound checks for the intermediate sums by default.
  *    This assumes that the number of chained sums will not overflow the native field
- *    in any limb. 
+ *    in any limb.
  * TODO:
- *    Understand if concatenating sums is possible with input limbs <2^88 with chunking
+ *    Understand if concatenating sums is possible with input limbs < 2^88 with chunking
  *)
 let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
     ?(full = false) (inputs : f Element.Standard.t list)
@@ -1063,8 +1063,8 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
  *     followed by a Zero gate,
  *     a FFAdd gate for the bound check,
  *     a Zero gate after this bound check,
- *     a Multi Range Check gadget for the result
- *     and a Multi Range Check gadget for the bound.
+ *     a multi-range-check gadget for the result
+ *     and a multi-range-check gadget for the bound.
  * This means that the intermediate results will not be range checked.
  *
  * In single mode:
@@ -1107,9 +1107,9 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *     followed by a Zero gate,
  *     a FFAdd gate for the bound check,
  *     a Zero gate after this bound check,
- *     and a Multi Range Check gadget.
- *     a Multi Range Check gadget for the result
- *     and a Multi Range Check gadget for the bound.
+ *     and a multi-range-check gadget.
+ *     a multi-range-check gadget for the result
+ *     and a multi-range-check gadget for the bound.
  * This means that the intermediate results will not be range checked.
  *
  * In single mode:
@@ -1184,11 +1184,11 @@ let compute_intermediate_products (type f)
 let compute_high_bound (x : Bignum_bigint.t)
     (foreign_field_modulus : Bignum_bigint.t) : Bignum_bigint.t =
   let x_hi = high_limb_of_bignum_bigint x in
-  let hi_fmod = high_limb_of_bignum_bigint foreign_field_modulus in
-  let hi_limb = Bignum_bigint.(Common.two_to_limb - hi_fmod - one) in
-  let x_hi_bound = Bignum_bigint.(x_hi + hi_limb) in
-  assert (Bignum_bigint.(x_hi_bound < Common.two_to_limb)) ;
-  x_hi_bound
+  let fmod_hi = high_limb_of_bignum_bigint foreign_field_modulus in
+  let limb_hi = Bignum_bigint.(Common.two_to_limb - fmod_hi - one) in
+  let x_bound_hi = Bignum_bigint.(x_hi + limb_hi) in
+  assert (Bignum_bigint.(x_bound_hi < Common.two_to_limb)) ;
+  x_bound_hi
 
 (* Perform integer bound addition for all limbs x' = x + f' *)
 let _compute_bound (x : Bignum_bigint.t)
@@ -1251,28 +1251,31 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Check foreign field modulus < max allowed *)
   check_modulus (module Circuit) foreign_field_modulus ;
 
-  (* Compute gate coefficients
-   *   This happens when circuit is created / not part of witness (e.g. exists, As_prover code)
+  (*
+   * Compute gate coefficients (happens when circuit is created)
    *)
+
+  (* Get high limb of foreign field modulus (coefficient) *)
   let _, _, foreign_field_modulus2 = foreign_field_modulus in
 
-  let big_foreign_field_modulus =
+  (* Compute foreign field modulus as bigint (used here and it witness generation) *)
+  let foreign_field_modulus =
     field_const_standard_limbs_to_bignum_bigint
       (module Circuit)
       foreign_field_modulus
   in
-  let ( neg_foreign_field_modulus
-      , ( neg_foreign_field_modulus0
-        , neg_foreign_field_modulus1
-        , neg_foreign_field_modulus2 ) ) =
+
+  (* Get all limbs of negated foreign field modulus (coefficients) *)
+  let ( neg_foreign_field_modulus0
+      , neg_foreign_field_modulus1
+      , neg_foreign_field_modulus2 ) =
     (* Compute negated foreign field modulus f' = 2^t - f public parameter *)
     let neg_foreign_field_modulus =
-      Bignum_bigint.(binary_modulus - big_foreign_field_modulus)
+      Bignum_bigint.(binary_modulus - foreign_field_modulus)
     in
-    ( neg_foreign_field_modulus
-    , bignum_bigint_to_field_const_standard_limbs
-        (module Circuit)
-        neg_foreign_field_modulus )
+    bignum_bigint_to_field_const_standard_limbs
+      (module Circuit)
+      neg_foreign_field_modulus
   in
 
   (* Compute witness values *)
@@ -1298,7 +1301,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
       , carry1_86
       , carry1_88
       , carry1_90 ) =
-    exists (Typ.array ~length:21 Field.typ) ~compute:(fun () ->
+    exists (Typ.array ~length:22 Field.typ) ~compute:(fun () ->
         (* Compute quotient remainder and negative foreign field modulus *)
         let quotient, remainder =
           (* Bignum_bigint computations *)
@@ -1311,11 +1314,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
             Element.Standard.to_bignum_bigint_as_prover
               (module Circuit)
               right_input
-          in
-          let foreign_field_modulus =
-            field_const_standard_limbs_to_bignum_bigint
-              (module Circuit)
-              foreign_field_modulus
           in
 
           (* Compute quotient and remainder using foreign field modulus *)
@@ -1334,15 +1332,13 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
               (module Circuit)
               quotient
           in
-          let neg_foreign_field_modulus =
-            bignum_bigint_to_field_const_standard_limbs
-              (module Circuit)
-              neg_foreign_field_modulus
-          in
           let product0, product1, product2 =
             compute_intermediate_products
               (module Circuit)
-              left_input right_input quotient neg_foreign_field_modulus
+              left_input right_input quotient
+              ( neg_foreign_field_modulus0
+              , neg_foreign_field_modulus1
+              , neg_foreign_field_modulus2 )
           in
 
           ( Common.field_to_bignum_bigint (module Circuit) product0
@@ -1361,12 +1357,12 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Compute bounds for multi-range-checks on quotient and remainder *)
         let quotient_hi_bound =
           Common.bignum_bigint_to_field (module Circuit)
-          @@ compute_high_bound quotient big_foreign_field_modulus
+          @@ compute_high_bound quotient foreign_field_modulus
         in
 
         let remainder_hi_bound =
           Common.bignum_bigint_to_field (module Circuit)
-          @@ compute_high_bound remainder big_foreign_field_modulus
+          @@ compute_high_bound remainder foreign_field_modulus
         in
 
         (* Compute the rest of the witness data *)
@@ -1420,7 +1416,8 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     Range_check.compact_multi (module Circuit) remainder01 remainder2
   in
 
-  (* NOTE: high bound checks and multi range checks for left and right should be done somewhere else *)
+  (* NOTE: high bound checks and multi range checks for left and right are
+           the responsibility of caller and should be done somewhere else *)
   let left_input0, left_input1, left_input2 =
     Element.Standard.to_limbs left_input
   in
@@ -1488,7 +1485,7 @@ let bytes_to_standard_element (type f)
   (* Convert the bytestring into a bigint *)
   let bytestring = Array.of_list bytestring in
 
-  (* C1: Check modulus_bit_length = # of bits you unpack 
+  (* C1: Check modulus_bit_length = # of bits you unpack
    * This is partly implicit in the circuit given the number of byte outputs of Keccak:
    * · input_bitlen < fmod_bitlen : OK
    * · input_bitlen = fmod_bitlen : OK
