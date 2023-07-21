@@ -21,6 +21,7 @@ let num_constraints = 1 lsl 15
 
 let tag, _cache, _p_module, Pickles.Provers.[ prover ] =
   Zkapps_examples.compile () ~cache:Cache_dir.cache ~auxiliary_typ:Impl.Typ.unit
+    ~override_wrap_domain:Pickles_base.Proofs_verified.N1
     ~branches:(module Nat.N1)
     ~max_proofs_verified:(module Nat.N0)
     ~name:"big_circuit"
