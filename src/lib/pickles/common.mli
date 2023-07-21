@@ -57,10 +57,7 @@ val ft_comm :
 
 val dlog_pcs_batch :
      'total Pickles_types.Nat.t
-     * ( 'proofs_verified
-       , Pickles_types.Nat.N41.n
-       , 'total )
-       Pickles_types.Nat.Adds.t
+     * ('proofs_verified, 'n, 'total) Pickles_types.Nat.Adds.t
   -> ('a, 'total, Pickles_types.Nat.z) Pickles_types.Pcs_batch.t
 
 val combined_evaluation :

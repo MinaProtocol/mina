@@ -866,6 +866,10 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
         lookup: None,
         generic_selector: eval(),
         poseidon_selector: eval(),
+        complete_add_selector: eval(),
+        mul_selector: eval(),
+        emul_selector: eval(),
+        endomul_scalar_selector: eval(),
     };
 
     let public = vec![Fp::one(), Fp::one()];
