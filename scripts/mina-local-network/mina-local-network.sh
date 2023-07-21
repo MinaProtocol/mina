@@ -239,7 +239,7 @@ recreate-schema() {
   
   # We need to change our working directory as script has relation to others subscripts 
   # and calling them from local folder
-  cd ./src/app/archive 
+  cd ./src/app/archive
   psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB} < create_schema.sql
   cd ../../../
 
