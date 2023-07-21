@@ -70,6 +70,10 @@ type nonrec 'caml_f proof_evaluations =
   ; lookup : 'caml_f lookup_evaluations option
   ; generic_selector : 'caml_f array point_evaluations
   ; poseidon_selector : 'caml_f array point_evaluations
+  ; complete_add_selector : 'caml_f array point_evaluations
+  ; mul_selector : 'caml_f array point_evaluations
+  ; emul_selector : 'caml_f array point_evaluations
+  ; endomul_scalar_selector : 'caml_f array point_evaluations
   }
 
 type nonrec 'caml_g poly_comm =

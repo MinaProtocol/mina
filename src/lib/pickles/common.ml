@@ -52,9 +52,9 @@ let hash_messages_for_next_step_proof ~app_state
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
        ~app_state )
 
-let dlog_pcs_batch (type proofs_verified total)
+let dlog_pcs_batch (type nat proofs_verified total)
     ((without_degree_bound, _pi) :
-      total Nat.t * (proofs_verified, Nat.N41.n, total) Nat.Adds.t ) =
+      total Nat.t * (proofs_verified, nat, total) Nat.Adds.t ) =
   Pcs_batch.create ~without_degree_bound ~with_degree_bound:[]
 
 let when_profiling profiling default =

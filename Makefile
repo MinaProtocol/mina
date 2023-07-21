@@ -142,7 +142,7 @@ dhall_types: ocaml_checks
 
 replayer: ocaml_checks
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=devnet
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=devnet
 	$(info Build complete)
 
 delegation_compliance: ocaml_checks

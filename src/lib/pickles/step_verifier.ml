@@ -568,12 +568,14 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
-          let num_commitments_without_degree_bound = Nat.N41.n in
+          let num_commitments_without_degree_bound = Nat.N45.n in
           let without_degree_bound =
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
-              :: [| m.psm_comm |]
+              :: [| m.psm_comm |] :: [| m.complete_add_comm |]
+              :: [| m.mul_comm |] :: [| m.emul_comm |]
+              :: [| m.endomul_scalar_comm |]
               :: Vector.append w_comm
                    (Vector.append
                       (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))

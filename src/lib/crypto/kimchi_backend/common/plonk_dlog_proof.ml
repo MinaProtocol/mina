@@ -243,7 +243,18 @@ module Make (Inputs : Inputs_intf) = struct
     { sorted; aggreg; table; runtime }
 
   let eval_of_backend
-      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+      ({ w
+       ; coefficients
+       ; z
+       ; s
+       ; generic_selector
+       ; poseidon_selector
+       ; complete_add_selector
+       ; mul_selector
+       ; emul_selector
+       ; endomul_scalar_selector
+       ; lookup
+       } :
         Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
     { w = tuple15_to_vec w
     ; coefficients = tuple15_to_vec coefficients
@@ -251,6 +262,10 @@ module Make (Inputs : Inputs_intf) = struct
     ; s = tuple6_to_vec s
     ; generic_selector
     ; poseidon_selector
+    ; complete_add_selector
+    ; mul_selector
+    ; emul_selector
+    ; endomul_scalar_selector
     ; lookup = Option.map ~f:lookup_eval_of_backend lookup
     }
 
@@ -300,6 +315,10 @@ module Make (Inputs : Inputs_intf) = struct
       ; s
       ; generic_selector
       ; poseidon_selector
+      ; complete_add_selector
+      ; mul_selector
+      ; emul_selector
+      ; endomul_scalar_selector
       ; lookup
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
@@ -308,6 +327,10 @@ module Make (Inputs : Inputs_intf) = struct
     ; s = tuple6_of_vec s
     ; generic_selector
     ; poseidon_selector
+    ; complete_add_selector
+    ; mul_selector
+    ; emul_selector
+    ; endomul_scalar_selector
     ; lookup = Option.map ~f:lookup_eval_to_backend lookup
     }
 
