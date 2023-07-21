@@ -808,6 +808,6 @@ module Network_manager = struct
     Deferred.unit
 
   let destroy t =
-    Deferred.Or_error.try_with (fun () -> destroy t)
+    Deferred.Or_error.try_with ~here:[%here] (fun () -> destroy t)
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 end

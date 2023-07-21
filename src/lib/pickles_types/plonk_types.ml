@@ -734,7 +734,12 @@ module Evals = struct
      - z
      - generic selector
      - poseidon selector
+     - complete_add_selector
+     - mul_selector
+     - emul_selector
+     - endomul_scalar_selector
      - w (witness columns)
+     - coefficients
      - s (sigma columns)
 
      then optionally:

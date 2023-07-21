@@ -626,6 +626,7 @@ module Transfer_recursive = struct
   let lazy_compiled =
     lazy
       (Pickles.compile () ~cache:Cache_dir.cache
+         ~override_wrap_domain:Pickles_base.Proofs_verified.N1
          ~public_input:(Input Rules.Transfer.Recursive.Statement.typ)
          ~auxiliary_typ:Impl.Typ.unit
          ~branches:(module Nat.N1)
