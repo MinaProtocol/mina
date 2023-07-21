@@ -719,7 +719,7 @@ let profile_zkapps ~verifier ledger zkapp_commands =
         (*verify*)
         let%map () =
           match%map
-            Async_kernel.Monitor.try_with (fun () ->
+            Async_kernel.Monitor.try_with ~here:[%here] (fun () ->
                 Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn
                   ~ignore_outside_snark:true ledger [ zkapp_command ] )
           with
