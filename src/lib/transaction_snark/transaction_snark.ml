@@ -4151,7 +4151,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           }
         in
         Pickles.compile () ~cache:Cache_dir.cache
-          ~override_wrap_domain:Pickles_base.Proofs_verified.N1
           ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
           ~branches:(module Nat.N1)
           ~max_proofs_verified:(module Nat.N0)
