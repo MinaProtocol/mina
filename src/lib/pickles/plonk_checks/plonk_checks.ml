@@ -288,6 +288,18 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
         get_eval e.emul_selector
     | Index EndoMulScalar ->
         get_eval e.endomul_scalar_selector
+    | Index RangeCheck0 ->
+        get_eval (Opt.value_exn e.range_check0_selector)
+    | Index RangeCheck1 ->
+        get_eval (Opt.value_exn e.range_check1_selector)
+    | Index ForeignFieldAdd ->
+        get_eval (Opt.value_exn e.foreign_field_add_selector)
+    | Index ForeignFieldMul ->
+        get_eval (Opt.value_exn e.foreign_field_mul_selector)
+    | Index Xor16 ->
+        get_eval (Opt.value_exn e.xor_selector)
+    | Index Rot64 ->
+        get_eval (Opt.value_exn e.rot_selector)
     | Index i ->
         failwithf
           !"Index %{sexp:Scalars.Gate_type.t}\n\
@@ -509,27 +521,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
             | Some joint_combiner ->
                 Some { joint_combiner } )
         ; optional_column_scalars =
-            { range_check0 =
-                compute_feature (Index RangeCheck0) feature_flags.range_check0
-                  actual_feature_flags.range_check0
-            ; range_check1 =
-                compute_feature (Index RangeCheck1) feature_flags.range_check1
-                  actual_feature_flags.range_check1
-            ; foreign_field_add =
-                compute_feature (Index ForeignFieldAdd)
-                  feature_flags.foreign_field_add
-                  actual_feature_flags.foreign_field_add
-            ; foreign_field_mul =
-                compute_feature (Index ForeignFieldMul)
-                  feature_flags.foreign_field_mul
-                  actual_feature_flags.foreign_field_mul
-            ; xor =
-                compute_feature (Index Xor16) feature_flags.xor
-                  actual_feature_flags.xor
-            ; rot =
-                compute_feature (Index Rot64) feature_flags.rot
-                  actual_feature_flags.rot
-            ; lookup_gate =
+            { lookup_gate =
                 compute_feature (LookupKindIndex Lookup) feature_flags.lookup
                   actual_feature_flags.lookup
             ; runtime_tables =
