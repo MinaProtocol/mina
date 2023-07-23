@@ -430,7 +430,6 @@ module Evals = struct
         ; rot_selector
         ; lookup_aggregation
         ; lookup_table
-        ; runtime_lookup_table
         ]
     in
     always_present @ optional_gates
@@ -744,7 +743,12 @@ module Evals = struct
      - z
      - generic selector
      - poseidon selector
+     - complete_add_selector
+     - mul_selector
+     - emul_selector
+     - endomul_scalar_selector
      - w (witness columns)
+     - coefficients
      - s (sigma columns)
 
      then optionally:

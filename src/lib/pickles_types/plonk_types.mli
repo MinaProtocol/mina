@@ -216,18 +216,7 @@ module Evals : sig
       ; lookup_sorted : ('f, 'bool) Opt.t array
       ; runtime_lookup_table : ('f, 'bool) Opt.t
       }
-
-    (** {4 Accessors} *)
-
-    val s : ('a, 'b) t -> 'a Permuts_minus_1_vec.t
-
-    val z : ('a, 'b) t -> 'a
-
-    val w : ('a, 'b) t -> 'a Columns_vec.t
-
-    val poseidon_selector : ('a, 'b) t -> 'a
-
-    val generic_selector : ('a, 'b) t -> 'a
+    [@@deriving fields]
 
     (** {4 Converters} *)
 

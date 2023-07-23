@@ -171,14 +171,6 @@ module Wrap = struct
                 ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
           end
 
-          (** All scalar values deferred by a verifier circuit.
-              The values in [vbmul], [complete_add], [endomul], [endomul_scalar], and [perm]
-              are all scalars which will have been used to scale selector polynomials during the
-              computation of the linearized polynomial commitment.
-
-              Then, we expose them so the next guy (who can do scalar arithmetic) can check that they
-              were computed correctly from the evaluations in the proof and the challenges.
-          *)
           type ( 'challenge
                , 'scalar_challenge
                , 'fp
