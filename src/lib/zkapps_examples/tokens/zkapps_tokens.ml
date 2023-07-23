@@ -659,6 +659,7 @@ end
 let lazy_compiled =
   lazy
     (Zkapps_examples.compile () ~cache:Cache_dir.cache
+       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
        ~auxiliary_typ:Impl.Typ.unit
        ~branches:(module Nat.N3)
        ~max_proofs_verified:(module Nat.N2)
