@@ -273,8 +273,8 @@ module Make (Inputs : Inputs_intf) = struct
     ; lookup_sorted =
         (let max_columns_num = 5 in
          Array.init max_columns_num ~f:(fun i ->
-             Option.try_with_join (fun () -> lookup_sorted.(i)) ) ;
-         runtime_lookup_table )
+             Option.try_with_join (fun () -> lookup_sorted.(i)) ) )
+    ; runtime_lookup_table
     }
 
   let of_backend (t : Backend.t) : t =
