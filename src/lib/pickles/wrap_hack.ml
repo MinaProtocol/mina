@@ -42,7 +42,7 @@ let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
   |> Vector.to_list
 
 (* Hash the me only, padding first. *)
-let hash_messages_for_next_wrap_proof (type n) (max_proofs_verified : n Nat.t)
+let hash_messages_for_next_wrap_proof (type n) (_max_proofs_verified : n Nat.t)
     (t :
       ( Tick.Curve.Affine.t
       , (_, n) Vector.t )
