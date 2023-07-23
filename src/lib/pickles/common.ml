@@ -236,15 +236,7 @@ let ft_comm ~add:( + ) ~scale ~endoscale:_ ~negate
   let _, [ sigma_comm_last ] =
     Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
-  let f_comm =
-    List.reduce_exn ~f:( + )
-      [ plonk.perm * sigma_comm_last
-      ; plonk.vbmul * m.mul_comm
-      ; plonk.complete_add * m.complete_add_comm
-      ; plonk.endomul * m.emul_comm
-      ; plonk.endomul_scalar * m.endomul_scalar_comm
-      ]
-  in
+  let f_comm = List.reduce_exn ~f:( + ) [ plonk.perm * sigma_comm_last ] in
   let chunked_t_comm =
     let n = Array.length t_comm in
     let res = ref t_comm.(n - 1) in
