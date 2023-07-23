@@ -158,10 +158,10 @@ let () =
 
   let index_terms (type a)
       ({ add = ( + )
-       ; sub = ( - )
+       ; sub = _
        ; mul = ( * )
-       ; square
-       ; pow
+       ; square = _
+       ; pow = _
        ; var
        ; field
        ; cell
@@ -245,10 +245,10 @@ let () =
 
   let index_terms (type a)
       ({ add = ( + )
-       ; sub = ( - )
+       ; sub = _
        ; mul = ( * )
-       ; square
-       ; pow
+       ; square = _
+       ; pow = _
        ; var
        ; field
        ; cell

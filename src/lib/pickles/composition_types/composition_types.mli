@@ -97,16 +97,7 @@ module Wrap : sig
           end
 
           module Optional_column_scalars : sig
-            type 'fp t =
-              { range_check0 : 'fp
-              ; range_check1 : 'fp
-              ; foreign_field_add : 'fp
-              ; foreign_field_mul : 'fp
-              ; xor : 'fp
-              ; rot : 'fp
-              ; lookup_gate : 'fp
-              ; runtime_tables : 'fp
-              }
+            type 'fp t = { lookup_gate : 'fp; runtime_tables : 'fp }
             [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
             val to_list : 'fp t -> 'fp list
@@ -886,7 +877,10 @@ module Wrap : sig
             * ( ('d, Nat.N3.n) Vector.t
               * ( 'e
                 * ( ('f, Nat.N1.n) Vector.t
-                  * ('bool vec8 * ('g * ('fp_opt vec8 * unit))) ) ) ) ) ) )
+                  * ( 'bool vec8
+                    * ( 'g
+                      * (('fp_opt * ('fp_opt * unit)) Hlist.HlistId.t * unit) )
+                    ) ) ) ) ) ) )
         Hlist.HlistId.t
 
       (** A layout of the raw data in a statement, which is needed for
@@ -1171,8 +1165,10 @@ module Step : sig
                     , 'num_bulletproof_challenges )
                     Vector.t
                   * ( ('bool, Nat.N1.n) Vector.t
-                    * ('bool vec8 * ('optional * ('fp_opt vec8 * unit))) ) ) )
-              ) ) )
+                    * ( 'bool vec8
+                      * ( 'optional
+                        * (('fp_opt * ('fp_opt * unit)) Hlist.HlistId.t * unit)
+                        ) ) ) ) ) ) ) )
           Hlist.HlistId.t
 
         (** A layout of the raw data in this value, which is needed for
@@ -1234,7 +1230,10 @@ module Step : sig
                  * ( ('b, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('g, Nat.N1.n) Vector.t
-                       * ('g vec8 * ('j * ('fp_opt2 vec8 * unit))) ) ) ) ) ) )
+                       * ( 'g vec8
+                         * ( 'j
+                           * ( ('fp_opt2 * ('fp_opt2 * unit)) Hlist.HlistId.t
+                             * unit ) ) ) ) ) ) ) ) )
              Hlist.HlistId.t
 
         val of_data :
@@ -1244,8 +1243,10 @@ module Step : sig
                  * ( ('d, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('f, Nat.N1.n) Vector.t
-                       * ('f vec8 * ('g * ('fp option vec8 * unit))) ) ) ) ) )
-             )
+                       * ( 'f vec8
+                         * ( 'g
+                           * ( ('fp option * ('fp option * unit)) Hlist.HlistId.t
+                             * unit ) ) ) ) ) ) ) ) )
              Hlist.HlistId.t
           -> feature_flags:
                Pickles_types.Plonk_types.Opt.Flag.t
@@ -1445,7 +1446,10 @@ module Step : sig
                  * ( ('b, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('g, Nat.N1.n) Vector.t
-                       * ('g vec8 * ('m * ('fp_opt2 vec8 * unit))) ) ) ) ) ) )
+                       * ( 'g vec8
+                         * ( 'm
+                           * ( ('fp_opt2 * ('fp_opt2 * unit)) Hlist.HlistId.t
+                             * unit ) ) ) ) ) ) ) ) )
              Hlist.HlistId.t
            , 'h )
            Vector.t
@@ -1459,8 +1463,10 @@ module Step : sig
                  * ( ('d, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('f, Nat.N1.n) Vector.t
-                       * ('f vec8 * ('g * ('fp option vec8 * unit))) ) ) ) ) )
-             )
+                       * ( 'f vec8
+                         * ( 'g
+                           * ( ('fp option * ('fp option * unit)) Hlist.HlistId.t
+                             * unit ) ) ) ) ) ) ) ) )
              Hlist.HlistId.t
            , 'h )
            Vector.t
@@ -1506,7 +1512,8 @@ module Step : sig
                          * ( bool vec8
                            * ( ('d Scalar_challenge.t * unit) Hlist.HlistId.t
                                option
-                             * ('f option vec8 * unit) ) ) ) ) ) ) ) )
+                             * ( ('f option * ('f option * unit)) Hlist.HlistId.t
+                               * unit ) ) ) ) ) ) ) ) )
                Hlist.HlistId.t
              , 'b )
              Vector.t
@@ -1528,7 +1535,8 @@ module Step : sig
                                , 'a Snarky_backendless.Cvar.t
                                  Snarky_backendless__Snark_intf.Boolean0.t )
                                Plonk_types.Opt.t
-                             * ('g option vec8 * unit) ) ) ) ) ) ) ) )
+                             * ( ('g option * ('g option * unit)) Hlist.HlistId.t
+                               * unit ) ) ) ) ) ) ) ) )
                Hlist.HlistId.t
              , 'b )
              Vector.t
