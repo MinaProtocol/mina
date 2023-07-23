@@ -820,9 +820,6 @@ struct
     include Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
   end
 
-  let field_array_if b ~then_ ~else_ =
-    Array.map2_exn then_ else_ ~f:(fun x1 x2 -> Field.if_ b ~then_:x1 ~else_:x2)
-
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
      1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
@@ -845,7 +842,6 @@ struct
         Types.Step.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
     let T = Proofs_verified.eq in
-    let open Pickles_types in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
     let plonk = map_plonk_to_field plonk in
@@ -871,11 +867,42 @@ struct
       Sponge.absorb sponge (fst evals.public_input) ;
       Sponge.absorb sponge (snd evals.public_input) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
-      Plonk_types.Opt.Early_stop_sequence.fold field_array_if xs ~init:()
-        ~f:(fun () (x1, x2) ->
-          let absorb = Array.iter ~f:(Sponge.absorb sponge) in
-          absorb x1 ; absorb x2 )
-        ~finish:(fun () -> Array.copy sponge.state)
+      (* This is a hacky, but much more efficient, version of the opt sponge.
+         This uses the assumption that the sponge 'absorption state' will align
+         after each optional absorption, letting us skip the expensive tracking
+         that this would otherwise require.
+         To future-proof this, we assert that the states are indeed compatible.
+      *)
+      List.iter xs ~f:(fun opt ->
+          let absorb = Array.iter ~f:(fun x -> Sponge.absorb sponge x) in
+          match opt with
+          | None ->
+              ()
+          | Some (x1, x2) ->
+              absorb x1 ; absorb x2
+          | Maybe (b, (x1, x2)) ->
+              (* Cache the sponge state before *)
+              let sponge_state_before = sponge.sponge_state in
+              let state_before = Array.copy sponge.state in
+              (* Absorb the points *)
+              absorb x1 ;
+              absorb x2 ;
+              (* Check that the sponge ends in a compatible state. *)
+              ( match (sponge_state_before, sponge.sponge_state) with
+              | Absorbed x, Absorbed y ->
+                  [%test_eq: int] x y
+              | Squeezed x, Squeezed y ->
+                  [%test_eq: int] x y
+              | Absorbed _, Squeezed _ ->
+                  [%test_eq: string] "absorbed" "squeezed"
+              | Squeezed _, Absorbed _ ->
+                  [%test_eq: string] "squeezed" "absorbed" ) ;
+              let state =
+                Array.map2_exn sponge.state state_before ~f:(fun then_ else_ ->
+                    Field.if_ b ~then_ ~else_ )
+              in
+              sponge.state <- state ) ;
+      Array.copy sponge.state
     in
     sponge.state <- sponge_state ;
     let xi_actual = squeeze_scalar sponge in

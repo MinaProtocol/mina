@@ -13,5 +13,12 @@ let create ~of_int =
     ; mul_selector = one
     ; emul_selector = one
     ; endomul_scalar_selector = one
+    ; (* FIXME *)
+      range_check0_selector = None
+    ; range_check1_selector = None
+    ; foreign_field_add_selector = None
+    ; foreign_field_mul_selector = None
+    ; xor_selector = None
+    ; rot_selector = None
     ; lookup = None
     }

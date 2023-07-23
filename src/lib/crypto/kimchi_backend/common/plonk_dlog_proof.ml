@@ -254,6 +254,12 @@ module Make (Inputs : Inputs_intf) = struct
        ; emul_selector
        ; endomul_scalar_selector
        ; lookup
+       ; range_check0_selector
+       ; range_check1_selector
+       ; foreign_field_add_selector
+       ; foreign_field_mul_selector
+       ; xor_selector
+       ; rot_selector
        } :
         Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
     { w = tuple15_to_vec w
@@ -266,6 +272,12 @@ module Make (Inputs : Inputs_intf) = struct
     ; mul_selector
     ; emul_selector
     ; endomul_scalar_selector
+    ; range_check0_selector
+    ; range_check1_selector
+    ; foreign_field_add_selector
+    ; foreign_field_mul_selector
+    ; xor_selector
+    ; rot_selector
     ; lookup = Option.map ~f:lookup_eval_of_backend lookup
     }
 
@@ -319,6 +331,12 @@ module Make (Inputs : Inputs_intf) = struct
       ; mul_selector
       ; emul_selector
       ; endomul_scalar_selector
+      ; range_check0_selector
+      ; range_check1_selector
+      ; foreign_field_add_selector
+      ; foreign_field_mul_selector
+      ; xor_selector
+      ; rot_selector
       ; lookup
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
@@ -331,6 +349,12 @@ module Make (Inputs : Inputs_intf) = struct
     ; mul_selector
     ; emul_selector
     ; endomul_scalar_selector
+    ; range_check0_selector
+    ; range_check1_selector
+    ; foreign_field_add_selector
+    ; foreign_field_mul_selector
+    ; xor_selector
+    ; rot_selector
     ; lookup = Option.map ~f:lookup_eval_to_backend lookup
     }
 
