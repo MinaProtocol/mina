@@ -74,6 +74,12 @@ type nonrec 'caml_f proof_evaluations =
   ; mul_selector : 'caml_f array point_evaluations
   ; emul_selector : 'caml_f array point_evaluations
   ; endomul_scalar_selector : 'caml_f array point_evaluations
+  ; range_check0_selector : 'caml_f array point_evaluations option
+  ; range_check1_selector : 'caml_f array point_evaluations option
+  ; foreign_field_add_selector : 'caml_f array point_evaluations option
+  ; foreign_field_mul_selector : 'caml_f array point_evaluations option
+  ; xor_selector : 'caml_f array point_evaluations option
+  ; rot_selector : 'caml_f array point_evaluations option
   }
 
 type nonrec 'caml_g poly_comm =

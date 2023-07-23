@@ -217,6 +217,12 @@ module Evals : sig
       ; mul_selector : 'f
       ; emul_selector : 'f
       ; endomul_scalar_selector : 'f
+      ; range_check0_selector : ('f, 'bool) Opt.t
+      ; range_check1_selector : ('f, 'bool) Opt.t
+      ; foreign_field_add_selector : ('f, 'bool) Opt.t
+      ; foreign_field_mul_selector : ('f, 'bool) Opt.t
+      ; xor_selector : ('f, 'bool) Opt.t
+      ; rot_selector : ('f, 'bool) Opt.t
       ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
       }
     [@@deriving fields]
@@ -242,6 +248,12 @@ module Evals : sig
     ; mul_selector : 'a
     ; emul_selector : 'a
     ; endomul_scalar_selector : 'a
+    ; range_check0_selector : 'a option
+    ; range_check1_selector : 'a option
+    ; foreign_field_add_selector : 'a option
+    ; foreign_field_mul_selector : 'a option
+    ; xor_selector : 'a option
+    ; rot_selector : 'a option
     ; lookup : 'a Lookup.t option
     }
 
