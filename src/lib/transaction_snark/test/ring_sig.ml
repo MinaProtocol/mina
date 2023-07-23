@@ -123,6 +123,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           let spec = List.hd_exn specs in
           let tag, _, (module P), Pickles.Provers.[ ringsig_prover; _ ] =
             Pickles.compile () ~cache:Cache_dir.cache
+              ~override_wrap_domain:Pickles_base.Proofs_verified.N1
               ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N2)
               ~max_proofs_verified:(module Nat.N2)
