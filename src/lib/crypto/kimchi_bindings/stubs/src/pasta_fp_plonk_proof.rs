@@ -10,6 +10,7 @@ use ark_ff::One;
 use array_init::array_init;
 use groupmap::GroupMap;
 use kimchi::prover_index::ProverIndex;
+use kimchi::verifier::verify;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use kimchi::{
     proof::{
@@ -97,39 +98,102 @@ pub fn caml_pasta_fp_plonk_proof_create(
 
 #[ocaml_gen::func]
 #[ocaml::func]
+pub fn caml_pasta_fp_plonk_proof_create_and_verify(
+    index: CamlPastaFpPlonkIndexPtr<'static>,
+    witness: Vec<CamlFpVector>,
+    prev_challenges: Vec<CamlFp>,
+    prev_sgs: Vec<CamlGVesta>,
+) -> Result<CamlProverProof<CamlGVesta, CamlFp>, ocaml::Error> {
+    {
+        let ptr: &mut poly_commitment::srs::SRS<Vesta> =
+            unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
+        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+    }
+    let prev = if prev_challenges.is_empty() {
+        Vec::new()
+    } else {
+        let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
+        prev_sgs
+            .into_iter()
+            .map(Into::<Vesta>::into)
+            .enumerate()
+            .map(|(i, sg)| {
+                let chals = prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
+                    .iter()
+                    .map(Into::<Fp>::into)
+                    .collect();
+                let comm = PolyComm::<Vesta> {
+                    unshifted: vec![sg],
+                    shifted: None,
+                };
+                RecursionChallenge { chals, comm }
+            })
+            .collect()
+    };
+
+    let witness: Vec<Vec<_>> = witness.iter().map(|x| (*x.0).clone()).collect();
+    let witness: [Vec<_>; COLUMNS] = witness
+        .try_into()
+        .map_err(|_| ocaml::Error::Message("the witness should be a column of 15 vectors"))?;
+    let index: &ProverIndex<Vesta> = &index.as_ref().0;
+
+    // public input
+    let public_input = witness[0][0..index.cs.public].to_vec();
+
+    // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
+    // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
+    // to doing this instead.
+    let runtime = unsafe { ocaml::Runtime::recover_handle() };
+
+    // Release the runtime lock so that other threads can run using it while we generate the proof.
+    runtime.releasing_runtime(|| {
+        let group_map = GroupMap::<Fq>::setup();
+        let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+            &group_map,
+            witness,
+            &[],
+            index,
+            prev,
+            None,
+        )
+        .map_err(|e| ocaml::Error::Error(e.into()))?;
+
+        let verifier_index = index.verifier_index();
+
+        // Verify proof
+        verify::<Vesta, EFqSponge, EFrSponge>(&group_map, &verifier_index, &proof, &public_input)?;
+
+        Ok((proof, public_input).into())
+    })
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     srs: CamlFpSrs,
-    indexed: bool,
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlFp,
     CamlProverProof<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
-    use poly_commitment::srs::{endos, SRS};
     use kimchi::circuits::{
         constraints::ConstraintSystem,
         gate::{CircuitGate, GateType},
-        lookup::runtime_tables::{RuntimeTable, RuntimeTableCfg, RuntimeTableSpec},
+        lookup::runtime_tables::{RuntimeTable, RuntimeTableCfg},
         polynomial::COLUMNS,
         wires::Wire,
     };
+    use poly_commitment::srs::{endos, SRS};
 
     let num_gates = 1000;
     let num_tables = 5;
 
     let mut runtime_tables_setup = vec![];
     for table_id in 0..num_tables {
-        let cfg = if indexed {
-            RuntimeTableCfg::Indexed(RuntimeTableSpec {
-                id: table_id as i32,
-                len: 5,
-            })
-        } else {
-            RuntimeTableCfg::Custom {
-                id: table_id as i32,
-                first_column: [8u32, 9, 8, 7, 1].into_iter().map(Into::into).collect(),
-            }
+        let cfg = RuntimeTableCfg {
+            id: table_id,
+            first_column: [8u32, 9, 8, 7, 1].into_iter().map(Into::into).collect(),
         };
         runtime_tables_setup.push(cfg);
     }
@@ -167,7 +231,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
             // create queries into our runtime lookup table
             let lookup_cols = &mut lookup_cols[1..];
             for chunk in lookup_cols.chunks_mut(2) {
-                chunk[0][row] = if indexed { 1u32.into() } else { 9u32.into() }; // index
+                chunk[0][row] = 9u32.into(); // index
                 chunk[1][row] = 2u32.into(); // value
             }
         }
@@ -215,28 +279,32 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     srs: CamlFpSrs,
 ) -> (CamlPastaFpPlonkIndex, CamlProverProof<CamlGVesta, CamlFp>) {
     use ark_ff::Zero;
-    use poly_commitment::srs::{endos, SRS};
     use kimchi::circuits::{
         constraints::ConstraintSystem,
         gate::{CircuitGate, Connect},
-        polynomials::{foreign_field_add::witness::FFOps, foreign_field_mul, range_check},
+        polynomials::foreign_field_mul,
         wires::Wire,
     };
     use num_bigint::BigUint;
     use num_bigint::RandBigInt;
     use o1_utils::{foreign_field::BigUintForeignFieldHelpers, FieldHelpers};
+    use poly_commitment::srs::{endos, SRS};
     use rand::{rngs::StdRng, SeedableRng};
 
     let foreign_field_modulus = Fq::modulus_biguint();
 
     // Layout
-    //      0    ForeignFieldMul   (foreign field multiplication gadget)
-    //      1    Zero              (foreign field multiplication gadget)
-    //      4-7  multi-range-check (left multiplicand)
-    //      8-11 multi-range-check (right multiplicand)
-    //     12-15 multi-range-check (product1_lo, product1_hi_0, carry1_lo)
-    //     16-19 multi-range-check (result range check)
-    //     20-23 multi-range-check (quotient range check)
+    //      0-1  ForeignFieldMul | Zero
+    //      2-5  compact-multi-range-check (result range check)
+    //        6  "single" Generic (result bound)
+    //      7-10 multi-range-check (quotient range check)
+    //     11-14 multi-range-check (quotient_bound, product1_lo, product1_hi_0)
+    //     later limb-check result bound
+    //        15 Generic (left and right bounds)
+    //     16-19 multi-range-check (left multiplicand)
+    //     20-23 multi-range-check (right multiplicand)
+    //     24-27 multi-range-check (result bound, left bound, right bound)
+    // TODO: check when kimchi is merged to berkeley
 
     // Create foreign field multiplication gates
     let (mut next_row, mut gates) =
@@ -247,58 +315,89 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     let right_input = rng.gen_biguint_range(&BigUint::zero(), &foreign_field_modulus);
 
     // Compute multiplication witness
-    let (mut witness, external_checks) =
+    let (mut witness, mut external_checks) =
         foreign_field_mul::witness::create(&left_input, &right_input, &foreign_field_modulus);
 
-    // Bound addition for multiplication result
-    CircuitGate::extend_single_ffadd(
-        &mut gates,
-        &mut next_row,
-        FFOps::Add,
-        &foreign_field_modulus,
-    );
-    gates.connect_cell_pair((1, 0), (2, 0));
-    gates.connect_cell_pair((1, 1), (2, 1));
-    gates.connect_cell_pair((1, 2), (2, 2));
-    external_checks
-        .extend_witness_bound_addition(&mut witness, &foreign_field_modulus.to_field_limbs());
+    // Result compact-multi-range-check
+    CircuitGate::extend_compact_multi_range_check(&mut gates, &mut next_row);
+    gates.connect_cell_pair((1, 0), (4, 1)); // remainder01
+    gates.connect_cell_pair((1, 1), (2, 0)); // remainder2
+    external_checks.extend_witness_compact_multi_range_checks(&mut witness);
+    // These are the coordinates (row, col) of the remainder limbs in the witness
+    // remainder0 -> (3, 0), remainder1 -> (4, 0), remainder2 -> (2,0)
 
-    // Left input multi-range-check
-    CircuitGate::extend_multi_range_check(&mut gates, &mut next_row);
-    gates.connect_cell_pair((0, 0), (4, 0));
-    gates.connect_cell_pair((0, 1), (5, 0));
-    gates.connect_cell_pair((0, 2), (6, 0));
-    range_check::witness::extend_multi_limbs(&mut witness, &left_input.to_field_limbs());
+    // Constant single Generic gate for result bound
+    CircuitGate::extend_high_bounds(&mut gates, &mut next_row, &foreign_field_modulus);
+    gates.connect_cell_pair((6, 0), (1, 1)); // remainder2
+    external_checks.extend_witness_high_bounds_computation(&mut witness, &foreign_field_modulus);
 
-    // Right input multi-range-check
+    // Quotient multi-range-check
     CircuitGate::extend_multi_range_check(&mut gates, &mut next_row);
-    gates.connect_cell_pair((0, 3), (8, 0));
-    gates.connect_cell_pair((0, 4), (9, 0));
-    gates.connect_cell_pair((0, 5), (10, 0));
-    range_check::witness::extend_multi_limbs(&mut witness, &right_input.to_field_limbs());
+    gates.connect_cell_pair((1, 2), (7, 0)); // quotient0
+    gates.connect_cell_pair((1, 3), (8, 0)); // quotient1
+    gates.connect_cell_pair((1, 4), (9, 0)); // quotient2
+                                             // Witness updated below
 
-    // Multiplication witness value product1_lo, product1_hi_0, carry1_lo multi-range-check
+    // Multiplication witness value quotient_bound, product1_lo, product1_hi_0 multi-range-check
     CircuitGate::extend_multi_range_check(&mut gates, &mut next_row);
-    gates.connect_cell_pair((0, 6), (12, 0)); // carry1_lo
-    gates.connect_cell_pair((1, 5), (13, 0)); // product1_lo
-    gates.connect_cell_pair((1, 6), (14, 0)); // product1_hi_0
+    gates.connect_cell_pair((1, 5), (11, 0)); // quotient_bound
+    gates.connect_cell_pair((0, 6), (12, 0)); // product1_lo
+    gates.connect_cell_pair((1, 6), (13, 0)); // product1_hi_0
                                               // Witness updated below
 
-    // Result/remainder bound multi-range-check
-    CircuitGate::extend_multi_range_check(&mut gates, &mut next_row);
-    gates.connect_cell_pair((3, 0), (16, 0));
-    gates.connect_cell_pair((3, 1), (17, 0));
-    gates.connect_cell_pair((3, 2), (18, 0));
-    // Witness updated below
-
-    // Add witness for external multi-range checks (product1_lo, product1_hi_0, carry1_lo and result)
+    // Add witness for external multi-range checks:
+    // [quotient0, quotient1, quotient2]
+    // [quotient_bound, product1_lo, product1_hi_0]
     external_checks.extend_witness_multi_range_checks(&mut witness);
 
-    // Quotient bound multi-range-check
-    CircuitGate::extend_compact_multi_range_check(&mut gates, &mut next_row);
-    gates.connect_cell_pair((1, 3), (22, 1));
-    gates.connect_cell_pair((1, 4), (20, 0));
-    external_checks.extend_witness_compact_multi_range_checks(&mut witness);
+    // DESIGNER CHOICE: left and right (and result bound from before)
+    let left_limbs = left_input.to_field_limbs();
+    let right_limbs = right_input.to_field_limbs();
+    // Constant Double Generic gate for result and quotient bounds
+    external_checks.add_high_bound_computation(&left_limbs[2]);
+    external_checks.add_high_bound_computation(&right_limbs[2]);
+    CircuitGate::extend_high_bounds(&mut gates, &mut next_row, &foreign_field_modulus);
+    gates.connect_cell_pair((15, 0), (0, 2)); // left2
+    gates.connect_cell_pair((15, 3), (0, 5)); // right2
+    external_checks.extend_witness_high_bounds_computation(&mut witness, &foreign_field_modulus);
+
+    // Left input multi-range-check
+    external_checks.add_multi_range_check(&left_limbs);
+    CircuitGate::extend_multi_range_check(&mut gates, &mut next_row);
+    gates.connect_cell_pair((0, 0), (16, 0)); // left_input0
+    gates.connect_cell_pair((0, 1), (17, 0)); // left_input1
+    gates.connect_cell_pair((0, 2), (18, 0)); // left_input2
+                                              // Witness updated below
+
+    // Right input multi-range-check
+    external_checks.add_multi_range_check(&right_limbs);
+    CircuitGate::extend_multi_range_check(&mut gates, &mut next_row);
+    gates.connect_cell_pair((0, 3), (20, 0)); // right_input0
+    gates.connect_cell_pair((0, 4), (21, 0)); // right_input1
+    gates.connect_cell_pair((0, 5), (22, 0)); // right_input2
+                                              // Witness updated below
+
+    // Add witness for external multi-range checks:
+    // left and right limbs
+    external_checks.extend_witness_multi_range_checks(&mut witness);
+
+    // [result_bound, 0, 0]
+    // Bounds for result limb range checks
+    CircuitGate::extend_multi_range_check(&mut gates, &mut next_row);
+    gates.connect_cell_pair((6, 2), (24, 0)); // result_bound
+                                              // Witness updated below
+
+    // Multi-range check bounds for left and right inputs
+    let left_hi_bound =
+        foreign_field_mul::witness::compute_high_bound(&left_input, &foreign_field_modulus);
+    let right_hi_bound =
+        foreign_field_mul::witness::compute_high_bound(&right_input, &foreign_field_modulus);
+    external_checks.add_limb_check(&left_hi_bound.into());
+    external_checks.add_limb_check(&right_hi_bound.into());
+    gates.connect_cell_pair((15, 2), (25, 0)); // left_bound
+    gates.connect_cell_pair((15, 5), (26, 0)); // right_bound
+
+    external_checks.extend_witness_limb_checks(&mut witness);
 
     // Temporary workaround for lookup-table/domain-size issue
     for _ in 0..(1 << 13) {
@@ -327,7 +426,10 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
         None,
     )
     .unwrap();
-    (CamlPastaFpPlonkIndex(Box::new(index)), (proof, vec![]).into())
+    (
+        CamlPastaFpPlonkIndex(Box::new(index)),
+        (proof, vec![]).into(),
+    )
 }
 
 #[ocaml_gen::func]
@@ -336,13 +438,13 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     srs: CamlFpSrs,
 ) -> (CamlPastaFpPlonkIndex, CamlProverProof<CamlGVesta, CamlFp>) {
     use ark_ff::Zero;
-    use poly_commitment::srs::{endos, SRS};
     use kimchi::circuits::{
         constraints::ConstraintSystem, gate::CircuitGate, polynomials::range_check, wires::Wire,
     };
     use num_bigint::BigUint;
     use num_bigint::RandBigInt;
     use o1_utils::{foreign_field::BigUintForeignFieldHelpers, BigUintFieldHelpers};
+    use poly_commitment::srs::{endos, SRS};
     use rand::{rngs::StdRng, SeedableRng};
 
     let rng = &mut StdRng::from_seed([255u8; 32]);
@@ -390,7 +492,10 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
         None,
     )
     .unwrap();
-    (CamlPastaFpPlonkIndex(Box::new(index)), (proof, vec![]).into())
+    (
+        CamlPastaFpPlonkIndex(Box::new(index)),
+        (proof, vec![]).into(),
+    )
 }
 
 #[ocaml_gen::func]
@@ -399,7 +504,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
     srs: CamlFpSrs,
 ) -> (CamlPastaFpPlonkIndex, CamlProverProof<CamlGVesta, CamlFp>) {
     use ark_ff::Zero;
-    use poly_commitment::srs::{endos, SRS};
     use kimchi::circuits::{
         constraints::ConstraintSystem,
         gate::{CircuitGate, Connect},
@@ -407,6 +511,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
         polynomials::{generic::GenericGateSpec, range_check},
         wires::Wire,
     };
+    use poly_commitment::srs::{endos, SRS};
 
     let gates = {
         // Public input row with value 0
@@ -459,7 +564,10 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
         None,
     )
     .unwrap();
-    (CamlPastaFpPlonkIndex(Box::new(index)), (proof, vec![]).into())
+    (
+        CamlPastaFpPlonkIndex(Box::new(index)),
+        (proof, vec![]).into(),
+    )
 }
 
 #[ocaml_gen::func]
@@ -472,7 +580,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     CamlProverProof<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
-    use poly_commitment::srs::{endos, SRS};
     use kimchi::circuits::{
         constraints::ConstraintSystem,
         gate::{CircuitGate, Connect},
@@ -485,6 +592,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
         wires::Wire,
     };
     use num_bigint::BigUint;
+    use poly_commitment::srs::{endos, SRS};
 
     // Includes a row to store value 1
     let num_public_inputs = 1;
@@ -599,7 +707,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
     CamlProverProof<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
-    use poly_commitment::srs::{endos, SRS};
     use kimchi::circuits::{
         constraints::ConstraintSystem,
         gate::{CircuitGate, Connect},
@@ -607,6 +714,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
         polynomials::{generic::GenericGateSpec, xor},
         wires::Wire,
     };
+    use poly_commitment::srs::{endos, SRS};
 
     let num_public_inputs = 2;
 
@@ -688,7 +796,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
     CamlProverProof<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
-    use poly_commitment::srs::{endos, SRS};
     use kimchi::circuits::{
         constraints::ConstraintSystem,
         gate::{CircuitGate, Connect},
@@ -699,6 +806,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
         },
         wires::Wire,
     };
+    use poly_commitment::srs::{endos, SRS};
 
     // Includes the actual input of the rotation and a row with the zero value
     let num_public_inputs = 2;
