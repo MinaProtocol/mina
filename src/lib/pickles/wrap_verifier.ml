@@ -820,9 +820,6 @@ struct
     include Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
   end
 
-  let field_array_if b ~then_ ~else_ =
-    Array.map2_exn then_ else_ ~f:(fun x1 x2 -> Field.if_ b ~then_:x1 ~else_:x2)
-
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
      1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
