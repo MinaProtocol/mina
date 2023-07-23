@@ -280,6 +280,14 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
         get_eval e.poseidon_selector
     | Index Generic ->
         get_eval e.generic_selector
+    | Index CompleteAdd ->
+        get_eval e.complete_add_selector
+    | Index VarBaseMul ->
+        get_eval e.mul_selector
+    | Index EndoMul ->
+        get_eval e.emul_selector
+    | Index EndoMulScalar ->
+        get_eval e.endomul_scalar_selector
     | Index i ->
         failwithf
           !"Index %{sexp:Scalars.Gate_type.t}\n\
@@ -493,12 +501,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; zeta
         ; zeta_to_domain_size = env.zeta_to_n_minus_1 + F.one
         ; zeta_to_srs_length = pow2pow (module F) zeta env.srs_length_log2
-        ; vbmul = Lazy.force (Hashtbl.find_exn index_terms (Index VarBaseMul))
-        ; complete_add =
-            Lazy.force (Hashtbl.find_exn index_terms (Index CompleteAdd))
-        ; endomul = Lazy.force (Hashtbl.find_exn index_terms (Index EndoMul))
-        ; endomul_scalar =
-            Lazy.force (Hashtbl.find_exn index_terms (Index EndoMulScalar))
         ; perm
         ; lookup =
             ( match joint_combiner with
@@ -594,7 +596,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         with_label __LOC__ (fun () ->
             List.map
               ~f:(fun f -> Shifted_value.equal Field.equal (f plonk) (f actual))
-              [ vbmul; complete_add; endomul; perm ] )
+              [ perm ] )
         @ List.filter_map
             ~f:(equal_opt ~equal:(Shifted_value.equal Field.equal))
             (List.zip_exn
