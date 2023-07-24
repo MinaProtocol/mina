@@ -310,10 +310,16 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
         get_eval (Opt.value_exn e.lookup_aggregation)
     | LookupRuntimeTable ->
         get_eval (Opt.value_exn e.runtime_lookup_table)
-    | LookupKindIndex (Lookup | Xor | RangeCheck | ForeignFieldMul) ->
-        failwith "Lookup kind index should have been linearized away"
+    | LookupKindIndex Lookup ->
+        get_eval (Opt.value_exn e.lookup_gate_lookup_selector)
+    | LookupKindIndex Xor ->
+        get_eval (Opt.value_exn e.xor_lookup_selector)
+    | LookupKindIndex RangeCheck ->
+        get_eval (Opt.value_exn e.range_check_lookup_selector)
+    | LookupKindIndex ForeignFieldMul ->
+        get_eval (Opt.value_exn e.foreign_field_mul_lookup_selector)
     | LookupRuntimeSelector ->
-        failwith "Lookup runtime selector should have been linearized away"
+        get_eval (Opt.value_exn e.runtime_lookup_table_selector)
   in
   let open F in
   let square x = x * x in
@@ -458,8 +464,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
 
   (** Computes the list of scalars used in the linearization. *)
   let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
-      (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift
-      ~(feature_flags : _ Plonk_types.Features.t) =
+      (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift =
     let _ = with_label in
     let open F in
     fun ({ alpha
@@ -475,7 +480,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
       let open Plonk_types.Evals.In_circuit in
       let e1 field = snd (field e) in
       let zkp = env.zk_polynomial in
-      let index_terms = Sc.index_terms env in
       let alpha_pow = env.alpha_pow in
       let w0 = Vector.map e.w ~f:fst in
       let perm =
@@ -485,16 +489,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
               ~init:(e1 z * beta * alpha_pow perm_alpha0 * zkp)
               ~f:(fun i acc (s, _) -> acc * (gamma + (beta * s) + w0.(i)))
             |> negate )
-      in
-      let compute_feature column feature_flag actual_feature_flag =
-        match feature_flag with
-        | Opt.Flag.Yes ->
-            Opt.Some (Lazy.force (Hashtbl.find_exn index_terms column))
-        | Opt.Flag.Maybe ->
-            let res = Lazy.force (Hashtbl.find_exn index_terms column) in
-            Opt.Maybe (actual_feature_flag, res)
-        | Opt.Flag.No ->
-            Opt.None
       in
       In_circuit.map_fields
         ~f:(Shifted_value.of_field (module F) ~shift)
@@ -511,15 +505,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
                 Plonk_types.Opt.None
             | Some joint_combiner ->
                 Some { joint_combiner } )
-        ; optional_column_scalars =
-            { lookup_gate =
-                compute_feature (LookupKindIndex Lookup) feature_flags.lookup
-                  actual_feature_flags.lookup
-            ; runtime_tables =
-                compute_feature LookupRuntimeSelector
-                  feature_flags.runtime_tables
-                  actual_feature_flags.runtime_tables
-            }
         ; feature_flags = actual_feature_flags
         }
 
@@ -533,12 +518,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   *)
   let checked (type t)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-      ~shift ~env ~feature_flags
-      (plonk : (_, _, _, _ Opt.t, _ Opt.t, _) In_circuit.t) evals =
+      ~shift ~env (plonk : (_, _, _, _ Opt.t, _ Opt.t, _) In_circuit.t) evals =
     let actual =
       derive_plonk ~with_label:Impl.with_label
         (module Impl.Field)
-        ~shift ~env ~feature_flags
+        ~shift ~env
         { alpha = plonk.alpha
         ; beta = plonk.beta
         ; gamma = plonk.gamma
@@ -554,38 +538,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         evals
     in
     let open Impl in
-    let equal_opt ~equal ((expected : _ Opt.t), (actual : _ Opt.t)) =
-      match (expected, actual) with
-      | None, None ->
-          None
-      | Some expected, Some actual ->
-          Some (equal expected actual)
-      | Maybe (is_some, expected), Some actual ->
-          Some (Boolean.( &&& ) is_some (equal expected actual))
-      | Maybe (is_some, expected), Maybe (is_some_actual, actual) ->
-          Some
-            (Boolean.( &&& )
-               (Boolean.equal is_some is_some_actual)
-               (Boolean.( ||| ) (Boolean.not is_some) (equal expected actual)) )
-      | Some _, Maybe _ ->
-          assert false
-      | None, (Some _ | Maybe _) ->
-          assert false
-      | (Some _ | Maybe _), None ->
-          assert false
-    in
     let open In_circuit in
     with_label __LOC__ (fun () ->
         with_label __LOC__ (fun () ->
             List.map
               ~f:(fun f -> Shifted_value.equal Field.equal (f plonk) (f actual))
               [ perm ] )
-        @ List.filter_map
-            ~f:(equal_opt ~equal:(Shifted_value.equal Field.equal))
-            (List.zip_exn
-               (In_circuit.Optional_column_scalars.to_list
-                  plonk.optional_column_scalars )
-               (In_circuit.Optional_column_scalars.to_list
-                  actual.optional_column_scalars ) )
         |> Boolean.all )
 end

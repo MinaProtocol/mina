@@ -215,6 +215,11 @@ module Evals : sig
       ; lookup_table : ('f, 'bool) Opt.t
       ; lookup_sorted : ('f, 'bool) Opt.t array
       ; runtime_lookup_table : ('f, 'bool) Opt.t
+      ; runtime_lookup_table_selector : ('f, 'bool) Opt.t
+      ; xor_lookup_selector : ('f, 'bool) Opt.t
+      ; lookup_gate_lookup_selector : ('f, 'bool) Opt.t
+      ; range_check_lookup_selector : ('f, 'bool) Opt.t
+      ; foreign_field_mul_lookup_selector : ('f, 'bool) Opt.t
       }
     [@@deriving fields]
 
@@ -249,6 +254,11 @@ module Evals : sig
     ; lookup_table : 'a option
     ; lookup_sorted : 'a option array
     ; runtime_lookup_table : 'a option
+    ; runtime_lookup_table_selector : 'a option
+    ; xor_lookup_selector : 'a option
+    ; lookup_gate_lookup_selector : 'a option
+    ; range_check_lookup_selector : 'a option
+    ; foreign_field_mul_lookup_selector : 'a option
     }
 
   (** {4 Iterators} *)

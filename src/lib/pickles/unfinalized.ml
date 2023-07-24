@@ -111,21 +111,10 @@ module Constant = struct
          let module Field = struct
            include Tock.Field
          end in
-         Plonk_checks.derive_plonk
-           (module Field) (* Wrap proof, no features needed *)
-           ~env ~shift ~feature_flags:Plonk_types.Features.none chals evals
+         Plonk_checks.derive_plonk (module Field) ~env ~shift chals evals
        in
        { deferred_values =
-           { plonk =
-               { plonk with
-                 alpha
-               ; beta
-               ; gamma
-               ; zeta
-               ; lookup = None
-               ; optional_column_scalars =
-                   { lookup_gate = None; runtime_tables = None }
-               }
+           { plonk = { plonk with alpha; beta; gamma; zeta; lookup = None }
            ; combined_inner_product = Shifted_value (tock ())
            ; xi = Scalar_challenge.create one_chal
            ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges

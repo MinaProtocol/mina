@@ -148,7 +148,6 @@ struct
         }
       in
       let data = Types_map.lookup_basic tag in
-      let feature_flags = data.feature_flags in
       let plonk0 = t.statement.proof_state.deferred_values.plonk in
       let plonk =
         let domain =
@@ -224,8 +223,7 @@ struct
             end in
             Plonk_checks.Type1.derive_plonk
               (module Field)
-              ~feature_flags ~env ~shift:Shifts.tick1 plonk_minimal
-              combined_evals )
+              ~env ~shift:Shifts.tick1 plonk_minimal combined_evals )
       in
       let (module Local_max_proofs_verified) = data.max_proofs_verified in
       let T = Local_max_proofs_verified.eq in
@@ -280,11 +278,6 @@ struct
                               .joint_combiner =
                                 Option.value_exn plonk0.joint_combiner
                             } )
-                    ; optional_column_scalars =
-                        Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                        .In_circuit
-                        .Optional_column_scalars
-                        .map ~f:Opt.to_option plonk.optional_column_scalars
                     }
                 }
             ; messages_for_next_wrap_proof =
@@ -501,7 +494,7 @@ struct
           include Tock.Field
         end in
         (* Wrap proof, no features *)
-        Plonk_checks.Type2.derive_plonk ~feature_flags:Plonk_types.Features.none
+        Plonk_checks.Type2.derive_plonk
           (module Field)
           ~env:tock_env ~shift:Shifts.tock2 tock_plonk_minimal
           tock_combined_evals
@@ -526,11 +519,6 @@ struct
                           .joint_combiner =
                             Option.value_exn plonk0.joint_combiner
                         } )
-                ; optional_column_scalars =
-                    Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                    .In_circuit
-                    .Optional_column_scalars
-                    .map ~f:Opt.to_option plonk.optional_column_scalars
                 }
             ; combined_inner_product = shifted_value combined_inner_product
             ; xi
