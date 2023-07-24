@@ -54,22 +54,24 @@ let verify_heterogenous (ts : Instance.t list) =
                      ; messages_for_next_step_proof =
                          { old_bulletproof_challenges; _ }
                      }
-                     (* TODO
-                        ; prev_x_hat = (x_hat1, _) as prev_x_hat
-                     *)
                  ; prev_evals = evals
                  } ) )
          ->
         Timer.start __LOC__ ;
         let non_chunking =
-          let single_chunk = ref true in
-          let _unit_evals =
+          let exception Is_chunked in
+          match
             Pickles_types.Plonk_types.Evals.map evals.evals.evals
               ~f:(fun (x, y) ->
-                single_chunk :=
-                  !single_chunk && Array.length x = 1 && Array.length y = 1 )
-          in
-          !single_chunk
+                if Array.length x > 1 || Array.length y > 1 then
+                  raise Is_chunked )
+          with
+          | exception Is_chunked ->
+              false
+          | _unit_evals ->
+              (* we do not care about _unit_evals, if we reached this point, we
+                 know all evals have length 1 for they cannot have length 0 *)
+              true
         in
         check (lazy "only uses single chunks", non_chunking) ;
         check
