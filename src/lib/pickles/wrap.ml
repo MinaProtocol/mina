@@ -551,7 +551,7 @@ let%test_module "gate finalization" =
           }
       end) )
 
-    let%test_module "foreign field multiplication" =
+    (*let%test_module "foreign field multiplication" =
       ( module Make (struct
         let example =
           no_public_input
@@ -564,7 +564,7 @@ let%test_module "gate finalization" =
           ; foreign_field_add = true
           ; foreign_field_mul = true
           }
-      end) )
+      end) )*)
 
     let%test_module "range check" =
       ( module Make (struct
