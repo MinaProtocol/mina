@@ -101,6 +101,7 @@ let Config =
       , docker_login : Optional DockerLogin.Type
       , summon : Optional Summon.Type
       , retries : List Retry.Type
+      , flake_retry_limit: Optional Natural
       , soft_fail : Optional B/SoftFail
       , skip: Optional B/Skip
       , `if` : Optional B/If
@@ -114,6 +115,7 @@ let Config =
     , artifact_paths = [] : List SelectFiles.Type
     , env = [] : List TaggedKey.Type
     , retries = [] : List Retry.Type
+    , flake_retry_limit = Some 4
     , soft_fail = None B/SoftFail
     , skip = None B/Skip
     , `if` = None B/If
@@ -180,13 +182,14 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                           retry.limit
                     })
                     -- per https://buildkite.com/docs/agent/v3#exit-codes:
-                    ([
+                    (
+                      [
                       -- infra error
                       Retry::{ exit_status = ExitStatus.Code -1, limit = Some 4 },
                       -- infra error
                       Retry::{ exit_status = ExitStatus.Code +255, limit = Some 4 },
                       -- common/flake error
-                      Retry::{ exit_status = ExitStatus.Code +1, limit = Some 4 },
+                      Retry::{ exit_status = ExitStatus.Code +1, limit = c.flake_retry_limit },
                       -- apt-get update race condition error
                       Retry::{ exit_status = ExitStatus.Code +100, limit = Some 4 },
                       -- Git checkout error
