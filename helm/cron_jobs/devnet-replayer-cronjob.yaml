@@ -1,4 +1,4 @@
-# kubectl apply -n mainnet -f helm/cron_jobs/mainnet-replayer-cronjob.yaml
+# kubectl apply -n devnet -f helm/cron_jobs/devnet-replayer-cronjob.yaml
 # the above command, with this accompanying file, needs only be run once.
 # Notes:
 # - the archive dump usually is of the form ...0000.sql.tar.gz, but not always
@@ -9,7 +9,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: mainnet-replayer-cronjob
+  name: devnet-replayer-cronjob
 spec:
   concurrencyPolicy: Forbid
   failedJobsHistoryLimit: 1
@@ -30,12 +30,12 @@ spec:
                echo "deb https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list;
                curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - ;
                apt-get update && apt-get install -y google-cloud-cli ;
-               ARCHIVE_DUMP_URI=$(gsutil ls gs://mina-archive-dumps/mainnet-archive-dump-*.sql.tar.gz | sort -r | head -n 1);
+               ARCHIVE_DUMP_URI=$(gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json ls gs://mina-archive-dumps/devnet-archive-dump-*.sql.tar.gz | sort -r | head -n 1);
                ARCHIVE_DUMP=$(basename $ARCHIVE_DUMP_URI);
                ARCHIVE_SQL=$(basename $ARCHIVE_DUMP_URI .tar.gz);
                echo "Getting archive dump" $ARCHIVE_DUMP_URI;
                gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $ARCHIVE_DUMP_URI . ;
-               MOST_RECENT_CHECKPOINT_URI=$(gsutil ls gs://mainnet-replayer-checkpoints/replayer-checkpoint-*.json | sort -r | head -n 1);
+               MOST_RECENT_CHECKPOINT_URI=$(gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json ls gs://devnet-replayer-checkpoints/replayer-checkpoint-*.json | sort -r | head -n 1);
                MOST_RECENT_CHECKPOINT=$(basename $MOST_RECENT_CHECKPOINT_URI);
                echo "Getting replayer checkpoint file" $MOST_RECENT_CHECKPOINT;
                gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $MOST_RECENT_CHECKPOINT_URI . ;
@@ -60,7 +60,7 @@ spec:
                TODAY_CHECKPOINT=replayer-checkpoint-$DATE.json;
                mv $DISK_CHECKPOINT $TODAY_CHECKPOINT;
                echo "Uploading checkpoint file" $TODAY_CHECKPOINT;
-               gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $TODAY_CHECKPOINT gs://mainnet-replayer-checkpoints/$TODAY_CHECKPOINT;
+               gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $TODAY_CHECKPOINT gs://devnet-replayer-checkpoints/$TODAY_CHECKPOINT;
                echo "Replayer errors:";
                grep Error replayer.log;
                HAVE_ERRORS=$?;
@@ -68,14 +68,14 @@ spec:
                  then REPLAYER_ERRORS=replayer_errors_${DATE};
                  echo "The replayer found errors, uploading log" $REPLAYER_ERRORS;
                  mv replayer.log $REPLAYER_ERRORS;
-                 gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $REPLAYER_ERRORS gs://mainnet-replayer-checkpoints/$REPLAYER_ERRORS;
+                 gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $REPLAYER_ERRORS gs://devnet-replayer-checkpoints/$REPLAYER_ERRORS;
                fi'
             env:
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: gcr.io/o1labs-192920/mina-rosetta:1.4.0beta2-fix-replayer-no-final-checkpoint-5af6dba-bullseye
+            image: gcr.io/o1labs-192920/mina-rosetta:1.4.0beta2-fix-replayer-start-ledger-hash-2627643-bullseye
             imagePullPolicy: IfNotPresent
-            name: mainnet-replayer-cronjob
+            name: devnet-replayer-cronjob
             resources:
               limits:
               requests:
