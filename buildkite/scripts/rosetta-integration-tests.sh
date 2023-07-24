@@ -245,8 +245,13 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
 EOF
   cd "$zkapp_path"
   npm ci
-  txn=$(zk deploy sandbox -y | sed -ne "s/https:\/\/berkeley.minaexplorer.com\/transaction\///p")
-  deploy_txs+=txn
+  # TODO: for now the txn hash is not being used, but ideally we would want to verify that it has
+  # been included in a block before interacting with the zkapps.
+  # FIXME: grepping the output of zk deploy is not ideal and very prone to be outdaded due to changes
+  # upstream, but zk deploy does not return the txn hash
+  # txn=$(zk deploy sandbox -y | sed -ne "s/https:\/\/minascan.io\/berkeley\/zk-transaction\///p")
+  # deploy_txs+=("$txn")
+  zk deploy sandbox -y
   cd -
   echo "Done."
 done
