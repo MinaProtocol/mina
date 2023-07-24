@@ -116,15 +116,15 @@ module Tick : S = struct
       ({ add = ( + )
        ; sub = ( - )
        ; mul = ( * )
-       ; square = _
+       ; square
        ; mds
-       ; endo_coefficient = _
+       ; endo_coefficient
        ; pow
        ; var
        ; field
        ; cell
        ; alpha_pow
-       ; double = _
+       ; double
        ; zk_polynomial = _
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
@@ -152,20 +152,20 @@ let () =
 
   let index_terms (type a)
       ({ add = ( + )
-       ; sub = ( - )
+       ; sub = _
        ; mul = ( * )
-       ; square
-       ; pow
+       ; square = _
+       ; pow = _
        ; var
        ; field
        ; cell
        ; alpha_pow
-       ; double
+       ; double = _
        ; zk_polynomial = _
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; mds = _
-       ; endo_coefficient
+       ; endo_coefficient = _
        ; srs_length_log2 = _
        ; vanishes_on_last_4_rows
        ; joint_combiner
@@ -203,15 +203,15 @@ module Tock : S = struct
       ({ add = ( + )
        ; sub = ( - )
        ; mul = ( * )
-       ; square = _
+       ; square
        ; mds
-       ; endo_coefficient = _
+       ; endo_coefficient
        ; pow
        ; var
        ; field
        ; cell
        ; alpha_pow
-       ; double = _
+       ; double
        ; zk_polynomial = _
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
@@ -239,20 +239,20 @@ let () =
 
   let index_terms (type a)
       ({ add = ( + )
-       ; sub = ( - )
+       ; sub = _
        ; mul = ( * )
-       ; square
-       ; pow
+       ; square = _
+       ; pow = _
        ; var
        ; field
        ; cell
        ; alpha_pow
-       ; double
+       ; double = _
        ; zk_polynomial = _
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; mds = _
-       ; endo_coefficient
+       ; endo_coefficient = _
        ; srs_length_log2 = _
        ; vanishes_on_last_4_rows
        ; joint_combiner

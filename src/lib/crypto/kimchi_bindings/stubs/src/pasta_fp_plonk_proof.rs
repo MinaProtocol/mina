@@ -25,6 +25,7 @@ use mina_poseidon::{
 };
 use poly_commitment::commitment::{CommitmentCurve, PolyComm};
 use poly_commitment::evaluation_proof::OpeningProof;
+use std::array;
 use std::convert::TryInto;
 
 type EFqSponge = DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>;
@@ -863,9 +864,22 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
         coefficients: array_init(|_| eval()),
         z: eval(),
         s: array_init(|_| eval()),
-        lookup: None,
         generic_selector: eval(),
         poseidon_selector: eval(),
+        complete_add_selector: eval(),
+        mul_selector: eval(),
+        emul_selector: eval(),
+        endomul_scalar_selector: eval(),
+        range_check0_selector: None,
+        range_check1_selector: None,
+        foreign_field_add_selector: None,
+        foreign_field_mul_selector: None,
+        xor_selector: None,
+        rot_selector: None,
+    lookup_aggregation: None,
+    lookup_table: None,
+    lookup_sorted: array::from_fn(|_| None),
+    runtime_lookup_table: None,
     };
 
     let public = vec![Fp::one(), Fp::one()];

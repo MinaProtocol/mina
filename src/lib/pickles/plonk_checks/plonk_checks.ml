@@ -280,6 +280,26 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
         get_eval e.poseidon_selector
     | Index Generic ->
         get_eval e.generic_selector
+    | Index CompleteAdd ->
+        get_eval e.complete_add_selector
+    | Index VarBaseMul ->
+        get_eval e.mul_selector
+    | Index EndoMul ->
+        get_eval e.emul_selector
+    | Index EndoMulScalar ->
+        get_eval e.endomul_scalar_selector
+    | Index RangeCheck0 ->
+        get_eval (Opt.value_exn e.range_check0_selector)
+    | Index RangeCheck1 ->
+        get_eval (Opt.value_exn e.range_check1_selector)
+    | Index ForeignFieldAdd ->
+        get_eval (Opt.value_exn e.foreign_field_add_selector)
+    | Index ForeignFieldMul ->
+        get_eval (Opt.value_exn e.foreign_field_mul_selector)
+    | Index Xor16 ->
+        get_eval (Opt.value_exn e.xor_selector)
+    | Index Rot64 ->
+        get_eval (Opt.value_exn e.rot_selector)
     | Index i ->
         failwithf
           !"Index %{sexp:Scalars.Gate_type.t}\n\
@@ -288,17 +308,13 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     | Coefficient i ->
         get_eval coefficients.(i)
     | LookupTable ->
-        get_eval (Opt.value_exn e.lookup).table
+        get_eval (Opt.value_exn e.lookup_table)
     | LookupSorted i ->
-        let sorted = (Opt.value_exn e.lookup).sorted in
-        if i < Array.length sorted then get_eval sorted.(i)
-        else
-          (* Return zero padding when the index is larger than sorted *)
-          F.zero
+        get_eval (Opt.value_exn e.lookup_sorted.(i))
     | LookupAggreg ->
-        get_eval (Opt.value_exn e.lookup).aggreg
+        get_eval (Opt.value_exn e.lookup_aggregation)
     | LookupRuntimeTable ->
-        get_eval (Opt.value_exn (Opt.value_exn e.lookup).runtime)
+        get_eval (Opt.value_exn e.runtime_lookup_table)
     | LookupKindIndex (Lookup | Xor | RangeCheck | ForeignFieldMul) ->
         failwith "Lookup kind index should have been linearized away"
     | LookupRuntimeSelector ->
@@ -493,12 +509,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; zeta
         ; zeta_to_domain_size = env.zeta_to_n_minus_1 + F.one
         ; zeta_to_srs_length = pow2pow (module F) zeta env.srs_length_log2
-        ; vbmul = Lazy.force (Hashtbl.find_exn index_terms (Index VarBaseMul))
-        ; complete_add =
-            Lazy.force (Hashtbl.find_exn index_terms (Index CompleteAdd))
-        ; endomul = Lazy.force (Hashtbl.find_exn index_terms (Index EndoMul))
-        ; endomul_scalar =
-            Lazy.force (Hashtbl.find_exn index_terms (Index EndoMulScalar))
         ; perm
         ; lookup =
             ( match joint_combiner with
@@ -507,27 +517,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
             | Some joint_combiner ->
                 Some { joint_combiner } )
         ; optional_column_scalars =
-            { range_check0 =
-                compute_feature (Index RangeCheck0) feature_flags.range_check0
-                  actual_feature_flags.range_check0
-            ; range_check1 =
-                compute_feature (Index RangeCheck1) feature_flags.range_check1
-                  actual_feature_flags.range_check1
-            ; foreign_field_add =
-                compute_feature (Index ForeignFieldAdd)
-                  feature_flags.foreign_field_add
-                  actual_feature_flags.foreign_field_add
-            ; foreign_field_mul =
-                compute_feature (Index ForeignFieldMul)
-                  feature_flags.foreign_field_mul
-                  actual_feature_flags.foreign_field_mul
-            ; xor =
-                compute_feature (Index Xor16) feature_flags.xor
-                  actual_feature_flags.xor
-            ; rot =
-                compute_feature (Index Rot64) feature_flags.rot
-                  actual_feature_flags.rot
-            ; lookup_gate =
+            { lookup_gate =
                 compute_feature (LookupKindIndex Lookup) feature_flags.lookup
                   actual_feature_flags.lookup
             ; runtime_tables =
@@ -594,7 +584,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         with_label __LOC__ (fun () ->
             List.map
               ~f:(fun f -> Shifted_value.equal Field.equal (f plonk) (f actual))
-              [ vbmul; complete_add; endomul; perm ] )
+              [ perm ] )
         @ List.filter_map
             ~f:(equal_opt ~equal:(Shifted_value.equal Field.equal))
             (List.zip_exn

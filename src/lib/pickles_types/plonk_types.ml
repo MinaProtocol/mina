@@ -55,6 +55,15 @@ module Opt = struct
 
   module Flag = struct
     type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
+
+    let ( ||| ) x y =
+      match (x, y) with
+      | Yes, _ | _, Yes ->
+          Yes
+      | Maybe, _ | _, Maybe ->
+          Maybe
+      | No, No ->
+          No
   end
 
   let map t ~f =
@@ -347,77 +356,6 @@ module Features = struct
 end
 
 module Evals = struct
-  module Lookup = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type 'f t =
-          { sorted : 'f array; aggreg : 'f; table : 'f; runtime : 'f option }
-        [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
-      end
-    end]
-
-    let sorted_length = 5
-
-    let dummy ~runtime z =
-      { aggreg = z
-      ; table = z
-      ; sorted = Array.create ~len:sorted_length z
-      ; runtime = Option.some_if runtime z
-      }
-
-    let map { sorted; aggreg; table; runtime } ~f =
-      { sorted = Array.map ~f sorted
-      ; aggreg = f aggreg
-      ; table = f table
-      ; runtime = Option.map ~f runtime
-      }
-
-    let map2 t1 t2 ~f =
-      { sorted = Array.map2_exn ~f t1.sorted t2.sorted
-      ; aggreg = f t1.aggreg t2.aggreg
-      ; table = f t1.table t2.table
-      ; runtime = Option.map2 ~f t1.runtime t2.runtime
-      }
-
-    module In_circuit = struct
-      type ('f, 'bool) t =
-        { sorted : 'f array
-        ; aggreg : 'f
-        ; table : 'f
-        ; runtime : ('f, 'bool) Opt.t
-        }
-      [@@deriving hlist, fields]
-
-      let map { sorted; aggreg; table; runtime } ~f =
-        { sorted = Array.map ~f sorted
-        ; aggreg = f aggreg
-        ; table = f table
-        ; runtime = Opt.map ~f runtime
-        }
-    end
-
-    let to_in_circuit (type f bool) ({ sorted; aggreg; table; runtime } : f t) :
-        (f, bool) In_circuit.t =
-      { sorted; aggreg; table; runtime = Opt.of_option runtime }
-
-    let typ impl e ~runtime_tables ~dummy =
-      Snarky_backendless.Typ.of_hlistable
-        [ Snarky_backendless.Typ.array ~length:sorted_length e
-        ; e
-        ; e
-        ; Opt.typ impl runtime_tables e ~dummy
-        ]
-        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-        ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
-
-    let opt_typ impl ({ lookup; runtime_tables; _ } : Opt.Flag.t Features.t)
-        ~dummy:z elt =
-      Opt.typ impl lookup
-        ~dummy:(dummy z ~runtime:(not (Opt.Flag.equal runtime_tables No)))
-        (typ impl ~runtime_tables ~dummy:z elt)
-  end
-
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -428,29 +366,75 @@ module Evals = struct
         ; s : 'a Permuts_minus_1_vec.Stable.V1.t
         ; generic_selector : 'a
         ; poseidon_selector : 'a
-        ; lookup : 'a Lookup.Stable.V1.t option
+        ; complete_add_selector : 'a
+        ; mul_selector : 'a
+        ; emul_selector : 'a
+        ; endomul_scalar_selector : 'a
+        ; range_check0_selector : 'a option
+        ; range_check1_selector : 'a option
+        ; foreign_field_add_selector : 'a option
+        ; foreign_field_mul_selector : 'a option
+        ; xor_selector : 'a option
+        ; rot_selector : 'a option
+        ; lookup_aggregation : 'a option
+        ; lookup_table : 'a option
+        ; lookup_sorted : 'a option array
+        ; runtime_lookup_table : 'a option
         }
       [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
     end
   end]
 
   let to_absorption_sequence
-      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
-      _ list =
+      { w
+      ; coefficients
+      ; z
+      ; s
+      ; generic_selector
+      ; poseidon_selector
+      ; complete_add_selector
+      ; mul_selector
+      ; emul_selector
+      ; endomul_scalar_selector
+      ; range_check0_selector
+      ; range_check1_selector
+      ; foreign_field_add_selector
+      ; foreign_field_mul_selector
+      ; xor_selector
+      ; rot_selector
+      ; lookup_aggregation
+      ; lookup_table
+      ; lookup_sorted
+      ; runtime_lookup_table
+      } : _ list =
     let always_present =
-      [ z; generic_selector; poseidon_selector ]
+      [ z
+      ; generic_selector
+      ; poseidon_selector
+      ; complete_add_selector
+      ; mul_selector
+      ; emul_selector
+      ; endomul_scalar_selector
+      ]
       @ Vector.to_list w
       @ Vector.to_list coefficients
       @ Vector.to_list s
     in
-    let lookup =
-      match lookup with
-      | None ->
-          []
-      | Some { Lookup.runtime; table; aggreg; sorted } ->
-          [ aggreg; table ] @ Array.to_list sorted @ Option.to_list runtime
+    let optional_gates =
+      List.filter_map ~f:Fn.id
+        [ range_check0_selector
+        ; range_check1_selector
+        ; foreign_field_add_selector
+        ; foreign_field_mul_selector
+        ; xor_selector
+        ; rot_selector
+        ; lookup_aggregation
+        ; lookup_table
+        ]
     in
-    always_present @ lookup
+    always_present @ optional_gates
+    @ Array.to_list (Array.filter_map ~f:Fn.id lookup_sorted)
+    @ Option.to_list runtime_lookup_table
 
   module In_circuit = struct
     type ('f, 'bool) t =
@@ -460,12 +444,45 @@ module Evals = struct
       ; s : 'f Permuts_minus_1_vec.t
       ; generic_selector : 'f
       ; poseidon_selector : 'f
-      ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
+      ; complete_add_selector : 'f
+      ; mul_selector : 'f
+      ; emul_selector : 'f
+      ; endomul_scalar_selector : 'f
+      ; range_check0_selector : ('f, 'bool) Opt.t
+      ; range_check1_selector : ('f, 'bool) Opt.t
+      ; foreign_field_add_selector : ('f, 'bool) Opt.t
+      ; foreign_field_mul_selector : ('f, 'bool) Opt.t
+      ; xor_selector : ('f, 'bool) Opt.t
+      ; rot_selector : ('f, 'bool) Opt.t
+      ; lookup_aggregation : ('f, 'bool) Opt.t
+      ; lookup_table : ('f, 'bool) Opt.t
+      ; lookup_sorted : ('f, 'bool) Opt.t array
+      ; runtime_lookup_table : ('f, 'bool) Opt.t
       }
     [@@deriving hlist, fields]
 
     let map (type bool a b)
-        ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+        ({ w
+         ; coefficients
+         ; z
+         ; s
+         ; generic_selector
+         ; poseidon_selector
+         ; complete_add_selector
+         ; mul_selector
+         ; emul_selector
+         ; endomul_scalar_selector
+         ; range_check0_selector
+         ; range_check1_selector
+         ; foreign_field_add_selector
+         ; foreign_field_mul_selector
+         ; xor_selector
+         ; rot_selector
+         ; lookup_aggregation
+         ; lookup_table
+         ; lookup_sorted
+         ; runtime_lookup_table
+         } :
           (a, bool) t ) ~(f : a -> b) : (b, bool) t =
       { w = Vector.map w ~f
       ; coefficients = Vector.map coefficients ~f
@@ -473,66 +490,147 @@ module Evals = struct
       ; s = Vector.map s ~f
       ; generic_selector = f generic_selector
       ; poseidon_selector = f poseidon_selector
-      ; lookup = Opt.map ~f:(Lookup.In_circuit.map ~f) lookup
+      ; complete_add_selector = f complete_add_selector
+      ; mul_selector = f mul_selector
+      ; emul_selector = f emul_selector
+      ; endomul_scalar_selector = f endomul_scalar_selector
+      ; range_check0_selector = Opt.map ~f range_check0_selector
+      ; range_check1_selector = Opt.map ~f range_check1_selector
+      ; foreign_field_add_selector = Opt.map ~f foreign_field_add_selector
+      ; foreign_field_mul_selector = Opt.map ~f foreign_field_mul_selector
+      ; xor_selector = Opt.map ~f xor_selector
+      ; rot_selector = Opt.map ~f rot_selector
+      ; lookup_aggregation = Opt.map ~f lookup_aggregation
+      ; lookup_table = Opt.map ~f lookup_table
+      ; lookup_sorted = Array.map ~f:(Opt.map ~f) lookup_sorted
+      ; runtime_lookup_table = Opt.map ~f runtime_lookup_table
       }
 
     let to_list
-        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
+        { w
+        ; coefficients
+        ; z
+        ; s
+        ; generic_selector
+        ; poseidon_selector
+        ; complete_add_selector
+        ; mul_selector
+        ; emul_selector
+        ; endomul_scalar_selector
+        ; range_check0_selector
+        ; range_check1_selector
+        ; foreign_field_add_selector
+        ; foreign_field_mul_selector
+        ; xor_selector
+        ; rot_selector
+        ; lookup_aggregation
+        ; lookup_table
+        ; lookup_sorted
+        ; runtime_lookup_table
+        } =
       let some x = Opt.Some x in
       let always_present =
         List.map ~f:some
-          ( [ z; generic_selector; poseidon_selector ]
+          ( [ z
+            ; generic_selector
+            ; poseidon_selector
+            ; complete_add_selector
+            ; mul_selector
+            ; emul_selector
+            ; endomul_scalar_selector
+            ]
           @ Vector.to_list w
           @ Vector.to_list coefficients
           @ Vector.to_list s )
       in
-      let with_lookup ~f (lookup : _ Lookup.In_circuit.t) =
-        always_present
-        @ List.map ~f
-            (Array.to_list lookup.sorted @ [ lookup.aggreg; lookup.table ])
-        @
-        match lookup.runtime with
-        | None ->
-            []
-        | Some _ | Maybe _ ->
-            [ lookup.runtime ]
+      let optional_gates =
+        [ range_check0_selector
+        ; range_check1_selector
+        ; foreign_field_add_selector
+        ; foreign_field_mul_selector
+        ; xor_selector
+        ; rot_selector
+        ]
       in
-      match lookup with
-      | None ->
-          always_present
-      | Some lookup ->
-          with_lookup ~f:some lookup
-      | Maybe (b, lookup) ->
-          with_lookup ~f:(fun x -> Maybe (b, x)) lookup
+      always_present @ optional_gates
+      @ Array.to_list lookup_sorted
+      @ [ lookup_aggregation; lookup_table; runtime_lookup_table ]
 
     let to_absorption_sequence
-        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
-        _ Opt.Early_stop_sequence.t =
+        { w
+        ; coefficients
+        ; z
+        ; s
+        ; generic_selector
+        ; poseidon_selector
+        ; complete_add_selector
+        ; mul_selector
+        ; emul_selector
+        ; endomul_scalar_selector
+        ; range_check0_selector
+        ; range_check1_selector
+        ; foreign_field_add_selector
+        ; foreign_field_mul_selector
+        ; xor_selector
+        ; rot_selector
+        ; lookup_aggregation
+        ; lookup_table
+        ; lookup_sorted
+        ; runtime_lookup_table
+        } : _ Opt.Early_stop_sequence.t =
       let always_present =
-        [ z; generic_selector; poseidon_selector ]
+        [ z
+        ; generic_selector
+        ; poseidon_selector
+        ; complete_add_selector
+        ; mul_selector
+        ; emul_selector
+        ; endomul_scalar_selector
+        ]
         @ Vector.to_list w
         @ Vector.to_list coefficients
         @ Vector.to_list s
       in
-      let some x = Opt.Some x in
-      let lookup =
-        match lookup with
-        | None ->
-            []
-        | Some { Lookup.In_circuit.runtime; table; aggreg; sorted } ->
-            List.map ~f:some ([ aggreg; table ] @ Array.to_list sorted)
-            @ [ runtime ]
-        | Maybe (b, { Lookup.In_circuit.runtime; table; aggreg; sorted }) ->
-            List.map
-              ~f:(fun x -> Opt.Maybe (b, x))
-              ([ aggreg; table ] @ Array.to_list sorted)
-            @ [ runtime ]
+      let optional_gates =
+        [ range_check0_selector
+        ; range_check1_selector
+        ; foreign_field_add_selector
+        ; foreign_field_mul_selector
+        ; xor_selector
+        ; rot_selector
+        ; lookup_aggregation
+        ; lookup_table
+        ]
       in
-      List.map ~f:some always_present @ lookup
+      let some x = Opt.Some x in
+      List.map ~f:some always_present
+      @ optional_gates
+      @ Array.to_list lookup_sorted
+      @ [ runtime_lookup_table ]
   end
 
   let to_in_circuit (type bool a)
-      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+      ({ w
+       ; coefficients
+       ; z
+       ; s
+       ; generic_selector
+       ; poseidon_selector
+       ; complete_add_selector
+       ; mul_selector
+       ; emul_selector
+       ; endomul_scalar_selector
+       ; range_check0_selector
+       ; range_check1_selector
+       ; foreign_field_add_selector
+       ; foreign_field_mul_selector
+       ; xor_selector
+       ; rot_selector
+       ; lookup_aggregation
+       ; lookup_table
+       ; lookup_sorted
+       ; runtime_lookup_table
+       } :
         a t ) : (a, bool) In_circuit.t =
     { w
     ; coefficients
@@ -540,11 +638,44 @@ module Evals = struct
     ; s
     ; generic_selector
     ; poseidon_selector
-    ; lookup = Opt.of_option (Option.map ~f:Lookup.to_in_circuit lookup)
+    ; complete_add_selector
+    ; mul_selector
+    ; emul_selector
+    ; endomul_scalar_selector
+    ; range_check0_selector = Opt.of_option range_check0_selector
+    ; range_check1_selector = Opt.of_option range_check1_selector
+    ; foreign_field_add_selector = Opt.of_option foreign_field_add_selector
+    ; foreign_field_mul_selector = Opt.of_option foreign_field_mul_selector
+    ; xor_selector = Opt.of_option xor_selector
+    ; rot_selector = Opt.of_option rot_selector
+    ; lookup_aggregation = Opt.of_option lookup_aggregation
+    ; lookup_table = Opt.of_option lookup_table
+    ; lookup_sorted = Array.map ~f:Opt.of_option lookup_sorted
+    ; runtime_lookup_table = Opt.of_option runtime_lookup_table
     }
 
   let map (type a b)
-      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+      ({ w
+       ; coefficients
+       ; z
+       ; s
+       ; generic_selector
+       ; poseidon_selector
+       ; complete_add_selector
+       ; mul_selector
+       ; emul_selector
+       ; endomul_scalar_selector
+       ; range_check0_selector
+       ; range_check1_selector
+       ; foreign_field_add_selector
+       ; foreign_field_mul_selector
+       ; xor_selector
+       ; rot_selector
+       ; lookup_aggregation
+       ; lookup_table
+       ; lookup_sorted
+       ; runtime_lookup_table
+       } :
         a t ) ~(f : a -> b) : b t =
     { w = Vector.map w ~f
     ; coefficients = Vector.map coefficients ~f
@@ -552,7 +683,20 @@ module Evals = struct
     ; s = Vector.map s ~f
     ; generic_selector = f generic_selector
     ; poseidon_selector = f poseidon_selector
-    ; lookup = Option.map ~f:(Lookup.map ~f) lookup
+    ; complete_add_selector = f complete_add_selector
+    ; mul_selector = f mul_selector
+    ; emul_selector = f emul_selector
+    ; endomul_scalar_selector = f endomul_scalar_selector
+    ; range_check0_selector = Option.map ~f range_check0_selector
+    ; range_check1_selector = Option.map ~f range_check1_selector
+    ; foreign_field_add_selector = Option.map ~f foreign_field_add_selector
+    ; foreign_field_mul_selector = Option.map ~f foreign_field_mul_selector
+    ; xor_selector = Option.map ~f xor_selector
+    ; rot_selector = Option.map ~f rot_selector
+    ; lookup_aggregation = Option.map ~f lookup_aggregation
+    ; lookup_table = Option.map ~f lookup_table
+    ; lookup_sorted = Array.map ~f:(Option.map ~f) lookup_sorted
+    ; runtime_lookup_table = Option.map ~f runtime_lookup_table
     }
 
   let map2 (type a b c) (t1 : a t) (t2 : b t) ~(f : a -> b -> c) : c t =
@@ -562,7 +706,31 @@ module Evals = struct
     ; s = Vector.map2 t1.s t2.s ~f
     ; generic_selector = f t1.generic_selector t2.generic_selector
     ; poseidon_selector = f t1.poseidon_selector t2.poseidon_selector
-    ; lookup = Option.map2 t1.lookup t2.lookup ~f:(Lookup.map2 ~f)
+    ; complete_add_selector =
+        f t1.complete_add_selector t2.complete_add_selector
+    ; mul_selector = f t1.mul_selector t2.mul_selector
+    ; emul_selector = f t1.emul_selector t2.emul_selector
+    ; endomul_scalar_selector =
+        f t1.endomul_scalar_selector t2.endomul_scalar_selector
+    ; range_check0_selector =
+        Option.map2 ~f t1.range_check0_selector t2.range_check0_selector
+    ; range_check1_selector =
+        Option.map2 ~f t1.range_check1_selector t2.range_check1_selector
+    ; foreign_field_add_selector =
+        Option.map2 ~f t1.foreign_field_add_selector
+          t2.foreign_field_add_selector
+    ; foreign_field_mul_selector =
+        Option.map2 ~f t1.foreign_field_mul_selector
+          t2.foreign_field_mul_selector
+    ; xor_selector = Option.map2 ~f t1.xor_selector t2.xor_selector
+    ; rot_selector = Option.map2 ~f t1.rot_selector t2.rot_selector
+    ; lookup_aggregation =
+        Option.map2 ~f t1.lookup_aggregation t2.lookup_aggregation
+    ; lookup_table = Option.map2 ~f t1.lookup_table t2.lookup_table
+    ; lookup_sorted =
+        Array.map2_exn ~f:(Option.map2 ~f) t1.lookup_sorted t2.lookup_sorted
+    ; runtime_lookup_table =
+        Option.map2 ~f t1.runtime_lookup_table t2.runtime_lookup_table
     }
 
   (*
@@ -575,7 +743,12 @@ module Evals = struct
      - z
      - generic selector
      - poseidon selector
+     - complete_add_selector
+     - mul_selector
+     - emul_selector
+     - endomul_scalar_selector
      - w (witness columns)
+     - coefficients
      - s (sigma columns)
 
      then optionally:
@@ -586,29 +759,85 @@ module Evals = struct
   *)
 
   let to_list
-      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
+      { w
+      ; coefficients
+      ; z
+      ; s
+      ; generic_selector
+      ; poseidon_selector
+      ; complete_add_selector
+      ; mul_selector
+      ; emul_selector
+      ; endomul_scalar_selector
+      ; range_check0_selector
+      ; range_check1_selector
+      ; foreign_field_add_selector
+      ; foreign_field_mul_selector
+      ; xor_selector
+      ; rot_selector
+      ; lookup_aggregation
+      ; lookup_table
+      ; lookup_sorted
+      ; runtime_lookup_table
+      } =
     let always_present =
-      [ z; generic_selector; poseidon_selector ]
+      [ z
+      ; generic_selector
+      ; poseidon_selector
+      ; complete_add_selector
+      ; mul_selector
+      ; emul_selector
+      ; endomul_scalar_selector
+      ]
       @ Vector.to_list w
       @ Vector.to_list coefficients
       @ Vector.to_list s
     in
-    match lookup with
-    | None ->
-        always_present
-    | Some lookup ->
-        always_present
-        @ Array.to_list lookup.sorted
-        @ [ lookup.aggreg; lookup.table ]
-        @ Option.to_list lookup.runtime
+    let optional_gates =
+      List.filter_map ~f:Fn.id
+        [ range_check0_selector
+        ; range_check1_selector
+        ; foreign_field_add_selector
+        ; foreign_field_mul_selector
+        ; xor_selector
+        ; rot_selector
+        ]
+    in
+    always_present @ optional_gates
+    @ Array.to_list (Array.filter_map ~f:Fn.id lookup_sorted)
+    @ Option.to_list lookup_aggregation
+    @ Option.to_list lookup_table
+    @ Option.to_list runtime_lookup_table
 
   let typ (type f a_var a)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      ~dummy e lookup_config :
+      ~dummy e (feature_flags : _ Features.t) :
       ((a_var, Impl.Boolean.var) In_circuit.t, a t, f) Snarky_backendless.Typ.t
       =
     let open Impl in
-    let lookup_typ = Lookup.opt_typ Impl.Boolean.typ lookup_config e ~dummy in
+    let opt flag = Opt.typ Impl.Boolean.typ flag e ~dummy in
+    let uses_lookup =
+      let { Features.range_check0
+          ; range_check1
+          ; foreign_field_add = _ (* Doesn't use lookup *)
+          ; foreign_field_mul
+          ; xor
+          ; rot
+          ; lookup
+          ; runtime_tables = _ (* Fixme *)
+          } =
+        feature_flags
+      in
+      Array.reduce_exn ~f:Opt.Flag.( ||| )
+        [| range_check0; range_check1; foreign_field_mul; xor; rot; lookup |]
+    in
+    let lookup_sorted =
+      match uses_lookup with
+      | Opt.Flag.No ->
+          Opt.Flag.No
+      | Yes | Maybe ->
+          Opt.Flag.Maybe
+    in
     Typ.of_hlistable
       [ Vector.typ e Columns.n
       ; Vector.typ e Columns.n
@@ -616,7 +845,20 @@ module Evals = struct
       ; Vector.typ e Permuts_minus_1.n
       ; e
       ; e
-      ; lookup_typ
+      ; e
+      ; e
+      ; e
+      ; e
+      ; opt feature_flags.range_check0
+      ; opt feature_flags.range_check1
+      ; opt feature_flags.foreign_field_add
+      ; opt feature_flags.foreign_field_mul
+      ; opt feature_flags.xor
+      ; opt feature_flags.rot
+      ; opt uses_lookup
+      ; opt uses_lookup
+      ; Typ.array ~length:5 (opt lookup_sorted) (* TODO: Fixme *)
+      ; opt feature_flags.runtime_tables
       ]
       ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -649,8 +891,8 @@ module All_evals = struct
         : (b1, b2) t =
       { public_input = f1 t.public_input; evals = Evals.map ~f:f2 t.evals }
 
-    let typ impl lookup_config f f_multi ~dummy =
-      let evals = Evals.typ impl f_multi lookup_config ~dummy in
+    let typ impl feature_flags f f_multi ~dummy =
+      let evals = Evals.typ impl f_multi feature_flags ~dummy in
       let open Snarky_backendless.Typ in
       of_hlistable [ f; evals ] ~var_to_hlist:In_circuit.to_hlist
         ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist
@@ -690,13 +932,13 @@ module All_evals = struct
 
   let typ (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      lookup_config =
+      feature_flags =
     let open Impl.Typ in
     let single = array ~length:1 field in
     let evals =
       With_public_input.typ
         (module Impl)
-        lookup_config (tuple2 field field) (tuple2 single single)
+        feature_flags (tuple2 field field) (tuple2 single single)
         ~dummy:Impl.Field.Constant.([| zero |], [| zero |])
     in
     of_hlistable [ evals; Impl.Field.typ ] ~var_to_hlist:In_circuit.to_hlist
