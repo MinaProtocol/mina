@@ -57,10 +57,10 @@ func loadOutputFile(filename string) (map[int]map[string]OutputCacheEntry, error
 }
 
 type ComplexValue struct {
-	Type string
-	File string `json:",omitempty"`
-	Step int
-	Name string
+	Type string `json:"type"`
+	File string `json:"file,omitempty"`
+	Step int    `json:"step"`
+	Name string `json:"name"`
 }
 
 func LocalComplexValue(step int, name string) ComplexValue {

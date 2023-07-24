@@ -19,13 +19,6 @@ type nonrec 'caml_f random_oracles =
 
 type nonrec 'evals point_evaluations = { zeta : 'evals; zeta_omega : 'evals }
 
-type nonrec 'caml_f lookup_evaluations =
-  { sorted : 'caml_f array point_evaluations array
-  ; aggreg : 'caml_f array point_evaluations
-  ; table : 'caml_f array point_evaluations
-  ; runtime : 'caml_f array point_evaluations option
-  }
-
 type nonrec 'caml_f proof_evaluations =
   { w :
       'caml_f array point_evaluations
@@ -67,9 +60,22 @@ type nonrec 'caml_f proof_evaluations =
       * 'caml_f array point_evaluations
       * 'caml_f array point_evaluations
       * 'caml_f array point_evaluations
-  ; lookup : 'caml_f lookup_evaluations option
   ; generic_selector : 'caml_f array point_evaluations
   ; poseidon_selector : 'caml_f array point_evaluations
+  ; complete_add_selector : 'caml_f array point_evaluations
+  ; mul_selector : 'caml_f array point_evaluations
+  ; emul_selector : 'caml_f array point_evaluations
+  ; endomul_scalar_selector : 'caml_f array point_evaluations
+  ; range_check0_selector : 'caml_f array point_evaluations option
+  ; range_check1_selector : 'caml_f array point_evaluations option
+  ; foreign_field_add_selector : 'caml_f array point_evaluations option
+  ; foreign_field_mul_selector : 'caml_f array point_evaluations option
+  ; xor_selector : 'caml_f array point_evaluations option
+  ; rot_selector : 'caml_f array point_evaluations option
+  ; lookup_aggregation : 'caml_f array point_evaluations option
+  ; lookup_table : 'caml_f array point_evaluations option
+  ; lookup_sorted : 'caml_f array point_evaluations option array
+  ; runtime_lookup_table : 'caml_f array point_evaluations option
   }
 
 type nonrec 'caml_g poly_comm =

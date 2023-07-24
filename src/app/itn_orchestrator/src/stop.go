@@ -6,7 +6,7 @@ import (
 )
 
 type StopParams struct {
-	Receipts []ScheduledPaymentsReceipt
+	Receipts []ScheduledPaymentsReceipt `json:"receipts"`
 }
 
 func StopTransactions(config Config, params StopParams) error {
