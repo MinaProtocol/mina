@@ -276,8 +276,9 @@ module Make (Inputs : Inputs_intf) = struct
     ; lookup_aggregation
     ; lookup_table
     ; lookup_sorted =
-        Array.init 5 ~f:(fun i ->
-            Option.try_with_join (fun () -> lookup_sorted.(i)) )
+        (let max_columns_num = 5 in
+         Array.init max_columns_num ~f:(fun i ->
+             Option.try_with_join (fun () -> lookup_sorted.(i)) ) )
     ; runtime_lookup_table
     ; runtime_lookup_table_selector
     ; xor_lookup_selector

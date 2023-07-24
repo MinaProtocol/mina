@@ -125,11 +125,14 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
       | `Path directory_name ->
           lazy (Ledger.create ~directory_name ~depth (), false)
     in
-    if insert_accounts then
-      List.iter (Lazy.force accounts) ~f:(fun (_, account) ->
-          Ledger.create_new_account_exn ledger
-            (Account.identifier account)
-            account ) ;
+    ( if insert_accounts then
+      let addrs_and_accounts =
+        let ledger_depth = Ledger.depth ledger in
+        Lazy.force accounts
+        |> List.mapi ~f:(fun i (_, acct) ->
+               (Ledger.Addr.of_int_exn ~ledger_depth i, acct) )
+      in
+      Ledger.set_batch_accounts ledger addrs_and_accounts ) ;
     ledger
 
   include Utils
