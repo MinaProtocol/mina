@@ -114,7 +114,7 @@ module Concrete_ : sig
     type challenge_constant =
       Pickles_limb_vector.Constant.Make(Pickles_types.Nat.N2).t
 
-    type tock_affine = point
+    type tock_affine = Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
 
     type 'a step_bp_vec = 'a Kimchi_pasta.Basic.Rounds.Step_vector.Stable.V1.t
 
