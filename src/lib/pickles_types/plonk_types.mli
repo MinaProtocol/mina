@@ -222,18 +222,7 @@ module Evals : sig
       ; range_check_lookup_selector : ('f, 'bool) Opt.t
       ; foreign_field_mul_lookup_selector : ('f, 'bool) Opt.t
       }
-
-    (** {4 Accessors} *)
-
-    val s : ('a, 'b) t -> 'a Permuts_minus_1_vec.t
-
-    val z : ('a, 'b) t -> 'a
-
-    val w : ('a, 'b) t -> 'a Columns_vec.t
-
-    val poseidon_selector : ('a, 'b) t -> 'a
-
-    val generic_selector : ('a, 'b) t -> 'a
+    [@@deriving fields]
 
     (** {4 Converters} *)
 

@@ -248,7 +248,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     let right_input = rng.gen_biguint_range(&BigUint::zero(), &foreign_field_modulus);
 
     // Compute multiplication witness
-    let (mut witness, external_checks) =
+    let (mut witness, mut external_checks) =
         foreign_field_mul::witness::create(&left_input, &right_input, &foreign_field_modulus);
 
     // Bound addition for multiplication result
