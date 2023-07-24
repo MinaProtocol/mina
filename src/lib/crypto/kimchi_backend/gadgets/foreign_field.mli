@@ -175,13 +175,31 @@ module External_checks : sig
   val append_compact_multi_range_check :
     'field t -> 'field Cvar.t compact_limbs -> unit
 
-  val append_bound_check : 'field t -> 'field Cvar.t standard_limbs -> unit
+  val append_bound_check : 'field t -> 'field Element.Standard.t -> unit
 end
 
 (* Type of operation *)
 type op_mode = Add | Sub
 
-(** Gadget to check the supplied value is a valid foreign field element for the
+(** Bound check the supplied value
+ *    Inputs:
+ *      external_checks       := Context to track required external checks
+ *      x                     := Value to check
+ *      foreign_field_modulus := Modulus of the foreign field
+ *
+ *    Outputs:
+ *      Inserts generic gate to constrain computation x'2 = x2 + 2^88 - f2 - 1
+ *      Adds x to external-checks.multi_ranges
+ *      Adds x'2 to external-checks.limb_ranges
+ *)
+val check_bound :
+     (module Snark_intf.Run with type field = 'f)
+  -> 'f External_checks.t (* external_checks context *)
+  -> 'f Element.Standard.t (* value *)
+  -> 'f standard_limbs
+(* foreign_field_modulus *)
+
+(** Gadget to check the supplied value is a canonical foreign field element for the
  *  supplied foreign field modulus
  *
  *    This gadget checks in the circuit that a value is less than the foreign field modulus.
@@ -202,7 +220,7 @@ type op_mode = Add | Sub
  *      - 1 FFAdd gate
  *      - 1 Zero gate
  *)
-val valid_element :
+val check_canonical :
      (module Snark_intf.Run with type field = 'f)
   -> 'f External_checks.t (* external_checks context *)
   -> 'f Element.Standard.t (* value *)
@@ -231,20 +249,20 @@ val constrain_external_checks :
  *      Returns the final result of the chain of sums
  *
  *    For n+1 inputs, the gadget creates n foreign field addition gates, followed by a final
- *    foreign field addition gate for the bound check (i.e. valid_element check). For this, 
+ *    foreign field addition gate for the bound check (i.e. canonical_element check). For this,
  *    two additional multi range checks must also be performed (for value and bound).
  *    By default, the range check takes place right after the final Raw row.
- * 
+ *
  * NOTE:
  *    This gadget does not create bound checks for the intermediate sums by default.
  *    This assumes that the number of chained sums will not overflow the native field
- *    in any limb. 
+ *    in any limb.
  * TODO:
  *    Understand if concatenating sums is possible with input limbs <2^88 with chunking
  *)
 val sum_chain :
      (module Snark_intf.Run with type field = 'f)
-  -> ?full:bool (*false*)
+  -> ?full:bool (* default false *)
   -> 'f Element.Standard.t list (* inputs *)
   -> op_mode list (* operations *)
   -> 'f standard_limbs (* foreign_field_modulus *)
@@ -254,7 +272,7 @@ val sum_chain :
 (** Gadget for a single foreign field addition
  *
  *    Inputs:
- *      full                  := Flag for whether to perform addition with valid_element check
+ *      full                  := Flag for whether to perform addition with canonical_element check
  *                               on the result (default true) or just a single FFAdd row (false)
  *      left_input            := 3 limbs foreign field element
  *      right_input           := 3 limbs foreign field element
@@ -279,7 +297,7 @@ val sum_chain :
  *)
 val add :
      (module Snark_intf.Run with type field = 'f)
-  -> ?full:bool (* false *)
+  -> ?full:bool (* default false *)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
@@ -289,7 +307,7 @@ val add :
 (** Gadget for a single foreign field subtraction
  *
  *    Inputs:
- *      full                  := Flag for whether to perform addition with valid_element check
+ *      full                  := Flag for whether to perform addition with canonical_element check
  *                               on the result (default true) or just a single FFAdd row (false)
  *      left_input            := 3 limbs foreign field element
  *      right_input           := 3 limbs foreign field element
@@ -315,7 +333,7 @@ val add :
  *)
 val sub :
      (module Snark_intf.Run with type field = 'f)
-  -> ?full:bool (* false *)
+  -> ?full:bool (* default false *)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
@@ -355,7 +373,7 @@ val mul :
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
   -> 'f Element.Standard.t
-(* product *)
+(* remainder *)
 
 (** Gadget to constrain conversion of bytes list (output of Keccak gadget)
    into foreign field element with standard limbs (input of ECDSA gadget).
