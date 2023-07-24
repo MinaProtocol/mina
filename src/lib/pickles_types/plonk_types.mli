@@ -23,6 +23,8 @@ module Opt : sig
 
   module Flag : sig
     type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
+
+    val ( ||| ) : t -> t -> t
   end
 
   val constant_layout_typ :
@@ -191,20 +193,6 @@ module Messages : sig
 end
 
 module Evals : sig
-  module Lookup : sig
-    type 'f t =
-      { sorted : 'f array; aggreg : 'f; table : 'f; runtime : 'f option }
-
-    module In_circuit : sig
-      type ('f, 'bool) t =
-        { sorted : 'f array
-        ; aggreg : 'f
-        ; table : 'f
-        ; runtime : ('f, 'bool) Opt.t
-        }
-    end
-  end
-
   module In_circuit : sig
     type ('f, 'bool) t =
       { w : 'f Columns_vec.t
@@ -223,7 +211,10 @@ module Evals : sig
       ; foreign_field_mul_selector : ('f, 'bool) Opt.t
       ; xor_selector : ('f, 'bool) Opt.t
       ; rot_selector : ('f, 'bool) Opt.t
-      ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
+      ; lookup_aggregation : ('f, 'bool) Opt.t
+      ; lookup_table : ('f, 'bool) Opt.t
+      ; lookup_sorted : ('f, 'bool) Opt.t array
+      ; runtime_lookup_table : ('f, 'bool) Opt.t
       }
     [@@deriving fields]
 
@@ -254,7 +245,10 @@ module Evals : sig
     ; foreign_field_mul_selector : 'a option
     ; xor_selector : 'a option
     ; rot_selector : 'a option
-    ; lookup : 'a Lookup.t option
+    ; lookup_aggregation : 'a option
+    ; lookup_table : 'a option
+    ; lookup_sorted : 'a option array
+    ; runtime_lookup_table : 'a option
     }
 
   (** {4 Iterators} *)

@@ -308,17 +308,13 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     | Coefficient i ->
         get_eval coefficients.(i)
     | LookupTable ->
-        get_eval (Opt.value_exn e.lookup).table
+        get_eval (Opt.value_exn e.lookup_table)
     | LookupSorted i ->
-        let sorted = (Opt.value_exn e.lookup).sorted in
-        if i < Array.length sorted then get_eval sorted.(i)
-        else
-          (* Return zero padding when the index is larger than sorted *)
-          F.zero
+        get_eval (Opt.value_exn e.lookup_sorted.(i))
     | LookupAggreg ->
-        get_eval (Opt.value_exn e.lookup).aggreg
+        get_eval (Opt.value_exn e.lookup_aggregation)
     | LookupRuntimeTable ->
-        get_eval (Opt.value_exn (Opt.value_exn e.lookup).runtime)
+        get_eval (Opt.value_exn e.runtime_lookup_table)
     | LookupKindIndex (Lookup | Xor | RangeCheck | ForeignFieldMul) ->
         failwith "Lookup kind index should have been linearized away"
     | LookupRuntimeSelector ->
