@@ -678,11 +678,18 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               max_slot ;
             try_slot ~logger pool max_slot
       in
-      [%log info] "Loading block information using target state hash" ;
-      let%bind block_ids =
+      [%log info]
+       "Loading block information using target state hash and start slot" ;
+      let%bind block_ids, oldest_block_id =
         process_block_infos_of_state_hash ~logger pool
           ~state_hash:target_state_hash
           ~start_slot:input.start_slot_since_genesis ~f:(fun block_infos ->
+              let ({ id = oldest_block_id; _ } : Sql.Block_info.t) =
+                Option.value_exn
+		(List.min_elt block_infos ~compare:(fun bi1 bi2 ->
+                     Int64.compare bi1.global_slot_since_genesis
+                       bi2.global_slot_since_genesis ) )
+            in
             let ids = List.map block_infos ~f:(fun { id; _ } -> id) in
             (* build mapping from global slots to state and ledger hashes *)
             let%bind () =
@@ -707,7 +714,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                       , Ledger_hash.of_base58_check_exn ledger_hash
                       , Frozen_ledger_hash.of_base58_check_exn snarked_hash ) )
             in
-            return (Int.Set.of_list ids) )
+            return (Int.Set.of_list ids, oldest_block_id) )
       in
       if Int64.equal input.start_slot_since_genesis 0L then
         (* check that genesis block is in chain to target hash                                                                                                                                                                                          assumption: genesis block occupies global slot 0
@@ -1474,16 +1481,6 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                   ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
                   ~last_block_id:zkc.block_id internal_cmds user_cmds zkcs )
       in
-      let%bind unparented_ids =
-        query_db ~f:(fun db -> Sql.Block.get_unparented db ())
-      in
-      let genesis_block_id =
-        match List.filter unparented_ids ~f:(Int.Set.mem block_ids) with
-        | [ id ] ->
-            id
-        | _ ->
-            failwith "Expected only the genesis block to have an unparented id"
-      in
       let%bind start_slot_since_genesis =
         let%map slot_opt =
           query_db ~f:(fun db ->
@@ -1517,7 +1514,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
           =
         apply_commands ~block_txns:[]
           ~last_global_slot_since_genesis:start_slot_since_genesis
-          ~last_block_id:genesis_block_id sorted_internal_cmds sorted_user_cmds
+          ~last_block_id:oldest_block_id sorted_internal_cmds sorted_user_cmds
           sorted_zkapp_cmds
       in
       match input.target_epoch_ledgers_state_hash with
