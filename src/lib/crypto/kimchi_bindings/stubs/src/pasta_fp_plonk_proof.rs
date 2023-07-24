@@ -248,7 +248,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     let right_input = rng.gen_biguint_range(&BigUint::zero(), &foreign_field_modulus);
 
     // Compute multiplication witness
-    let (mut witness, external_checks) =
+    let (mut witness, mut external_checks) =
         foreign_field_mul::witness::create(&left_input, &right_input, &foreign_field_modulus);
 
     // Bound addition for multiplication result
@@ -876,10 +876,15 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
         foreign_field_mul_selector: None,
         xor_selector: None,
         rot_selector: None,
-    lookup_aggregation: None,
-    lookup_table: None,
-    lookup_sorted: array::from_fn(|_| None),
-    runtime_lookup_table: None,
+        lookup_aggregation: None,
+        lookup_table: None,
+        lookup_sorted: array::from_fn(|_| None),
+        runtime_lookup_table: None,
+        runtime_lookup_table_selector: None,
+        xor_lookup_selector: None,
+        lookup_gate_lookup_selector: None,
+        range_check_lookup_selector: None,
+        foreign_field_mul_lookup_selector: None,
     };
 
     let public = vec![Fp::one(), Fp::one()];
