@@ -23,6 +23,8 @@ module Opt : sig
 
   module Flag : sig
     type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
+
+    val ( ||| ) : t -> t -> t
   end
 
   val constant_layout_typ :
