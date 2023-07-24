@@ -8,17 +8,20 @@ import (
 )
 
 type PaymentSubParams struct {
-	ExperimentName         string
-	Tps, MinTps            float64
-	DurationInMinutes      int
-	FeeMax, FeeMin, Amount uint64
-	Receiver               itn_json_types.MinaPublicKey
+	ExperimentName string                       `json:"experimentName"`
+	Tps            float64                      `json:"tps"`
+	MinTps         float64                      `json:"minTps"`
+	DurationMin    int                          `json:"durationMin"`
+	MaxFee         uint64                       `json:"maxFee"`
+	MinFee         uint64                       `json:"minFee"`
+	Amount         uint64                       `json:"amount"`
+	Receiver       itn_json_types.MinaPublicKey `json:"receiver"`
 }
 
 type PaymentParams struct {
 	PaymentSubParams
-	Senders []itn_json_types.MinaPrivateKey
-	Nodes   []NodeAddress
+	FeePayers []itn_json_types.MinaPrivateKey `json:"feePayers"`
+	Nodes     []NodeAddress                   `json:"nodes"`
 }
 
 type ScheduledPaymentsReceipt struct {
@@ -28,9 +31,9 @@ type ScheduledPaymentsReceipt struct {
 
 func PaymentKeygenRequirements(gap int, params PaymentSubParams) (int, uint64) {
 	maxParticipants := int(math.Ceil(params.Tps / params.MinTps))
-	txCost := params.FeeMax + params.Amount
+	txCost := params.MaxFee + params.Amount
 	tpsGap := uint64(math.Round(params.Tps * float64(gap)))
-	totalTxs := uint64(math.Ceil(float64(params.DurationInMinutes) * 60 * params.Tps))
+	totalTxs := uint64(math.Ceil(float64(params.DurationMin) * 60 * params.Tps))
 	balance := 3 * txCost * totalTxs
 	keys := maxParticipants + int(tpsGap)*2
 	return keys, balance
@@ -38,14 +41,14 @@ func PaymentKeygenRequirements(gap int, params PaymentSubParams) (int, uint64) {
 
 func schedulePaymentsDo(config Config, params PaymentParams, nodeAddress NodeAddress, batchIx int, tps float64, feePayers []itn_json_types.MinaPrivateKey) (string, error) {
 	paymentInput := PaymentsDetails{
-		DurationInMinutes:     params.DurationInMinutes,
-		TransactionsPerSecond: tps,
-		Memo:                  fmt.Sprintf("%s-%d", params.ExperimentName, batchIx),
-		FeeMax:                params.FeeMax,
-		FeeMin:                params.FeeMin,
-		Amount:                params.Amount,
-		Receiver:              params.Receiver,
-		Senders:               feePayers,
+		DurationMin: params.DurationMin,
+		Tps:         tps,
+		MemoPrefix:  fmt.Sprintf("%s-%d", params.ExperimentName, batchIx),
+		MaxFee:      params.MaxFee,
+		MinFee:      params.MinFee,
+		Amount:      params.Amount,
+		Receiver:    params.Receiver,
+		Senders:     feePayers,
 	}
 	handle, err := SchedulePaymentsGql(config, nodeAddress, paymentInput)
 	if err == nil {
@@ -56,10 +59,10 @@ func schedulePaymentsDo(config Config, params PaymentParams, nodeAddress NodeAdd
 
 func SchedulePayments(config Config, params PaymentParams, output func(ScheduledPaymentsReceipt)) error {
 	tps, nodes := selectNodes(params.Tps, params.MinTps, params.Nodes)
-	feePayersPerNode := len(params.Senders) / len(nodes)
+	feePayersPerNode := len(params.FeePayers) / len(nodes)
 	successfulNodes := make([]NodeAddress, 0, len(nodes))
 	remTps := params.Tps
-	remFeePayers := params.Senders
+	remFeePayers := params.FeePayers
 	var err error
 	for nodeIx, nodeAddress := range nodes {
 		feePayers := remFeePayers[:feePayersPerNode]

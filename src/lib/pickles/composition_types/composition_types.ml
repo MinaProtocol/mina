@@ -87,119 +87,28 @@ module Wrap = struct
           end
 
           module Optional_column_scalars = struct
-            type 'fp t =
-              { range_check0 : 'fp
-              ; range_check1 : 'fp
-              ; foreign_field_add : 'fp
-              ; foreign_field_mul : 'fp
-              ; xor : 'fp
-              ; rot : 'fp
-              ; lookup_gate : 'fp
-              ; runtime_tables : 'fp
-              }
+            type 'fp t = { lookup_gate : 'fp; runtime_tables : 'fp }
             [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
-            let map ~f
-                { range_check0
-                ; range_check1
-                ; foreign_field_add
-                ; foreign_field_mul
-                ; xor
-                ; rot
-                ; lookup_gate
-                ; runtime_tables
-                } =
-              { range_check0 = f range_check0
-              ; range_check1 = f range_check1
-              ; foreign_field_add = f foreign_field_add
-              ; foreign_field_mul = f foreign_field_mul
-              ; xor = f xor
-              ; rot = f rot
-              ; lookup_gate = f lookup_gate
-              ; runtime_tables = f runtime_tables
-              }
+            let map ~f { lookup_gate; runtime_tables } =
+              { lookup_gate = f lookup_gate; runtime_tables = f runtime_tables }
 
             let map2 ~f t1 t2 =
-              { range_check0 = f t1.range_check0 t2.range_check0
-              ; range_check1 = f t1.range_check1 t2.range_check1
-              ; foreign_field_add = f t1.foreign_field_add t2.foreign_field_add
-              ; foreign_field_mul = f t1.foreign_field_mul t2.foreign_field_mul
-              ; xor = f t1.xor t2.xor
-              ; rot = f t1.rot t2.rot
-              ; lookup_gate = f t1.lookup_gate t2.lookup_gate
+              { lookup_gate = f t1.lookup_gate t2.lookup_gate
               ; runtime_tables = f t1.runtime_tables t2.runtime_tables
               }
 
-            let to_list
-                { range_check0
-                ; range_check1
-                ; foreign_field_add
-                ; foreign_field_mul
-                ; xor
-                ; rot
-                ; lookup_gate
-                ; runtime_tables
-                } =
-              [ range_check0
-              ; range_check1
-              ; foreign_field_add
-              ; foreign_field_mul
-              ; xor
-              ; rot
-              ; lookup_gate
-              ; runtime_tables
-              ]
+            let to_list { lookup_gate; runtime_tables } =
+              [ lookup_gate; runtime_tables ]
 
-            let to_data
-                { range_check0
-                ; range_check1
-                ; foreign_field_add
-                ; foreign_field_mul
-                ; xor
-                ; rot
-                ; lookup_gate
-                ; runtime_tables
-                } =
-              Hlist.HlistId.
-                [ range_check0
-                ; range_check1
-                ; foreign_field_add
-                ; foreign_field_mul
-                ; xor
-                ; rot
-                ; lookup_gate
-                ; runtime_tables
-                ]
+            let to_data { lookup_gate; runtime_tables } =
+              Hlist.HlistId.[ lookup_gate; runtime_tables ]
 
-            let of_data
-                Hlist.HlistId.
-                  [ range_check0
-                  ; range_check1
-                  ; foreign_field_add
-                  ; foreign_field_mul
-                  ; xor
-                  ; rot
-                  ; lookup_gate
-                  ; runtime_tables
-                  ] =
-              { range_check0
-              ; range_check1
-              ; foreign_field_add
-              ; foreign_field_mul
-              ; xor
-              ; rot
-              ; lookup_gate
-              ; runtime_tables
-              }
+            let of_data Hlist.HlistId.[ lookup_gate; runtime_tables ] =
+              { lookup_gate; runtime_tables }
 
             let of_feature_flags (feature_flags : _ Plonk_types.Features.t) =
-              { range_check0 = feature_flags.range_check0
-              ; range_check1 = feature_flags.range_check1
-              ; foreign_field_add = feature_flags.foreign_field_add
-              ; foreign_field_mul = feature_flags.foreign_field_mul
-              ; xor = feature_flags.xor
-              ; rot = feature_flags.rot
-              ; lookup_gate = feature_flags.lookup
+              { lookup_gate = feature_flags.lookup
               ; runtime_tables = feature_flags.runtime_tables
               }
 
@@ -243,19 +152,8 @@ module Wrap = struct
                 | _ ->
                     opt_spec
               in
-              let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =
-                of_feature_flags feature_flags |> to_data
-              in
-              Spec.T.Struct
-                [ opt_spec f1
-                ; opt_spec f2
-                ; opt_spec f3
-                ; opt_spec f4
-                ; opt_spec f5
-                ; opt_spec f6
-                ; opt_spec f7
-                ; opt_spec f8
-                ]
+              let [ f1; f2 ] = of_feature_flags feature_flags |> to_data in
+              Spec.T.Struct [ opt_spec f1; opt_spec f2 ]
 
             let typ (type f fp)
                 (module Impl : Snarky_backendless.Snark_intf.Run
@@ -266,27 +164,13 @@ module Wrap = struct
                 Plonk_types.Opt.typ Impl.Boolean.typ flag fp ~dummy:dummy_scalar
               in
               Snarky_backendless.Typ.of_hlistable
-                [ opt_typ feature_flags.range_check0
-                ; opt_typ feature_flags.range_check1
-                ; opt_typ feature_flags.foreign_field_add
-                ; opt_typ feature_flags.foreign_field_mul
-                ; opt_typ feature_flags.xor
-                ; opt_typ feature_flags.rot
-                ; opt_typ feature_flags.lookup
+                [ opt_typ feature_flags.lookup
                 ; opt_typ feature_flags.runtime_tables
                 ]
                 ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
                 ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
           end
 
-          (** All scalar values deferred by a verifier circuit.
-              The values in [vbmul], [complete_add], [endomul], [endomul_scalar], and [perm]
-              are all scalars which will have been used to scale selector polynomials during the
-              computation of the linearized polynomial commitment.
-
-              Then, we expose them so the next guy (who can do scalar arithmetic) can check that they
-              were computed correctly from the evaluations in the proof and the challenges.
-          *)
           type ( 'challenge
                , 'scalar_challenge
                , 'fp
@@ -303,12 +187,6 @@ module Wrap = struct
                   *)
             ; zeta_to_srs_length : 'fp
             ; zeta_to_domain_size : 'fp
-            ; vbmul : 'fp  (** scalar used on the vbmul selector *)
-            ; complete_add : 'fp
-                  (** scalar used on the complete_add selector *)
-            ; endomul : 'fp  (** scalar used on the endomul selector *)
-            ; endomul_scalar : 'fp
-                  (** scalar used on the endomul_scalar selector *)
             ; perm : 'fp
                   (** scalar used on one of the permutation polynomial commitments. *)
             ; feature_flags : 'bool Plonk_types.Features.t
@@ -330,10 +208,6 @@ module Wrap = struct
             { t with
               zeta_to_srs_length = f t.zeta_to_srs_length
             ; zeta_to_domain_size = f t.zeta_to_domain_size
-            ; vbmul = f t.vbmul
-            ; complete_add = f t.complete_add
-            ; endomul = f t.endomul
-            ; endomul_scalar = f t.endomul_scalar
             ; perm = f t.perm
             ; optional_column_scalars =
                 Optional_column_scalars.map ~f:(Opt.map ~f)
@@ -350,10 +224,6 @@ module Wrap = struct
               ; challenge
               ; challenge
               ; Scalar_challenge.typ scalar_challenge
-              ; fp
-              ; fp
-              ; fp
-              ; fp
               ; fp
               ; fp
               ; fp
@@ -926,7 +796,7 @@ module Wrap = struct
             ]
         in
         Spec.T.Struct
-          [ Vector (B Field, Nat.N9.n)
+          [ Vector (B Field, Nat.N5.n)
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
@@ -954,10 +824,6 @@ module Wrap = struct
                        ; zeta
                        ; zeta_to_srs_length
                        ; zeta_to_domain_size
-                       ; vbmul
-                       ; complete_add
-                       ; endomul
-                       ; endomul_scalar
                        ; perm
                        ; feature_flags
                        ; lookup
@@ -978,10 +844,6 @@ module Wrap = struct
           ; b
           ; zeta_to_srs_length
           ; zeta_to_domain_size
-          ; vbmul
-          ; complete_add
-          ; endomul
-          ; endomul_scalar
           ; perm
           ]
         in
@@ -1030,10 +892,6 @@ module Wrap = struct
             ; b
             ; zeta_to_srs_length
             ; zeta_to_domain_size
-            ; vbmul
-            ; complete_add
-            ; endomul
-            ; endomul_scalar
             ; perm
             ] =
           fp
@@ -1068,10 +926,6 @@ module Wrap = struct
                     ; zeta
                     ; zeta_to_srs_length
                     ; zeta_to_domain_size
-                    ; vbmul
-                    ; complete_add
-                    ; endomul
-                    ; endomul_scalar
                     ; perm
                     ; feature_flags
                     ; lookup =
@@ -1295,7 +1149,7 @@ module Step = struct
               ]
           in
           Spec.T.Struct
-            [ Vector (B Field, Nat.N9.n)
+            [ Vector (B Field, Nat.N5.n)
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
             ; Vector (Scalar Challenge, Nat.N3.n)
@@ -1321,10 +1175,6 @@ module Step = struct
                      ; zeta
                      ; zeta_to_srs_length
                      ; zeta_to_domain_size
-                     ; vbmul
-                     ; complete_add
-                     ; endomul
-                     ; endomul_scalar
                      ; perm
                      ; feature_flags
                      ; lookup
@@ -1341,10 +1191,6 @@ module Step = struct
             ; b
             ; zeta_to_srs_length
             ; zeta_to_domain_size
-            ; vbmul
-            ; complete_add
-            ; endomul
-            ; endomul_scalar
             ; perm
             ]
           in
@@ -1376,10 +1222,6 @@ module Step = struct
                   ; b
                   ; zeta_to_srs_length
                   ; zeta_to_domain_size
-                  ; vbmul
-                  ; complete_add
-                  ; endomul
-                  ; endomul_scalar
                   ; perm
                   ]
               ; Vector.[ sponge_digest_before_evaluations ]
@@ -1409,10 +1251,6 @@ module Step = struct
                   ; zeta
                   ; zeta_to_srs_length
                   ; zeta_to_domain_size
-                  ; vbmul
-                  ; complete_add
-                  ; endomul
-                  ; endomul_scalar
                   ; perm
                   ; feature_flags
                   ; lookup =

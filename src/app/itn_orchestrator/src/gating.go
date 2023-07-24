@@ -8,12 +8,12 @@ import (
 )
 
 type IsolateParams struct {
-	Participants []NodeAddress
+	Nodes []NodeAddress `json:"nodes"`
 }
 
 func Isolate(config Config, params IsolateParams) error {
-	peers := make([]NetworkPeer, len(params.Participants))
-	for i, address := range params.Participants {
+	peers := make([]NetworkPeer, len(params.Nodes))
+	for i, address := range params.Nodes {
 		host := string(address[:strings.IndexRune(string(address), ':')])
 		nd, has := config.NodeData[address]
 		if !has {
@@ -29,7 +29,7 @@ func Isolate(config Config, params IsolateParams) error {
 			Host:       host,
 		}
 	}
-	for i, address := range params.Participants {
+	for i, address := range params.Nodes {
 		addedPeers := make([]NetworkPeer, len(peers)-1)
 		copy(addedPeers, peers[:i])
 		copy(addedPeers[i:], peers[i+1:])
@@ -62,8 +62,8 @@ func (IsolateAction) Name() string { return "isolate" }
 var _ Action = IsolateAction{}
 
 type ResetGatingParams struct {
-	Participants   []NodeAddress
-	AddRandomPeers int
+	Nodes          []NodeAddress `json:"nodes"`
+	AddRandomPeers int           `json:"addRandomPeers,omitempty"`
 }
 
 func ResetGating(config Config, params ResetGatingParams) error {
@@ -83,12 +83,12 @@ func ResetGating(config Config, params ResetGatingParams) error {
 		BannedPeers:     make([]NetworkPeer, 0),
 		TrustedPeers:    make([]NetworkPeer, 0),
 	}
-	for _, address := range params.Participants {
+	for _, address := range params.Nodes {
 		if err := UpdateGatingGql(config, address, gatingUpdate1); err != nil {
 			return fmt.Errorf("failed to update gating for %s: %v", address, err)
 		}
 	}
-	for _, address := range params.Participants {
+	for _, address := range params.Nodes {
 		var somePeers []NetworkPeer
 		if params.AddRandomPeers >= len(peers)-1 {
 			somePeers = peers

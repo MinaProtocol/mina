@@ -181,6 +181,16 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
         lookup: None,
         generic_selector: eval(),
         poseidon_selector: eval(),
+        complete_add_selector: eval(),
+        mul_selector: eval(),
+        emul_selector: eval(),
+        endomul_scalar_selector: eval(),
+        range_check0_selector: None,
+        range_check1_selector: None,
+        foreign_field_add_selector: None,
+        foreign_field_mul_selector: None,
+        xor_selector: None,
+        rot_selector: None,
     };
 
     let public = vec![Fq::one(), Fq::one()];

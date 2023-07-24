@@ -909,15 +909,7 @@ let wrap
                           (* TODO: This assumes that wrap circuits do not use
                              optional gates.
                           *)
-                          { range_check0 = None
-                          ; range_check1 = None
-                          ; foreign_field_add = None
-                          ; foreign_field_mul = None
-                          ; xor = None
-                          ; rot = None
-                          ; lookup_gate = None
-                          ; runtime_tables = None
-                          }
+                          { lookup_gate = None; runtime_tables = None }
                       }
                   }
               }
