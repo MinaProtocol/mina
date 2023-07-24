@@ -393,3 +393,234 @@ groups:
       summary: "Missing blocks observed on {{ $labels.testnet }}"
       description: "{{ $value }} Missing block(s) observed on network {{ $labels.testnet }}."
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
+
+- name: Berkeley syncStatus related alerts
+  rules:
+  - alert: HighDisconnectedBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"} [${alert_timeframe}])) > 3
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has more than 3 blocks that have been produced on a remote side chains in the last hour"
+      description: "{{ $value }} blocks have been produced that share no common ancestor with our transition frontier on network {{ $labels.test }} in the last hour."
+      runbook: "https://www.notion.so/minaprotocol/HighDisconnectedBlocksPerHour-14da6dc40386439799eb2a573d077ecb"
+
+  - alert: HighOldBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_worse_than_root {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"} [${alert_timeframe}])) > 5
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has more than 5 blocks that are not selected over the root of our transition frontier in the last hour"
+      description: "{{ $value }} blocks have been produced that are not selected over the root of our transition frontier in the last hour"
+      runbook: "https://www.notion.so/minaprotocol/HighOldBlocksPerHour-134ba51aef4d482bb065ce7a02dd8fb7"
+
+  - alert: HighInvalidProofPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"} [${alert_timeframe}])) > 3
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has more than 3 blocks that contains an invalid blockchain snark proof in last hour"
+      description: "{{ $value }} blocks have been produced that contains an invalid blockchain snark proof in last hour"
+      runbook: "https://www.notion.so/minaprotocol/HighInvalidProofPerHour-8ff715ccf9564b6e8a27b5a9dc65ef77"
+
+  - alert: LowPeerCount
+    expr: min by (testnet) (Coda_Network_peers {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) < 3
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} avg. peer count is critically low"
+      description: "Critically low peer count of {{ $value }} on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/LowPeerCount-3a66ae1ca6fd44b585eca37f9206d429"
+
+  - alert: CriticallyLowMinWindowDensity
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_min_window_density {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) <= 13
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} min density is critically low"
+      description: "Critically low min density of {{ $value }} on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/LowMinWindowDensity-Runbook-7908635be4754b44a862d9bec8edc239"
+
+  - alert: LowFillRate
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_slot_fill_rate {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) < 0.75 * 0.6
+    for: 1h
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} slot fill rate is critically low"
+      description: "Lower fill rate of {{ $value }} than expected on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/LowFillRate-36efb1cd9b5d461db6976bc1938fab9e"
+
+  - alert: NoTransactionsInSeveralBlocks
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_empty_blocks_at_best_tip {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) >= 5
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has >= 5 blocks without transactions at the tip"
+      description: "{{ $value }} blocks without transactions on tip of network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/No-Transactions-In-Several-Blocks-55ca13df38dd4c3491e11d8ea8020c08"
+
+  - alert: NoCoinbaseInBlocks
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_best_tip_coinbase {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) < 1
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has blocks without coinbases"
+      description: "{{ $value }} Blocks without coinbases on tip of network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/NoCoinbaseInBlocks-aacbc2a4f9334d0db2de20c2f77ac34f"
+
+  - alert: LongFork
+    expr: max by (testnet) (Coda_Transition_frontier_longest_fork {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) >= 16
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has a fork of length at least 16"
+      description: "Fork of length {{ $value }} on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/LongFork-e65e5ad7437f4f4dbac201abbf9ace81"
+
+  - alert: OldBestTip
+    expr: min by (testnet) ((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) >= 15 * 180
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }}: all nodes have best tips older than 15 slots"
+      description: "All nodes have best tips older than 15 slots (45 minutes) on network {{ $labels.testnet }}. Best tip: {{ $value }}"
+      runbook: "https://www.notion.so/minaprotocol/OldBestTip-8afa955101b642bd8356edfd0b03b640"
+
+  - alert: NoNewSnarks
+    expr: min by (testnet) ((time() - 1609459200) - Coda_Snark_work_useful_snark_work_received_time_sec {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) >= 2 * 180 and max by (testnet) (Coda_Snark_work_pending_snark_work {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) != 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }}: no new SNARK work seen for 2 slots."
+      description: "No node has received SNARK work in the last 2 slots (6 minutes) on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/NoNewSnarks-f86d27c81af54954b2fb61378bff9d4d"
+
+  - alert: NoNewTransactions
+    expr: min by (testnet) ((time() - 1609459200) - Coda_Transaction_pool_useful_transactions_received_time_sec {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) >= 2 * 180
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }}: no new transactions seen for 2 slots."
+      description: "No node has received transactions in their transaction pool in the last 2 slots (6 minutes) on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/NoNewTransactions-27dbeafab8ea4d659ee6f748acb2fd6c"
+
+  - alert: FewBlocksPerHour
+    expr: quantile by (testnet) (0.5, increase(Coda_Transition_frontier_max_blocklength_observed {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"} [30m])) < 1
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last 30m)"
+      description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
+      runbook: "https://www.notion.so/minaprotocol/FewBlocksPerHour-47a6356f093242d988b0d9527ce23478"
+ 
+  - alert: HighBlockGossipLatency
+    expr: max by (testnet) (max_over_time(Coda_Block_latency_gossip_time {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"} [${alert_timeframe}])) > 200
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} block gossip latency is high"
+      description: "High block gossip latency of {{ $value }}(ms) within {{ $labels.testnet }} network."
+      runbook: "https://www.notion.so/minaprotocol/HighBlockGossipLatency-2096501c7cf34032b44e903ec1a4d79c"
+
+  - alert: SomewhatOldBestTip
+    expr: count by (testnet) (((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) >= 8 * 180) > 1
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }}: at least 2 nodes have best tips older than 8 slots"
+      description: "At least 2 nodes have best tips older than 8 slots (24 minutes) on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/SomewhatOldBestTip-bb1509582bdd4908bcda656eebf421b5"
+
+  - alert: MediumFork
+    expr: max by (testnet) (Coda_Transition_frontier_longest_fork {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) >= 8
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has a fork of length at least 8"
+      description: "Fork of length {{ $value }} on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/MediumFork-0a530813af2e40c491cdf01b3a2b2304"
+
+  - alert: NoTransactionsInAtLeastOneBlock
+    expr: max by (testnet) (Coda_Transition_frontier_empty_blocks_at_best_tip {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has at least 1 block without transactions at the tip"
+      description: "{{ $value }} Blocks without transactions on tip of network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/NoTransactionsInAtLeastOneBlock-049250ff7ae84de990233c7b6d35f763"
+
+  - alert: LowMinWindowDensity
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_min_window_density {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"}) <= 35
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} min density is low"
+      description: "Low min density on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/LowMinWindowDensity-Runbook-7908635be4754b44a862d9bec8edc239"
+
+  - alert: LowDisconnectedBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"} [${alert_timeframe}])) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has at least 1 blocks that have been produced on a remote side chains in the last hour"
+      description: "{{ $value }} blocks have been produced that share no common ancestor with our transition frontier on network {{ $labels.test }} in the last hour."
+      runbook: "https://www.notion.so/minaprotocol/LowDisconnectedBlocksPerHour-32bd49852fbb499090106fe63a504859"
+
+  - alert: LowOldBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_worse_than_root {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"} [${alert_timeframe}])) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has at least 1 blocks that are not selected over the root of our transition frontier in the last hour"
+      description: "{{ $value }} blocks have been produced that are not selected over the root of our transition frontier in the last hour"
+      runbook: "https://www.notion.so/minaprotocol/LowOldBlocksPerHour-1cc2e92b8ca944869d810f7afd7c2d78"
+
+  - alert: LowInvalidProofPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"} [${alert_timeframe}])) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has at least 1 blocks that contains an invalid blockchain snark proof in last hour"
+      description: "{{ $value }} blocks have been produced that contains an invalid blockchain snark proof in last hour"
+      runbook: "https://www.notion.so/minaprotocol/LowInvalidProofPerHour-b6e88b9ae84f47169e7f86017ab9e340"
+
+  - alert: LowPostgresBlockHeightGrowth
+    expr: min by (testnet) (increase(Coda_Archive_max_block_height {testnet="berkeley",syncStatus!="INIT"|"BOOTSTRAP"|"CATCHUP"} [${alert_timeframe}])) < 1
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} rate of archival of network blocks in Postgres DB is lower than expected"
+      description: "The rate of {{ $value }} new blocks observed by archive postgres instances is low on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
+
