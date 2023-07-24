@@ -43,11 +43,11 @@ module Wrap =
 
 let tests =
   let open Alcotest in
-  [ ( "step"
+  [ ( "Sponge:Step"
     , [ test_case "sponge" `Quick (fun () ->
             Step.test Pickles__Tick_field_sponge.params )
       ] )
-  ; ( "wrap"
+  ; ( "Sponge:Wrap"
     , [ test_case "sponge" `Quick (fun () ->
             Wrap.test Pickles__Tock_field_sponge.params )
       ] )

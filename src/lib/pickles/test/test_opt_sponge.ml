@@ -85,7 +85,7 @@ module Step = Test_make (Impls.Step) (Step_main_inputs.Sponge.Permutation)
 let tests =
   let open Alcotest in
   [ ( "Opt_sponge"
-    , [ test_case "wrap corrrect " `Quick Wrap.test_correctness
-      ; test_case "step corrrect " `Quick Step.test_correctness
+    , [ test_case "wrap correct" `Quick Wrap.test_correctness
+      ; test_case "step correct" `Quick Step.test_correctness
       ] )
   ]

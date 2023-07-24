@@ -81,8 +81,8 @@ let test_scale_fast_2_small () =
 
 let tests =
   let open Alcotest in
-  [ ( "Step curve ops"
-    , [ test_case "scale fast '" `Quick test_scale_fast_2
-      ; test_case "scale fast smal" `Quick test_scale_fast_2_small
+  [ ( "Step curve operations"
+    , [ test_case "scale fast prime" `Quick test_scale_fast_2
+      ; test_case "scale fast small" `Quick test_scale_fast_2_small
       ] )
   ]

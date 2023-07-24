@@ -87,4 +87,6 @@ module Step =
   Test_make (Pickles__Impls.Step) (Pickles__Step_main_inputs.Inner_curve)
 
 let tests =
-  [ ("Plonk curve ops Wrap", Wrap.tests); ("Plonk curve ops Step", Step.tests) ]
+  [ ("Plonk curve operations:Wrap", Wrap.tests)
+  ; ("Plonk curve operations:Step", Step.tests)
+  ]

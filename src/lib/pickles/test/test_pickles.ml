@@ -456,7 +456,7 @@ module Test1 = struct
     let example2_input, example2_proof = example2
 
     let () =
-      Tests.add_slow ~name:"Tree_proof return" ~f:(fun () ->
+      Tests.add_slow ~name:"tree_proof return" ~f:(fun () ->
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
                  Proof.verify_promise examples ) ) )
@@ -502,7 +502,7 @@ module Test1 = struct
     (* let example_input, example_proof = example *)
 
     let () =
-      Tests.add_slow ~name:"Add one return" ~f:(fun () ->
+      Tests.add_slow ~name:"add one return" ~f:(fun () ->
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
                  Proof.verify_promise [ example () ] ) ) )
