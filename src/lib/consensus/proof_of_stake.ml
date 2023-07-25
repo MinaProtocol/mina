@@ -294,11 +294,11 @@ module Make_str (A : Wire_types.Concrete) = struct
                 File_system.rmrf location
 
           let ledger_subset keys ledger =
+            let open Mina_ledger in
             match ledger with
             | Genesis_epoch_ledger ledger ->
-                Mina_base.Sparse_ledger.of_ledger_subset_exn ledger keys
+                Sparse_ledger.of_ledger_subset_exn ledger keys
             | Ledger_db db_ledger ->
-                let open Mina_base in
                 let ledger = Ledger.of_database db_ledger in
                 let subset_ledger =
                   Sparse_ledger.of_ledger_subset_exn ledger keys
