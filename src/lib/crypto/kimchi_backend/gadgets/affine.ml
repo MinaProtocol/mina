@@ -117,8 +117,10 @@ let%test_unit "affine" =
                   "64223534476670136480328171927326822445460557333044467340973794755877726909525"
               )
           in
-          Foreign_field.result_row (module Runner.Impl) @@ fst pt_a ;
-          Foreign_field.result_row (module Runner.Impl) @@ snd pt_a ;
+          Foreign_field.result_row
+            (module Runner.Impl)
+            (fst pt_a)
+            (Some (snd pt_a)) ;
           let pt_b =
             of_bignum_bigint_coordinates
               (module Runner.Impl)
@@ -128,15 +130,19 @@ let%test_unit "affine" =
                   "8901505138963553768122761105087501646863888139548342861255965172357387323186"
               )
           in
-          Foreign_field.result_row (module Runner.Impl) @@ fst pt_b ;
-          Foreign_field.result_row (module Runner.Impl) @@ snd pt_b ;
+          Foreign_field.result_row
+            (module Runner.Impl)
+            (fst pt_b)
+            (Some (snd pt_b)) ;
           let bit =
             Runner.Impl.(exists Boolean.typ_unchecked ~compute:(fun () -> true))
           in
 
           let pt_c = if_ (module Runner.Impl) bit ~then_:pt_a ~else_:pt_b in
-          Foreign_field.result_row (module Runner.Impl) (fst pt_c) ;
-          Foreign_field.result_row (module Runner.Impl) (snd pt_c) ;
+          Foreign_field.result_row
+            (module Runner.Impl)
+            (fst pt_c)
+            (Some (snd pt_c)) ;
 
           assert_equal (module Runner.Impl) pt_c pt_a ;
 
@@ -146,8 +152,10 @@ let%test_unit "affine" =
           in
 
           let pt_d = if_ (module Runner.Impl) bit2 ~then_:pt_a ~else_:pt_b in
-          Foreign_field.result_row (module Runner.Impl) (fst pt_d) ;
-          Foreign_field.result_row (module Runner.Impl) (snd pt_d) ;
+          Foreign_field.result_row
+            (module Runner.Impl)
+            (fst pt_d)
+            (Some (snd pt_d)) ;
 
           assert_equal (module Runner.Impl) pt_d pt_b ;
 

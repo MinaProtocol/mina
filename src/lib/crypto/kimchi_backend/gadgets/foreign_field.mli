@@ -156,18 +156,22 @@ module External_checks : sig
   module Cvar = Snarky_backendless.Cvar
 
   type 'field t =
-    { mutable multi_ranges : 'field Cvar.t standard_limbs list
-    ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
-    ; mutable bounds : ('field Cvar.t standard_limbs * bool) list
+    { mutable bounds : ('field Cvar.t standard_limbs * bool) list
     ; mutable canonicals : 'field Cvar.t standard_limbs list
+    ; mutable multi_ranges : 'field Cvar.t standard_limbs list
+    ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
     ; mutable limb_ranges : 'field Cvar.t list
     }
 
   (** Create a new context *)
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
 
-  (** Tracks a limb-range-check *)
-  val append_limb_check : 'field t -> 'field Cvar.t -> unit
+  (** Track a bound check *)
+  val append_bound_check :
+    'field t -> ?do_multi_range_check:bool -> 'field Element.Standard.t -> unit
+
+  (** Track a canonical check *)
+  val append_canonical_check : 'field t -> 'field Element.Standard.t -> unit
 
   (** Track a multi-range-check *)
   val append_multi_range_check :
@@ -177,12 +181,8 @@ module External_checks : sig
   val append_compact_multi_range_check :
     'field t -> 'field Cvar.t compact_limbs -> unit
 
-  (** Track a bound check *)
-  val append_bound_check :
-    'field t -> ?do_multi_range_check:bool -> 'field Element.Standard.t -> unit
-
-  (** Track a canonical check *)
-  val append_canonical_check : 'field t -> 'field Element.Standard.t -> unit
+  (** Tracks a limb-range-check *)
+  val append_limb_check : 'field t -> 'field Cvar.t -> unit
 end
 
 (* Type of operation *)
@@ -308,6 +308,7 @@ val result_row :
      (module Snark_intf.Run with type field = 'f)
   -> ?label:string
   -> 'f Element.Standard.t
+  -> 'f Element.Standard.t option
   -> unit
 
 (** Gadget for foreign field multiplication
