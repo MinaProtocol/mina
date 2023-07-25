@@ -388,8 +388,8 @@ struct
     let soft_timeout_in_slots = 8 in
     { id = Next_epoch_ledger_updated
     ; description =
-        "Next epoch ledger gets updated to a ledger that's different from  \n\
-        \       the genesis"
+        "Next epoch ledger gets updated to a ledger that's different from  the \
+         genesis"
     ; predicate = Event_predicate (Event_type.Block_produced, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
