@@ -2,6 +2,8 @@ open Core
 open Key_cache
 include T (Or_error)
 
+let may_download () = false
+
 let on_disk to_string read write prefix =
   let path k = prefix ^/ to_string k in
   let read k =

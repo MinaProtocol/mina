@@ -3,10 +3,6 @@ open Async_kernel
 
 include module type of Key_cache_intf
 
-val may_download : unit -> bool
-
-val set_downloads_enabled : bool -> unit
-
 module Trivial : Sync
 
 module Trivial_async : Async

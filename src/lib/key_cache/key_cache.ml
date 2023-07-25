@@ -4,17 +4,7 @@ open Async_kernel
 [%%import "/src/config.mlh"]
 
 include Key_cache_intf
-
-[%%inject "may_download", download_snark_keys]
-
-let may_download = ref may_download
-
-let set_downloads_enabled b = may_download := b
-
-let may_download () = !may_download
-
 module Trivial = Key_cache_dummy.Key_cache.Trivial
-
 module Trivial_async = Key_cache_dummy.Key_cache.Trivial_async
 
 let sync = ref (module Trivial : Sync)

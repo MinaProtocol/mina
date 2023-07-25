@@ -4,6 +4,8 @@ open Key_cache
 open Async_kernel
 include T (Deferred.Or_error)
 
+let may_download () = false
+
 let on_disk to_string read write prefix =
   let path k = prefix ^/ to_string k in
   let read k =
