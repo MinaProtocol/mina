@@ -198,12 +198,12 @@ module Tock : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
-       ; joint_combiner
-       ; beta
-       ; gamma
-       ; unnormalized_lagrange_basis
-       ; if_feature
+       ; vanishes_on_last_4_rows = _
+       ; joint_combiner = _
+       ; beta = _
+       ; gamma = _
+       ; unnormalized_lagrange_basis = _
+       ; if_feature = _
        } :
         a Env.t) =
 |ocaml}

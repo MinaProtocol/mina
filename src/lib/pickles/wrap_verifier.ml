@@ -836,11 +836,10 @@ struct
         ( _
         , _
         , _ Shifted_value.Type2.t
-        , _
-        , _
         , _ )
         Types.Step.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
+    let module Plonk = Types.Step.Proof_state.Deferred_values.Plonk in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
@@ -918,7 +917,9 @@ struct
     (* TODO: r actually does not need to be a scalar challenge. *)
     let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
     let plonk_minimal =
-      Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option_unsafe
+      plonk |> Plonk.to_minimal
+      |> Plonk.Minimal.to_wrap
+           ~feature_flags:Features.(map ~f:Boolean.var_of_value none_bool)
     in
     let combined_evals =
       let n = Common.Max_degree.wrap_log2 in
@@ -1041,7 +1042,11 @@ struct
           (* This proof is a wrap proof; no need to consider features. *)
           Plonk_checks.checked
             (module Impl)
-            ~env ~shift:shift2 plonk combined_evals )
+            ~env ~shift:shift2
+            (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+             .to_wrap ~opt_none:Plonk_types.Opt.None ~false_:Boolean.false_
+               plonk )
+            combined_evals )
     in
     print_bool "xi_correct" xi_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;

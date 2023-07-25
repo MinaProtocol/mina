@@ -128,9 +128,6 @@ let expand_feature_flags (type boolean)
      ; runtime_tables = _
      } as features :
       boolean Plonk_types.Features.t ) : boolean all_feature_flags =
-  let lookup_tables =
-    lazy (B.any [ range_check0; range_check1; foreign_field_mul; xor; rot ])
-  in
   let lookup_pattern_range_check =
     (* RangeCheck, Rot gates use RangeCheck lookup pattern *)
     lazy B.(range_check0 ||| range_check1 ||| rot)
@@ -170,8 +167,7 @@ let expand_feature_flags (type boolean)
     (* Lookup has max_lookups_per_row = 3 *)
     lazy (B.( ||| ) (Lazy.force lookups_per_row_4) lookup)
   in
-
-  { lookup_tables
+  { lookup_tables = lookups_per_row_3
   ; table_width_at_least_1
   ; table_width_at_least_2
   ; table_width_3
@@ -305,7 +301,8 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     | LookupTable ->
         get_eval (Opt.value_exn e.lookup_table)
     | LookupSorted i ->
-        get_eval (Opt.value_exn e.lookup_sorted.(i))
+        get_eval
+          (Opt.value_exn (Option.value_exn (Vector.nth e.lookup_sorted i)))
     | LookupAggreg ->
         get_eval (Opt.value_exn e.lookup_aggregation)
     | LookupRuntimeTable ->
