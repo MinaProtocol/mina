@@ -1726,7 +1726,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
      *     right_input           := right multiplicand
      *     foreign_field_modulus := foreign field modulus
      *)
-    let _test_mul_full ?cs (left_input : Bignum_bigint.t)
+    let test_mul_full ?cs (left_input : Bignum_bigint.t)
         (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
         =
       (* Generate and verify first proof *)
@@ -1753,26 +1753,6 @@ let%test_unit "foreign_field arithmetics gadgets" =
                that are required for soundness *)
             let external_checks = External_checks.create (module Runner.Impl) in
 
-            (* External checks for this test (example, circuit designer has complete flexibility about organization)
-               *   Layout
-               *       0) ForeignFieldMul           (result = left * right modulo f)
-               *       1) Zero
-               *       2) ForeignFieldAdd           (result bound addition)
-               *       3) Zero                      (result bound addition)
-               *       4) ForeignFieldAdd           (left bound addition)
-               *       5) Zero                      (left bound addition)
-               *       6) ForeignFieldAdd           (right bound addition)
-               *       7) Zero                      (right bound addition)
-               *    8-11) multi-range-check         (right bound)
-               *   12-15) multi-range-check         (right bound)
-               *   16-19) multi-range-check         (left bound)
-               *   20-23) multi-range-check         (left bound)
-               *   24-27) multi-range-check         (result)
-               *   28-31) multi-range-check         (result bound)
-               *   32-35) multi-range-check         (product1_lo, product1_hi_0, carry1_lo)
-               *   36-39) compact-multi-range-check (quotient)
-            *)
-
             (* Create the foreign field mul gadget *)
             let product =
               mul
@@ -1792,32 +1772,28 @@ let%test_unit "foreign_field arithmetics gadgets" =
                     (module Runner.Impl)
                     expected product ) ) ;
 
-            (* Bound check left input *)
+            (* Check left input *)
             External_checks.append_bound_check external_checks left_input ;
+            External_checks.append_canonical_check external_checks left_input ;
 
-            (* let left_input0, left_input1, left_input2 =
-                 Element.Standard.to_limbs left_input
-               in
-               Range_check.multi
-                 (module Runner.Impl)
-                 left_input0 left_input1 left_input2 ;
-               External_checks.append_high_bound external_checks left_input2 ; *)
-
-            (* Bound check right input *)
+            (* Check right input *)
             External_checks.append_bound_check external_checks right_input ;
+            External_checks.append_canonical_check external_checks right_input ;
 
-            (*
-             * Perform external checks
-             *)
-            assert (Mina_stdlib.List.Length.equal external_checks.bounds 3) ;
-            (* left, right, result *)
-            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 8) ;
+            (* Check result *)
+            External_checks.append_bound_check external_checks product ;
+            External_checks.append_canonical_check external_checks product ;
+
+            (* Sanity checks *)
+            assert (Mina_stdlib.List.Length.equal external_checks.bounds 4) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.canonicals 3) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
             assert (
               Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
-                1 ) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 1) ;
+                0 ) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
 
-            (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
+            (* Perform external checks *)
             constrain_external_checks
               (module Runner.Impl)
               external_checks foreign_field_modulus )
@@ -1829,7 +1805,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
     (* Helper to test foreign field arithmetics together
      * It computes a * b + a - b
      *)
-    let _test_ff ?cs (left_input : Bignum_bigint.t)
+    let test_ff ?cs (left_input : Bignum_bigint.t)
         (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
         =
       (* Generate and verify proof *)
@@ -1862,47 +1838,34 @@ let%test_unit "foreign_field arithmetics gadgets" =
 
             (* Create external checks context for tracking extra constraints
                that are required for soundness *)
-            let unused_external_checks =
-              External_checks.create (module Runner.Impl)
-            in
+            let external_checks = External_checks.create (module Runner.Impl) in
 
+            (* Multiply something *)
             let product =
               mul
                 (module Runner.Impl)
-                unused_external_checks left_input right_input
-                foreign_field_modulus
+                external_checks left_input right_input foreign_field_modulus
             in
 
+            (* Add something *)
             let addition =
               add (module Runner.Impl) product left_input foreign_field_modulus
             in
+            result_row
+              (module Runner.Impl)
+              ~label:"foreign_field_test" addition None ;
+
+            (* Subtract something *)
             let subtraction =
               sub
                 (module Runner.Impl)
                 addition right_input foreign_field_modulus
             in
-            let external_checks = External_checks.create (module Runner.Impl) in
+            result_row
+              (module Runner.Impl)
+              ~label:"foreign_field_test" subtraction None ;
 
-            (* Check product matches expected result *)
-            (* Check that the inputs were foreign field elements*)
-            let _out =
-              check_canonical
-                (module Runner.Impl)
-                external_checks left_input foreign_field_modulus
-            in
-            let _out =
-              check_canonical
-                (module Runner.Impl)
-                external_checks right_input foreign_field_modulus
-            in
-
-            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 4) ;
-            List.iter external_checks.multi_ranges ~f:(fun multi_range ->
-                let v0, v1, v2 = multi_range in
-                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-                () ) ;
-
-            (* Check product matches expected result *)
+            (* Sanity checks *)
             as_prover (fun () ->
                 let expected_mul =
                   Element.Standard.of_bignum_bigint
@@ -1930,7 +1893,41 @@ let%test_unit "foreign_field arithmetics gadgets" =
                 assert (
                   Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    expected_sub subtraction ) ) )
+                    expected_sub subtraction ) ) ;
+
+            (* Check left input *)
+            External_checks.append_bound_check external_checks left_input ;
+            External_checks.append_canonical_check external_checks left_input ;
+
+            (* Check right input *)
+            External_checks.append_bound_check external_checks right_input ;
+            External_checks.append_canonical_check external_checks right_input ;
+
+            (* Check product *)
+            External_checks.append_bound_check external_checks product ;
+            External_checks.append_canonical_check external_checks product ;
+
+            (* Check addition *)
+            External_checks.append_bound_check external_checks addition ;
+            External_checks.append_canonical_check external_checks addition ;
+
+            (* Check subtraction *)
+            External_checks.append_bound_check external_checks subtraction ;
+            External_checks.append_canonical_check external_checks subtraction ;
+
+            (* More sanity checks *)
+            assert (Mina_stdlib.List.Length.equal external_checks.bounds 6) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.canonicals 5) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
+            assert (
+              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
+                0 ) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
+
+            (* Perform external checks *)
+            constrain_external_checks
+              (module Runner.Impl)
+              external_checks foreign_field_modulus )
       in
       cs
     in
@@ -2082,7 +2079,6 @@ let%test_unit "foreign_field arithmetics gadgets" =
            "1fffe27b14baa740db0c8bb6656de61d2871a64093908af6181f46351a1c1909" )
         vesta_modulus
     in
-    (*
 
     (* Full test including all external checks *)
     let cs =
@@ -2110,10 +2106,8 @@ let%test_unit "foreign_field arithmetics gadgets" =
            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" )
         secp256k1_modulus
     in
-    () ) ; *)
     () )
 
-(*
 let%test_unit "foreign_field equal_as_prover" =
   if tests_enabled then
     let open Kimchi_gadgets_test_runner in
@@ -2173,64 +2167,3 @@ let%test_unit "foreign_field equal_as_prover" =
           () )
     in
     ()
-
-let%test_unit "foreign_field equal_as_prover" =
-  if tests_enabled then
-    let open Kimchi_gadgets_test_runner in
-    (* Initialize the SRS cache. *)
-    let () =
-      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-    in
-    (* Check equal_as_prover *)
-    let _cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () ->
-          let open Runner.Impl in
-          let x =
-            Element.Standard.of_bignum_bigint (module Runner.Impl)
-            @@ Common.bignum_bigint_of_hex
-                 "5925fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c"
-          in
-          let y =
-            Element.Standard.of_bignum_bigint (module Runner.Impl)
-            @@ Common.bignum_bigint_of_hex
-                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
-          in
-          let z =
-            Element.Standard.of_bignum_bigint (module Runner.Impl)
-            @@ Common.bignum_bigint_of_hex
-                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
-          in
-          as_prover (fun () ->
-              assert (
-                not (Element.Standard.equal_as_prover (module Runner.Impl) x y) ) ;
-              assert (Element.Standard.equal_as_prover (module Runner.Impl) y z) ) ;
-
-          let x =
-            Element.Compact.of_bignum_bigint (module Runner.Impl)
-            @@ Common.bignum_bigint_of_hex
-                 "5925fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c"
-          in
-          let y =
-            Element.Compact.of_bignum_bigint (module Runner.Impl)
-            @@ Common.bignum_bigint_of_hex
-                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
-          in
-          let z =
-            Element.Compact.of_bignum_bigint (module Runner.Impl)
-            @@ Common.bignum_bigint_of_hex
-                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
-          in
-          as_prover (fun () ->
-              assert (
-                not (Element.Compact.equal_as_prover (module Runner.Impl) x y) ) ;
-              assert (Element.Compact.equal_as_prover (module Runner.Impl) y z) ) ;
-
-          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-          let fake =
-            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
-          in
-          Boolean.Assert.is_true (Field.equal fake Field.zero) ;
-          () )
-    in
-    ()
- *)
