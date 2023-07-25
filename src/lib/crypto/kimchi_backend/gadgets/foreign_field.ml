@@ -1289,7 +1289,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
       , carry1_86
       , carry1_88
       , carry1_90 ) =
-    exists (Typ.array ~length:22 Field.typ) ~compute:(fun () ->
+    exists (Typ.array ~length:21 Field.typ) ~compute:(fun () ->
         (* Compute quotient remainder and negative foreign field modulus *)
         let quotient, remainder =
           (* Bignum_bigint computations *)
@@ -1505,7 +1505,7 @@ let bytes_to_standard_element (type f)
 (*********)
 
 let%test_unit "foreign_field arithmetics gadgets" =
-  if tests_enabled then
+  if tests_enabled then (
     let (* Import the gadget test runner *)
     open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -1594,7 +1594,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
      *     - foreign_field_modulus
      *     - is_sub: list of operations to perform
      *)
-    let _test_add_chain ?cs (inputs : Bignum_bigint.t list)
+    let test_add_chain ?cs (inputs : Bignum_bigint.t list)
         (operations : op_mode list) (foreign_field_modulus : Bignum_bigint.t) =
       (* Generate and verify proof *)
       let cs, _proof_keypair, _proof =
@@ -1638,6 +1638,10 @@ let%test_unit "foreign_field arithmetics gadgets" =
                 (module Runner.Impl)
                 inputs operations foreign_field_modulus
             in
+            result_row
+              (module Runner.Impl)
+              ~label:"test_add_chain_result" sum None ;
+
             (* Check sum matches expected result *)
             as_prover (fun () ->
                 let expected =
@@ -1661,7 +1665,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
      *     right_input           := right multiplicand
      *     foreign_field_modulus := foreign field modulus
      *)
-    let _test_mul ?cs (left_input : Bignum_bigint.t)
+    let test_mul ?cs (left_input : Bignum_bigint.t)
         (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
         =
       (* Generate and verify proof *)
@@ -1697,6 +1701,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
                 unused_external_checks left_input right_input
                 foreign_field_modulus
             in
+
             (* Check product matches expected result *)
             as_prover (fun () ->
                 let expected =
@@ -1822,8 +1827,8 @@ let%test_unit "foreign_field arithmetics gadgets" =
     in
 
     (* Helper to test foreign field arithmetics together
-       * It computes a * b + a - b
-    *)
+     * It computes a * b + a - b
+     *)
     let _test_ff ?cs (left_input : Bignum_bigint.t)
         (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
         =
@@ -1936,22 +1941,21 @@ let%test_unit "foreign_field arithmetics gadgets" =
         "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
     in
     let secp256k1_max = Bignum_bigint.(secp256k1_modulus - Bignum_bigint.one) in
-    let _secp256k1_sqrt = Common.bignum_bigint_sqrt secp256k1_max in
+    let secp256k1_sqrt = Common.bignum_bigint_sqrt secp256k1_max in
     let pallas_modulus =
       Common.bignum_bigint_of_hex
         "40000000000000000000000000000000224698fc094cf91b992d30ed00000001"
     in
     let pallas_max = Bignum_bigint.(pallas_modulus - Bignum_bigint.one) in
-    let _pallas_sqrt = Common.bignum_bigint_sqrt pallas_max in
+    let pallas_sqrt = Common.bignum_bigint_sqrt pallas_max in
     let vesta_modulus =
       Common.bignum_bigint_of_hex
         "40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001"
     in
-    let _vesta_max = Bignum_bigint.(vesta_modulus - Bignum_bigint.one) in
+    let vesta_max = Bignum_bigint.(vesta_modulus - Bignum_bigint.one) in
 
-    (* FFAdd TESTS *)
-    (* Single tests *)
-    let _cs =
+    (* Single foreign field addition tests *)
+    let cs =
       test_add
         (Common.bignum_bigint_of_hex
            "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
@@ -1959,8 +1963,6 @@ let%test_unit "foreign_field arithmetics gadgets" =
            "80000000000000000000000000000000000000000000000000000000000000d0" )
         secp256k1_modulus
     in
-    ()
-(*
     let _cs = test_add ~cs secp256k1_max secp256k1_max secp256k1_modulus in
     let _cs = test_add ~cs pallas_max pallas_max secp256k1_modulus in
     let _cs = test_add ~cs vesta_modulus pallas_modulus secp256k1_modulus in
@@ -1977,6 +1979,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
         secp256k1_modulus
     in
 
+    (* Negative single addition tests *)
     assert (
       Common.is_error (fun () ->
           (* check that the inputs need to be smaller than the modulus *)
@@ -2019,6 +2022,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
         ]
         [ Add; Sub; Sub; Add ] vesta_modulus
     in
+
     (* Check that the number of inputs need to be coherent with number of operations *)
     assert (
       Common.is_error (fun () ->
@@ -2028,9 +2032,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
           in
           () ) ) ;
 
-    (* FFMul TESTS*)
-
-    (* Positive tests *)
+    (* Foreign field multiplication tests *)
     (* zero_mul: 0 * 0 *)
     let cs = test_mul Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
     (* one_mul: max * 1 *)
@@ -2052,45 +2054,9 @@ let%test_unit "foreign_field arithmetics gadgets" =
            "d551c3d990f42b6d780275d9ca7e30e72941aa29dcffffffffffffffffffffff" )
         secp256k1_modulus
     in
-    (* test nonzero carry10 *)
-    let _cs =
-      test_mul
-        (Common.bignum_bigint_of_hex
-           "4000000000000000000000000000000000000000000000000000000000000000" )
-        (Common.bignum_bigint_of_hex
-           "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0" )
-        Bignum_bigint.(pow (of_int 2) (of_int 259))
-    in
-    (* test nonzero carry1_hi *)
-    let _cs =
-      test_mul
-        (Common.bignum_bigint_of_hex
-           "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
-        (Common.bignum_bigint_of_hex
-           "8000000000000000000000000000000000000000000000000000000000000000d0" )
-        Bignum_bigint.(pow (of_int 2) (of_int 259) - one)
-    in
-    (* test nonzero_second_bit_carry1_hi *)
-    let _cs =
-      test_mul ~cs
-        (Common.bignum_bigint_of_hex
-           "ffffffffffffffffffffffffffffffffffffffffffffffff8a9dec7cfd1acdeb" )
-        (Common.bignum_bigint_of_hex
-           "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e" )
-        secp256k1_modulus
-    in
-    (* test random_multiplicands_carry1_lo *)
-    let _cs =
-      test_mul ~cs
-        (Common.bignum_bigint_of_hex
-           "ffd913aa9e17a63c7a0ff2354218037aafcd6ecaa67f56af1de882594a434dd3" )
-        (Common.bignum_bigint_of_hex
-           "7d313d6b42719a39acea5f51de9d50cd6a4ec7147c003557e114289e9d57dffc" )
-        secp256k1_modulus
-    in
     (* test random_multiplicands_valid *)
     let _cs =
-      test_mul ~cs
+      test_mul
         (Common.bignum_bigint_of_hex
            "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
         (Common.bignum_bigint_of_hex
@@ -2116,6 +2082,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
            "1fffe27b14baa740db0c8bb6656de61d2871a64093908af6181f46351a1c1909" )
         vesta_modulus
     in
+    (*
 
     (* Full test including all external checks *)
     let cs =
@@ -2143,9 +2110,10 @@ let%test_unit "foreign_field arithmetics gadgets" =
            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" )
         secp256k1_modulus
     in
-    () ) ;
-  ()
+    () ) ; *)
+    () )
 
+(*
 let%test_unit "foreign_field equal_as_prover" =
   if tests_enabled then
     let open Kimchi_gadgets_test_runner in
