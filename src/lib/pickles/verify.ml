@@ -121,15 +121,6 @@ let verify_heterogenous (ts : Instance.t list) =
             step_domain ~shifts:Common.tick_shifts
             ~domain_generator:Backend.Tick.Field.domain_generator
         in
-        let feature_flags =
-          Plonk_types.Features.map
-            ~f:(function
-              | false ->
-                  Plonk_types.Opt.Flag.No
-              | true ->
-                  Plonk_types.Opt.Flag.Yes )
-            plonk0.feature_flags
-        in
         let tick_env =
           let module Env_bool = struct
             type t = bool
@@ -170,8 +161,8 @@ let verify_heterogenous (ts : Instance.t list) =
             end in
             Plonk_checks.Type1.derive_plonk
               (module Field)
-              ~feature_flags ~shift:Shifts.tick1 ~env:tick_env
-              tick_plonk_minimal tick_combined_evals
+              ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
+              tick_combined_evals
           in
           { p with
             zeta = plonk0.zeta
@@ -185,11 +176,6 @@ let verify_heterogenous (ts : Instance.t list) =
                     .Lookup
                     .joint_combiner = Option.value_exn plonk0.joint_combiner
                   } )
-          ; optional_column_scalars =
-              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-              .In_circuit
-              .Optional_column_scalars
-              .map ~f:Plonk_types.Opt.to_option p.optional_column_scalars
           }
         in
         Timer.clock __LOC__ ;
