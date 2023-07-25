@@ -1,0 +1,7 @@
+(library
+ (name key_cache_intf)
+ (public_name key_cache.intf)
+ (libraries core_kernel async_kernel)
+ (instrumentation (backend bisect_ppx))
+ (modules_without_implementation key_cache_intf)
+ (preprocess (pps ppx_version)))

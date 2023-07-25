@@ -1,0 +1,9 @@
+(library
+ (name key_cache_dummy)
+ (public_name key_cache.dummy)
+ (libraries
+   core_kernel
+   async_kernel
+   key_cache.intf)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))

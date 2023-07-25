@@ -1,7 +1,11 @@
 (library
  (name key_cache)
  (public_name key_cache)
- (libraries core_kernel async_kernel)
+ (libraries
+   core_kernel
+   async_kernel
+   key_cache.dummy
+   key_cache.intf)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp)))
