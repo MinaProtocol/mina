@@ -6,4 +6,5 @@
    async_kernel
    key_cache.intf)
  (instrumentation (backend bisect_ppx))
+ (implements key_cache)
  (preprocess (pps ppx_version)))

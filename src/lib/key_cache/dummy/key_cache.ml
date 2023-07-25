@@ -1,9 +1,8 @@
 open Async_kernel
 open Core_kernel
-
 include Key_cache_intf
 
-module Trivial : Sync = struct
+module Sync : Sync = struct
   include T (Or_error)
 
   module Disk_storable = struct
@@ -26,7 +25,7 @@ module Trivial : Sync = struct
     Ok ()
 end
 
-module Trivial_async : Async = struct
+module Async : Async = struct
   include T (Deferred.Or_error)
 
   module Disk_storable = struct
