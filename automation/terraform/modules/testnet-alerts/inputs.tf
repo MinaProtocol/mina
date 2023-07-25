@@ -23,9 +23,9 @@ variable "rule_filter" {
 }
 
 variable "berkeley_testnet" {
-  type         = string
-  desccription = "Filter to select only berkeley network"
-  default      = "testnet=\"berkeley\""
+  type        = string
+  description = "Filter to select only berkeley network"
+  default     = "testnet=\"berkeley\""
 }
 
 variable "alert_timeframe" {
