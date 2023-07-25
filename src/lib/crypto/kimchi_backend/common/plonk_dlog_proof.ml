@@ -229,13 +229,33 @@ module Make (Inputs : Inputs_intf) = struct
     ; challenge_polynomial_commitment = g t.sg
     }
 
-  let lookup_eval_of_backend
-      ({ sorted; aggreg; table; runtime } : 'f Kimchi_types.lookup_evaluations)
-      : _ Pickles_types.Plonk_types.Evals.Lookup.t =
-    { sorted; aggreg; table; runtime }
-
   let eval_of_backend
-      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+      ({ w
+       ; coefficients
+       ; z
+       ; s
+       ; generic_selector
+       ; poseidon_selector
+       ; complete_add_selector
+       ; mul_selector
+       ; emul_selector
+       ; endomul_scalar_selector
+       ; range_check0_selector
+       ; range_check1_selector
+       ; foreign_field_add_selector
+       ; foreign_field_mul_selector
+       ; xor_selector
+       ; rot_selector
+       ; lookup_aggregation
+       ; lookup_table
+       ; lookup_sorted
+       ; runtime_lookup_table
+       ; runtime_lookup_table_selector
+       ; xor_lookup_selector
+       ; lookup_gate_lookup_selector
+       ; range_check_lookup_selector
+       ; foreign_field_mul_lookup_selector
+       } :
         Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
     { w = tuple15_to_vec w
     ; coefficients = tuple15_to_vec coefficients
@@ -243,7 +263,28 @@ module Make (Inputs : Inputs_intf) = struct
     ; s = tuple6_to_vec s
     ; generic_selector
     ; poseidon_selector
-    ; lookup = Option.map ~f:lookup_eval_of_backend lookup
+    ; complete_add_selector
+    ; mul_selector
+    ; emul_selector
+    ; endomul_scalar_selector
+    ; range_check0_selector
+    ; range_check1_selector
+    ; foreign_field_add_selector
+    ; foreign_field_mul_selector
+    ; xor_selector
+    ; rot_selector
+    ; lookup_aggregation
+    ; lookup_table
+    ; lookup_sorted =
+        (let max_columns_num = 5 in
+         Array.init max_columns_num ~f:(fun i ->
+             Option.try_with_join (fun () -> lookup_sorted.(i)) ) )
+    ; runtime_lookup_table
+    ; runtime_lookup_table_selector
+    ; xor_lookup_selector
+    ; lookup_gate_lookup_selector
+    ; range_check_lookup_selector
+    ; foreign_field_mul_lookup_selector
     }
 
   let of_backend (t : Backend.t) : t =
@@ -280,11 +321,6 @@ module Make (Inputs : Inputs_intf) = struct
         }
       ~openings:{ proof; evals; ft_eval1 = t.ft_eval1 }
 
-  let lookup_eval_to_backend
-      { Pickles_types.Plonk_types.Evals.Lookup.sorted; aggreg; table; runtime }
-      : 'f Kimchi_types.lookup_evaluations =
-    { sorted; aggreg; table; runtime }
-
   let eval_to_backend
       { Pickles_types.Plonk_types.Evals.w
       ; coefficients
@@ -292,7 +328,25 @@ module Make (Inputs : Inputs_intf) = struct
       ; s
       ; generic_selector
       ; poseidon_selector
-      ; lookup
+      ; complete_add_selector
+      ; mul_selector
+      ; emul_selector
+      ; endomul_scalar_selector
+      ; range_check0_selector
+      ; range_check1_selector
+      ; foreign_field_add_selector
+      ; foreign_field_mul_selector
+      ; xor_selector
+      ; rot_selector
+      ; lookup_aggregation
+      ; lookup_table
+      ; lookup_sorted
+      ; runtime_lookup_table
+      ; runtime_lookup_table_selector
+      ; xor_lookup_selector
+      ; lookup_gate_lookup_selector
+      ; range_check_lookup_selector
+      ; foreign_field_mul_lookup_selector
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
     ; coefficients = tuple15_of_vec coefficients
@@ -300,7 +354,27 @@ module Make (Inputs : Inputs_intf) = struct
     ; s = tuple6_of_vec s
     ; generic_selector
     ; poseidon_selector
-    ; lookup = Option.map ~f:lookup_eval_to_backend lookup
+    ; complete_add_selector
+    ; mul_selector
+    ; emul_selector
+    ; endomul_scalar_selector
+    ; range_check0_selector
+    ; range_check1_selector
+    ; foreign_field_add_selector
+    ; foreign_field_mul_selector
+    ; xor_selector
+    ; rot_selector
+    ; lookup_aggregation
+    ; lookup_table
+    ; lookup_sorted =
+        Array.init 5 ~f:(fun i ->
+            Option.try_with_join (fun () -> lookup_sorted.(i)) )
+    ; runtime_lookup_table
+    ; runtime_lookup_table_selector
+    ; xor_lookup_selector
+    ; lookup_gate_lookup_selector
+    ; range_check_lookup_selector
+    ; foreign_field_mul_lookup_selector
     }
 
   let vec_to_array (type t elt)

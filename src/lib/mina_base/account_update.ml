@@ -91,8 +91,11 @@ module Authorization_kind = struct
       let open Fields_derivers_zkapps in
       let open Fields in
       let ( !. ) = ( !. ) ~t_fields_annots in
+      let verification_key_hash =
+        needs_custom_js ~js_type:field ~name:"VerificationKeyHash" field
+      in
       Fields.make_creator obj ~is_signed:!.bool ~is_proved:!.bool
-        ~verification_key_hash:!.field
+        ~verification_key_hash:!.verification_key_hash
       |> finish "AuthorizationKindStructured" ~t_toplevel_annots
 
     [%%endif]
