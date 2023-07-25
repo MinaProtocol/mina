@@ -14,7 +14,7 @@ let tuple5_of_array array =
   | _ ->
       assert false
 
-let tuple22_of_array array =
+let tuple21_of_array array =
   match array with
   | [| a1
      ; a2
@@ -37,7 +37,6 @@ let tuple22_of_array array =
      ; a19
      ; a20
      ; a21
-     ; a22
     |] ->
       ( a1
       , a2
@@ -59,8 +58,7 @@ let tuple22_of_array array =
       , a18
       , a19
       , a20
-      , a21
-      , a22 )
+      , a21 )
   | _ ->
       assert false
 
@@ -1228,7 +1226,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Compute witness values *)
   let ( remainder01
       , remainder2
-      , remainder_hi_bound
       , quotient0
       , quotient1
       , quotient2
@@ -1307,11 +1304,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
           @@ compute_high_bound quotient foreign_field_modulus
         in
 
-        let remainder_hi_bound =
-          Common.bignum_bigint_to_field (module Circuit)
-          @@ compute_high_bound remainder foreign_field_modulus
-        in
-
         (* Compute the rest of the witness data *)
         let quotient0, quotient1, quotient2 =
           bignum_bigint_to_field_const_standard_limbs (module Circuit) quotient
@@ -1322,7 +1314,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         [| remainder01
          ; remainder2
-         ; remainder_hi_bound
          ; quotient0
          ; quotient1
          ; quotient2
@@ -1343,7 +1334,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
          ; of_bits carry1 88 90
          ; of_bits carry1 90 91
         |] )
-    |> tuple22_of_array
+    |> tuple21_of_array
   in
 
   (* Add external checks *)
@@ -1352,8 +1343,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   External_checks.append_multi_range_check external_checks
     (quotient_hi_bound, product1_lo, product1_hi_0) ;
-
-  External_checks.append_limb_check external_checks remainder_hi_bound ;
 
   (* Instead of appending external check for compact MRC for remainder,
      this is added directly, so that the standard limbs
