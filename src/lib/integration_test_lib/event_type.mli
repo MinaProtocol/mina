@@ -53,6 +53,8 @@ module Block_produced : sig
     ; global_slot : int
     ; snarked_ledger_generated : bool
     ; state_hash : State_hash.t
+    ; next_epoch_ledger_updated : bool
+    ; staking_epoch_ledger_updated : bool
     }
 
   include Event_type_intf with type t := t

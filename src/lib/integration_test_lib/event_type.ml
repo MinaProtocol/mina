@@ -141,6 +141,8 @@ module Block_produced = struct
     ; global_slot : int
     ; snarked_ledger_generated : bool
     ; state_hash : State_hash.t
+    ; next_epoch_ledger_updated : bool
+    ; staking_epoch_ledger_updated : bool
     }
   [@@deriving to_yojson, equal]
 
@@ -194,14 +196,24 @@ module Block_produced = struct
     let%bind snarked_ledger_generated =
       find bool breadcrumb [ "just_emitted_a_proof" ]
     in
-    let%bind breadcrumb_consensus_state =
+    let%bind breadcrumb_protocol_state =
       find json breadcrumb
-        [ "validated_transition"
-        ; "data"
-        ; "protocol_state"
-        ; "body"
-        ; "consensus_state"
-        ]
+        [ "validated_transition"; "data"; "protocol_state"; "body" ]
+    in
+    let frozen_ledger_hash_of_string str =
+      Frozen_ledger_hash.of_yojson (`String str)
+      |> function
+      | Ok hash -> Or_error.return hash | Error str -> Or_error.error_string str
+    in
+    let%bind genesis_ledger_hash =
+      let%bind ledger_hash_str =
+        find string breadcrumb_protocol_state
+          [ "blockchain_state"; "genesis_ledger_hash" ]
+      in
+      frozen_ledger_hash_of_string ledger_hash_str
+    in
+    let%bind breadcrumb_consensus_state =
+      find json breadcrumb_protocol_state [ "consensus_state" ]
     in
     let%bind block_height =
       find int breadcrumb_consensus_state [ "blockchain_length" ]
@@ -214,8 +226,35 @@ module Block_produced = struct
       in
       List.nth_exn global_slot_since_hard_fork 1 |> Int.of_string
     in
-    let%map epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
-    { block_height; global_slot; epoch; snarked_ledger_generated; state_hash }
+    let%bind epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
+    let%bind staking_epoch_ledger_updated =
+      let%bind ledger_hash_str =
+        find string breadcrumb_consensus_state
+          [ "staking_epoch_data"; "ledger"; "hash" ]
+      in
+      let%map staking_epoch_ledger_hash =
+        frozen_ledger_hash_of_string ledger_hash_str
+      in
+      Frozen_ledger_hash.equal staking_epoch_ledger_hash genesis_ledger_hash
+    in
+    let%map next_epoch_ledger_updated =
+      let%bind ledger_hash_str =
+        find string breadcrumb_consensus_state
+          [ "next_epoch_data"; "ledger"; "hash" ]
+      in
+      let%map next_epoch_ledger_hash =
+        frozen_ledger_hash_of_string ledger_hash_str
+      in
+      Frozen_ledger_hash.equal next_epoch_ledger_hash genesis_ledger_hash
+    in
+    { block_height
+    ; global_slot
+    ; epoch
+    ; snarked_ledger_generated
+    ; state_hash
+    ; staking_epoch_ledger_updated
+    ; next_epoch_ledger_updated
+    }
 
   let parse_func message =
     let open Or_error.Let_syntax in
@@ -946,6 +985,8 @@ let%test_unit "parse breadcrumb functions properly" =
           ; state_hash =
               State_hash.of_base58_check_exn
                 "3NLBdEiVExFLZsTHJXqNwUFtG1nwTWN7Kd4mNCNjGKcFy2QeWjFL"
+          ; staking_epoch_ledger_updated = true
+          ; next_epoch_ledger_updated = true
           }
       in
       assert (Block_produced.equal result expected)

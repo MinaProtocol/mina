@@ -41,6 +41,8 @@ struct
     | Zkapp_to_be_included_in_frontier
     | Persisted_frontier_loaded
     | Transition_frontier_loaded_from_persistence
+    | Staking_epoch_ledger_updated
+    | Next_epoch_ledger_updated
 
   type t =
     { id : wait_condition_id
@@ -359,6 +361,36 @@ struct
                else acc ^ ", " ^ str ) )
           (Signed_command_memo.to_string_hum zkapp_command.memo)
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let staking_epoch_ledger_updated () =
+    let check () _node (block_produced : Event_type.Block_produced.t) =
+      if block_produced.staking_epoch_ledger_updated then Predicate_passed
+      else Predicate_continuation ()
+    in
+    let soft_timeout_in_slots = 8 in
+    { id = Staking_epoch_ledger_updated
+    ; description =
+        "Staking epoch ledger gets updated to a ledger that's different from \
+         the genesis"
+    ; predicate = Event_predicate (Event_type.Block_produced, (), check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let next_epoch_ledger_updated () =
+    let check () _node (block_produced : Event_type.Block_produced.t) =
+      if block_produced.next_epoch_ledger_updated then Predicate_passed
+      else Predicate_continuation ()
+    in
+    let soft_timeout_in_slots = 8 in
+    { id = Next_epoch_ledger_updated
+    ; description =
+        "Next epoch ledger gets updated to a ledger that's different from  \n\
+        \       the genesis"
+    ; predicate = Event_predicate (Event_type.Block_produced, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }

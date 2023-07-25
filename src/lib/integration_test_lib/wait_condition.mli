@@ -32,6 +32,8 @@ module Make
     | Zkapp_to_be_included_in_frontier
     | Persisted_frontier_loaded
     | Transition_frontier_loaded_from_persistence
+    | Staking_epoch_ledger_updated
+    | Next_epoch_ledger_updated
 
   type t =
     { id : wait_condition_id
