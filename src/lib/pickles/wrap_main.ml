@@ -36,15 +36,12 @@ module Old_bulletproof_chals = struct
         -> t
 end
 
-let pack_statement max_proofs_verified ~lookup ~feature_flags t =
+let pack_statement max_proofs_verified t =
   let open Types.Step in
   Spec.pack
     (module Impl)
-    (Statement.spec
-       (module Impl)
-       max_proofs_verified Backend.Tock.Rounds.n lookup feature_flags )
-    (Statement.to_data t ~option_map:Plonk_types.Opt.map
-       ~to_opt:Plonk_types.Opt.to_option_unsafe )
+    (Statement.spec max_proofs_verified Backend.Tock.Rounds.n)
+    (Statement.to_data t)
 
 let shifts ~log2_size = Common.tock_shifts ~log2_size
 
@@ -304,32 +301,6 @@ let wrap_main
                        ; wrap_domain
                        ]
                      ->
-                    let deferred_values =
-                      (* strengthen the values to constants when we know they're true or false.
-                         This lets us skip some later computations.
-                      *)
-                      { deferred_values with
-                        plonk =
-                          { deferred_values.plonk with
-                            feature_flags =
-                              Plonk_types.Features.map2
-                                deferred_values.plonk.feature_flags
-                                Plonk_types.Features.none
-                                ~f:(fun actual_flag flag ->
-                                  match flag with
-                                  | No ->
-                                      Boolean.Assert.( = ) actual_flag
-                                        Boolean.false_ ;
-                                      Boolean.false_
-                                  | Yes ->
-                                      Boolean.Assert.( = ) actual_flag
-                                        Boolean.true_ ;
-                                      Boolean.true_
-                                  | Maybe ->
-                                      actual_flag )
-                          }
-                      }
-                    in
                     let sponge =
                       let s = Sponge.create sponge_params in
                       Sponge.absorb s sponge_digest_before_evaluations ;
@@ -430,8 +401,7 @@ let wrap_main
                   ~verification_key:step_plonk_index ~srs ~xi ~sponge
                   ~public_input:
                     (Array.map
-                       (pack_statement Max_proofs_verified.n ~feature_flags
-                          ~lookup:lookup_config_for_pack prev_statement )
+                       (pack_statement Max_proofs_verified.n prev_statement)
                        ~f:(function
                       | `Field (Shifted_value x) ->
                           `Field (split_field x)

@@ -344,12 +344,12 @@ struct
         ( 'a
         , Inputs.Impl.Field.t Import.Scalar_challenge.t
         , _ )
-        Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t )
+        Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t )
       (m2 :
         ( Inputs.Impl.Field.t
         , Inputs.Impl.Field.t Import.Scalar_challenge.t
         , _ )
-        Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t ) =
+        Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t ) =
     let open Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
     let scalar_chal
@@ -916,7 +916,7 @@ struct
       SC.to_field_checked (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
     in
     let plonk =
-      Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
+      Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
         ~f:Fn.id ~scalar plonk
     in
     let domain =
@@ -1226,8 +1226,6 @@ struct
         , _ Shifted_value.Type2.t
         , _
         , _
-        , _
-        , _
         , _ )
         Types.Step.Proof_state.Per_proof.In_circuit.t ) =
     let public_input :
@@ -1258,7 +1256,11 @@ struct
         ~xi ~verification_key:wrap_verification_key ~sponge ~sponge_after_index
         ~public_input ~sg_old
         ~advice:{ b; combined_inner_product }
-        ~proof ~plonk:unfinalized.deferred_values.plonk
+        ~proof
+        ~plonk:
+          (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+           .to_wrap ~opt_none:Opt.None ~false_:Boolean.false_
+             unfinalized.deferred_values.plonk )
     in
     with_label __LOC__ (fun () ->
         with_label __LOC__ (fun () ->
