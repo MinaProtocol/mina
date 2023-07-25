@@ -1,0 +1,58 @@
+(library
+ (public_name integration_test_abstract_engine)
+ (name integration_test_abstract_engine)
+ (inline_tests)
+ (instrumentation (backend bisect_ppx))
+ (preprocessor_deps ../../graphql-ppx-config.inc ../../../graphql_schema.json)
+ (preprocess (pps
+               ppx_mina ppx_version ppx_let ppx_pipebang ppx_inline_test
+               ppx_custom_printf ppx_deriving_yojson lens.ppx_deriving
+               ppx_sexp_conv ppx_assert ppx_deriving.eq
+               graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}))
+(libraries
+   ;; opam libraries
+   async_unix
+   async_kernel
+   core_kernel
+   core
+   async
+   cmdliner
+   base
+   uri
+   sexplib0
+   stdio
+   result
+   base.caml
+   integers
+   re2
+   ;; local libraries
+   key_gen
+   integration_test_lib
+   graphql_lib
+   mina_runtime_config
+   mina_base
+   genesis_constants
+   genesis_ledger_helper
+   logger
+   mina_base_import
+   signature_lib
+   currency
+   mina_version
+   timeout_lib
+   mina_numbers
+   mina_stdlib
+   mina_transaction
+   file_system
+   pickles
+   pickles_types
+   backend
+   kimchi_pasta
+   kimchi_backend.pasta.basic
+   with_hash
+   data_hash_lib
+   generated_graphql_queries
+   mina_graphql
+   error_json
+   ppx_inline_test.config
+   )
+)
