@@ -113,29 +113,10 @@ module Constant = struct
 
            type nonrec bool = bool
          end in
-         Plonk_checks.derive_plonk
-           (module Field) (* Wrap proof, no features needed *)
-           ~env ~shift ~feature_flags:Plonk_types.Features.none chals evals
+         Plonk_checks.derive_plonk (module Field) ~env ~shift chals evals
        in
        { deferred_values =
-           { plonk =
-               { plonk with
-                 alpha
-               ; beta
-               ; gamma
-               ; zeta
-               ; lookup = None
-               ; optional_column_scalars =
-                   { range_check0 = None
-                   ; range_check1 = None
-                   ; foreign_field_add = None
-                   ; foreign_field_mul = None
-                   ; xor = None
-                   ; rot = None
-                   ; lookup_gate = None
-                   ; runtime_tables = None
-                   }
-               }
+           { plonk = { plonk with alpha; beta; gamma; zeta; lookup = None }
            ; combined_inner_product = Shifted_value (tock ())
            ; xi = Scalar_challenge.create one_chal
            ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges

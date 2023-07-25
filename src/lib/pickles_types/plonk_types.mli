@@ -23,6 +23,8 @@ module Opt : sig
 
   module Flag : sig
     type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
+
+    val ( ||| ) : t -> t -> t
   end
 
   val constant_layout_typ :
@@ -191,20 +193,6 @@ module Messages : sig
 end
 
 module Evals : sig
-  module Lookup : sig
-    type 'f t =
-      { sorted : 'f array; aggreg : 'f; table : 'f; runtime : 'f option }
-
-    module In_circuit : sig
-      type ('f, 'bool) t =
-        { sorted : 'f array
-        ; aggreg : 'f
-        ; table : 'f
-        ; runtime : ('f, 'bool) Opt.t
-        }
-    end
-  end
-
   module In_circuit : sig
     type ('f, 'bool) t =
       { w : 'f Columns_vec.t
@@ -217,7 +205,21 @@ module Evals : sig
       ; mul_selector : 'f
       ; emul_selector : 'f
       ; endomul_scalar_selector : 'f
-      ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
+      ; range_check0_selector : ('f, 'bool) Opt.t
+      ; range_check1_selector : ('f, 'bool) Opt.t
+      ; foreign_field_add_selector : ('f, 'bool) Opt.t
+      ; foreign_field_mul_selector : ('f, 'bool) Opt.t
+      ; xor_selector : ('f, 'bool) Opt.t
+      ; rot_selector : ('f, 'bool) Opt.t
+      ; lookup_aggregation : ('f, 'bool) Opt.t
+      ; lookup_table : ('f, 'bool) Opt.t
+      ; lookup_sorted : ('f, 'bool) Opt.t array
+      ; runtime_lookup_table : ('f, 'bool) Opt.t
+      ; runtime_lookup_table_selector : ('f, 'bool) Opt.t
+      ; xor_lookup_selector : ('f, 'bool) Opt.t
+      ; lookup_gate_lookup_selector : ('f, 'bool) Opt.t
+      ; range_check_lookup_selector : ('f, 'bool) Opt.t
+      ; foreign_field_mul_lookup_selector : ('f, 'bool) Opt.t
       }
     [@@deriving fields]
 
@@ -242,7 +244,21 @@ module Evals : sig
     ; mul_selector : 'a
     ; emul_selector : 'a
     ; endomul_scalar_selector : 'a
-    ; lookup : 'a Lookup.t option
+    ; range_check0_selector : 'a option
+    ; range_check1_selector : 'a option
+    ; foreign_field_add_selector : 'a option
+    ; foreign_field_mul_selector : 'a option
+    ; xor_selector : 'a option
+    ; rot_selector : 'a option
+    ; lookup_aggregation : 'a option
+    ; lookup_table : 'a option
+    ; lookup_sorted : 'a option array
+    ; runtime_lookup_table : 'a option
+    ; runtime_lookup_table_selector : 'a option
+    ; xor_lookup_selector : 'a option
+    ; lookup_gate_lookup_selector : 'a option
+    ; range_check_lookup_selector : 'a option
+    ; foreign_field_mul_lookup_selector : 'a option
     }
 
   (** {4 Iterators} *)
