@@ -1,0 +1,105 @@
+# kubectl apply -n berkeley -f helm/cron_jobs/berkeley-replayer-cronjob.yaml
+# the above command, with this accompanying file, needs only be run once.
+# Notes:
+# - the archive dump usually is of the form ...0000.sql.tar.gz, but not always
+#   we reverse-sort the filenames, take the most recent one
+# - ALTER USER takes a password bracketed in single-quotes or $$s
+#   too hard to make the single-quotes work inside single-quotes, so use $$
+#   the space in the password makes sure a $ isn't applied to the following string
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: berkeley-replayer-cronjob
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - command:
+            - /bin/bash
+            - -c
+            - 'echo "Starting replayer cron job";
+               apt update;
+               echo "Installing libjemalloc2";
+               apt-get -y install libjemalloc2;
+               echo "Installing gsutil";
+               apt-get -y install apt-transport-https ca-certificates gnupg curl;
+               echo "deb https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list;
+               curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - ;
+               apt-get update && apt-get install -y google-cloud-cli ;
+               ARCHIVE_DUMP_URI=$(gsutil ls gs://mina-archive-dumps/berkeley-archive-dump-*.sql.tar.gz | sort -r | head -n 1);
+               ARCHIVE_DUMP=$(basename $ARCHIVE_DUMP_URI);
+               ARCHIVE_SQL=$(basename $ARCHIVE_DUMP_URI .tar.gz);
+               echo "Getting archive dump" $ARCHIVE_DUMP_URI;
+               gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $ARCHIVE_DUMP_URI . ;
+               MOST_RECENT_CHECKPOINT_URI=$(gsutil ls gs://berkeley-replayer-checkpoints/berkeley-replayer-checkpoint-*.json | sort -r | head -n 1);
+               MOST_RECENT_CHECKPOINT=$(basename $MOST_RECENT_CHECKPOINT_URI);
+               echo "Getting replayer checkpoint file" $MOST_RECENT_CHECKPOINT;
+               gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $MOST_RECENT_CHECKPOINT_URI . ;
+               echo "Starting Postgresql";
+               service postgresql start;
+               echo "Importing archive dump";
+               tar -xzvf $ARCHIVE_DUMP;
+               mv $ARCHIVE_SQL ~postgres/;
+               echo "Deleting archive dump";
+               rm -f $ARCHIVE_DUMP;
+               su postgres -c "cd ~ && echo ALTER USER postgres WITH PASSWORD \\$\\$ foobar \\$\\$ | psql";
+               su postgres -c "cd ~ && echo CREATE DATABASE archive_balances_migrated | psql";
+               su postgres -c "cd ~ && psql < $ARCHIVE_SQL";
+               echo "Deleting archive SQL file";
+               su postgres -c "cd ~ && rm -f $ARCHIVE_SQL";
+               echo "Running replayer";
+               mina-replayer --archive-uri postgres://postgres:%20foobar%20@localhost/archive_balances_migrated --input-file $MOST_RECENT_CHECKPOINT --continue-on-error --output-file /dev/null --checkpoint-interval 50 >& replayer.log ;
+               echo "Done running replayer";
+               rm -f $MOST_RECENT_CHECKPOINT;
+               DISK_CHECKPOINT=$(ls -t replayer-checkpoint*.json | head -n 1);
+               DATE=$(date +%F);
+               TODAY_CHECKPOINT=berkeley-replayer-checkpoint-$DATE.json;
+               mv $DISK_CHECKPOINT $TODAY_CHECKPOINT;
+               echo "Uploading checkpoint file" $TODAY_CHECKPOINT;
+               gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $TODAY_CHECKPOINT gs://berkeley-replayer-checkpoints/$TODAY_CHECKPOINT;
+               echo "Replayer errors:";
+               grep Error replayer.log;
+               HAVE_ERRORS=$?;
+               if [ $HAVE_ERRORS -eq 0 ];
+                 then REPLAYER_ERRORS=berkeley_replayer_errors_${DATE};
+                 echo "The replayer found errors, uploading log" $REPLAYER_ERRORS;
+                 mv replayer.log $REPLAYER_ERRORS;
+                 gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $REPLAYER_ERRORS gs://berkeley-replayer-checkpoints/$REPLAYER_ERRORS;
+               fi'
+            env:
+            - name: GCLOUD_KEYFILE
+              value: /gcloud/keyfile.json
+            image: gcr.io/o1labs-192920/mina-rosetta:1.4.0beta2-fix-replayer-no-final-checkpoint-5af6dba-bullseye
+            imagePullPolicy: IfNotPresent
+            name: berkeley-replayer-cronjob
+            resources:
+              limits:
+              requests:
+                memory: 32.0Gi
+                cpu: 20.0
+            resources: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /gcloud/
+              name: gcloud-keyfile
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - name: gcloud-keyfile
+            secret:
+              defaultMode: 256
+              items:
+              - key: keyfile
+                path: keyfile.json
+              secretName: gcloud-keyfile
+  schedule: 0 2 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false
