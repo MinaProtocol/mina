@@ -9,7 +9,7 @@
    base
    stdio
    ;; local libraries
-   key_cache
+   key_cache.intf
    logger
    )
  (instrumentation (backend bisect_ppx))

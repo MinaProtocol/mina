@@ -17,7 +17,6 @@
    pickles
    pickles_types
    unsigned_extended
-   key_cache.native
    mina_base
    mina_runtime_config
    genesis_constants

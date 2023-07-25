@@ -3,8 +3,6 @@ open Signature_lib
 open Mina_base
 open Inline_test_quiet_logs
 
-let () = Key_cache_native.linkme (* Ensure that we use the native key cache. *)
-
 module Accounts = struct
   module Single = struct
     let to_account_with_pk :

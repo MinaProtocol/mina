@@ -1,5 +1,5 @@
 open Core
-open Key_cache
+open Key_cache_intf
 include T (Or_error)
 
 let may_download () = false

@@ -1,6 +1,6 @@
 open Core
 open Async
-open Key_cache
+open Key_cache_intf
 open Async_kernel
 include T (Deferred.Or_error)
 

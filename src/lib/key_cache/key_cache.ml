@@ -11,10 +11,6 @@ let sync = ref (module Trivial : Sync)
 
 let async = ref (module Trivial_async : Async)
 
-let set_sync_implementation x = sync := x
-
-let set_async_implementation x = async := x
-
 module Sync : Sync = struct
   include T (Or_error)
 

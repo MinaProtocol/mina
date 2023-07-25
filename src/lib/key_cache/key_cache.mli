@@ -7,12 +7,6 @@ module Trivial : Sync
 
 module Trivial_async : Async
 
-(** Update the implementation used for [Sync]. Defaults to [Trivial]. *)
-val set_sync_implementation : (module Sync) -> unit
-
-(** Update the implementation used for [Async]. Defaults to [Trivial_async]. *)
-val set_async_implementation : (module Async) -> unit
-
 (** Exposes the current synchronous implementation, which may be overridden by
     [set_sync_implementation].
 *)
