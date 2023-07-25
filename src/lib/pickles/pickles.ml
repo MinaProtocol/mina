@@ -1734,6 +1734,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                     ; runtime_tables
                                     } () ->
                               (* TODO(dw) pas runtime tables information *)
+                              let runtime_tables =
+                                Array.map
+                                  ~f:(fun (rt :
+                                            Pasta_bindings.Fq.t
+                                            Snarky_backendless.Runtime_table.t
+                                            ) :
+                                          Pasta_bindings.Fq.t
+                                          Kimchi_types.runtime_table ->
+                                    { id = rt.id; data = rt.data } )
+                                  runtime_tables
+                              in
                               Backend.Tock.Proof.create_async
                                 ~primary:public_inputs
                                 ~auxiliary:auxiliary_inputs pk

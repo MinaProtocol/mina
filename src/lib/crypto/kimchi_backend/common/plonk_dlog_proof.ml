@@ -59,6 +59,10 @@ module type Inputs_intf = sig
     end
   end
 
+  module Runtime_table : sig
+    type t = Scalar_field.t Kimchi_types.runtime_table
+  end
+
   module Poly_comm : sig
     type t = Base_field.t Poly_comm.t
 
@@ -96,7 +100,7 @@ module type Inputs_intf = sig
          Index.t
       -> primary:Scalar_field.Vector.t
       -> auxiliary:Scalar_field.Vector.t
-      -> runtime_tables:Scalar_field.t Kimchi_types.runtime_table array
+      -> runtime_tables:Runtime_table.t array
       -> prev_chals:Scalar_field.t array
       -> prev_comms:Curve.Affine.Backend.t array
       -> t
@@ -105,7 +109,7 @@ module type Inputs_intf = sig
          Index.t
       -> primary:Scalar_field.Vector.t
       -> auxiliary:Scalar_field.Vector.t
-      -> runtime_tables:Scalar_field.t Kimchi_types.runtime_table array
+      -> runtime_tables:Runtime_table.t array
       -> prev_chals:Scalar_field.t array
       -> prev_comms:Curve.Affine.Backend.t array
       -> t Promise.t
@@ -114,7 +118,7 @@ module type Inputs_intf = sig
          Index.t
       -> primary:Scalar_field.Vector.t
       -> auxiliary:Scalar_field.Vector.t
-      -> runtime_tables:Scalar_field.t Kimchi_types.runtime_table array
+      -> runtime_tables:Runtime_table.t array
       -> prev_chals:Scalar_field.t array
       -> prev_comms:Curve.Affine.Backend.t array
       -> t Promise.t

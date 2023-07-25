@@ -26,9 +26,9 @@ let generate_and_verify_proof ?cs circuit =
         let proof =
           let runtime_tables =
             Array.map
-              (fun (rt : Impl.RuntimeTable.t) ->
-                Tick.RuntimeTable.
-                  { id = rt.Impl.RuntimeTable.id; data = rt.data } )
+              (fun (rt : Impl.field Snarky_backendless.Runtime_table.t) :
+                   Impl.field Kimchi_types.runtime_table ->
+                { id = rt.id; data = rt.data } )
               runtime_tables
           in
           (* Only block_on_async for testing; do not do this in production!! *)

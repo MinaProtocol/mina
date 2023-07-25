@@ -819,6 +819,15 @@ struct
                           ; runtime_tables
                           } next_statement_hashed ->
                     [%log internal] "Backend_tick_proof_create_async" ;
+                    let runtime_tables =
+                      Array.map
+                        ~f:(fun (rt :
+                                  Pasta_bindings.Fp.t
+                                  Snarky_backendless.Runtime_table.t ) :
+                                Pasta_bindings.Fp.t Kimchi_types.runtime_table ->
+                          { id = rt.id; data = rt.data } )
+                        runtime_tables
+                    in
                     let%map.Promise proof =
                       (* TODO(dw) pass runtime tables *)
                       Backend.Tick.Proof.create_async ~primary:public_inputs

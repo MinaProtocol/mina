@@ -16,10 +16,6 @@ end
 
 let field_size : Bigint.t = Field.size
 
-module RuntimeTable = struct
-  type 'f t = { id : int32; data : 'f array }
-end
-
 module Verification_key = struct
   type t =
     ( Pasta_bindings.Fp.t
@@ -73,6 +69,10 @@ module Proof = Plonk_dlog_proof.Make (struct
 
   module Scalar_field = Field
   module Base_field = Fq
+
+  module Runtime_table = struct
+    type t = Scalar_field.t Kimchi_types.runtime_table
+  end
 
   module Backend = struct
     type t =
