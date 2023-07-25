@@ -1722,7 +1722,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         end in
                         Wrap.Type1.derive_plonk
                           (module Field)
-                          ~feature_flags:Plonk_types.Features.none
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
                       in
@@ -1839,10 +1838,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                             .plonk
                                           with
                                           lookup = None
-                                        ; optional_column_scalars =
-                                            { lookup_gate = None
-                                            ; runtime_tables = None
-                                            }
                                         }
                                     }
                                 }

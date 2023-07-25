@@ -28,4 +28,9 @@ let create ~of_int =
         (let max_columns_num = 5 in
          Array.init max_columns_num ~f:(fun _ -> None) )
     ; runtime_lookup_table = None
+    ; runtime_lookup_table_selector = None
+    ; xor_lookup_selector = None
+    ; lookup_gate_lookup_selector = None
+    ; range_check_lookup_selector = None
+    ; foreign_field_mul_lookup_selector = None
     }
