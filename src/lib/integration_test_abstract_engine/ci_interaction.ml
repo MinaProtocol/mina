@@ -21,7 +21,7 @@ let cluster_zone = "us-west1a"
 
 module Network_config = struct
   module Cli_inputs = Cli_inputs
-  
+
   type block_producer_config =
     { name : string; keypair : Network_keypair.t; libp2p_secret : string }
   [@@deriving to_yojson]
@@ -71,14 +71,13 @@ module Network_config = struct
           fun map ->
             `Assoc
               (Core.Map.fold_right ~init:[]
-                  ~f:(fun ~key:k ~data:v accum ->
-                    (k, Network_keypair.to_yojson v) :: accum )
-                  map )] )
+                 ~f:(fun ~key:k ~data:v accum ->
+                   (k, Network_keypair.to_yojson v) :: accum )
+                 map )] )
     ; constants : Test_config.constants
     ; terraform : terraform_config
     }
   [@@deriving to_yojson]
-
 
   let terraform_config_to_assoc t =
     let[@warning "-8"] (`Assoc assoc : Yojson.Safe.t) =
@@ -121,7 +120,7 @@ module Network_config = struct
     if List.contains_dup ~compare:String.compare key_names_list then
       failwith
         "All accounts in genesis ledger must have unique names.  Check to make \
-          sure you are not using the same account_name more than once" ;
+         sure you are not using the same account_name more than once" ;
     let all_nodes_names_list =
       List.map block_producers ~f:(fun acct -> acct.node_name)
       @ match snark_coordinator with None -> [] | Some n -> [ n.node_name ]
@@ -129,15 +128,15 @@ module Network_config = struct
     if List.contains_dup ~compare:String.compare all_nodes_names_list then
       failwith
         "All nodes in testnet must have unique names.  Check to make sure you \
-          are not using the same node_name more than once" ;
+         are not using the same node_name more than once" ;
 
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let keypairs =
       List.take
         (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
         (List.drop
-            (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
-            1 )
+           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
+           1 )
         (List.length genesis_ledger)
     in
     let labeled_accounts :
@@ -220,9 +219,9 @@ module Network_config = struct
             { base =
                 Accounts
                   (let tuplist = String.Map.data genesis_ledger_accounts in
-                    List.map tuplist ~f:(fun tup ->
-                        let acct, _ = tup in
-                        acct ) )
+                   List.map tuplist ~f:(fun tup ->
+                       let acct, _ = tup in
+                       acct ) )
             ; add_genesis_winner = None
             ; num_accounts = None
             ; balances = []
@@ -235,7 +234,7 @@ module Network_config = struct
     let genesis_constants =
       Or_error.ok_exn
         (Genesis_ledger_helper.make_genesis_constants ~logger
-            ~default:Genesis_constants.compiled runtime_config )
+           ~default:Genesis_constants.compiled runtime_config )
     in
     let constants : Test_config.constants =
       { constraints = constraint_constants; genesis = genesis_constants }
@@ -260,8 +259,8 @@ module Network_config = struct
                 let failstring =
                   Format.sprintf
                     "Failing because the account key of all initial block \
-                      producers must be in the genesis ledger.  name of Node: \
-                      %s.  name of Account which does not exist: %s"
+                     producers must be in the genesis ledger.  name of Node: \
+                     %s.  name of Account which does not exist: %s"
                     node.node_name node.account_name
                 in
                 failwith failstring
@@ -288,9 +287,9 @@ module Network_config = struct
     let genesis_keypairs =
       String.Map.of_alist_exn
         (List.map (String.Map.to_alist genesis_ledger_accounts)
-            ~f:(fun element ->
-              let kp_name, (_, (pk, sk)) = element in
-              (kp_name, mk_net_keypair kp_name (pk, sk)) ) )
+           ~f:(fun element ->
+             let kp_name, (_, (pk, sk)) = element in
+             (kp_name, mk_net_keypair kp_name (pk, sk)) ) )
     in
     let snark_coordinator_config =
       match snark_coordinator with
@@ -305,8 +304,8 @@ module Network_config = struct
                 let failstring =
                   Format.sprintf
                     "Failing because the account key of all initial snark \
-                      coordinators must be in the genesis ledger.  name of \
-                      Node: %s.  name of Account which does not exist: %s"
+                     coordinators must be in the genesis ledger.  name of \
+                     Node: %s.  name of Account which does not exist: %s"
                     node.node_name node.account_name
                 in
                 failwith failstring
@@ -404,10 +403,10 @@ end
 module Request = struct
   type t =
     | Access_token
-    | CreateNetwork of Network_config.t
-    | DeployNetwork of Network_id.t
-    | DestroyNetwork of Network_id.t
-    | GetNodeLogs of Node_id.t
+    | Create_network of Network_config.t
+    | Deploy_network of Network_id.t
+    | Destroy_network of Network_id.t
+    | Get_node_logs of Node_id.t
   [@@deriving to_yojson]
 end
 
@@ -420,11 +419,9 @@ module Node_type = struct
     | Snark_coordinator
   [@@deriving eq, yojson]
 
-  let to_string nt =
-    to_yojson nt |> Yojson.Safe.to_string
+  let to_string nt = to_yojson nt |> Yojson.Safe.to_string
 
-  let of_string s =
-    of_yojson @@ `List [ `String s ] |> Result.ok_or_failwith
+  let of_string s = of_yojson @@ `List [ `String s ] |> Result.ok_or_failwith
 end
 
 module Network_deploy_response = struct
@@ -454,10 +451,10 @@ end
 module Response = struct
   type t =
     | Access_token of Access_token.t
-    | NetworkCreated of Network_id.t
-    | NetworkDeployed of Network_deploy_response.t
-    | NetworkDestroyed
-    | NodeLogs of Node_id.t * string
+    | Network_created of Network_id.t
+    | Network_deployed of Network_deploy_response.t
+    | Network_destroyed
+    | Node_logs of Node_id.t * string
   [@@deriving eq, of_yojson]
 end
 
@@ -466,58 +463,64 @@ end
   https://www.notion.so/minafoundation/Lucy-CI-Interactions-e36b48ac52994cafbe1367548e02241d?pvs=4
   *)
 
-let request_ci_access_token () : Response.t Async.Deferred.t =
+let request_ci_access_token () : Response.t Deferred.Or_error.t =
   failwith "request_ci_access_token"
 
 (* for example, we can communicate with the CI via https and test-specific access token *)
-let[@warning "-27"] send_ci_http_request ~(access_token: Access_token.t) ~(request_body: Request.t) : Response.t Async.Deferred.t =
+let[@warning "-27"] send_ci_http_request ~(access_token : Access_token.t)
+    ~(request_body : Request.t) : Response.t Deferred.Or_error.t =
   let req_str = request_body |> Request.to_yojson |> Yojson.Safe.to_string in
   failwithf "send_ci_http_request: %s\n" req_str ()
 
 module Request_unit_tests = struct
-  let%test_unit "Create network request" = assert true (* TODO: too complicated for now *)
+  let%test_unit "Create network request" = assert true
+  (* TODO: too complicated for now *)
 
   let%test_unit "Deploy network request" =
     let open Request in
-    let result = DeployNetwork "network0" |> to_yojson |> Yojson.Safe.to_string in
+    let result =
+      Deploy_network "network0" |> to_yojson |> Yojson.Safe.to_string
+    in
     let ( = ) = String.equal in
-    assert (result = {| [ "DeployNetwork", "network0" ] |})
+    assert (result = {|["Deploy_network","network0"]|})
 
   let%test_unit "Destroy network request" =
     let open Request in
-    let result = DestroyNetwork "network0" |> to_yojson |> Yojson.Safe.to_string in
+    let result =
+      Destroy_network "network0" |> to_yojson |> Yojson.Safe.to_string
+    in
     let ( = ) = String.equal in
-    assert (result = {| [ "DestroyNetwork", "network0" ] |})
+    assert (result = {|["Destroy_network","network0"]|})
 
   let%test_unit "Get node logs request" =
     let open Request in
-    let result = GetNodeLogs "node0" |> to_yojson |> Yojson.Safe.to_string in
+    let result = Get_node_logs "node0" |> to_yojson |> Yojson.Safe.to_string in
     let ( = ) = String.equal in
-    assert (result = {| [ "GetNodeLogs", "node0" ] |})
+    assert (result = {|["Get_node_logs","node0"]|})
 end
 
 module Response_unit_tests = struct
   let%test_unit "Parse network created response" =
-  let open Response in
+    let open Response in
     let result =
-      `List [  `String "NetworkCreated"; `String "node0" ]
+      `List [ `String "Network_created"; `String "node0" ]
       |> of_yojson |> Result.ok_or_failwith
     in
     let ( = ) = equal in
-    assert (
-      result = NetworkCreated "node0"
-    )
+    assert (result = Network_created "node0")
 
   let%test_unit "Parse network deployed response" =
     let open Node_type in
     let open Network_deploy_response in
     let result =
-      {| { "node0": ("Archive_node", "gql0"),
-          "node1": ("Block_producer_node", "gql1"),
-          "node2": ("Non_seed_node", "gql2"),
-          "node3": ("Seed_node", "gql3"),
-          "node4": ("Snark_coordinator", "gql4")
-          } |}
+      {|
+        { "node0": ("Archive_node", "gql0")
+        , "node1": ("Block_producer_node", "gql1")
+        , "node2": ("Non_seed_node", "gql2")
+        , "node3": ("Seed_node", "gql3")
+        , "node4": ("Snark_coordinator", "gql4")
+        }
+      |}
       |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith
     in
     let ( = ) = equal in
@@ -534,21 +537,17 @@ module Response_unit_tests = struct
   let%test_unit "Parse network destroyed response" =
     let open Response in
     let result =
-      `List [ `String "NetworkDestroyed" ]
+      `List [ `String "Network_destroyed" ]
       |> of_yojson |> Result.ok_or_failwith
     in
-    assert (
-      equal result NetworkDestroyed
-    )
+    assert (equal result Network_destroyed)
 
   let%test_unit "Parse node logs response" =
     let open Response in
     let result =
-      `List [ `String "NodeLogs"; `String "node0"; `String "node0_logs" ]
+      `List [ `String "Node_logs"; `String "node0"; `String "node0_logs" ]
       |> of_yojson |> Result.ok_or_failwith
     in
     let ( = ) = equal in
-    assert (
-      result = NodeLogs ("node0", "node0_logs")
-    )
+    assert (result = Node_logs ("node0", "node0_logs"))
 end

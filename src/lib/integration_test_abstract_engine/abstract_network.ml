@@ -1064,14 +1064,19 @@ module Node = struct
   (* return an error if [t] isn't an archive node *)
   let dump_archive_data ~logger (t : t) ~data_file =
     let%bind data =
-      match%map send_ci_http_request ~access_token:t.config.access_token ~request_body:(Request.GetNodeLogs (id t)) with
-      | Response.NodeLogs (_, logs) -> logs
-      | _ -> failwith "invalid node logs response"
+      match%map
+        send_ci_http_request ~access_token:t.config.access_token
+          ~request_body:(Request.Get_node_logs (id t))
+      with
+      | Ok (Response.Node_logs (_, logs)) ->
+          logs
+      | _ ->
+          failwith "invalid node logs response"
     in
     [%log info] "Dumping archive data to file %s" data_file ;
-    Malleable_error.return @@
-    Out_channel.with_file data_file ~f:(fun out_ch ->
-        Out_channel.output_string out_ch data )
+    Malleable_error.return
+    @@ Out_channel.with_file data_file ~f:(fun out_ch ->
+           Out_channel.output_string out_ch data )
 
   let run_replayer ~logger (t : t) =
     [%log info] "Running replayer on archived data (node: %s, container: %s)"

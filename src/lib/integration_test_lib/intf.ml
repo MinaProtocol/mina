@@ -199,10 +199,10 @@ module Engine = struct
         -> pk:Signature_lib.Public_key.Compressed.t
         -> string list Deferred.Or_error.t
 
-      val get_peer_id :
+      val get_peer_ids :
         logger:Logger.t -> t -> (string * string list) Deferred.Or_error.t
 
-      val must_get_peer_id :
+      val must_get_peer_ids :
         logger:Logger.t -> t -> (string * string list) Malleable_error.t
 
       val get_best_chain :
