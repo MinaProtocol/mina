@@ -22,6 +22,12 @@ variable "rule_filter" {
   description = "Filter to apply to monitoring search space for managing the scope of alert rule checks"
 }
 
+variable "berkeley_testnet" {
+  type         = string
+  desccription = "Filter to select only berkeley network"
+  default      = "testnet=\"berkeley\""
+}
+
 variable "alert_timeframe" {
   type        = string
   description = "Range of time to inspect for alert rule violations"
