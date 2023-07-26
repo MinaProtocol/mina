@@ -17,10 +17,12 @@
 open Core_kernel
 open Async
 
+[@@@warning "-32"]
+
 module type CONTEXT = sig
   val logger : Logger.t
 
-  val _precomputed_values : Precomputed_values.t
+  val precomputed_values : Precomputed_values.t
 
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
@@ -33,12 +35,12 @@ let context (logger : Logger.t) : (module CONTEXT) =
 
     let proof_level = Genesis_constants.Proof_level.None
 
-    let _precomputed_values =
+    let precomputed_values =
       { (Lazy.force Precomputed_values.for_unit_tests) with proof_level }
 
-    let consensus_constants = _precomputed_values.consensus_constants
+    let consensus_constants = precomputed_values.consensus_constants
 
-    let constraint_constants = _precomputed_values.constraint_constants
+    let constraint_constants = precomputed_values.constraint_constants
   end )
 
 let read_directory dir_name =
@@ -61,6 +63,9 @@ let read_directory dir_name =
         Int.compare
           (extract_height_from_filename a)
           (extract_height_from_filename b) ) ;
+    let blocks_array =
+      Array.map ~f:(fun fname -> Filename.concat dir fname) blocks_array
+    in
     Array.to_list blocks_array
   in
   blocks_in_dir dir_name
@@ -73,17 +78,14 @@ let read_block_file blocks_filename =
     | Error err ->
         failwithf "Could not read block: %s" err ()
   in
-  let blocks =
-    Sequence.unfold ~init:(In_channel.create blocks_filename)
-      ~f:(fun blocks_file ->
-        match In_channel.input_line blocks_file with
-        | Some line ->
-            Some (read_block_line line, blocks_file)
-        | None ->
-            In_channel.close blocks_file ;
-            None )
-  in
-  return blocks
+  let blocks_file = In_channel.create blocks_filename in
+  match In_channel.input_line blocks_file with
+  | Some line ->
+      In_channel.close blocks_file ;
+      return (read_block_line line)
+  | None ->
+      In_channel.close blocks_file ;
+      failwithf "File %s is empty" blocks_filename ()
 
 let run_select ~context:(module Context : CONTEXT)
     (block : Mina_block.Precomputed.t) =
@@ -103,13 +105,10 @@ let run_select ~context:(module Context : CONTEXT)
   in
   return ()
 
-let process_block ~context precomputed_blocks =
-  match Sequence.next precomputed_blocks with
-  | Some (precomputed_block, _precomputed_blocks) ->
-      let%bind () = run_select ~context precomputed_block in
-      return ()
-  | None ->
-      return ()
+let process_block ~context precomputed_block =
+  let%bind () = run_select ~context precomputed_block in
+  print_endline "process_block: finished processing block" ;
+  return ()
 
 let process_precomputed_blocks ~context blocks =
   let%bind () =
@@ -119,20 +118,20 @@ let process_precomputed_blocks ~context blocks =
   in
   return ()
 
-let json_to_precomputed json_blocks =
-  Deferred.List.map json_blocks ~f:(fun json -> read_block_file json)
-
 let main () ~blocks_dir =
   let logger = Logger.create () in
   let context = context logger in
 
   [%log info] "Starting to read blocks dir"
     ~metadata:[ ("blocks_dir", `String blocks_dir) ] ;
-  let%bind json_blocks = read_directory blocks_dir in
-  let%bind blocks = json_to_precomputed json_blocks in
+  let%bind block_sorted_filenames = read_directory blocks_dir in
+  let%bind precomputed_blocks =
+    Deferred.List.map block_sorted_filenames ~f:(fun json ->
+        read_block_file json )
+  in
   [%log info] "Finished reading blocks dir" ;
 
-  let%bind () = process_precomputed_blocks ~context blocks in
+  let%bind () = process_precomputed_blocks ~context precomputed_blocks in
 
   return ()
 
