@@ -25,6 +25,7 @@
 (package (name coda_genesis_proof))
 (package (name command_line_tests))
 (package (name consensus))
+(package (name consensus_test))
 (package (name crs))
 (package (name crypto_params))
 (package (name cstubs_applicative))
