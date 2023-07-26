@@ -416,7 +416,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/MultipleNodeRestarted-360bc1ed48a24dfca4bcbae1e29d0584"
 
   - alert: HighDisconnectedBlocksPerHour
-    expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor {${berkeley_testnet},${berkeley_rule_filter}}  [${alert_timeframe}])) > 3
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor {${berkeley_testnet},${synced_status_filter}}  [${alert_timeframe}])) > 3
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -426,7 +426,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/HighDisconnectedBlocksPerHour-14da6dc40386439799eb2a573d077ecb"
 
   - alert: HighOldBlocksPerHour
-    expr: max by (testnet) (increase(Coda_Rejected_blocks_worse_than_root {${berkeley_testnet},${berkeley_rule_filter}}  [${alert_timeframe}])) > 5
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_worse_than_root {${berkeley_testnet},${synced_status_filter}}  [${alert_timeframe}])) > 5
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -436,7 +436,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/HighOldBlocksPerHour-134ba51aef4d482bb065ce7a02dd8fb7"
 
   - alert: HighInvalidProofPerHour
-    expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof {${berkeley_testnet},${berkeley_rule_filter}}  [${alert_timeframe}])) > 3
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof {${berkeley_testnet}}  [${alert_timeframe}])) > 3
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -517,7 +517,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Nodes-out-of-sync-0f29c739e47c42e4adabe62a2a0316bd"
 
   - alert: LowPeerCount
-    expr: min by (testnet) (Coda_Network_peers {${berkeley_testnet},${berkeley_rule_filter}} ) < 3
+    expr: min by (testnet) (Coda_Network_peers {${berkeley_testnet},${synced_status_filter}} ) < 3
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -528,7 +528,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowPeerCount-3a66ae1ca6fd44b585eca37f9206d429"
 
   - alert: CriticallyLowMinWindowDensity
-    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_min_window_density {${berkeley_testnet},${berkeley_rule_filter}} ) <= 13
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_min_window_density {${berkeley_testnet},${synced_status_filter}} ) <= 35
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -539,7 +539,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowMinWindowDensity-Runbook-7908635be4754b44a862d9bec8edc239"
 
   - alert: LowFillRate
-    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_slot_fill_rate {${berkeley_testnet},${berkeley_rule_filter}} ) < 0.75 * 0.6
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_slot_fill_rate {${berkeley_testnet},${synced_status_filter}} ) < 0.75 * 0.6
     for: 1h
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -550,7 +550,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowFillRate-36efb1cd9b5d461db6976bc1938fab9e"
 
   - alert: NoTransactionsInSeveralBlocks
-    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_empty_blocks_at_best_tip {${berkeley_testnet},${berkeley_rule_filter}} ) >= 5
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_empty_blocks_at_best_tip {${berkeley_testnet},${synced_status_filter}} ) >= 5
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -560,7 +560,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/No-Transactions-In-Several-Blocks-55ca13df38dd4c3491e11d8ea8020c08"
 
   - alert: NoCoinbaseInBlocks
-    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_best_tip_coinbase {${berkeley_testnet},${berkeley_rule_filter}} ) < 1
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_best_tip_coinbase {${berkeley_testnet},${synced_status_filter}} ) < 1
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -571,7 +571,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/NoCoinbaseInBlocks-aacbc2a4f9334d0db2de20c2f77ac34f"
 
   - alert: LongFork
-    expr: max by (testnet) (Coda_Transition_frontier_longest_fork {${berkeley_testnet},${berkeley_rule_filter}} ) >= 16
+    expr: max by (testnet) (Coda_Transition_frontier_longest_fork {${berkeley_testnet},${synced_status_filter}} ) >= 16
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -581,7 +581,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LongFork-e65e5ad7437f4f4dbac201abbf9ace81"
 
   - alert: OldBestTip
-    expr: min by (testnet) ((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec {${berkeley_testnet},${berkeley_rule_filter}} ) >= 15 * 180
+    expr: min by (testnet) ((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec {${berkeley_testnet},${synced_status_filter}} ) >= 15 * 180
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -591,7 +591,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/OldBestTip-8afa955101b642bd8356edfd0b03b640"
 
   - alert: NoNewSnarks
-    expr: min by (testnet) ((time() - 1609459200) - Coda_Snark_work_useful_snark_work_received_time_sec {${berkeley_testnet},${berkeley_rule_filter}} ) >= 2 * 180 and max by (testnet) (Coda_Snark_work_pending_snark_work {${berkeley_testnet},${berkeley_rule_filter}} ) != 0
+    expr: min by (testnet) ((time() - 1609459200) - Coda_Snark_work_useful_snark_work_received_time_sec {${berkeley_testnet},${synced_status_filter}} ) >= 2 * 180 and max by (testnet) (Coda_Snark_work_pending_snark_work {${berkeley_testnet},${synced_status_filter}} ) != 0
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -601,7 +601,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/NoNewSnarks-f86d27c81af54954b2fb61378bff9d4d"
 
   - alert: NoNewTransactions
-    expr: min by (testnet) ((time() - 1609459200) - Coda_Transaction_pool_useful_transactions_received_time_sec {${berkeley_testnet},${berkeley_rule_filter}} ) >= 2 * 180
+    expr: min by (testnet) ((time() - 1609459200) - Coda_Transaction_pool_useful_transactions_received_time_sec {${berkeley_testnet},${synced_status_filter}} ) >= 2 * 180
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -633,7 +633,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
 
   - alert: FewBlocksPerHour
-    expr: quantile by (testnet) (0.5, increase(Coda_Transition_frontier_max_blocklength_observed {${berkeley_testnet},${berkeley_rule_filter}}  [30m])) < 1
+    expr: quantile by (testnet) (0.5, increase(Coda_Transition_frontier_max_blocklength_observed {${berkeley_testnet},${synced_status_filter}}  [30m])) < 1
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -644,7 +644,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/FewBlocksPerHour-47a6356f093242d988b0d9527ce23478"
  
   - alert: HighBlockGossipLatency
-    expr: max by (testnet) (max_over_time(Coda_Block_latency_gossip_time {${berkeley_testnet},${berkeley_rule_filter}}  [${alert_timeframe}])) > 200
+    expr: max by (testnet) (max_over_time(Coda_Block_latency_gossip_time {${berkeley_testnet},${synced_status_filter}}  [${alert_timeframe}])) > 200
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -655,7 +655,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/HighBlockGossipLatency-2096501c7cf34032b44e903ec1a4d79c"
 
   - alert: SomewhatOldBestTip
-    expr: count by (testnet) (((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec {${berkeley_testnet},${berkeley_rule_filter}} ) >= 8 * 180) > 1
+    expr: count by (testnet) (((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec {${berkeley_testnet},${synced_status_filter}} ) >= 8 * 180) > 1
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -665,7 +665,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/SomewhatOldBestTip-bb1509582bdd4908bcda656eebf421b5"
 
   - alert: MediumFork
-    expr: max by (testnet) (Coda_Transition_frontier_longest_fork {${berkeley_testnet},${berkeley_rule_filter}} ) >= 8
+    expr: max by (testnet) (Coda_Transition_frontier_longest_fork {${berkeley_testnet},${synced_status_filter}} ) >= 8
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -675,7 +675,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/MediumFork-0a530813af2e40c491cdf01b3a2b2304"
 
   - alert: NoTransactionsInAtLeastOneBlock
-    expr: max by (testnet) (Coda_Transition_frontier_empty_blocks_at_best_tip {${berkeley_testnet},${berkeley_rule_filter}} ) > 0
+    expr: max by (testnet) (Coda_Transition_frontier_empty_blocks_at_best_tip {${berkeley_testnet},${synced_status_filter}} ) > 0
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -685,7 +685,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/NoTransactionsInAtLeastOneBlock-049250ff7ae84de990233c7b6d35f763"
 
   - alert: LowMinWindowDensity
-    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_min_window_density {${berkeley_testnet},${berkeley_rule_filter}} ) <= 35
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_min_window_density {${berkeley_testnet},${synced_status_filter}} ) <= 60
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -706,7 +706,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/SeedListDown-d8d4e14609884c63a7086309336f3462"
 
   - alert: LowDisconnectedBlocksPerHour
-    expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor {${berkeley_testnet},${berkeley_rule_filter}}  [${alert_timeframe}])) > 0
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor {${berkeley_testnet},${synced_status_filter}}  [${alert_timeframe}])) > 0
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -716,7 +716,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowDisconnectedBlocksPerHour-32bd49852fbb499090106fe63a504859"
 
   - alert: LowOldBlocksPerHour
-    expr: max by (testnet) (increase(Coda_Rejected_blocks_worse_than_root {${berkeley_testnet},${berkeley_rule_filter}}  [${alert_timeframe}])) > 0
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_worse_than_root {${berkeley_testnet},${synced_status_filter}}  [${alert_timeframe}])) > 0
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -726,7 +726,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowOldBlocksPerHour-1cc2e92b8ca944869d810f7afd7c2d78"
 
   - alert: LowInvalidProofPerHour
-    expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof {${berkeley_testnet},${berkeley_rule_filter}}  [${alert_timeframe}])) > 0
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof {${berkeley_testnet}}  [${alert_timeframe}])) > 0
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -736,7 +736,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowInvalidProofPerHour-b6e88b9ae84f47169e7f86017ab9e340"
 
   - alert: LowPostgresBlockHeightGrowth
-    expr: min by (testnet) (increase(Coda_Archive_max_block_height {${berkeley_testnet},${berkeley_rule_filter}}  [${alert_timeframe}])) < 1
+    expr: min by (testnet) (increase(Coda_Archive_max_block_height {${berkeley_testnet}}  [${alert_timeframe}])) < 1
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
