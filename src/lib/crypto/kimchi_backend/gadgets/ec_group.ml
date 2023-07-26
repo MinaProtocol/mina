@@ -2317,18 +2317,18 @@ let%test_unit "Ec_group.ops_mixed" =
             in
 
             (* Check for expected quantity of external checks *)
-            if Bignum_bigint.(curve.bignum.a = zero) then
-              assert (
-                Mina_stdlib.List.Length.equal unused_external_checks.bounds 14 )
-            else
-              assert (
-                Mina_stdlib.List.Length.equal unused_external_checks.bounds 15 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.bounds 15 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                7 ) ;
+                14 ) ;
             assert (
               Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 7 ) ;
+                unused_external_checks.compact_multi_ranges 0 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
