@@ -89,8 +89,8 @@ module Constant = struct
            ~srs_length_log2:Common.Max_degree.wrap_log2
            ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
            ~field_of_hex:
-             (Core_kernel.Fn.compose Tock.Field.of_bigint
-                Kimchi_pasta.Pasta.Bigint256.of_hex_string )
+             (Core_kernel.Fn.compose Tock.Field.of_bigint (fun x ->
+                  Kimchi_pasta.Pasta.Bigint256.of_hex_string x ) )
            ~domain:
              (Plonk_checks.domain
                 (module Tock.Field)
@@ -101,8 +101,6 @@ module Constant = struct
        let plonk =
          let module Field = struct
            include Tock.Field
-
-           type nonrec bool = bool
          end in
          Plonk_checks.derive_plonk (module Field) ~env ~shift chals evals
          |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
@@ -123,7 +121,7 @@ module Constant = struct
        } )
 end
 
-let typ ~wrap_rounds : (t, Constant.t) Typ.t =
+let typ ~wrap_rounds:_ : (t, Constant.t) Typ.t =
   Types.Step.Proof_state.Per_proof.typ
     (module Impl)
     (Shifted_value.typ Other_field.typ)
