@@ -1,0 +1,21 @@
+(library
+ (public_name logger.fake)
+ (name logger_fake)
+ (libraries
+   ;; opam libraries
+   result
+   core_kernel
+   sexplib0
+   bin_prot.shape
+   base.caml
+   base.base_internalhash_types
+   ;; local libraries
+   interpolator_lib
+   mina_compile_config
+   ppx_version.runtime
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (implements logger)
+ (synopsis "Fake logging library"))

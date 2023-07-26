@@ -8,65 +8,65 @@ let
   inherit (builtins) filterSource path;
 
   inherit (pkgs.lib)
-    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath
-    optionalString escapeShellArg;
+    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath optionalString
+    escapeShellArg;
 
   external-repo =
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
   export = opam-nix.importOpam ../opam.export;
-  external-packages =
-    getAttrs [ "sodium" "capnp" "rpc_parallel" "async_kernel" "base58" ]
-    (builtins.mapAttrs (_: last) (opam-nix.listRepo external-repo));
+  external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
+    (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
-  difference = a: b:
-    filterAttrs (name: _: !builtins.elem name (builtins.attrNames b)) a;
-
+  # Packages which are `installed` in the export.
+  # These are all the transitive ocaml dependencies of Mina.
   export-installed = opam-nix.opamListToQuery export.installed;
 
+  # Extra packages which are not in opam.export but useful for development, such as an LSP server.
   extra-packages = with implicit-deps; {
-    dune-rpc = dune;
-    dyn = dune;
-    fiber = dune;
-    ocaml-lsp-server = "1.11.6";
+    dune-rpc = "3.5.0";
+    dyn = "3.5.0";
+    fiber = "3.5.0";
+    chrome-trace = "3.5.0";
+    ocaml-lsp-server = "1.15.1-4.14";
+    ocamlc-loc = "3.5.0";
     ocaml-system = ocaml;
     ocamlformat-rpc-lib = "0.22.4";
-    omd = "1.3.1";
-    ordering = dune;
+    omd = "1.3.2";
+    ordering = "3.5.0";
     pp = "1.1.2";
     ppx_yojson_conv_lib = "v0.15.0";
-    stdune = dune;
+    stdune = "3.5.0";
     xdg = dune;
   };
 
+  # Dependencies required by every Mina package
   implicit-deps = export-installed // external-packages;
 
+  # Pins from opam.export
   pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
 
-  scope = opam-nix.applyOverlays opam-nix.__overlays (opam-nix.defsToScope pkgs
-    ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
+  scope = opam-nix.applyOverlays opam-nix.__overlays
+    (opam-nix.defsToScope pkgs { }
+      ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
 
   installedPackageNames =
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
 
   sourceInfo = inputs.self.sourceInfo or { };
 
+  # "System" dependencies required by all Mina packages
   external-libs = with pkgs;
     [ zlib bzip2 gmp openssl libffi ]
     ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
 
+  # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
   filtered-src = with inputs.nix-filter.lib;
     filter {
       root = ../.;
       include =
         [ (inDirectory "src") "dune" "dune-project" "./graphql_schema.json" ];
-    };
-
-  dockerfiles-scripts = with inputs.nix-filter.lib;
-    filter {
-      root = ../.;
-      include = [ (inDirectory "dockerfiles") ];
     };
 
   overlay = self: super:
@@ -79,9 +79,11 @@ let
       lld_wrapped = pkgs.writeShellScriptBin "ld.lld"
         ''${pkgs.llvmPackages.bintools}/bin/ld.lld "$@"'';
 
+      # Make a script wrapper around a binary, setting all the necessary environment variables and adding necessary tools to PATH.
+      # Also passes the version information to the executable.
       wrapMina = let
         commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
-        commit_date = inputs.self.sourceInfo.lastModifiedDate or "<unknown>";
+        commit_date = inputs.flockenzeit.lib.RFC-5322 inputs.self.sourceInfo.lastModified or 0;
       in package:
       { deps ? [ pkgs.gnutar pkgs.gzip ], }:
       pkgs.runCommand "${package.name}-release" {
@@ -100,6 +102,8 @@ let
         done
       '') package.outputs);
 
+      # Derivation which has all Mina's dependencies in it, and creates an empty output if the command succeds.
+      # Useful for unit tests.
       runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { } }:
         check:
         self.mina-dev.overrideAttrs (oa:
@@ -115,6 +119,7 @@ let
       lmdb = super.lmdb.overrideAttrs
         (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
 
+      # Can't find sodium-static and ctypes
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
         propagatedBuildInputs = [ pkgs.sodium-static ];
@@ -123,14 +128,18 @@ let
         '';
       });
 
+      # Doesn't have an explicit dependency on ctypes
       rpc_parallel = super.rpc_parallel.overrideAttrs
         (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
 
+      # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({
         pname = "mina";
         version = "dev";
         # Prevent unnecessary rebuilds on non-source changes
         src = filtered-src;
+
+        withFakeOpam = false;
 
         # TODO, get this from somewhere
         MARLIN_REPO_SHA = "<unknown>";
@@ -138,11 +147,14 @@ let
         MINA_COMMIT_DATE = "<unknown>";
         MINA_BRANCH = "<unknown>";
 
+        DUNE_PROFILE = "devnet";
+
         NIX_LDFLAGS =
           optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
           "-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation";
 
         buildInputs = ocaml-libs ++ external-libs;
+
         nativeBuildInputs = [
           self.dune
           self.ocamlfind
@@ -157,10 +169,16 @@ let
         MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
-        MARLIN_PLONK_STUBS = "${pkgs.marlin_plonk_bindings_stubs}/lib";
+        # this is used to retrieve the path of the built static library
+        # and copy it from within a dune rule
+        # (see src/lib/crypto/kimchi_bindings/stubs/dune)
+        MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
         DISABLE_CHECK_OPAM_SWITCH = "true";
 
         MINA_VERSION_IMPLEMENTATION = "mina_version.runtime";
+
+        PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+        PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
 
         configurePhase = ''
           export MINA_ROOT="$PWD"
@@ -182,17 +200,31 @@ let
             src/app/rosetta/rosetta_testnet_signatures.exe \
             src/app/rosetta/rosetta_mainnet_signatures.exe \
             src/app/generate_keypair/generate_keypair.exe \
-            src/lib/mina_base/sample_keypairs.json \
-            -j$NIX_BUILD_CORES
+            src/app/archive/archive.exe \
+            src/app/archive_blocks/archive_blocks.exe \
+            src/app/extract_blocks/extract_blocks.exe \
+            src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+            src/app/replayer/replayer.exe \
+            src/app/swap_bad_balances/swap_bad_balances.exe \
+            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
           dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
+          # Building documentation fails, because not everything in the source tree compiles. Ignore the errors.
           dune build @doc || true
         '';
 
-        outputs =
-          [ "out" "generate_keypair" "mainnet" "testnet" "genesis" "sample" "batch_txn_tool"];
+        outputs = [
+          "out"
+          "archive"
+          "generate_keypair"
+          "mainnet"
+          "testnet"
+          "genesis"
+          "sample"
+          "batch_txn_tool"
+        ];
 
         installPhase = ''
-          mkdir -p $out/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
+          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
           mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           pushd _build/default
           cp src/app/cli/src/mina.exe $out/bin/mina
@@ -205,6 +237,11 @@ let
           cp src/app/cli/src/mina_testnet_signatures.exe $testnet/bin/mina_testnet_signatures
           cp src/app/rosetta/rosetta_testnet_signatures.exe $testnet/bin/rosetta_testnet_signatures
           cp src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
+          cp src/app/archive/archive.exe $archive/bin/mina-archive
+          cp src/app/archive_blocks/archive_blocks.exe $archive/bin/mina-archive-blocks
+          cp src/app/missing_blocks_auditor/missing_blocks_auditor.exe $archive/bin/mina-missing-blocks-auditor
+          cp src/app/replayer/replayer.exe $archive/bin/mina-replayer
+          cp src/app/swap_bad_balances/swap_bad_balances.exe $archive/bin/mina-swap-bad-balances
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
           popd
@@ -216,27 +253,51 @@ let
         OCAMLPARAM = "_,cclib=-lc++";
       });
 
+      # Same as above, but wrapped with version info.
       mina = wrapMina self.mina-dev { };
 
+      # Mina with additional instrumentation info.
+      with-instrumentation-dev = self.mina-dev.overrideAttrs (oa: {
+        pname = "with-instrumentation";
+        outputs = [ "out" ];
+
+        buildPhase = ''
+          dune build  --display=short --profile=testnet_postake_medium_curves --instrument-with bisect_ppx src/app/cli/src/mina.exe
+        '';
+        installPhase = ''
+          mkdir -p $out/bin
+          mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
+        '';
+      });
+        
+      with-instrumentation = wrapMina self.with-instrumentation-dev { };
+      
+      # Unit tests
       mina_tests = runMinaCheck {
         name = "tests";
         extraArgs = {
           MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          MINA_LIBP2P_PASS = "naughty blue worm";
+          MINA_PRIVKEY_PASS = "naughty blue worm";
           TZDIR = "${pkgs.tzdata}/share/zoneinfo";
         };
         extraInputs = [ pkgs.ephemeralpg ];
       } ''
         dune build graphql_schema.json --display=short
         export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
-        psql "$MINA_TEST_POSTGRES" < src/app/archive/create_schema.sql
+        pushd src/app/archive
+        psql "$MINA_TEST_POSTGRES" < create_schema.sql
+        popd
         # TODO: investigate failing tests, ideally we should run all tests in src/
         dune runtest src/app/archive src/lib/command_line_tests --display=short
       '';
 
+      # Check if the code is formatted properly
       mina-ocaml-format = runMinaCheck { name = "ocaml-format"; } ''
         dune exec --profile=dev src/app/reformat/reformat.exe -- -path . -check
       '';
 
+      # Javascript Client SDK
       mina_client_sdk = self.mina-dev.overrideAttrs (_: {
         pname = "mina_client_sdk";
         version = "dev";
@@ -244,13 +305,16 @@ let
 
         outputs = [ "out" ];
 
-        checkInputs = [ pkgs.nodejs ];
+        checkInputs = [ pkgs.nodejs-16_x ];
 
         MINA_VERSION_IMPLEMENTATION = "mina_version.dummy";
 
         buildPhase = ''
-          export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$opam__zarith__lib/zarith"
-          dune build --display=short src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_mainnet
+          dune build --display=short \
+            src/lib/crypto/kimchi_bindings/js/node_js \
+            src/app/client_sdk/client_sdk.bc.js \
+            src/lib/snarky_js_bindings/snarky_js_node.bc.js \
+            src/lib/snarky_js_bindings/snarky_js_web.bc.js
         '';
 
         doCheck = true;
@@ -267,41 +331,15 @@ let
         '';
 
         installPhase = ''
-          mkdir -p $out/share/client_sdk
+          mkdir -p $out/share/client_sdk $out/share/snarkyjs_bindings
           mv _build/default/src/app/client_sdk/client_sdk.bc.js $out/share/client_sdk
+          mv _build/default/src/lib/snarky_js_bindings/snarky_js_*.js $out/share/snarkyjs_bindings
         '';
       });
 
-      mina_build_config = pkgs.stdenv.mkDerivation {
-        pname = "mina_build_config";
-        version = "dev";
-        src = filtered-src;
-        nativeBuildInputs = [ pkgs.rsync ];
-
-        installPhase = ''
-          mkdir -p $out/etc/coda/build_config
-          cp src/config/mainnet.mlh $out/etc/coda/build_config/BUILD.mlh
-          rsync -Huav src/config/* $out/etc/coda/build_config/.
-        '';
-      };
-
-      mina_daemon_scripts = pkgs.stdenv.mkDerivation {
-        pname = "mina_daemon_scripts";
-        version = "dev";
-        src = dockerfiles-scripts;
-        buildInputs = [ pkgs.bash pkgs.python3 ];
-        installPhase = ''
-          mkdir -p $out/healthcheck $out/entrypoint.d
-          mv dockerfiles/scripts/healthcheck-utilities.sh $out/healthcheck/utilities.sh
-          mv dockerfiles/scripts/cron_job_dump_ledger.sh $out/cron_job_dump_ledger.sh
-          mv dockerfiles/scripts/daemon-entrypoint.sh $out/entrypoint.sh
-          mv dockerfiles/puppeteer-context/* $out/
-        '';
-      };
-
+      # Integration test executive
       test_executive-dev = self.mina-dev.overrideAttrs (oa: {
         pname = "mina-test_executive";
-        src = filtered-src;
         outputs = [ "out" ];
 
         buildPhase = ''

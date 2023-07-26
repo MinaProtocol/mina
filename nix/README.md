@@ -34,6 +34,17 @@ You may also install Nix from your distribution's official repository;
 Note however that it is preferrable you get a relatively recent
 version (⩾ 2.5), and the version from the repository may be rather old.
 
+**warning for macOS users**: macOS updates will often break your nix
+installation. To prevent that, you can add the following to your `~/.bashrc` or
+`~/.zshrc`:
+
+```bash
+# avoid macOS updates to destroy nix
+if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
+  source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+fi
+```
+
 ## 2. Enable Flakes (optional but recommended)
 
 Mina is packaged using [Nix Flakes](https://nixos.wiki/wiki/Flakes),
@@ -84,14 +95,16 @@ If you wish to build Mina yourself, or work on some changes incrementally, run
 otherwise). This will drop you in a shell with all dependencies, including
 OCaml, Rust and Go ones available, so the only thing you have to do is run `dune
 build src/app/cli/src/mina.exe`. You can also just run `eval "$buildPhase"` to
-run the same command as would be run inside the nix sandbox. The produced
-executable can be found in `_build/default/src/app/cli/src/mina.exe`. You most
-likely want to run it from the same shell you've built it in, since the
-executable looks for certain dependencies at runtime via environment variables,
-meaning you either have to set those variables yourself or rely on the ones set
-by the `devShell`. The executable produced by `nix build mina` (see ["Pure"
-build section](#pure-build)) doesn't suffer from this limitation, since it is
-wrapped with all the necessary environment variables.
+run the same command as would be run inside the nix sandbox. Running `make
+build` will **not** work due to it trying to build the already-built go
+dependencies. The produced executable can be found in
+`_build/default/src/app/cli/src/mina.exe`. You most likely want to **run it from
+the same shell you've built it in**, since the executable looks for certain
+dependencies at runtime via environment variables, meaning you either have to
+set those variables yourself or rely on the ones set by the `devShell`. The
+executable produced by `nix build mina` (see ["Pure" build
+section](#pure-build)) doesn't suffer from this limitation, since it is wrapped
+with all the necessary environment variables.
 
 Note that `opam` will **not** be available in that shell, since Nix takes over
 the job of computing and installing dependencies. If you need to modify the opam
@@ -196,17 +209,36 @@ branches, or otherwise changing the dependency tree of Mina.
 
 TL;DR:
 ```
-nix build mina#mina-docker
+$(nix build mina#mina-image-full) | docker load
+# Also available: mina-image-slim, mina-image-instr, mina-archive-image-full,
 ```
 
 Since a "pure" build can happen entirely inside the Nix sandbox, we can use its
-result to produce other useful artifacts with Nix. For example, you can build a
-slim docker image. Run `nix build mina#mina-docker` if you're using flakes (or
-`nix-build packages.x86_64-linux.mina-docker` otherwise). You will get a
-`result` symlink in the current directory, which links to a tarball containing
-the docker image. You can load the image using `docker load -i result`, then
-note the tag it outputs. You can then run Mina from this docker image with
-`docker run mina:<tag> mina.exe <args>`.
+result to produce other useful artifacts with Nix. For example, we can build
+docker images. Due to /nix/store space usage concerns, instead of building the
+image itself Nix produces a script which, when executed, outputs a tarball of a
+docker image, suitable for consumption with `docker load`. After loading the
+image, it can be used as any other docker image would be (e.g. with `docker
+run`). The images for branches available on github can also be obtained from the
+registry at
+`us-west2-docker.pkg.dev/o1labs-192920/nix-containers/$IMAGE:$BRANCH`, e.g.
+`docker run --rm -it
+us-west2-docker.pkg.dev/o1labs-192920/nix-containers/mina-image-full:develop` .
+
+The `slim` image only has the Mina daemon itself, whereas `full` images also
+contain many useful tools, such as coreutils, fake init, jq, etc.
+
+The `instr` image is a replica of `full` image with additional instrumenation data.
+
+### Debian package
+
+TL;DR:
+```
+nix build mina#mina-deb
+```
+
+The Debian package is for installing on .deb-based systems which don't have Nix
+installed. **Installing it if you have Nix already won't work.**
 
 ### Demo nixos-container
 
@@ -346,6 +378,14 @@ networking inside the Nix sandbox (in order to vendor all the dependencies using
 specified explicitly. This is the hash you're updating by running
 `./nix/update-libp2p-hashes.sh`.
 
+### Notes on instrumenation package
+
+`nix build mina#mina_with_instrumentation` allows to build a special version on mina
+ with instrumentation enabled. This can be helpful if one would like verify 
+what is a code coverage of end-to-end/manual tests performed over mina under development. 
+Additionally there is a docker image available which wraps up above mina build into full mina image. 
+One can prepare it using command: `$(nix build mina#mina-image-instr-full --print-out-paths) | docker load`
+
 ### Discovering all the packages this Flake provides
 
 `nix flake show` doesn't work due to
@@ -391,6 +431,25 @@ nix-repl> :u legacyPackages.x86_64-linux.regular.ocamlPackages_mina.mina-dev.ove
 ```
 
 ## Troubleshooting
+
+### Evaluation takes too long
+
+Evaluating any output of this flake for the first time can take a substantial
+amount of time. This is because Nix wants to ensure purity, and thus copies all
+submodules to the store and checks them out individually, even if you already
+have them checked out in your work tree.
+
+This is good for reproducibility, but can be inconvenient. Here are some steps
+you can take to circumvent this:
+
+- If you're using `direnv`, make sure to install and use `nix-direnv`. It has a
+  caching mechanism that significantly speeds up subsequent re-entries into the
+  environment. You might have to `direnv reload` manually once in a while as a
+  trade-off.
+- If you are trying to evaluate something from a clean checkout, it will take
+  longer, because Nix will try to ensure purity. You can circumvent this by
+  making the index dirty, e.g. by doing `touch foo; git add foo` . This will
+  make all Nix commands do a quick copy instead of checking everything out.
 
 ### `Error: File unavailable:`, `Undefined symbols for architecture ...:`, `Compiler version mismatch`, missing dependency libraries, or incorrect dependency library versions
 
@@ -522,7 +581,7 @@ export GIT_LFS_SKIP_SMUDGE=1
 
 Before running any `nix` commands.
 
-### Warning: ignoring untrusted substituter
+### `Warning: ignoring untrusted substituter`
 
 Update your `/etc/nix/nix.conf` with the following content (concatenating new
 values with possibly already existing):
@@ -533,3 +592,23 @@ trusted-public-keys = nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct
 ```
 
 And then reload your `nix-daemon` service.
+
+### `gcc: Argument list too long`
+
+If you have a lot of big environment variables, especially on macOS, this might
+happen when you try to build anything inside the pure shell. It happens because
+the stack size for every process is limited, and it is shared between the
+current environment, the argument list, and some other things. Therefore, if
+your environment takes up too much space, not enough is left for the arguments.
+The way to fix the error is to unset some of the bigger enviornment variables,
+perhaps with
+
+```bash
+export XDG_DATA_DIRS= DIRENV_DIFF= <...>
+```
+
+Before running any `dune` commands.
+
+Alternatively, you can just run your commands inside `nix develop
+--ignore-environment mina`, which unsets all the outside environment variables,
+resulting in a more reproducible but less convenient environment.
