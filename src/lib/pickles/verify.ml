@@ -1,11 +1,7 @@
 module SC = Scalar_challenge
-open Core_kernel
-open Async_kernel
 open Pickles_types
 open Common
 open Import
-open Backend
-open Tuple_lib
 
 module Instance = struct
   type t =
@@ -19,7 +15,6 @@ module Instance = struct
 end
 
 let verify_heterogenous (ts : Instance.t list) =
-  let module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk in
   let module Tick_field = Backend.Tick.Field in
   let logger = Internal_tracing_context_logger.get () in
   [%log internal] "Verify_heterogenous"
@@ -40,7 +35,7 @@ let verify_heterogenous (ts : Instance.t list) =
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
   [%log internal] "Compute_plonks_and_chals" ;
-  let computed_bp_chals, deferred_values =
+  let _computed_bp_chals, deferred_values =
     List.map ts
       ~f:(fun
            (T
@@ -55,6 +50,7 @@ let verify_heterogenous (ts : Instance.t list) =
                          { old_bulletproof_challenges; _ }
                      }
                  ; prev_evals = evals
+                 ; proof = _
                  } ) )
          ->
         Timer.start __LOC__ ;
@@ -92,7 +88,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         Timer.clock __LOC__ ;
         let { Deferred_values.Minimal.plonk = _
-            ; branch_data
+            ; branch_data = _
             ; bulletproof_challenges
             } =
           Deferred_values.Minimal.map_challenges
@@ -212,8 +208,7 @@ let verify_heterogenous (ts : Instance.t list) =
   Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
   result ()
 
-let verify (type a return_typ n)
-    (max_proofs_verified : (module Nat.Intf with type n = n))
+let verify (type a n) (max_proofs_verified : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous
