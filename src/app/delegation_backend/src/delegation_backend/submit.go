@@ -194,7 +194,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	blockHash := req.GetData().GetBlockDataHash()
 	ps := makePaths(submittedAt, blockHash, submitter)
 
-	remoteAddr := r.Header.Get("X-Forwarded-For")
+	remoteAddr := strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0]
 	if remoteAddr == "" {
 		// If there is no X-Forwarded-For header, use the remote address
 		remoteAddr = r.RemoteAddr
