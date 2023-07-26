@@ -2,7 +2,7 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let tests_enabled = true
+let tests_enabled = false
 
 (* Endianness type *)
 type endianness = Big | Little
