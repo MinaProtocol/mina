@@ -73,15 +73,14 @@ module Wrap = struct
             type 'scalar_challenge t = { joint_combiner : 'scalar_challenge }
             [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
-            let[@warning "-45"] to_struct l = Hlist.HlistId.[ l.joint_combiner ]
+            let to_struct l = Hlist.HlistId.[ l.joint_combiner ]
 
-            let[@warning "-45"] of_struct Hlist.HlistId.[ joint_combiner ] =
-              { joint_combiner }
+            let of_struct Hlist.HlistId.[ joint_combiner ] = { joint_combiner }
 
             let map ~f { joint_combiner } =
               { joint_combiner = f joint_combiner }
 
-            let typ scalar_challenge =
+            let typ (type f fp) scalar_challenge =
               Snarky_backendless.Typ.of_hlistable ~var_to_hlist:to_hlist
                 ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
                 ~value_of_hlist:of_hlist [ scalar_challenge ]
@@ -151,7 +150,7 @@ module Wrap = struct
               ; runtime_tables
               ]
 
-            let[@warning "-45"] to_data
+            let to_data
                 { range_check0
                 ; range_check1
                 ; foreign_field_add
@@ -172,7 +171,7 @@ module Wrap = struct
                 ; runtime_tables
                 ]
 
-            let[@warning "-45"] of_data
+            let of_data
                 Hlist.HlistId.
                   [ range_check0
                   ; range_check1
@@ -213,22 +212,20 @@ module Wrap = struct
                   | None ->
                       Plonk_types.Opt.None )
 
-            let[@warning "-45"] refine_opt feature_flags t =
+            let refine_opt feature_flags t =
               let flags = of_feature_flags feature_flags in
               map2 flags t ~f:(fun flag v ->
-                  let open Plonk_types.Opt in
                   match (flag, v) with
-                  | Flag.Yes, Plonk_types.Opt.Maybe (_, v) ->
+                  | Plonk_types.Opt.Flag.Yes, Plonk_types.Opt.Maybe (_, v) ->
                       Plonk_types.Opt.Some v
-                  | Flag.Yes, (Some _ | None) ->
+                  | Plonk_types.Opt.Flag.Yes, _ ->
                       assert false
-                  | Flag.Maybe, v ->
+                  | Plonk_types.Opt.Flag.Maybe, _ ->
                       v
-                  | Flag.No, (None | Some _ | Maybe _) ->
+                  | Plonk_types.Opt.Flag.No, _ ->
                       Plonk_types.Opt.None )
 
-            let spec (* (type f) *) _
-                (* ((module Impl) : f impl) *) (zero : _ Zero_values.t)
+            let spec (type f) ((module Impl) : f impl) (zero : _ Zero_values.t)
                 (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
                 =
               let opt_spec flag =
@@ -243,7 +240,7 @@ module Wrap = struct
                 match flag with
                 | Plonk_types.Opt.Flag.No ->
                     Spec.T.Constant (None, (fun _ _ -> (* TODO *) ()), opt_spec)
-                | Plonk_types.Opt.Flag.(Yes | Maybe) ->
+                | _ ->
                     opt_spec
               in
               let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =
@@ -484,7 +481,7 @@ module Wrap = struct
           ; xi
           ; bulletproof_challenges
           ; branch_data
-          } ~f:_ ~scalar =
+          } ~f ~scalar =
         { xi = scalar xi
         ; combined_inner_product
         ; b
@@ -737,7 +734,7 @@ module Wrap = struct
 
     open Snarky_backendless.H_list
 
-    let[@warning "-45"] to_hlist
+    let to_hlist
         { app_state
         ; dlog_plonk_index
         ; challenge_polynomial_commitments
@@ -749,7 +746,7 @@ module Wrap = struct
       ; old_bulletproof_challenges
       ]
 
-    let[@warning "-45"] of_hlist
+    let of_hlist
         ([ app_state
          ; dlog_plonk_index
          ; challenge_polynomial_commitments
@@ -942,7 +939,7 @@ module Wrap = struct
           ]
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
-      let[@warning "-45"] to_data
+      let to_data
           ({ proof_state =
                { deferred_values =
                    { xi
@@ -1016,7 +1013,7 @@ module Wrap = struct
           ]
 
       (** Construct a statement (as structured data) from the flat data-based representation. *)
-      let[@warning "-45"] of_data
+      let of_data
           Hlist.HlistId.
             [ fp
             ; challenge
@@ -1311,7 +1308,7 @@ module Step = struct
               .spec impl lookup.zero feature_flags
             ]
 
-        let[@warning "-45"] to_data
+        let to_data
             ({ deferred_values =
                  { xi
                  ; bulletproof_challenges
@@ -1372,7 +1369,7 @@ module Step = struct
           ; optional_column_scalars
           ]
 
-        let[@warning "-45"] of_data
+        let of_data
             Hlist.HlistId.
               [ Vector.
                   [ combined_inner_product
@@ -1441,6 +1438,7 @@ module Step = struct
       end
 
       let typ impl fq ~assert_16_bits ~zero ~feature_flags =
+        let open Deferred_values.Plonk.In_circuit.Lookup in
         let lookup_config =
           { Wrap.Lookup_parameters.use =
               feature_flags.Plonk_types.Features.lookup
@@ -1476,19 +1474,19 @@ module Step = struct
     include struct
       open Hlist.HlistId
 
-      let _to_data { unfinalized_proofs; messages_for_next_step_proof } =
+      let to_data { unfinalized_proofs; messages_for_next_step_proof } =
         [ Vector.map unfinalized_proofs ~f:Per_proof.In_circuit.to_data
         ; messages_for_next_step_proof
         ]
 
-      let _of_data [ unfinalized_proofs; messages_for_next_step_proof ] =
+      let of_data [ unfinalized_proofs; messages_for_next_step_proof ] =
         { unfinalized_proofs =
             Vector.map unfinalized_proofs ~f:Per_proof.In_circuit.of_data
         ; messages_for_next_step_proof
         }
-    end [@@warning "-45"]
+    end
 
-    let[@warning "-60"] typ (type n f)
+    let typ (type n f)
         ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
         as impl ) zero ~assert_16_bits
         (proofs_verified :
@@ -1525,7 +1523,7 @@ module Step = struct
       }
     [@@deriving sexp, compare, yojson]
 
-    let[@warning "-45"] to_data
+    let to_data
         { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
         ; messages_for_next_wrap_proof
         } ~option_map ~to_opt =
@@ -1536,7 +1534,7 @@ module Step = struct
       ; messages_for_next_wrap_proof
       ]
 
-    let[@warning "-45"] of_data
+    let of_data
         Hlist.HlistId.
           [ unfinalized_proofs
           ; messages_for_next_step_proof

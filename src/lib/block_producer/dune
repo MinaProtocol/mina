@@ -10,6 +10,7 @@
    core_kernel
    core
    async
+   integers
    ;; local libraries
    mina_wire_types
    mina_metrics
@@ -67,6 +68,7 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    internal_tracing
+   mina_networking
  )
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_register_event))

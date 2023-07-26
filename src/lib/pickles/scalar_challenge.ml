@@ -120,12 +120,11 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
   done ;
   with_label __LOC__ (fun () ->
       assert_
-        Snarky_backendless.Constraint.
-          { annotation = Some __LOC__
-          ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
-                T (EC_endoscalar { state = Array.of_list_rev !state }))
-          } ) ;
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
+              T (EC_endoscalar { state = Array.of_list_rev !state }))
+        } ) ;
   (!a, !b, !n)
 
 let to_field_checked (type f) ?num_bits
@@ -161,7 +160,9 @@ let test (type f)
   let module Field_constant = struct
     include Field.Constant
 
-    let _if_ b ~then_ ~else_ = if b then then_ () else else_ ()
+    type nonrec bool = bool
+
+    let if_ b ~then_ ~else_ = if b then then_ () else else_ ()
   end in
   Quickcheck.test ~trials:10
     (Quickcheck.Generator.list_with_length n Bool.quickcheck_generator)

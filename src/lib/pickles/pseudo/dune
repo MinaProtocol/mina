@@ -1,11 +1,7 @@
 (library
  (name pseudo)
  (public_name pickles.pseudo)
- (flags
-  (:standard
-    -w +a-40..42-44
-    -warn-error +a)
-  -open Core_kernel)
+ (flags -warn-error -27)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson ))
  (libraries

@@ -51,7 +51,6 @@ func main() {
 	sheetsService, err2 := sheets.NewService(ctx, option.WithScopes(sheets.SpreadsheetsReadonlyScope))
 	if err2 != nil {
 		log.Fatalf("Error creating Sheets service: %v", err2)
-		return
 	}
 	initWl := RetrieveWhitelist(sheetsService, log, appCfg)
 	wlMvar := new(WhitelistMVar)

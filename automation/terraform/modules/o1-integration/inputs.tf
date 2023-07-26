@@ -46,6 +46,11 @@ variable "mina_points_image" {
   type = string
 }
 
+variable "enable_working_dir_persitence" {
+  type = bool
+  default = false
+}
+
 variable "runtime_config" {
   type = string
 }

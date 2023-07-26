@@ -535,7 +535,7 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
             longident
     end
   in
-  let t, params =
+  let t, t_is_unboxed, params =
     let subst_type t_stri =
       (* NOTE: Can't use [Ast_pattern] here; it rejects attributes attached to
          types..
@@ -543,8 +543,11 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
       match t_stri.pstr_desc with
       | Pstr_type
           ( rec_flag
-          , [ ( { ptype_name = { txt = "t"; _ }; ptype_private = Public; _ } as
-              typ )
+          , [ ( { ptype_name = { txt = "t"; _ }
+                ; ptype_private = Public
+                ; ptype_attributes
+                ; _
+                } as typ )
             ] ) ->
           let params = typ.ptype_params in
           let typ =
@@ -555,7 +558,12 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
             }
           in
           let t = { stri with pstr_desc = Pstr_type (rec_flag, [ typ ]) } in
-          (t, params)
+          let is_unboxed =
+            List.exists ptype_attributes
+              ~f:(fun { attr_name = { txt; _ }; _ } ->
+                String.equal txt "unboxed" )
+          in
+          (t, is_unboxed, params)
       | _ ->
           (* should be unreachable *)
           (* TODO: Handle rpc types. *)
@@ -620,6 +628,9 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
     in
     let deriving_bin_io =
       lazy (create_attr ~loc (Located.mk "deriving") (PStr [ [%stri bin_io] ]))
+    in
+    let unboxed_attr =
+      lazy (create_attr ~loc (Located.mk "unboxed") (PStr []))
     in
     let make_tag_module ?bin_io_include typ_decl mod_name =
       (* if bin_io_include is given, then we use that to generate the
@@ -843,11 +854,19 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
         let include_binable_stri = find_include_binable_stri modl_stri in
         let typ_decl =
           (* type `typ` is equal to the type `t` from the surrounding module *)
-          type_declaration ~name:(Located.mk "typ") ~params ~cstrs:[]
-            ~private_:Public
-            ~manifest:
-              (Some (ptyp_constr (Located.lident "t") (List.map ~f:fst params)))
-            ~kind:Ptype_abstract
+          let ty_decl =
+            type_declaration ~name:(Located.mk "typ") ~params ~cstrs:[]
+              ~private_:Public
+              ~manifest:
+                (Some
+                   (ptyp_constr (Located.lident "t") (List.map ~f:fst params))
+                )
+              ~kind:Ptype_abstract
+          in
+          let ptype_attributes =
+            if t_is_unboxed then [ Lazy.force unboxed_attr ] else []
+          in
+          { ty_decl with ptype_attributes }
         in
         let include_binable_all_version_tags =
           make_all_tags_binable_include#structure_item include_binable_stri
@@ -863,7 +882,12 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
           let typ_stri = mk_all_version_tags_type_decl#structure_item t_stri in
           match typ_stri.pstr_desc with
           | Pstr_type (Recursive, [ typ_decl ]) ->
-              typ_decl
+              let ptype_attributes =
+                if t_is_unboxed then
+                  Lazy.force unboxed_attr :: typ_decl.ptype_attributes
+                else typ_decl.ptype_attributes
+              in
+              { typ_decl with ptype_attributes }
           | _ ->
               Location.raise_errorf ~loc
                 "Expected type declaration for type `typ`"
@@ -885,7 +909,12 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
                 )
               ~kind:Ptype_abstract
           in
-          { ty_decl with ptype_attributes = [ Lazy.force deriving_bin_io ] }
+          let ptype_attributes =
+            if t_is_unboxed then
+              [ Lazy.force unboxed_attr; Lazy.force deriving_bin_io ]
+            else [ Lazy.force deriving_bin_io ]
+          in
+          { ty_decl with ptype_attributes }
         in
         make_tag_module typ_decl with_top_version_tag_module
     in

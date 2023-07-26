@@ -159,3 +159,5 @@ type MetaToBeSaved struct {
 	GraphqlControlPort int     `json:"graphql_control_port,omitempty"`
 	BuiltWithCommitSha string  `json:"built_with_commit_sha,omitempty"`
 }
+
+const LATEST_PAYLOAD_VERSION = 1

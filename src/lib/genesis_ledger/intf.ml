@@ -3,7 +3,7 @@ open Signature_lib
 open Core_kernel
 
 module Timing = struct
-  type t = (int, int, int) Account_timing.Poly.t
+  type t = (int, int, int, int) Account_timing.Poly.t
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in

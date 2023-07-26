@@ -22,12 +22,67 @@ module Proof_data = struct
   [@@deriving bin_io_unversioned]
 end
 
+let get_backend_payload_version ~logger ~interruptor ~url =
+  let open Interruptible.Let_syntax in
+  let make_interruptible f = Interruptible.lift f interruptor in
+  match%bind
+    make_interruptible
+      (Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
+           Cohttp_async.Client.get url ) )
+  with
+  | Ok ({ status; _ }, body) -> (
+      let status_code = Cohttp.Code.code_of_status status in
+      let succeeded = status_code = 200 in
+      if not succeeded then (
+        [%log warn] "Failure to obtain service payload version at URL $url" ;
+        Interruptible.return None )
+      else
+        match%map
+          make_interruptible
+            (Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
+                 Cohttp_async.Body.to_string body ) )
+        with
+        | Ok body_s ->
+            int_of_string_opt body_s
+        | Error exn ->
+            [%log warn]
+              "Error when obtaining service payload version body response at \
+               URL $url"
+              ~metadata:
+                [ ("url", `String (Uri.to_string url))
+                ; ("error", `String (Exn.to_string exn))
+                ] ;
+            None )
+  | Error exn ->
+      [%log warn] "Error when obtaining service payload version at URL $url"
+        ~metadata:
+          [ ("url", `String (Uri.to_string url))
+          ; ("error", `String (Exn.to_string exn))
+          ] ;
+      Interruptible.return None
+
 let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     ~state_hash ~produced block_data =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
-  let request = Payload.create_request block_data submitter_keypair in
-  let json = Payload.request_to_yojson request in
+  let%bind version =
+    match%map get_backend_payload_version ~logger ~interruptor ~url with
+    | None ->
+        [%log warn] "Defaulting to payload version 0" ;
+        0
+    | Some version ->
+        [%log info] "Using payload version %d" version ;
+        version
+  in
+  let json =
+    match version with
+    | 0 ->
+        let request = Payload.V0.create_request block_data submitter_keypair in
+        Payload.request_to_yojson Payload.V0.block_data_to_yojson request
+    | _ ->
+        let request = Payload.V1.create_request block_data submitter_keypair in
+        Payload.request_to_yojson Payload.V1.block_data_to_yojson request
+  in
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
@@ -168,7 +223,7 @@ let block_base64_of_breadcrumb breadcrumb =
 
 let send_produced_block_at ~logger ~interruptor ~url ~peer_id
     ~(submitter_keypair : Keypair.t) ~graphql_control_port ~block_produced_bvar
-    ~block_producer_version tm =
+    ~built_with_commit_sha tm =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
   let timeout_min = 3.0 in
@@ -189,12 +244,12 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
       let block_base64 = block_base64_of_breadcrumb breadcrumb in
       let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
       let block_data =
-        { block = block_base64
+        { Payload.block = block_base64
         ; created_at = Rfc3339_time.get_rfc3339_time ()
         ; peer_id
         ; snark_work = None
         ; graphql_control_port
-        ; block_producer_version
+        ; built_with_commit_sha
         }
       in
       send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
@@ -202,7 +257,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
 
 let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
     ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
-    ~snark_work_fee ~graphql_control_port ~block_producer_version =
+    ~snark_work_fee ~graphql_control_port ~built_with_commit_sha =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
@@ -231,12 +286,12 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
            uptime service" ;
         let state_hash = Transition_frontier.Breadcrumb.state_hash best_tip in
         let block_data =
-          { block = block_base64
+          { Payload.block = block_base64
           ; created_at = Rfc3339_time.get_rfc3339_time ()
           ; peer_id
           ; snark_work = None
           ; graphql_control_port
-          ; block_producer_version
+          ; built_with_commit_sha
           }
         in
         send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
@@ -272,12 +327,11 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
               Transition_frontier.Breadcrumb.state_hash best_tip
             in
             let block_data =
-              { block = block_base64
+              { Payload.block = block_base64
               ; created_at = Rfc3339_time.get_rfc3339_time ()
               ; peer_id
               ; snark_work = None
               ; graphql_control_port
-              ; block_producer_version
               ; built_with_commit_sha
               }
             in
@@ -317,12 +371,13 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                   Transition_frontier.Breadcrumb.state_hash best_tip
                 in
                 let block_data =
-                  { block = block_base64
+                  { Payload.block = block_base64
                   ; created_at = Rfc3339_time.get_rfc3339_time ()
                   ; peer_id
                   ; snark_work = None
                   ; graphql_control_port
-                  ; block_producer_version
+                  ; built_with_commit_sha
+                  }
                 in
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
                   ~state_hash ~produced:false block_data
@@ -357,12 +412,12 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                       Transition_frontier.Breadcrumb.state_hash best_tip
                     in
                     let block_data =
-                      { block = block_base64
+                      { Payload.block = block_base64
                       ; created_at = Rfc3339_time.get_rfc3339_time ()
                       ; peer_id
                       ; snark_work = Some snark_work_base64
                       ; graphql_control_port
-                      ; block_producer_version
+                      ; built_with_commit_sha
                       }
                     in
                     send_uptime_data ~logger ~interruptor ~submitter_keypair
@@ -371,7 +426,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
 let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
     ~time_controller ~block_produced_bvar ~uptime_submitter_keypair
     ~get_next_producer_timing ~get_snark_work_fee ~get_peer
-    ~graphql_control_port ~block_producer_version =
+    ~graphql_control_port ~built_with_commit_sha =
   match uptime_url with
   | None ->
       [%log info] "Not running uptime service, no URL given" ;
@@ -411,6 +466,8 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
           Deferred.create (fun ivar -> interrupt_ivar := ivar)
       in
       let run_iteration next_block_tm : Block_time.t Deferred.t =
+        O1trace.thread "uptime_service"
+        @@ fun () ->
         let get_next_producer_time_opt () =
           match get_next_producer_timing () with
           | None ->
@@ -463,7 +520,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                      block" ;
                   send_produced_block_at ~logger ~interruptor ~url ~peer_id
                     ~submitter_keypair ~graphql_control_port
-                    ~block_producer_version ~block_produced_bvar
+                    ~built_with_commit_sha ~block_produced_bvar
                     next_producer_time
                 in
                 let send_block_and_snark_work () =
@@ -473,7 +530,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                   send_block_and_transaction_snark ~logger ~interruptor ~url
                     ~snark_worker ~transition_frontier ~peer_id
                     ~submitter_keypair ~snark_work_fee ~graphql_control_port
-                    ~block_producer_version
+                    ~built_with_commit_sha
                 in
                 match get_next_producer_time_opt () with
                 | None ->

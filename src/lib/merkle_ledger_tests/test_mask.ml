@@ -1,4 +1,4 @@
-(* test_make.ml -- tests Merkle mask connected to underlying Merkle tree *)
+(* test_mask.ml -- tests Merkle mask connected to underlying Merkle tree *)
 
 open Core
 open Test_stubs
@@ -82,7 +82,9 @@ module Make (Test : Test_intf) = struct
 
   let dummy_location = Test.Location.Account dummy_address
 
-  let dummy_account = Quickcheck.random_value Account.gen
+  let dummy_account =
+    let account = Quickcheck.random_value Account.gen in
+    { account with token_id = Token_id.default }
 
   let create_new_account_exn mask account =
     let public_key = Account.identifier account in
@@ -97,9 +99,9 @@ module Make (Test : Test_intf) = struct
         location
 
   let create_existing_account_exn mask account =
-    let public_key = Account.identifier account in
+    let account_id = Account.identifier account in
     let action, location =
-      Mask.Attached.get_or_create_account mask public_key account
+      Mask.Attached.get_or_create_account mask account_id account
       |> Or_error.ok_exn
     in
     match action with
@@ -262,9 +264,14 @@ module Make (Test : Test_intf) = struct
     if Test.depth <= 8 then
       Test.with_instances (fun maskable mask ->
           let attached_mask = Maskable.register_mask maskable mask in
-          Mask.Attached.set attached_mask dummy_location dummy_account ;
+          let loc0 =
+            Test.Location.Addr.of_directions
+              (List.init Test.depth ~f:(fun _ -> Direction.Left))
+          in
+          Mask.Attached.set attached_mask (Test.Location.Account loc0)
+            dummy_account ;
           (* Make some accounts *)
-          let num_accounts = 1 lsl Test.depth in
+          let num_accounts = (1 lsl Test.depth) - 1 in
           let gen_values gen =
             Quickcheck.random_value
               (Quickcheck.Generator.list_with_length num_accounts gen)
@@ -550,7 +557,7 @@ module Make (Test : Test_intf) = struct
         List.iter parent_accounts ~f:(fun account ->
             ignore @@ parent_create_new_account_exn maskable account ) ;
         (* all accounts in parent to_list *)
-        let parent_list = Maskable.to_list maskable in
+        let parent_list = Maskable.to_list_sequential maskable in
         let zero_balance account =
           Account.update_balance account Balance.zero
         in
@@ -558,7 +565,7 @@ module Make (Test : Test_intf) = struct
         let mask_accounts = List.map parent_accounts ~f:zero_balance in
         List.iter mask_accounts ~f:(fun account ->
             ignore @@ create_existing_account_exn attached_mask account ) ;
-        let mask_list = Mask.Attached.to_list attached_mask in
+        let mask_list = Mask.Attached.to_list_sequential attached_mask in
         (* same number of accounts after adding them to mask *)
         assert (Stdlib.List.compare_lengths parent_list mask_list = 0) ;
         (* should only see the zero balances in mask list *)

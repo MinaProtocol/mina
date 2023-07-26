@@ -247,10 +247,6 @@ module Plonk_constraint = struct
           ; right_input_hi : 'v
           ; field_overflow : 'v
           ; carry : 'v
-          ; (* Coefficients *) foreign_field_modulus0 : 'f
-          ; foreign_field_modulus1 : 'f
-          ; foreign_field_modulus2 : 'f
-          ; sign : 'f
           }
       | ForeignFieldMul of
           { (* Current row *)
@@ -275,12 +271,6 @@ module Plonk_constraint = struct
           ; quotient_bound2 : 'v
           ; product1_lo : 'v
           ; product1_hi_0 : 'v
-          ; (* Coefficients *) foreign_field_modulus0 : 'f
-          ; foreign_field_modulus1 : 'f
-          ; foreign_field_modulus2 : 'f
-          ; neg_foreign_field_modulus0 : 'f
-          ; neg_foreign_field_modulus1 : 'f
-          ; neg_foreign_field_modulus2 : 'f
           }
       | Rot64 of
           { (* Current row *)
@@ -299,6 +289,19 @@ module Plonk_constraint = struct
           ; bound_crumb5 : 'v
           ; bound_crumb6 : 'v
           ; bound_crumb7 : 'v
+          ; (* Next row *) shifted : 'v
+          ; shifted_limb0 : 'v
+          ; shifted_limb1 : 'v
+          ; shifted_limb2 : 'v
+          ; shifted_limb3 : 'v
+          ; shifted_crumb0 : 'v
+          ; shifted_crumb1 : 'v
+          ; shifted_crumb2 : 'v
+          ; shifted_crumb3 : 'v
+          ; shifted_crumb4 : 'v
+          ; shifted_crumb5 : 'v
+          ; shifted_crumb6 : 'v
+          ; shifted_crumb7 : 'v
           ; (* Coefficients *) two_to_rot : 'f (* Rotation scalar 2^rot *)
           }
       | Raw of
@@ -483,10 +486,6 @@ module Plonk_constraint = struct
           ; right_input_hi
           ; field_overflow
           ; carry
-          ; (* Coefficients *) foreign_field_modulus0
-          ; foreign_field_modulus1
-          ; foreign_field_modulus2
-          ; sign
           } ->
           ForeignFieldAdd
             { left_input_lo = f left_input_lo
@@ -497,10 +496,6 @@ module Plonk_constraint = struct
             ; right_input_hi = f right_input_hi
             ; field_overflow = f field_overflow
             ; carry = f carry
-            ; (* Coefficients *) foreign_field_modulus0
-            ; foreign_field_modulus1
-            ; foreign_field_modulus2
-            ; sign
             }
       | ForeignFieldMul
           { (* Current row *) left_input0
@@ -524,12 +519,6 @@ module Plonk_constraint = struct
           ; quotient_bound2
           ; product1_lo
           ; product1_hi_0
-          ; (* Coefficients *) foreign_field_modulus0
-          ; foreign_field_modulus1
-          ; foreign_field_modulus2
-          ; neg_foreign_field_modulus0
-          ; neg_foreign_field_modulus1
-          ; neg_foreign_field_modulus2
           } ->
           ForeignFieldMul
             { (* Current row *) left_input0 = f left_input0
@@ -553,12 +542,6 @@ module Plonk_constraint = struct
             ; quotient_bound2 = f quotient_bound2
             ; product1_lo = f product1_lo
             ; product1_hi_0 = f product1_hi_0
-            ; (* Coefficients *) foreign_field_modulus0
-            ; foreign_field_modulus1
-            ; foreign_field_modulus2
-            ; neg_foreign_field_modulus0
-            ; neg_foreign_field_modulus1
-            ; neg_foreign_field_modulus2
             }
       | Rot64
           { (* Current row *) word
@@ -576,6 +559,19 @@ module Plonk_constraint = struct
           ; bound_crumb5
           ; bound_crumb6
           ; bound_crumb7
+          ; (* Next row *) shifted
+          ; shifted_limb0
+          ; shifted_limb1
+          ; shifted_limb2
+          ; shifted_limb3
+          ; shifted_crumb0
+          ; shifted_crumb1
+          ; shifted_crumb2
+          ; shifted_crumb3
+          ; shifted_crumb4
+          ; shifted_crumb5
+          ; shifted_crumb6
+          ; shifted_crumb7
           ; (* Coefficients *) two_to_rot
           } ->
           Rot64
@@ -594,6 +590,19 @@ module Plonk_constraint = struct
             ; bound_crumb5 = f bound_crumb5
             ; bound_crumb6 = f bound_crumb6
             ; bound_crumb7 = f bound_crumb7
+            ; (* Next row *) shifted = f shifted
+            ; shifted_limb0 = f shifted_limb0
+            ; shifted_limb1 = f shifted_limb1
+            ; shifted_limb2 = f shifted_limb2
+            ; shifted_limb3 = f shifted_limb3
+            ; shifted_crumb0 = f shifted_crumb0
+            ; shifted_crumb1 = f shifted_crumb1
+            ; shifted_crumb2 = f shifted_crumb2
+            ; shifted_crumb3 = f shifted_crumb3
+            ; shifted_crumb4 = f shifted_crumb4
+            ; shifted_crumb5 = f shifted_crumb5
+            ; shifted_crumb6 = f shifted_crumb6
+            ; shifted_crumb7 = f shifted_crumb7
             ; (* Coefficients *) two_to_rot
             }
       | Raw { kind; values; coeffs } ->
@@ -818,7 +827,9 @@ end = struct
     let res = Relative_position.Table.create () in
     Hashtbl.iter equivalence_classes ~f:(fun ps ->
         let rotate_left = function [] -> [] | x :: xs -> xs @ [ x ] in
-        let ps = Hash_set.to_list ps in
+        let ps =
+          Hash_set.to_list ps |> List.sort ~compare:[%compare: Row.t Position.t]
+        in
         List.iter2_exn ps (rotate_left ps) ~f:(fun input output ->
             Hashtbl.add_exn res ~key:input ~data:output ) ) ;
     res
@@ -1833,7 +1844,7 @@ end = struct
            ; Some (reduce_to_v out_3)
           |]
         in
-        (* The raw gate after a Xor16 gate is a Const to check that all values are zero.
+        (* The generic gate after a Xor16 gate is a Const to check that all values are zero.
            For that, the first coefficient is 1 and the rest will be zero.
            This will be included in the gadget for a chain of Xors, not here.*)
         add_row sys curr_row Xor16 [||]
@@ -1847,10 +1858,6 @@ end = struct
           ; right_input_hi
           ; field_overflow
           ; carry
-          ; (* Coefficients *) foreign_field_modulus0
-          ; foreign_field_modulus1
-          ; foreign_field_modulus2
-          ; sign
           } ) ->
         (*
         //! | Gate   | `ForeignFieldAdd`        | Circuit/gadget responsibility  |
@@ -1891,12 +1898,7 @@ end = struct
            ; None
           |]
         in
-        add_row sys vars ForeignFieldAdd
-          [| foreign_field_modulus0
-           ; foreign_field_modulus1
-           ; foreign_field_modulus2
-           ; sign
-          |]
+        add_row sys vars ForeignFieldAdd [||]
     | Plonk_constraint.T
         (ForeignFieldMul
           { (* Current row *) left_input0
@@ -1920,12 +1922,6 @@ end = struct
           ; quotient_bound2
           ; product1_lo
           ; product1_hi_0
-          ; (* Coefficients *) foreign_field_modulus0
-          ; foreign_field_modulus1
-          ; foreign_field_modulus2
-          ; neg_foreign_field_modulus0
-          ; neg_foreign_field_modulus1
-          ; neg_foreign_field_modulus2
           } ) ->
         (*
         //! | Gate   | `ForeignFieldMul`            | `Zero`                    |
@@ -1984,14 +1980,7 @@ end = struct
            ; None
           |]
         in
-        add_row sys vars_curr ForeignFieldMul
-          [| foreign_field_modulus0
-           ; foreign_field_modulus1
-           ; foreign_field_modulus2
-           ; neg_foreign_field_modulus0
-           ; neg_foreign_field_modulus1
-           ; neg_foreign_field_modulus2
-          |] ;
+        add_row sys vars_curr ForeignFieldMul [||] ;
         add_row sys vars_next Zero [||]
     | Plonk_constraint.T
         (Rot64
@@ -2010,11 +1999,24 @@ end = struct
           ; bound_crumb5
           ; bound_crumb6
           ; bound_crumb7
+          ; (* Next row *) shifted
+          ; shifted_limb0
+          ; shifted_limb1
+          ; shifted_limb2
+          ; shifted_limb3
+          ; shifted_crumb0
+          ; shifted_crumb1
+          ; shifted_crumb2
+          ; shifted_crumb3
+          ; shifted_crumb4
+          ; shifted_crumb5
+          ; shifted_crumb6
+          ; shifted_crumb7
           ; (* Coefficients *) two_to_rot
           } ) ->
         (*
-        //! | Gate   | `Rot64`             | `RangeCheck0` gadget designer's duty |
-        //! | ------ | ------------------- | ------------------------------------ |
+        //! | Gate   | `Rot64`             | `RangeCheck0`    |
+        //! | ------ | ------------------- | ---------------- |
         //! | Column | `Curr`              | `Next`           |
         //! | ------ | ------------------- | ---------------- |
         //! |      0 | copy `word`         |`shifted`         |
@@ -2051,7 +2053,28 @@ end = struct
            ; Some (reduce_to_v bound_crumb7)
           |]
         in
-        add_row sys vars_curr Rot64 [| two_to_rot |]
+        let vars_next =
+          [| (* Next row *) Some (reduce_to_v shifted)
+           ; None
+           ; None
+           ; Some (reduce_to_v shifted_limb0)
+           ; Some (reduce_to_v shifted_limb1)
+           ; Some (reduce_to_v shifted_limb2)
+           ; Some (reduce_to_v shifted_limb3)
+           ; Some (reduce_to_v shifted_crumb0)
+           ; Some (reduce_to_v shifted_crumb1)
+           ; Some (reduce_to_v shifted_crumb2)
+           ; Some (reduce_to_v shifted_crumb3)
+           ; Some (reduce_to_v shifted_crumb4)
+           ; Some (reduce_to_v shifted_crumb5)
+           ; Some (reduce_to_v shifted_crumb6)
+           ; Some (reduce_to_v shifted_crumb7)
+          |]
+        in
+        let compact = Fp.zero in
+        add_row sys vars_curr Rot64 [| two_to_rot |] ;
+        add_row sys vars_next RangeCheck0
+          [| compact (* Standard 3-limb mode *) |]
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->

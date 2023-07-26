@@ -362,6 +362,8 @@ module Worker = struct
                  ~directory:(Option.value_exn conf_dir)
                  ~log_filename:"mina-verifier.log" ~max_size ~num_rotate ) ;
           Option.iter internal_trace_filename ~f:(fun log_filename ->
+              Itn_logger.set_message_postprocessor
+                Internal_tracing.For_itn_logger.post_process_message ;
               Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
                 ~processor:Internal_tracing.For_logger.processor
                 ~transport:
@@ -420,7 +422,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
          [rest] handler for the 'rest' of the errors after the value is
          determined, which logs the errors and then swallows them.
       *)
-      Monitor.try_with ~name:"Verifier RPC worker" ~here:[%here] ~run:`Now
+      Monitor.try_with ~here:[%here] ~name:"Verifier RPC worker" ~run:`Now
         ~rest:
           (`Call
             (fun exn ->

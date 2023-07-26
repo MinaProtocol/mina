@@ -44,7 +44,10 @@ module type S = sig
        and type t := t
 
   (** list of accounts in the ledger *)
-  val to_list : t -> account list
+  val to_list : t -> account list Async.Deferred.t
+
+  (** list of accounts via slower sequential mechanism *)
+  val to_list_sequential : t -> account list
 
   (** iterate over all indexes and accounts *)
   val iteri : t -> f:(index -> account -> unit) -> unit
@@ -71,10 +74,10 @@ module type S = sig
     -> init:'accum
     -> f:('accum -> account -> ('accum, 'stop) Base.Continue_or_stop.t)
     -> finish:('accum -> 'stop)
-    -> 'stop
+    -> 'stop Async.Deferred.t
 
   (** set of account ids associated with accounts *)
-  val accounts : t -> account_id_set
+  val accounts : t -> account_id_set Async.Deferred.t
 
   (** Get the account id that owns a token. *)
   val token_owner : t -> token_id -> account_id option

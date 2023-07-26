@@ -344,6 +344,8 @@ let calculate_root_transition_diff t heir =
     (Root_transitioned
        { new_root = new_root_data
        ; garbage = Full garbage_nodes
+       ; old_root_scan_state =
+           Full (Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
        ; just_emitted_a_proof
        } )
 
@@ -720,9 +722,11 @@ module Metrics = struct
         | Some parent ->
             find_ancestor ~f parent
     in
+    let curr_global_slot_u32 cs =
+      curr_global_slot cs |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
+    in
     let start =
-      let open Consensus.Data.Consensus_state in
-      let slot = intprop curr_global_slot in
+      let slot = intprop curr_global_slot_u32 in
       let best_tip_slot = slot best_tip in
       let k = Unsigned.UInt32.to_int consensus_constants.k in
       match
@@ -733,7 +737,7 @@ module Metrics = struct
     in
     let change f = intprop f best_tip - intprop f start in
     let length_change = change blockchain_length in
-    let slot_change = change curr_global_slot in
+    let slot_change = change curr_global_slot_u32 in
     if slot_change = 0 then 1.
     else Float.of_int length_change /. Float.of_int slot_change
 end
