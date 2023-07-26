@@ -3053,20 +3053,25 @@ let%test_unit "Ec_group.check_ia" =
             check_ia (module Runner.Impl) unused_external_checks curve ia ;
 
             (* Check for expected quantity of external checks *)
-            let bounds_checks_count = ref 3 in
+            let bound_checks_count = ref 3 in
             if not Bignum_bigint.(curve.bignum.a = zero) then
-              bounds_checks_count := !bounds_checks_count + 1 ;
+              bound_checks_count := !bound_checks_count + 1 ;
             if not Bignum_bigint.(curve.bignum.b = zero) then
-              bounds_checks_count := !bounds_checks_count + 1 ;
+              bound_checks_count := !bound_checks_count + 1 ;
+
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.bounds
-                !bounds_checks_count ) ;
+                !bound_checks_count ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.canonicals 1 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                3 ) ;
+                6 ) ;
             assert (
               Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 3 ) ;
+                unused_external_checks.compact_multi_ranges 0 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
             () )
       in
 
