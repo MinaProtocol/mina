@@ -27,11 +27,16 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val current_chain : Mina_block.Precomputed.t list
 end
 
-let context (logger : Logger.t) : (module CONTEXT) =
+let context (logger : Logger.t) (current_chain : Mina_block.Precomputed.t list)
+    : (module CONTEXT) =
   ( module struct
     let logger = logger
+
+    let current_chain = current_chain
 
     let proof_level = Genesis_constants.Proof_level.None
 
@@ -87,28 +92,61 @@ let read_block_file blocks_filename =
       In_channel.close blocks_file ;
       failwithf "File %s is empty" blocks_filename ()
 
+let print_block_info block =
+  Mina_block.Precomputed.to_yojson block
+  |> Yojson.Safe.to_string |> print_endline
+
 let run_select ~context:(module Context : CONTEXT)
-    (block : Mina_block.Precomputed.t) =
-  let protocol_state_hashes =
-    Mina_state.Protocol_state.hashes block.protocol_state
+    (existing_block : Mina_block.Precomputed.t)
+    (candidate_block : Mina_block.Precomputed.t) =
+  let open Context in
+  let existing_protocol_state_hashes =
+    Mina_state.Protocol_state.hashes existing_block.protocol_state
   in
-  let consensus_state_with_hashes =
-    { With_hash.hash = protocol_state_hashes
-    ; data = Mina_state.Protocol_state.consensus_state block.protocol_state
+  let existing_consensus_state_with_hashes =
+    { With_hash.hash = existing_protocol_state_hashes
+    ; data =
+        Mina_state.Protocol_state.consensus_state existing_block.protocol_state
     }
   in
-  let _t =
+  let candidate_protocol_state_hashes =
+    Mina_state.Protocol_state.hashes candidate_block.protocol_state
+  in
+  let candidate_consensus_state_with_hashes =
+    { With_hash.hash = candidate_protocol_state_hashes
+    ; data =
+        Mina_state.Protocol_state.consensus_state candidate_block.protocol_state
+    }
+  in
+  let select_status =
     Consensus.Hooks.select
       ~context:(module Context)
-      ~existing:consensus_state_with_hashes
-      ~candidate:consensus_state_with_hashes
+      ~existing:existing_consensus_state_with_hashes
+      ~candidate:candidate_consensus_state_with_hashes
   in
-  return ()
+  match select_status with
+  | `Take ->
+      [%log info] "select_status: `Take" ;
+      print_endline "select_status: `Take" ;
+      print_block_info existing_block ;
+      print_block_info candidate_block ;
+      return ()
+  | `Keep ->
+      [%log info] "select_status: `Keep" ;
+      print_endline "select_status: `Keep" ;
+      print_block_info existing_block ;
+      print_block_info candidate_block ;
+      return ()
 
-let process_block ~context precomputed_block =
-  let%bind () = run_select ~context precomputed_block in
-  print_endline "process_block: finished processing block" ;
-  return ()
+let process_block ~context:(module Context : CONTEXT) precomputed_block =
+  match List.last Context.current_chain with
+  | Some last_block ->
+      let%bind () =
+        run_select ~context:(module Context) last_block precomputed_block
+      in
+      return ()
+  | None ->
+      failwith "Context.current_chain is empty"
 
 let process_precomputed_blocks ~context blocks =
   let%bind () =
@@ -120,7 +158,6 @@ let process_precomputed_blocks ~context blocks =
 
 let main () ~blocks_dir =
   let logger = Logger.create () in
-  let context = context logger in
 
   [%log info] "Starting to read blocks dir"
     ~metadata:[ ("blocks_dir", `String blocks_dir) ] ;
@@ -131,9 +168,15 @@ let main () ~blocks_dir =
   in
   [%log info] "Finished reading blocks dir" ;
 
-  let%bind () = process_precomputed_blocks ~context precomputed_blocks in
-
-  return ()
+  match precomputed_blocks with
+  | [] ->
+      failwith "No blocks found"
+  | first_block :: remaining_blocks ->
+      let current_chain = [ first_block ] in
+      let context = context logger current_chain in
+      let precomputed_blocks = remaining_blocks in
+      let%bind () = process_precomputed_blocks ~context precomputed_blocks in
+      return ()
 
 let () =
   Command.(
