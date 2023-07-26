@@ -818,10 +818,16 @@ let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
     else x_cubed_ax
   in
 
+  (* Safety check: make sure x_cubed_ax_b is canonical *)
+  Foreign_field.External_checks.append_canonical_check external_checks
+    x_cubed_ax_b ;
+
   (* C5: y^2 = y * y *)
   let y_squared =
     Foreign_field.mul (module Circuit) external_checks y y curve.modulus
   in
+
+  (* No canonical check required for y_squared since it must be equal to x_cubed_ax_b *)
 
   (* Bounds 5: Left and right inputs are gadget input (checked by caller)
    *           Result bound check already tracked by Foreign_field.mul
@@ -2911,15 +2917,20 @@ let%test_unit "Ec_group.is_on_curve" =
               bound_checks_count := !bound_checks_count + 1 ;
             if not Bignum_bigint.(curve.bignum.b = zero) then
               bound_checks_count := !bound_checks_count + 1 ;
+
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.bounds
                 !bound_checks_count ) ;
             assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.canonicals 1 ) ;
+            assert (
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                3 ) ;
+                6 ) ;
             assert (
               Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 3 ) ;
+                unused_external_checks.compact_multi_ranges 0 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
             () )
       in
 
