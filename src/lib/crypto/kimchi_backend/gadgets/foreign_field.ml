@@ -1381,25 +1381,8 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     |> tuple21_of_array
   in
 
-  (* Add external checks *)
-  External_checks.append_multi_range_check external_checks
-    (quotient0, quotient1, quotient2) ;
-
-  External_checks.append_multi_range_check external_checks
-    (quotient_hi_bound, product1_lo, product1_hi_0) ;
-
-  (* Instead of appending external check for compact MRC for remainder,
-     this is added directly, so that the standard limbs
-     (remainder0, remainder1, remainder2) are copyable in witness cells *)
-  let remainder0, remainder1 =
-    Range_check.compact_multi (module Circuit) remainder01 remainder2
-  in
-
-  External_checks.append_bound_check external_checks ~do_multi_range_check:false
-    (Element.Standard.of_limbs (remainder0, remainder1, remainder2)) ;
-
   (* NOTE: high bound checks and multi range checks for left and right are
-           the responsibility of caller and should be done somewhere else *)
+   *       the responsibility of caller and should be done somewhere else *)
   let left_input0, left_input1, left_input2 =
     Element.Standard.to_limbs left_input
   in
@@ -1449,11 +1432,31 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
                  } )
         } ) ;
 
+  (*
+   * Add external checks (and related)
+   *)
+  External_checks.append_multi_range_check external_checks
+    (quotient0, quotient1, quotient2) ;
+
+  External_checks.append_multi_range_check external_checks
+    (quotient_hi_bound, product1_lo, product1_hi_0) ;
+
+  (* Instead of appending external check for compact MRC for remainder,
+   * this is added directly, so that the standard limbs
+   * (remainder0, remainder1, remainder2) are copyable in witness cells *)
+  let remainder0, remainder1 =
+    Range_check.compact_multi (module Circuit) remainder01 remainder2
+  in
+
+  External_checks.append_bound_check external_checks ~do_multi_range_check:false
+    (Element.Standard.of_limbs (remainder0, remainder1, remainder2)) ;
+
   Element.Standard.of_limbs (remainder0, remainder1, remainder2)
 
 (* Gadget to constrain conversion of bytes array (output of Keccak gadget)
-   into foreign field element with standard limbs (input of ECDSA gadget).
-   Include the endianness of the bytes list. *)
+ * into foreign field element with standard limbs (input of ECDSA gadget).
+ * Include the endianness of the bytes list.
+ *)
 let bytes_to_standard_element (type f)
     (module Circuit : Snark_intf.Run with type field = f)
     ~(endian : Keccak.endianness) (bytestring : Circuit.Field.t list)
