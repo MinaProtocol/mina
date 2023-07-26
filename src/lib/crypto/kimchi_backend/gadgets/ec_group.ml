@@ -969,7 +969,7 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Add: sum = acc + base *)
         let sum = add (module Circuit) external_checks curve acc base in
         (* Bounds 1:
-         *   Left input is previous result, so already checked.
+         *   Left input is previous result (already checked).
          *   Right input is checked by previous doubling check.
          *   Initial acc and base are gadget inputs (checked by caller).
          *   Result bounds check below.
@@ -977,6 +977,11 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         Foreign_field.External_checks.append_bound_check external_checks
         @@ Affine.x sum ;
         Foreign_field.External_checks.append_bound_check external_checks
+        @@ Affine.y sum ;
+        (* Safety checks *)
+        Foreign_field.External_checks.append_canonical_check external_checks
+        @@ Affine.x sum ;
+        Foreign_field.External_checks.append_canonical_check external_checks
         @@ Affine.y sum ;
 
         (* Group double: double_base = base + base *)
@@ -987,13 +992,20 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
                 double (module Circuit) external_checks curve base
               in
               (* Bounds 2:
-               *   Input is previous result, so already checked.
+               *   Input is previous result (already checked).
                *   Initial base is gadget input (checked by caller).
                *   Result bounds check below.
                *)
               Foreign_field.External_checks.append_bound_check external_checks
               @@ Affine.x double_base ;
               Foreign_field.External_checks.append_bound_check external_checks
+              @@ Affine.y double_base ;
+              (* Safety checks *)
+              Foreign_field.External_checks.append_canonical_check
+                external_checks
+              @@ Affine.x double_base ;
+              Foreign_field.External_checks.append_canonical_check
+                external_checks
               @@ Affine.y double_base ;
               double_base
           | Some doubles ->
