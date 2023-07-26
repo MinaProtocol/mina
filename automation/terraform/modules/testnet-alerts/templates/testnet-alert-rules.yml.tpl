@@ -446,7 +446,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/HighInvalidProofPerHour-8ff715ccf9564b6e8a27b5a9dc65ef77"
 
   - alert: WatchdogNoNewLogs
-    expr: max by (testnet) (Coda_watchdog_pods_with_no_new_logs) {${berkeley_testnet}} > 0
+    expr: max by (testnet) (Coda_watchdog_pods_with_no_new_logs {${berkeley_testnet}}) > 0
     for: 12m
     labels:
       testnet: "{{ $labels.testnet }}"
