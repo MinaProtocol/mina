@@ -9,6 +9,7 @@ import os
 import traceback
 import argparse
 import time
+import logging
 import random
 import itertools
 import numpy as np
@@ -23,7 +24,6 @@ from graphviz import Digraph
 from datetime import datetime
 import uuid
 from collections import Counter
-
 from kubernetes import client, config, stream
 from discord_webhook import DiscordWebhook
 
@@ -53,7 +53,6 @@ def main():
 
     args = parser.parse_args(sys.argv[1:])
 
-
     if args.incluster:
         config.load_incluster_config()
         assert(args.namespace == '')
@@ -81,6 +80,12 @@ def main():
 
     seeds = [ p for p in pod_names if 'seed' in p ]
 
+
+    if len(seeds) < 1:
+      logging.error(f'no seeds found when querying running seeds in {args.namespace} namespace')
+      return
+
+
     seed = seeds[-1]
 
     seed_pod = [ p for p in pods.to_dict()['items'] if p['metadata']['name'] == seed ][0]
@@ -88,25 +93,19 @@ def main():
     seed_vars_dict = [ v for v in seed_daemon_container['env'] ]
     seed_daemon_port = [ v['value'] for v in seed_vars_dict if v['name'] == 'DAEMON_CLIENT_PORT'][0]
 
-    print('seed', seed)
+    logging.info(f'seeds: {seed}')
 
     request_timeout_seconds = 600
 
     def exec_locally(command):
       command = command.replace('mina', args.binary)
-      print(command)
+      logging.info(command)
       import subprocess
       subprocess = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, text=True)
       res = subprocess.stdout.read()
-      print('result', len(res))
+      logging.info(f'result: {len(res)}')
 
       return res
-
-      #import IPython; IPython.embed()
-
-      #print(command)
-      #sys.exit()
-      #pass
 
     def exec_on_seed(command):
 
@@ -119,7 +118,7 @@ def main():
         result = stream.stream(v1.connect_get_namespaced_pod_exec, seed, args.namespace, command=exec_command, container='mina', stderr=True, stdout=True, stdin=False, tty=False, _request_timeout=timeout)
         return result
 
-      print('running command:', command)
+      logging.info(f'running command: {command}')
 
       tmp_file = '/tmp/cns_command.' + str(uuid.uuid4()) + '.out'
 
@@ -127,11 +126,11 @@ def main():
       result = exec_cmd(command + ' &> ' + tmp_file, request_timeout_seconds)
       end = time.time()
 
-      print('done running command')
-      print('\tseconds to run:', end - start)
+      logging.info('done running command')
+      logging.info(f'\tseconds to run: {end - start}')
 
       file_len = int(exec_cmd('stat --printf="%s" ' + tmp_file, 10))
-      print('\tfile length:', str(file_len/(1024*1024)) + 'MB')
+      logging.info(f'\tfile length: {str(file_len/(1024*1024))} MB')
 
 
       read_segment = lambda start, size: exec_cmd('cat ' + tmp_file + ' | head -c ' + str(start + size) + ' | tail -c ' + str(size), 240)
@@ -144,7 +143,7 @@ def main():
       result = ''.join(chunks)
       end = time.time()
 
-      print('\tseconds to get result:', end - start)
+      logging.info(f'\tseconds to get result: {end - start}')
 
       exec_cmd('rm ' + tmp_file, 10)
 
@@ -187,7 +186,7 @@ def main():
       # we use ast instead of json to handle properties with single quotes instead of double quotes (which the response seems to often contain)
       resps = [ ast.literal_eval(s) for s in resp.split('\n') if s != '' ]
 
-      print ('Received %s node_status responses'%(str(len(resps))))
+      logging.info (f'Received {(str(len(resps)))} node_status responses')
 
       peers = list(filter(no_error,resps))
       error_resps = list(filter(contains_error,resps))
@@ -215,31 +214,29 @@ def main():
           elif 'timed out requesting node status data from peer' in error_str:
             err_time_out += 1
           elif 'node status data was greater than' in error_str:
-            print("Errored response: {}".format(error_str))
+            logging.error("Errored response: {}".format(error_str))
             err_size_limit_exceeded +=1
           elif 'stream reset' in error_str:
             err_stream_reset += 1
           else:
-            print("Errored response: {}".format(error_str))
+            logging.error("Errored response: {}".format(error_str))
             err_others += 1
         except:
-          print("Errored response: {}".format(p))
+          logging.error("Errored response: {}".format(p))
           err_others += 1
 
-      print('\t%s valid responses from peers'%(str(len(list(peers)))))
-      print('\t%s error responses'%(str(len(list(error_resps)))))
-      print('=========================')        
-      print('\t%s context deadline exceeded'%(str(err_context_deadline)))
-      print('\t%s failed to negotiate security protocol'%(str(err_negotiate_security_protocol)))
-      print('\t%s connection refused'%(str(err_connection_refused)))
-      print('\t%s timed out requesting node status data from peer'%(str(err_time_out)))
-      print('\t%s node status data size exceed limit'%(str(err_size_limit_exceeded)))
-      print('\t%s stream reset'%(str(err_stream_reset)))
-      print('\t%s other errors'%(str(err_others)))
-      print('=========================')
-      #if len(errors) > 100:
-      #  import IPython; IPython.embed()
-
+      logging.info(f'\t{str(len(list(peers)))} valid responses from peers')
+      logging.info(f'\t{str(len(list(error_resps)))} error responses')
+      logging.info('=========================')        
+      logging.info(f'\t{str(err_context_deadline)} context deadline exceeded')
+      logging.info(f'\t{str(err_negotiate_security_protocol)} failed to negotiate security protocol')
+      logging.info(f'\t{str(err_connection_refused)} connection refused')
+      logging.info(f'\t{str(err_time_out)} timed out requesting node status data from peer')
+      logging.info(f'\t{str(err_size_limit_exceeded)} node status data size exceed limit')
+      logging.info(f'\t{str(err_stream_reset)} stream reset')
+      logging.info(f'\t{str(err_others)} other errors')
+      logging.info('=========================')
+   
       key_value_peers = [ ((p['node_ip_addr'], p['node_peer_id']), p) for p in peers ]
 
       for (k,v) in key_value_peers:
@@ -277,7 +274,7 @@ def main():
         else:
           node_status_other_errors.append(e)
 
-    print ('Gathering node_status from daemon peers')
+    logging.info('Gathering node_status from daemon peers')
 
     seed_status = exec_command("mina client status")
     if seed_status == '':
@@ -556,7 +553,7 @@ def main():
 
     formatted_report = json.dumps(json_report, indent=2)
 
-    print(formatted_report)
+    logging.info(formatted_report)
 
     if discord_webhook_url is not None and len(discord_webhook_url) > 0:
       if len(formatted_report) > discord_char_limit - 5:
@@ -580,11 +577,12 @@ def main():
 
 if __name__ == "__main__":
   try:
+    logging.basicConfig(level=logging.INFO)
     main()
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     trace = traceback.format_exc()
-    print(str(namespace) + " exited with error", trace)
+    logging.error(f'watchdog over {namespace} exited with error: {trace}')
     if discord_webhook_url is not None and len(discord_webhook_url) > 0:
       msg = str(namespace) + " exited with error: " + str(trace)
       if len(msg) > discord_char_limit - 5:
