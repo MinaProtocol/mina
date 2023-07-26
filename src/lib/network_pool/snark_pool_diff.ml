@@ -25,7 +25,7 @@ module Make
     (Pool : Intf.Snark_resource_pool_intf
               with type transition_frontier := Transition_frontier.t) :
   Intf.Snark_pool_diff_intf with type resource_pool := Pool.t = struct
-  type t =
+  type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
     | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
   [@@deriving compare, sexp, to_yojson, hash]
@@ -64,8 +64,6 @@ module Make
     | Empty ->
         1
 
-  let verified_size _ = 1
-
   let max_per_15_seconds = 20
 
   let summary = function
@@ -81,8 +79,7 @@ module Make
 
   let of_result
       (res :
-        ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
-          Snark_work_lib.Work.Spec.t
+        ( (_, _) Snark_work_lib.Work.Single.Spec.t Snark_work_lib.Work.Spec.t
         , Ledger_proof.t )
         Snark_work_lib.Work.Result.t ) =
     Add_solved_work
@@ -142,8 +139,7 @@ module Make
     let { Envelope.Incoming.data = diff; sender; _ } = t in
     match diff with
     | Empty ->
-        Deferred.return
-          (Error (`Other (Error.of_string "cannot apply empty snark pool diff")))
+        Error (`Other (Error.of_string "cannot apply empty snark pool diff"))
     | Add_solved_work (work, { Priced_proof.proof; fee }) -> (
         let is_local = match sender with Local -> true | _ -> false in
         let to_or_error = function
@@ -154,11 +150,13 @@ module Make
         in
         match has_lower_fee pool work ~fee:fee.fee ~sender with
         | Ok () ->
-            Pool.add_snark ~is_local pool ~work ~proof ~fee >>| to_or_error
+            let%map.Result accepted, rejected =
+              Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
+            in
+            (`Accept, accepted, rejected)
         | Error e ->
-            Deferred.return
-              ( if is_local then Error (`Locally_generated (diff, ()))
-              else Error (`Other e) ) )
+            if is_local then Error (`Locally_generated (diff, ()))
+            else Error (`Other e) )
 
   type Structured_log_events.t +=
     | Snark_work_received of { work : compact; sender : Envelope.Sender.t }

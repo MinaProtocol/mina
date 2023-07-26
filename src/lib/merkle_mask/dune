@@ -21,7 +21,7 @@
    debug_assert
    merkle_ledger
    visualization
-   non_empty_list
+   mina_stdlib
    direction
  )
  (preprocess

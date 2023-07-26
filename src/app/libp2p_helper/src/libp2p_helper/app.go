@@ -24,7 +24,7 @@ import (
 )
 
 func newApp() *app {
-	outChan := make(chan *capnp.Message, 64)
+	outChan := make(chan *capnp.Message, 1<<12) // 4kb
 	ctx := context.Background()
 	return &app{
 		P2p:                      nil,
@@ -329,7 +329,7 @@ func setMultiaddrList(m ipc.Multiaddr_List, addrs []multiaddr.Multiaddr) {
 
 func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 	go func() {
-		buf := make([]byte, 4096)
+		buf := make([]byte, 1<<17) // 128kb
 		tot := uint64(0)
 		for {
 			n, err := stream.Read(buf)
@@ -359,15 +359,13 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 }
 
 func beginMDNS(app *app, foundPeerCh chan peerDiscovery) error {
-	mdns := mdns.NewMdnsService(app.P2p.Host, "_coda-discovery._udp.local")
-	app.P2p.Mdns = mdns
 	l := &mdnsListener{
 		FoundPeer: foundPeerCh,
 		app:       app,
 	}
-	mdns.RegisterNotifee(l)
-
-	return nil
+	mdns := mdns.NewMdnsService(app.P2p.Host, "_coda-discovery._udp.local", l)
+	app.P2p.Mdns = mdns
+	return mdns.Start()
 }
 
 func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {

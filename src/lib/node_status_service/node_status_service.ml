@@ -81,7 +81,7 @@ let send_node_status_data ~logger ~url node_status_data =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
   match%map
-    Async.try_with (fun () ->
+    Async.try_with ~here:[%here] (fun () ->
         Cohttp_async.Client.post ~headers
           ~body:(Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
           url )
@@ -159,7 +159,8 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
   every ~start:(after five_slots) ~continue_on_error:true five_slots
   @@ fun () ->
   don't_wait_for
-  @@
+  @@ O1trace.thread "node_status_service"
+  @@ fun () ->
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       [%log info] "Transition frontier not available for node status service" ;
@@ -336,7 +337,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                     { hash
                     ; sender
                     ; received_at =
-                        Time.to_string (Block_time.to_time received_at)
+                        Time.to_string (Block_time.to_time_exn received_at)
                     ; is_valid = false
                     ; reason_for_rejection = Some reason_for_rejection
                     } )
@@ -345,7 +346,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                       { hash
                       ; sender
                       ; received_at =
-                          Time.to_string (Block_time.to_time received_at)
+                          Time.to_string (Block_time.to_time_exn received_at)
                       ; is_valid = true
                       ; reason_for_rejection = None
                       } )
