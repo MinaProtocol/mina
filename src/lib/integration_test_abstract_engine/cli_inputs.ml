@@ -2,8 +2,7 @@ open Cmdliner
 
 (* TODO: finalize this *)
 
-type t =
-  { mina_automation_location : string }
+type t = { mina_automation_location : string }
 
 let term =
   let mina_automation_location =

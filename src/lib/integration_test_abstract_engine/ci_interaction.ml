@@ -409,8 +409,9 @@ module Request = struct
     [@@deriving to_yojson]
   end
 
-  type start_node = { node_id : Node_id.t; fresh_state : bool; commit_sha : string }
-    [@@deriving eq, yojson]
+  type start_node =
+    { node_id : Node_id.t; fresh_state : bool; commit_sha : string }
+  [@@deriving eq, yojson]
 
   module Platform_agnostic = struct
     type t =
@@ -473,15 +474,17 @@ module Response = struct
       | Network_destroyed
     [@@deriving eq, of_yojson]
   end
-  
+
   module Node_logs = struct
     type t = string [@@deriving eq]
 
     let to_yojson s = `String s
 
     let of_yojson = function
-      | `String s -> Ok s
-      | x -> Error (Yojson.Safe.to_string x)
+      | `String s ->
+          Ok s
+      | x ->
+          Error (Yojson.Safe.to_string x)
   end
 
   module Platform_agnostic = struct
@@ -502,28 +505,34 @@ end
   https://www.notion.so/minafoundation/Lucy-CI-Interactions-e36b48ac52994cafbe1367548e02241d?pvs=4
   *)
 
-let request_ci_access_token () : Response.Platform_agnostic.t Deferred.Or_error.t =
+let request_ci_access_token () :
+    Response.Platform_agnostic.t Deferred.Or_error.t =
   failwith "request_ci_access_token"
 
 (* for example, we can communicate with the CI via https and test-specific access token *)
 let[@warning "-27"] send_ci_http_request ~(access_token : Access_token.t)
-    ~(request_body : Request.Platform_specific.t) : Response.Platform_specific.t Deferred.Or_error.t =
-  let req_str = request_body |> Request.Platform_specific.to_yojson |> Yojson.Safe.to_string in
+    ~(request_body : Request.Platform_specific.t) :
+    Response.Platform_specific.t Deferred.Or_error.t =
+  let req_str =
+    request_body |> Request.Platform_specific.to_yojson |> Yojson.Safe.to_string
+  in
   (* TODO: http request *)
   failwithf "send_ci_http_request: %s\n" req_str ()
 
 let[@warning "-27"] send_ci_http_request' ~(access_token : Access_token.t)
-    ~(request_body : Request.Platform_agnostic.t) : Response.Platform_agnostic.t Deferred.Or_error.t =
-  let req_str = request_body |> Request.Platform_agnostic.to_yojson |> Yojson.Safe.to_string in
+    ~(request_body : Request.Platform_agnostic.t) :
+    Response.Platform_agnostic.t Deferred.Or_error.t =
+  let req_str =
+    request_body |> Request.Platform_agnostic.to_yojson |> Yojson.Safe.to_string
+  in
   (* TODO: http request *)
   failwithf "send_ci_http_request: %s\n" req_str ()
 
 module Request_unit_tests = struct
   let ( = ) = String.equal
 
-  let%test_unit "Create network request" =
-    assert true
-    (* TODO: too complicated for now *)
+  let%test_unit "Create network request" = assert true
+  (* TODO: too complicated for now *)
 
   let%test_unit "Deploy network request" =
     let open Request.Platform_specific in
@@ -546,10 +555,14 @@ module Request_unit_tests = struct
 
   let%test_unit "Start node request" =
     let open Request.Platform_agnostic in
-    let result = Start_node { node_id = "node0"; fresh_state = true; commit_sha = "0123456" }
+    let result =
+      Start_node
+        { node_id = "node0"; fresh_state = true; commit_sha = "0123456" }
       |> to_yojson |> Yojson.Safe.to_string
     in
-    assert (result = {|["Start_node",{"node_id":"node0","fresh_state":true,"commit_sha":"0123456"}]|})
+    assert (
+      result
+      = {|["Start_node",{"node_id":"node0","fresh_state":true,"commit_sha":"0123456"}]|} )
 
   let%test_unit "Stop node request" =
     let open Request.Platform_agnostic in
@@ -558,7 +571,9 @@ module Request_unit_tests = struct
 
   let%test_unit "Dump archive data request" =
     let open Request.Platform_agnostic in
-    let result = Dump_archive_data "node0" |> to_yojson |> Yojson.Safe.to_string in
+    let result =
+      Dump_archive_data "node0" |> to_yojson |> Yojson.Safe.to_string
+    in
     assert (result = {|["Dump_archive_data","node0"]|})
 
   let%test_unit "Dump mina logs request" =
@@ -568,7 +583,9 @@ module Request_unit_tests = struct
 
   let%test_unit "Dump precomputed blocks request" =
     let open Request.Platform_agnostic in
-    let result = Dump_precomputed_blocks "node0" |> to_yojson |> Yojson.Safe.to_string in
+    let result =
+      Dump_precomputed_blocks "node0" |> to_yojson |> Yojson.Safe.to_string
+    in
     assert (result = {|["Dump_precomputed_blocks","node0"]|})
 
   let%test_unit "Run replayer request" =
@@ -616,8 +633,8 @@ module Response_unit_tests = struct
 
   let%test_unit "Parse network destroyed response" =
     let result =
-      {|["Network_destroyed"]|} |> Yojson.Safe.from_string
-      |> of_yojson |> Result.ok_or_failwith
+      {|["Network_destroyed"]|} |> Yojson.Safe.from_string |> of_yojson
+      |> Result.ok_or_failwith
     in
     assert (result = Network_destroyed)
 
@@ -627,22 +644,22 @@ module Response_unit_tests = struct
 
   let%test_unit "Parse access token response" =
     let result =
-      {|["Access_token","token0"]|} |> Yojson.Safe.from_string
-      |> of_yojson |> Result.ok_or_failwith
+      {|["Access_token","token0"]|} |> Yojson.Safe.from_string |> of_yojson
+      |> Result.ok_or_failwith
     in
     assert (result = Access_token "token0")
 
   let%test_unit "Node started response" =
     let result =
-      {|["Node_started","node0"]|} |> Yojson.Safe.from_string
-      |> of_yojson |> Result.ok_or_failwith
+      {|["Node_started","node0"]|} |> Yojson.Safe.from_string |> of_yojson
+      |> Result.ok_or_failwith
     in
     assert (result = Node_started "node0")
 
   let%test_unit "Node stopped response" =
     let result =
-      {|["Node_stopped","node0"]|} |> Yojson.Safe.from_string
-      |> of_yojson |> Result.ok_or_failwith
+      {|["Node_stopped","node0"]|} |> Yojson.Safe.from_string |> of_yojson
+      |> Result.ok_or_failwith
     in
     assert (result = Node_stopped "node0")
 

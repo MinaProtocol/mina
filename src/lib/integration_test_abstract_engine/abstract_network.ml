@@ -54,22 +54,27 @@ module Node = struct
 
   (* TODO: remove *)
   let get_logs_in_container ?container_id { node_id; config; _ } =
-    let container_id =
-      Option.value container_id ~default:""
-    in
+    let container_id = Option.value container_id ~default:"" in
     let%bind cwd = Unix.getcwd () in
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "kubectl"
-      ( base_kube_args config
-      @ [ "logs"; "-c"; container_id; node_id ] )
+      (base_kube_args config @ [ "logs"; "-c"; container_id; node_id ])
 
   let start ?commit_sha ~fresh_state t : unit Malleable_error.t =
-    let commit_sha = Option.value commit_sha ~default:t.config.current_commit_sha in
+    let commit_sha =
+      Option.value commit_sha ~default:t.config.current_commit_sha
+    in
     let access_token = t.config.access_token in
-    let request_body = Request.Platform_agnostic.Start_node { node_id = id t; fresh_state; commit_sha } in
+    let request_body =
+      Request.Platform_agnostic.Start_node
+        { node_id = id t; fresh_state; commit_sha }
+    in
     let%bind () =
       match%map send_ci_http_request' ~access_token ~request_body with
-      | Ok (Response.Platform_agnostic.Node_started node_id) when String.equal node_id (id t) -> ()
-      | _ -> failwith "invalid node started response"
+      | Ok (Response.Platform_agnostic.Node_started node_id)
+        when String.equal node_id (id t) ->
+          ()
+      | _ ->
+          failwith "invalid node started response"
     in
     Malleable_error.return ()
 
@@ -78,15 +83,18 @@ module Node = struct
     let request_body = Request.Platform_agnostic.Stop_node (id t) in
     let%bind () =
       match%map send_ci_http_request' ~access_token ~request_body with
-      | Ok (Response.Platform_agnostic.Node_stopped node_id) when String.equal node_id (id t) -> ()
-      | _ -> failwith "invalid node stopped response"
+      | Ok (Response.Platform_agnostic.Node_stopped node_id)
+        when String.equal node_id (id t) ->
+          ()
+      | _ ->
+          failwith "invalid node stopped response"
     in
     Malleable_error.return ()
 
   let logger_metadata node =
     [ ("namespace", `String node.config.namespace)
     ; ("app_id", `String node.app_id)
-    ; ("node_id", `String (node.node_id))
+    ; ("node_id", `String node.node_id)
     ]
 
   module Scalars = Graphql_lib.Scalars
@@ -95,8 +103,7 @@ module Node = struct
     (* TODO: fix *)
     let ingress_uri node =
       let host =
-        sprintf "%s.%s" node.config.testnet_name
-          node.config.ingress_uri
+        sprintf "%s.%s" node.config.testnet_name node.config.ingress_uri
       in
       let path = sprintf "/%s/graphql" node.app_id in
       Uri.make ~scheme:"http" ~host ~path ~port:80 ()
@@ -1028,7 +1035,7 @@ module Node = struct
     else
       Deferred.Or_error.error_string
         "Node is not currently capturing structured log messages"
-  
+
   (* TODO: check if node is an archive node *)
   let dump_archive_data ~logger (t : t) ~data_file =
     let%bind data =
@@ -1036,7 +1043,8 @@ module Node = struct
         send_ci_http_request' ~access_token:t.config.access_token
           ~request_body:(Request.Platform_agnostic.Dump_archive_data (id t))
       with
-      | Ok (Response.Platform_agnostic.Archive_data_dump (node_id, logs)) when String.equal node_id (id t) ->
+      | Ok (Response.Platform_agnostic.Archive_data_dump (node_id, logs))
+        when String.equal node_id (id t) ->
           logs
       | _ ->
           failwith "invalid archive dump data response"
@@ -1047,23 +1055,23 @@ module Node = struct
            Out_channel.output_string out_ch data )
 
   let run_replayer ~logger (t : t) =
-    [%log info] "Running replayer on archived data node: %s"
-      (t.node_id) ;
+    [%log info] "Running replayer on archived data node: %s" t.node_id ;
     let access_token = t.config.access_token in
     let request_body = Request.Platform_agnostic.Run_replayer (id t) in
     let%bind output =
       match%map send_ci_http_request' ~access_token ~request_body with
-      | Ok (Response.Platform_agnostic.Replayer_run (node_id, output)) when String.equal node_id (id t) ->
+      | Ok (Response.Platform_agnostic.Replayer_run (node_id, output))
+        when String.equal node_id (id t) ->
           output
-      | _ -> failwith "invalid run replayer response"
+      | _ ->
+          failwith "invalid run replayer response"
     in
     Malleable_error.return output
 
   (* TODO: convert *)
   let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
-    [%log info] "Dumping logs from node: %s"
-      (t.node_id) ;
+    [%log info] "Dumping logs from node: %s" t.node_id ;
     let%map logs = get_logs_in_container t in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
@@ -1072,8 +1080,7 @@ module Node = struct
   (* TODO: convert *)
   let dump_precomputed_blocks ~logger (t : t) =
     let open Malleable_error.Let_syntax in
-    [%log info]
-      "Dumping precomputed blocks from logs for node: %s" t.node_id ;
+    [%log info] "Dumping precomputed blocks from logs for node: %s" t.node_id ;
     let%bind logs = get_logs_in_container t in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
@@ -1189,9 +1196,10 @@ module Workload_to_deploy = struct
 
   let construct_workload workload_id pod_info : t = { workload_id; pod_info }
 
-  let[@warning "-27"] cons_pod_info ?network_keypair ?(has_archive_container = false)
-      primary_container_id = ""
-    (* { network_keypair; has_archive_container; primary_container_id } *)
+  let[@warning "-27"] cons_pod_info ?network_keypair
+      ?(has_archive_container = false) primary_container_id =
+    ""
+  (* { network_keypair; has_archive_container; primary_container_id } *)
 
   let get_nodes_from_workload t ~config =
     let%bind cwd = Unix.getcwd () in
@@ -1289,8 +1297,7 @@ let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
 
 let all_node_id t =
   let pods = all_pods t |> Core.Map.to_alist in
-  List.fold pods ~init:[] ~f:(fun acc (_, node) ->
-      List.cons (node.node_id) acc )
+  List.fold pods ~init:[] ~f:(fun acc (_, node) -> List.cons node.node_id acc)
 
 (* TODO: what to do with this? *)
 let initialize_infra ~logger network =
