@@ -1,11 +1,15 @@
 package codanet
 
 import (
+	"context"
 	"fmt"
 
-	lmdbbs "github.com/georgeee/go-bs-lmdb"
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/ledgerwatch/lmdb-go/lmdb"
 	"github.com/multiformats/go-multihash"
+	lmdbbs "github.com/o1-labs/go-bs-lmdb"
 )
 
 type RootBlockStatus int
@@ -17,14 +21,42 @@ const (
 )
 
 type BitswapStorage interface {
-	GetStatus(key [32]byte) (RootBlockStatus, error)
-	SetStatus(key [32]byte, value RootBlockStatus) error
-	DeleteStatus(key [32]byte) error
-	DeleteBlocks(keys [][32]byte) error
-	ViewBlock(key [32]byte, callback func([]byte) error) error
+	GetStatus(ctx context.Context, key [32]byte) (RootBlockStatus, error)
+	SetStatus(ctx context.Context, key [32]byte, value RootBlockStatus) error
+	DeleteStatus(ctx context.Context, key [32]byte) error
+	DeleteBlocks(ctx context.Context, keys [][32]byte) error
+	ViewBlock(ctx context.Context, key [32]byte, callback func([]byte) error) error
+	StoreBlocks(ctx context.Context, blocks []blocks.Block) error
 }
 
-type BitswapStorageLmdb lmdbbs.Blockstore
+type BitswapStorageLmdb struct {
+	blockstore *lmdbbs.Blockstore
+	statusDB   lmdb.DBI
+}
+
+func OpenBitswapStorageLmdb(path string) (*BitswapStorageLmdb, error) {
+	// 256MiB, a large enough mmap size to make mmap grow() a rare event
+	opt := lmdbbs.Options{
+		Path:            path,
+		InitialMmapSize: 256 << 20,
+		CidToKeyMapper:  cidToKeyMapper,
+		KeyToCidMapper:  keyToCidMapper,
+		MaxDBs:          2,
+	}
+	blockstore, err := lmdbbs.Open(&opt)
+	if err != nil {
+		return nil, err
+	}
+	statusDB, err := blockstore.OpenDB("status")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create/open lmdb status database: %w", err)
+	}
+	return &BitswapStorageLmdb{blockstore: blockstore, statusDB: statusDB}, nil
+}
+
+func (b *BitswapStorageLmdb) Blockstore() blockstore.Blockstore {
+	return b.blockstore
+}
 
 func UnmarshalRootBlockStatus(r []byte) (res RootBlockStatus, err error) {
 	err = fmt.Errorf("wrong root block status retrieved: %v", r)
@@ -38,22 +70,16 @@ func UnmarshalRootBlockStatus(r []byte) (res RootBlockStatus, err error) {
 	return
 }
 
-func statusKey(key [32]byte) []byte {
-	return append([]byte{BS_STATUS_PREFIX}, key[:]...)
+func (bs *BitswapStorageLmdb) StoreBlocks(ctx context.Context, blocks []blocks.Block) error {
+	return bs.blockstore.PutMany(ctx, blocks)
 }
 
-func blockKey(key []byte) []byte {
-	return append([]byte{BS_BLOCK_PREFIX}, key...)
+func (bs *BitswapStorageLmdb) ViewBlock(ctx context.Context, key [32]byte, callback func([]byte) error) error {
+	return bs.blockstore.View(ctx, BlockHashToCid(key), callback)
 }
 
-func (bs_ *BitswapStorageLmdb) ViewBlock(key [32]byte, callback func([]byte) error) error {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	return bs.View(BlockHashToCid(key), callback)
-}
-
-func (bs_ *BitswapStorageLmdb) GetStatus(key [32]byte) (res RootBlockStatus, err error) {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	r, err := bs.GetData(statusKey(key))
+func (bs *BitswapStorageLmdb) GetStatus(ctx context.Context, key [32]byte) (res RootBlockStatus, err error) {
+	r, err := bs.blockstore.GetData(ctx, bs.statusDB, key[:])
 	if err != nil {
 		return
 	}
@@ -61,9 +87,8 @@ func (bs_ *BitswapStorageLmdb) GetStatus(key [32]byte) (res RootBlockStatus, err
 	return
 }
 
-func (bs_ *BitswapStorageLmdb) DeleteStatus(key [32]byte) error {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) ([]byte, bool, error) {
+func (bs *BitswapStorageLmdb) DeleteStatus(ctx context.Context, key [32]byte) error {
+	return bs.blockstore.PutData(ctx, bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
 		prev, err := UnmarshalRootBlockStatus(prevVal)
 		if err != nil {
 			return nil, false, err
@@ -82,9 +107,8 @@ func isStatusTransitionAllowed(exists bool, prev RootBlockStatus, newStatus Root
 	return allowed
 }
 
-func (bs_ *BitswapStorageLmdb) SetStatus(key [32]byte, newStatus RootBlockStatus) error {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) ([]byte, bool, error) {
+func (bs *BitswapStorageLmdb) SetStatus(ctx context.Context, key [32]byte, newStatus RootBlockStatus) error {
+	return bs.blockstore.PutData(ctx, bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
 		var prev RootBlockStatus
 		if exists {
 			var err error
@@ -99,13 +123,12 @@ func (bs_ *BitswapStorageLmdb) SetStatus(key [32]byte, newStatus RootBlockStatus
 		return []byte{byte(newStatus)}, true, nil
 	})
 }
-func (bs_ *BitswapStorageLmdb) DeleteBlocks(keys [][32]byte) error {
-	bs := (*lmdbbs.Blockstore)(bs_)
+func (bs *BitswapStorageLmdb) DeleteBlocks(ctx context.Context, keys [][32]byte) error {
 	cids := make([]cid.Cid, len(keys))
 	for i, key := range keys {
 		cids[i] = BlockHashToCid(key)
 	}
-	return bs.DeleteMany(cids)
+	return bs.blockstore.DeleteMany(ctx, cids)
 }
 
 const (
@@ -118,9 +141,25 @@ var MULTI_HASH_CODE = multihash.Names["blake2b-256"]
 func cidToKeyMapper(id cid.Cid) []byte {
 	mh, err := multihash.Decode(id.Hash())
 	if err == nil && mh.Code == MULTI_HASH_CODE && id.Prefix().Codec == cid.Raw {
-		return blockKey(mh.Digest)
+		return mh.Digest
 	}
 	return nil
+}
+
+func keyToCidMapperDo(key []byte) cid.Cid {
+	mh, _ := multihash.Encode(key, MULTI_HASH_CODE)
+	return cid.NewCidV1(cid.Raw, mh)
+}
+
+func BlockHashToCid(h [32]byte) cid.Cid {
+	return keyToCidMapperDo(h[:])
+}
+
+func keyToCidMapper(key []byte) (id cid.Cid) {
+	if len(key) == 32 {
+		id = keyToCidMapperDo(key)
+	}
+	return
 }
 
 // BlockHashToCidSuffix is a function useful for debug output
@@ -129,15 +168,7 @@ func BlockHashToCidSuffix(h [32]byte) string {
 	return s[len(s)-6:]
 }
 
-func BlockHashToCid(h [32]byte) cid.Cid {
-	mh, _ := multihash.Encode(h[:], MULTI_HASH_CODE)
-	return cid.NewCidV1(cid.Raw, mh)
-}
-
-func keyToCidMapper(key []byte) (id cid.Cid) {
-	if len(key) == 33 && key[0] == BS_BLOCK_PREFIX {
-		mh, _ := multihash.Encode(key[1:], MULTI_HASH_CODE)
-		id = cid.NewCidV1(cid.Raw, mh)
-	}
-	return
+func (b *BitswapStorageLmdb) Close() {
+	b.blockstore.CloseDB(b.statusDB)
+	b.blockstore.Close()
 }

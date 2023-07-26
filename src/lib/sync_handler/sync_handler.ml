@@ -1,9 +1,20 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_block
+module Ledger = Mina_ledger.Ledger
+module Sync_ledger = Mina_ledger.Sync_ledger
 open Frontier_base
 open Network_peer
+
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
@@ -155,8 +166,7 @@ module Make (Inputs : Inputs_intf) :
           Transition_frontier.(
             find frontier hash >>| Breadcrumb.validated_transition)
           ( find_in_root_history frontier hash
-          >>| Fn.compose External_transition.Validated.lower
-                Root_data.Historical.transition )
+          >>| Root_data.Historical.transition )
           ~f:Fn.const
       in
       With_hash.data @@ Mina_block.Validated.forget validated_transition
@@ -181,15 +191,22 @@ module Make (Inputs : Inputs_intf) :
     go [] (Transition_frontier.best_tip frontier)
 
   module Root = struct
-    let prove ~logger ~consensus_constants ~frontier seen_consensus_state =
+    let prove ~context:(module Context : CONTEXT) ~frontier seen_consensus_state
+        =
+      let module Context = struct
+        include Context
+
+        let logger =
+          Logger.extend logger [ ("selection_context", `String "Root.prove") ]
+      end in
       let open Option.Let_syntax in
-      let%bind best_tip_with_witness = Best_tip_prover.prove ~logger frontier in
+      let%bind best_tip_with_witness =
+        Best_tip_prover.prove ~context:(module Context) frontier
+      in
       let is_tip_better =
         Consensus.Hooks.equal_select_status
-          (Consensus.Hooks.select ~constants:consensus_constants
-             ~logger:
-               (Logger.extend logger
-                  [ ("selection_context", `String "Root.prove") ] )
+          (Consensus.Hooks.select
+             ~context:(module Context)
              ~existing:
                (With_hash.map ~f:Mina_block.consensus_state
                   best_tip_with_witness.data )
@@ -201,8 +218,15 @@ module Make (Inputs : Inputs_intf) :
         data = With_hash.data best_tip_with_witness.data
       }
 
-    let verify ~logger ~verifier ~consensus_constants ~genesis_constants
-        ~precomputed_values observed_state peer_root =
+    let verify ~context:(module Context : CONTEXT) ~verifier ~genesis_constants
+        observed_state peer_root =
+      let module Context = struct
+        include Context
+
+        let logger =
+          Logger.extend logger [ ("selection_context", `String "Root.verify") ]
+      end in
+      let open Context in
       let open Deferred.Result.Let_syntax in
       let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
                verified_witness ) =
@@ -211,10 +235,8 @@ module Make (Inputs : Inputs_intf) :
       in
       let is_before_best_tip candidate =
         Consensus.Hooks.equal_select_status
-          (Consensus.Hooks.select ~constants:consensus_constants
-             ~logger:
-               (Logger.extend logger
-                  [ ("selection_context", `String "Root.verify") ] )
+          (Consensus.Hooks.select
+             ~context:(module Context)
              ~existing:
                (With_hash.map ~f:Mina_block.consensus_state best_tip_transition)
              ~candidate )
@@ -305,7 +327,7 @@ let%test_module "Sync_handler" =
 
     let to_external_transition breadcrumb =
       Transition_frontier.Breadcrumb.validated_transition breadcrumb
-      |> External_transition.Validation.forget_validation
+      |> Mina_block.Validated.forget
 
     let%test "a node should be able to give a valid proof of their root" =
       heartbeat_flag := true ;
@@ -330,7 +352,7 @@ let%test_module "Sync_handler" =
               |> Breadcrumb.validated_transition)
           in
           let observed_state =
-            External_transition.Validated.protocol_state seen_transition
+            Mina_block.Validated.protocol_state seen_transition
             |> Protocol_state.consensus_state
           in
           let root_with_proof =
@@ -345,7 +367,7 @@ let%test_module "Sync_handler" =
             verify observed_state root_with_proof |> Deferred.Or_error.ok_exn
           in
           heartbeat_flag := false ;
-          External_transition.(
+          Mina_block.(
             equal
               (With_hash.data root_transition)
               (to_external_transition (Transition_frontier.root frontier))

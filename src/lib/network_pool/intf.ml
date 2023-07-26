@@ -1,6 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Mina_base
+open Mina_transaction
 open Pipe_lib
 open Network_peer
 
@@ -22,8 +23,7 @@ module type Resource_pool_base_intf = sig
   end
 
   (** Diff from a transition frontier extension that would update the resource pool*)
-  val handle_transition_frontier_diff :
-    transition_frontier_diff -> t -> unit Deferred.t
+  val handle_transition_frontier_diff : transition_frontier_diff -> t -> unit
 
   val create :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -66,7 +66,9 @@ module type Resource_pool_diff_intf = sig
    *  smaller after application is completed. *)
   val size : t -> int
 
-  val verified_size : verified -> int
+  (* TODO
+     val verified_size : verified -> int
+  *)
 
   (** How big to consider this diff for purposes of metering. *)
   val score : t -> int
@@ -88,10 +90,9 @@ module type Resource_pool_diff_intf = sig
   val unsafe_apply :
        pool
     -> verified Envelope.Incoming.t
-    -> ( t * rejected
+    -> ( [ `Accept | `Reject ] * t * rejected
        , [ `Locally_generated of t * rejected | `Other of Error.t ] )
        Result.t
-       Deferred.t
 
   val is_empty : t -> bool
 
@@ -127,10 +128,15 @@ module type Broadcast_callback = sig
   type rejected_diff
 
   type t =
-    | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+    | Local of
+        (   ( [ `Broadcasted | `Not_broadcasted ]
+            * resource_pool_diff
+            * rejected_diff )
+            Or_error.t
+         -> unit )
     | External of Mina_net2.Validation_callback.t
 
-  val drop : resource_pool_diff -> rejected_diff -> t -> unit Deferred.t
+  val drop : resource_pool_diff -> rejected_diff -> t -> unit
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
@@ -162,7 +168,11 @@ module type Network_pool_base_intf = sig
     Mina_net2.Sink.S_with_void
       with type msg :=
         resource_pool_diff
-        * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+        * (   ( [ `Broadcasted | `Not_broadcasted ]
+              * resource_pool_diff
+              * rejected_diff )
+              Or_error.t
+           -> unit )
 
   module Remote_sink :
     Mina_net2.Sink.S_with_void
@@ -197,7 +207,7 @@ module type Network_pool_base_intf = sig
 
   val resource_pool : t -> resource_pool
 
-  val broadcasts : t -> resource_pool_diff Linear_pipe.Reader.t
+  val broadcasts : t -> resource_pool_diff With_nonce.t Linear_pipe.Reader.t
 
   val create_rate_limiter : unit -> Rate_limiter.t
 
@@ -205,7 +215,7 @@ module type Network_pool_base_intf = sig
        t
     -> resource_pool_diff_verified Envelope.Incoming.t
     -> Broadcast_callback.t
-    -> unit Deferred.t
+    -> unit
 end
 
 (** A [Snark_resource_pool_intf] is a superset of a
@@ -225,7 +235,7 @@ module type Snark_resource_pool_intf = sig
     -> work:Transaction_snark_work.Statement.t
     -> proof:Ledger_proof.t One_or_two.t
     -> fee:Fee_with_prover.t
-    -> [ `Added | `Statement_not_referenced ] Deferred.t
+    -> [ `Added | `Statement_not_referenced ]
 
   val request_proof :
        t
@@ -252,7 +262,7 @@ end
 module type Snark_pool_diff_intf = sig
   type resource_pool
 
-  type t =
+  type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
     | Add_solved_work of
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
@@ -283,8 +293,7 @@ module type Snark_pool_diff_intf = sig
   val compact_json : t -> Yojson.Safe.t option
 
   val of_result :
-       ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
-         Snark_work_lib.Work.Spec.t
+       ( (_, _) Snark_work_lib.Work.Single.Spec.t Snark_work_lib.Work.Spec.t
        , Ledger_proof.t )
        Snark_work_lib.Work.Result.t
     -> t
@@ -298,17 +307,16 @@ module type Transaction_pool_diff_intf = sig
   module Diff_error : sig
     type t =
       | Insufficient_replace_fee
-      | Invalid_signature
       | Duplicate
-      | Sender_account_does_not_exist
       | Invalid_nonce
       | Insufficient_funds
-      | Insufficient_fee
       | Overflow
       | Bad_token
       | Unwanted_fee_token
       | Expired
       | Overloaded
+      | Fee_payer_account_not_found
+      | Fee_payer_not_permitted_to_send
     [@@deriving sexp, yojson]
 
     val to_string_hum : t -> string
@@ -338,14 +346,13 @@ module type Transaction_resource_pool_intf = sig
        trust_system:Trust_system.t
     -> pool_max_size:int
     -> verifier:Verifier.t
+    -> genesis_constants:Genesis_constants.t
     -> Config.t
 
   val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
 
   val transactions :
-       logger:Logger.t
-    -> t
-    -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
+    t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
   val all_from_account :
        t
@@ -373,6 +380,8 @@ module type Base_ledger_intf = sig
     t -> Account_id.t list -> (Account_id.t * Location.t option) list
 
   val get : t -> Location.t -> Account.t option
+
+  val accounts : t -> Account_id.Set.t Deferred.t
 
   val get_batch : t -> Location.t list -> (Location.t * Account.t option) list
 

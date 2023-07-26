@@ -6,17 +6,21 @@
    ;; opam libraries
    core_kernel
    ppx_inline_test.config
+   result
    ;; local libraries
+   kimchi_backend
    pickles.backend
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    random_oracle_input
    signature_lib
    snark_params
    random_oracle
    pickles
    mina_signature_kind
-   pasta
+   mina_base
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_optcomp ppx_inline_test))
+ (preprocess (pps ppx_mina ppx_jane ppx_version ppx_inline_test))
  (synopsis "Schnorr signatures for strings"))

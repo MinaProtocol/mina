@@ -16,7 +16,7 @@
    web_request
    )
  (preprocess
-  (pps ppx_coda ppx_version ppx_jane ppx_deriving.std))
+  (pps ppx_mina ppx_version ppx_jane ppx_deriving.std))
  (instrumentation (backend bisect_ppx))
  (synopsis
    "Transforming Coda data such that it can be easy for the Web Client to process"))

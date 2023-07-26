@@ -5,7 +5,7 @@
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
-               ppx_assert ppx_coda ppx_version ppx_here ppx_custom_printf ppx_deriving.show
+               ppx_assert ppx_mina ppx_version ppx_here ppx_custom_printf ppx_deriving.show
                ppx_inline_test ppx_let ppx_pipebang))
  (libraries
    ;; opam libraries

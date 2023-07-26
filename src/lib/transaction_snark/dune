@@ -13,13 +13,19 @@
    sexplib0
    bignum
    core
-   ppx_version.runtime
    core_kernel
    base.md5
    base.caml
    async_unix
+   splittable_random
    ;; local libraries
+   mina_wire_types
+   mina_base.import
+   mina_transaction
+   mina_transaction_logic
    hash_prefix_states
+   kimchi_backend.common
+   kimchi_backend
    with_hash
    bitstring_lib
    one_or_two
@@ -35,9 +41,11 @@
    cache_dir
    snarky.backendless
    sgn
+   sgn_type
    mina_state
    o1trace
    pickles
+   pickles_base
    random_oracle_input
    pickles_types
    coda_genesis_ledger
@@ -49,11 +57,15 @@
    quickcheck_lib
    test_util
    transaction_witness
+   mina_ledger
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    merkle_ledger
-   zexe_backend
-   pasta
-   )
+   mina_base.util
+   ppx_version.runtime
+   logger
+ )
  (preprocess
-  (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
+  (pps ppx_snarky ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
  (instrumentation (backend bisect_ppx))
  (synopsis "Transaction state transition snarking library"))
