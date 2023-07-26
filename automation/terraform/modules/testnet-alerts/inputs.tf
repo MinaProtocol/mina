@@ -28,7 +28,7 @@ variable "berkeley_testnet" {
   default     = "testnet=\"berkeley\""
 }
 
-variable "berkeley_rule_filter" {
+variable "synced_status_filter" {
   type        = string
   description = "Filter that only applies to berkeley network with syncStatus labels"
   default     = "syncStatus=\"SYNCED\""

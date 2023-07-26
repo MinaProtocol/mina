@@ -8,7 +8,7 @@ data "template_file" "testnet_alerts" {
     alert_timeframe           = var.alert_timeframe
     alert_evaluation_duration = var.alert_duration
     berkeley_testnet          = var.berkeley_testnet
-    berkeley_rule_filter      = var.berkeley_rule_filter
+    synced_status_filter      = var.synced_status_filter
   }
 }
 
