@@ -8,7 +8,7 @@ module type BC_ext = sig
 
   val is_expired : t -> bool
 
-  val error : Error.t -> t -> unit Deferred.t
+  val error : Error.t -> t -> unit
 end
 
 module type Pool_sink = sig
@@ -83,7 +83,8 @@ module Base
         let diff = Envelope.Incoming.data env in
         [%log' warn logger] "Dropping verified diff $diff due to pipe overflow"
           ~metadata:[ ("diff", Diff.verified_to_yojson diff) ] ;
-        BC.drop Diff.empty (Diff.reject_overloaded_diff diff) cb
+        BC.drop Diff.empty (Diff.reject_overloaded_diff diff) cb ;
+        Deferred.unit
 
   let verify_impl ~logger ~trace_label resource_pool rl env cb :
       Diff.verified Envelope.Incoming.t option Deferred.t =
@@ -110,11 +111,11 @@ module Base
                   ; ("diff", summary)
                   ]
                 "exceeded capacity from $sender" ;
-              BC.error (Error.of_string "exceeded capacity") cb
-              >>| fun _ -> None
+              BC.error (Error.of_string "exceeded capacity") cb ;
+              Deferred.return None
           | `Within_capacity ->
               O1trace.thread verify_diffs_thread_label (fun () ->
-                  match%bind Diff.verify resource_pool env with
+                  match%map Diff.verify resource_pool env with
                   | Error err ->
                       [%log' debug logger]
                         "Refusing to rebroadcast $diff. Verification error: \
@@ -124,7 +125,8 @@ module Base
                           ; ("error", Error_json.error_to_yojson err)
                           ] ;
                       (*reject incoming messages*)
-                      BC.error err cb >>| fun _ -> None
+                      BC.error err cb ;
+                      None
                   | Ok verified_diff ->
                       [%log' debug logger] "Verified diff: $verified_diff"
                         ~metadata:
@@ -135,7 +137,7 @@ module Base
                             , Envelope.Sender.to_yojson
                               @@ Envelope.Incoming.sender verified_diff )
                           ] ;
-                      Deferred.return (Some verified_diff) ) )
+                      Some verified_diff ) )
 
   let push t (msg, cb) =
     match t with
@@ -238,13 +240,21 @@ module Local_sink
      and type unwrapped_t = Diff.verified Envelope.Incoming.t * BC.t
      and type msg :=
       BC.resource_pool_diff
-      * ((BC.resource_pool_diff * BC.rejected_diff) Or_error.t -> unit) =
+      * (   ( [ `Broadcasted | `Not_broadcasted ]
+            * BC.resource_pool_diff
+            * BC.rejected_diff )
+            Or_error.t
+         -> unit ) =
   Base (Diff) (BC)
     (struct
       type raw_msg = BC.resource_pool_diff
 
       type raw_callback =
-        (BC.resource_pool_diff * BC.rejected_diff) Or_error.t -> unit
+           ( [ `Broadcasted | `Not_broadcasted ]
+           * BC.resource_pool_diff
+           * BC.rejected_diff )
+           Or_error.t
+        -> unit
 
       let convert_callback cb = BC.Local cb
 

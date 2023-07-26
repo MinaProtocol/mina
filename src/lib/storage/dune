@@ -17,7 +17,8 @@
    base.caml
    ;; local libraries
    logger
-   )
+   ppx_version.runtime
+ )
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation (backend bisect_ppx))
