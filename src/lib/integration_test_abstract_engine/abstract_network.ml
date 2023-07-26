@@ -7,6 +7,7 @@ open Ci_interaction
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
 
+(* TODO: remove *)
 let mina_archive_container_id = "mina_archive_container_id"
 
 let mina_archive_username = "mina_archive_username"
@@ -25,110 +26,77 @@ type config =
   ; namespace : string
   ; graphql_enabled : bool
   ; access_token : Access_token.t
+  ; network_id : Network_id.t
+  ; ingress_uri : string
+  ; current_commit_sha : string
   }
 
+(* TODO: remove *)
 let base_kube_args { cluster; namespace; _ } =
   [ "--cluster"; cluster; "--namespace"; namespace ]
 
-let id : Network_id.t Ivar.t = Async.Ivar.create ()
-
-let network_ingress_uri : string Ivar.t = Async.Ivar.create ()
-
 module Node = struct
-  type pod_info =
-    { network_keypair : Network_keypair.t option
-    ; primary_container_id : string
-          (* this is going to be probably either "mina" or "worker" *)
-    ; has_archive_container : bool
-          (* archive pods have a "mina" container and an "archive" container alongside *)
-    }
-
+  (* TODO: remove app_id, add ingress_uri *)
   type t =
     { app_id : string
-    ; pod_ids : string list
-    ; pod_info : pod_info
+    ; node_id : string
+    ; network_keypair : Network_keypair.t option
     ; config : config
+    ; node_type : Node_type.t
     }
 
-  let id { pod_ids; _ } = List.hd_exn pod_ids
+  let id { node_id; _ } = node_id
 
-  let network_keypair { pod_info = { network_keypair; _ }; _ } = network_keypair
+  let network_keypair { network_keypair; _ } = network_keypair
 
+  (* TODO: remove *)
   let base_kube_args t = [ "--cluster"; t.cluster; "--namespace"; t.namespace ]
 
-  let get_logs_in_container ?container_id { pod_ids; config; pod_info; _ } =
+  (* TODO: remove *)
+  let get_logs_in_container ?container_id { node_id; config; _ } =
     let container_id =
-      Option.value container_id ~default:pod_info.primary_container_id
+      Option.value container_id ~default:""
     in
     let%bind cwd = Unix.getcwd () in
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "kubectl"
       ( base_kube_args config
-      @ [ "logs"; "-c"; container_id; List.hd_exn pod_ids ] )
+      @ [ "logs"; "-c"; container_id; node_id ] )
 
-  let run_in_container ?(exit_code = 10) ?container_id ?override_with_pod_id
-      ~cmd t =
-    let { config; pod_info; _ } = t in
-    let pod_id =
-      match override_with_pod_id with
-      | Some pid ->
-          pid
-      | None ->
-          List.hd_exn t.pod_ids
-    in
-    let container_id =
-      Option.value container_id ~default:pod_info.primary_container_id
-    in
-    let%bind cwd = Unix.getcwd () in
-    Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code cwd "kubectl"
-      ( base_kube_args config
-      @ [ "exec"; "-c"; container_id; "-i"; pod_id; "--" ]
-      @ cmd )
-
-  let cp_string_to_container_file ?container_id ~str ~dest t =
-    let { pod_ids; config; pod_info; _ } = t in
-    let container_id =
-      Option.value container_id ~default:pod_info.primary_container_id
-    in
-    let tmp_file, oc =
-      Caml.Filename.open_temp_file ~temp_dir:Filename.temp_dir_name
-        "integration_test_cp_string" ".tmp"
-    in
-    Out_channel.output_string oc str ;
-    Out_channel.close oc ;
-    let%bind cwd = Unix.getcwd () in
-    let dest_file =
-      sprintf "%s/%s:%s" config.namespace (List.hd_exn pod_ids) dest
-    in
-    Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
-      (base_kube_args config @ [ "cp"; "-c"; container_id; tmp_file; dest_file ])
-
-  let start ~fresh_state node : unit Malleable_error.t =
-    let open Malleable_error.Let_syntax in
+  let start ?commit_sha ~fresh_state t : unit Malleable_error.t =
+    let commit_sha = Option.value commit_sha ~default:t.config.current_commit_sha in
+    let access_token = t.config.access_token in
+    let request_body = Request.Platform_agnostic.Start_node { node_id = id t; fresh_state; commit_sha } in
     let%bind () =
-      if fresh_state then
-        run_in_container node ~cmd:[ "sh"; "-c"; "rm -rf .mina-config/*" ]
-        >>| ignore
-      else Malleable_error.return ()
+      match%map send_ci_http_request' ~access_token ~request_body with
+      | Ok (Response.Platform_agnostic.Node_started node_id) when String.equal node_id (id t) -> ()
+      | _ -> failwith "invalid node started response"
     in
-    run_in_container ~exit_code:11 node ~cmd:[ "/start.sh" ] >>| ignore
+    Malleable_error.return ()
 
-  let stop node =
-    let open Malleable_error.Let_syntax in
-    run_in_container ~exit_code:12 node ~cmd:[ "/stop.sh" ] >>| ignore
+  let stop t =
+    let access_token = t.config.access_token in
+    let request_body = Request.Platform_agnostic.Stop_node (id t) in
+    let%bind () =
+      match%map send_ci_http_request' ~access_token ~request_body with
+      | Ok (Response.Platform_agnostic.Node_stopped node_id) when String.equal node_id (id t) -> ()
+      | _ -> failwith "invalid node stopped response"
+    in
+    Malleable_error.return ()
 
   let logger_metadata node =
     [ ("namespace", `String node.config.namespace)
     ; ("app_id", `String node.app_id)
-    ; ("pod_id", `String (List.hd_exn node.pod_ids))
+    ; ("node_id", `String (node.node_id))
     ]
 
   module Scalars = Graphql_lib.Scalars
 
   module Graphql = struct
+    (* TODO: fix *)
     let ingress_uri node =
       let host =
         sprintf "%s.%s" node.config.testnet_name
-          (Ivar.value_exn network_ingress_uri)
+          node.config.ingress_uri
       in
       let path = sprintf "/%s/graphql" node.app_id in
       Uri.make ~scheme:"http" ~host ~path ~port:80 ()
@@ -1060,18 +1028,18 @@ module Node = struct
     else
       Deferred.Or_error.error_string
         "Node is not currently capturing structured log messages"
-
-  (* return an error if [t] isn't an archive node *)
+  
+  (* TODO: check if node is an archive node *)
   let dump_archive_data ~logger (t : t) ~data_file =
     let%bind data =
       match%map
-        send_ci_http_request ~access_token:t.config.access_token
-          ~request_body:(Request.Get_node_logs (id t))
+        send_ci_http_request' ~access_token:t.config.access_token
+          ~request_body:(Request.Platform_agnostic.Dump_archive_data (id t))
       with
-      | Ok (Response.Node_logs (_, logs)) ->
+      | Ok (Response.Platform_agnostic.Archive_data_dump (node_id, logs)) when String.equal node_id (id t) ->
           logs
       | _ ->
-          failwith "invalid node logs response"
+          failwith "invalid archive dump data response"
     in
     [%log info] "Dumping archive data to file %s" data_file ;
     Malleable_error.return
@@ -1079,50 +1047,33 @@ module Node = struct
            Out_channel.output_string out_ch data )
 
   let run_replayer ~logger (t : t) =
-    [%log info] "Running replayer on archived data (node: %s, container: %s)"
-      (List.hd_exn t.pod_ids) mina_archive_container_id ;
-    let open Malleable_error.Let_syntax in
-    let%bind accounts =
-      run_in_container t
-        ~cmd:[ "jq"; "-c"; ".ledger.accounts"; "/root/config/daemon.json" ]
+    [%log info] "Running replayer on archived data node: %s"
+      (t.node_id) ;
+    let access_token = t.config.access_token in
+    let request_body = Request.Platform_agnostic.Run_replayer (id t) in
+    let%bind output =
+      match%map send_ci_http_request' ~access_token ~request_body with
+      | Ok (Response.Platform_agnostic.Replayer_run (node_id, output)) when String.equal node_id (id t) ->
+          output
+      | _ -> failwith "invalid run replayer response"
     in
-    let replayer_input =
-      sprintf
-        {| { "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }} |}
-        accounts
-    in
-    let dest = "replayer-input.json" in
-    let%bind _res =
-      Deferred.bind ~f:Malleable_error.return
-        (cp_string_to_container_file t ~container_id:mina_archive_container_id
-           ~str:replayer_input ~dest )
-    in
-    run_in_container t ~container_id:mina_archive_container_id
-      ~cmd:
-        [ "mina-replayer"
-        ; "--archive-uri"
-        ; postgres_url
-        ; "--input-file"
-        ; dest
-        ; "--output-file"
-        ; "/dev/null"
-        ; "--continue-on-error"
-        ]
+    Malleable_error.return output
 
+  (* TODO: convert *)
   let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
-    [%log info] "Dumping container logs from (node: %s, container: %s)"
-      (List.hd_exn t.pod_ids) t.pod_info.primary_container_id ;
+    [%log info] "Dumping logs from node: %s"
+      (t.node_id) ;
     let%map logs = get_logs_in_container t in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
         Out_channel.output_string out_ch logs )
 
+  (* TODO: convert *)
   let dump_precomputed_blocks ~logger (t : t) =
     let open Malleable_error.Let_syntax in
     [%log info]
-      "Dumping precomputed blocks from logs for (node: %s, container: %s)"
-      (List.hd_exn t.pod_ids) t.pod_info.primary_container_id ;
+      "Dumping precomputed blocks from logs for node: %s" t.node_id ;
     let%bind logs = get_logs_in_container t in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
@@ -1234,13 +1185,13 @@ module Node = struct
 end
 
 module Workload_to_deploy = struct
-  type t = { workload_id : string; pod_info : Node.pod_info }
+  type t = { workload_id : string; pod_info : string }
 
   let construct_workload workload_id pod_info : t = { workload_id; pod_info }
 
-  let cons_pod_info ?network_keypair ?(has_archive_container = false)
-      primary_container_id : Node.pod_info =
-    { network_keypair; has_archive_container; primary_container_id }
+  let[@warning "-27"] cons_pod_info ?network_keypair ?(has_archive_container = false)
+      primary_container_id = ""
+    (* { network_keypair; has_archive_container; primary_container_id } *)
 
   let get_nodes_from_workload t ~config =
     let%bind cwd = Unix.getcwd () in
@@ -1256,35 +1207,35 @@ module Workload_to_deploy = struct
              ; "jsonpath={.spec.selector.matchLabels.app}"
              ] ) )
     in
-    let%map pod_ids_str =
+    let%map node_id_str =
       Integration_test_lib.Util.run_cmd_or_hard_error cwd "kubectl"
         ( base_kube_args config
         @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
     in
-    let pod_ids =
-      String.split pod_ids_str ~on:'\n'
+    let node_id =
+      String.split node_id_str ~on:'\n'
       |> List.filter ~f:(Fn.compose not String.is_empty)
       |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
+      |> String.concat ~sep:"TODO:"
     in
-    (* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
-    (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
-    (* TODO fix this^ and have a more elegant solution *)
-    let pod_info = t.pod_info in
-    { Node.app_id; pod_ids; pod_info; config }
+    let node_type = Node_type.Seed_node in
+    let network_keypair = None in
+    { Node.app_id; node_id; node_type; config; network_keypair }
 end
 
 type t =
-  { namespace : string
-  ; constants : Test_config.constants
+  { constants : Test_config.constants
   ; seeds : Node.t Core.String.Map.t
   ; block_producers : Node.t Core.String.Map.t
   ; snark_coordinators : Node.t Core.String.Map.t
   ; snark_workers : Node.t Core.String.Map.t
   ; archive_nodes : Node.t Core.String.Map.t
-        (* ; nodes_by_pod_id : Node.t Core.String.Map.t *)
   ; testnet_log_filter : string
   ; genesis_keypairs : Network_keypair.t Core.String.Map.t
+  ; network_id : Network_id.t
   }
+
+let id { network_id; _ } = network_id
 
 let constants { constants; _ } = constants
 
@@ -1313,7 +1264,7 @@ let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
   |> Core.String.Map.of_alist_exn
 
 (* all_pods returns everything in the network.  remember that snark_workers will never initialize and will never sync, and aren't supposed to *)
-(* TODO snark workers and snark coordinators have the same key name, but different workload ids*)
+(* TODO: snark workers and snark coordinators have the same key name, but different workload ids*)
 let all_pods t =
   List.concat
     [ Core.String.Map.to_alist t.seeds
@@ -1336,32 +1287,22 @@ let all_non_seed_pods t =
 
 let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
 
-let lookup_node_by_pod_id t id =
-  let pods = all_pods t |> Core.Map.to_alist in
-  List.fold pods ~init:None ~f:(fun acc (node_name, node) ->
-      match acc with
-      | Some acc ->
-          Some acc
-      | None ->
-          if String.equal id (List.hd_exn node.pod_ids) then
-            Some (node_name, node)
-          else None )
-
-let all_pod_ids t =
+let all_node_id t =
   let pods = all_pods t |> Core.Map.to_alist in
   List.fold pods ~init:[] ~f:(fun acc (_, node) ->
-      List.cons (List.hd_exn node.pod_ids) acc )
+      List.cons (node.node_id) acc )
 
+(* TODO: what to do with this? *)
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
   let max_polls = 40 (* 10 mins *) in
-  let all_pods_set = all_pod_ids network |> String.Set.of_list in
+  let all_pods_set = all_node_id network |> String.Set.of_list in
   let kube_get_pods () =
     Integration_test_lib.Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/"
       "kubectl"
       [ "-n"
-      ; network.namespace
+      ; "namespace"
       ; "get"
       ; "pods"
       ; "-ojsonpath={range \

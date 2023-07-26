@@ -342,6 +342,9 @@ module Network_manager = struct
       ; namespace = t.namespace
       ; graphql_enabled = t.graphql_enabled
       ; access_token = "access_token" (* TODO: *)
+      ; network_id = "network_id" (* TODO: *)
+      ; ingress_uri = "ingress_uri" (* TODO: *)
+      ; current_commit_sha = "0000000" (* TODO: *)
       }
     in
     let func_for_fold ~(key : string) ~data accum_M =
@@ -373,13 +376,13 @@ module Network_manager = struct
         ~f:func_for_fold
     in
     let network =
-      { Abstract_network.namespace = t.namespace
+      { Abstract_network.network_id = t.namespace (* TODO: fix *)
       ; constants = t.constants
       ; seeds
       ; block_producers
       ; snark_coordinators
       ; snark_workers
-      ; archive_nodes (* ; all_nodes *)
+      ; archive_nodes
       ; testnet_log_filter = t.testnet_log_filter
       ; genesis_keypairs = t.genesis_keypairs
       }

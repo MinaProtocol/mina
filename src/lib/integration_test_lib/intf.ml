@@ -45,7 +45,7 @@ module Engine = struct
 
       val network_keypair : t -> Network_keypair.t option
 
-      val start : fresh_state:bool -> t -> unit Malleable_error.t
+      val start : ?commit_sha:string -> fresh_state:bool -> t -> unit Malleable_error.t
 
       val stop : t -> unit Malleable_error.t
 
@@ -220,6 +220,7 @@ module Engine = struct
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
 
+      (** Returns the stdout output from running the replayer on the node's archive db *)
       val run_replayer : logger:Logger.t -> t -> string Malleable_error.t
 
       val dump_mina_logs :
@@ -255,7 +256,7 @@ module Engine = struct
 
     val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
 
-    val id : string Async.Ivar.t
+    val id : t -> string
   end
 
   module type Network_manager_intf = sig
