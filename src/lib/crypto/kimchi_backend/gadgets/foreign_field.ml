@@ -653,6 +653,38 @@ let check_modulus (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   check_modulus_bignum_bigint (module Circuit) foreign_field_modulus
 
+(* Gadget for creating an addition or subtraction result row (Zero gate with result) *)
+let result_row (type f) (module Circuit : Snark_intf.Run with type field = f)
+    ?(label = "result_row") (result1 : f Element.Standard.t)
+    (result2 : f Element.Standard.t option) =
+  let open Circuit in
+  let result1_0, result1_1, result1_2 = Element.Standard.to_limbs result1 in
+  with_label label (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Raw
+                 { kind = Zero
+                 ; values =
+                     ( match result2 with
+                     | None ->
+                         [| result1_0; result1_1; result1_2 |]
+                     | Some result2 ->
+                         let result2_0, result2_1, result2_2 =
+                           Element.Standard.to_limbs result2
+                         in
+                         [| result1_0
+                          ; result1_1
+                          ; result1_2
+                          ; result2_0
+                          ; result2_1
+                          ; result2_2
+                         |] )
+                 ; coeffs = [||]
+                 } )
+        } )
+
 (* Represents two limbs as one single field element with twice as many bits *)
 let as_prover_compact_limb (type f)
     (module Circuit : Snark_intf.Run with type field = f) (lo : f) (hi : f) : f
@@ -661,8 +693,9 @@ let as_prover_compact_limb (type f)
 
 (* Internal foreign field addition helper *)
 let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
-    (operation : op_mode) (foreign_field_modulus : f standard_limbs) :
+    ~(final : bool) (left_input : f Element.Standard.t)
+    (right_input : f Element.Standard.t) (operation : op_mode)
+    (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t * f * Circuit.Field.t =
   let open Circuit in
   (* Decompose modulus into limbs *)
@@ -817,40 +850,14 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
                  } )
         } ) ;
 
-  (* Return the result *)
-  (Element.Standard.of_limbs (result0, result1, result2), sign, field_overflow)
+  let result = Element.Standard.of_limbs (result0, result1, result2) in
 
-(* Gadget for creating an addition or subtraction result row (Zero gate with result) *)
-let result_row (type f) (module Circuit : Snark_intf.Run with type field = f)
-    ?(label = "result_row") (result1 : f Element.Standard.t)
-    (result2 : f Element.Standard.t option) =
-  let open Circuit in
-  let result1_0, result1_1, result1_2 = Element.Standard.to_limbs result1 in
-  with_label label (fun () ->
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Raw
-                 { kind = Zero
-                 ; values =
-                     ( match result2 with
-                     | None ->
-                         [| result1_0; result1_1; result1_2 |]
-                     | Some result2 ->
-                         let result2_0, result2_1, result2_2 =
-                           Element.Standard.to_limbs result2
-                         in
-                         [| result1_0
-                          ; result1_1
-                          ; result1_2
-                          ; result2_0
-                          ; result2_1
-                          ; result2_2
-                         |] )
-                 ; coeffs = [||]
-                 } )
-        } )
+  if final then
+    (* Create the result row *)
+    result_row (module Circuit) ~label:"result_row" result None ;
+
+  (* Return the result *)
+  (result, sign, field_overflow)
 
 (** Gadget for a chain of foreign field sums (additions or subtractions)
  *
@@ -902,7 +909,9 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
 
     (* Create the foreign field addition row *)
     let result, _sign, _ovf =
-      sum_setup (module Circuit) left.(0) right op foreign_field_modulus
+      sum_setup
+        (module Circuit)
+        ~final:false left.(0) right op foreign_field_modulus
     in
 
     (* Update left input for next iteration *)
@@ -917,6 +926,8 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
 (* Definition of a gadget for a single foreign field addition
  *
  *    Inputs:
+ *      final                 := Whether it is the final operation of a chain.
+ *                               Default is false (does not add final result row)
  *      left_input            := Foreign field element
  *      right_input           := Foreign field element
  *      foreign_field_modulus := Foreign field modulus
@@ -926,16 +937,22 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      Returns the result
  *)
 let add (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
+    ?(final = false) (left_input : f Element.Standard.t)
+    (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
+  let final = match final with true -> true | false -> false in
   let result, _sign, _ovf =
-    sum_setup (module Circuit) left_input right_input Add foreign_field_modulus
+    sum_setup
+      (module Circuit)
+      ~final left_input right_input Add foreign_field_modulus
   in
   result
 
 (* Definition of a gadget for a single foreign field subtraction
  *
  *    Inputs:
+ *      final                 := Whether it is the final operation of a chain.
+ *                               Default is false (does not add final result row)
  *      left_input            := Foreign field element
  *      right_input           := Foreign field element
  *      foreign_field_modulus := Foreign field modulus
@@ -945,10 +962,14 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      Returns ther result
  *)
 let sub (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
+    ?(final = true) (left_input : f Element.Standard.t)
+    (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
+  let final = match final with true -> true | false -> false in
   let result, _sign, _ovf =
-    sum_setup (module Circuit) left_input right_input Sub foreign_field_modulus
+    sum_setup
+      (module Circuit)
+      ~final left_input right_input Sub foreign_field_modulus
   in
   result
 
@@ -1035,12 +1056,13 @@ let check_canonical (type f)
           value foreign_field_modulus ) ;
       () ) ;
 
-  (* Create FFAdd gate to compute the bound value (i.e. part of check_canonical) *)
+  (* Create FFAdd gate to compute the bound value (i.e. part of check_canonical)
+     and creates the result row afterwards *)
   let bound, sign, ovf =
-    sum_setup (module Circuit) value offset Add foreign_field_modulus
+    sum_setup
+      (module Circuit)
+      ~final:true value offset Add foreign_field_modulus
   in
-  (* Result row *)
-  result_row (module Circuit) ~label:"check_canonical_result" bound None ;
 
   (* Sanity check *)
   as_prover (fun () ->

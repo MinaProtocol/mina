@@ -265,9 +265,11 @@ val sum_chain :
   -> 'f Element.Standard.t
 (* result *)
 
-(** Gadget for a single foreign field addition
+(** Definition of a gadget for a single foreign field addition
  *
  *    Inputs:
+ *      final                 := Whether it is the final operation of a chain.
+ *                               Default is false (does not add final result row)
  *      left_input            := Foreign field element
  *      right_input           := Foreign field element
  *      foreign_field_modulus := Foreign field modulus
@@ -278,15 +280,18 @@ val sum_chain :
  *)
 val add :
      (module Snark_intf.Run with type field = 'f)
+  -> ?final:bool
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
   -> 'f Element.Standard.t
 (* result *)
 
-(** Gadget for a single foreign field subtraction
+(** Definition of a gadget for a single foreign field subtraction
  *
  *    Inputs:
+ *      final                 := Whether it is the final operation of a chain.
+ *                               Default is false (does not add final result row)
  *      left_input            := Foreign field element
  *      right_input           := Foreign field element
  *      foreign_field_modulus := Foreign field modulus
@@ -297,6 +302,7 @@ val add :
  *)
 val sub :
      (module Snark_intf.Run with type field = 'f)
+  -> ?final:bool
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)

@@ -133,7 +133,7 @@ let%test_unit "custom gates integration" =
             let out_ffadd =
               Foreign_field.add
                 (module Runner.Impl)
-                out_ffmul foreign_elem secp256k1_modulus
+                ~final:true out_ffmul foreign_elem secp256k1_modulus
             in
             let l0, l1, l2 = Element.Standard.to_limbs out_ffadd in
             Range_check.multi (module Runner.Impl) l0 l1 l2 ;
