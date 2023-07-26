@@ -6,7 +6,7 @@
 # - ALTER USER takes a password bracketed in single-quotes or $$s
 #   too hard to make the single-quotes work inside single-quotes, so use $$
 #   the space in the password makes sure a $ isn't applied to the following string
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: mainnet-replayer-cronjob
@@ -30,12 +30,12 @@ spec:
                echo "deb https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list;
                curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - ;
                apt-get update && apt-get install -y google-cloud-cli ;
-               ARCHIVE_DUMP_URI=$(gsutil ls gs://mina-archive-dumps/mainnet-archive-dump-*.sql.tar.gz | sort -r | head -n 1);
+               ARCHIVE_DUMP_URI=$(gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json ls gs://mina-archive-dumps/mainnet-archive-dump-*.sql.tar.gz | sort -r | head -n 1);
                ARCHIVE_DUMP=$(basename $ARCHIVE_DUMP_URI);
                ARCHIVE_SQL=$(basename $ARCHIVE_DUMP_URI .tar.gz);
                echo "Getting archive dump" $ARCHIVE_DUMP_URI;
                gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $ARCHIVE_DUMP_URI . ;
-               MOST_RECENT_CHECKPOINT_URI=$(gsutil ls gs://mainnet-replayer-checkpoints/replayer-checkpoint-*.json | sort -r | head -n 1);
+               MOST_RECENT_CHECKPOINT_URI=$(gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json ls gs://mainnet-replayer-checkpoints/replayer-checkpoint-*.json | sort -r | head -n 1);
                MOST_RECENT_CHECKPOINT=$(basename $MOST_RECENT_CHECKPOINT_URI);
                echo "Getting replayer checkpoint file" $MOST_RECENT_CHECKPOINT;
                gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $MOST_RECENT_CHECKPOINT_URI . ;
@@ -73,7 +73,7 @@ spec:
             env:
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: gcr.io/o1labs-192920/mina-rosetta:1.4.0beta2-fix-replayer-no-final-checkpoint-5af6dba-bullseye
+            image: gcr.io/o1labs-192920/mina-rosetta:1.4.0beta2-fix-replayer-start-ledger-hash-2627643-bullseye
             imagePullPolicy: IfNotPresent
             name: mainnet-replayer-cronjob
             resources:

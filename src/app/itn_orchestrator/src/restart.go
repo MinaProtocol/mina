@@ -9,8 +9,8 @@ import (
 )
 
 type RestartParams struct {
-	Nodes []NodeAddress
-	Clean bool
+	Nodes []NodeAddress `json:"nodes"`
+	Clean bool          `json:"clean,omitempty"`
 }
 
 type RestartAction struct{}

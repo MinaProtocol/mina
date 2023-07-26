@@ -7,7 +7,11 @@ module Verifier_index_json = struct
   module Lookup = struct
     type 't lookup_selectors =
           't Kimchi_types.VerifierIndex.Lookup.lookup_selectors =
-      { lookup : 't option }
+      { lookup : 't option
+      ; xor : 't option
+      ; range_check : 't option
+      ; ffmul : 't option
+      }
     [@@deriving yojson]
 
     type lookup_pattern = Kimchi_types.lookup_pattern =
