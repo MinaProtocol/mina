@@ -34,7 +34,10 @@ end)
 
     type t =
       | Local of
-          (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected) Or_error.t
+          (   ( [ `Broadcasted | `Not_broadcasted ]
+              * Resource_pool.Diff.t
+              * Resource_pool.Diff.rejected )
+              Or_error.t
            -> unit )
       | External of Mina_net2.Validation_callback.t
 
@@ -46,35 +49,32 @@ end)
 
     open Mina_net2.Validation_callback
 
-    let error err =
-      Fn.compose Deferred.return (function
-        | Local f ->
-            f (Error err)
-        | External cb ->
-            fire_if_not_already_fired cb `Reject )
+    let error err = function
+      | Local f ->
+          f (Error err)
+      | External cb ->
+          fire_if_not_already_fired cb `Reject
 
-    let drop accepted rejected =
-      Fn.compose Deferred.return (function
-        | Local f ->
-            f (Ok (accepted, rejected))
-        | External cb ->
-            fire_if_not_already_fired cb `Ignore )
+    let reject accepted rejected = function
+      | Local f ->
+          f (Ok (`Not_broadcasted, accepted, rejected))
+      | External cb ->
+          fire_if_not_already_fired cb `Reject
+
+    let drop accepted rejected = function
+      | Local f ->
+          f (Ok (`Not_broadcasted, accepted, rejected))
+      | External cb ->
+          fire_if_not_already_fired cb `Ignore
 
     let forward broadcast_pipe accepted rejected = function
       | Local f ->
-          f (Ok (accepted, rejected)) ;
-          Linear_pipe.write broadcast_pipe accepted
+          f (Ok (`Broadcasted, accepted, rejected)) ;
+          Linear_pipe.write broadcast_pipe
+            { With_nonce.message = accepted; nonce = 0 }
+          |> don't_wait_for
       | External cb ->
-          fire_if_not_already_fired cb `Accept ;
-          Deferred.unit
-
-    let _replace broadcast_pipe accepted rejected = function
-      | Local f ->
-          f (Ok (accepted, rejected)) ;
-          Linear_pipe.write broadcast_pipe accepted
-      | External cb ->
-          fire_if_not_already_fired cb `Ignore ;
-          Linear_pipe.write broadcast_pipe accepted
+          fire_if_not_already_fired cb `Accept
   end
 
   module Remote_sink =
@@ -102,8 +102,8 @@ end)
   type t =
     { resource_pool : Resource_pool.t
     ; logger : Logger.t
-    ; write_broadcasts : Resource_pool.Diff.t Linear_pipe.Writer.t
-    ; read_broadcasts : Resource_pool.Diff.t Linear_pipe.Reader.t
+    ; write_broadcasts : Resource_pool.Diff.t With_nonce.t Linear_pipe.Writer.t
+    ; read_broadcasts : Resource_pool.Diff.t With_nonce.t Linear_pipe.Reader.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     }
 
@@ -135,9 +135,11 @@ end)
         forward t.write_broadcasts diff' rejected cb )
     in
     O1trace.sync_thread apply_and_broadcast_thread_label (fun () ->
-        match%bind Resource_pool.Diff.unsafe_apply t.resource_pool diff with
-        | Ok res ->
-            rebroadcast res
+        match Resource_pool.Diff.unsafe_apply t.resource_pool diff with
+        | Ok (`Accept, accepted, rejected) ->
+            rebroadcast (accepted, rejected)
+        | Ok (`Reject, accepted, rejected) ->
+            Broadcast_callback.reject accepted rejected cb
         | Error (`Locally_generated res) ->
             rebroadcast res
         | Error (`Other e) ->
@@ -184,10 +186,10 @@ end)
         ~trace_label:Resource_pool.label ~logger resource_pool
     in
     log_rate_limiter_occasionally network_pool remote_rl ;
-    (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
+    (*priority: Transition frontier diffs > local diffs > incoming diffs*)
     Deferred.don't_wait_for
       (O1trace.thread Resource_pool.label (fun () ->
-           Strict_pipe.Reader.Merge.iter
+           Strict_pipe.Reader.Merge.iter_sync
              [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
                    Transition_frontier_extension diff )
              ; remote_r
@@ -196,10 +198,10 @@ end)
              ~f:(fun diff_source ->
                match diff_source with
                | Diff ((verified_diff, cb) : Remote_sink.unwrapped_t) ->
-                   O1trace.thread processing_diffs_thread_label (fun () ->
+                   O1trace.sync_thread processing_diffs_thread_label (fun () ->
                        apply_and_broadcast network_pool verified_diff cb )
                | Transition_frontier_extension diff ->
-                   O1trace.thread
+                   O1trace.sync_thread
                      processing_transition_frontier_diffs_thread_label
                      (fun () ->
                        Resource_pool.handle_transition_frontier_diff diff
@@ -243,9 +245,10 @@ end)
                      ~f:(fun d -> `String (Resource_pool.Diff.summary d))
                      rebroadcastable ) )
             ] ;
+      let nonce = Time_ns.to_int_ns_since_epoch (Time_ns.now ()) in
       let%bind () =
-        Deferred.List.iter rebroadcastable
-          ~f:(Linear_pipe.write t.write_broadcasts)
+        Deferred.List.iter rebroadcastable ~f:(fun message ->
+            Linear_pipe.write t.write_broadcasts With_nonce.{ message; nonce } )
       in
       let%bind () = Async.after rebroadcast_interval in
       go ()
@@ -254,7 +257,7 @@ end)
 
   let create ~config ~constraint_constants ~consensus_constants ~time_controller
       ~frontier_broadcast_pipe ~logger ~log_gossip_heard ~on_remote_push =
-    (*Diffs from tansition frontier extensions*)
+    (* Diffs from transition frontier extensions *)
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
         create ~name:"Network pool transition frontier diffs" Synchronous)

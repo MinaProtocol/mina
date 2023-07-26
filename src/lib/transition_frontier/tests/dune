@@ -15,11 +15,11 @@
    mina_state
    staged_ledger
    with_hash
+   mina_ledger
    child_processes
    genesis_constants
    logger
    mina_block
-   signature_lib
    transition_frontier_persistent_root
    inline_test_quiet_logs
    mina_base
@@ -34,7 +34,11 @@
    frontier_base
    transition_frontier
    protocol_version
+   yojson
+   mina_net2
+   libp2p_ipc
+   staged_ledger_diff
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_version)))
+ (preprocess (pps ppx_jane ppx_version ppx_mina)))

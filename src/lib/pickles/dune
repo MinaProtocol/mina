@@ -2,13 +2,30 @@
  (inline_tests)
  (name pickles)
  (public_name pickles)
- (flags -warn-error -22+34+33+27)
+ (modules_without_implementation
+  full_signature
+  type
+  intf
+  pickles_intf)
+ ; Deactivated warnings
+ ; 40: name-out-scope (activate later)
+ ;
+ ; 41: ambiguous name (too many of them for now, activate later)
+ ;
+ ; 42: disambiguated-name (rely on type disambiguation ,not too bad but closer
+ ; module openings may both solve the warning *and* help the reader)
+ ;
+ ; 44: open-shadow-identifier (operation overloading is common in the codebase)
+ (flags
+  (:standard -w +a-40..42-44
+             -warn-error +a-27)
+   -open Core_kernel)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
    ppx_version
-   ppx_coda
+   ppx_mina
    ppx_jane
    ppx_compare
    ppx_deriving_yojson
@@ -29,6 +46,13 @@
    async_kernel
    bin_prot.shape
    ;; local libraries
+   mina_wire_types
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   kimchi_backend.pasta.constraint_system
    bitstring_lib
    snarky.intf
    pickles.backend
@@ -37,9 +61,9 @@
    snarky_group_map
    sponge
    pickles.pseudo
-   pickles.precomputed
    pickles.limb_vector
    pickles_base
+   kimchi_backend
    mina_version
    base58_check
    codable
@@ -53,18 +77,10 @@
    key_cache
    snark_keys_header
    tuple_lib
-   zexe_backend
-   zexe_backend_common
-   marlin_plonk_bindings
-   marlin_plonk_bindings_pasta_vesta
-   marlin_plonk_bindings_pasta_pallas
-   pasta
-   run_in_thread
-   marlin_plonk_bindings_pasta_fq_urs
-   marlin_plonk_bindings_types
-   marlin_plonk_bindings_pasta_fp_urs
-   marlin_plonk_bindings_pasta_fp_index
-   marlin_plonk_bindings_pasta_fq_index
-   marlin_plonk_bindings_pasta_fp_verifier_index
-   marlin_plonk_bindings_pasta_fq_verifier_index
+   promise
+   kimchi_backend.common
+   logger
+   internal_tracing.context_logger
+   ppx_version.runtime
+   error_json
 ))

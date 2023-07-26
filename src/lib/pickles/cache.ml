@@ -10,7 +10,7 @@ module Step = struct
         * Backend.Tick.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
-        | _id, header, n, h ->
+        | _id, header, n, _h ->
             sprintf !"step-%s-%s-%d-%s" header.kind.type_ header.kind.identifier
               n header.identifying_hash
     end
@@ -20,10 +20,11 @@ module Step = struct
       [@@deriving sexp]
 
       let to_string : t -> _ = function
-        | _id, header, n, h ->
+        | _id, header, n, _h ->
             sprintf !"vk-step-%s-%s-%d-%s" header.kind.type_
               header.kind.identifier n header.identifying_hash
     end
+    [@@warning "-4"]
   end
 
   let storable =
@@ -34,7 +35,7 @@ module Step = struct
             let%map header_read, index =
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset ->
-                  Marlin_plonk_bindings.Pasta_fp_index.read ~offset
+                  Kimchi_bindings.Protocol.Index.Fp.read (Some offset)
                     (Backend.Tick.Keypair.load_urs ()) )
                 path
             in
@@ -50,7 +51,7 @@ module Step = struct
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
-                (Marlin_plonk_bindings.Pasta_fp_index.write ~append:true
+                (Kimchi_bindings.Protocol.Index.Fp.write (Some true)
                    t.Backend.Tick.Keypair.index )
               header path ) )
 
@@ -62,7 +63,7 @@ module Step = struct
             let%map header_read, index =
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset path ->
-                  Marlin_plonk_bindings.Pasta_fp_verifier_index.read ~offset
+                  Kimchi_bindings.Protocol.VerifierIndex.Fp.read (Some offset)
                     (Backend.Tick.Keypair.load_urs ())
                     path )
                 path
@@ -79,11 +80,10 @@ module Step = struct
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
-                (Marlin_plonk_bindings.Pasta_fp_verifier_index.write
-                   ~append:true x )
+                (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path ) )
 
-  let read_or_generate cache k_p k_v typ main =
+  let read_or_generate ~prev_challenges cache k_p k_v typ return_typ main =
     let s_p = storable in
     let s_v = vk_storable in
     let open Impls.Step in
@@ -99,7 +99,8 @@ module Step = struct
         | Error _e ->
             let r =
               Common.time "stepkeygen" (fun () ->
-                  generate_keypair ~exposing:[ typ ] main )
+                  constraint_system ~input_typ:typ ~return_typ main
+                  |> Keypair.generate ~prev_challenges )
             in
             Timer.clock __LOC__ ;
             ignore
@@ -135,10 +136,11 @@ module Wrap = struct
         [%equal: unit * Md5.t] ((* TODO: *) ignore x1, y1) (ignore x2, y2)
 
       let to_string : t -> _ = function
-        | _id, header, h ->
+        | _id, header, _h ->
             sprintf !"vk-wrap-%s-%s-%s" header.kind.type_ header.kind.identifier
               header.identifying_hash
     end
+    [@@warning "-4"]
 
     module Proving = struct
       type t =
@@ -147,7 +149,7 @@ module Wrap = struct
         * Backend.Tock.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
-        | _id, header, h ->
+        | _id, header, _h ->
             sprintf !"wrap-%s-%s-%s" header.kind.type_ header.kind.identifier
               header.identifying_hash
     end
@@ -161,7 +163,7 @@ module Wrap = struct
             let%map header_read, index =
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset ->
-                  Marlin_plonk_bindings.Pasta_fq_index.read ~offset
+                  Kimchi_bindings.Protocol.Index.Fq.read (Some offset)
                     (Backend.Tock.Keypair.load_urs ()) )
                 path
             in
@@ -177,10 +179,10 @@ module Wrap = struct
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
-                (Marlin_plonk_bindings.Pasta_fq_index.write ~append:true t.index)
+                (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
               header path ) )
 
-  let read_or_generate step_domains cache k_p k_v typ main =
+  let read_or_generate ~prev_challenges cache k_p k_v typ return_typ main =
     let module Vk = Verification_key in
     let open Impls.Wrap in
     let s_p = storable in
@@ -196,7 +198,8 @@ module Wrap = struct
          | Error _e ->
              let r =
                Common.time "wrapkeygen" (fun () ->
-                   generate_keypair ~exposing:[ typ ] main )
+                   constraint_system ~input_typ:typ ~return_typ main
+                   |> Keypair.generate ~prev_challenges )
              in
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)
@@ -208,12 +211,12 @@ module Wrap = struct
         (let k_v = Lazy.force k_v in
          let s_v =
            Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
-             (fun (_, header, cs) ~path ->
+             (fun (_, header, _cs) ~path ->
                Or_error.try_with_join (fun () ->
                    let open Or_error.Let_syntax in
                    let%map header_read, index =
                      Snark_keys_header.read_with_header
-                       ~read_data:(fun ~offset path ->
+                       ~read_data:(fun ~offset:_ path ->
                          Binable.of_string
                            (module Vk.Stable.Latest)
                            (In_channel.read_all path) )
@@ -243,23 +246,16 @@ module Wrap = struct
          match Key_cache.Sync.read cache s_v k_v with
          | Ok (vk, d) ->
              (vk, d)
-         | Error e ->
+         | Error _e ->
              let kp, _dirty = Lazy.force pk in
              let vk = Keypair.vk kp in
              let pk = Keypair.pk kp in
              let vk : Vk.t =
                { index = vk
                ; commitments =
-                   Pickles_types.Plonk_verification_key_evals.map vk.evals
-                     ~f:(fun x ->
-                       Array.map x.unshifted ~f:(function
-                         | Infinity ->
-                             failwith "Unexpected zero curve point"
-                         | Finite x ->
-                             x ) )
-               ; step_domains
+                   Kimchi_pasta.Pallas_based_plonk.Keypair.vk_commitments vk
                ; data =
-                   (let open Marlin_plonk_bindings.Pasta_fq_index in
+                   (let open Kimchi_bindings.Protocol.Index.Fq in
                    { constraints = domain_d1_size pk.index })
                }
              in

@@ -1,0 +1,11 @@
+(library
+ (public_name pasta_bindings.backend)
+ (name pasta_bindings_backend)
+ (modules pasta_bindings_backend)
+ (instrumentation
+  (backend bisect_ppx))
+ (inline_tests)
+ (preprocess
+  (pps ppx_version ppx_inline_test))
+ (virtual_modules pasta_bindings_backend)
+ (default_implementation pasta_bindings.backend.native))
