@@ -401,21 +401,36 @@ module Node_id = struct
 end
 
 module Request = struct
-  type t =
-    | Access_token
-    | Create_network of Network_config.t
-    | Deploy_network of Network_id.t
-    | Destroy_network of Network_id.t
-    | Get_node_logs of Node_id.t
-  [@@deriving to_yojson]
+  module Platform_specific = struct
+    type t =
+      | Create_network of Network_config.t
+      | Deploy_network of Network_id.t
+      | Destroy_network of Network_id.t
+    [@@deriving to_yojson]
+  end
+
+  type start_node = { node_id : Node_id.t; fresh_state : bool; commit_sha : string }
+    [@@deriving eq, yojson]
+
+  module Platform_agnostic = struct
+    type t =
+      | Access_token
+      | Start_node of start_node
+      | Stop_node of Node_id.t
+      | Dump_archive_data of Node_id.t
+      | Dump_mina_logs of Node_id.t
+      | Dump_precomputed_blocks of Node_id.t
+      | Run_replayer of Node_id.t
+    [@@deriving to_yojson]
+  end
 end
 
 module Node_type = struct
   type t =
     | Archive_node
     | Block_producer_node
-    | Non_seed_node
     | Seed_node
+    | Snark_worker
     | Snark_coordinator
   [@@deriving eq, yojson]
 
@@ -428,12 +443,14 @@ module Network_deploy_response = struct
   module Map = Map.Make (String)
   include Map
 
-  type t = (Node_type.t * string) Map.t [@@deriving eq]
+  type t = (Node_type.t * string option) Map.t [@@deriving eq]
 
   let of_yojson =
     let f accum = function
       | node_id, `Tuple [ `String nt; `String gql_uri ] ->
-          Map.set accum ~key:node_id ~data:(Node_type.of_string nt, gql_uri)
+          Map.set accum ~key:node_id ~data:(Node_type.of_string nt, Some gql_uri)
+      | node_id, `Tuple [ `String nt; `Null ] ->
+          Map.set accum ~key:node_id ~data:(Node_type.of_string nt, None)
       | _ ->
           failwith "invalid network_deploy_response yojson entry"
     in
@@ -449,13 +466,35 @@ module Access_token = struct
 end
 
 module Response = struct
-  type t =
-    | Access_token of Access_token.t
-    | Network_created of Network_id.t
-    | Network_deployed of Network_deploy_response.t
-    | Network_destroyed
-    | Node_logs of Node_id.t * string
-  [@@deriving eq, of_yojson]
+  module Platform_specific = struct
+    type t =
+      | Network_created of Network_id.t
+      | Network_deployed of Network_deploy_response.t
+      | Network_destroyed
+    [@@deriving eq, of_yojson]
+  end
+  
+  module Node_logs = struct
+    type t = string [@@deriving eq]
+
+    let to_yojson s = `String s
+
+    let of_yojson = function
+      | `String s -> Ok s
+      | x -> Error (Yojson.Safe.to_string x)
+  end
+
+  module Platform_agnostic = struct
+    type t =
+      | Access_token of Access_token.t
+      | Node_started of Node_id.t
+      | Node_stopped of Node_id.t
+      | Archive_data_dump of Node_id.t * string
+      | Mina_logs_dump of Node_id.t * Node_logs.t
+      | Precomputed_block_dump of Node_id.t * string
+      | Replayer_run of Node_id.t * string
+    [@@deriving eq, of_yojson]
+  end
 end
 
 (**
@@ -463,50 +502,91 @@ end
   https://www.notion.so/minafoundation/Lucy-CI-Interactions-e36b48ac52994cafbe1367548e02241d?pvs=4
   *)
 
-let request_ci_access_token () : Response.t Deferred.Or_error.t =
+let request_ci_access_token () : Response.Platform_agnostic.t Deferred.Or_error.t =
   failwith "request_ci_access_token"
 
 (* for example, we can communicate with the CI via https and test-specific access token *)
 let[@warning "-27"] send_ci_http_request ~(access_token : Access_token.t)
-    ~(request_body : Request.t) : Response.t Deferred.Or_error.t =
-  let req_str = request_body |> Request.to_yojson |> Yojson.Safe.to_string in
+    ~(request_body : Request.Platform_specific.t) : Response.Platform_specific.t Deferred.Or_error.t =
+  let req_str = request_body |> Request.Platform_specific.to_yojson |> Yojson.Safe.to_string in
+  (* TODO: http request *)
+  failwithf "send_ci_http_request: %s\n" req_str ()
+
+let[@warning "-27"] send_ci_http_request' ~(access_token : Access_token.t)
+    ~(request_body : Request.Platform_agnostic.t) : Response.Platform_agnostic.t Deferred.Or_error.t =
+  let req_str = request_body |> Request.Platform_agnostic.to_yojson |> Yojson.Safe.to_string in
+  (* TODO: http request *)
   failwithf "send_ci_http_request: %s\n" req_str ()
 
 module Request_unit_tests = struct
-  let%test_unit "Create network request" = assert true
-  (* TODO: too complicated for now *)
+  let ( = ) = String.equal
+
+  let%test_unit "Create network request" =
+    assert true
+    (* TODO: too complicated for now *)
 
   let%test_unit "Deploy network request" =
-    let open Request in
+    let open Request.Platform_specific in
     let result =
       Deploy_network "network0" |> to_yojson |> Yojson.Safe.to_string
     in
-    let ( = ) = String.equal in
     assert (result = {|["Deploy_network","network0"]|})
 
   let%test_unit "Destroy network request" =
-    let open Request in
+    let open Request.Platform_specific in
     let result =
       Destroy_network "network0" |> to_yojson |> Yojson.Safe.to_string
     in
-    let ( = ) = String.equal in
     assert (result = {|["Destroy_network","network0"]|})
 
-  let%test_unit "Get node logs request" =
-    let open Request in
-    let result = Get_node_logs "node0" |> to_yojson |> Yojson.Safe.to_string in
-    let ( = ) = String.equal in
-    assert (result = {|["Get_node_logs","node0"]|})
+  let%test_unit "Access token request" =
+    let open Request.Platform_agnostic in
+    let result = Access_token |> to_yojson |> Yojson.Safe.to_string in
+    assert (result = {|["Access_token"]|})
+
+  let%test_unit "Start node request" =
+    let open Request.Platform_agnostic in
+    let result = Start_node { node_id = "node0"; fresh_state = true; commit_sha = "0123456" }
+      |> to_yojson |> Yojson.Safe.to_string
+    in
+    assert (result = {|["Start_node",{"node_id":"node0","fresh_state":true,"commit_sha":"0123456"}]|})
+
+  let%test_unit "Stop node request" =
+    let open Request.Platform_agnostic in
+    let result = Stop_node "node0" |> to_yojson |> Yojson.Safe.to_string in
+    assert (result = {|["Stop_node","node0"]|})
+
+  let%test_unit "Dump archive data request" =
+    let open Request.Platform_agnostic in
+    let result = Dump_archive_data "node0" |> to_yojson |> Yojson.Safe.to_string in
+    assert (result = {|["Dump_archive_data","node0"]|})
+
+  let%test_unit "Dump mina logs request" =
+    let open Request.Platform_agnostic in
+    let result = Dump_mina_logs "node0" |> to_yojson |> Yojson.Safe.to_string in
+    assert (result = {|["Dump_mina_logs","node0"]|})
+
+  let%test_unit "Dump precomputed blocks request" =
+    let open Request.Platform_agnostic in
+    let result = Dump_precomputed_blocks "node0" |> to_yojson |> Yojson.Safe.to_string in
+    assert (result = {|["Dump_precomputed_blocks","node0"]|})
+
+  let%test_unit "Run replayer request" =
+    let open Request.Platform_agnostic in
+    let result = Run_replayer "node0" |> to_yojson |> Yojson.Safe.to_string in
+    assert (result = {|["Run_replayer","node0"]|})
 end
 
 module Response_unit_tests = struct
+  open Response.Platform_specific
+
+  let ( = ) = equal
+
   let%test_unit "Parse network created response" =
-    let open Response in
     let result =
       `List [ `String "Network_created"; `String "node0" ]
       |> of_yojson |> Result.ok_or_failwith
     in
-    let ( = ) = equal in
     assert (result = Network_created "node0")
 
   let%test_unit "Parse network deployed response" =
@@ -516,8 +596,8 @@ module Response_unit_tests = struct
       {|
         { "node0": ("Archive_node", "gql0")
         , "node1": ("Block_producer_node", "gql1")
-        , "node2": ("Non_seed_node", "gql2")
-        , "node3": ("Seed_node", "gql3")
+        , "node2": ("Seed_node", "gql2")
+        , "node3": ("Snark_worker", null)
         , "node4": ("Snark_coordinator", "gql4")
         }
       |}
@@ -527,27 +607,71 @@ module Response_unit_tests = struct
     assert (
       result
       = of_alist_exn
-          [ ("node0", (Archive_node, "gql0"))
-          ; ("node1", (Block_producer_node, "gql1"))
-          ; ("node2", (Non_seed_node, "gql2"))
-          ; ("node3", (Seed_node, "gql3"))
-          ; ("node4", (Snark_coordinator, "gql4"))
+          [ ("node0", (Archive_node, Some "gql0"))
+          ; ("node1", (Block_producer_node, Some "gql1"))
+          ; ("node2", (Seed_node, Some "gql2"))
+          ; ("node3", (Snark_worker, None))
+          ; ("node4", (Snark_coordinator, Some "gql4"))
           ] )
 
   let%test_unit "Parse network destroyed response" =
-    let open Response in
     let result =
-      `List [ `String "Network_destroyed" ]
+      {|["Network_destroyed"]|} |> Yojson.Safe.from_string
       |> of_yojson |> Result.ok_or_failwith
     in
-    assert (equal result Network_destroyed)
+    assert (result = Network_destroyed)
 
-  let%test_unit "Parse node logs response" =
-    let open Response in
+  open Response.Platform_agnostic
+
+  let ( = ) = equal
+
+  let%test_unit "Parse access token response" =
     let result =
-      `List [ `String "Node_logs"; `String "node0"; `String "node0_logs" ]
+      {|["Access_token","token0"]|} |> Yojson.Safe.from_string
       |> of_yojson |> Result.ok_or_failwith
     in
-    let ( = ) = equal in
-    assert (result = Node_logs ("node0", "node0_logs"))
+    assert (result = Access_token "token0")
+
+  let%test_unit "Node started response" =
+    let result =
+      {|["Node_started","node0"]|} |> Yojson.Safe.from_string
+      |> of_yojson |> Result.ok_or_failwith
+    in
+    assert (result = Node_started "node0")
+
+  let%test_unit "Node stopped response" =
+    let result =
+      {|["Node_stopped","node0"]|} |> Yojson.Safe.from_string
+      |> of_yojson |> Result.ok_or_failwith
+    in
+    assert (result = Node_stopped "node0")
+
+  let%test_unit "Archive data dump response" =
+    let result =
+      {|["Archive_data_dump","node0","data0"]|} |> Yojson.Safe.from_string
+      |> of_yojson |> Result.ok_or_failwith
+    in
+    assert (result = Archive_data_dump ("node0", "data0"))
+
+  let%test_unit "Mina logs dump response" =
+    let raw_logs = "{\"log0\":\"msg0\"}\n{\"log1\":\"msg1\"}" in
+    let result =
+      `List [ `String "Mina_logs_dump"; `String "node0"; `String raw_logs ]
+      |> of_yojson |> Result.ok_or_failwith
+    in
+    assert (result = Mina_logs_dump ("node0", raw_logs))
+
+  let%test_unit "Precomputed block dump response" =
+    let result =
+      {|["Precomputed_block_dump","node0","blocks"]|} |> Yojson.Safe.from_string
+      |> of_yojson |> Result.ok_or_failwith
+    in
+    assert (result = Precomputed_block_dump ("node0", "blocks"))
+
+  let%test_unit "Replayer run response" =
+    let result =
+      {|["Replayer_run","node0","logs0"]|} |> Yojson.Safe.from_string
+      |> of_yojson |> Result.ok_or_failwith
+    in
+    assert (result = Replayer_run ("node0", "logs0"))
 end
