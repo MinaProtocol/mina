@@ -2,7 +2,7 @@
 # The "build-deps" stage
 # - Installs all compilers/interpreters, tools, and OS packages on the given debian or ubuntu image
 #################################################################################################
-# Supports debian:stretch-slim, debian:buster-slim, and ubuntu:focal
+# Supports debian:buster-slim, debian:bullseye-slim, and ubuntu:focal
 ARG image=ubuntu:focal
 FROM ${image} AS build-deps
 
@@ -14,13 +14,17 @@ ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.0.7
 
 # Golang version number used to detemine tarball name
-ARG GO_VERSION=1.16.5
+ARG GO_VERSION=1.18.2
 
 # Go Capnp Version (for capnpc dependency)
-ARG GO_CAPNP_VERSION=v3.0.0-alpha.1
+ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
-ARG RUST_VERSION=1.52.1
+ARG RUST_VERSION=1.63.0
+# Nightly Rust Version used for WebAssembly builds
+ARG RUST_NIGHTLY=2022-09-12
+# wasm-pack version
+ARG WASM_PACK_VERSION=v0.10.3
 
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
@@ -40,6 +44,8 @@ RUN apt-get update --quiet \
     libgmp-dev \
     libgmp3-dev \
     libjemalloc-dev \
+    liblmdb-dev \
+    liblmdb0 \
     libpq-dev \
     libprocps-dev \
     libsodium-dev \
@@ -86,18 +92,24 @@ RUN curl -sL \
 RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
 
 # --- Rust install via rustup-init to a given RUST_VERSION
+# --- Additionally, install RUST_NIGHTLY via rustup
+# For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
+# As opposed to introducing another shell script here (that mostly just determines the platform)
+# we just download the binary for the only platform we care about in this docker environment
 USER opam
 RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
   https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
-  && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal \
+  && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal --component rust-src --target wasm32-unknown-unknown \
+  && $HOME/.cargo/bin/rustup toolchain install "nightly-${RUST_NIGHTLY}" --profile minimal --component rust-src --target wasm32-unknown-unknown --no-self-update \
   && rm /tmp/rustup-init
-# For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
-# As opposed to introducing another shell script here (that mostly just determines the platform)
-# we just download the binary for the only platform we care about in this docker environment
+USER root
+
+# --- Install rust wasm-pack version WASM_PACK_VERSION manually via curl/tar
+RUN curl -sL https://github.com/rustwasm/wasm-pack/releases/download/${WASM_PACK_VERSION}/wasm-pack-${WASM_PACK_VERSION}-x86_64-unknown-linux-musl.tar.gz \
+  | tar --extract --gzip --strip-components=1 --directory=/usr/bin --file=-
 
 # --- RocksDB Installation of a given ROCKSDB_VERSION
-USER root
 # These flags turn some errors into warnings for running with G++ 9 or higher
 # The build command below checks for the g++ major version and removes CXXFLAGS if its less than 9
 ENV CXXFLAGS '-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess'
@@ -113,7 +125,7 @@ RUN git clone https://github.com/facebook/rocksdb \
   && rm -rf /rocksdb \
   && strip -S /usr/local/lib/librocksdb_coda.a
 # Clear CXXFLAGS afterwards to avoid affecting other code
-ENV CXXFLAGS ""
+ENV CXXFLAGS=""
 
 ###########################################################################################
 # Initialize opam in a minimal fashion
@@ -122,7 +134,7 @@ ENV CXXFLAGS ""
 # Set up environment for running as opam user
 WORKDIR /home/opam
 USER opam
-ENV HOME /home/opam
+ENV HOME=/home/opam
 
 # --- Create the following user directory configs as the Opam user:
 ## Add go + rust to the path, unlimit the opam user,
@@ -133,6 +145,8 @@ RUN mkdir --mode=700 ~/.gnupg \
   && echo 'export PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"' >> ~/.bashrc \
   && echo 'ulimit -s unlimited' >> ~/.bashrc \
   && echo "disable-ipv6" >> ~/.gnupg/dirmngr.conf
+
+ENV PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # --- Ocaml install of a given OCAML_VERSION via opam switch
 # additionally initializes opam with sandboxing disabled, as we did not install bubblewrap above.
@@ -149,10 +163,10 @@ RUN git clone \
 # This package was particularly tricky to get to install correctly because of how the package's source code is structured.
 # To work around this, we install it as a dependency for a local go module and build the binary from the GOPATH.
 RUN mkdir go-tmp \
-    && cd go-tmp \
-    && /usr/lib/go/bin/go mod init local/build \
-    && /usr/lib/go/bin/go get capnproto.org/go/capnp/v3@$GO_CAPNP_VERSION \
-    && /usr/lib/go/bin/go build -o capnpc-go capnproto.org/go/capnp/v3/capnpc-go \
-    && sudo mv capnpc-go /usr/local/bin \
-    && cd - \
-    && sudo rm -rf go-tmp
+  && cd go-tmp \
+  && /usr/lib/go/bin/go mod init local/build \
+  && /usr/lib/go/bin/go get capnproto.org/go/capnp/v3@$GO_CAPNP_VERSION \
+  && /usr/lib/go/bin/go build -o capnpc-go capnproto.org/go/capnp/v3/capnpc-go \
+  && sudo mv capnpc-go /usr/local/bin \
+  && cd - \
+  && sudo rm -rf go-tmp

@@ -3,11 +3,10 @@
  (public_name timeout_lib)
  (libraries
    ;; opam libraries
-   core
    core_kernel
    async_kernel
    ;; local libraries
    logger
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_version ppx_coda)))
+ (preprocess (pps ppx_jane ppx_version ppx_mina)))

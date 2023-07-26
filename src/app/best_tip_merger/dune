@@ -5,6 +5,7 @@
   (modes native)
   (libraries
    ;; opam libraries
+   async.async_command
    async_kernel
    stdio
    base.caml
@@ -24,16 +25,22 @@
    mina_state
    transition_frontier_extensions
    mina_base
+   logger.file_system
    logger
    cli_lib
    transition_frontier
    data_hash_lib
    rose_tree
    consensus
+   mina_wire_types
+   pickles.backend
+   snark_params
+   pickles
+   kimchi_backend.pasta
     )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
-    ppx_coda
+    ppx_mina
     ppx_deriving.show
     ppx_deriving_yojson
     ppx_jane

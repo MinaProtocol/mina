@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -20,6 +21,7 @@ type errorResponse struct {
 }
 
 func writeErrorResponse(app *App, w *http.ResponseWriter, msg string) {
+	app.Log.Debugf("Responding with error: %s", msg)
 	bs, err := json.Marshal(errorResponse{msg})
 	if err == nil {
 		_, err2 := io.Copy(*w, bytes.NewReader(bs))
@@ -98,6 +100,10 @@ func makeSignPayload(req *submitRequestData) ([]byte, error) {
 		signPayload.WriteString(",\"snark_work\":")
 		signPayload.Write(req.SnarkWork.json)
 	}
+	if req.GraphqlControlPort != 0 {
+		signPayload.WriteString(",\"graphql_control_port\":")
+		signPayload.WriteString(fmt.Sprintf("%d", req.GraphqlControlPort))
+	}
 	signPayload.WriteString("}")
 	return signPayload.Buf.Bytes(), signPayload.Err
 }
@@ -159,7 +165,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hash := blake2b.Sum256(payload)
-	if !verifySig(&req.Submitter, &req.Sig, hash[:], NETWORK_ID) {
+	if !verifySig(&req.Submitter, &req.Sig, hash[:], NetworkId()) {
 		w.WriteHeader(401)
 		writeErrorResponse(h.app, &w, "Invalid signature")
 		return
@@ -174,13 +180,20 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ps, blockHash := makePaths(submittedAt, &req)
 
+	remoteAddr := r.Header.Get("X-Forwarded-For")
+	if remoteAddr == "" {
+		// If there is no X-Forwarded-For header, use the remote address
+		remoteAddr = r.RemoteAddr
+	}
+
 	meta := MetaToBeSaved{
-		CreatedAt:  req.Data.CreatedAt.Format(time.RFC3339),
-		PeerId:     req.Data.PeerId,
-		SnarkWork:  req.Data.SnarkWork,
-		RemoteAddr: r.RemoteAddr,
-		BlockHash:  blockHash,
-		Submitter:  req.Submitter,
+		CreatedAt:          req.Data.CreatedAt.Format(time.RFC3339),
+		PeerId:             req.Data.PeerId,
+		SnarkWork:          req.Data.SnarkWork,
+		RemoteAddr:         r.RemoteAddr,
+		BlockHash:          blockHash,
+		Submitter:          req.Submitter,
+		GraphqlControlPort: req.Data.GraphqlControlPort,
 	}
 
 	metaBytes, err1 := json.Marshal(meta)
