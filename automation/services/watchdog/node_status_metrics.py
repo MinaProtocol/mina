@@ -85,7 +85,7 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
   nodes_synced.set(synced_fraction)
 
   end = time.time()
-  print("Updating Coda_watchdog_nodes_synced took {} seconds".format(end-start))
+  print("Updating Mina_watchdog_nodes_synced took {} seconds".format(end-start))
 
   # -------------------------------------------------
 
@@ -151,7 +151,7 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
   print("Number of  peers with 'Synced' status: {}\nPeers not synced near the best tip: {}".format(sum(all_synced_peers), peers_out_of_sync))
 
   end2 = time.time()
-  print("Updating Coda_watchdog_nodes_synced_near_best_tip took {} seconds".format(end2-end))
+  print("Updating Mina_watchdog_nodes_synced_near_best_tip took {} seconds".format(end2-end))
 
   nodes_synced_near_best_tip.set(synced_near_best_tip_fraction)
 
@@ -200,10 +200,10 @@ def collect_node_status(v1, namespace, seeds, pods, seed_nodes_responded, seed_n
 
     try:
       cmd = "mina advanced get-peers"
-      peers = util.exec_on_pod(v1, namespace, seed, 'coda', cmd).rstrip().split('\n')
+      peers = util.exec_on_pod(v1, namespace, seed, 'mina', cmd).rstrip().split('\n')
 
       cmd = "mina advanced node-status -daemon-port " + seed_daemon_port + " -peers " + ",".join(peers) + " -show-errors"
-      resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
+      resp = util.exec_on_pod(v1, namespace, seed, 'mina', cmd)
 
       if not 'Error: Unable to connect to Mina Daemon.' in resp:
         add_resp(resp, peers, seed, seed_nodes_responded, seed_nodes_queried)
