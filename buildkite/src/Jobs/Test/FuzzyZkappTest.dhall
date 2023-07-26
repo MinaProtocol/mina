@@ -6,7 +6,6 @@ let D = S.PathPattern
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
-
 let Command = ../../Command/Base.dhall
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
@@ -23,9 +22,9 @@ let buildTestCmd : Text -> Text -> Natural -> Natural -> Size -> Command.Type = 
       key = "fuzzy-zkapp-unit-test-${profile}",
       target = cmd_target,
       docker = None Docker.Type,
-      artifact_paths = [ S.contains "core_dumps/*" ]
+      artifact_paths = [ S.contains "core_dumps/*" ],
+      flake_retry_limit = Some 0
     }
-
 in
 
 Pipeline.build

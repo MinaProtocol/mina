@@ -1,19 +1,15 @@
 module SC = Scalar_challenge
 open Core_kernel
-open Async_kernel
 open Pickles_types
 open Common
 open Import
 open Backend
-open Tuple_lib
 
 (* TODO: Just stick this in plonk_checks.ml *)
 module Plonk_checks = struct
   include Plonk_checks
   module Type1 =
     Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
-  module Type2 =
-    Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
 end
 
 let expand_deferred (type n most_recent_width)
@@ -39,7 +35,6 @@ let expand_deferred (type n most_recent_width)
        , Branch_data.t )
        Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t ) :
     _ Types.Wrap.Proof_state.Deferred_values.t =
-  let module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk in
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
   Timer.start __LOC__ ;
@@ -47,7 +42,7 @@ let expand_deferred (type n most_recent_width)
   let sc = SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar in
   Timer.clock __LOC__ ;
   let plonk0 = proof_state.deferred_values.plonk in
-  let { Deferred_values.Minimal.branch_data; bulletproof_challenges } =
+  let { Deferred_values.Minimal.branch_data; bulletproof_challenges; _ } =
     Deferred_values.Minimal.map_challenges ~f:Challenge.Constant.to_tick_field
       ~scalar:sc proof_state.deferred_values
   in
@@ -116,8 +111,6 @@ let expand_deferred (type n most_recent_width)
     let p =
       let module Field = struct
         include Tick.Field
-
-        type nonrec bool = bool
       end in
       Plonk_checks.Type1.derive_plonk
         (module Field)
@@ -129,7 +122,7 @@ let expand_deferred (type n most_recent_width)
     ; beta = plonk0.beta
     ; gamma = plonk0.gamma
     ; lookup =
-        Option.map (Plonk_types.Opt.to_option_unsafe p.lookup) ~f:(fun l ->
+        Option.map (Plonk_types.Opt.to_option_unsafe p.lookup) ~f:(fun _ ->
             { Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup
               .joint_combiner = Option.value_exn plonk0.joint_combiner
             } )
