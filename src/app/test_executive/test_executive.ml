@@ -47,7 +47,7 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
   else Deferred.return ()
 
 let engines : engine list =
-  [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S)) ]
+  [ ("cloud", (module Integration_test_abstract_engine : Intf.Engine.S)) ]
 
 let tests : test list =
   [ ( "peers-reliability"
@@ -241,7 +241,6 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       deferred
 
 let main inputs =
-  (* TODO: abstract over which engine is in use, allow engine to be set form CLI *)
   let (Test_inputs_with_cli_inputs ((module Test_inputs), cli_inputs)) =
     inputs.test_inputs
   in
@@ -253,16 +252,6 @@ let main inputs =
        and type node = Engine.Network.Node.t
        and type dsl = Dsl.t )
   in
-  (*
-    (module Test (Test_inputs)
-    : Intf.Test.S
-      with type network = Engine.Network.t
-       and type log_engine = Engine.Log_engine.t )
-    *)
-  (* TODO:
-   *   let (module Exec) = (module Execute.Make (Engine)) in
-   *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
-   *)
   let logger = Logger.create () in
   let images =
     { Test_config.Container_images.mina = inputs.mina_image
@@ -360,7 +349,6 @@ let main inputs =
         in
         [%log trace] "initializing network abstraction" ;
         let%bind () = Engine.Network.initialize_infra ~logger network in
-
         [%log info] "Starting the daemons within the pods" ;
         let start_print (node : Engine.Network.Node.t) =
           let open Malleable_error.Let_syntax in
