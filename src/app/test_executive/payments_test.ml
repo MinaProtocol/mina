@@ -91,6 +91,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (* The node that we send GraphQL requests to needs to stay online. *)
     Map.iter ~f:(Wait_condition.require_online online_monitor) all_nodes ;
+    (* We need snark work for this test. *)
+    Core_kernel.Map.iter
+      ~f:(Wait_condition.require_online online_monitor)
+      (Network.snark_coordinators network) ;
 
     let untimed_node_a =
       Core.String.Map.find_exn
