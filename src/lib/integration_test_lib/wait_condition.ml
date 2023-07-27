@@ -213,6 +213,14 @@ struct
 
   type online_nodes_monitor = { mutable required_online : String.Set.t }
 
+  exception Required_node_is_offline of string
+
+  exception Required_node_moved_id of string * string * string
+
+  exception
+    Required_node_offline_with_query_error of
+      string * Malleable_error.Hard_fail.t
+
   let require_online t node =
     t.required_online <-
       Set.add t.required_online (Engine.Network.Node.app_id node)
@@ -229,10 +237,23 @@ struct
           let node_name = Network.Node.app_id offline_node in
           [%log info] "Detected node offline $node"
             ~metadata:[ ("node", `String node_name) ] ;
-          if Set.mem monitor.required_online node_name then (
-            [%log fatal] "Offline $node is required for this test"
-              ~metadata:[ ("node", `String node_name) ] ;
-            failwith "Aborted because of required offline node" ) ;
+          if Set.mem monitor.required_online node_name then
+            Async.don't_wait_for
+              ( [%log fatal] "Offline $node is required for this test"
+                  ~metadata:[ ("node", `String node_name) ] ;
+                let open Async.Deferred.Let_syntax in
+                let prev_id = Network.Node.id offline_node in
+                match%map Network.Node.get_id_nocache offline_node with
+                | Ok
+                    { Malleable_error.Result_accumulator.computation_result = id
+                    ; _
+                    } ->
+                    if String.equal prev_id id then
+                      raise (Required_node_moved_id (node_name, prev_id, id))
+                    else raise (Required_node_is_offline node_name)
+                | Error e ->
+                    raise (Required_node_offline_with_query_error (node_name, e))
+              ) ;
           Async_kernel.Deferred.return `Continue )
     in
     (monitor, node_liveness_subscription)

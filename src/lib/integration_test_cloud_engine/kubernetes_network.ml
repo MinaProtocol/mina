@@ -279,6 +279,24 @@ module Node = struct
                   Out_channel.output_string out_ch block ) )
     in
     Malleable_error.return ()
+
+  let get_pod_ids_helper ~cwd ~config app_id =
+    let open Malleable_error.Let_syntax in
+    let%map pod_ids_str =
+      Integration_test_lib.Util.run_cmd_or_hard_error cwd "kubectl"
+        ( base_kube_args config
+        @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
+    in
+    String.split pod_ids_str ~on:'\n'
+    |> List.filter ~f:(Fn.compose not String.is_empty)
+    |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
+
+  let get_id_nocache node =
+    let%bind cwd = Unix.getcwd () in
+    let open Malleable_error.Let_syntax in
+    let%map pod_ids = get_pod_ids_helper ~cwd ~config:node.config node.app_id in
+    (* Here, as elsewhere, we should handle this better. *)
+    List.hd_exn pod_ids
 end
 
 module Workload_to_deploy = struct
@@ -304,16 +322,7 @@ module Workload_to_deploy = struct
              ; "jsonpath={.spec.selector.matchLabels.app}"
              ] ) )
     in
-    let%map pod_ids_str =
-      Integration_test_lib.Util.run_cmd_or_hard_error cwd "kubectl"
-        ( base_kube_args config
-        @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
-    in
-    let pod_ids =
-      String.split pod_ids_str ~on:'\n'
-      |> List.filter ~f:(Fn.compose not String.is_empty)
-      |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
-    in
+    let%map pod_ids = Node.get_pod_ids_helper ~cwd ~config app_id in
     (* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
     (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
     (* TODO fix this^ and have a more elegant solution *)

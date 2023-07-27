@@ -62,6 +62,8 @@ module Engine = struct
 
       val dump_precomputed_blocks :
         logger:Logger.t -> t -> unit Malleable_error.t
+
+      val get_id_nocache : t -> string Malleable_error.t
     end
 
     type t
@@ -241,6 +243,14 @@ module Dsl = struct
       test_config:Test_config.t -> num_proofs:int -> t
 
     type online_nodes_monitor
+
+    exception Required_node_is_offline of string
+
+    exception Required_node_moved_id of string * string * string
+
+    exception
+      Required_node_offline_with_query_error of
+        string * Malleable_error.Hard_fail.t
 
     val require_online : online_nodes_monitor -> Engine.Network.Node.t -> unit
 

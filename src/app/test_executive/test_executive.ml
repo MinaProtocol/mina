@@ -384,9 +384,35 @@ let main inputs =
           else "errors occurred"
         in
         (exit_reason, Deferred.return malleable_error)
-    | Error exn ->
-        [%log error] "%s" (Exn.to_string_mach exn) ;
-        ("exception thrown", Malleable_error.hard_error (Error.of_exn exn))
+    | Error exn -> (
+        match Monitor.extract_exn exn with
+        | Dsl.Wait_condition.Required_node_moved_id (node_name, prev_id, id) ->
+            [%log fatal]
+              "Required node $node changed ID from $old_id to $new_id"
+              ~metadata:
+                [ ("node", `String node_name)
+                ; ("old_id", `String prev_id)
+                ; ("new_id", `String id)
+                ] ;
+            ( "node ID reassigned"
+            , Malleable_error.hard_error ~exit_code:18 (Error.of_exn exn) )
+        | Dsl.Wait_condition.Required_node_is_offline node_name ->
+            [%log fatal] "Required node $node is offline"
+              ~metadata:[ ("node", `String node_name) ] ;
+            ( "node offline"
+            , Malleable_error.hard_error ~exit_code:19 (Error.of_exn exn) )
+        | Dsl.Wait_condition.Required_node_offline_with_query_error
+            (node_name, hard_fail) ->
+            [%log fatal]
+              "Required node $node is offline, but could not determine whether \
+               its ID changed"
+              ~metadata:[ ("node", `String node_name) ] ;
+            ( " node offline"
+            , Deferred.return (Error { hard_fail with exit_code = Some 20 }) )
+        | _ ->
+            [%log fatal] "%s" (Exn.to_string_mach exn) ;
+            ("exception thrown", Malleable_error.hard_error (Error.of_exn exn))
+        )
   in
   let%bind () = f_dispatch_cleanup ~exit_reason ~test_result in
   exit 0
