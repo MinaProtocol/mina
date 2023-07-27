@@ -597,8 +597,25 @@ let ci_http_request' ~access_token ~request_body =
 module Request_unit_tests = struct
   let ( = ) = String.equal
 
-  let%test_unit "Create network request" = assert true
-  (* TODO: too complicated for now *)
+  let%test_unit "Create network request" =
+    let constants : Test_config.constants =
+      { constraints = Genesis_constants.Constraint_constants.compiled
+      ; genesis = Genesis_constants.compiled
+      }
+    in
+    let network_config : Network_config.t' =
+      { mina_automation_location = "loc"
+      ; debug_arg = true
+      ; genesis_keypairs = Core.String.Map.empty
+      ; constants
+      }
+    in
+    let result =
+      Network_config.t'_to_yojson network_config |> Yojson.Safe.to_string
+    in
+    assert (
+      result
+      = {|{"mina_automation_location":"loc","debug_arg":true,"genesis_keypairs":{},"constants":{"constraints":{"sub_windows_per_window":11,"ledger_depth":35,"work_delay":2,"block_window_duration_ms":180000,"transaction_capacity_log_2":7,"pending_coinbase_depth":5,"coinbase_amount":"720000000000","supercharged_coinbase_factor":1,"account_creation_fee":"1","fork":null},"genesis":{"protocol":{"k":290,"slots_per_epoch":7140,"slots_per_sub_window":7,"delta":0,"genesis_state_timestamp":"2020-09-16 10:15:00.000000Z"},"txpool_max_size":3000,"num_accounts":null,"zkapp_proof_update_cost":10.26,"zkapp_signed_single_update_cost":9.140000000000001,"zkapp_signed_pair_update_cost":10.08,"zkapp_transaction_cost_limit":69.45,"max_event_elements":100,"max_action_elements":100}}}|} )
 
   let%test_unit "Deploy network request" =
     let open Request.Platform_specific in
