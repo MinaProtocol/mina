@@ -90,6 +90,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     List.iter ~f:(Wait_condition.require_online online_monitor) empty_bps ;
     (* The receiver needs to be online to synchronize to. *)
     Wait_condition.require_online online_monitor receiver ;
+    (* We need snark work for this test. *)
+    Core_kernel.Map.iter
+      ~f:(Wait_condition.require_online online_monitor)
+      (Network.snark_coordinators network) ;
 
     let rec map_remove_keys map ~(keys : string list) =
       match keys with
