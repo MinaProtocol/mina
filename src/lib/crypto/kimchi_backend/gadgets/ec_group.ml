@@ -3411,7 +3411,7 @@ let%test_unit "Ec_group.scalar_mul" =
     in
     ()
 
-let%test_unit "Ec_group.scalar_mul_properties" =
+let%test_unit "Ec_group.scalar_mul_properties_addition" =
   if scalar_mul_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -3420,13 +3420,11 @@ let%test_unit "Ec_group.scalar_mul_properties" =
     in
 
     (* Test elliptic curve scalar multiplication properties *)
-    let test_scalar_mul_properties ?cs (curve : Curve_params.t)
+    let test_scalar_mul_properties_addition ?cs (curve : Curve_params.t)
         (a_scalar : Bignum_bigint.t) (b_scalar : Bignum_bigint.t)
         (point : Affine.bignum_point) (a_expected_result : Affine.bignum_point)
         (b_expected_result : Affine.bignum_point)
-        (a_plus_b_expected : Affine.bignum_point)
-        (a_times_b_expected : Affine.bignum_point)
-        (negation_expected : Affine.bignum_point) =
+        (a_plus_b_expected : Affine.bignum_point) =
       (* Generate and verify proof *)
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
@@ -3469,16 +3467,6 @@ let%test_unit "Ec_group.scalar_mul_properties" =
               Affine.of_bignum_bigint_coordinates
                 (module Runner.Impl)
                 a_plus_b_expected
-            in
-            let a_times_b_expected =
-              Affine.of_bignum_bigint_coordinates
-                (module Runner.Impl)
-                a_times_b_expected
-            in
-            let negation_expected =
-              Affine.of_bignum_bigint_coordinates
-                (module Runner.Impl)
-                negation_expected
             in
 
             (* Create external checks context for tracking extra constraints
@@ -3532,6 +3520,165 @@ let%test_unit "Ec_group.scalar_mul_properties" =
               (module Runner.Impl)
               a_result_plus_b_result a_plus_b_result ;
 
+            () )
+      in
+
+      cs
+    in
+
+    (*
+     * EC scalar multiplication properties tests
+     *)
+
+    (* Tests with generator *)
+    let a_scalar =
+      Bignum_bigint.of_string
+        "79401928295407367700174300280555320402843131478792245979539416476579739380993"
+    in
+    (* aG *)
+    let a_expected =
+      ( Bignum_bigint.of_string
+          "17125835931983334217694156357722716412757965999176597307946554943053675538785"
+      , Bignum_bigint.of_string
+          "46388026915780724534166509048612278793220290073988306084942872130687658791661"
+      )
+    in
+    let b_scalar =
+      Bignum_bigint.of_string
+        "89091288558408807474211262098870527285408764120538440460973310880924228023627"
+    in
+    (* bG *)
+    let b_expected =
+      ( Bignum_bigint.of_string
+          "79327061200655101960260174492040176163202074463842535225851740487556039447898"
+      , Bignum_bigint.of_string
+          "17719907321698144940791372349744661269763063699265755816142522447977929876765"
+      )
+    in
+    (* (a + b)G *)
+    let a_plus_b_expected =
+      ( Bignum_bigint.of_string
+          "81040990384669475923010997008987195868838198748766130146528604954229008315134"
+      , Bignum_bigint.of_string
+          "34561268318835956667566052477444512933985042899902969559255322703897774718063"
+      )
+    in
+
+    assert (is_on_curve_bignum_point Secp256k1.params a_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params b_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params a_plus_b_expected) ;
+
+    let _cs =
+      test_scalar_mul_properties_addition Secp256k1.params a_scalar b_scalar
+        Secp256k1.params.gen a_expected b_expected a_plus_b_expected
+    in
+
+    (* Tests with another curve point *)
+    let point =
+      ( Bignum_bigint.of_string
+          "33774054739397672981116348681092907963399779523481500939771509974082662984990"
+      , Bignum_bigint.of_string
+          "60414776605185041994402340927179985824709402511452021592188768672640080416757"
+      )
+    in
+    let a_scalar =
+      Bignum_bigint.of_string
+        "101698197574283114939368343806106834988902354006673798485060078476846328099457"
+    in
+    (* aP *)
+    let a_expected =
+      ( Bignum_bigint.of_string
+          "75195284589272297831705973079897644085806639251981864022525558637369799002975"
+      , Bignum_bigint.of_string
+          "21318219854954928210493202207122232794689530644716510309784081397689563830643"
+      )
+    in
+    let b_scalar =
+      Bignum_bigint.of_string
+        "29906750163917842454712060592346612426879165698013462577595179415632189050569"
+    in
+    (* bP *)
+    let b_expected =
+      ( Bignum_bigint.of_string
+          "31338730031552911193929716320599408654845663804319033450328019997834721773857"
+      , Bignum_bigint.of_string
+          "19509931248131549366806268091016515808560677012657535095393179462073374184004"
+      )
+    in
+    (* (a + b)P *)
+    let a_plus_b_expected =
+      ( Bignum_bigint.of_string
+          "3785015531479612950834562670482118046158085046729801327010146109899305257240"
+      , Bignum_bigint.of_string
+          "67252551234352942899384104854542424500400416990163373189382133933498016564076"
+      )
+    in
+
+    assert (is_on_curve_bignum_point Secp256k1.params point) ;
+    assert (is_on_curve_bignum_point Secp256k1.params a_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params b_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params a_plus_b_expected) ;
+
+    let _cs =
+      test_scalar_mul_properties_addition Secp256k1.params a_scalar b_scalar
+        point a_expected b_expected a_plus_b_expected
+    in
+    () )
+
+let%test_unit "Ec_group.scalar_mul_properties_multiplication" =
+  if scalar_mul_tests_enabled then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test elliptic curve scalar multiplication properties *)
+    let test_scalar_mul_properties_multiplication ?cs (curve : Curve_params.t)
+        (a_scalar : Bignum_bigint.t) (b_scalar : Bignum_bigint.t)
+        (point : Affine.bignum_point) (a_point : Affine.bignum_point)
+        (b_point : Affine.bignum_point)
+        (a_times_b_expected : Affine.bignum_point) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            (* Prepare test public inputs *)
+            let curve =
+              Curve_params.to_circuit_constants (module Runner.Impl) curve
+            in
+            let a_scalar_bits =
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true a_scalar
+            in
+            let b_scalar_bits =
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true b_scalar
+            in
+            let point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
+            in
+            let a_point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) a_point
+            in
+            let b_point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) b_point
+            in
+            let a_times_b_expected =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                a_times_b_expected
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* Skipping computation of aP and bP because it's too big for circuit without chunking enabled *)
+
             (*
              * Check distributive property with multiplying scalars: [a]bP = [b]aP = [a*b]P
              *)
@@ -3540,14 +3687,14 @@ let%test_unit "Ec_group.scalar_mul_properties" =
             let a_b_result =
               scalar_mul
                 (module Runner.Impl)
-                unused_external_checks curve a_scalar_bits b_result
+                unused_external_checks curve a_scalar_bits b_point
             in
 
             (* [b]aP *)
             let b_a_result =
               scalar_mul
                 (module Runner.Impl)
-                unused_external_checks curve b_scalar_bits a_result
+                unused_external_checks curve b_scalar_bits a_point
             in
 
             (* Compute a*b as foreign field multiplication in scalar field *)
@@ -3575,6 +3722,165 @@ let%test_unit "Ec_group.scalar_mul_properties" =
             Affine.assert_equal
               (module Runner.Impl)
               ab_result a_times_b_expected ;
+            () )
+      in
+
+      cs
+    in
+
+    (*
+     * EC scalar multiplication properties tests
+     *)
+
+    (* Tests with generator *)
+    let a_scalar =
+      Bignum_bigint.of_string
+        "79401928295407367700174300280555320402843131478792245979539416476579739380993"
+    in
+    (* aG *)
+    let a_expected =
+      ( Bignum_bigint.of_string
+          "17125835931983334217694156357722716412757965999176597307946554943053675538785"
+      , Bignum_bigint.of_string
+          "46388026915780724534166509048612278793220290073988306084942872130687658791661"
+      )
+    in
+    let b_scalar =
+      Bignum_bigint.of_string
+        "89091288558408807474211262098870527285408764120538440460973310880924228023627"
+    in
+    (* bG *)
+    let b_expected =
+      ( Bignum_bigint.of_string
+          "79327061200655101960260174492040176163202074463842535225851740487556039447898"
+      , Bignum_bigint.of_string
+          "17719907321698144940791372349744661269763063699265755816142522447977929876765"
+      )
+    in
+    (* (a * b)G *)
+    let a_times_b_expected =
+      ( Bignum_bigint.of_string
+          "81456477659851325370442471400511783773782655276230587738882014172211964156628"
+      , Bignum_bigint.of_string
+          "95026373302104994624825470484745116441888023752189438912144935562310761663097"
+      )
+    in
+
+    assert (is_on_curve_bignum_point Secp256k1.params a_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params b_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params a_times_b_expected) ;
+
+    let _cs =
+      test_scalar_mul_properties_multiplication Secp256k1.params a_scalar
+        b_scalar Secp256k1.params.gen a_expected b_expected a_times_b_expected
+    in
+
+    (* Tests with another curve point *)
+    let point =
+      ( Bignum_bigint.of_string
+          "33774054739397672981116348681092907963399779523481500939771509974082662984990"
+      , Bignum_bigint.of_string
+          "60414776605185041994402340927179985824709402511452021592188768672640080416757"
+      )
+    in
+    let a_scalar =
+      Bignum_bigint.of_string
+        "101698197574283114939368343806106834988902354006673798485060078476846328099457"
+    in
+    (* aP *)
+    let a_expected =
+      ( Bignum_bigint.of_string
+          "75195284589272297831705973079897644085806639251981864022525558637369799002975"
+      , Bignum_bigint.of_string
+          "21318219854954928210493202207122232794689530644716510309784081397689563830643"
+      )
+    in
+    let b_scalar =
+      Bignum_bigint.of_string
+        "29906750163917842454712060592346612426879165698013462577595179415632189050569"
+    in
+    (* bP *)
+    let b_expected =
+      ( Bignum_bigint.of_string
+          "31338730031552911193929716320599408654845663804319033450328019997834721773857"
+      , Bignum_bigint.of_string
+          "19509931248131549366806268091016515808560677012657535095393179462073374184004"
+      )
+    in
+    (* (a * b)P *)
+    let a_times_b_expected =
+      ( Bignum_bigint.of_string
+          "104796198157638974641325627725056289938393733264860209068332598339943619687138"
+      , Bignum_bigint.of_string
+          "62474612839119693016992187953610680368302121786246432257338185158014628586401"
+      )
+    in
+
+    assert (is_on_curve_bignum_point Secp256k1.params point) ;
+    assert (is_on_curve_bignum_point Secp256k1.params a_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params b_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params a_times_b_expected) ;
+
+    let _cs =
+      test_scalar_mul_properties_multiplication Secp256k1.params a_scalar
+        b_scalar point a_expected b_expected a_times_b_expected
+    in
+    () )
+
+let%test_unit "Ec_group.scalar_mul_properties_negation" =
+  if scalar_mul_tests_enabled then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test elliptic curve scalar multiplication properties *)
+    let test_scalar_mul_properties_negation ?cs (curve : Curve_params.t)
+        (a_scalar : Bignum_bigint.t) (point : Affine.bignum_point)
+        (a_expected_result : Affine.bignum_point)
+        (negation_expected : Affine.bignum_point) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            (* Prepare test public inputs *)
+            let curve =
+              Curve_params.to_circuit_constants (module Runner.Impl) curve
+            in
+            let a_scalar_bits =
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true a_scalar
+            in
+            let point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
+            in
+            let a_expected_result =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                a_expected_result
+            in
+            let negation_expected =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                negation_expected
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* A = aP *)
+            let a_result =
+              scalar_mul
+                (module Runner.Impl)
+                unused_external_checks curve a_scalar_bits point
+            in
+
+            (* Assert aP = expected A *)
+            Affine.assert_equal (module Runner.Impl) a_result a_expected_result ;
 
             (*
              * Check scaling computes with negation: [-a]P = -(aP)
@@ -3621,6 +3927,8 @@ let%test_unit "Ec_group.scalar_mul_properties" =
       cs
     in
 
+    printf "\n scalar mul properties 3\n" ;
+
     (*
      * EC scalar multiplication properties tests
      *)
@@ -3638,34 +3946,6 @@ let%test_unit "Ec_group.scalar_mul_properties" =
           "46388026915780724534166509048612278793220290073988306084942872130687658791661"
       )
     in
-    let b_scalar =
-      Bignum_bigint.of_string
-        "89091288558408807474211262098870527285408764120538440460973310880924228023627"
-    in
-    (* bG *)
-    let b_expected =
-      ( Bignum_bigint.of_string
-          "79327061200655101960260174492040176163202074463842535225851740487556039447898"
-      , Bignum_bigint.of_string
-          "17719907321698144940791372349744661269763063699265755816142522447977929876765"
-      )
-    in
-    (* (a + b)G *)
-    let a_plus_b_expected =
-      ( Bignum_bigint.of_string
-          "81040990384669475923010997008987195868838198748766130146528604954229008315134"
-      , Bignum_bigint.of_string
-          "34561268318835956667566052477444512933985042899902969559255322703897774718063"
-      )
-    in
-    (* (a * b)G *)
-    let a_times_b_expected =
-      ( Bignum_bigint.of_string
-          "81456477659851325370442471400511783773782655276230587738882014172211964156628"
-      , Bignum_bigint.of_string
-          "95026373302104994624825470484745116441888023752189438912144935562310761663097"
-      )
-    in
     (* [-a]G *)
     let negation_expected =
       ( Bignum_bigint.of_string
@@ -3676,15 +3956,11 @@ let%test_unit "Ec_group.scalar_mul_properties" =
     in
 
     assert (is_on_curve_bignum_point Secp256k1.params a_expected) ;
-    assert (is_on_curve_bignum_point Secp256k1.params b_expected) ;
-    assert (is_on_curve_bignum_point Secp256k1.params a_plus_b_expected) ;
-    assert (is_on_curve_bignum_point Secp256k1.params a_times_b_expected) ;
     assert (is_on_curve_bignum_point Secp256k1.params negation_expected) ;
 
     let _cs =
-      test_scalar_mul_properties Secp256k1.params a_scalar b_scalar
-        Secp256k1.params.gen a_expected b_expected a_plus_b_expected
-        a_times_b_expected negation_expected
+      test_scalar_mul_properties_negation Secp256k1.params a_scalar
+        Secp256k1.params.gen a_expected negation_expected
     in
 
     (* Tests with another curve point *)
@@ -3707,34 +3983,6 @@ let%test_unit "Ec_group.scalar_mul_properties" =
           "21318219854954928210493202207122232794689530644716510309784081397689563830643"
       )
     in
-    let b_scalar =
-      Bignum_bigint.of_string
-        "29906750163917842454712060592346612426879165698013462577595179415632189050569"
-    in
-    (* bP *)
-    let b_expected =
-      ( Bignum_bigint.of_string
-          "31338730031552911193929716320599408654845663804319033450328019997834721773857"
-      , Bignum_bigint.of_string
-          "19509931248131549366806268091016515808560677012657535095393179462073374184004"
-      )
-    in
-    (* (a + b)P *)
-    let a_plus_b_expected =
-      ( Bignum_bigint.of_string
-          "3785015531479612950834562670482118046158085046729801327010146109899305257240"
-      , Bignum_bigint.of_string
-          "67252551234352942899384104854542424500400416990163373189382133933498016564076"
-      )
-    in
-    (* (a * b)P *)
-    let a_times_b_expected =
-      ( Bignum_bigint.of_string
-          "104796198157638974641325627725056289938393733264860209068332598339943619687138"
-      , Bignum_bigint.of_string
-          "62474612839119693016992187953610680368302121786246432257338185158014628586401"
-      )
-    in
     (* [-a]P *)
     let negation_expected =
       ( Bignum_bigint.of_string
@@ -3746,15 +3994,11 @@ let%test_unit "Ec_group.scalar_mul_properties" =
 
     assert (is_on_curve_bignum_point Secp256k1.params point) ;
     assert (is_on_curve_bignum_point Secp256k1.params a_expected) ;
-    assert (is_on_curve_bignum_point Secp256k1.params b_expected) ;
-    assert (is_on_curve_bignum_point Secp256k1.params a_plus_b_expected) ;
-    assert (is_on_curve_bignum_point Secp256k1.params a_times_b_expected) ;
     assert (is_on_curve_bignum_point Secp256k1.params negation_expected) ;
 
     let _cs =
-      test_scalar_mul_properties Secp256k1.params a_scalar b_scalar point
-        a_expected b_expected a_plus_b_expected a_times_b_expected
-        negation_expected
+      test_scalar_mul_properties_negation Secp256k1.params a_scalar point
+        a_expected negation_expected
     in
     () )
 
