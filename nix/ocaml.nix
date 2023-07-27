@@ -29,10 +29,12 @@ let
     dune-rpc = dune;
     dyn = dune;
     fiber = dune;
-    ocaml-lsp-server = "1.11.6";
+    chrome-trace = dune;
+    ocaml-lsp-server = "1.15.1-4.14";
+    ocamlc-loc = dune;
     ocaml-system = ocaml;
     ocamlformat-rpc-lib = "0.22.4";
-    omd = "1.3.1";
+    omd = "1.3.2";
     ordering = dune;
     pp = "1.1.2";
     ppx_yojson_conv_lib = "v0.15.0";
