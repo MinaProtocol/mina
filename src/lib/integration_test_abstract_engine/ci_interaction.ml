@@ -59,12 +59,10 @@ module Network_config = struct
     }
   [@@deriving to_yojson]
 
+  (* TODO: replace with t' *)
   type t =
     { mina_automation_location : string
     ; debug_arg : bool
-    ; check_capacity : bool
-    ; check_capacity_delay : int
-    ; check_capacity_retries : int
     ; genesis_keypairs :
         (Network_keypair.t Core.String.Map.t
         [@to_yojson
@@ -76,6 +74,23 @@ module Network_config = struct
                  map )] )
     ; constants : Test_config.constants
     ; terraform : terraform_config
+    }
+  [@@deriving to_yojson]
+
+  (* TODO: remove *)
+  type t' =
+    { mina_automation_location : string
+    ; debug_arg : bool
+    ; genesis_keypairs :
+        (Network_keypair.t Core.String.Map.t
+        [@to_yojson
+          fun map ->
+            `Assoc
+              (Core.Map.fold_right ~init:[]
+                 ~f:(fun ~key:k ~data:v accum ->
+                   (k, Network_keypair.to_yojson v) :: accum )
+                 map )] )
+    ; constants : Test_config.constants
     }
   [@@deriving to_yojson]
 
@@ -322,9 +337,6 @@ module Network_config = struct
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
-    ; check_capacity = cli_inputs.check_capacity
-    ; check_capacity_delay = cli_inputs.check_capacity_delay
-    ; check_capacity_retries = cli_inputs.check_capacity_retries
     ; genesis_keypairs
     ; constants
     ; terraform =
@@ -403,7 +415,7 @@ end
 module Request = struct
   module Platform_specific = struct
     type t =
-      | Create_network of Network_config.t
+      | Create_network of Network_config.t'
       | Deploy_network of Network_id.t
       | Destroy_network of Network_id.t
     [@@deriving to_yojson]
@@ -423,6 +435,10 @@ module Request = struct
       | Dump_precomputed_blocks of Node_id.t
       | Run_replayer of Node_id.t
     [@@deriving to_yojson]
+  end
+
+  module type S = sig
+    type t [@@deriving to_yojson]
   end
 end
 
@@ -475,6 +491,7 @@ module Response = struct
     [@@deriving eq, of_yojson]
   end
 
+  (** Logproc takes care of these logs so we bypass them here *)
   module Node_logs = struct
     type t = string [@@deriving eq]
 
@@ -498,6 +515,10 @@ module Response = struct
       | Replayer_run of Node_id.t * string
     [@@deriving eq, of_yojson]
   end
+
+  module type S = sig
+    type t [@@deriving of_yojson]
+  end
 end
 
 (**
@@ -505,28 +526,73 @@ end
   https://www.notion.so/minafoundation/Lucy-CI-Interactions-e36b48ac52994cafbe1367548e02241d?pvs=4
   *)
 
+module Ci = struct
+  type t = { host : string; port : int } [@@deriving of_yojson]
+
+  let ci : t Async.Ivar.t = Async.Ivar.create ()
+
+  let uri () =
+    let ci = Async.Ivar.value_exn ci in
+    Uri.make ~scheme:"http" ~host:ci.host ~port:ci.port ()
+end
+
 let request_ci_access_token () :
     Response.Platform_agnostic.t Deferred.Or_error.t =
   failwith "request_ci_access_token"
 
-(* for example, we can communicate with the CI via https and test-specific access token *)
-let[@warning "-27"] send_ci_http_request ~(access_token : Access_token.t)
-    ~(request_body : Request.Platform_specific.t) :
-    Response.Platform_specific.t Deferred.Or_error.t =
-  let req_str =
-    request_body |> Request.Platform_specific.to_yojson |> Yojson.Safe.to_string
+let post ~(access_token : Access_token.t) ~request_body =
+  let headers =
+    let open Cohttp in
+    Header.add_list (Header.init ())
+      [ ("Authorization", access_token)
+      ; ("Accept", "application/json")
+      ; ("Content-Type", "application/json")
+      ]
   in
-  (* TODO: http request *)
-  failwithf "send_ci_http_request: %s\n" req_str ()
+  Deferred.Or_error.try_with ~here:[%here] ~extract_exn:true (fun () ->
+      Cohttp_async.Client.post ~headers
+        ~body:(Cohttp_async.Body.of_string request_body)
+        (Ci.uri ()) )
 
-let[@warning "-27"] send_ci_http_request' ~(access_token : Access_token.t)
-    ~(request_body : Request.Platform_agnostic.t) :
-    Response.Platform_agnostic.t Deferred.Or_error.t =
-  let req_str =
-    request_body |> Request.Platform_agnostic.to_yojson |> Yojson.Safe.to_string
+let to_json ~response ~body_str =
+  match Cohttp.Code.code_of_status (Cohttp_async.Response.status response) with
+  | 200 ->
+      Deferred.return (Ok (Yojson.Safe.from_string body_str))
+  | code ->
+      Deferred.return
+        (Error (Error.createf "Status code %d -- %s" code body_str))
+
+let http (type a b) (module Req : Request.S with type t = a)
+    (module Res : Response.S with type t = b) ~access_token ~(request_body : a)
+    =
+  let request_body = Req.to_yojson request_body |> Yojson.Safe.to_string in
+  let open Deferred.Or_error.Let_syntax in
+  let%bind response, body = post ~access_token ~request_body in
+  let%bind body_str =
+    Cohttp_async.Body.to_string body |> Deferred.map ~f:Result.return
   in
-  (* TODO: http request *)
-  failwithf "send_ci_http_request: %s\n" req_str ()
+  let%bind body_json = to_json ~response ~body_str in
+  let open Yojson.Safe.Util in
+  ( match (member "errors" body_json, member "data" body_json) with
+  | `Null, `Null ->
+      Error (Error.of_string "Empty response from http query")
+  | error, `Null ->
+      Error (Error.of_string @@ to_string error)
+  | _, raw_json ->
+      Res.of_yojson raw_json |> Result.map_error ~f:Error.of_string )
+  |> Deferred.return
+
+let ci_http_request ~access_token ~request_body =
+  http
+    (module Request.Platform_specific)
+    (module Response.Platform_specific)
+    ~access_token ~request_body
+
+let ci_http_request' ~access_token ~request_body =
+  http
+    (module Request.Platform_agnostic)
+    (module Response.Platform_agnostic)
+    ~access_token ~request_body
 
 module Request_unit_tests = struct
   let ( = ) = String.equal

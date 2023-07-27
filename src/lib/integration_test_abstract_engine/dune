@@ -7,7 +7,7 @@
  (preprocess (pps
                ppx_mina ppx_version ppx_let ppx_pipebang ppx_inline_test
                ppx_custom_printf ppx_deriving_yojson lens.ppx_deriving
-               ppx_sexp_conv ppx_assert ppx_deriving.eq
+               ppx_sexp_conv ppx_assert ppx_deriving.eq ppx_here
                graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}))
 (libraries
    ;; opam libraries
@@ -15,6 +15,8 @@
    async_kernel
    core_kernel
    core
+   cohttp
+   cohttp-async
    async
    cmdliner
    base
