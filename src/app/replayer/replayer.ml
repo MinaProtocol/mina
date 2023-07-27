@@ -538,10 +538,10 @@ let try_slot ~logger pool slot =
       Core_kernel.exit 1 ) ;
     match%bind find_canonical_chain ~logger pool slot with
     | None ->
-        go ~slot:(slot - 1) ~tries_left:(tries_left - 1)
+        go ~slot:(Int64.pred slot) ~tries_left:(tries_left - 1)
     | Some state_hash ->
         [%log info]
-          "Found possible canonical chain to target state hash %s at slot %d"
+          "Found possible canonical chain to target state hash %s at slot %Ld"
           state_hash slot ;
         return state_hash
   in
@@ -633,7 +633,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             let%bind max_slot =
               query_db ~f:(fun db -> Sql.Block.get_max_slot db ())
             in
-            [%log info] "Maximum global slot since genesis in blocks is %d"
+            [%log info] "Maximum global slot since genesis in blocks is %Ldd"
               max_slot ;
             try_slot ~logger pool max_slot
       in
