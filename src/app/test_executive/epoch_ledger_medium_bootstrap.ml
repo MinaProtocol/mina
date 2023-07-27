@@ -46,25 +46,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let num_proofs = 2
 
-  let padding_payments () =
-    let needed_for_padding =
-      Test_config.transactions_needed_for_ledger_proofs config ~num_proofs
-    in
-    if !transactions_sent >= needed_for_padding then 0
-    else needed_for_padding - !transactions_sent
-
-  let send_padding_transactions ~fee ~logger ~n nodes =
-    let sender = List.nth_exn nodes 0 in
-    let receiver = List.nth_exn nodes 1 in
-    let open Malleable_error.Let_syntax in
-    let%bind sender_pub_key = pub_key_of_node sender in
-    let%bind receiver_pub_key = pub_key_of_node receiver in
-    repeat_seq ~n ~f:(fun () ->
-        Graphql_requests.must_send_online_payment ~logger
-          (Network.Node.get_ingress_uri sender)
-          ~sender_pub_key ~receiver_pub_key ~amount:Currency.Amount.one ~fee
-        >>| ignore )
-
   let run network t =
     let slot_ms =
       Option.value_exn config.proof_config.block_window_duration_ms
@@ -95,7 +76,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "send out padding transactions"
         (let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
          send_padding_transactions block_producer_nodes ~fee ~logger
-           ~n:(padding_payments ()) )
+           ~n:(padding_payments ~transactions_sent ~num_proofs ~config) )
     in
     let%bind () = section "stop the node" (Node.stop node_c) in
     let%bind () =
