@@ -206,7 +206,8 @@ struct
       then Predicate_passed
       else Predicate_continuation ()
     in
-    let soft_timeout_in_slots = 8 * 3 in
+    let soft_timeout_in_slots = 4 in
+    let hard_timeout_in_slots = 6 in
     let formatted_nodes =
       nodes
       |> List.map ~f:(fun node -> "\"" ^ Node.id node ^ "\"")
@@ -216,7 +217,7 @@ struct
     ; description = sprintf "%s to synchronize" formatted_nodes
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
-    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    ; hard_timeout = Slots hard_timeout_in_slots
     }
 
   let signed_command_to_be_included_in_frontier ~txn_hash
