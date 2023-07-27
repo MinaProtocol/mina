@@ -91,17 +91,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node_c =
       Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
-
-    (*let%bind () =
-        let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
-        send_padding_transactions block_producer_nodes ~fee ~logger
-          ~n:1000
-      in
-    *)
-    let%bind () =
-      section "blocks are produced"
-        (wait_for t (Wait_condition.blocks_to_be_produced 1))
-    in
     let%bind () =
       section "send out padding transactions"
         (let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
