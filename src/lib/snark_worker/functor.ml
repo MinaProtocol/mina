@@ -234,6 +234,10 @@ module Make (Inputs : Intf.Inputs_intf) :
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
     in
+    let constraint_digests =
+      Transaction_snark.constraint_system_digests ~constraint_constants ()
+      |> List.map ~f:(Tuple2.map_snd ~f:Md5_lib.to_binary)
+    in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     (* retry interval with jitter *)
     let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0) in
@@ -272,8 +276,8 @@ module Make (Inputs : Intf.Inputs_intf) :
         !"Snark worker using daemon $addr"
         ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
       match%bind
-        dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
-          daemon_address
+        dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect
+          constraint_digests daemon_address
       with
       | Error e ->
           log_and_retry "getting work" e (retry_pause 10.) go
@@ -319,7 +323,8 @@ module Make (Inputs : Intf.Inputs_intf) :
               emit_proof_metrics result.metrics
                 (Work.Result.transactions result)
                 logger ;
-              [%log info] "Submitted completed SNARK work $work_ids to $address"
+              [%log info]
+                "Submitting completed SNARK work $work_ids to $address"
                 ~metadata:
                   [ ("address", `String (Host_and_port.to_string daemon_address))
                   ; ( "work_ids"
