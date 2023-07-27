@@ -7,19 +7,6 @@ open Ci_interaction
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
 
-(* TODO: remove *)
-let mina_archive_container_id = "mina_archive_container_id"
-
-let mina_archive_username = "mina_archive_username"
-
-let mina_archive_pw = "mina_archive_pw"
-
-let postgres_url =
-  Printf.sprintf "postgres://%s:%s@archive-1-postgresql:5432/archive"
-    mina_archive_username mina_archive_pw
-
-let node_password = "naughty blue worm"
-
 type config =
   { testnet_name : string
   ; cluster : string
@@ -31,10 +18,6 @@ type config =
   ; current_commit_sha : string
   }
 
-(* TODO: remove *)
-let base_kube_args { cluster; namespace; _ } =
-  [ "--cluster"; cluster; "--namespace"; namespace ]
-
 module Node = struct
   (* TODO: remove app_id, add ingress_uri *)
   type t =
@@ -43,6 +26,7 @@ module Node = struct
     ; network_keypair : Network_keypair.t option
     ; config : config
     ; node_type : Node_type.t
+    ; password : string
     }
 
   let id { node_id; _ } = node_id
@@ -69,7 +53,7 @@ module Node = struct
         { node_id = id t; fresh_state; commit_sha }
     in
     let%bind () =
-      match%map send_ci_http_request' ~access_token ~request_body with
+      match%map ci_http_request' ~access_token ~request_body with
       | Ok (Response.Platform_agnostic.Node_started node_id)
         when String.equal node_id (id t) ->
           ()
@@ -82,7 +66,7 @@ module Node = struct
     let access_token = t.config.access_token in
     let request_body = Request.Platform_agnostic.Stop_node (id t) in
     let%bind () =
-      match%map send_ci_http_request' ~access_token ~request_body with
+      match%map ci_http_request' ~access_token ~request_body with
       | Ok (Response.Platform_agnostic.Node_stopped node_id)
         when String.equal node_id (id t) ->
           ()
@@ -718,7 +702,7 @@ module Node = struct
       let unlock_account_obj =
         Graphql.Unlock_account.(
           make
-          @@ makeVariables ~password:node_password ~public_key:sender_pub_key ())
+          @@ makeVariables ~password:t.password ~public_key:sender_pub_key ())
       in
       exec_graphql_request ~logger ~node:t ~initial_delay_sec:0.
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
@@ -853,8 +837,7 @@ module Node = struct
       let unlock_account_obj =
         Graphql.Unlock_account.(
           make
-          @@ makeVariables ~password:"naughty blue worm"
-               ~public_key:sender_pub_key ())
+          @@ makeVariables ~password:t.password ~public_key:sender_pub_key ())
       in
       exec_graphql_request ~logger ~node:t
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
@@ -1036,123 +1019,140 @@ module Node = struct
       Deferred.Or_error.error_string
         "Node is not currently capturing structured log messages"
 
-  (* TODO: check if node is an archive node *)
   let dump_archive_data ~logger (t : t) ~data_file =
-    let%bind data =
-      match%map
-        send_ci_http_request' ~access_token:t.config.access_token
-          ~request_body:(Request.Platform_agnostic.Dump_archive_data (id t))
-      with
-      | Ok (Response.Platform_agnostic.Archive_data_dump (node_id, logs))
-        when String.equal node_id (id t) ->
-          logs
-      | _ ->
-          failwith "invalid archive dump data response"
-    in
-    [%log info] "Dumping archive data to file %s" data_file ;
-    Malleable_error.return
-    @@ Out_channel.with_file data_file ~f:(fun out_ch ->
-           Out_channel.output_string out_ch data )
+    if Node_type.(equal t.node_type Archive_node) then
+      let access_token = t.config.access_token in
+      let request_body = Request.Platform_agnostic.Dump_archive_data (id t) in
+      try
+        let%bind data =
+          match%map ci_http_request' ~access_token ~request_body with
+          | Ok (Response.Platform_agnostic.Archive_data_dump (node_id, logs))
+            when String.equal node_id (id t) ->
+              logs
+          | _ ->
+              failwith "invalid archive dump data response"
+        in
+        [%log info] "Dumping archive data to file %s" data_file ;
+        Malleable_error.return
+        @@ Out_channel.with_file data_file ~f:(fun out_ch ->
+               Out_channel.output_string out_ch data )
+      with Failure err -> Malleable_error.hard_error_string err
+    else
+      Malleable_error.hard_error_string
+      @@ sprintf "Node %s of type %s cannot dump archive data" (id t)
+           (Node_type.to_string t.node_type)
 
   let run_replayer ~logger (t : t) =
     [%log info] "Running replayer on archived data node: %s" t.node_id ;
     let access_token = t.config.access_token in
     let request_body = Request.Platform_agnostic.Run_replayer (id t) in
-    let%bind output =
-      match%map send_ci_http_request' ~access_token ~request_body with
-      | Ok (Response.Platform_agnostic.Replayer_run (node_id, output))
-        when String.equal node_id (id t) ->
-          output
-      | _ ->
-          failwith "invalid run replayer response"
-    in
-    Malleable_error.return output
+    try
+      let%bind output =
+        match%map ci_http_request' ~access_token ~request_body with
+        | Ok (Response.Platform_agnostic.Replayer_run (node_id, output))
+          when String.equal node_id (id t) ->
+            output
+        | _ ->
+            failwith "invalid run replayer response"
+      in
+      Malleable_error.return output
+    with Failure err -> Malleable_error.hard_error_string err
 
-  (* TODO: convert *)
   let dump_mina_logs ~logger (t : t) ~log_file =
-    let open Malleable_error.Let_syntax in
     [%log info] "Dumping logs from node: %s" t.node_id ;
-    let%map logs = get_logs_in_container t in
-    [%log info] "Dumping container log to file %s" log_file ;
-    Out_channel.with_file log_file ~f:(fun out_ch ->
-        Out_channel.output_string out_ch logs )
+    let access_token = t.config.access_token in
+    let request_body = Request.Platform_agnostic.Dump_mina_logs (id t) in
+    try
+      let%bind logs =
+        match%map ci_http_request' ~access_token ~request_body with
+        | Ok (Response.Platform_agnostic.Mina_logs_dump (node_id, logs))
+          when String.equal node_id (id t) ->
+            logs
+        | _ ->
+            failwith "invalid dump mina logs response"
+      in
+      [%log info] "Dumping logs to file %s" log_file ;
+      Malleable_error.return
+      @@ Out_channel.with_file log_file ~f:(fun out_ch ->
+             Out_channel.output_string out_ch logs )
+    with Failure err -> Malleable_error.hard_error_string err
 
-  (* TODO: convert *)
   let dump_precomputed_blocks ~logger (t : t) =
-    let open Malleable_error.Let_syntax in
     [%log info] "Dumping precomputed blocks from logs for node: %s" t.node_id ;
-    let%bind logs = get_logs_in_container t in
-    (* kubectl logs may include non-log output, like "Using password from environment variable" *)
-    let log_lines =
-      String.split logs ~on:'\n'
-      |> List.filter ~f:(String.is_prefix ~prefix:"{\"timestamp\":")
+    let access_token = t.config.access_token in
+    let request_body =
+      Request.Platform_agnostic.Dump_precomputed_blocks (id t)
     in
-    let jsons = List.map log_lines ~f:Yojson.Safe.from_string in
-    let metadata_jsons =
-      List.map jsons ~f:(fun json ->
-          match json with
-          | `Assoc items -> (
-              match List.Assoc.find items ~equal:String.equal "metadata" with
-              | Some md ->
-                  md
-              | None ->
-                  failwithf "Log line is missing metadata: %s"
-                    (Yojson.Safe.to_string json)
-                    () )
-          | other ->
-              failwithf "Expected log line to be a JSON record, got: %s"
-                (Yojson.Safe.to_string other)
-                () )
-    in
-    let state_hash_and_blocks =
-      List.fold metadata_jsons ~init:[] ~f:(fun acc json ->
-          match json with
-          | `Assoc items -> (
-              match
-                List.Assoc.find items ~equal:String.equal "precomputed_block"
-              with
-              | Some block -> (
-                  match
-                    List.Assoc.find items ~equal:String.equal "state_hash"
-                  with
-                  | Some state_hash ->
-                      (state_hash, block) :: acc
-                  | None ->
-                      failwith
-                        "Log metadata contains a precomputed block, but no \
-                         state hash" )
-              | None ->
-                  acc )
-          | other ->
-              failwithf "Expected log line to be a JSON record, got: %s"
-                (Yojson.Safe.to_string other)
-                () )
-    in
-    let%bind.Deferred () =
-      Deferred.List.iter state_hash_and_blocks
-        ~f:(fun (state_hash_json, block_json) ->
-          let double_quoted_state_hash =
-            Yojson.Safe.to_string state_hash_json
-          in
-          let state_hash =
-            String.sub double_quoted_state_hash ~pos:1
-              ~len:(String.length double_quoted_state_hash - 2)
-          in
-          let block = Yojson.Safe.pretty_to_string block_json in
-          let filename = state_hash ^ ".json" in
-          match%map.Deferred Sys.file_exists filename with
-          | `Yes ->
-              [%log info]
-                "File already exists for precomputed block with state hash %s"
-                state_hash
-          | _ ->
-              [%log info]
-                "Dumping precomputed block with state hash %s to file %s"
-                state_hash filename ;
-              Out_channel.with_file filename ~f:(fun out_ch ->
-                  Out_channel.output_string out_ch block ) )
-    in
-    Malleable_error.return ()
+    try
+      let%bind logs =
+        match%map ci_http_request' ~access_token ~request_body with
+        | Ok
+            (Response.Platform_agnostic.Precomputed_block_dump (node_id, blocks))
+          when String.equal node_id (id t) ->
+            blocks
+        | _ ->
+            failwith "invalid dump precomputed blocks response"
+      in
+      let log_lines =
+        String.split logs ~on:'\n'
+        |> List.filter ~f:(String.is_prefix ~prefix:"{\"timestamp\":")
+      in
+      let jsons = List.map log_lines ~f:Yojson.Safe.from_string in
+      let metadata_jsons =
+        List.map jsons ~f:(fun json ->
+            match Yojson.Safe.Util.member "metadata" json with
+            | `Null ->
+                failwithf "Log line is missing metadata: %s"
+                  (Yojson.Safe.to_string json)
+                  ()
+            | md ->
+                md )
+      in
+      let state_hash_and_blocks =
+        List.fold metadata_jsons ~init:[] ~f:(fun acc json ->
+            match Yojson.Safe.Util.member "precomputed_block" json with
+            | `Null ->
+                acc
+            | `Assoc _ as block -> (
+                match Yojson.Safe.Util.member "state_hash" json with
+                | `String _ as state_hash ->
+                    (state_hash, block) :: acc
+                | _ ->
+                    failwith
+                      "Log metadata contains a precomputed block, but no state \
+                       hash" )
+            | other ->
+                failwithf "Expected log line to be a JSON record, got: %s"
+                  (Yojson.Safe.to_string other)
+                  () )
+      in
+      let open Deferred.Let_syntax in
+      let%bind () =
+        Deferred.List.iter state_hash_and_blocks
+          ~f:(fun (state_hash_json, block_json) ->
+            let double_quoted_state_hash =
+              Yojson.Safe.to_string state_hash_json
+            in
+            let state_hash =
+              String.sub double_quoted_state_hash ~pos:1
+                ~len:(String.length double_quoted_state_hash - 2)
+            in
+            let block = Yojson.Safe.pretty_to_string block_json in
+            let filename = state_hash ^ ".json" in
+            match%map Sys.file_exists filename with
+            | `Yes ->
+                [%log info]
+                  "File already exists for precomputed block with state hash %s"
+                  state_hash
+            | _ ->
+                [%log info]
+                  "Dumping precomputed block with state hash %s to file %s"
+                  state_hash filename ;
+                Out_channel.with_file filename ~f:(fun out_ch ->
+                    Out_channel.output_string out_ch block ) )
+      in
+      Malleable_error.return ()
+    with Failure err -> Malleable_error.hard_error_string err
 
   let get_metrics ~logger t =
     let open Deferred.Or_error.Let_syntax in
@@ -1191,15 +1191,19 @@ module Node = struct
         }
 end
 
+(* TODO: remove *)
 module Workload_to_deploy = struct
   type t = { workload_id : string; pod_info : string }
+
+  (* TODO: remove *)
+  let base_kube_args { cluster; namespace; _ } =
+    [ "--cluster"; cluster; "--namespace"; namespace ]
 
   let construct_workload workload_id pod_info : t = { workload_id; pod_info }
 
   let[@warning "-27"] cons_pod_info ?network_keypair
       ?(has_archive_container = false) primary_container_id =
     ""
-  (* { network_keypair; has_archive_container; primary_container_id } *)
 
   let get_nodes_from_workload t ~config =
     let%bind cwd = Unix.getcwd () in
@@ -1227,19 +1231,24 @@ module Workload_to_deploy = struct
       |> String.concat ~sep:"TODO:"
     in
     let node_type = Node_type.Seed_node in
+    (* TODO: get from ci runner *)
     let network_keypair = None in
-    { Node.app_id; node_id; node_type; config; network_keypair }
+    (* TODO: get from ci runner *)
+    let password = "password" in
+    (* TODO: get from ci runner *)
+    { Node.app_id; node_id; node_type; config; network_keypair; password }
 end
 
 type t =
   { constants : Test_config.constants
+  ; testnet_log_filter : string
+  ; genesis_keypairs : Network_keypair.t Core.String.Map.t
+        (* below values are given by CI *)
   ; seeds : Node.t Core.String.Map.t
   ; block_producers : Node.t Core.String.Map.t
   ; snark_coordinators : Node.t Core.String.Map.t
   ; snark_workers : Node.t Core.String.Map.t
   ; archive_nodes : Node.t Core.String.Map.t
-  ; testnet_log_filter : string
-  ; genesis_keypairs : Network_keypair.t Core.String.Map.t
   ; network_id : Network_id.t
   }
 
@@ -1271,8 +1280,7 @@ let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
     ]
   |> Core.String.Map.of_alist_exn
 
-(* all_pods returns everything in the network.  remember that snark_workers will never initialize and will never sync, and aren't supposed to *)
-(* TODO: snark workers and snark coordinators have the same key name, but different workload ids*)
+(* TODO: this info is returned from CI *)
 let all_pods t =
   List.concat
     [ Core.String.Map.to_alist t.seeds
@@ -1299,7 +1307,7 @@ let all_node_id t =
   let pods = all_pods t |> Core.Map.to_alist in
   List.fold pods ~init:[] ~f:(fun acc (_, node) -> List.cons node.node_id acc)
 
-(* TODO: what to do with this? *)
+(* TODO: remove *)
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in

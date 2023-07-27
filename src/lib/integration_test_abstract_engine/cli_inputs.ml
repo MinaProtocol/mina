@@ -17,4 +17,5 @@ let term =
           [ "mina-automation-location" ]
           ~env ~docv:"MINA_AUTOMATION_LOCATION" ~doc)
   in
-  mina_automation_location
+  let lift mina_automation_location = { mina_automation_location } in
+  Term.(const lift $ mina_automation_location)

@@ -15,8 +15,6 @@ type metrics_t =
 type best_chain_block =
   { state_hash : string; command_transaction_count : int; creator_pk : string }
 
-(* TODO: malleable error -> or error *)
-
 module Engine = struct
   module type Network_config_intf = sig
     module Cli_inputs : sig
@@ -45,7 +43,8 @@ module Engine = struct
 
       val network_keypair : t -> Network_keypair.t option
 
-      val start : ?commit_sha:string -> fresh_state:bool -> t -> unit Malleable_error.t
+      val start :
+        ?commit_sha:string -> fresh_state:bool -> t -> unit Malleable_error.t
 
       val stop : t -> unit Malleable_error.t
 
