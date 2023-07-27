@@ -27,16 +27,11 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val current_chain : Mina_block.Precomputed.t list
 end
 
-let context (logger : Logger.t) (current_chain : Mina_block.Precomputed.t list)
-    : (module CONTEXT) =
+let context (logger : Logger.t) : (module CONTEXT) =
   ( module struct
     let logger = logger
-
-    let current_chain = current_chain
 
     let proof_level = Genesis_constants.Proof_level.None
 
@@ -47,6 +42,8 @@ let context (logger : Logger.t) (current_chain : Mina_block.Precomputed.t list)
 
     let constraint_constants = precomputed_values.constraint_constants
   end )
+
+let current_chain : Mina_block.Precomputed.t list ref = ref []
 
 let read_directory dir_name =
   let extract_height_from_filename fname =
@@ -99,47 +96,51 @@ let print_block_info block =
 let run_select ~context:(module Context : CONTEXT)
     (existing_block : Mina_block.Precomputed.t)
     (candidate_block : Mina_block.Precomputed.t) =
-  let open Context in
-  let existing_protocol_state_hashes =
-    Mina_state.Protocol_state.hashes existing_block.protocol_state
-  in
   let existing_consensus_state_with_hashes =
-    { With_hash.hash = existing_protocol_state_hashes
+    { With_hash.hash =
+        Mina_state.Protocol_state.hashes existing_block.protocol_state
     ; data =
         Mina_state.Protocol_state.consensus_state existing_block.protocol_state
     }
   in
-  let candidate_protocol_state_hashes =
-    Mina_state.Protocol_state.hashes candidate_block.protocol_state
-  in
   let candidate_consensus_state_with_hashes =
-    { With_hash.hash = candidate_protocol_state_hashes
+    { With_hash.hash =
+        Mina_state.Protocol_state.hashes candidate_block.protocol_state
     ; data =
         Mina_state.Protocol_state.consensus_state candidate_block.protocol_state
     }
   in
-  let select_status =
+
+  match
     Consensus.Hooks.select
       ~context:(module Context)
       ~existing:existing_consensus_state_with_hashes
       ~candidate:candidate_consensus_state_with_hashes
-  in
-  match select_status with
+  with
   | `Take ->
-      [%log info] "select_status: `Take" ;
-      print_endline "select_status: `Take" ;
-      print_block_info existing_block ;
-      print_block_info candidate_block ;
+      let candidate_length =
+        Mina_state.Protocol_state.consensus_state candidate_block.protocol_state
+        |> Consensus.Data.Consensus_state.blockchain_length
+        |> Unsigned.UInt32.to_int
+      in
+      let existing_length =
+        Mina_state.Protocol_state.consensus_state existing_block.protocol_state
+        |> Consensus.Data.Consensus_state.blockchain_length
+        |> Unsigned.UInt32.to_int
+      in
+      if candidate_length = existing_length then
+        current_chain := List.rev (candidate_block :: List.tl_exn !current_chain)
+      else if candidate_length > existing_length then
+        current_chain := candidate_block :: !current_chain
+      else
+        failwith
+          "Candidate block has lower blockchain length than existing block" ;
       return ()
   | `Keep ->
-      [%log info] "select_status: `Keep" ;
-      print_endline "select_status: `Keep" ;
-      print_block_info existing_block ;
-      print_block_info candidate_block ;
       return ()
 
 let process_block ~context:(module Context : CONTEXT) precomputed_block =
-  match List.last Context.current_chain with
+  match List.last current_chain.contents with
   | Some last_block ->
       let%bind () =
         run_select ~context:(module Context) last_block precomputed_block
@@ -167,15 +168,16 @@ let main () ~blocks_dir =
         read_block_file json )
   in
   [%log info] "Finished reading blocks dir" ;
+  let context = context logger in
 
   match precomputed_blocks with
   | [] ->
       failwith "No blocks found"
   | first_block :: remaining_blocks ->
-      let current_chain = [ first_block ] in
-      let context = context logger current_chain in
+      current_chain := [ first_block ] ;
       let precomputed_blocks = remaining_blocks in
       let%bind () = process_precomputed_blocks ~context precomputed_blocks in
+      print_block_info (List.hd_exn !current_chain) ;
       return ()
 
 let () =
