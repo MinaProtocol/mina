@@ -42,6 +42,8 @@ module Engine = struct
 
       val id : t -> string
 
+      val app_id : t -> string
+
       val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t
@@ -237,6 +239,18 @@ module Dsl = struct
 
     val ledger_proofs_emitted_since_genesis :
       test_config:Test_config.t -> num_proofs:int -> t
+
+    type online_nodes_monitor
+
+    val require_online : online_nodes_monitor -> Engine.Network.Node.t -> unit
+
+    val not_require_online :
+      online_nodes_monitor -> Engine.Network.Node.t -> unit
+
+    val monitor_online_nodes :
+         logger:Logger.t
+      -> Event_router.t
+      -> online_nodes_monitor * unit Event_router.event_subscription
   end
 
   module type S = sig
@@ -262,6 +276,8 @@ module Dsl = struct
     val section : string -> unit Malleable_error.t -> unit Malleable_error.t
 
     val network_state : t -> Network_state.t
+
+    val event_router : t -> Event_router.t
 
     val wait_for : t -> Wait_condition.t -> unit Malleable_error.t
 

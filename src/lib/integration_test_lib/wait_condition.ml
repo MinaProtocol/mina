@@ -210,4 +210,30 @@ struct
     ; soft_timeout = Network_time_span.Slots (total_slots + 6)
     ; hard_timeout = Network_time_span.Slots (total_slots + 12)
     }
+
+  type online_nodes_monitor = { mutable required_online : String.Set.t }
+
+  let require_online t node =
+    t.required_online <-
+      Set.add t.required_online (Engine.Network.Node.app_id node)
+
+  let not_require_online t node =
+    t.required_online <-
+      Set.remove t.required_online (Engine.Network.Node.app_id node)
+
+  let monitor_online_nodes ~logger event_router =
+    let open Engine in
+    let monitor = { required_online = String.Set.empty } in
+    let node_liveness_subscription =
+      Event_router.on event_router Node_offline ~f:(fun offline_node () ->
+          let node_name = Network.Node.app_id offline_node in
+          [%log info] "Detected node offline $node"
+            ~metadata:[ ("node", `String node_name) ] ;
+          if Set.mem monitor.required_online node_name then (
+            [%log fatal] "Offline $node is required for this test"
+              ~metadata:[ ("node", `String node_name) ] ;
+            failwith "Aborted because of required offline node" ) ;
+          Async_kernel.Deferred.return `Continue )
+    in
+    (monitor, node_liveness_subscription)
 end

@@ -61,6 +61,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node_c =
       Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
+
+    let online_monitor, online_monitor_subscription =
+      Wait_condition.monitor_online_nodes ~logger (event_router t)
+    in
+    (* The nodes that we synchronize to must be online. *)
+    Wait_condition.require_online online_monitor node_a ;
+    Wait_condition.require_online online_monitor node_b ;
+
     let%bind () =
       section "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
@@ -79,10 +87,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          wait_for t
            (Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]) )
     in
-    section "network is fully connected after one node was restarted"
-      (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
-       let%bind final_connectivity_data =
-         fetch_connectivity_data ~logger (Core.String.Map.data all_nodes)
-       in
-       assert_peers_completely_connected final_connectivity_data )
+    let%bind () =
+      section "network is fully connected after one node was restarted"
+        (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
+         let%bind final_connectivity_data =
+           fetch_connectivity_data ~logger (Core.String.Map.data all_nodes)
+         in
+         assert_peers_completely_connected final_connectivity_data )
+    in
+    return (Event_router.cancel (event_router t) online_monitor_subscription ())
 end
