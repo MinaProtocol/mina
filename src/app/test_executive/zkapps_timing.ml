@@ -63,6 +63,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     Map.iter
       ~f:(Wait_condition.require_online online_monitor)
       (Network.archive_nodes network) ;
+    (* We need snark work for this test. *)
+    Core_kernel.Map.iter
+      ~f:(Wait_condition.require_online online_monitor)
+      (Network.snark_coordinators network) ;
 
     let constraint_constants =
       Genesis_constants.Constraint_constants.compiled
