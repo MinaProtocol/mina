@@ -52,8 +52,8 @@ type Params struct {
 }
 
 type Command struct {
-	Action  string
-	Params  any
+	Action  string `json:"action"`
+	Params  any    `json:"params"`
 	comment string
 }
 
@@ -75,8 +75,8 @@ func discovery(p lib.DiscoveryParams) Command {
 }
 
 type SampleRefParams struct {
-	Group  lib.ComplexValue
-	Ratios []float64
+	Group  lib.ComplexValue `json:"group"`
+	Ratios []float64        `json:"ratios"`
 }
 
 func sample(groupRef int, groupName string, ratios []float64) Command {
@@ -88,8 +88,8 @@ func sample(groupRef int, groupName string, ratios []float64) Command {
 
 type ZkappRefParams struct {
 	lib.ZkappSubParams
-	FeePayers lib.ComplexValue
-	Nodes     lib.ComplexValue
+	FeePayers lib.ComplexValue `json:"feePayers"`
+	Nodes     lib.ComplexValue `json:"nodes"`
 }
 
 func zkapps(feePayersRef int, nodesRef int, nodesName string, params lib.ZkappSubParams) Command {
@@ -102,14 +102,14 @@ func zkapps(feePayersRef int, nodesRef int, nodesName string, params lib.ZkappSu
 
 type PaymentRefParams struct {
 	lib.PaymentSubParams
-	Senders lib.ComplexValue
-	Nodes   lib.ComplexValue
+	FeePayers lib.ComplexValue `json:"feePayers"`
+	Nodes     lib.ComplexValue `json:"nodes"`
 }
 
 func payments(feePayersRef int, nodesRef int, nodesName string, params lib.PaymentSubParams) Command {
 	return Command{Action: lib.PaymentsAction{}.Name(), Params: PaymentRefParams{
 		PaymentSubParams: params,
-		Senders:          lib.LocalComplexValue(feePayersRef, "key"),
+		FeePayers:        lib.LocalComplexValue(feePayersRef, "key"),
 		Nodes:            lib.LocalComplexValue(nodesRef, nodesName),
 	}}
 }
@@ -121,8 +121,8 @@ func wait(sec int) Command {
 }
 
 type RestartRefParams struct {
-	Nodes lib.ComplexValue
-	Clean bool
+	Nodes lib.ComplexValue `json:"nodes"`
+	Clean bool             `json:"clean,omitempty"`
 }
 
 func restart(nodesRef int, nodesName string, clean bool) Command {
@@ -133,8 +133,8 @@ func restart(nodesRef int, nodesName string, clean bool) Command {
 }
 
 type JoinRefParams struct {
-	Group1 lib.ComplexValue
-	Group2 lib.ComplexValue
+	Group1 lib.ComplexValue `json:"group1"`
+	Group2 lib.ComplexValue `json:"group2"`
 }
 
 func join(g1Ref int, g1Name string, g2Ref int, g2Name string) Command {
@@ -145,8 +145,8 @@ func join(g1Ref int, g1Name string, g2Ref int, g2Name string) Command {
 }
 
 type ExceptRefParams struct {
-	Group  lib.ComplexValue
-	Except lib.ComplexValue
+	Group  lib.ComplexValue `json:"group"`
+	Except lib.ComplexValue `json:"except"`
 }
 
 func except(groupRef int, groupName string, exceptRef int, exceptName string) Command {
@@ -165,7 +165,7 @@ func (p *Params) Generate(round int) GeneratedRound {
 	zkappsKeysDir := fmt.Sprintf("%s/round-%d/zkapps", p.FundKeyPrefix, round)
 	paymentsKeysDir := fmt.Sprintf("%s/round-%d/payments", p.FundKeyPrefix, round)
 	tps := sampleTps(p.BaseTps, p.StressTps)
-	experimentName := fmt.Sprintf("%s (round %d)", p.ExperimentName, round)
+	experimentName := fmt.Sprintf("%s-%d", p.ExperimentName, round)
 	zkappTps := tps * p.ZkappRatio
 	zkappParams := lib.ZkappSubParams{
 		ExperimentName:    experimentName,
@@ -181,14 +181,14 @@ func (p *Params) Generate(round int) GeneratedRound {
 	}
 	zkappKeysNum, zkappAmount := lib.ZkappKeygenRequirements(zkappParams)
 	paymentParams := lib.PaymentSubParams{
-		ExperimentName:    experimentName,
-		Tps:               tps - zkappTps,
-		MinTps:            0.02,
-		DurationInMinutes: p.RoundDurationMin,
-		FeeMin:            1e9,
-		FeeMax:            2e9,
-		Amount:            1e5,
-		Receiver:          p.PaymentReceiver,
+		ExperimentName: experimentName,
+		Tps:            tps - zkappTps,
+		MinTps:         0.02,
+		DurationMin:    p.RoundDurationMin,
+		MinFee:         1e9,
+		MaxFee:         2e9,
+		Amount:         1e5,
+		Receiver:       p.PaymentReceiver,
 	}
 	paymentKeysNum, paymentAmount := lib.PaymentKeygenRequirements(p.Gap, paymentParams)
 	cmds := []Command{}
@@ -288,6 +288,7 @@ func main() {
 	flag.StringVar(&p.FundKeyPrefix, "fund-keys-dir", "./fund-keys", "Dir for generated fund key prefixes")
 	flag.StringVar(&p.PasswordEnv, "password-env", "", "Name of environment variable to read privkey password from")
 	flag.StringVar((*string)(&p.PaymentReceiver), "payment-receiver", "", "Mina PK receiving payments")
+	flag.StringVar(&p.ExperimentName, "experiment-name", "exp-0", "Name of experiment")
 	flag.Parse()
 	p.Privkeys = strings.Split(privkeys, ",")
 	switch mode {
