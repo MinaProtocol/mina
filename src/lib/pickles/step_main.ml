@@ -344,9 +344,8 @@ let step_main :
           exists
             (Vector.typ'
                (Vector.map
-                  ~f:(fun feature_flags ->
-                    Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
-                      ~feature_flags )
+                  ~f:(fun _feature_flags ->
+                    Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n )
                   feature_flags ) )
             ~request:(fun () -> Req.Unfinalized_proofs)
         and messages_for_next_wrap_proof =
