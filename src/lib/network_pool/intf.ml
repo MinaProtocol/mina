@@ -227,6 +227,7 @@ module type Snark_resource_pool_intf = sig
        trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> disk_location:string
+    -> skip_local_snark_work_verification:bool
     -> Config.t
 
   val add_snark :
