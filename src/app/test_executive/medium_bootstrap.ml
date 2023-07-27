@@ -49,8 +49,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
     let%bind () =
-      wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+      section_hard "Wait for nodes to initialize"
+        (wait_for t
+           (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes)) )
     in
     let node_a =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
@@ -70,11 +71,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     Wait_condition.require_online online_monitor node_b ;
 
     let%bind () =
-      section "blocks are produced"
+      section_hard "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
     in
     let%bind () =
-      section "restart node after 2k+1, ie 5, blocks"
+      section_hard "restart node after 2k+1, ie 5, blocks"
         (let%bind () = Node.stop node_c in
          [%log info] "%s stopped, will now wait for blocks to be produced"
            (Node.id node_c) ;
@@ -88,7 +89,40 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]) )
     in
     let%bind () =
-      section "network is fully connected after one node was restarted"
+      section_hard "network is fully connected after one node was restarted"
+        (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
+         let%bind final_connectivity_data =
+           fetch_connectivity_data ~logger (Core.String.Map.data all_nodes)
+         in
+         assert_peers_completely_connected final_connectivity_data )
+    in
+    let%bind () =
+      section_hard "blocks are produced"
+        (wait_for t (Wait_condition.blocks_to_be_produced 1))
+    in
+    let%bind () =
+      section_hard "restart node with the same state after 1 block"
+        (let%bind () = Node.stop node_c in
+         [%log info] "%s stopped, will now wait for blocks to be produced"
+           (Node.id node_c) ;
+         let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 1) in
+         let%bind () = Node.start ~fresh_state:false node_c in
+         [%log info]
+           "%s started again on same data, will now wait for this node to \
+            initialize"
+           (Node.id node_c) ;
+         let%bind () =
+           wait_for t
+             (Wait_condition.transition_frontier_loaded_from_persistence
+                ~fresh_data:false ~sync_needed:false )
+         in
+         let%bind () = wait_for t (Wait_condition.node_to_initialize node_c) in
+         wait_for t
+           (Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]) )
+    in
+
+    let%bind () =
+      section_hard "network is fully connected after one node was restarted"
         (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
          let%bind final_connectivity_data =
            fetch_connectivity_data ~logger (Core.String.Map.data all_nodes)

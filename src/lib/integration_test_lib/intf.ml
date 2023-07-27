@@ -2,6 +2,7 @@ open Async_kernel
 open Core_kernel
 open Mina_base
 open Pipe_lib
+open Mina_transaction
 
 type metrics_t =
   { block_production_delay : int list
@@ -182,6 +183,11 @@ module Dsl = struct
       ; global_slot : int
       ; snarked_ledgers_generated : int
       ; blocks_generated : int
+      ; num_transition_frontier_loaded_from_persistence : int
+      ; num_persisted_frontier_loaded : int
+      ; num_persisted_frontier_fresh_boot : int
+      ; num_bootstrap_required : int
+      ; num_persisted_frontier_dropped : int
       ; node_initialization : bool String.Map.t
       ; gossip_received : Gossip_state.t String.Map.t
       ; best_tips_by_node : State_hash.t String.Map.t
@@ -215,6 +221,9 @@ module Dsl = struct
       | Signed_command_to_be_included_in_frontier
       | Ledger_proofs_emitted_since_genesis
       | Block_height_growth
+      | Zkapp_to_be_included_in_frontier
+      | Persisted_frontier_loaded
+      | Transition_frontier_loaded_from_persistence
 
     val wait_condition_id : t -> wait_condition_id
 
@@ -241,6 +250,14 @@ module Dsl = struct
 
     val ledger_proofs_emitted_since_genesis :
       test_config:Test_config.t -> num_proofs:int -> t
+
+    val zkapp_to_be_included_in_frontier :
+      has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
+
+    val persisted_frontier_loaded : Engine.Network.Node.t -> t
+
+    val transition_frontier_loaded_from_persistence :
+      fresh_data:bool -> sync_needed:bool -> t
 
     type online_nodes_monitor
 

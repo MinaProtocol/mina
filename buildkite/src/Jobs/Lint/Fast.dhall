@@ -22,13 +22,18 @@ let commands =
       [ Cmd.run "./scripts/lint_codeowners.sh"
       , Cmd.run "./scripts/lint_rfcs.sh"
       , Cmd.run "make check-snarky-submodule"
+      , Cmd.run "make check-proof-systems-submodule"
       , Cmd.run "./scripts/lint_preprocessor_deps.sh"
       ]
 
 in  Pipeline.build
       Pipeline.Config::{
         spec = JobSpec::{
-        , dirtyWhen = [ S.strictlyStart (S.contains "src/") ]
+        , dirtyWhen = [
+            S.strictly (S.contains "Makefile"),
+            S.strictlyStart (S.contains "src/"),
+            S.strictlyStart (S.contains "rfcs/")
+          ]
         , path = "Lint"
         , name = "Fast"
         }
@@ -37,7 +42,7 @@ in  Pipeline.build
             Command.Config::{
             , commands = commands
             , label =
-                "Fast lint steps; CODEOWNERs, RFCs, Check Snarky Submodule, Preprocessor Deps"
+                "Fast lint steps; CODEOWNERs, RFCs, Check Snarky & Proof-Systems submodules, Preprocessor Deps"
             , key = "lint"
             , target = Size.Small
             , docker = Some Docker::{

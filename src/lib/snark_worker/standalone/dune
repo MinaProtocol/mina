@@ -10,12 +10,16 @@
    async.async_command
    async_unix
    async_kernel
+   sexplib0
    ;; local libraries
    mina_base
    currency
+   key_gen
    snark_worker
+   mina_base.import
    genesis_constants
    signature_lib
+   transaction_snark
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_let ppx_custom_printf ppx_version)))

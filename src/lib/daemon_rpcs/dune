@@ -25,6 +25,7 @@
    transition_frontier
    block_time
    mina_numbers
+   itn_logger
    cli_lib
    transaction_inclusion_status
    consensus
@@ -39,6 +40,7 @@
    network_pool
    data_hash_lib
    trust_system
+   ppx_version.runtime
  )
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_compare ppx_deriving.make

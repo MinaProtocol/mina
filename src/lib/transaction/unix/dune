@@ -1,0 +1,22 @@
+(library
+ (name mina_transaction_unix)
+ (public_name mina_transaction.unix)
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   graphql-async
+   graphql
+   yojson
+   core_kernel
+   core
+   sexplib0
+   ppx_inline_test.config
+   ;; local libraries
+   graphql_basic_scalars
+   mina_transaction
+   mina_base
+   genesis_constants
+ )
+ (preprocess (pps ppx_jane ppx_version))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Utils that depends on the unix library"))

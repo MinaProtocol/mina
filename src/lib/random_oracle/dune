@@ -18,8 +18,8 @@
    pickles
    random_oracle_input
    snarky.backendless
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    fold_lib
-   marlin_plonk_bindings_pasta_fp_poseidon
-   marlin_plonk_bindings_pasta_fp_vector
-   pasta
+   random_oracle.permutation
 ))

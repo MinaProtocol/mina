@@ -1,3 +1,4 @@
+open Core_kernel
 open Integration_test_lib
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
@@ -26,13 +27,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
         ]
+    ; num_archive_nodes = 1
     }
 
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     (* fee for user commands *)
-    let fee = Currency.Fee.of_int 10_000_000 in
+    let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
     let all_nodes = Network.all_nodes network in
     let%bind () =
       wait_for t
@@ -51,12 +53,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* The node that we send GraphQL requests to needs to stay online. *)
     Wait_condition.require_online online_monitor node_b ;
     (* The archive node needs to be online to run the final replayer test. *)
-    Core_kernel.Map.iter
+    Map.iter
       ~f:(Wait_condition.require_online online_monitor)
       (Network.archive_nodes network) ;
 
     let%bind () =
-      section "delegate all mina currency from node_b to node_a"
+      section "Delegate all mina currency from node_b to node_a"
         (let delegation_receiver = node_a in
          let%bind delegation_receiver_pub_key =
            pub_key_of_node delegation_receiver
@@ -75,5 +77,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.signed_command_to_be_included_in_frontier
               ~txn_hash:hash ~node_included_in:`Any_node ) )
     in
-    return (Event_router.cancel (event_router t) online_monitor_subscription ())
+    Event_router.cancel (event_router t) online_monitor_subscription () ;
+    section_hard "Running replayer"
+      (let%bind logs =
+         Network.Node.run_replayer ~logger
+           (List.hd_exn @@ Core.String.Map.data (Network.archive_nodes network))
+       in
+       check_replayer_logs ~logger logs )
 end
