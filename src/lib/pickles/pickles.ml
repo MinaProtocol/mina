@@ -626,6 +626,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
+                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -757,6 +758,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
+                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -1658,7 +1660,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         end in
                         Wrap.Type1.derive_plonk
                           (module Field)
-                          ~feature_flags:Plonk_types.Features.none
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
                       in
@@ -1775,22 +1776,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                             .plonk
                                           with
                                           lookup = None
-                                        ; optional_column_scalars =
-                                            { range_check0 = None
-                                            ; range_check1 = None
-                                            ; foreign_field_add = None
-                                            ; foreign_field_mul = None
-                                            ; xor = None
-                                            ; rot = None
-                                            ; lookup_gate = None
-                                            ; runtime_tables = None
-                                            }
                                         }
                                     }
                                 }
                             } )
                     in
-                    ( { proof = next_proof
+                    ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof
                       ; statement =
                           Types.Wrap.Statement.to_minimal
                             ~to_option:Opt.to_option next_statement
@@ -1951,40 +1942,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let () = Backtrace.elide := false
 
       let () = Snarky_backendless.Snark0.set_eval_constraints true
-
-      let%test_module "test uncorrelated deferred b" =
-        ( module Compile.Make_adversarial_test (struct
-          let tweak_statement (stmt : _ Import.Types.Wrap.Statement.In_circuit.t)
-              =
-            (* Modify the statement to contain an invalid [b] value. *)
-            let b = Tick.Field.random () in
-            let shift_value =
-              Shifted_value.Type1.of_field
-                (module Tick.Field)
-                ~shift:Shifts.tick1
-            in
-            { stmt with
-              proof_state =
-                { stmt.proof_state with
-                  deferred_values =
-                    { stmt.proof_state.deferred_values with b = shift_value b }
-                }
-            }
-
-          let check_verifier_error err =
-            (* Convert to JSON to make it easy to parse. *)
-            err |> Error_json.error_to_yojson
-            |> Yojson.Safe.Util.member "multiple"
-            |> Yojson.Safe.Util.to_list
-            |> List.find_exn ~f:(fun json ->
-                   let prefix =
-                     json
-                     |> Yojson.Safe.Util.member "string"
-                     |> Yojson.Safe.Util.to_string |> String.sub ~pos:0 ~len:3
-                   in
-                   String.equal prefix "b: " )
-            |> fun _ -> ()
-        end) )
 
       let%test_module "test domain size too large" =
         ( module Compile.Make_adversarial_test (struct
@@ -2159,6 +2116,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
+                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -2508,6 +2466,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
+                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)

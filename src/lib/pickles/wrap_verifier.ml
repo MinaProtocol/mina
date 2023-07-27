@@ -711,7 +711,7 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
-          let num_commitments_without_degree_bound = Nat.N41.n in
+          let num_commitments_without_degree_bound = Nat.N45.n in
           let without_degree_bound =
             (* sg_old
                x_hat
@@ -724,7 +724,9 @@ struct
             *)
             Vector.append sg_old
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
-                :: [| m.psm_comm |]
+                :: [| m.psm_comm |] :: [| m.complete_add_comm |]
+                :: [| m.mul_comm |] :: [| m.emul_comm |]
+                :: [| m.endomul_scalar_comm |]
                 :: Vector.append w_comm
                      (Vector.append
                         (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
@@ -843,9 +845,6 @@ struct
     include Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
   end
 
-  let field_array_if b ~then_ ~else_ =
-    Array.map2_exn then_ else_ ~f:(fun x1 x2 -> Field.if_ b ~then_:x1 ~else_:x2)
-
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
      1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
@@ -862,13 +861,11 @@ struct
         ( _
         , _
         , _ Shifted_value.Type2.t
-        , _
-        , _
         , _ )
         Types.Step.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
+    let module Plonk = Types.Step.Proof_state.Deferred_values.Plonk in
     let T = Proofs_verified.eq in
-    let open Pickles_types in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
     let plonk = map_plonk_to_field plonk in
@@ -894,11 +891,42 @@ struct
       Sponge.absorb sponge (fst evals.public_input) ;
       Sponge.absorb sponge (snd evals.public_input) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
-      Pickles_types.Opt.Early_stop_sequence.fold field_array_if xs ~init:()
-        ~f:(fun () (x1, x2) ->
-          let absorb = Array.iter ~f:(Sponge.absorb sponge) in
-          absorb x1 ; absorb x2 )
-        ~finish:(fun () -> Array.copy sponge.state)
+      (* This is a hacky, but much more efficient, version of the opt sponge.
+         This uses the assumption that the sponge 'absorption state' will align
+         after each optional absorption, letting us skip the expensive tracking
+         that this would otherwise require.
+         To future-proof this, we assert that the states are indeed compatible.
+      *)
+      List.iter xs ~f:(fun opt ->
+          let absorb = Array.iter ~f:(fun x -> Sponge.absorb sponge x) in
+          match opt with
+          | None ->
+              ()
+          | Some (x1, x2) ->
+              absorb x1 ; absorb x2
+          | Maybe (b, (x1, x2)) ->
+              (* Cache the sponge state before *)
+              let sponge_state_before = sponge.sponge_state in
+              let state_before = Array.copy sponge.state in
+              (* Absorb the points *)
+              absorb x1 ;
+              absorb x2 ;
+              (* Check that the sponge ends in a compatible state. *)
+              ( match (sponge_state_before, sponge.sponge_state) with
+              | Absorbed x, Absorbed y ->
+                  [%test_eq: int] x y
+              | Squeezed x, Squeezed y ->
+                  [%test_eq: int] x y
+              | Absorbed _, Squeezed _ ->
+                  [%test_eq: string] "absorbed" "squeezed"
+              | Squeezed _, Absorbed _ ->
+                  [%test_eq: string] "squeezed" "absorbed" ) ;
+              let state =
+                Array.map2_exn sponge.state state_before ~f:(fun then_ else_ ->
+                    Field.if_ b ~then_ ~else_ )
+              in
+              sponge.state <- state ) ;
+      Array.copy sponge.state
     in
     sponge.state <- sponge_state ;
     let xi_actual = squeeze_scalar sponge in
@@ -914,7 +942,9 @@ struct
     (* TODO: r actually does not need to be a scalar challenge. *)
     let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
     let plonk_minimal =
-      Plonk.to_minimal plonk ~to_option:Pickles_types.Opt.to_option_unsafe
+      plonk |> Plonk.to_minimal
+      |> Plonk.Minimal.to_wrap
+           ~feature_flags:Features.(map ~f:Boolean.var_of_value none_bool)
     in
     let combined_evals =
       let n = Common.Max_degree.wrap_log2 in
@@ -1036,9 +1066,13 @@ struct
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
           (* This proof is a wrap proof; no need to consider features. *)
-          Plonk_checks.checked ~feature_flags:Plonk_types.Features.none
+          Plonk_checks.checked
             (module Impl)
-            ~env ~shift:shift2 plonk combined_evals )
+            ~env ~shift:shift2
+            (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+             .to_wrap ~opt_none:Plonk_types.Opt.None ~false_:Boolean.false_
+               plonk )
+            combined_evals )
     in
     print_bool "xi_correct" xi_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;

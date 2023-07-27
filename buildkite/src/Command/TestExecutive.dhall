@@ -72,7 +72,7 @@ in
             ],
         label = "Build JS integration tests",
         key = "build-js-tests",
-        target = Size.Integration,
+        target = Size.XLarge,
         `if` = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'"
       },
 

@@ -43,19 +43,6 @@ module Step : sig
     -> ( ( ( ( Impl.Field.t
              , Impl.Field.t Composition_types.Scalar_challenge.t
              , Other_field.t Pickles_types.Shifted_value.Type2.t
-             , ( Other_field.t Pickles_types.Shifted_value.Type2.t
-               , Impl.field Snarky_backendless.Cvar.t
-                 Snarky_backendless.Snark_intf.Boolean0.t )
-               Pickles_types.Opt.t
-             , ( Impl.Field.t Composition_types.Scalar_challenge.t
-                 Pickles_types.Hlist0.Id.t
-                 Composition_types.Step.Proof_state.Deferred_values.Plonk
-                 .In_circuit
-                 .Lookup
-                 .t
-               , Impl.field Snarky_backendless.Cvar.t
-                 Snarky_backendless.Snark_intf.Boolean0.t )
-               Pickles_types.Opt.t
              , ( Impl.field Snarky_backendless.Cvar.t
                  Kimchi_backend_common.Scalar_challenge.t
                  Composition_types.Bulletproof_challenge.t
@@ -75,13 +62,6 @@ module Step : sig
        , ( ( ( Challenge.Constant.t
              , Challenge.Constant.t Composition_types.Scalar_challenge.t
              , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-             , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t option
-             , Challenge.Constant.t Composition_types.Scalar_challenge.t
-               Composition_types.Step.Proof_state.Deferred_values.Plonk
-               .In_circuit
-               .Lookup
-               .t
-               option
              , ( Limb_vector.Challenge.Constant.t
                  Kimchi_backend_common.Scalar_challenge.t
                  Composition_types.Bulletproof_challenge.t

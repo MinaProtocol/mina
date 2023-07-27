@@ -19,7 +19,7 @@ let%test_unit "custom gates integration" =
     in
 
     (* Convert Bignum_bigint.t to field standard_limbs *)
-    let bignum_bigint_to_field_standard_limbs (type f)
+    let bignum_bigint_to_field_const_standard_limbs (type f)
         (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
         (bigint : Bignum_bigint.t) : f standard_limbs =
       let l0, l1, l2 = bignum_bigint_to_standard_limbs bigint in
@@ -46,7 +46,7 @@ let%test_unit "custom gates integration" =
             let open Runner.Impl in
             let open Bitwise in
             let secp256k1_modulus =
-              bignum_bigint_to_field_standard_limbs (module Runner.Impl)
+              bignum_bigint_to_field_const_standard_limbs (module Runner.Impl)
               @@ Common.bignum_bigint_of_hex
                    "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
             in
@@ -64,7 +64,7 @@ let%test_unit "custom gates integration" =
               Element.Standard.of_bignum_bigint (module Runner.Impl)
               @@ Common.bignum_bigint_of_hex foreign_elem
             in
-            let out_rot = rot_64 (module Runner.Impl) word_64bit 5 Right in
+            let out_rot = rot64 (module Runner.Impl) word_64bit 5 Right in
 
             let two_to_88 =
               exists Field.typ ~compute:(fun () ->

@@ -365,7 +365,6 @@ module Protocol = struct
 
       external example_with_lookup :
            SRS.Fp.t
-        -> bool
         -> Index.Fp.t
            * Pasta_bindings.Fp.t
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity

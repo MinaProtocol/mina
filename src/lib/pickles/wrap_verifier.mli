@@ -126,13 +126,6 @@ val finalize_other_proof :
      , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
        Pickles_types.Shifted_value.Type2.t
      , ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-         Pickles_types.Shifted_value.Type2.t
-       , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-         Snarky_backendless.Boolean.t )
-       Composition_types.Opt.t
-     , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-       Snarky_backendless.Boolean.t
-     , ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Import.Scalar_challenge.t
          Import.Bulletproof_challenge.t
        , 'c )

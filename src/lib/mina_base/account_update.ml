@@ -91,8 +91,11 @@ module Authorization_kind = struct
       let open Fields_derivers_zkapps in
       let open Fields in
       let ( !. ) = ( !. ) ~t_fields_annots in
+      let verification_key_hash =
+        needs_custom_js ~js_type:field ~name:"VerificationKeyHash" field
+      in
       Fields.make_creator obj ~is_signed:!.bool ~is_proved:!.bool
-        ~verification_key_hash:!.field
+        ~verification_key_hash:!.verification_key_hash
       |> finish "AuthorizationKindStructured" ~t_toplevel_annots
 
     [%%endif]
@@ -110,12 +113,12 @@ module Authorization_kind = struct
     | None_given ->
         { is_signed = false
         ; is_proved = false
-        ; verification_key_hash = Field.zero
+        ; verification_key_hash = Zkapp_account.dummy_vk_hash ()
         }
     | Signature ->
         { is_signed = true
         ; is_proved = false
-        ; verification_key_hash = Field.zero
+        ; verification_key_hash = Zkapp_account.dummy_vk_hash ()
         }
     | Proof verification_key_hash ->
         { is_signed = false; is_proved = true; verification_key_hash }

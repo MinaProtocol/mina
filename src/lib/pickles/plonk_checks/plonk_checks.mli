@@ -58,8 +58,7 @@ end
 
 type 'f field = (module Field_intf with type t = 'f)
 
-val lookup_tables_used :
-  Opt.Flag.t Plonk_types.Features.t -> Opt.Flag.t
+val lookup_tables_used : Opt.Flag.t Plonk_types.Features.t -> Opt.Flag.t
 
 val domain :
      't field
@@ -109,7 +108,6 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
     -> (module Field_intf with type t = 't)
     -> env:'t Scalars.Env.t
     -> shift:'t Shifted_value.Shift.t
-    -> feature_flags:Plonk_types.Features.options
     -> ( 't
        , 't
        , 'b )
@@ -132,7 +130,6 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        (module Snarky_backendless.Snark_intf.Run with type field = 't)
     -> shift:'t Snarky_backendless.Cvar.t Shifted_value.Shift.t
     -> env:'t Snarky_backendless.Cvar.t Scalars.Env.t
-    -> feature_flags:Opt.Flag.t Plonk_types.Features.t
     -> ( 't Snarky_backendless.Cvar.t
        , 't Snarky_backendless.Cvar.t
        , 't Snarky_backendless.Cvar.t Shifted_value.t

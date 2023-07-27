@@ -285,10 +285,14 @@ module Account_update_under_construction = struct
             Token_id.(Checked.equal t.token_id (Checked.constant default))
         ; may_use_token = t.may_use_token
         ; authorization_kind =
-            { is_signed = t.authorization_kind.is_signed
-            ; is_proved = t.authorization_kind.is_proved
-            ; verification_key_hash = Option.value ~default:Field.zero t.vk_hash
-            }
+            (let dummy_vk_hash =
+               Field.constant (Zkapp_account.dummy_vk_hash ())
+             in
+             { is_signed = t.authorization_kind.is_signed
+             ; is_proved = t.authorization_kind.is_proved
+             ; verification_key_hash =
+                 Option.value ~default:dummy_vk_hash t.vk_hash
+             } )
         }
       in
       let calls =
@@ -512,6 +516,7 @@ let compile :
          Pickles.Tag.t
     -> ?cache:_
     -> ?disk_keys:(_, branches) Vector.t * _
+    -> ?override_wrap_domain:_
     -> auxiliary_typ:(auxiliary_var, auxiliary_value) Typ.t
     -> branches:(module Nat.Intf with type n = branches)
     -> max_proofs_verified:
@@ -559,8 +564,8 @@ let compile :
            * auxiliary_value )
            Deferred.t )
          H3_2.T(Pickles.Prover).t =
- fun ?self ?cache ?disk_keys ~auxiliary_typ ~branches ~max_proofs_verified ~name
-     ~constraint_constants ~choices () ->
+ fun ?self ?cache ?disk_keys ?override_wrap_domain ~auxiliary_typ ~branches
+     ~max_proofs_verified ~name ~constraint_constants ~choices () ->
   let vk_hash = ref None in
   let choices ~self =
     let rec go :
@@ -618,7 +623,7 @@ let compile :
     go (choices ~self)
   in
   let tag, cache_handle, proof, provers =
-    Pickles.compile () ?self ?cache ?disk_keys
+    Pickles.compile () ?self ?cache ?disk_keys ?override_wrap_domain
       ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
       ~branches ~max_proofs_verified ~name ~constraint_constants ~choices

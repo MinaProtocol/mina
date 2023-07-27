@@ -610,7 +610,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
-    ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state =
+    ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state ~net =
   let open Context in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
@@ -959,7 +959,9 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                         [%log info] ~metadata
                           "Generated transition $state_hash was accepted into \
                            transition frontier" ;
-                        return ()
+                        Deferred.map ~f:Result.return
+                          (Mina_networking.broadcast_state net
+                             (Breadcrumb.block_with_hash breadcrumb) )
                     | `Timed_out ->
                         (* FIXME #3167: this should be fatal, and more
                            importantly, shouldn't happen.
@@ -1000,240 +1002,229 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       let production_supervisor = Singleton_supervisor.create ~task:produce in
       let scheduler = Singleton_scheduler.create time_controller in
       let rec check_next_block_timing slot i () =
-        O1trace.sync_thread "check_next_block_timing" (fun () ->
-            (* Begin checking for the ability to produce a block *)
-            match Broadcast_pipe.Reader.peek frontier_reader with
-            | None ->
-                log_bootstrap_mode () ;
-                don't_wait_for
-                  (let%map () =
-                     Broadcast_pipe.Reader.iter_until frontier_reader
-                       ~f:(Fn.compose Deferred.return Option.is_some)
-                   in
-                   check_next_block_timing slot i () )
-            | Some transition_frontier ->
-                let consensus_state =
-                  Transition_frontier.best_tip transition_frontier
-                  |> Breadcrumb.consensus_state
-                in
-                let now = Block_time.now time_controller in
-                let epoch_data_for_vrf, ledger_snapshot =
-                  O1trace.sync_thread "get_epoch_data_for_vrf" (fun () ->
-                      Consensus.Hooks.get_epoch_data_for_vrf
-                        ~constants:consensus_constants (time_to_ms now)
-                        consensus_state ~local_state:consensus_local_state
-                        ~logger )
-                in
-                let i' = Mina_numbers.Length.succ epoch_data_for_vrf.epoch in
-                let new_global_slot = epoch_data_for_vrf.global_slot in
-                let generate_genesis_proof_if_needed () =
-                  match Broadcast_pipe.Reader.peek frontier_reader with
-                  | Some transition_frontier ->
-                      let consensus_state =
-                        Transition_frontier.best_tip transition_frontier
-                        |> Breadcrumb.consensus_state
-                      in
-                      if
-                        Consensus.Data.Consensus_state.is_genesis_state
-                          consensus_state
-                      then genesis_breadcrumb () |> Deferred.ignore_m
-                      else Deferred.return ()
-                  | None ->
-                      Deferred.return ()
-                in
-                (* TODO: Re-enable this assertion when it doesn't fail dev demos
-                 *       (see #5354)
-                 * assert (
+        (* Begin checking for the ability to produce a block *)
+        match Broadcast_pipe.Reader.peek frontier_reader with
+        | None ->
+            log_bootstrap_mode () ;
+            don't_wait_for
+              (let%map () =
+                 Broadcast_pipe.Reader.iter_until frontier_reader
+                   ~f:(Fn.compose Deferred.return Option.is_some)
+               in
+               check_next_block_timing slot i () )
+        | Some transition_frontier ->
+            let consensus_state =
+              Transition_frontier.best_tip transition_frontier
+              |> Breadcrumb.consensus_state
+            in
+            let now = Block_time.now time_controller in
+            let epoch_data_for_vrf, ledger_snapshot =
+              O1trace.sync_thread "get_epoch_data_for_vrf" (fun () ->
+                  Consensus.Hooks.get_epoch_data_for_vrf
+                    ~constants:consensus_constants (time_to_ms now)
+                    consensus_state ~local_state:consensus_local_state ~logger )
+            in
+            let i' = Mina_numbers.Length.succ epoch_data_for_vrf.epoch in
+            let new_global_slot = epoch_data_for_vrf.global_slot in
+            let generate_genesis_proof_if_needed () =
+              match Broadcast_pipe.Reader.peek frontier_reader with
+              | Some transition_frontier ->
+                  let consensus_state =
+                    Transition_frontier.best_tip transition_frontier
+                    |> Breadcrumb.consensus_state
+                  in
+                  if
+                    Consensus.Data.Consensus_state.is_genesis_state
+                      consensus_state
+                  then genesis_breadcrumb () |> Deferred.ignore_m
+                  else Deferred.return ()
+              | None ->
+                  Deferred.return ()
+            in
+            (* TODO: Re-enable this assertion when it doesn't fail dev demos
+             *       (see #5354)
+             * assert (
                    Consensus.Hooks.required_local_state_sync
                     ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
                    = None ) ; *)
-                don't_wait_for
-                  (let%bind () =
-                     if Mina_numbers.Length.(i' > i) then
-                       Vrf_evaluation_state.update_epoch_data ~vrf_evaluator
-                         ~epoch_data_for_vrf ~logger vrf_evaluation_state
-                     else Deferred.unit
-                   in
-                   let%bind () =
-                     (*Poll once every slot if the evaluation for the epoch is not completed or the evaluation is completed*)
-                     if
-                       Mina_numbers.Global_slot_since_hard_fork.(
-                         new_global_slot > slot)
-                       && not
-                            (Vrf_evaluation_state.finished vrf_evaluation_state)
-                     then
+            don't_wait_for
+              (let%bind () =
+                 if Mina_numbers.Length.(i' > i) then
+                   Vrf_evaluation_state.update_epoch_data ~vrf_evaluator
+                     ~epoch_data_for_vrf ~logger vrf_evaluation_state
+                 else Deferred.unit
+               in
+               let%bind () =
+                 (*Poll once every slot if the evaluation for the epoch is not completed or the evaluation is completed*)
+                 if
+                   Mina_numbers.Global_slot_since_hard_fork.(
+                     new_global_slot > slot)
+                   && not (Vrf_evaluation_state.finished vrf_evaluation_state)
+                 then
+                   Vrf_evaluation_state.poll ~vrf_evaluator ~logger
+                     vrf_evaluation_state
+                 else Deferred.unit
+               in
+               match Core.Queue.dequeue vrf_evaluation_state.queue with
+               | None -> (
+                   (*Keep trying until we get some slots*)
+                   let poll () =
+                     let%bind () =
+                       Async.after
+                         (Time.Span.of_ms
+                            ( Mina_compile_config.vrf_poll_interval_ms
+                            |> Int.to_float ) )
+                     in
+                     let%map () =
                        Vrf_evaluation_state.poll ~vrf_evaluator ~logger
                          vrf_evaluation_state
-                     else Deferred.unit
+                     in
+                     Singleton_scheduler.schedule scheduler
+                       (Block_time.now time_controller)
+                       ~f:(check_next_block_timing new_global_slot i')
                    in
-                   match Core.Queue.dequeue vrf_evaluation_state.queue with
-                   | None -> (
-                       (*Keep trying until we get some slots*)
-                       let poll () =
-                         let%bind () =
-                           Async.after
-                             (Time.Span.of_ms
-                                ( Mina_compile_config.vrf_poll_interval_ms
-                                |> Int.to_float ) )
-                         in
-                         let%map () =
-                           Vrf_evaluation_state.poll ~vrf_evaluator ~logger
-                             vrf_evaluation_state
-                         in
-                         Singleton_scheduler.schedule scheduler
-                           (Block_time.now time_controller)
+                   match
+                     Vrf_evaluation_state.evaluator_status vrf_evaluation_state
+                   with
+                   | Completed ->
+                       let epoch_end_time =
+                         Consensus.Hooks.epoch_end_time
+                           ~constants:consensus_constants
+                           epoch_data_for_vrf.epoch
+                       in
+                       set_next_producer_timing (`Check_again epoch_end_time)
+                         consensus_state ;
+                       [%log info] "No more slots won in this epoch" ;
+                       return
+                         (Singleton_scheduler.schedule scheduler epoch_end_time
+                            ~f:(check_next_block_timing new_global_slot i') )
+                   | At last_slot ->
+                       set_next_producer_timing (`Evaluating_vrf last_slot)
+                         consensus_state ;
+                       poll ()
+                   | Start ->
+                       set_next_producer_timing
+                         (`Evaluating_vrf new_global_slot) consensus_state ;
+                       poll () )
+               | Some slot_won -> (
+                   let winning_global_slot = slot_won.global_slot in
+                   let slot, epoch =
+                     let t =
+                       Consensus.Data.Consensus_time.of_global_slot
+                         winning_global_slot ~constants:consensus_constants
+                     in
+                     Consensus.Data.Consensus_time.(slot t, epoch t)
+                   in
+                   [%log info] "Block producer won slot $slot in epoch $epoch"
+                     ~metadata:
+                       [ ( "slot"
+                         , Mina_numbers.Global_slot_since_genesis.(
+                             to_yojson @@ of_uint32 slot) )
+                       ; ("epoch", Mina_numbers.Length.to_yojson epoch)
+                       ] ;
+                   let now = Block_time.now time_controller in
+                   let curr_global_slot =
+                     Consensus.Data.Consensus_time.(
+                       of_time_exn ~constants:consensus_constants now
+                       |> to_global_slot)
+                   in
+                   let winner_pk = fst slot_won.delegator in
+                   let data =
+                     Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
+                       ~coinbase_receiver:!coinbase_receiver
+                   in
+                   if
+                     Mina_numbers.Global_slot_since_hard_fork.(
+                       curr_global_slot = winning_global_slot)
+                   then (
+                     (*produce now*)
+                     [%log info] "Producing a block now" ;
+                     set_next_producer_timing
+                       (`Produce_now (data, winner_pk))
+                       consensus_state ;
+                     Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
+                     let%map () = generate_genesis_proof_if_needed () in
+                     ignore
+                       ( Interruptible.finally
+                           (Singleton_supervisor.dispatch production_supervisor
+                              (now, data, winner_pk) )
                            ~f:(check_next_block_timing new_global_slot i')
-                       in
-                       match
-                         Vrf_evaluation_state.evaluator_status
-                           vrf_evaluation_state
-                       with
-                       | Completed ->
-                           let epoch_end_time =
-                             Consensus.Hooks.epoch_end_time
-                               ~constants:consensus_constants
-                               epoch_data_for_vrf.epoch
-                           in
-                           set_next_producer_timing
-                             (`Check_again epoch_end_time) consensus_state ;
-                           [%log info] "No more slots won in this epoch" ;
-                           return
-                             (Singleton_scheduler.schedule scheduler
-                                epoch_end_time
-                                ~f:(check_next_block_timing new_global_slot i') )
-                       | At last_slot ->
-                           set_next_producer_timing (`Evaluating_vrf last_slot)
-                             consensus_state ;
-                           poll ()
-                       | Start ->
-                           set_next_producer_timing
-                             (`Evaluating_vrf new_global_slot) consensus_state ;
-                           poll () )
-                   | Some slot_won -> (
-                       let winning_global_slot = slot_won.global_slot in
-                       let slot, epoch =
-                         let t =
-                           Consensus.Data.Consensus_time.of_global_slot
-                             winning_global_slot ~constants:consensus_constants
+                         : (_, _) Interruptible.t ) )
+                   else
+                     match
+                       Mina_numbers.Global_slot_since_hard_fork.diff
+                         winning_global_slot curr_global_slot
+                     with
+                     | None ->
+                         [%log warn]
+                           "Skipping block production for global slot \
+                            $slot_won because it has passed. Current global \
+                            slot is $curr_slot"
+                           ~metadata:
+                             [ ( "slot_won"
+                               , Mina_numbers.Global_slot_since_hard_fork
+                                 .to_yojson winning_global_slot )
+                             ; ( "curr_slot"
+                               , Mina_numbers.Global_slot_since_hard_fork
+                                 .to_yojson curr_global_slot )
+                             ] ;
+                         return (check_next_block_timing new_global_slot i' ())
+                     | Some slot_diff ->
+                         [%log info] "Producing a block in $slots slots"
+                           ~metadata:
+                             [ ( "slots"
+                               , Mina_numbers.Global_slot_span.to_yojson
+                                   slot_diff )
+                             ] ;
+                         let time =
+                           Consensus.Data.Consensus_time.(
+                             start_time ~constants:consensus_constants
+                               (of_global_slot ~constants:consensus_constants
+                                  winning_global_slot ))
+                           |> Block_time.to_span_since_epoch
+                           |> Block_time.Span.to_ms
                          in
-                         Consensus.Data.Consensus_time.(slot t, epoch t)
-                       in
-                       [%log info]
-                         "Block producer won slot $slot in epoch $epoch"
-                         ~metadata:
-                           [ ( "slot"
-                             , Mina_numbers.Global_slot_since_genesis.(
-                                 to_yojson @@ of_uint32 slot) )
-                           ; ("epoch", Mina_numbers.Length.to_yojson epoch)
-                           ] ;
-                       let now = Block_time.now time_controller in
-                       let curr_global_slot =
-                         Consensus.Data.Consensus_time.(
-                           of_time_exn ~constants:consensus_constants now
-                           |> to_global_slot)
-                       in
-                       let winner_pk = fst slot_won.delegator in
-                       let data =
-                         Consensus.Hooks.get_block_data ~slot_won
-                           ~ledger_snapshot
-                           ~coinbase_receiver:!coinbase_receiver
-                       in
-                       if
-                         Mina_numbers.Global_slot_since_hard_fork.(
-                           curr_global_slot = winning_global_slot)
-                       then (
-                         (*produce now*)
-                         [%log info] "Producing a block now" ;
                          set_next_producer_timing
-                           (`Produce_now (data, winner_pk))
+                           (`Produce (time, data, winner_pk))
                            consensus_state ;
                          Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-                         let%map () = generate_genesis_proof_if_needed () in
-                         ignore
-                           ( Interruptible.finally
-                               (Singleton_supervisor.dispatch
-                                  production_supervisor (now, data, winner_pk) )
-                               ~f:(check_next_block_timing new_global_slot i')
-                             : (_, _) Interruptible.t ) )
-                       else
-                         match
-                           Mina_numbers.Global_slot_since_hard_fork.diff
-                             winning_global_slot curr_global_slot
-                         with
-                         | None ->
-                             [%log warn]
-                               "Skipping block production for global slot \
-                                $slot_won because it has passed. Current \
-                                global slot is $curr_slot"
-                               ~metadata:
-                                 [ ( "slot_won"
-                                   , Mina_numbers.Global_slot_since_hard_fork
-                                     .to_yojson winning_global_slot )
-                                 ; ( "curr_slot"
-                                   , Mina_numbers.Global_slot_since_hard_fork
-                                     .to_yojson curr_global_slot )
-                                 ] ;
-                             return
-                               (check_next_block_timing new_global_slot i' ())
-                         | Some slot_diff ->
-                             [%log info] "Producing a block in $slots slots"
-                               ~metadata:
-                                 [ ( "slots"
-                                   , Mina_numbers.Global_slot_span.to_yojson
-                                       slot_diff )
-                                 ] ;
-                             let time =
-                               Consensus.Data.Consensus_time.(
-                                 start_time ~constants:consensus_constants
-                                   (of_global_slot
-                                      ~constants:consensus_constants
-                                      winning_global_slot ))
-                               |> Block_time.to_span_since_epoch
-                               |> Block_time.Span.to_ms
-                             in
-                             set_next_producer_timing
-                               (`Produce (time, data, winner_pk))
-                               consensus_state ;
-                             Mina_metrics.(
-                               Counter.inc_one Block_producer.slots_won) ;
-                             let scheduled_time = time_of_ms time in
-                             don't_wait_for
-                               ((* Attempt to generate a genesis proof in the slot
-                                   immediately before we'll actually need it, so that
-                                   it isn't limiting our block production time in the
-                                   won slot.
-                                   This also allows non-genesis blocks to be received
-                                   in the meantime and alleviate the need to produce
-                                   one at all, if this won't have block height 1.
-                                *)
-                                let scheduled_genesis_time =
-                                  time_of_ms
-                                    Int64.(
-                                      time
-                                      - of_int
-                                          constraint_constants
-                                            .block_window_duration_ms)
-                                in
-                                let span_till_time =
-                                  Block_time.diff scheduled_genesis_time
-                                    (Block_time.now time_controller)
-                                  |> Block_time.Span.to_time_span
-                                in
-                                let%bind () = after span_till_time in
-                                generate_genesis_proof_if_needed () ) ;
-                             Singleton_scheduler.schedule scheduler
-                               scheduled_time ~f:(fun () ->
-                                 ignore
-                                   ( Interruptible.finally
-                                       (Singleton_supervisor.dispatch
-                                          production_supervisor
-                                          (scheduled_time, data, winner_pk) )
-                                       ~f:
-                                         (check_next_block_timing
-                                            new_global_slot i' )
-                                     : (_, _) Interruptible.t ) ) ;
-                             Deferred.return () ) ) )
+                         let scheduled_time = time_of_ms time in
+                         don't_wait_for
+                           ((* Attempt to generate a genesis proof in the slot
+                               immediately before we'll actually need it, so that
+                               it isn't limiting our block production time in the
+                               won slot.
+                               This also allows non-genesis blocks to be received
+                               in the meantime and alleviate the need to produce
+                               one at all, if this won't have block height 1.
+                            *)
+                            let scheduled_genesis_time =
+                              time_of_ms
+                                Int64.(
+                                  time
+                                  - of_int
+                                      constraint_constants
+                                        .block_window_duration_ms)
+                            in
+                            let span_till_time =
+                              Block_time.diff scheduled_genesis_time
+                                (Block_time.now time_controller)
+                              |> Block_time.Span.to_time_span
+                            in
+                            let%bind () = after span_till_time in
+                            generate_genesis_proof_if_needed () ) ;
+                         Singleton_scheduler.schedule scheduler scheduled_time
+                           ~f:(fun () ->
+                             ignore
+                               ( Interruptible.finally
+                                   (Singleton_supervisor.dispatch
+                                      production_supervisor
+                                      (scheduled_time, data, winner_pk) )
+                                   ~f:
+                                     (check_next_block_timing new_global_slot i')
+                                 : (_, _) Interruptible.t ) ) ;
+                         Deferred.return () ) )
       in
       let start () =
         check_next_block_timing Mina_numbers.Global_slot_since_hard_fork.zero
