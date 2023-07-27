@@ -2,9 +2,9 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let basic_tests_enabled = false
+let basic_tests_enabled = true
 
-let scalar_mul_tests_enabled = false
+let scalar_mul_tests_enabled = true
 
 (* Array to tuple helper *)
 let tuple9_of_array array =
@@ -3928,8 +3928,6 @@ let%test_unit "Ec_group.scalar_mul_properties_negation" =
 
       cs
     in
-
-    printf "\n scalar mul properties 3\n" ;
 
     (*
      * EC scalar multiplication properties tests
