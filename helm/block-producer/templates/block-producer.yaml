@@ -24,6 +24,9 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{- if not $.Values.allowPodPreemption }}
+      priorityClassName: nonpreempting
+      {{- end }}
       initContainers:
       - name: fix-perms
         image: busybox
@@ -380,5 +383,7 @@ spec:
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
 {{- end }}
+---
+{{ end }}
 ---
 {{ end }}

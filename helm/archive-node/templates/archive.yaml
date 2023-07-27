@@ -24,6 +24,9 @@ spec:
         prometheus.io/path: '/metrics'
     spec:
       {{- if .Values.archive.enableLocalDaemon }}
+      {{- if not $.Values.allowPodPreemption }}
+      priorityClassName: nonpreempting
+      {{- end }}
       initContainers:
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}

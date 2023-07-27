@@ -1,5 +1,7 @@
 testnetName: "testnet"
 
+allowPodPreemption: true
+
 mina:
   runtimeConfig:
   generateGenesisProof: true
@@ -109,3 +111,8 @@ healthcheck:
 
 nodeSelector:
   preemptible: true
+
+storage:
+  accessMode: "ReadWriteOnce"
+  size: "4Gi"
+  storageClass: "standard"

@@ -39,6 +39,9 @@ locals {
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
       exposeGraphql        = var.expose_graphql
     }
+    
+    allowPodPreemption = var.allow_pod_preemption
+    persist_working_dir = var.enable_working_dir_persitence
 
     seedConfigs = [
       for index, config in var.seed_configs : {
@@ -121,6 +124,8 @@ locals {
         archiveAddress       = config.archiveAddress
       }
     ]
+    allowPodPreemption = var.allow_pod_preemption
+    persist_working_dir = var.enable_working_dir_persitence
   }
 
   archive_vars = [for item in var.archive_configs : {
@@ -155,6 +160,8 @@ locals {
         }
       }
     }
+    allowPodPreemption = var.allow_pod_preemption
+    persist_working_dir = var.enable_working_dir_persitence
   }]
 
   snark_vars = [
@@ -175,8 +182,10 @@ locals {
       snarkFee = snark.snark_worker_fee
       workSelectionAlgorithm = "seq"
 
-      workerCpuRequest = var.worker_cpu_request
-      workerMemRequest= var.worker_mem_request
+      workerCpuRequest    = var.worker_cpu_request
+      workerMemRequest    = var.worker_mem_request
+      allowPodPreemption = var.allow_pod_preemption
+      persist_working_dir = var.enable_working_dir_persitence
     }
   ]
 
@@ -186,6 +195,8 @@ locals {
       mina        = local.daemon
       healthcheck = local.healthcheck_vars
       name = node.name
+      allowPodPreemption = var.allow_pod_preemption
+      persist_working_dir = var.enable_working_dir_persitence
     }
   ]
 
