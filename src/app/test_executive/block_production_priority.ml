@@ -88,6 +88,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "observer"
       |> Core.String.Map.data
     in
+
+    let online_monitor, online_monitor_subscription =
+      Wait_condition.monitor_online_nodes ~logger (event_router t)
+    in
+    (* The nodes that we send GraphQL requests to needs to stay online. *)
+    List.iter ~f:(Wait_condition.require_online online_monitor) empty_bps ;
+    (* The receiver needs to be online to synchronize to. *)
+    Wait_condition.require_online online_monitor receiver ;
+
     let rec map_remove_keys map ~(keys : string list) =
       match keys with
       | [] ->
@@ -227,17 +236,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Fn.compose Malleable_error.soften_error
                 (Fn.compose Malleable_error.ignore_m get_metrics) ) )
     in
-    section "catchup observer"
-      (let%bind () = Network.Node.start ~fresh_state:false observer in
-       [%log info]
-         "Observer %s started again, will now wait for this node to initialize"
-         (Network.Node.id observer) ;
-       let%bind () = wait_for t (Wait_condition.node_to_initialize observer) in
-       wait_for t
-         ( Wait_condition.nodes_to_synchronize [ receiver; observer ]
-         |> Wait_condition.with_timeouts
-              ~soft_timeout:(Network_time_span.Slots 3)
-              ~hard_timeout:
-                (Network_time_span.Literal
-                   (Time.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
+    let%bind () =
+      section "catchup observer"
+        (let%bind () = Network.Node.start ~fresh_state:false observer in
+         [%log info]
+           "Observer %s started again, will now wait for this node to \
+            initialize"
+           (Network.Node.id observer) ;
+         let%bind () =
+           wait_for t (Wait_condition.node_to_initialize observer)
+         in
+         wait_for t
+           ( Wait_condition.nodes_to_synchronize [ receiver; observer ]
+           |> Wait_condition.with_timeouts
+                ~soft_timeout:(Network_time_span.Slots 3)
+                ~hard_timeout:
+                  (Network_time_span.Literal
+                     (Time.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
+    in
+    return (Event_router.cancel (event_router t) online_monitor_subscription ())
 end

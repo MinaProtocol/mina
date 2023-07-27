@@ -138,6 +138,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 String.(Network.Node.id n <> Network.Node.id first_bp) )
               (Core.String.Map.data (Network.all_nodes network)) ) )
     in
+
+    let online_monitor, online_monitor_subscription =
+      Wait_condition.monitor_online_nodes ~logger (event_router t)
+    in
+    (* The node that we send GraphQL requests to needs to stay online. *)
+    Wait_condition.require_online online_monitor node ;
+    (* The archive node needs to be online to run the final replayer test. *)
+    Map.iter
+      ~f:(Wait_condition.require_online online_monitor)
+      (Network.archive_nodes network) ;
+
     let keymap =
       List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
         ~f:(fun map { private_key; public_key } ->
@@ -370,6 +381,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         @@ Wait_condition.ledger_proofs_emitted_since_genesis
              ~test_config:config ~num_proofs )
     in
+    Event_router.cancel (event_router t) online_monitor_subscription () ;
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;
     section_hard "Running replayer"

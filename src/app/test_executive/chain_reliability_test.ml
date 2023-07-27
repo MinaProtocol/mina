@@ -49,6 +49,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node_c =
       Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
+
+    let online_monitor, online_monitor_subscription =
+      Wait_condition.monitor_online_nodes ~logger (event_router t)
+    in
+    (* The nodes that we sync to need to stay online. *)
+    Wait_condition.require_online online_monitor node_a ;
+    Wait_condition.require_online online_monitor node_b ;
+
     let%bind _ =
       section "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 2))
@@ -102,20 +110,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          [%log info] "chain_reliability_test: finished waiting for payments" ;
          () )
     in
-    section "common prefix of all nodes is no farther back than 1 block"
-      (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 4, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
-      (let%bind (labeled_chains : (string * string list) list) =
-         Malleable_error.List.map (Core.String.Map.data all_nodes)
-           ~f:(fun node ->
-             let%map chain =
-               Integration_test_lib.Graphql_requests.must_get_best_chain ~logger
-                 (Node.get_ingress_uri node)
-             in
-             (Node.id node, List.map ~f:(fun b -> b.state_hash) chain) )
-       in
-       let (chains : string list list) =
-         List.map labeled_chains ~f:(fun (_, chain) -> chain)
-       in
-       print_chains labeled_chains ;
-       check_common_prefixes chains ~tolerance:1 ~logger )
+    let%bind () =
+      section "common prefix of all nodes is no farther back than 1 block"
+        (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 4, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
+        (let%bind (labeled_chains : (string * string list) list) =
+           Malleable_error.List.map (Core.String.Map.data all_nodes)
+             ~f:(fun node ->
+               let%map chain =
+                 Integration_test_lib.Graphql_requests.must_get_best_chain
+                   ~logger
+                   (Node.get_ingress_uri node)
+               in
+               (Node.id node, List.map ~f:(fun b -> b.state_hash) chain) )
+         in
+         let (chains : string list list) =
+           List.map labeled_chains ~f:(fun (_, chain) -> chain)
+         in
+         print_chains labeled_chains ;
+         check_common_prefixes chains ~tolerance:1 ~logger )
+    in
+    return (Event_router.cancel (event_router t) online_monitor_subscription ())
 end

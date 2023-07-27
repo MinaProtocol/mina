@@ -43,6 +43,8 @@ module Engine = struct
 
       val id : t -> string
 
+      val app_id : t -> string
+
       val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t
@@ -254,6 +256,18 @@ module Dsl = struct
 
     val transition_frontier_loaded_from_persistence :
       fresh_data:bool -> sync_needed:bool -> t
+
+    type online_nodes_monitor
+
+    val require_online : online_nodes_monitor -> Engine.Network.Node.t -> unit
+
+    val not_require_online :
+      online_nodes_monitor -> Engine.Network.Node.t -> unit
+
+    val monitor_online_nodes :
+         logger:Logger.t
+      -> Event_router.t
+      -> online_nodes_monitor * unit Event_router.event_subscription
   end
 
   module type S = sig

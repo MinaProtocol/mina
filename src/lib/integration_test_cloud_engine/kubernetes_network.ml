@@ -43,6 +43,8 @@ module Node = struct
 
   let id { pod_ids; _ } = List.hd_exn pod_ids
 
+  let app_id { app_id; _ } = app_id
+
   let network_keypair { pod_info = { network_keypair; _ }; _ } = network_keypair
 
   let base_kube_args t = [ "--cluster"; t.cluster; "--namespace"; t.namespace ]

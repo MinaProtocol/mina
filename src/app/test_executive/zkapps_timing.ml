@@ -53,6 +53,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Network.block_producers network |> Core.String.Map.data
     in
     let node = List.hd_exn block_producer_nodes in
+
+    let online_monitor, online_monitor_subscription =
+      Wait_condition.monitor_online_nodes ~logger (event_router t)
+    in
+    (* The node that we send GraphQL requests to needs to stay online. *)
+    Wait_condition.require_online online_monitor node ;
+    (* The archive node needs to be online to run the final replayer test. *)
+    Map.iter
+      ~f:(Wait_condition.require_online online_monitor)
+      (Network.archive_nodes network) ;
+
     let constraint_constants =
       Genesis_constants.Constraint_constants.compiled
     in
@@ -717,6 +728,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Malleable_error.hard_error
              (Error.of_string "Ledger update contains a timing update") ) )
     in
+    Event_router.cancel (event_router t) online_monitor_subscription () ;
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger

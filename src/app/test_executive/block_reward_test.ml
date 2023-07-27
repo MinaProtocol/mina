@@ -36,6 +36,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node =
       Core.String.Map.find_exn (Network.block_producers network) "node"
     in
+
+    let online_monitor, online_monitor_subscription =
+      Wait_condition.monitor_online_nodes ~logger (event_router t)
+    in
+    (* The node that we send GraphQL requests to needs to stay online. *)
+    Wait_condition.require_online online_monitor node ;
+
     let bp_keypair =
       (Core.String.Map.find_exn (Network.genesis_keypairs network) "node-key")
         .keypair
@@ -48,30 +55,34 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "wait for 1 block to be produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
     in
-    section
-      "check that the account balances are what we expect after the block has \
-       been produced"
-      (let%bind { total_balance = bp_balance; _ } =
-         Graphql_requests.must_get_account_data ~logger
-           (Network.Node.get_ingress_uri node)
-           ~account_id:bp_pk_account_id
-       in
-       (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
-       let bp_expected =
-         Currency.Amount.add bp_original_balance coinbase_reward
-         |> Option.value_exn
-       in
-       [%log info] "bp_expected: %s"
-         (Currency.Amount.to_mina_string bp_expected) ;
-       [%log info] "bp_balance: %s" (Currency.Balance.to_mina_string bp_balance) ;
-       if
-         Currency.Amount.( = )
-           (Currency.Balance.to_amount bp_balance)
-           bp_expected
-       then Malleable_error.return ()
-       else
-         Malleable_error.soft_error_format ~value:()
-           "Error with account balances.  bp balance is %d and should be %d"
-           (Currency.Balance.to_nanomina_int bp_balance)
-           (Currency.Amount.to_nanomina_int bp_expected) )
+    let%bind () =
+      section
+        "check that the account balances are what we expect after the block \
+         has been produced"
+        (let%bind { total_balance = bp_balance; _ } =
+           Graphql_requests.must_get_account_data ~logger
+             (Network.Node.get_ingress_uri node)
+             ~account_id:bp_pk_account_id
+         in
+         (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
+         let bp_expected =
+           Currency.Amount.add bp_original_balance coinbase_reward
+           |> Option.value_exn
+         in
+         [%log info] "bp_expected: %s"
+           (Currency.Amount.to_mina_string bp_expected) ;
+         [%log info] "bp_balance: %s"
+           (Currency.Balance.to_mina_string bp_balance) ;
+         if
+           Currency.Amount.( = )
+             (Currency.Balance.to_amount bp_balance)
+             bp_expected
+         then Malleable_error.return ()
+         else
+           Malleable_error.soft_error_format ~value:()
+             "Error with account balances.  bp balance is %d and should be %d"
+             (Currency.Balance.to_nanomina_int bp_balance)
+             (Currency.Amount.to_nanomina_int bp_expected) )
+    in
+    return (Event_router.cancel (event_router t) online_monitor_subscription ())
 end

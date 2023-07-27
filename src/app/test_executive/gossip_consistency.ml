@@ -46,6 +46,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let sender_bp =
       Core.String.Map.find_exn (Network.block_producers network) "node-b"
     in
+
+    let online_monitor, online_monitor_subscription =
+      Wait_condition.monitor_online_nodes ~logger (event_router t)
+    in
+    (* The node that we send GraphQL requests to needs to stay online. *)
+    Wait_condition.require_online online_monitor sender_bp ;
+    (* The node that we observe the transactions received on needs to stay
+       online.
+    *)
+    Wait_condition.require_online online_monitor receiver_bp ;
+
     let%bind sender_pub_key = pub_key_of_node sender_bp in
     let num_payments = 3 in
     let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
@@ -120,5 +131,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [%log info] "gossip_consistency test: consistency ratio OK" ;
         result
     in
+    Event_router.cancel (event_router t) online_monitor_subscription () ;
     [%log info] "gossip_consistency test: test finished!!"
 end

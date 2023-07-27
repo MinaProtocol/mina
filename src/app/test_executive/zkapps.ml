@@ -138,9 +138,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            ( Wait_condition.nodes_to_initialize
            @@ (Network.all_nodes network |> Core.String.Map.data) ) )
     in
+
+    (* Online monitor, to ensure that required nodes do not die. *)
+    let online_monitor, online_monitor_subscription =
+      Wait_condition.monitor_online_nodes ~logger (event_router t)
+    in
     let node =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
+    (* The node that we send GraphQL requests to needs to stay online. *)
+    Wait_condition.require_online online_monitor node ;
+    (* The archive node needs to be online to run the final replayer test. *)
+    Map.iter
+      ~f:(Wait_condition.require_online online_monitor)
+      (Network.archive_nodes network) ;
+
     let constraint_constants = Network.constraint_constants network in
     let fish1_kp =
       (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
@@ -874,6 +886,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.ledger_proofs_emitted_since_genesis
               ~test_config:config ~num_proofs:1 ) )
     in
+    Event_router.cancel (event_router t) online_monitor_subscription () ;
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;
     section_hard "Running replayer"

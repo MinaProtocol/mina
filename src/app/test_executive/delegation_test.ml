@@ -46,6 +46,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node_b =
       Core.String.Map.find_exn (Network.block_producers network) "node-b"
     in
+
+    let online_monitor, online_monitor_subscription =
+      Wait_condition.monitor_online_nodes ~logger (event_router t)
+    in
+    (* The node that we send GraphQL requests to needs to stay online. *)
+    Wait_condition.require_online online_monitor node_b ;
+    (* The archive node needs to be online to run the final replayer test. *)
+    Map.iter
+      ~f:(Wait_condition.require_online online_monitor)
+      (Network.archive_nodes network) ;
+
     let%bind () =
       section "Delegate all mina currency from node_b to node_a"
         (let delegation_receiver = node_a in
@@ -66,6 +77,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.signed_command_to_be_included_in_frontier
               ~txn_hash:hash ~node_included_in:`Any_node ) )
     in
+    Event_router.cancel (event_router t) online_monitor_subscription () ;
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
