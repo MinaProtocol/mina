@@ -1825,6 +1825,8 @@ let create ?wallets (config : Config.t) =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
               ~disk_location:config.snark_pool_disk_location
+              ~skip_local_snark_work_verification:
+                config.skip_local_snark_work_verification
           in
           let snark_pool, snark_remote_sink, snark_local_sink =
             Network_pool.Snark_pool.create ~config:snark_pool_config

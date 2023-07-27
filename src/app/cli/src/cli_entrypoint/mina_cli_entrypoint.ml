@@ -484,6 +484,11 @@ let setup_daemon logger =
         "true|false Whether to send the commit SHA used to build the node to \
          the uptime service. (default: false)"
       no_arg
+  and verify_local_snark_works =
+    flag "--verify_local_snark_works" no_arg
+      ~doc:
+        "Verify snark works coming from workers connected to this snark \
+         coordinator"
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -1366,6 +1371,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                    }
                  ~snark_coordinator_key:run_snark_coordinator_flag
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                 ~skip_local_snark_work_verification:
+                   (not verify_local_snark_works)
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~persistent_root_location:(conf_dir ^/ "root")
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")

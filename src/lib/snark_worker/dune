@@ -21,6 +21,7 @@
    result
    async_unix
    bin_prot.shape
+   base.md5
    ;; local libraries
    one_or_two
    mina_metrics
