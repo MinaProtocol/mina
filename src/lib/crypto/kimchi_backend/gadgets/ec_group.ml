@@ -2330,7 +2330,7 @@ let%test_unit "Ec_group.ops_mixed" =
             in
 
             (* S + S = D *)
-            let double =
+            let double_value =
               double (module Runner.Impl) unused_external_checks curve sum
             in
 
@@ -2353,7 +2353,7 @@ let%test_unit "Ec_group.ops_mixed" =
                 assert (
                   Affine.equal_as_prover
                     (module Runner.Impl)
-                    double expected_result ) ) ;
+                    double_value expected_result ) ) ;
             () )
       in
 
@@ -4052,18 +4052,17 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
             in
 
             (* Check for expected quantity of external checks *)
-            if Bignum_bigint.(curve.bignum.a = zero) then
-              assert (
-                Mina_stdlib.List.Length.equal unused_external_checks.bounds 42 )
-            else
-              assert (
-                Mina_stdlib.List.Length.equal unused_external_checks.bounds 43 ) ;
+            assert (Mina_stdlib.List.Length.equal unused_external_checks.bounds 44 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                17 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.canonicals 8 ) ;
             assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 17 ) ;
+                Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
+                34 ) ;
+            assert (
+                  Mina_stdlib.List.Length.equal
+                  unused_external_checks.compact_multi_ranges 0 ) ;
+                  assert (
+                    Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
