@@ -63,6 +63,14 @@ val lift :
 
 module Flag : sig
   type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
+
+  (** [( ||| )] is a commutative ternary disjunction on {!type:t} with 
+      a similar specification to its usual Boolean [||] counterpart:
+
+      - [Yes] is absorbing: [Yes ||| x] is [Yes]
+      - [No] is neutral:    [No ||| x]  is [x]
+   *)
+  val ( ||| ) : t -> t -> t
 end
 
 val constant_layout_typ :

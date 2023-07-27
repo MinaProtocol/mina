@@ -125,7 +125,7 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~proofs_verified ~wrap_rounds ~feature_flags =
+  let input ~proofs_verified ~wrap_rounds ~feature_flags:_ =
     let open Types.Step.Statement in
     let spec = spec proofs_verified wrap_rounds in
     let (T (typ, f, f_inv)) =

@@ -1070,7 +1070,7 @@ struct
             (module Impl)
             ~env ~shift:shift2
             (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-             .to_wrap ~opt_none:Plonk_types.Opt.None ~false_:Boolean.false_
+             .to_wrap ~opt_none:Pickles_types.Opt.none ~false_:Boolean.false_
                plonk )
             combined_evals )
     in

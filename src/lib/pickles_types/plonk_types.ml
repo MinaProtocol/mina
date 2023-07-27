@@ -439,7 +439,32 @@ module Evals = struct
       }
 
     let to_list
-        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
+        { w
+        ; coefficients
+        ; z
+        ; s
+        ; generic_selector
+        ; poseidon_selector
+        ; complete_add_selector
+        ; mul_selector
+        ; emul_selector
+        ; endomul_scalar_selector
+        ; range_check0_selector
+        ; range_check1_selector
+        ; foreign_field_add_selector
+        ; foreign_field_mul_selector
+        ; xor_selector
+        ; rot_selector
+        ; lookup_aggregation
+        ; lookup_table
+        ; lookup_sorted
+        ; runtime_lookup_table
+        ; runtime_lookup_table_selector
+        ; xor_lookup_selector
+        ; lookup_gate_lookup_selector
+        ; range_check_lookup_selector
+        ; foreign_field_mul_lookup_selector
+        } =
       let some x = Opt.some x in
       let always_present =
         List.map ~f:some

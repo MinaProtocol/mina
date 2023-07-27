@@ -228,17 +228,15 @@ let tick_public_input_of_statement ~max_proofs_verified ~feature_flags
     (Backend.Tick.Field.Vector.length input)
     ~f:(Backend.Tick.Field.Vector.get input)
 
-let ft_comm ~add:( + ) ~scale ~endoscale:_ ~negate
+let ft_comm ~add ~scale ~endoscale:_ ~negate
     ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha:_
     ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
-    ~t_comm ~options =
-  let _ = options in
-
-  (* ignore flags for now *)
+    ~t_comm ~options:_ =
+  let ( + ) = add in
   let _, [ sigma_comm_last ] =
     Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
-  let f_comm = List.reduce_exn ~f:( + ) [ plonk.perm * sigma_comm_last ] in
+  let f_comm = scale sigma_comm_last plonk.perm in
   let chunked_t_comm =
     let n = Array.length t_comm in
     let res = ref t_comm.(n - 1) in

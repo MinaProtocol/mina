@@ -122,7 +122,7 @@ let expand_deferred (type n most_recent_width)
     ; beta = plonk0.beta
     ; gamma = plonk0.gamma
     ; lookup =
-        Option.map (Plonk_types.Opt.to_option_unsafe p.lookup) ~f:(fun _ ->
+        Option.map (Opt.to_option_unsafe p.lookup) ~f:(fun _ ->
             { Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup
               .joint_combiner = Option.value_exn plonk0.joint_combiner
             } )

@@ -852,8 +852,7 @@ struct
   (* TODO: This needs to handle the fact of variable length evaluations.
      Meaning it needs opt sponge. *)
   let finalize_other_proof (type b branches)
-      (module Proofs_verified : Nat.Add.Intf with type n = b)
-      ~(feature_flags : Opt.Flag.t Plonk_types.Features.t)
+      (module Proofs_verified : Nat.Add.Intf with type n = b) ~feature_flags:_
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
       ~(* TODO: Add "actual proofs verified" so that proofs don't

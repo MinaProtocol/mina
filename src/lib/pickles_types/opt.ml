@@ -50,6 +50,15 @@ let lift ?on_maybe ~none f = function
 
 module Flag = struct
   type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
+
+  let ( ||| ) x y =
+    match (x, y) with
+    | Yes, _ | _, Yes ->
+        Yes
+    | Maybe, _ | _, Maybe ->
+        Maybe
+    | No, No ->
+        No
 end
 
 let map t ~f =

@@ -1184,7 +1184,7 @@ module Step : sig
                  , bool
                  , 'f )
                  Snarky_backendless.Typ.t
-            -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+            -> feature_flags:Opt.Flag.t Plonk_types.Features.t
             -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
             -> ( ('c, 'e Scalar_challenge.t, 'fp) t
                , ('d, 'b Scalar_challenge.t, 'a) t
@@ -1358,7 +1358,7 @@ module Step : sig
                , 'field2 Snarky_backendless__Snark_intf.Boolean0.t
                , ( ('challenge2 Scalar_challenge.t * unit) Hlist.HlistId.t
                  , 'field2 Snarky_backendless__Snark_intf.Boolean0.t )
-                 Plonk_types.Opt.t
+                 Opt.t
                , 'field2 option
                , 'num_bulletproof_challenges )
                flat_repr

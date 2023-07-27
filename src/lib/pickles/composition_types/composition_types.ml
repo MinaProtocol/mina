@@ -174,8 +174,7 @@ module Wrap = struct
               ; fp
               ; fp
               ; Plonk_types.Features.typ ~feature_flags bool
-              ; Opt.typ Impl.Boolean.typ
-                  feature_flags.Plonk_types.Features.lookup
+              ; Opt.typ Impl.Boolean.typ uses_lookup
                   ~dummy:{ joint_combiner = dummy_scalar_challenge }
                   (Lookup.typ (Scalar_challenge.typ scalar_challenge))
               ]
