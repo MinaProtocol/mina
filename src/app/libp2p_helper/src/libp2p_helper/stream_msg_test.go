@@ -9,7 +9,7 @@ import (
 	ipc "libp2p_ipc"
 
 	capnp "capnproto.org/go/capnp/v3"
-	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p/core/host"
 )
 
 func testAddStreamHandlerDo(t *testing.T, protocol string, app *app, rpcSeqno uint64) {
