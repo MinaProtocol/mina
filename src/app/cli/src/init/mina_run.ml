@@ -482,10 +482,26 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                       (Time.Span.to_sec total))) ) ) ;
         Perf_histograms.add_span ~name:"snark_worker_transition_time" total )
   in
+  let tx_constraint_digest_equal =
+    Transaction_snark.constraint_system_digests
+      ~constraint_constants:
+        (Mina_lib.config mina).precomputed_values.constraint_constants ()
+    |> List.map ~f:(Tuple2.map_snd ~f:Md5.to_binary)
+    |> List.equal (Tuple2.equal ~eq1:String.equal ~eq2:String.equal)
+  in
   let snark_worker_impls =
-    [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
+    [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc
+        (fun () constraint_digests_worker ->
           Deferred.return
             (let open Option.Let_syntax in
+            let%bind () =
+              if tx_constraint_digest_equal constraint_digests_worker then
+                Some ()
+              else (
+                [%log warn]
+                  "worker has a different transactions constraints digest" ;
+                None )
+            in
             let%bind key =
               Option.merge
                 (Mina_lib.snark_worker_key mina)

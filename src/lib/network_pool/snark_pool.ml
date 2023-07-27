@@ -97,6 +97,7 @@ struct
           { trust_system : (Trust_system.t[@sexp.opaque])
           ; verifier : (Verifier.t[@sexp.opaque])
           ; disk_location : string
+          ; skip_local_snark_work_verification : bool
           }
         [@@deriving sexp, make]
       end
@@ -431,7 +432,9 @@ struct
                     ~sender
                 in
                 match Signature_lib.Public_key.decompress prover with
-                | Some _ when is_local ->
+                | Some _
+                  when is_local && t.config.skip_local_snark_work_verification
+                  ->
                     Deferred.return true
                 | None ->
                     (* We may need to decompress the key when paying the fee
@@ -624,6 +627,7 @@ let%test_module "random set test" =
     let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
         ~disk_location:"/tmp/snark-pool"
+        ~skip_local_snark_work_verification:true
 
     let gen ?length () =
       let open Quickcheck.Generator.Let_syntax in
