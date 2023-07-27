@@ -978,6 +978,7 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         @@ Affine.x sum ;
         Foreign_field.External_checks.append_bound_check external_checks
         @@ Affine.y sum ;
+
         (* Safety checks *)
         Foreign_field.External_checks.append_canonical_check external_checks
         @@ Affine.x sum ;
@@ -1000,6 +1001,7 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
               @@ Affine.x double_base ;
               Foreign_field.External_checks.append_bound_check external_checks
               @@ Affine.y double_base ;
+
               (* Safety checks *)
               Foreign_field.External_checks.append_canonical_check
                 external_checks
@@ -4052,17 +4054,18 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
             in
 
             (* Check for expected quantity of external checks *)
-            assert (Mina_stdlib.List.Length.equal unused_external_checks.bounds 44 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.bounds 44 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 8 ) ;
             assert (
-                Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
+              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 34 ) ;
             assert (
-                  Mina_stdlib.List.Length.equal
-                  unused_external_checks.compact_multi_ranges 0 ) ;
-                  assert (
-                    Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
+              Mina_stdlib.List.Length.equal
+                unused_external_checks.compact_multi_ranges 0 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -4150,14 +4153,14 @@ let%test_unit "Ec_group.scalar_mul_tiny_full" =
              *)
 
             (* Sanity checks *)
-            if Bignum_bigint.(curve.bignum.a = zero) then
-              assert (Mina_stdlib.List.Length.equal external_checks.bounds 42)
-            else assert (Mina_stdlib.List.Length.equal external_checks.bounds 43) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.bounds 44) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.canonicals 8) ;
             assert (
-              Mina_stdlib.List.Length.equal external_checks.multi_ranges 17 ) ;
+              Mina_stdlib.List.Length.equal external_checks.multi_ranges 34 ) ;
             assert (
               Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
-                17 ) ;
+                0 ) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
