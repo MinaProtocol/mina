@@ -21,6 +21,9 @@ spec:
         prometheus.io/port: '10000'
         prometheus.io/path: '/metrics'
     spec:
+      {{- if not $.Values.allowPodPreemption }}
+      priorityClassName: nonpreempting
+      {{- end }}
       containers:
       - name: worker
         resources:

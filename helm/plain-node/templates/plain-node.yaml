@@ -23,6 +23,9 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{- if not $.Values.allowPodPreemption }}
+      priorityClassName: nonpreempting
+      {{- end }}
       initContainers:
       containers:
       - name: mina

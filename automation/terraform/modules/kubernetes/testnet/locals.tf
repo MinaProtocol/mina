@@ -40,6 +40,7 @@ locals {
       exposeGraphql        = var.expose_graphql
     }
     
+    allowPodPreemption = var.allow_pod_preemption
     persist_working_dir = var.enable_working_dir_persitence
 
     seedConfigs = [
@@ -123,6 +124,7 @@ locals {
         archiveAddress       = config.archiveAddress
       }
     ]
+    allowPodPreemption = var.allow_pod_preemption
     persist_working_dir = var.enable_working_dir_persitence
   }
 
@@ -158,6 +160,7 @@ locals {
         }
       }
     }
+    allowPodPreemption = var.allow_pod_preemption
     persist_working_dir = var.enable_working_dir_persitence
   }]
 
@@ -181,6 +184,7 @@ locals {
 
       workerCpuRequest    = var.worker_cpu_request
       workerMemRequest    = var.worker_mem_request
+      allowPodPreemption = var.allow_pod_preemption
       persist_working_dir = var.enable_working_dir_persitence
     }
   ]
@@ -191,6 +195,7 @@ locals {
       mina        = local.daemon
       healthcheck = local.healthcheck_vars
       name = node.name
+      allowPodPreemption = var.allow_pod_preemption
       persist_working_dir = var.enable_working_dir_persitence
     }
   ]

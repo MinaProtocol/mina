@@ -302,7 +302,7 @@ module Workload_to_deploy = struct
              ; "jsonpath={.spec.selector.matchLabels.app}"
              ] ) )
     in
-    let%map pod_ids_str =
+    let%bind pod_ids_str =
       Integration_test_lib.Util.run_cmd_or_hard_error cwd "kubectl"
         ( base_kube_args config
         @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
@@ -312,11 +312,14 @@ module Workload_to_deploy = struct
       |> List.filter ~f:(Fn.compose not String.is_empty)
       |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
     in
-    (* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
-    (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
-    (* TODO fix this^ and have a more elegant solution *)
-    let pod_info = t.pod_info in
-    { Node.app_id; pod_ids; pod_info; config }
+    if List.is_empty pod_ids then
+      Malleable_error.hard_error_format "no pods found for app %s" app_id
+    else
+      (* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
+      (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
+      (* TODO fix this^ and have a more elegant solution *)
+      let pod_info = t.pod_info in
+      return { Node.app_id; pod_ids; pod_info; config }
 end
 
 type t =

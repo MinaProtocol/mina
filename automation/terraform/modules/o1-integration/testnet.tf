@@ -20,6 +20,7 @@ module "kubernetes_testnet" {
   mina_bots_image    = var.mina_bots_image
   mina_points_image  = var.mina_points_image
   enable_working_dir_persitence = var.enable_working_dir_persitence
+  allow_pod_preemption  = false
   log_level             = "Trace"
   log_snark_work_gossip = true
 
