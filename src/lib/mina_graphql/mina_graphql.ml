@@ -5186,12 +5186,49 @@ module Mutations = struct
             let s = sprintf "Deleted %d log%s" n (if n > 1 then "s" else "") in
             return @@ Ok s )
 
+    let stop_daemon =
+      (* minimum delay is to allow this GraphQL request to return *)
+      let min_delay_secs = 5 in
+      io_field "stopDaemon" ~doc:"Stop the Mina daemon"
+        ~args:
+          Arg.
+            [ arg "delaySeconds"
+                ~doc:
+                  (sprintf
+                     "Seconds to delay before stopping daemon (minimum %d)"
+                     min_delay_secs )
+                ~typ:int
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = with_seq_no, _; _ } () delay_secs ->
+          O1trace.thread "itn_stop_daemon"
+          @@ fun () ->
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            let delay_secs =
+              Option.value_map delay_secs ~default:min_delay_secs ~f:Fn.id
+            in
+            if delay_secs < min_delay_secs then
+              return
+              @@ Error
+                   (sprintf "Delay of %d seconds is less than minimum %d"
+                      delay_secs min_delay_secs )
+            else
+              let s = sprintf "Stopping daemon in %d seconds" delay_secs in
+              let delay_span = delay_secs |> Float.of_int |> Time.Span.of_sec in
+              Async.Deferred.don't_wait_for
+                (let%bind () = Async.after delay_span in
+                 let%bind () = Scheduler.yield () in
+                 exit 0 ) ;
+              return @@ Ok s )
+
     let commands =
       [ schedule_payments
       ; schedule_zkapp_commands
       ; stop_scheduled_transactions
       ; update_gating
       ; flush_internal_logs
+      ; stop_daemon
       ]
   end
 end
