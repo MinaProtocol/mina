@@ -19,13 +19,6 @@ type nonrec 'caml_f random_oracles =
 
 type nonrec 'evals point_evaluations = { zeta : 'evals; zeta_omega : 'evals }
 
-type nonrec 'caml_f lookup_evaluations =
-  { sorted : 'caml_f array point_evaluations array
-  ; aggreg : 'caml_f array point_evaluations
-  ; table : 'caml_f array point_evaluations
-  ; runtime : 'caml_f array point_evaluations option
-  }
-
 type nonrec 'caml_f proof_evaluations =
   { w :
       'caml_f array point_evaluations
@@ -67,9 +60,27 @@ type nonrec 'caml_f proof_evaluations =
       * 'caml_f array point_evaluations
       * 'caml_f array point_evaluations
       * 'caml_f array point_evaluations
-  ; lookup : 'caml_f lookup_evaluations option
   ; generic_selector : 'caml_f array point_evaluations
   ; poseidon_selector : 'caml_f array point_evaluations
+  ; complete_add_selector : 'caml_f array point_evaluations
+  ; mul_selector : 'caml_f array point_evaluations
+  ; emul_selector : 'caml_f array point_evaluations
+  ; endomul_scalar_selector : 'caml_f array point_evaluations
+  ; range_check0_selector : 'caml_f array point_evaluations option
+  ; range_check1_selector : 'caml_f array point_evaluations option
+  ; foreign_field_add_selector : 'caml_f array point_evaluations option
+  ; foreign_field_mul_selector : 'caml_f array point_evaluations option
+  ; xor_selector : 'caml_f array point_evaluations option
+  ; rot_selector : 'caml_f array point_evaluations option
+  ; lookup_aggregation : 'caml_f array point_evaluations option
+  ; lookup_table : 'caml_f array point_evaluations option
+  ; lookup_sorted : 'caml_f array point_evaluations option array
+  ; runtime_lookup_table : 'caml_f array point_evaluations option
+  ; runtime_lookup_table_selector : 'caml_f array point_evaluations option
+  ; xor_lookup_selector : 'caml_f array point_evaluations option
+  ; lookup_gate_lookup_selector : 'caml_f array point_evaluations option
+  ; range_check_lookup_selector : 'caml_f array point_evaluations option
+  ; foreign_field_mul_lookup_selector : 'caml_f array point_evaluations option
   }
 
 type nonrec 'caml_g poly_comm =
@@ -193,7 +204,12 @@ module VerifierIndex = struct
     type nonrec lookup_info =
       { max_per_row : int; max_joint_size : int; features : lookup_features }
 
-    type nonrec 't lookup_selectors = { lookup : 't option } [@@boxed]
+    type nonrec 't lookup_selectors =
+      { lookup : 't option
+      ; xor : 't option
+      ; range_check : 't option
+      ; ffmul : 't option
+      }
 
     type nonrec 'poly_comm t =
       { joint_lookup_used : bool

@@ -30,7 +30,6 @@ use wires_15_stubs::{
     srs::{fp::*, fq::*},
     CamlCircuitGate,
     CamlLookupCommitments,
-    CamlLookupEvaluations,
     CamlOpeningProof,
     CamlPolyComm,
     CamlProofEvaluations,
@@ -100,7 +99,6 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlScalarChallenge::<T1> => "scalar_challenge");
     decl_type!(w, env, CamlRandomOracles::<T1> => "random_oracles");
     decl_type!(w, env, PointEvaluations::<T1> => "point_evaluations");
-    decl_type!(w, env, CamlLookupEvaluations<T1> => "lookup_evaluations");
     decl_type!(w, env, CamlProofEvaluations::<T1> => "proof_evaluations");
     decl_type!(w, env, CamlPolyComm::<T1> => "poly_comm");
     decl_type!(w, env, CamlRecursionChallenge::<T1, T2> => "recursion_challenge");

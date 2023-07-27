@@ -5,7 +5,7 @@ import (
 )
 
 type SlotsWonParams struct {
-	Participants []NodeAddress
+	Nodes []NodeAddress `json:"nodes"`
 }
 
 type SlotsWonOutput struct {
@@ -14,7 +14,7 @@ type SlotsWonOutput struct {
 }
 
 func SlotsWon(config Config, params SlotsWonParams, output func(SlotsWonOutput)) error {
-	for _, address := range params.Participants {
+	for _, address := range params.Nodes {
 		resp, slotsQueried, err := SlotsWonGql(config, address)
 		if slotsQueried {
 			if err != nil {
