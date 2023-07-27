@@ -284,14 +284,6 @@ module Network_manager = struct
       ; genesis_keypairs = network_config.genesis_keypairs
       }
     in
-    (* check capacity *)
-    let%bind () =
-      if network_config.check_capacity then
-        check_kube_capacity t ~logger
-          ~delay:(Float.of_int network_config.check_capacity_delay)
-          ~retries:network_config.check_capacity_retries
-      else Malleable_error.return ()
-    in
     (* making the main.tf.json *)
     let open Deferred.Let_syntax in
     let%bind () =
