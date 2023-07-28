@@ -431,6 +431,7 @@ let initialize_infra ~logger network =
   let rec poll n =
     [%log debug] "Checking kubernetes pod statuses, n=%d" n ;
     let is_successful_pod_status status = String.equal "Running" status in
+    let is_failed_pod_status status = String.equal "Failure" status in
     match%bind Deferred.bind ~f:Malleable_error.return (kube_get_pods ()) with
     | Ok str ->
         let pod_statuses = parse_pod_statuses str in
@@ -443,6 +444,11 @@ let initialize_infra ~logger network =
         let all_pods_are_present =
           List.for_all (String.Set.elements all_pods_set) ~f:(fun pod_id ->
               String.Map.mem pod_statuses pod_id )
+        in
+        let failed_pods =
+          List.filter_map (String.Map.to_alist pod_statuses)
+            ~f:(fun (pod_id, status) ->
+              Option.some_if (is_failed_pod_status status) pod_id )
         in
         let any_pods_are_not_running =
           (* there could be duplicate keys... *)
@@ -461,6 +467,15 @@ let initialize_infra ~logger network =
             (present_pods |> String.concat ~sep:"; ") ;
           Malleable_error.hard_error_string ~exit_code:5
             "Some pods were not found in namespace." )
+        else if not (List.is_empty failed_pods) then (
+          [%log fatal]
+            "At least one pod had an error while deploying. \n\
+             Expected pods: [%s].   \n\
+             Failed pos: [%s]."
+            (String.Set.elements all_pods_set |> String.concat ~sep:"; ")
+            (failed_pods |> String.concat ~sep:"; ") ;
+          Malleable_error.hard_error_string ~exit_code:14
+            "Some pods failed to deploy." )
         else if any_pods_are_not_running then
           let failed_pod_statuses =
             List.filter (String.Map.to_alist pod_statuses)
