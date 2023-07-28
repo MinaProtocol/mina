@@ -11,18 +11,18 @@ module "kubernetes_testnet" {
   cluster_region = var.cluster_region
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
+  priority_class = kubernetes_priority_class.testnet_priority_class.metadata[0].name
 
-  mina_image         = var.mina_image
-  use_custom_entrypoint = true
-  custom_entrypoint = "/mina_daemon_puppeteer.py"
-  mina_archive_image = var.mina_archive_image
-  mina_agent_image   = var.mina_agent_image
-  mina_bots_image    = var.mina_bots_image
-  mina_points_image  = var.mina_points_image
+  mina_image                    = var.mina_image
+  use_custom_entrypoint         = true
+  custom_entrypoint             = "/mina_daemon_puppeteer.py"
+  mina_archive_image            = var.mina_archive_image
+  mina_agent_image              = var.mina_agent_image
+  mina_bots_image               = var.mina_bots_image
+  mina_points_image             = var.mina_points_image
   enable_working_dir_persitence = var.enable_working_dir_persitence
-  allow_pod_preemption  = false
-  log_level             = "Trace"
-  log_snark_work_gossip = true
+  log_level                     = "Trace"
+  log_snark_work_gossip         = true
 
   #make sure everyone has the seed peer's multiaddress
   additional_peers = ["/dns4/seed.${var.testnet_name}/tcp/${local.seed_external_port}/p2p/12D3KooWCoGWacXE4FRwAX8VqhnWVKhz5TTEecWEuGmiNrDt2XLf"]
