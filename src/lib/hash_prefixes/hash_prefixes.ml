@@ -32,7 +32,7 @@ let zkapp_account = create "MinaZkappAccount"
 
 let zkapp_payload = create "MinaZkappPayload"
 
-let zkapp_body = create "MinaZkappBody"
+let zkapp_body chain_name = create (chain_name ^ "MinaZkappBody")
 
 let merkle_tree i = create (Printf.sprintf "MinaMklTree%03d" i)
 
@@ -87,8 +87,6 @@ let zkapp_precondition_protocol_state = create "MinaZkappPredPS"
 
 (*for Account_update.Account_precondition.t*)
 let account_update_account_precondition = create "MinaAcctUpdAcctPred"
-
-let account_update = create "MinaAcctUpdate"
 
 let account_update_cons = create "MinaAcctUpdateCons"
 

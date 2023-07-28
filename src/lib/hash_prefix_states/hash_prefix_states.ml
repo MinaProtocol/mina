@@ -103,15 +103,20 @@ let zkapp_account = salt zkapp_account
 
 let zkapp_payload = salt zkapp_payload
 
-let zkapp_body = salt zkapp_body
+let zkapp_body ?(signature_kind = Mina_signature_kind.t) =
+  match signature_kind with
+  | Mainnet ->
+      salt (zkapp_body "Mainnet")
+  | Testnet ->
+      salt (zkapp_body "Testnet")
+  | Other_network chain_name ->
+      salt (zkapp_body chain_name)
 
 let zkapp_precondition = salt zkapp_precondition
 
 let zkapp_precondition_account = salt zkapp_precondition_account
 
 let zkapp_precondition_protocol_state = salt zkapp_precondition_protocol_state
-
-let account_update = salt account_update
 
 let account_update_account_precondition =
   salt account_update_account_precondition
