@@ -72,11 +72,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node_c =
       Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
+    let start_time = Time.now () in
     let%bind () =
       section "send out padding transactions"
         (let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
          send_padding_transactions block_producer_nodes ~fee ~logger
-           ~n:(padding_payments ~transactions_sent ~num_proofs ~config) )
+           ~n:(2 * padding_payments ~transactions_sent ~num_proofs ~config) )
+    in
+    let%bind () =
+      section "wait for a ledger proof being emitted"
+        (wait_for t
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1
+              ~test_config:config ) )
     in
     let%bind () = section "stop the node" (Node.stop node_c) in
     let%bind () =
@@ -84,7 +91,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Wait for one epoch, and make sure the next epoch ledger has been \
          updated"
         (let%bind () =
-           Malleable_error.lift (Async.after (Time.Span.of_ms epoch_ms))
+           let current_time = Time.now () in
+           Malleable_error.lift
+             (Async.after
+                Time.Span.(of_ms epoch_ms - Time.(diff current_time start_time)) )
          in
          wait_for t (Wait_condition.next_epoch_ledger_updated ()) )
     in
