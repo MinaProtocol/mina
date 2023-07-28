@@ -11,7 +11,7 @@ postgresql:
     persistence:
       enabled: true
       size: 100Gi
-      storageClass: ssd-delete
+      storageClass: local-path
     initdb:
       user: "minadash"
       password: null

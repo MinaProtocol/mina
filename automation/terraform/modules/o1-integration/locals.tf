@@ -1,8 +1,8 @@
 locals {
-  graphql_ingress_dns = "${var.testnet_name}.graphql.test.o1test.net"
+  graphql_ingress_dns               = "${var.testnet_name}.graphql.test.o1test.net"
   snark_worker_host_port            = 10001
   block_producer_starting_host_port = 10010
-  
+
 
   # seed_peer = {
   #   multiaddr = "/dns4/seed.${var.testnet_name}/tcp/10401/p2p/12D3KooWCoGWacXE4FRwAX8VqhnWVKhz5TTEecWEuGmiNrDt2XLf",
@@ -15,36 +15,36 @@ locals {
   seed_external_port = 10001
 
   seed_config = {
-    name                 = "seed",
-    class                = "seed",
-    libp2p_secret        = "seed-discovery-keys",
-    libp2p_secret_pw     = "naughty blue worm"
-    external_ip          = null,
+    name             = "seed",
+    class            = "seed",
+    libp2p_secret    = "seed-discovery-keys",
+    libp2p_secret_pw = "naughty blue worm"
+    external_ip      = null,
     # private_key_secret = null,
-    enableArchive        = false,
-    archiveAddress       = null
-    persist_working_dir  = var.enable_working_dir_persitence
+    enableArchive       = false,
+    archiveAddress      = null
+    persist_working_dir = var.enable_working_dir_persitence
   }
-  
+
 
   #snark_coordinator_name = "snark-coordinator-${lower(substr(var.snark_worker_public_key, -6, -1))}"
 
   default_archive_node = {
-    image                   = var.mina_archive_image
-    serverPort              = "3086"
-    externalPort            = "11010"
-    enableLocalDaemon       = true
-    enablePostgresDB        = true
+    image             = var.mina_archive_image
+    serverPort        = "3086"
+    externalPort      = "11010"
+    enableLocalDaemon = true
+    enablePostgresDB  = true
 
-    postgresHost            = "archive-1-postgresql"
-    postgresPort            = 5432
+    postgresHost = "archive-1-postgresql"
+    postgresPort = 5432
     # remoteSchemaFile needs to be just the script name, not a url.  remoteSchemaAuxFiles needs to be a list of urls of scripts, one of these urls needs to be the url of the main sql script that invokes the other ones.  sorry it's confusing
-    remoteSchemaFile        = var.mina_archive_schema
-    remoteSchemaAuxFiles    = var.mina_archive_schema_aux_files
+    remoteSchemaFile     = var.mina_archive_schema
+    remoteSchemaAuxFiles = var.mina_archive_schema_aux_files
 
     persistenceEnabled      = false
     persistenceSize         = "1Gi"
-    persistenceStorageClass = "ssd-delete"
+    persistenceStorageClass = "local-path"
     persistenceAccessModes  = ["ReadWriteOnce"]
     spotAllowed             = "true"
     persist_working_dir     = var.enable_working_dir_persitence
@@ -52,10 +52,10 @@ locals {
 
   archive_node_configs = var.archive_configs != null ? [for item in var.archive_configs : merge(local.default_archive_node, item)] : [
     for i in range(1, var.archive_node_count + 1) : merge(local.default_archive_node, {
-      name              = "archive-${i}"
-      postgresHost      = "archive-${i}-postgresql"
+      name         = "archive-${i}"
+      postgresHost = "archive-${i}-postgresql"
     })
   ]
 
-  archive_node_names         = var.archive_node_count == 0 ? [ "" ] : [for i in range(var.archive_node_count) : "archive-${i + 1}:3086"]
+  archive_node_names = var.archive_node_count == 0 ? [""] : [for i in range(var.archive_node_count) : "archive-${i + 1}:3086"]
 }

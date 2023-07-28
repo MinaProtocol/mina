@@ -74,7 +74,7 @@ Parameter | Description | Default
 `postgresql.primary.service.type` | network connection used to expose the zkApps dashboard | `LoadBalancer`
 `postgresql.primary.persistence.enabled` | enable or disable persistent storage | `true`
 `postgresql.primary.persistence.size` | storage disk size | `100Gi`
-`postgresql.primary.persistence.storageClass` | storage disk type | `ssd-delete`
+`postgresql.primary.persistence.storageClass` | storage disk type | `ssd-delete`, `local-path`
 `postgresql.primary.initdb.user` | default database user | `mina`
 `postgresql.primary.initdb.password` | default database password | `null`
 `postgresql.primary.initdb.scripts` | script to initialize the zkApp dashboard database table | `zkapp-table.sql : CREATE TABLE zkapps (time timestamp, unique_zkapps INT, total_zkapps INT, successful_txns INT, failed_txns INT, total_txns INT, successful_payments INT, failed_payments INT, total_payments INT, total_acct_updates INT);`

@@ -47,7 +47,7 @@ postgresql:
     persistence:
       enabled: false
       size: 8Gi
-      storageClass: ssd-delete
+      storageClass: local-path
     initdb:
       user: "mina"
       password: "zo3moong7moog4Iep7eNgo3iecaesahH"
