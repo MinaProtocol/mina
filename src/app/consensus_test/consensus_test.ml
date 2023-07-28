@@ -19,6 +19,12 @@ open Async
 
 [@@@warning "-32"]
 
+module BlockFileOutput = struct
+  type t =
+    { height : int; parent_state_hash : string; previous_state_hash : string }
+  [@@deriving to_yojson]
+end
+
 module type CONTEXT = sig
   val logger : Logger.t
 
@@ -93,9 +99,31 @@ let print_block_info block =
   Mina_block.Precomputed.to_yojson block
   |> Yojson.Safe.to_string |> print_endline
 
+let precomputed_block_to_block_file_output (block : Mina_block.Precomputed.t) :
+    BlockFileOutput.t =
+  let open Yojson.Safe.Util in
+  let block_json = Mina_block.Precomputed.to_yojson block in
+
+  (* Extract desired fields *)
+  let data = block_json |> member "data" in
+  let protocol_state = data |> member "protocol_state" in
+  let body = protocol_state |> member "body" in
+  let consensus_state = body |> member "consensus_state" in
+  let height =
+    consensus_state |> member "blockchain_length" |> to_string |> int_of_string
+  in
+  let parent_state_hash =
+    protocol_state |> member "previous_state_hash" |> to_string
+  in
+
+  { BlockFileOutput.height
+  ; BlockFileOutput.parent_state_hash
+  ; BlockFileOutput.previous_state_hash = parent_state_hash
+  }
+
 let run_select ~context:(module Context : CONTEXT)
-    (existing_block : Mina_block.Precomputed.t)
     (candidate_block : Mina_block.Precomputed.t) =
+  let existing_block = List.hd_exn !current_chain in
   let existing_consensus_state_with_hashes =
     { With_hash.hash =
         Mina_state.Protocol_state.hashes existing_block.protocol_state
@@ -110,7 +138,6 @@ let run_select ~context:(module Context : CONTEXT)
         Mina_state.Protocol_state.consensus_state candidate_block.protocol_state
     }
   in
-
   match
     Consensus.Hooks.select
       ~context:(module Context)
@@ -128,10 +155,14 @@ let run_select ~context:(module Context : CONTEXT)
         |> Consensus.Data.Consensus_state.blockchain_length
         |> Unsigned.UInt32.to_int
       in
-      if candidate_length = existing_length then
-        current_chain := List.rev (candidate_block :: List.tl_exn !current_chain)
-      else if candidate_length > existing_length then
+      if candidate_length > existing_length then
         current_chain := candidate_block :: !current_chain
+      else if candidate_length = existing_length then
+        match !current_chain with
+        | _ :: rest_of_list ->
+            current_chain := candidate_block :: rest_of_list
+        | [] ->
+            failwith "current_chain is empty"
       else
         failwith
           "Candidate block has lower blockchain length than existing block" ;
@@ -139,20 +170,10 @@ let run_select ~context:(module Context : CONTEXT)
   | `Keep ->
       return ()
 
-let process_block ~context:(module Context : CONTEXT) precomputed_block =
-  match List.last current_chain.contents with
-  | Some last_block ->
-      let%bind () =
-        run_select ~context:(module Context) last_block precomputed_block
-      in
-      return ()
-  | None ->
-      failwith "Context.current_chain is empty"
-
 let process_precomputed_blocks ~context blocks =
   let%bind () =
     Deferred.List.iter blocks ~f:(fun block ->
-        let%bind () = process_block ~context block in
+        let%bind () = run_select ~context block in
         return () )
   in
   return ()
@@ -173,11 +194,25 @@ let main () ~blocks_dir =
   match precomputed_blocks with
   | [] ->
       failwith "No blocks found"
-  | first_block :: remaining_blocks ->
+  | first_block :: precomputed_blocks ->
       current_chain := [ first_block ] ;
-      let precomputed_blocks = remaining_blocks in
       let%bind () = process_precomputed_blocks ~context precomputed_blocks in
-      print_block_info (List.hd_exn !current_chain) ;
+      let file_output =
+        List.map ~f:precomputed_block_to_block_file_output !current_chain
+        |> List.rev
+      in
+      let write_block_to_file (i : int) (block : BlockFileOutput.t) :
+          unit Deferred.t =
+        let block_json = BlockFileOutput.to_yojson block in
+        let block_json_str = Yojson.Safe.to_string block_json in
+        let file_name = sprintf "compare/block_%d.json" i in
+        Writer.save file_name ~contents:block_json_str
+      in
+      let%bind () =
+        Deferred.List.iteri file_output ~f:(fun i block ->
+            let%bind () = write_block_to_file i block in
+            return () )
+      in
       return ()
 
 let () =
