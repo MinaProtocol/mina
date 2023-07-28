@@ -20,9 +20,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Stable = struct
     module V1 = struct
       type t = Wire_types.global_slot_span = Global_slot_span of T.Stable.V1.t
-      [@@unboxed] [@@deriving hash, sexp, compare, equal, yojson]
+      [@@unboxed] [@@deriving hash, sexp, compare, equal]
 
       let to_latest = Fn.id
+
+      let to_yojson (Global_slot_span t) = `String (T.to_string t)
+
+      let of_yojson = function
+        | `String s ->
+            Ok (Global_slot_span (T.of_string s))
+        | _ ->
+            Error "Global_slot_span.of_yojson: expected string"
     end
   end]
 
@@ -39,6 +47,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       Snark_params.Tick.Typ.transport T.Checked.typ ~there:to_uint32
         ~back:of_uint32
   end
+
+  let to_yojson = Stable.Latest.to_yojson
+
+  let of_yojson = Stable.Latest.of_yojson
 
   let to_string t = Unsigned.UInt32.to_string @@ to_uint32 t
 

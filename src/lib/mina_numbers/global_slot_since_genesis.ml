@@ -25,9 +25,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
     module Stable = struct
       module V1 = struct
         type t = Wire_types.global_slot = Since_genesis of T.Stable.V1.t
-        [@@unboxed] [@@deriving hash, sexp, compare, equal, yojson]
+        [@@unboxed] [@@deriving hash, sexp, compare, equal]
 
         let to_latest = Fn.id
+
+        let to_yojson (Since_genesis u32) = `String (T.to_string u32)
+
+        let of_yojson = function
+          | `String i ->
+              Ok (Since_genesis (T.of_string i))
+          | _ ->
+              Error "Global_slot.of_yojson: Expected `String"
       end
     end]
 
@@ -36,6 +44,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let to_uint32 (Since_genesis u32) : uint32 = u32
 
     let of_uint32 u32 : t = Since_genesis u32
+
+    let to_yojson = Stable.Latest.to_yojson
+
+    let of_yojson = Stable.Latest.of_yojson
   end
 
   include M
