@@ -15,6 +15,7 @@ module type S = sig
   module Types_map = Types_map
   module Step_verifier = Step_verifier
   module Common = Common
+  module Ro = Ro
 
   exception Return_digest of Md5.t
 
