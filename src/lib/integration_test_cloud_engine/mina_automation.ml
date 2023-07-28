@@ -766,8 +766,6 @@ module Network_manager = struct
         ~init:(Malleable_error.return Core.String.Map.empty)
         ~f:func_for_fold
     in
-    [%log info] "snark_coordinators = $snark_coordinators"
-      ~metadata:[("snark_coordinators", `List (List.map (Map.data snark_coordinators) ~f:(fun x -> `List (List.map x.pod_ids ~f:(fun x -> `String x)))))] ;
     let network =
       { Kubernetes_network.namespace = t.namespace
       ; constants = t.constants
