@@ -1,5 +1,4 @@
 testnetName: "testnet"
-allowPodPreemption: true
 mina:
   runtimeConfig:
   generateGenesisProof: true

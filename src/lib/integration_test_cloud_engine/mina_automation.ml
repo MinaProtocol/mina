@@ -22,6 +22,27 @@ let cluster_zone = "us-west1a"
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
+  (* This function computes the priority value of pods to use for the deployment. Pod priority will
+   * determine the order of the queue in which unscheduled pods are scheduled onto nodes. By
+   * computing the pod priority from the timestamp of the deployment, we ensure that earlier
+   * deployments will take scheduling priority over older deployments that are also waiting to be
+   * scheduled. For more information on pod priority, refer to the kubernetes documentation.
+   * https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass
+   *)
+  let compute_pod_priority () =
+    let pod_priority_genesis_timestamp = 1690569524 in
+    let max_pod_priority = 1000000000 in
+    let min_pod_priority = -2147483648 in
+    let current_timestamp =
+      Time.now () |> Time.to_span_since_epoch |> Time.Span.to_sec
+      |> Float.to_int
+    in
+    let priority =
+      max_pod_priority - (current_timestamp - pod_priority_genesis_timestamp)
+    in
+    assert (priority > min_pod_priority) ;
+    priority
+
   type block_producer_config =
     { name : string (* ; id : string *)
     ; keypair : Network_keypair.t
@@ -59,6 +80,7 @@ module Network_config = struct
     ; mem_request : string
     ; worker_cpu_request : int
     ; worker_mem_request : string
+    ; pod_priority : int
     }
   [@@deriving to_yojson]
 
@@ -342,6 +364,7 @@ module Network_config = struct
         ; mem_request = "12Gi"
         ; worker_cpu_request = 6
         ; worker_mem_request = "8Gi"
+        ; pod_priority = compute_pod_priority ()
         }
     }
 
