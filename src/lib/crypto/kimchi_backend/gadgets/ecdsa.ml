@@ -2,7 +2,7 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let tests_enabled = false
+let tests_enabled = true
 
 (* Array to tuple helper *)
 let tuple6_of_array array =
@@ -12,20 +12,19 @@ let tuple6_of_array array =
   | _ ->
       assert false
 
-(* Gadget to assert signature scalars r,s \in Fn
+(* Gadget to assert signature scalars r,s \in Fn \ 0
  * Must be used when r and s are not public parameters
  *
  *   Scalar field external checks:
  *     Bound checks:         6
+ *     Canonical checks:     2
  *     Multi-range-checks:   2
  *     Compact-range-checks: 2
- *     Total range-checks:   10
+ *     Total range-checks:   42
  *
- *   Rows: (per crumb, not counting inputs/outputs and constants)
- *     Check:               4
- *     Bound additions:    12
- *     Multi-range-checks: 40
- *     Total:              56
+ *   Rows: (not counting inputs/outputs and constants)
+ *     Check:           ~46
+ *     External checks: ~59
  *)
 let signature_scalar_check (type f)
     (module Circuit : Snark_intf.Run with type field = f)
@@ -94,11 +93,13 @@ let signature_scalar_check (type f)
   let computed_one =
     Foreign_field.mul (module Circuit) scalar_checks r r_inv curve.order
   in
+
   (* Bounds 1: Left input r is bound checked below
    *           Right input r_inv is bound checked below
-   *           Result bound check is covered by scalar_checks
+   *           Result bound check is covered by Foreign_field.mul
    *)
   Foreign_field.External_checks.append_bound_check scalar_checks r ;
+  Foreign_field.External_checks.append_canonical_check scalar_checks r ;
   Foreign_field.External_checks.append_bound_check scalar_checks r_inv ;
   (* Assert r * r^-1 = 1 *)
   Foreign_field.Element.Standard.assert_equal (module Circuit) computed_one one ;
@@ -112,6 +113,7 @@ let signature_scalar_check (type f)
    *           Result bound check is covered by scalar_checks
    *)
   Foreign_field.External_checks.append_bound_check scalar_checks s ;
+  Foreign_field.External_checks.append_canonical_check scalar_checks s ;
   Foreign_field.External_checks.append_bound_check scalar_checks s_inv ;
   (* Assert s * s^-1 = 1 *)
   Foreign_field.Element.Standard.assert_equal (module Circuit) computed_one one
@@ -152,26 +154,27 @@ let signature_scalar_check (type f)
  *      ia coordinates are valid
  *
  *   Base field external checks: (per crumb, not counting inputs and output)
- *     Bound checks:         100 (+2 when a != 0 and +1 when b != 0)
- *     Multi-range-checks:    40
- *     Compact-range-checks:  40
- *     Total range-checks:   180
+ *     Bound checks:          96 (+2 when a != 0 and +1 when b != 0)
+ *     Canonical checks:      19
+ *     Multi-range-checks:    159
+ *     Compact-range-checks:  ~78
+ *     Total range-checks:   1152
  *
  *   Scalar field external checks: (per crumb, not counting inputs and output)
  *     Bound checks:          5
- *     Multi-range-checks:    3
- *     Compact-range-checks:  3
- *     Total range-checks:   11
+ *     Canonical checks:      4
+ *     Multi-range-checks:    14
+ *     Compact-range-checks:  ~7
+ *     Total range-checks:   185
  *
  *   Rows: (per crumb, not counting inputs/outputs and constants)
- *     Verify:              ~205 (+5 when a != 0 and +2 when b != 0)
- *     Bound additions:      210
- *     Multi-range-checks:   764
- *     Total:               1179
+ *     Verify:          370 (+5 when a != 0 and +2 when b != 0)
+ *     External checks: 925
+ *     Total:           1295
  *
  *   Constants:
- *     Curve constants:        10 (for 256-bit curve; one-time cost per circuit)
- *     Pre-computing doubles: 767 (for 256-bit curve; one-time cost per circuit)
+ *     Curve constants:        ~10 (for 256-bit curve; one-time cost per circuit)
+ *     Pre-computing doubles: ~767 (for 256-bit curve; one-time cost per circuit)
  *
  *)
 let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
@@ -247,6 +250,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Result is gadget input (already checked externally).
    *)
   Foreign_field.External_checks.append_bound_check scalar_checks u1 ;
+  Foreign_field.External_checks.append_canonical_check scalar_checks u1 ;
 
   (* Assert s * u1 = z *)
   Foreign_field.Element.Standard.assert_equal
@@ -265,6 +269,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Result is gadget input (already checked externally).
    *)
   Foreign_field.External_checks.append_bound_check scalar_checks u2 ;
+  Foreign_field.External_checks.append_canonical_check scalar_checks u2 ;
 
   (* Assert s * u2 = r *)
   Foreign_field.Element.Standard.assert_equal (module Circuit) r_computed r ;
@@ -305,12 +310,8 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* Bounds 5: Generator is gadget input (public parameter)
    *           Initial accumulator is gadget input (checked externally or public parameter)
-   *           Result bound check for u1_point below.
+   *           Result bound check for u1_point (already covered by Ec_group.scalar_mul)
    *)
-  Foreign_field.External_checks.append_bound_check base_checks
-  @@ Affine.x u1_point ;
-  Foreign_field.External_checks.append_bound_check base_checks
-  @@ Affine.y u1_point ;
 
   (* C6: Constrain scalar multiplication u2P *)
   let u2_point =
@@ -321,12 +322,8 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* Bounds 6: Pubkey is gadget input (checked externally)
    *           Initial accumulator is gadget input (checked externally or public parameter)
-   *           Result bound check for u2_point below.
+   *           Result bound check for u2_point (already covered by Ec_group.scalar_mul)
    *)
-  Foreign_field.External_checks.append_bound_check base_checks
-  @@ Affine.x u2_point ;
-  Foreign_field.External_checks.append_bound_check base_checks
-  @@ Affine.y u2_point ;
 
   (* C7: R = u1G + u2P *)
   let result =
@@ -339,6 +336,10 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   Foreign_field.External_checks.append_bound_check base_checks
   @@ Affine.x result ;
   Foreign_field.External_checks.append_bound_check base_checks
+  @@ Affine.y result ;
+  Foreign_field.External_checks.append_canonical_check base_checks
+  @@ Affine.x result ;
+  Foreign_field.External_checks.append_canonical_check base_checks
   @@ Affine.y result ;
 
   (* Constrain that r = Rx (mod n), where n is the scalar field modulus
@@ -410,6 +411,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Result bound check is already covered by scalar_checks
    *)
   Foreign_field.External_checks.append_bound_check scalar_checks quotient ;
+  Foreign_field.External_checks.append_canonical_check scalar_checks quotient ;
 
   (* C9: Compute qn = q * (n - 1) + q *)
   let quotient_times_n =
@@ -438,6 +440,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *            Result already bound checked by (Bounds 7)
    *)
   Foreign_field.External_checks.append_bound_check scalar_checks x_prime ;
+  Foreign_field.External_checks.append_canonical_check scalar_checks x_prime ;
 
   (* C11: Check qn + r = Rx *)
   Foreign_field.Element.Standard.assert_equal
@@ -785,14 +788,14 @@ let%test_unit "Ecdsa.verify_light" =
             (* Check scalar field external check counts *)
             assert (Mina_stdlib.List.Length.equal unused_scalar_checks.bounds 5) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_scalar_checks.canonicals 0 ) ;
+              Mina_stdlib.List.Length.equal unused_scalar_checks.canonicals 4 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_scalar_checks.multi_ranges 6 ) ;
             assert (
               Mina_stdlib.List.Length.equal
                 unused_scalar_checks.compact_multi_ranges 0 ) ;
-                assert (
-                  Mina_stdlib.List.Length.equal unused_scalar_checks.limb_ranges 0 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_scalar_checks.limb_ranges 0 ) ;
 
             () )
       in
@@ -911,7 +914,7 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
              *)
 
             (* Sanity check *)
-            let base_bound_checks_count = ref (42 + 2 + 42 + 2 + 6 + 2 + 3) in
+            let base_bound_checks_count = ref 95 in
             if not Bignum_bigint.(curve.bignum.a = zero) then
               base_bound_checks_count := !base_bound_checks_count + 2 ;
             if not Bignum_bigint.(curve.bignum.b = zero) then
@@ -919,14 +922,11 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
             assert (
               Mina_stdlib.List.Length.equal base_checks.bounds
                 !base_bound_checks_count ) ;
-            assert (
-                  Mina_stdlib.List.Length.equal base_checks.canonicals
-                    17 ) ;
+            assert (Mina_stdlib.List.Length.equal base_checks.canonicals 19) ;
             assert (Mina_stdlib.List.Length.equal base_checks.multi_ranges 80) ;
             assert (
               Mina_stdlib.List.Length.equal base_checks.compact_multi_ranges 0 ) ;
-            assert (
-                Mina_stdlib.List.Length.equal base_checks.limb_ranges 0 ) ;
+            assert (Mina_stdlib.List.Length.equal base_checks.limb_ranges 0) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
@@ -939,12 +939,11 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
 
             (* Sanity checks *)
             assert (Mina_stdlib.List.Length.equal scalar_checks.bounds 5) ;
-            assert (Mina_stdlib.List.Length.equal scalar_checks.canonicals 0) ;
+            assert (Mina_stdlib.List.Length.equal scalar_checks.canonicals 4) ;
             assert (Mina_stdlib.List.Length.equal scalar_checks.multi_ranges 6) ;
             assert (
               Mina_stdlib.List.Length.equal scalar_checks.compact_multi_ranges 0 ) ;
-              assert (
-                Mina_stdlib.List.Length.equal scalar_checks.limb_ranges 0 ) ;
+            assert (Mina_stdlib.List.Length.equal scalar_checks.limb_ranges 0) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
@@ -992,7 +991,7 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
     () )
 
 let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
-  if (* tests_enabled *) true then (
+  if tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -1076,7 +1075,7 @@ let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
     (* Test 1: No chunking (big test that doesn't require chunkning)
      *         Uses precomputed generator doubles.
      *         Extracted s,d such that that u1 and u2 scalars are equal to m = 177225723614878382952356121702918977654 (128 bits) *)
-     let pubkey =
+    let pubkey =
       (* secret key d = (s - z)/r *)
       ( Bignum_bigint.of_string
           "6559447345535823731364817861985473100513487071640065635466595453031721007862"

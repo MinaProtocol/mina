@@ -40,15 +40,13 @@ let is_on_curve_bignum_point (curve : Curve_params.t)
  *
  *   External checks: (not counting inputs and output)
  *     Bound checks:          6
- *     Multi-range-checks:    3
+ *     Multi-range-checks:    6
  *     Compact-range-checks:  3
- *     Total range-checks:   12
+ *     Total range-checks:    51
  *
  *   Rows: (not counting inputs/outputs and constants)
- *     Group addition:     13
- *     Bound additions:    12
- *     Multi-range-checks: 48
- *     Total:              73
+ *     Group addition:  26
+ *     External checks: ~896
  *
  *   Supported group axioms:
  *     Closure
@@ -350,16 +348,14 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      P is not O (the point at infinity)
  *
  *   External checks: (not counting inputs and output)
- *     Bound checks:          8 (+1 when a != 0)
- *     Multi-range-checks:    4
- *     Compact-range-checks:  4
- *     Total range-checks:   16
+ *     Bound checks:         8 (+1 when a != 0)
+ *     Multi-range-checks:   8
+ *     Compact-range-checks: 4
+ *     Total range-checks:   68 (+4 when a != 0)
  *
  *   Rows: (not counting inputs/outputs and constants)
- *     Group double:       16 (+2 when a != 0)
- *     Bound additions:    16
- *     Multi-range-checks: 64
- *     Total:              96
+ *     Group double:     34 (+2 when a != 0)
+ *     External checks: ~885
  *
  *   Note: See group addition notes (above) about group properties supported by this implementation
  *)
@@ -735,19 +731,16 @@ let compute_ia_points ?(point : Affine.bignum_point option)
  *
  *   External checks: (not counting inputs and output)
  *     Bound checks:         3 (+1 when a != 0 and +1 when b != 0)
- *     Multi-range-checks:   3
+ *     Multi-range-checks:   6
  *     Compact-range-checks: 3
- *     Total range-checks:   9
+ *     Total range-checks:   39
  *
  *   Rows: (not counting inputs/outputs and constants)
- *     Curve check:         8 (+1 when a != 0 and +2 when b != 0)
- *     Bound additions:     6
- *     Multi-range-checks: 36
- *     Total:              50
+ *     Curve check: 8 (+1 when a != 0 and +2 when b != 0)
  *
  *   Constants:
- *     Curve constants:        10 (for 256-bit curve; one-time cost per circuit)
- *     Pre-computing doubles: 767 (for 256-bit curve; one-time cost per circuit)
+ *     Curve constants:        ~10 (for 256-bit curve; one-time cost per circuit)
+ *     Pre-computing doubles: ~767 (for 256-bit curve; one-time cost per circuit)
  *)
 let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t)
@@ -893,19 +886,17 @@ let check_ia (type f) (module Circuit : Snark_intf.Run with type field = f)
  *
  *   External checks: (per crumb, not counting inputs and output)
  *     Bound checks:         42 (+1 when a != 0)
- *     Multi-range-checks:   17
- *     Compact-range-checks: 17
- *     Total range-checks:   76
+ *     Multi-range-checks:   34
+ *     Compact-range-checks: 7
+ *     Total range-checks:   291
  *
  *   Rows: (per crumb, not counting inputs/outputs and constants)
- *     Scalar multiplication:  ~84 (+2 when a != 0)
- *     Bound additions:         84
- *     Multi-range-checks:     308
- *     Total:                  476
+ *     Scalar multiplication: ~84 (+2 when a != 0)
+ *     External checks:       ~441
  *
  *   Constants:
- *     Curve constants:        10 (for 256-bit curve; one-time cost per circuit)
- *     Pre-computing doubles: 767 (for 256-bit curve; one-time cost per circuit)
+ *     Curve constants:        ~10 (for 256-bit curve; one-time cost per circuit)
+ *     Pre-computing doubles: ~767 (for 256-bit curve; one-time cost per circuit)
  *)
 let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t)
@@ -1054,6 +1045,10 @@ let check_subgroup (type f)
   @@ Affine.x n_minus_one_point ;
   Foreign_field.External_checks.append_bound_check external_checks
   @@ Affine.y n_minus_one_point ;
+  Foreign_field.External_checks.append_canonical_check external_checks
+  @@ Affine.x n_minus_one_point ;
+  Foreign_field.External_checks.append_canonical_check external_checks
+  @@ Affine.y n_minus_one_point ;
 
   (* C2: Compute -P *)
   let minus_point = negate (module Circuit) curve point in
@@ -1160,6 +1155,7 @@ let%test_unit "Ec_group.add" =
         (Bignum_bigint.of_int 0, Bignum_bigint.of_int 2)
       (* expected result *)
     in
+
     let _cs =
       test_add fake_curve5
         (Bignum_bigint.of_int 2, Bignum_bigint.of_int 3) (* left_input *)
@@ -2040,7 +2036,6 @@ let%test_unit "Ec_group.double" =
             )
           in
           test_double Secp256k1.params point wrong_result ) ) ;
-
     () )
 
 let%test_unit "Ec_group.double_chained" =
