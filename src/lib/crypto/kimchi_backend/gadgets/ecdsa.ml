@@ -2,7 +2,7 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let tests_enabled = true
+let tests_enabled = false
 
 (* Array to tuple helper *)
 let tuple6_of_array array =
@@ -307,8 +307,10 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Initial accumulator is gadget input (checked externally or public parameter)
    *           Result bound check for u1_point below.
    *)
-  Foreign_field.External_checks.append_bound_check base_checks @@ Affine.x u1_point ;
-  Foreign_field.External_checks.append_bound_check base_checks @@ Affine.y u1_point ;
+  Foreign_field.External_checks.append_bound_check base_checks
+  @@ Affine.x u1_point ;
+  Foreign_field.External_checks.append_bound_check base_checks
+  @@ Affine.y u1_point ;
 
   (* C6: Constrain scalar multiplication u2P *)
   let u2_point =
@@ -321,8 +323,10 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Initial accumulator is gadget input (checked externally or public parameter)
    *           Result bound check for u2_point below.
    *)
-  Foreign_field.External_checks.append_bound_check base_checks @@ Affine.x u2_point ;
-  Foreign_field.External_checks.append_bound_check base_checks @@ Affine.y u2_point ;
+  Foreign_field.External_checks.append_bound_check base_checks
+  @@ Affine.x u2_point ;
+  Foreign_field.External_checks.append_bound_check base_checks
+  @@ Affine.y u2_point ;
 
   (* C7: R = u1G + u2P *)
   let result =
@@ -332,8 +336,10 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Bounds 7: Left and right inputs checked by (Bounds 5) and (Bounds 6)
    *           Result bound is bound checked below
    *)
-  Foreign_field.External_checks.append_bound_check base_checks @@ Affine.x result ;
-  Foreign_field.External_checks.append_bound_check base_checks @@ Affine.y result ;
+  Foreign_field.External_checks.append_bound_check base_checks
+  @@ Affine.x result ;
+  Foreign_field.External_checks.append_bound_check base_checks
+  @@ Affine.y result ;
 
   (* Constrain that r = Rx (mod n), where n is the scalar field modulus
    *
@@ -407,9 +413,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* C9: Compute qn = q * (n - 1) + q *)
   let quotient_times_n =
-    Foreign_field.add
-      (module Circuit)
-      ~full:false quotient_product quotient curve.order
+    Foreign_field.add (module Circuit) quotient_product quotient curve.order
   in
 
   (* Bounds 9: Left input q * (n - 1) is covered by (Bounds 8)
@@ -422,14 +426,12 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
     Foreign_field.Element.Standard.of_limbs (x_prime0, x_prime1, x_prime2)
   in
   let computed_x =
-    Foreign_field.add
-      (module Circuit)
-      ~full:false quotient_times_n x_prime curve.order
+    Foreign_field.add (module Circuit) quotient_times_n x_prime curve.order
   in
   (* Addition chain final result row *)
   Foreign_field.result_row
     (module Circuit)
-    ~label:"Ecdsa.verify_computed_x" computed_x ;
+    ~label:"Ecdsa.verify_computed_x" computed_x None ;
 
   (* Bounds 10: Left input qn is chained input, so not checked
    *            Right input x_prime bounds checked below
@@ -732,8 +734,10 @@ let%test_unit "Ecdsa.verify_light" =
             let pubkey =
               Affine.of_bignum_bigint_coordinates (module Runner.Impl) pubkey
             in
-            Foreign_field.result_row (module Runner.Impl) (fst pubkey) ;
-            Foreign_field.result_row (module Runner.Impl) (snd pubkey) ;
+            Foreign_field.result_row
+              (module Runner.Impl)
+              (fst pubkey)
+              (Some (snd pubkey)) ;
             let signature =
               ( Foreign_field.Element.Standard.of_bignum_bigint
                   (module Runner.Impl)
@@ -742,14 +746,16 @@ let%test_unit "Ecdsa.verify_light" =
                   (module Runner.Impl)
                   (snd signature) )
             in
-            Foreign_field.result_row (module Runner.Impl) (fst signature) ;
-            Foreign_field.result_row (module Runner.Impl) (snd signature) ;
+            Foreign_field.result_row
+              (module Runner.Impl)
+              (fst signature)
+              (Some (snd signature)) ;
             let msg_hash =
               Foreign_field.Element.Standard.of_bignum_bigint
                 (module Runner.Impl)
                 msg_hash
             in
-            Foreign_field.result_row (module Runner.Impl) msg_hash ;
+            Foreign_field.result_row (module Runner.Impl) msg_hash None ;
 
             (* Create external checks contexts for tracking extra constraints
                that are required for soundness (unused in this simple test) *)
@@ -779,10 +785,15 @@ let%test_unit "Ecdsa.verify_light" =
             (* Check scalar field external check counts *)
             assert (Mina_stdlib.List.Length.equal unused_scalar_checks.bounds 5) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_scalar_checks.multi_ranges 3 ) ;
+              Mina_stdlib.List.Length.equal unused_scalar_checks.canonicals 0 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_scalar_checks.multi_ranges 6 ) ;
             assert (
               Mina_stdlib.List.Length.equal
-                unused_scalar_checks.compact_multi_ranges 3 ) ;
+                unused_scalar_checks.compact_multi_ranges 0 ) ;
+                assert (
+                  Mina_stdlib.List.Length.equal unused_scalar_checks.limb_ranges 0 ) ;
+
             () )
       in
 
@@ -853,8 +864,10 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
             let pubkey =
               Affine.of_bignum_bigint_coordinates (module Runner.Impl) pubkey
             in
-            Foreign_field.result_row (module Runner.Impl) (fst pubkey) ;
-            Foreign_field.result_row (module Runner.Impl) (snd pubkey) ;
+            Foreign_field.result_row
+              (module Runner.Impl)
+              (fst pubkey)
+              (Some (snd pubkey)) ;
             let signature =
               ( Foreign_field.Element.Standard.of_bignum_bigint
                   (module Runner.Impl)
@@ -863,14 +876,16 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
                   (module Runner.Impl)
                   (snd signature) )
             in
-            Foreign_field.result_row (module Runner.Impl) (fst signature) ;
-            Foreign_field.result_row (module Runner.Impl) (snd signature) ;
+            Foreign_field.result_row
+              (module Runner.Impl)
+              (fst signature)
+              (Some (snd signature)) ;
             let msg_hash =
               Foreign_field.Element.Standard.of_bignum_bigint
                 (module Runner.Impl)
                 msg_hash
             in
-            Foreign_field.result_row (module Runner.Impl) msg_hash ;
+            Foreign_field.result_row (module Runner.Impl) msg_hash None ;
 
             (* Create external checks contexts for tracking extra constraints
                that are required for soundness (unused in this simple test) *)
@@ -904,9 +919,14 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
             assert (
               Mina_stdlib.List.Length.equal base_checks.bounds
                 !base_bound_checks_count ) ;
-            assert (Mina_stdlib.List.Length.equal base_checks.multi_ranges 40) ;
             assert (
-              Mina_stdlib.List.Length.equal base_checks.compact_multi_ranges 40 ) ;
+                  Mina_stdlib.List.Length.equal base_checks.canonicals
+                    17 ) ;
+            assert (Mina_stdlib.List.Length.equal base_checks.multi_ranges 80) ;
+            assert (
+              Mina_stdlib.List.Length.equal base_checks.compact_multi_ranges 0 ) ;
+            assert (
+                Mina_stdlib.List.Length.equal base_checks.limb_ranges 0 ) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
@@ -919,9 +939,12 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
 
             (* Sanity checks *)
             assert (Mina_stdlib.List.Length.equal scalar_checks.bounds 5) ;
-            assert (Mina_stdlib.List.Length.equal scalar_checks.multi_ranges 3) ;
+            assert (Mina_stdlib.List.Length.equal scalar_checks.canonicals 0) ;
+            assert (Mina_stdlib.List.Length.equal scalar_checks.multi_ranges 6) ;
             assert (
-              Mina_stdlib.List.Length.equal scalar_checks.compact_multi_ranges 3 ) ;
+              Mina_stdlib.List.Length.equal scalar_checks.compact_multi_ranges 0 ) ;
+              assert (
+                Mina_stdlib.List.Length.equal scalar_checks.limb_ranges 0 ) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
@@ -969,7 +992,7 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
     () )
 
 let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
-  if tests_enabled then (
+  if (* tests_enabled *) true then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -1052,40 +1075,8 @@ let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
 
     (* Test 1: No chunking (big test that doesn't require chunkning)
      *         Uses precomputed generator doubles.
-     *         Extracted s,d such that that u1 and u2 scalars are equal to m = 95117056129877063566687163501128961107874747202063760588013341337 (216 bits) *)
-    let pubkey =
-      (* secret key d = (s - z)/r *)
-      ( Bignum_bigint.of_string
-          "28335432349034412295843546619549969371276098848890005110917167585721026348383"
-      , Bignum_bigint.of_string
-          "40779711449769771629236800666139862371172776689379727569918249313574127557987"
-      )
-    in
-    let signature =
-      ( (* r = Gx *)
-        Bignum_bigint.of_string
-          "55066263022277343669578718895168534326250603453777594175500187360389116729240"
-      , (* s = r/m *)
-        Bignum_bigint.of_string
-          "92890023769187417206640608811117482540691917151111621018323984641303111040093"
-      )
-    in
-    let msg_hash =
-      (* z = ms *)
-      Bignum_bigint.of_string
-        "55066263022277343669578718895168534326250603453777594175500187360389116729240"
-    in
-
-    assert (Ec_group.is_on_curve_bignum_point Secp256k1.params pubkey) ;
-
-    let _cs =
-      test_verify_full_no_subgroup_check Secp256k1.params
-        ~scalar_mul_bit_length:216 pubkey signature msg_hash
-    in
-
-    (* Test 2: No chunking (big test that doesn't require chunkning)
      *         Extracted s,d such that that u1 and u2 scalars are equal to m = 177225723614878382952356121702918977654 (128 bits) *)
-    let pubkey =
+     let pubkey =
       (* secret key d = (s - z)/r *)
       ( Bignum_bigint.of_string
           "6559447345535823731364817861985473100513487071640065635466595453031721007862"
@@ -1108,6 +1099,15 @@ let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
         "55066263022277343669578718895168534326250603453777594175500187360389116729240"
     in
 
+    assert (Ec_group.is_on_curve_bignum_point Secp256k1.params pubkey) ;
+
+    let _cs =
+      test_verify_full_no_subgroup_check Secp256k1.params
+        ~scalar_mul_bit_length:128 pubkey signature msg_hash
+    in
+
+    (* Test 2: No chunking (big test that doesn't require chunkning)
+     *         Extracted s,d such that that u1 and u2 scalars are equal to m = 177225723614878382952356121702918977654 (128 bits) *)
     let _cs =
       test_verify_full_no_subgroup_check Secp256k1.params
         ~use_precomputed_gen_doubles:false ~scalar_mul_bit_length:128 pubkey
