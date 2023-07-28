@@ -67,51 +67,79 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
     =
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)
-  let%map () = return () in
+  let%bind () = return () in
+  let%map best_tip = Mina_lib.best_tip t in
+  let consensus_state =
+    Transition_frontier.Breadcrumb.consensus_state best_tip
+  in
+  let global_slot_since_genesis =
+    Mina_numbers.Global_slot.to_int
+    @@ Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state
+  in
   let open Deferred.Let_syntax in
-  let%map result = Mina_lib.add_transactions t [ user_command_input ] in
-  txn_count := !txn_count + 1 ;
-  match result with
-  | Ok ([], [ failed_txn ]) ->
-      Error
-        (Error.of_string
-           (sprintf !"%s"
-              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
-                .to_yojson (snd failed_txn)
-              |> Yojson.Safe.to_string ) ) )
-  | Ok ([ Signed_command txn ], []) ->
-      [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:[ ("command", User_command.to_yojson (Signed_command txn)) ]
-        "Scheduled payment $command" ;
-      Ok txn
-  | Ok (valid_commands, invalid_commands) ->
-      [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:
-          [ ( "valid_commands"
-            , `List (List.map ~f:User_command.to_yojson valid_commands) )
-          ; ( "invalid_commands"
-            , `List
-                (List.map
-                   ~f:
-                     (Fn.compose
-                        Network_pool.Transaction_pool.Resource_pool.Diff
-                        .Diff_error
-                        .to_yojson snd )
-                   invalid_commands ) )
-          ]
-        "Invalid result from scheduling a payment" ;
-      Error (Error.of_string "Internal error while scheduling a payment")
-  | Error e ->
-      Error e
+  match (Mina_lib.config t).slot_tx_end with
+  | Some slot_tx_end when global_slot_since_genesis >= slot_tx_end ->
+      [%log' warn (Mina_lib.top_level_logger t)] "can't produce" ;
+      Deferred.return (Error (Error.of_string "can't produce"))
+  | Some _ | None -> (
+      let%map result = Mina_lib.add_transactions t [ user_command_input ] in
+      txn_count := !txn_count + 1 ;
+      match result with
+      | Ok ([], [ failed_txn ]) ->
+          Error
+            (Error.of_string
+               (sprintf !"%s"
+                  ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                    .to_yojson (snd failed_txn)
+                  |> Yojson.Safe.to_string ) ) )
+      | Ok ([ Signed_command txn ], []) ->
+          [%log' info (Mina_lib.top_level_logger t)]
+            ~metadata:
+              [ ("command", User_command.to_yojson (Signed_command txn)) ]
+            "Scheduled payment $command" ;
+          Ok txn
+      | Ok (valid_commands, invalid_commands) ->
+          [%log' info (Mina_lib.top_level_logger t)]
+            ~metadata:
+              [ ( "valid_commands"
+                , `List (List.map ~f:User_command.to_yojson valid_commands) )
+              ; ( "invalid_commands"
+                , `List
+                    (List.map
+                       ~f:
+                         (Fn.compose
+                            Network_pool.Transaction_pool.Resource_pool.Diff
+                            .Diff_error
+                            .to_yojson snd )
+                       invalid_commands ) )
+              ]
+            "Invalid result from scheduling a payment" ;
+          Error (Error.of_string "Internal error while scheduling a payment")
+      | Error e ->
+          Error e )
 
 let setup_and_submit_user_commands t user_command_list =
   let open Participating_state.Let_syntax in
-  let%map _is_active = Mina_lib.active_or_bootstrapping t in
-  [%log' warn (Mina_lib.top_level_logger t)]
-    "batch-send-payments does not yet report errors"
-    ~metadata:
-      [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
-  Mina_lib.add_transactions t user_command_list
+  let%bind _is_active = Mina_lib.active_or_bootstrapping t in
+  let%map best_tip = Mina_lib.best_tip t in
+  let consensus_state =
+    Transition_frontier.Breadcrumb.consensus_state best_tip
+  in
+  let global_slot_since_genesis =
+    Mina_numbers.Global_slot.to_int
+    @@ Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state
+  in
+  match (Mina_lib.config t).slot_tx_end with
+  | Some slot_tx_end when global_slot_since_genesis >= slot_tx_end ->
+      [%log' warn (Mina_lib.top_level_logger t)] "can't produce" ;
+      Deferred.return (Error (Error.of_string "can't produce"))
+  | Some _ | None ->
+      [%log' warn (Mina_lib.top_level_logger t)]
+        "batch-send-payments does not yet report errors"
+        ~metadata:
+          [ ("mina_command", `String "scheduling a batch of user transactions")
+          ] ;
+      Mina_lib.add_transactions t user_command_list
 
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
   type proof_elem = User_command.t
