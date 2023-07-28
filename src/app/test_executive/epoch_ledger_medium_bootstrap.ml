@@ -85,7 +85,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1
               ~test_config:config ) )
     in
-    let%bind () = section "stop the node" (Node.stop node_c) in
     let%bind () =
       section
         "Wait for one epoch, and make sure the next epoch ledger has been \
@@ -108,8 +107,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          wait_for t (Wait_condition.staking_epoch_ledger_updated ()) )
     in
     let%bind () =
-      section "restart node after 2 epochs"
-        (let%bind () = Node.start ~fresh_state:true node_c in
+      section "stop and restart node after 2 epochs"
+        (let%bind () = section "stop the node" (Node.stop node_c) in
+         let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 1) in
+         let%bind () = Node.start ~fresh_state:true node_c in
          [%log info]
            "%s started again, will now wait for this node to initialize"
            (Node.id node_c) ;
