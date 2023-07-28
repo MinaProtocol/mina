@@ -478,7 +478,7 @@ let setup_daemon logger =
          You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
   and verify_local_snark_works =
-    flag "--verify_local_snark_works" no_arg
+    flag "--verify-local-snark-works" no_arg
       ~doc:
         "Verify snark works coming from workers connected to this snark \
          coordinator"
