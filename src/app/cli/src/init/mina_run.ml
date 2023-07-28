@@ -498,7 +498,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               if tx_constraint_digest_equal constraint_digests_worker then
                 Some ()
               else (
-                [%log warn]
+                [%log error]
                   "worker has a different transactions constraints digest" ;
                 None )
             in
