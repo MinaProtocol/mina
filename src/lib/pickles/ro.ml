@@ -3,9 +3,11 @@ open Backend
 open Import
 
 let bits_random_oracle =
-  let h = Digestif.blake2s 32 in
+  let module Blake2s = Digestif.Make_BLAKE2S (struct
+    let digest_size = 32
+  end) in
   fun ~length s ->
-    Digestif.digest_string h s |> Digestif.to_raw_string h |> String.to_list
+    Blake2s.digest_string s |> Blake2s.to_raw_string |> String.to_list
     |> List.concat_map ~f:(fun c ->
            let c = Char.to_int c in
            List.init 8 ~f:(fun i -> (c lsr i) land 1 = 1) )
