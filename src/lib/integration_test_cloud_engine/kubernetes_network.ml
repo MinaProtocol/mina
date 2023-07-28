@@ -404,7 +404,7 @@ let all_pod_ids t =
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
-  let max_polls = 40 (* 10 mins *) in
+  let max_polls = 1080 (* 6 hours *) in
   let all_pods_set = all_pod_ids network |> String.Set.of_list in
   let kube_get_pods () =
     Integration_test_lib.Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/"
