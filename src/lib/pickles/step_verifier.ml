@@ -600,7 +600,9 @@ struct
                 ~polynomials:(without_degree_bound, []) )
         in
         let joint_combiner =
-          if lookup_verification_enabled then failwith "TODO" else None
+          if lookup_verification_enabled then
+            Some { Kimchi_types.inner = Impl.Field.one }
+          else None
         in
         assert_eq_deferred_values
           { alpha = plonk.alpha

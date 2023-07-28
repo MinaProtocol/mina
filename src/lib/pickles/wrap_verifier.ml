@@ -495,23 +495,35 @@ struct
 
   module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
+  let challenge_joint_combiners ~chal_f joint_combiner_0 joint_combiner_1 =
+    match (joint_combiner_0, joint_combiner_1) with
+    | None, None ->
+        ()
+    | Some jc0, Some jc1 ->
+        chal_f jc0 jc1
+    | Some _, None | None, Some _ ->
+        invalid_arg "optional joint_combiners are not comparable"
+
   (* Just for exhaustiveness over fields *)
   let iter2 ~chal ~scalar_chal
       { Plonk.Minimal.alpha = alpha_0
       ; beta = beta_0
       ; gamma = gamma_0
       ; zeta = zeta_0
-      ; joint_combiner = _
+      ; joint_combiner = joint_combiner_0
       ; feature_flags = _
       }
       { Plonk.Minimal.alpha = alpha_1
       ; beta = beta_1
       ; gamma = gamma_1
       ; zeta = zeta_1
-      ; joint_combiner = _
+      ; joint_combiner = joint_combiner_1
       ; feature_flags = _
       } =
-    if G.lookup_verification_enabled then failwith "Wrap_verifier.iter2:TODO" ;
+    if G.lookup_verification_enabled then
+      with_label __LOC__ (fun () ->
+          challenge_joint_combiners ~chal_f:scalar_chal joint_combiner_0
+            joint_combiner_1 ) ;
     with_label __LOC__ (fun () -> chal beta_0 beta_1) ;
     with_label __LOC__ (fun () -> chal gamma_0 gamma_1) ;
     with_label __LOC__ (fun () -> scalar_chal alpha_0 alpha_1) ;
@@ -750,7 +762,9 @@ struct
               , [] )
         in
         let joint_combiner =
-          if G.lookup_verification_enabled then failwith "TODO" else None
+          if G.lookup_verification_enabled then
+            Some { Kimchi_types.inner = Impl.Field.one }
+          else None
         in
         assert_eq_plonk
           { alpha = plonk.alpha
