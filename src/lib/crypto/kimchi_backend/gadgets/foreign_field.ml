@@ -990,7 +990,7 @@ let check_bound (type f) (module Circuit : Snark_intf.Run with type field = f)
     (* Add external multi-range-check x *)
     External_checks.append_multi_range_check external_checks (x0, x1, x2) ;
 
-  (* Add external limb-check x *)
+  (* Add external limb-check for x2_bound *)
   External_checks.append_limb_check external_checks x2_bound ;
 
   x2_bound
@@ -1231,8 +1231,8 @@ let compute_witness_variables (type f)
 
 (* Foreign field multiplication gadget definition *)
 let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (external_checks : f External_checks.t) (left_input : f Element.Standard.t)
-    (right_input : f Element.Standard.t)
+    (external_checks : f External_checks.t) ?(bound_check_result = true)
+    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
   let open Circuit in
   let of_bits = Common.field_bits_le_to_field (module Circuit) in
@@ -1441,15 +1441,85 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
   External_checks.append_multi_range_check external_checks
     (quotient_hi_bound, product1_lo, product1_hi_0) ;
 
-  (* Instead of appending external check for compact MRC for remainder,
-   * this is added directly, so that the standard limbs
-   * (remainder0, remainder1, remainder2) are copyable in witness cells *)
   let remainder0, remainder1 =
-    Range_check.compact_multi (module Circuit) remainder01 remainder2
-  in
+    if bound_check_result then (
+      (* Instead of doing the remainder compact-multi-range check externally,
+       * we must insert it directly here, so that the standard limbs
+       * (remainder0, remainder1, remainder2) are copyable in witness cells *)
+      let remainder0, remainder1 =
+        Range_check.compact_multi (module Circuit) remainder01 remainder2
+      in
+      External_checks.append_bound_check external_checks
+        ~do_multi_range_check:false
+        (Element.Standard.of_limbs (remainder0, remainder1, remainder2)) ;
 
-  External_checks.append_bound_check external_checks ~do_multi_range_check:false
-    (Element.Standard.of_limbs (remainder0, remainder1, remainder2)) ;
+      (remainder0, remainder1) )
+    else
+      (* We do not require a bound check of the result, so save 5.3 rows!
+       *
+       * This happens when the result is already bound-checked outside of this gadget, i.e.,
+       * with some other cvar x, such that x = remainder.
+       *
+       * In this case, we do not want to duplicate the bound check and the compact-range-check.
+       * We only need to make sure that the remainder limbs (remainder0, remainder1, remainder2)
+       * are part of the witness and that remainder0 + 2^L * remainder1 = remainder01.
+       *
+       * We take this approach
+       *     1. Omit adding the bound check to the external-checks (saves 1.8 rows)
+       *     2. Omit doing a compact-multi-range-check on the remainder and do something simpler (saves 3.5 rows)
+       *
+       * Instead of the compact-multi-range-check we do the following
+       *     1. Add copy constrains for remainder0 = x0, remainder1 = x1, remainder2 = x2
+       *        (this is a precondition done outside this gadget)
+       *     2. Compute the decomposition remainder01 = remainder0 + 2^L * remainder1 with a Generic gate
+       *
+       * Details: Since x0, x1, x2 are already bound-checked they are already range-checked < 2^L.
+       * Therefore, in terms of decomposing remainder01, doing (1) and (2) is equivalent to what
+       * the compact-multi-range-check would do. However, it only requires 3 copy constraints and 1
+       * Generic gate, consuming 0.5 rows per double instead of 4.  In the external checks, we also save
+       * an additional generic gate for the high bound computation (0.5 rows) and another range-check
+       * for the high bound range-check (1.3 rows).  This gives a total savings of 5.3 rows per
+       * group double, which is a significant improvement, especially when used in scalar multiplication.
+       *)
+      let remainder0, remainder1 =
+        exists
+          Typ.(Field.typ * Field.typ)
+          ~compute:(fun () ->
+            let remainder01 =
+              Common.cvar_field_to_bignum_bigint_as_prover
+                (module Circuit)
+                remainder01
+            in
+            let remainder1, remainder0 =
+              Common.bignum_bigint_div_rem remainder01 Common.two_to_limb
+            in
+
+            Common.
+              ( bignum_bigint_to_field (module Circuit) remainder0
+              , bignum_bigint_to_field (module Circuit) remainder1 ) )
+      in
+
+      (* Constrain remainder01 = remainder0 + 2^L * remainder1 *)
+      let two_to_limb =
+        Common.bignum_bigint_to_field (module Circuit) @@ Common.two_to_limb
+      in
+      with_label "foreign_field_mul_result_decomposition" (fun () ->
+          assert_
+            { annotation = Some __LOC__
+            ; basic =
+                Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+                  (Basic
+                     { l = (Field.Constant.one, remainder0)
+                     ; r = (two_to_limb, remainder1)
+                     ; o = (Field.Constant.(negate one), remainder01)
+                     ; m = Field.Constant.zero
+                     ; c = Field.Constant.zero
+                     } )
+            } ;
+          () ) ;
+
+      (remainder0, remainder1)
+  in
 
   Element.Standard.of_limbs (remainder0, remainder1, remainder2)
 

@@ -579,7 +579,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
     let point_x3_squared =
       Foreign_field.mul
         (module Circuit)
-        external_checks point_x3 point_x curve.modulus
+        external_checks ~bound_check_result:false point_x3 point_x curve.modulus
     in
 
     (* Bounds 10a: Left input (point_x3) bound check added below.
@@ -1804,8 +1804,12 @@ let%test_unit "Ec_group.double" =
             in
 
             (* Check for expected quantity of external checks *)
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.bounds 9 ) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 8 )
+            else
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 9 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
@@ -2081,8 +2085,12 @@ let%test_unit "Ec_group.double_chained" =
             in
 
             (* Check for expected quantity of external checks *)
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.bounds 18 ) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 16 )
+            else
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 18 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
@@ -2221,7 +2229,9 @@ let%test_unit "Ec_group.double_full" =
                     result expected_result ) ) ;
 
             (* Check for expected quantity of external checks *)
-            assert (Mina_stdlib.List.Length.equal external_checks.bounds 13) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (Mina_stdlib.List.Length.equal external_checks.bounds 12)
+            else assert (Mina_stdlib.List.Length.equal external_checks.bounds 13) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 4) ;
             assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 8) ;
             assert (
@@ -2337,8 +2347,12 @@ let%test_unit "Ec_group.ops_mixed" =
             in
 
             (* Check for expected quantity of external checks *)
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.bounds 15 ) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 14 )
+            else
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 15 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
@@ -2885,7 +2899,6 @@ let%test_unit "Ec_group.properties" =
         expected_commutative_result expected_associative_result
         expected_distributive_result
     in
-
     () )
 
 (*******************************)
@@ -4052,8 +4065,12 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
             in
 
             (* Check for expected quantity of external checks *)
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.bounds 44 ) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 42 )
+            else
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 43 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 8 ) ;
             assert (
@@ -4151,7 +4168,9 @@ let%test_unit "Ec_group.scalar_mul_tiny_full" =
              *)
 
             (* Sanity checks *)
-            assert (Mina_stdlib.List.Length.equal external_checks.bounds 44) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (Mina_stdlib.List.Length.equal external_checks.bounds 42)
+            else assert (Mina_stdlib.List.Length.equal external_checks.bounds 43) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 8) ;
             assert (
               Mina_stdlib.List.Length.equal external_checks.multi_ranges 34 ) ;

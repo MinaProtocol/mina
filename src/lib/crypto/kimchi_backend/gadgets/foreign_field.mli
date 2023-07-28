@@ -321,6 +321,7 @@ val result_row :
  *
  *   Inputs:
  *     external_checks       := Context to track required external checks
+ *     bound_check_result    := Option to supress result bound check when not required
  *     left_input            := Multiplicand foreign field element
  *     right_input           := Multiplicand foreign field element
  *     foreign_field_modulus := Must be less than than max foreign field modulus
@@ -333,6 +334,7 @@ val result_row :
 val mul :
      (module Snark_intf.Run with type field = 'f)
   -> 'f External_checks.t (* external_checks *)
+  -> ?bound_check_result:bool
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
