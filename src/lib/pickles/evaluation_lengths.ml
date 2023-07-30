@@ -24,9 +24,7 @@ let create ~of_int =
     ; rot_selector = None
     ; lookup_aggregation = None
     ; lookup_table = None
-    ; lookup_sorted =
-        (let max_columns_num = 5 in
-         Array.init max_columns_num ~f:(fun _ -> None) )
+    ; lookup_sorted = Vector.init Nat.N5.n ~f:(fun _ -> None)
     ; runtime_lookup_table = None
     ; runtime_lookup_table_selector = None
     ; xor_lookup_selector = None
