@@ -7,7 +7,6 @@ module type Statement_var_intf = Intf.Statement_var
 module type Statement_value_intf = Intf.Statement_value
 
 module SC = Scalar_challenge
-open Tuple_lib
 open Core_kernel
 open Async_kernel
 open Import
@@ -21,34 +20,6 @@ exception Return_digest of Md5.t
 let profile_constraints = false
 
 let verify_promise = Verify.verify
-
-let pad_local_max_proofs_verifieds
-    (type prev_varss prev_valuess env max_proofs_verified branches)
-    (max_proofs_verified : max_proofs_verified Nat.t)
-    (length : (prev_varss, branches) Hlist.Length.t)
-    (local_max_proofs_verifieds :
-      (prev_varss, prev_valuess, env) H2_1.T(H2_1.T(E03(Int))).t ) :
-    ((int, max_proofs_verified) Vector.t, branches) Vector.t =
-  let module Vec = struct
-    type t = (int, max_proofs_verified) Vector.t
-  end in
-  let module M =
-    H2_1.Map
-      (H2_1.T
-         (E03 (Int))) (E03 (Vec))
-         (struct
-           module HI = H2_1.T (E03 (Int))
-
-           let f : type a b e. (a, b, e) H2_1.T(E03(Int)).t -> Vec.t =
-            fun xs ->
-             let (T (_proofs_verified, pi)) = HI.length xs in
-             let module V = H2_1.To_vector (Int) in
-             let v = V.f pi xs in
-             Vector.extend_front_exn v max_proofs_verified 0
-         end)
-  in
-  let module V = H2_1.To_vector (Vec) in
-  V.f length (M.f local_max_proofs_verifieds)
 
 open Kimchi_backend
 module Proof_ = P.Base
@@ -312,10 +283,6 @@ struct
     let padded = V.f branches (M.f choices) |> Vector.transpose in
     (padded, Maxes.m padded)
 
-  module Lazy_ (A : T0) = struct
-    type t = A.t Lazy.t
-  end
-
   module Lazy_keys = struct
     type t =
       (Impls.Step.Keypair.t * Dirty.t) Lazy.t
@@ -324,7 +291,7 @@ struct
     (* TODO Think this is right.. *)
   end
 
-  let log_step main typ name index =
+  let log_step main _typ name index =
     let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
     let log =
       let weight =
@@ -749,7 +716,6 @@ struct
           Impls.Step.Typ.(input_typ * output_typ)
     in
     let provers =
-      let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
       let f :
           type prev_vars prev_values local_widths local_heights.
              (prev_vars, prev_values, local_widths, local_heights) Branch_data.t
@@ -763,7 +729,6 @@ struct
              * (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t )
              Promise.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
-        let (module Requests) = b.requests in
         let _, prev_vars_length = b.proofs_verified in
         let step handler next_state =
           let wrap_vk = Lazy.force wrap_vk in
@@ -833,7 +798,7 @@ struct
         wrap
       in
       let rec go :
-          type xs1 xs2 xs3 xs4 xs5 xs6.
+          type xs1 xs2 xs3 xs4.
              (xs1, xs2, xs3, xs4) H4.T(Branch_data).t
           -> (xs1, xs2, xs3, xs4) H4.T(E04(Lazy_keys)).t
           -> ( xs2
@@ -962,7 +927,7 @@ module Side_loaded = struct
 end
 
 let compile_with_wrap_main_override_promise :
-    type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess prev_ret_varss prev_ret_valuess widthss heightss max_proofs_verified branches.
+    type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
        ?self:(var, value, max_proofs_verified, branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
     -> ?disk_keys:
@@ -1066,7 +1031,7 @@ let compile_with_wrap_main_override_promise :
       (Auxiliary_value)
   in
   let rec conv_irs :
-      type v1ss v2ss v3ss v4ss wss hss.
+      type v1ss v2ss wss hss.
          ( v1ss
          , v2ss
          , wss
@@ -1112,13 +1077,7 @@ let compile_with_wrap_main_override_promise :
   let module P = struct
     type statement = value
 
-    type return_type = ret_value
-
     module Max_local_max_proofs_verified = Max_proofs_verified
-
-    module Max_proofs_verified_vec = Nvector (struct
-      include Max_proofs_verified
-    end)
 
     include
       Proof.Make
@@ -1143,8 +1102,6 @@ let compile_with_wrap_main_override_promise :
         ts
 
     let verify ts = verify_promise ts |> Promise.to_deferred
-
-    let statement (T p : t) = p.statement.messages_for_next_step_proof.app_state
   end in
   (self, cache_handle, (module P), provers)
 
@@ -1165,7 +1122,6 @@ let wrap_main_dummy_override _ _ _ _ _ _ _ =
     let module SC' = SC in
     let open Impls.Wrap in
     let open Wrap_main_inputs in
-    let open Wrap_main in
     (* Create some variables to be used in constraints below. *)
     let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
     let y = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0) in
@@ -1193,7 +1149,7 @@ let wrap_main_dummy_override _ _ _ _ _ _ _ =
     (* Pad the circuit so that its domain size matches the one
        that would have been used by the true wrap_main.
     *)
-    for i = 0 to 64000 do
+    for _ = 0 to 64000 do
       assert_r1cs x y z
     done
   in
@@ -1272,20 +1228,6 @@ module Make_adversarial_test (M : sig
 end) =
 struct
   open Impls.Step
-
-  module Statement = struct
-    type t = unit
-
-    let to_field_elements () = [||]
-  end
-
-  module A = Statement
-  module A_value = Statement
-
-  let typ = Typ.unit
-
-  module Branches = Nat.N1
-  module Max_proofs_verified = Nat.N2
 
   let constraint_constants : Snark_keys_header.Constraint_constants.t =
     { sub_windows_per_window = 0
@@ -1370,8 +1312,6 @@ struct
   module Recurse_on_bad_proof = struct
     open Impls.Step
 
-    let dummy_proof = P.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
-
     type _ Snarky_backendless.Request.t +=
       | Proof : Proof.t Snarky_backendless.Request.t
 
@@ -1383,14 +1323,14 @@ struct
       | _ ->
           respond Unhandled
 
-    let tag, _, p, ([ step ] : _ H3_2.T(Prover).t) =
+    let _tag, _, p, ([ step ] : _ H3_2.T(Prover).t) =
       Common.time "compile" (fun () ->
           compile_with_wrap_main_override_promise ()
             ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
             ~branches:(module Nat.N1)
             ~max_proofs_verified:(module Nat.N2)
             ~name:"recurse-on-bad" ~constraint_constants
-            ~choices:(fun ~self ->
+            ~choices:(fun ~self:_ ->
               [ { identifier = "main"
                 ; feature_flags = Plonk_types.Features.none_bool
                 ; prevs = [ tag; tag ]

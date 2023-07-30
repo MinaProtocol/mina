@@ -2,7 +2,7 @@ open Core_kernel
 open Pickles_types
 module Sponge_lib = Sponge
 
-module Snarkable = struct
+module Snarkable : sig
   module type S1 = sig
     type _ t
 
@@ -122,7 +122,7 @@ module Snarkable = struct
   end
 end
 
-module Evals = struct
+module Evals : sig
   module type S = sig
     type n
 
@@ -134,16 +134,14 @@ module Evals = struct
   end
 end
 
-module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
-  open Impl
-
+module Group (Impl : Snarky_backendless.Snark_intf.Run) : sig
   module type S = sig
     type t
 
     module Params : sig
-      val a : Field.Constant.t
+      val a : Impl.Field.Constant.t
 
-      val b : Field.Constant.t
+      val b : Impl.Field.Constant.t
     end
 
     module Constant : sig
@@ -163,26 +161,26 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
 
       val scale : t -> Scalar.t -> t
 
-      val to_affine_exn : t -> field * field
+      val to_affine_exn : t -> Impl.field * Impl.field
 
-      val of_affine : field * field -> t
+      val of_affine : Impl.field * Impl.field -> t
     end
 
-    val typ_unchecked : (t, Constant.t, field) Snarky_backendless.Typ.t
+    val typ_unchecked : (t, Constant.t, Impl.field) Snarky_backendless.Typ.t
 
-    val typ : (t, Constant.t, field) Snarky_backendless.Typ.t
+    val typ : (t, Constant.t, Impl.field) Snarky_backendless.Typ.t
 
     val ( + ) : t -> t -> t
 
     val double : t -> t
 
-    val scale : t -> Boolean.var list -> t
+    val scale : t -> Impl.Boolean.var list -> t
 
-    val if_ : Boolean.var -> then_:t -> else_:t -> t
+    val if_ : Impl.Boolean.var -> then_:t -> else_:t -> t
 
     val negate : t -> t
 
-    val to_field_elements : t -> Field.t list
+    val to_field_elements : t -> Impl.Field.t list
 
     module Scaling_precomputation : sig
       type t
@@ -193,20 +191,18 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
     val constant : Constant.t -> t
 
     val multiscale_known :
-      (Boolean.var list * Scaling_precomputation.t) array -> t
+      (Impl.Boolean.var list * Scaling_precomputation.t) array -> t
   end
 end
 
-module Sponge (Impl : Snarky_backendless.Snark_intf.Run) = struct
-  open Impl
-
+module Sponge (Impl : Snarky_backendless.Snark_intf.Run) : sig
   module type S =
     Sponge.Intf.Sponge
-      with module Field := Field
+      with module Field := Impl.Field
        and module State := Sponge.State
-       and type input := Field.t
-       and type digest := Field.t
-       and type t = Field.t Sponge.t
+       and type input := Impl.Field.t
+       and type digest := Impl.Field.t
+       and type t = Impl.Field.t Sponge.t
 end
 
 module type Inputs_base = sig
@@ -253,7 +249,7 @@ module type Inputs_base = sig
   val sponge_params : Impl.Field.t Sponge_lib.Params.t
 end
 
-module Wrap_main_inputs = struct
+module Wrap_main_inputs : sig
   module type S = sig
     include Inputs_base
 
@@ -267,7 +263,7 @@ module Wrap_main_inputs = struct
   end
 end
 
-module Step_main_inputs = struct
+module Step_main_inputs : sig
   module type S = sig
     include Inputs_base
 
