@@ -10,12 +10,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
-  type network = Network.t
-
-  type node = Network.Node.t
-
-  type dsl = Dsl.t
+  let test_name = "payments"
 
   (* TODO: refactor all currency values to decimal represenation *)
   (* TODO: test account creation fee *)
@@ -33,8 +28,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     in
     { default with
-      requires_graphql = true
-    ; genesis_ledger =
+      genesis_ledger =
         [ { account_name = "untimed-node-a-key"
           ; balance = "400000"
           ; timing = Untimed (* 400_000_000_000_000 *)

@@ -61,17 +61,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  type network = Network.t
-
-  type node = Network.Node.t
-
-  type dsl = Dsl.t
+  let test_name = "verification-key"
 
   let config =
     let open Test_config in
     { default with
-      requires_graphql = true
-    ; genesis_ledger =
+      genesis_ledger =
         [ { account_name = "whale1-key"
           ; balance = "9000000000"
           ; timing = Untimed
