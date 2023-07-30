@@ -256,6 +256,8 @@ module Engine = struct
     val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
 
     val id : t -> string
+
+    val config_path : string ref
   end
 
   module type Network_manager_intf = sig
@@ -482,16 +484,16 @@ module Test = struct
 
     type dsl
 
+    val test_name : string
+
     val config : Test_config.t
 
     val run : network -> dsl -> unit Malleable_error.t
   end
 
-  (* NB: until the DSL is actually implemented, a test just takes in the engine
-   * implementation directly. *)
   module type Functor_intf = functor (Inputs : Inputs_intf) ->
     S
-      with type network = Inputs.Engine.Network.t
-       and type node = Inputs.Engine.Network.Node.t
-       and type dsl = Inputs.Dsl.t
+      with type network := Inputs.Engine.Network.t
+       and type node := Inputs.Engine.Network.Node.t
+       and type dsl := Inputs.Dsl.t
 end
