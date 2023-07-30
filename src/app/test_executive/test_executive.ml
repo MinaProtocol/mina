@@ -4,7 +4,7 @@ open Cmdliner
 open Pipe_lib
 open Integration_test_lib
 
-type test = string * (module Intf.Test.Functor_intf)
+type test = (module Intf.Test.Functor_intf)
 
 type engine = string * (module Intf.Engine.S)
 
@@ -30,6 +30,7 @@ type inputs =
   ; mina_image : string
   ; archive_image : string option
   ; debug : bool
+  ; config_path : string
   }
 
 let validate_inputs ~logger inputs (test_config : Test_config.t) :
@@ -44,29 +45,28 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
       "This test uses archive nodes.  archive-image argument cannot be absent \
        for this test" ;
     exit 1 )
-  else Deferred.return ()
+  else Deferred.unit
 
 let engines : engine list =
-  [ ("cloud", (module Integration_test_abstract_engine : Intf.Engine.S)) ]
+  let abstract_engine =
+    (module Integration_test_abstract_engine : Intf.Engine.S)
+  in
+  [ ("cloud", abstract_engine); ("local", abstract_engine) ]
 
 let tests : test list =
-  [ ( "peers-reliability"
-    , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
-  ; ( "chain-reliability"
-    , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
-  ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
-  ; ("delegation", (module Delegation_test.Make : Intf.Test.Functor_intf))
-  ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
-  ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
-  ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))
-  ; ("zkapps-timing", (module Zkapps_timing.Make : Intf.Test.Functor_intf))
-  ; ("zkapps-nonce", (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf))
-  ; ( "verification-key"
-    , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
-  ; ( "block-prod-prio"
-    , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
-  ; ("snarkyjs", (module Snarkyjs.Make : Intf.Test.Functor_intf))
-  ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
+  [ (module Block_production_priority.Make : Intf.Test.Functor_intf)
+  ; (module Block_reward_test.Make : Intf.Test.Functor_intf)
+  ; (module Chain_reliability_test.Make : Intf.Test.Functor_intf)
+  ; (module Delegation_test.Make : Intf.Test.Functor_intf)
+  ; (module Gossip_consistency.Make : Intf.Test.Functor_intf)
+  ; (module Medium_bootstrap.Make : Intf.Test.Functor_intf)
+  ; (module Payments_test.Make : Intf.Test.Functor_intf)
+  ; (module Peers_reliability_test.Make : Intf.Test.Functor_intf)
+  ; (module Snarkyjs.Make : Intf.Test.Functor_intf)
+  ; (module Verification_key_update.Make : Intf.Test.Functor_intf)
+  ; (module Zkapps.Make : Intf.Test.Functor_intf)
+  ; (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf)
+  ; (module Zkapps_timing.Make : Intf.Test.Functor_intf)
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
@@ -196,8 +196,6 @@ let report_test_errors ~log_error_set ~internal_error_set =
       let%bind () = Writer.(flushed (Lazy.force stderr)) in
       return exit_code
 
-(* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
-
 let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
     ~log_engine_cleanup_func ~lift_accumulated_errors_func ~net_manager_ref
     ~log_engine_ref ~network_state_writer_ref ~cleanup_deferred_ref ~exit_reason
@@ -240,19 +238,22 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       cleanup_deferred_ref := Some deferred ;
       deferred
 
+let test_name (test : test)
+    (inputs : (module Integration_test_lib.Intf.Test.Inputs_intf)) =
+  let (module Inputs) = inputs in
+  let module Test = (val test) (Inputs) in
+  Test.test_name
+
 let main inputs =
   let (Test_inputs_with_cli_inputs ((module Test_inputs), cli_inputs)) =
     inputs.test_inputs
   in
   let open Test_inputs in
-  let test_name, (module Test) = inputs.test in
-  let (module T) =
-    (module Test (Test_inputs) : Intf.Test.S
-      with type network = Engine.Network.t
-       and type node = Engine.Network.Node.t
-       and type dsl = Dsl.t )
-  in
+  let (module Test) = inputs.test in
+  let test_name = test_name inputs.test (module Test_inputs) in
+  let module T = Test (Test_inputs) in
   let logger = Logger.create () in
+  (* TODO: provide as json file *)
   let images =
     { Test_config.Container_images.mina = inputs.mina_image
     ; archive_node =
@@ -291,7 +292,7 @@ let main inputs =
       ~lift_accumulated_errors_func ~net_manager_ref ~log_engine_ref
       ~network_state_writer_ref ~cleanup_deferred_ref
   in
-  (* run test while gracefully recovering handling exceptions and interrupts *)
+  (* run test while gracefully recovering, handling exceptions, and interrupts *)
   [%log trace] "attaching signal handler" ;
   Signal.handle Signal.terminating ~f:(fun signal ->
       [%log info] "handling signal %s" (Signal.to_string signal) ;
@@ -349,7 +350,7 @@ let main inputs =
         in
         [%log trace] "initializing network abstraction" ;
         let%bind () = Engine.Network.initialize_infra ~logger network in
-        [%log info] "Starting the daemons within the pods" ;
+        [%log info] "starting the daemons within the pods" ;
         let start_print (node : Engine.Network.Node.t) =
           let open Malleable_error.Let_syntax in
           [%log info] "starting %s ..." (Engine.Network.Node.id node) ;
@@ -369,7 +370,7 @@ let main inputs =
           Dsl.wait_for dsl (Dsl.Wait_condition.nodes_to_initialize seed_nodes)
         in
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
-        [%log info] "Daemons started" ;
+        [%log info] "daemons started" ;
         [%log trace] "executing test" ;
         T.run network dsl )
   in
@@ -392,13 +393,20 @@ let start inputs =
   never_returns
     (Async.Scheduler.go_main ~main:(fun () -> don't_wait_for (main inputs)) ())
 
-let test_arg =
-  (* we nest the tests in a redundant index so that we still get the name back after cmdliner evaluates the argument *)
+let test_arg inputs =
   let indexed_tests =
-    List.map tests ~f:(fun (name, test) -> (name, (name, test)))
+    List.map tests ~f:(fun test -> (test_name test inputs, test))
   in
   let doc = "The name of the test to execute." in
   Arg.(required & pos 0 (some (enum indexed_tests)) None & info [] ~doc)
+
+let config_path_arg =
+  let doc = "Path to the CI config file." in
+  let env = Arg.env_var "MINA_CI_CONFIG_PATH" ~doc in
+  Arg.(
+    required
+    & opt (some non_dir_file) None
+    & info [ "config-path"; "config" ] ~env ~docv:"MINA_CI_CONFIG_PATH" ~doc)
 
 let mina_image_arg =
   let doc = "Identifier of the Mina docker image to test." in
@@ -408,13 +416,21 @@ let mina_image_arg =
     & opt (some string) None
     & info [ "mina-image" ] ~env ~docv:"MINA_IMAGE" ~doc)
 
+let images_arg =
+  let doc = "Identifier of the archive node docker image to test." in
+  let env = Arg.env_var "ARCHIVE_IMAGE" ~doc in
+  Arg.(
+    value
+    & opt (some string) None
+    & info [ "archive-image" ] ~env ~docv:"ARCHIVE_IMAGE" ~doc)
+
 let archive_image_arg =
   let doc = "Identifier of the archive node docker image to test." in
   let env = Arg.env_var "ARCHIVE_IMAGE" ~doc in
   Arg.(
     value
-      ( opt (some string) None
-      & info [ "archive-image" ] ~env ~docv:"ARCHIVE_IMAGE" ~doc ))
+    & opt (some string) None
+    & info [ "archive-image" ] ~env ~docv:"ARCHIVE_IMAGE" ~doc)
 
 let debug_arg =
   let doc =
@@ -425,28 +441,43 @@ let debug_arg =
 
 let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
+let info engine_name =
+  let doc =
+    match engine_name with
+    | "cloud" ->
+        "Run mina integration tests on a remote cloud provider."
+    | "local" ->
+        "Run mina integration tests locally with Minimina."
+    | _ ->
+        assert false
+  in
+  Term.info engine_name ~doc ~exits:Term.default_exits
+
 let engine_cmd ((engine_name, (module Engine)) : engine) =
-  let info =
-    let doc = "Run mina integration test(s) on remote cloud provider." in
-    Term.info engine_name ~doc ~exits:Term.default_exits
+  let info = info engine_name in
+  let module Inputs = Make_test_inputs (Engine) () in
+  let set_config path =
+    Engine.Network.config_path := path ;
+    path
   in
   let test_inputs_with_cli_inputs_arg =
     let wrap_cli_inputs cli_inputs =
-      Test_inputs_with_cli_inputs
-        ((module Make_test_inputs (Engine) ()), cli_inputs)
+      Test_inputs_with_cli_inputs ((module Inputs), cli_inputs)
     in
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs test_inputs test mina_image archive_image debug =
-      { test_inputs; test; mina_image; archive_image; debug }
+    let cons_inputs test_inputs test archive_image debug mina_image config_path
+        =
+      { test_inputs; test; mina_image; archive_image; debug; config_path }
     in
     Term.(
-      const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
-      $ mina_image_arg $ archive_image_arg $ debug_arg)
+      const cons_inputs $ test_inputs_with_cli_inputs_arg
+      $ test_arg (module Inputs)
+      $ archive_image_arg $ debug_arg $ mina_image_arg
+      $ (const set_config $ config_path_arg))
   in
-  let term = Term.(const start $ inputs_term) in
-  (term, info)
+  (Term.(const start $ inputs_term), info)
 
 let help_cmd =
   let doc = "Print out test executive documentation." in
