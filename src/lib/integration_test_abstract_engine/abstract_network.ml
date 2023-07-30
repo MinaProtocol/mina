@@ -12,17 +12,17 @@ type config =
   ; cluster : string
   ; namespace : string
   ; graphql_enabled : bool
-  ; access_token : Access_token.t
   ; network_id : Network_id.t
   ; ingress_uri : string
   ; current_commit_sha : string
   }
 
+(* [config_path] is instantiated when command line args are parsed *)
+let config_path = ref ""
+
 module Node = struct
-  (* TODO: remove app_id, add ingress_uri *)
   type t =
-    { app_id : string
-    ; node_id : string
+    { node_id : string
     ; network_keypair : Network_keypair.t option
     ; config : config
     ; node_type : Node_type.t
@@ -44,40 +44,41 @@ module Node = struct
       (base_kube_args config @ [ "logs"; "-c"; container_id; node_id ])
 
   let start ?commit_sha ~fresh_state t : unit Malleable_error.t =
-    let commit_sha =
-      Option.value commit_sha ~default:t.config.current_commit_sha
-    in
-    let access_token = t.config.access_token in
-    let request_body =
-      Request.Platform_agnostic.Start_node
-        { node_id = id t; fresh_state; commit_sha }
-    in
-    let%bind () =
-      match%map ci_http_request' ~access_token ~request_body with
-      | Ok (Response.Platform_agnostic.Node_started node_id)
-        when String.equal node_id (id t) ->
-          ()
-      | _ ->
-          failwith "invalid node started response"
-    in
-    Malleable_error.return ()
+    try
+      let commit_sha =
+        Option.value commit_sha ~default:t.config.current_commit_sha
+      in
+      let args =
+        [ ("node_id", `String (id t))
+        ; ("fresh_state", `Bool fresh_state)
+        ; ("commit_sha", `String commit_sha)
+        ]
+      in
+      let%bind () =
+        match%map run_command ~config:!config_path ~args "start_node" with
+        | Ok (Response.Node_started _) ->
+            ()
+        | _ ->
+            failwith "invalid node started response"
+      in
+      Malleable_error.return ()
+    with Failure err -> Malleable_error.hard_error_string err
 
   let stop t =
-    let access_token = t.config.access_token in
-    let request_body = Request.Platform_agnostic.Stop_node (id t) in
-    let%bind () =
-      match%map ci_http_request' ~access_token ~request_body with
-      | Ok (Response.Platform_agnostic.Node_stopped node_id)
-        when String.equal node_id (id t) ->
-          ()
-      | _ ->
-          failwith "invalid node stopped response"
-    in
-    Malleable_error.return ()
+    try
+      let args = [ ("node_id", `String (id t)) ] in
+      let%bind () =
+        match%map run_command ~config:!config_path ~args "stop_node" with
+        | Ok (Response.Node_stopped _) ->
+            ()
+        | _ ->
+            failwith "invalid node stopped response"
+      in
+      Malleable_error.return ()
+    with Failure err -> Malleable_error.hard_error_string err
 
   let logger_metadata node =
     [ ("namespace", `String node.config.namespace)
-    ; ("app_id", `String node.app_id)
     ; ("node_id", `String node.node_id)
     ]
 
@@ -89,7 +90,7 @@ module Node = struct
       let host =
         sprintf "%s.%s" node.config.testnet_name node.config.ingress_uri
       in
-      let path = sprintf "/%s/graphql" node.app_id in
+      let path = sprintf "/%s/graphql" node.node_id in
       Uri.make ~scheme:"http" ~host ~path ~port:80 ()
 
     module Client = Graphql_lib.Client.Make (struct
@@ -105,104 +106,104 @@ module Node = struct
     module Unlock_account =
     [%graphql
     ({|
-      mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
-        unlockAccount(input: {password: $password, publicKey: $public_key }) {
-          account {
-            public_key: publicKey
+        mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
+          unlockAccount(input: {password: $password, publicKey: $public_key }) {
+            account {
+              public_key: publicKey
+            }
           }
         }
-      }
-    |}
+      |}
     [@encoders Encoders] )]
 
     module Send_test_payments =
     [%graphql
     {|
-      mutation ($senders: [PrivateKey!]!,
-      $receiver: PublicKey!,
-      $amount: UInt64!,
-      $fee: UInt64!,
-      $repeat_count: UInt32!,
-      $repeat_delay_ms: UInt32!) @encoders(module: "Encoders"){
-        sendTestPayments(
-          senders: $senders, receiver: $receiver, amount: $amount, fee: $fee,
-          repeat_count: $repeat_count,
-          repeat_delay_ms: $repeat_delay_ms)
-      }
-    |}]
+        mutation ($senders: [PrivateKey!]!,
+        $receiver: PublicKey!,
+        $amount: UInt64!,
+        $fee: UInt64!,
+        $repeat_count: UInt32!,
+        $repeat_delay_ms: UInt32!) @encoders(module: "Encoders"){
+          sendTestPayments(
+            senders: $senders, receiver: $receiver, amount: $amount, fee: $fee,
+            repeat_count: $repeat_count,
+            repeat_delay_ms: $repeat_delay_ms)
+        }
+      |}]
 
     module Send_payment =
     [%graphql
     {|
-     mutation ($input: SendPaymentInput!)@encoders(module: "Encoders"){
-        sendPayment(input: $input){
+      mutation ($input: SendPaymentInput!)@encoders(module: "Encoders"){
+          sendPayment(input: $input){
+              payment {
+                id
+                nonce
+                hash
+              }
+            }
+        }
+      |}]
+
+    module Send_payment_with_raw_sig =
+    [%graphql
+    {|
+      mutation (
+      $input:SendPaymentInput!,
+      $rawSignature: String!
+      )@encoders(module: "Encoders")
+        {
+          sendPayment(
+            input:$input,
+            signature: {rawSignature: $rawSignature}
+          )
+          {
             payment {
               id
               nonce
               hash
             }
           }
-      }
-    |}]
-
-    module Send_payment_with_raw_sig =
-    [%graphql
-    {|
-     mutation (
-     $input:SendPaymentInput!,
-     $rawSignature: String!
-     )@encoders(module: "Encoders")
-      {
-        sendPayment(
-          input:$input,
-          signature: {rawSignature: $rawSignature}
-        )
-        {
-          payment {
-            id
-            nonce
-            hash
-          }
         }
-      }
-    |}]
+      |}]
 
     module Send_delegation =
     [%graphql
     {|
-      mutation ($input: SendDelegationInput!) @encoders(module: "Encoders"){
-        sendDelegation(input:$input){
-            delegation {
-              id
-              nonce
-              hash
+        mutation ($input: SendDelegationInput!) @encoders(module: "Encoders"){
+          sendDelegation(input:$input){
+              delegation {
+                id
+                nonce
+                hash
+              }
             }
-          }
-      }
-    |}]
+        }
+      |}]
 
     module Set_snark_worker =
     [%graphql
     {|
-      mutation ($input: SetSnarkWorkerInput! ) @encoders(module: "Encoders"){
-        setSnarkWorker(input:$input){
-          lastSnarkWorker
-          }
-      }
-    |}]
+        mutation ($input: SetSnarkWorkerInput! ) @encoders(module: "Encoders"){
+          setSnarkWorker(input:$input){
+            lastSnarkWorker
+            }
+        }
+      |}]
 
     module Get_account_data =
     [%graphql
     {|
-      query ($public_key: PublicKey!) @encoders(module: "Encoders"){
-        account(publicKey: $public_key) {
-          nonce
-          balance {
-            total @ppxCustom(module: "Scalars.Balance")
+        query ($public_key: PublicKey!) @encoders(module: "Encoders"){
+          account(publicKey: $public_key) {
+            nonce
+            balance {
+              total @ppxCustom(module: "Scalars.Balance")
+            }
           }
         }
-      }
-    |}]
+      |}]
 
     module Send_test_zkapp = Generated_graphql_queries.Send_test_zkapp
     module Pooled_zkapp_commands =
@@ -211,112 +212,112 @@ module Node = struct
     module Query_peer_id =
     [%graphql
     {|
-      query {
-        daemonStatus {
-          addrsAndPorts {
-            peer {
-              peerId
+        query {
+          daemonStatus {
+            addrsAndPorts {
+              peer {
+                peerId
+              }
             }
-          }
-          peers {  peerId }
+            peers {  peerId }
 
+          }
         }
-      }
-    |}]
+      |}]
 
     module Best_chain =
     [%graphql
     {|
-      query ($max_length: Int) @encoders(module: "Encoders"){
-        bestChain (maxLength: $max_length) {
-          stateHash @ppxCustom(module: "Graphql_lib.Scalars.String_json")
-          commandTransactionCount
-          creatorAccount {
-            publicKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+        query ($max_length: Int) @encoders(module: "Encoders"){
+          bestChain (maxLength: $max_length) {
+            stateHash @ppxCustom(module: "Graphql_lib.Scalars.String_json")
+            commandTransactionCount
+            creatorAccount {
+              publicKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+            }
           }
         }
-      }
-    |}]
+      |}]
 
     module Query_metrics =
     [%graphql
     {|
-      query {
-        daemonStatus {
-          metrics {
-            blockProductionDelay
-            transactionPoolDiffReceived
-            transactionPoolDiffBroadcasted
-            transactionsAddedToPool
-            transactionPoolSize
+        query {
+          daemonStatus {
+            metrics {
+              blockProductionDelay
+              transactionPoolDiffReceived
+              transactionPoolDiffBroadcasted
+              transactionsAddedToPool
+              transactionPoolSize
+            }
           }
         }
-      }
-    |}]
+      |}]
 
     module StartFilteredLog =
     [%graphql
     {|
-      mutation ($filter: [String!]!) @encoders(module: "Encoders"){
-        startFilteredLog(filter: $filter)
-      }
-    |}]
+        mutation ($filter: [String!]!) @encoders(module: "Encoders"){
+          startFilteredLog(filter: $filter)
+        }
+      |}]
 
     module GetFilteredLogEntries =
     [%graphql
     {|
-      query ($offset: Int!) @encoders(module: "Encoders"){
-        getFilteredLogEntries(offset: $offset) {
-            logMessages,
-            isCapturing,
-        }
+        query ($offset: Int!) @encoders(module: "Encoders"){
+          getFilteredLogEntries(offset: $offset) {
+              logMessages,
+              isCapturing,
+          }
 
-    }
-    |}]
+      }
+      |}]
 
     module Account =
     [%graphql
     {|
-      query ($public_key: PublicKey!, $token: UInt64) {
-        account (publicKey : $public_key, token : $token) {
-          balance { liquid
-                    locked
-                    total
+        query ($public_key: PublicKey!, $token: UInt64) {
+          account (publicKey : $public_key, token : $token) {
+            balance { liquid
+                      locked
+                      total
+                    }
+            delegate
+            nonce
+            permissions { editActionState
+                          editState
+                          incrementNonce
+                          receive
+                          send
+                          access
+                          setDelegate
+                          setPermissions
+                          setZkappUri
+                          setTokenSymbol
+                          setVerificationKey
+                          setVotingFor
+                          setTiming
+                        }
+            actionState
+            zkappState
+            zkappUri
+            timing { cliffTime @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                    cliffAmount
+                    vestingPeriod @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                    vestingIncrement
+                    initialMinimumBalance
                   }
-          delegate
-          nonce
-          permissions { editActionState
-                        editState
-                        incrementNonce
-                        receive
-                        send
-                        access
-                        setDelegate
-                        setPermissions
-                        setZkappUri
-                        setTokenSymbol
-                        setVerificationKey
-                        setVotingFor
-                        setTiming
-                      }
-          actionState
-          zkappState
-          zkappUri
-          timing { cliffTime @ppxCustom(module: "Graphql_lib.Scalars.JSON")
-                   cliffAmount
-                   vestingPeriod @ppxCustom(module: "Graphql_lib.Scalars.JSON")
-                   vestingIncrement
-                   initialMinimumBalance
-                 }
-          tokenId
-          tokenSymbol
-          verificationKey { verificationKey
-                            hash
-                          }
-          votingFor
+            tokenId
+            tokenSymbol
+            verificationKey { verificationKey
+                              hash
+                            }
+            votingFor
+          }
         }
-      }
-    |}]
+      |}]
   end
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
@@ -368,7 +369,7 @@ module Node = struct
               [%log error]
                 "GraphQL request \"$query\" to \"$uri\" returned an error: \
                  \"$error\" (this is a graphql error so not retrying)"
-                ~metadata:(metadata @ [ ("error", `String err_string) ]) ;
+                ~metadata:(("error", `String err_string) :: metadata) ;
               Deferred.Or_error.error_string err_string
       in
       let%bind () = after (Time.Span.of_sec initial_delay_sec) in
@@ -998,7 +999,7 @@ module Node = struct
           [%log error]
             "Attempted to start structured log collection on $node, but it had \
              already started"
-            ~metadata:[ ("node", `String t.app_id) ] ;
+            ~metadata:[ ("node", `String t.node_id) ] ;
           return (Ok ()) )
     | Error e ->
         return (Error e)
@@ -1021,13 +1022,13 @@ module Node = struct
 
   let dump_archive_data ~logger (t : t) ~data_file =
     if Node_type.(equal t.node_type Archive_node) then
-      let access_token = t.config.access_token in
-      let request_body = Request.Platform_agnostic.Dump_archive_data (id t) in
+      let args = [ ("node_id", `String (id t)) ] in
       try
         let%bind data =
-          match%map ci_http_request' ~access_token ~request_body with
-          | Ok (Response.Platform_agnostic.Archive_data_dump (node_id, logs))
-            when String.equal node_id (id t) ->
+          match%map
+            run_command ~config:!config_path ~args "dump_archive_data"
+          with
+          | Ok (Response.Archive_data_dump (_, logs)) ->
               logs
           | _ ->
               failwith "invalid archive dump data response"
@@ -1044,13 +1045,11 @@ module Node = struct
 
   let run_replayer ~logger (t : t) =
     [%log info] "Running replayer on archived data node: %s" t.node_id ;
-    let access_token = t.config.access_token in
-    let request_body = Request.Platform_agnostic.Run_replayer (id t) in
+    let args = [ ("node_id", `String (id t)) ] in
     try
       let%bind output =
-        match%map ci_http_request' ~access_token ~request_body with
-        | Ok (Response.Platform_agnostic.Replayer_run (node_id, output))
-          when String.equal node_id (id t) ->
+        match%map run_command ~config:!config_path ~args "run_replayer" with
+        | Ok (Response.Replayer_run (_, output)) ->
             output
         | _ ->
             failwith "invalid run replayer response"
@@ -1060,13 +1059,11 @@ module Node = struct
 
   let dump_mina_logs ~logger (t : t) ~log_file =
     [%log info] "Dumping logs from node: %s" t.node_id ;
-    let access_token = t.config.access_token in
-    let request_body = Request.Platform_agnostic.Dump_mina_logs (id t) in
+    let args = [ ("node_id", `String (id t)) ] in
     try
       let%bind logs =
-        match%map ci_http_request' ~access_token ~request_body with
-        | Ok (Response.Platform_agnostic.Mina_logs_dump (node_id, logs))
-          when String.equal node_id (id t) ->
+        match%map run_command ~config:!config_path ~args "dump_mina_logs" with
+        | Ok (Response.Mina_logs_dump (_, logs)) ->
             logs
         | _ ->
             failwith "invalid dump mina logs response"
@@ -1079,16 +1076,13 @@ module Node = struct
 
   let dump_precomputed_blocks ~logger (t : t) =
     [%log info] "Dumping precomputed blocks from logs for node: %s" t.node_id ;
-    let access_token = t.config.access_token in
-    let request_body =
-      Request.Platform_agnostic.Dump_precomputed_blocks (id t)
-    in
+    let args = [ ("node_id", `String (id t)) ] in
     try
       let%bind logs =
-        match%map ci_http_request' ~access_token ~request_body with
-        | Ok
-            (Response.Platform_agnostic.Precomputed_block_dump (node_id, blocks))
-          when String.equal node_id (id t) ->
+        match%map
+          run_command ~config:!config_path ~args "dump_precomputed_blocks"
+        with
+        | Ok (Response.Precomputed_block_dump (_, blocks)) ->
             blocks
         | _ ->
             failwith "invalid dump precomputed blocks response"
@@ -1205,38 +1199,17 @@ module Workload_to_deploy = struct
       ?(has_archive_container = false) primary_container_id =
     ""
 
-  let get_nodes_from_workload t ~config =
-    let%bind cwd = Unix.getcwd () in
-    let open Malleable_error.Let_syntax in
-    let%bind app_id =
-      Deferred.bind ~f:Malleable_error.or_hard_error
-        (Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
-           ( base_kube_args config
-           @ [ "get"
-             ; "deployment"
-             ; t.workload_id
-             ; "-o"
-             ; "jsonpath={.spec.selector.matchLabels.app}"
-             ] ) )
-    in
-    let%map node_id_str =
-      Integration_test_lib.Util.run_cmd_or_hard_error cwd "kubectl"
-        ( base_kube_args config
-        @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
-    in
-    let node_id =
-      String.split node_id_str ~on:'\n'
-      |> List.filter ~f:(Fn.compose not String.is_empty)
-      |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
-      |> String.concat ~sep:"TODO:"
-    in
+  let[@warning "-27"] get_nodes_from_workload t ~config =
+    let node_id = "node_id" in
+    (* TODO: get from ci runner *)
     let node_type = Node_type.Seed_node in
     (* TODO: get from ci runner *)
     let network_keypair = None in
     (* TODO: get from ci runner *)
     let password = "password" in
     (* TODO: get from ci runner *)
-    { Node.app_id; node_id; node_type; config; network_keypair; password }
+    Malleable_error.return
+      { Node.node_id; node_type; config; network_keypair; password }
 end
 
 type t =
