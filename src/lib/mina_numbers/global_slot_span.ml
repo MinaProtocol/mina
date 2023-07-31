@@ -24,6 +24,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let to_latest = Fn.id
 
+      let sexp_of_t (Global_slot_span u32) = Sexp.Atom (T.to_string u32)
+
+      let t_of_sexp = function
+        | Sexp.Atom i ->
+            Global_slot_span (T.of_string i)
+        | _ ->
+            failwith "Global_slot.of_sexp: Expected Atom"
+
       let to_yojson (Global_slot_span t) = `String (T.to_string t)
 
       let of_yojson = function
@@ -47,6 +55,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       Snark_params.Tick.Typ.transport T.Checked.typ ~there:to_uint32
         ~back:of_uint32
   end
+
+  let sexp_of_t = Stable.Latest.sexp_of_t
+
+  let t_of_sexp = Stable.Latest.t_of_sexp
 
   let to_yojson = Stable.Latest.to_yojson
 
