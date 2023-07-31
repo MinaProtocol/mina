@@ -177,22 +177,6 @@ module Output = struct
         root_node :: acc_trees )
 end
 
-module type Graph_node_intf = sig
-  type t
-
-  type display [@@deriving yojson]
-
-  val display : t -> display
-
-  val equal : t -> t -> bool
-
-  val hash : t -> int
-
-  val compare : t -> t -> int
-
-  val name : t -> string
-end
-
 module Display = struct
   type state =
     | Root of State_hash.t
@@ -221,7 +205,7 @@ module Compact_display = struct
         { current : State_hash.t
         ; parent : State_hash.t
         ; blockchain_length : Mina_numbers.Length.t
-        ; global_slot : Mina_numbers.Global_slot.t
+        ; global_slot : Mina_numbers.Global_slot_since_genesis.t
         }
   [@@deriving yojson]
 
@@ -259,7 +243,7 @@ module Graph_node = struct
     | Node of
         { current : State_hash.t
         ; length : Mina_numbers.Length.t
-        ; slot : Mina_numbers.Global_slot.t
+        ; slot : Mina_numbers.Global_slot_since_genesis.t
         }
   [@@deriving yojson, equal, hash]
 
@@ -283,7 +267,7 @@ module Graph_node = struct
           ("NA", "NA")
       | Node s ->
           ( Mina_numbers.Length.to_string s.length
-          , Mina_numbers.Global_slot.to_string s.slot )
+          , Mina_numbers.Global_slot_since_genesis.to_string s.slot )
     in
     { state; slot; length; peers = t.peers }
 
@@ -347,9 +331,9 @@ let main ~input_dir ~output_dir ~output_format ~min_peers () =
   Logger.Consumer_registry.register ~id:"default"
     ~processor:(Logger.Processor.raw ())
     ~transport:
-      (Logger.Transport.File_system.dumb_logrotate ~directory:output_dir
+      (Logger_file_system.dumb_logrotate ~directory:output_dir
          ~log_filename:"mina-best-tip-merger.log" ~max_size:logrotate_max_size
-         ~num_rotate ) ;
+         ~num_rotate:logrotate_num_rotate ) ;
   let logger = Logger.create () in
   let t' =
     List.fold ~init:t files ~f:(fun t log_file ->

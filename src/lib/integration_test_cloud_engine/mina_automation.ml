@@ -157,7 +157,9 @@ module Network_config = struct
     let keypairs =
       List.take
         (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
-        (List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1)
+        (List.drop
+           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
+           1 )
         (List.length genesis_ledger)
     in
     let labeled_accounts :
@@ -192,10 +194,10 @@ module Network_config = struct
           let default = Runtime_config.Accounts.Single.default in
           let acct =
             { default with
-              pk = Some (Public_key.Compressed.to_string pk)
+              pk = Public_key.Compressed.to_string pk
             ; sk = Some (Private_key.to_base58_check sk)
             ; balance =
-                Balance.of_formatted_string balance
+                Balance.of_mina_string_exn balance
                 (* delegation currently unsupported *)
             ; delegate = None
             ; timing
@@ -215,7 +217,16 @@ module Network_config = struct
     in
     let runtime_config =
       { Runtime_config.daemon =
-          Some { txpool_max_size = Some txpool_max_size; peer_list_url = None }
+          Some
+            { txpool_max_size = Some txpool_max_size
+            ; peer_list_url = None
+            ; zkapp_proof_update_cost = None
+            ; zkapp_signed_single_update_cost = None
+            ; zkapp_signed_pair_update_cost = None
+            ; zkapp_transaction_cost_limit = None
+            ; max_event_elements = None
+            ; max_action_elements = None
+            }
       ; genesis =
           Some
             { k = Some k
@@ -292,7 +303,9 @@ module Network_config = struct
       ^ "/src/app/archive/"
     in
     let mina_archive_schema_aux_files =
-      [ mina_archive_base_url ^ "create_schema.sql" ]
+      [ mina_archive_base_url ^ "create_schema.sql"
+      ; mina_archive_base_url ^ "zkapp_tables.sql"
+      ]
     in
     let genesis_keypairs =
       String.Map.of_alist_exn
@@ -709,6 +722,6 @@ module Network_manager = struct
     Deferred.unit
 
   let destroy t =
-    Deferred.Or_error.try_with (fun () -> destroy t)
+    Deferred.Or_error.try_with ~here:[%here] (fun () -> destroy t)
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 end

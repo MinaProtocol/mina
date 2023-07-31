@@ -16,8 +16,10 @@
    snark_params
    snarky.backendless
    mina_state
+   mina_numbers
    sgn
-   )
+   ppx_version.runtime
+ )
  (preprocess
   (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))

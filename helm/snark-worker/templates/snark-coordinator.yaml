@@ -62,11 +62,12 @@ spec:
           "-snark-worker-fee", "$(CODA_SNARK_FEE)",
           "-work-selection", "$(WORK_SELECTION)",
           "-enable-peer-exchange", "true",
+          "-libp2p-keypair", "/root/libp2p-keys/key",
           {{- if $.Values.mina.logTxnPoolGossip }}
           "-log-txn-pool-gossip", "true",
           {{- end -}}
           {{- if $.Values.mina.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
+          "-config-file", "/root/config/daemon.json",
           {{- end }}
           {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
@@ -101,6 +102,8 @@ spec:
           value: {{ $.Values.mina.ports.p2p | quote }}
         - name: WORK_SELECTION
           value: {{$.Values.workSelectionAlgorithm | quote }}
+        - name: MINA_LIBP2P_PASS
+          value: {{ $.Values.mina.privkeyPass | quote }}
         ports:
         - name: client-port
           protocol: TCP 
@@ -119,13 +122,44 @@ spec:
 {{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.snarkCoordinator.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
-      {{- if $.Values.mina.runtimeConfig }}
         volumeMounts:
+        {{- if $.Values.mina.runtimeConfig }}
         - name: daemon-config
-          mountPath: "/config/"
+          mountPath: "/root/config/"
+        {{- end }}
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        - name: config-dir
+          mountPath: /root/.mina-config/
       volumes:
+      {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
         configMap:
           name: {{$.Values.coordinatorName }}-daemon-config
       {{- end }}
+      - name: actual-libp2p
+        emptyDir: {}
+      - name: config-dir
+      {{- if $.Values.persist_working_dir }}
+        persistentVolumeClaim:
+           claimName: pvc-{{ $.Values.coordinatorName }}
+      {{- else }} 
+        emptyDir: {}
+      {{ end }}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
+
+---
+{{- if $.Values.persist_working_dir }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-{{ $.Values.coordinatorName }}
+spec:
+  accessModes:
+    - {{ $.Values.storage.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ $.Values.storage.size | quote }}
+  storageClassName: "{{ $.Values.storage.storageClass }}"
+---
+{{ end }}
