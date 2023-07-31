@@ -8,7 +8,6 @@
    base.caml
    result
    base
-   ppx_version.runtime
    core_kernel
    integers
    sexplib0
@@ -20,9 +19,11 @@
    bignum_bigint
    snark_params
    ppx_dhall_type
-)
+   test_util
+   ppx_version.runtime
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_coda ppx_version ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_inline_test ppx_deriving.std ppx_deriving_yojson))
+  (pps ppx_mina ppx_version ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_inline_test ppx_deriving.std ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
  (synopsis "Unsigned integer functions"))

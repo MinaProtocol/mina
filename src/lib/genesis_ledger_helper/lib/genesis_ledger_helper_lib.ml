@@ -1,6 +1,7 @@
 open Core
 open Signature_lib
 open Mina_base
+open Inline_test_quiet_logs
 
 let () = Key_cache_native.linkme (* Ensure that we use the native key cache. *)
 
@@ -10,23 +11,14 @@ module Accounts = struct
         Runtime_config.Accounts.Single.t -> Mina_base.Account.t Or_error.t =
      fun t ->
       let open Or_error.Let_syntax in
-      let%bind pk =
-        match t.pk with
-        | Some pk ->
-            Ok (Signature_lib.Public_key.Compressed.of_base58_check_exn pk)
-        | None ->
-            Or_error.errorf
-              !"No public key to create the account from runtime config \
-                %{sexp: Runtime_config.Accounts.Single.t}"
-              t
-      in
+      let pk = Signature_lib.Public_key.Compressed.of_base58_check_exn t.pk in
       let delegate =
         Option.map ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
           t.delegate
       in
       let token_id =
         Option.value_map t.token ~default:Token_id.default
-          ~f:Mina_base.Token_id.of_uint64
+          ~f:Mina_base.Token_id.of_string
       in
       let account_id = Mina_base.Account_id.create pk token_id in
       let account =
@@ -50,13 +42,19 @@ module Accounts = struct
         | None ->
             account.permissions
         | Some
-            { stake
-            ; edit_state
+            { edit_state
             ; send
             ; receive
+            ; access
             ; set_delegate
             ; set_permissions
             ; set_verification_key
+            ; set_zkapp_uri
+            ; edit_action_state
+            ; set_token_symbol
+            ; increment_nonce
+            ; set_voting_for
+            ; set_timing
             } ->
             let auth_required a =
               match a with
@@ -68,85 +66,118 @@ module Accounts = struct
                   Proof
               | Signature ->
                   Signature
-              | Both ->
-                  Both
               | Impossible ->
                   Impossible
             in
-            { Mina_base.Permissions.Poly.stake
-            ; edit_state = auth_required edit_state
+            { Mina_base.Permissions.Poly.edit_state = auth_required edit_state
+            ; access = auth_required access
             ; send = auth_required send
             ; receive = auth_required receive
             ; set_delegate = auth_required set_delegate
             ; set_permissions = auth_required set_permissions
             ; set_verification_key = auth_required set_verification_key
+            ; set_zkapp_uri = auth_required set_zkapp_uri
+            ; edit_action_state = auth_required edit_action_state
+            ; set_token_symbol = auth_required set_token_symbol
+            ; increment_nonce = auth_required increment_nonce
+            ; set_voting_for = auth_required set_voting_for
+            ; set_timing = auth_required set_timing
             }
       in
-      let token_permissions =
-        Option.value_map t.token_permissions ~default:account.token_permissions
-          ~f:(fun { token_owned; disable_new_accounts; account_disabled } ->
-            if token_owned then
-              Mina_base.Token_permissions.Token_owned { disable_new_accounts }
-            else Not_owned { account_disabled } )
+      let%bind token_symbol =
+        try
+          let token_symbol =
+            Option.value ~default:Mina_base.Account.Token_symbol.default
+              t.token_symbol
+          in
+          Mina_base.Account.Token_symbol.check token_symbol ;
+          return token_symbol
+        with _ ->
+          Or_error.errorf "Token symbol exceeds max length: %d > %d"
+            (String.length (Option.value_exn t.token_symbol))
+            Mina_base.Account.Token_symbol.max_length
       in
-      let%map snapp =
-        match t.snapp with
+      let%map zkapp =
+        match t.zkapp with
         | None ->
             Ok None
-        | Some { state; verification_key } ->
+        | Some
+            { app_state
+            ; verification_key
+            ; zkapp_version
+            ; action_state
+            ; last_action_slot
+            ; proved_state
+            ; zkapp_uri
+            } ->
+            let%bind () =
+              let zkapp_uri_length = String.length zkapp_uri in
+              if zkapp_uri_length > Zkapp_account.Zkapp_uri.max_length then
+                Or_error.errorf "zkApp URI \"%s\" exceeds max length: %d > %d"
+                  zkapp_uri zkapp_uri_length Zkapp_account.Zkapp_uri.max_length
+              else Or_error.return ()
+            in
             let%bind app_state =
               if
-                Pickles_types.Vector.Nat.to_int Snapp_state.Max_state_size.n
-                <> List.length state
-              then
+                Mina_stdlib.List.Length.Compare.(
+                  app_state
+                  = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n)
+              then Ok (Zkapp_state.V.of_list_exn app_state)
+              else
                 Or_error.errorf
                   !"Snap account state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
-                  t (List.length state)
-              else Ok (Snapp_state.V.of_list_exn state)
+                  t (List.length app_state)
             in
-            let%map verification_key =
-              (* Use a URI-safe alphabet to make life easier for maintaining json
-                   We prefer this to base58-check here because users should not
-                   be manually entering verification keys.
-              *)
-              Option.value_map ~default:(Ok None) verification_key
-                ~f:(fun verification_key ->
-                  let%map vk =
-                    Base64.decode ~alphabet:Base64.uri_safe_alphabet
-                      verification_key
-                    |> Result.map_error ~f:(function `Msg s ->
-                           Error.createf
-                             !"Could not parse verification key account \
-                               %{sexp:Runtime_config.Accounts.Single.t}: %s"
-                             t s )
-                    |> Result.map
-                         ~f:
-                           (Binable.of_string
-                              ( module Pickles.Side_loaded.Verification_key
-                                       .Stable
-                                       .Latest ) )
-                  in
-                  Some (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk) )
+
+            let verification_key =
+              Option.map verification_key
+                ~f:(With_hash.of_data ~hash_data:Zkapp_account.digest_vk)
             in
-            Some { Snapp_account.verification_key; app_state }
+            let%map action_state =
+              if
+                Mina_stdlib.List.Length.Compare.(
+                  action_state = Pickles_types.Nat.to_int Pickles_types.Nat.N5.n)
+              then Ok (Pickles_types.Vector.Vector_5.of_list_exn action_state)
+              else
+                Or_error.errorf
+                  !"zkApp account action_state has invalid length %{sexp: \
+                    Runtime_config.Accounts.Single.t} length: %d"
+                  t (List.length action_state)
+            in
+
+            let last_action_slot =
+              Mina_numbers.Global_slot_since_genesis.of_int last_action_slot
+            in
+            Some
+              { Zkapp_account.verification_key
+              ; app_state
+              ; zkapp_version
+              ; action_state
+              ; last_action_slot
+              ; proved_state
+              ; zkapp_uri
+              }
       in
-      { account with
-        delegate =
-          (if Option.is_some delegate then delegate else account.delegate)
-      ; token_id
-      ; token_permissions
-      ; nonce = Account.Nonce.of_uint32 t.nonce
-      ; receipt_chain_hash =
-          Option.value_map t.receipt_chain_hash
-            ~default:account.receipt_chain_hash
-            ~f:Mina_base.Receipt.Chain_hash.of_base58_check_exn
-      ; voting_for =
-          Option.value_map ~default:account.voting_for
-            ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
-      ; snapp
-      ; permissions
-      }
+      ( { public_key = account.public_key
+        ; balance = account.balance
+        ; timing = account.timing
+        ; token_symbol
+        ; delegate =
+            (if Option.is_some delegate then delegate else account.delegate)
+        ; token_id
+        ; nonce = Account.Nonce.of_uint32 t.nonce
+        ; receipt_chain_hash =
+            Option.value_map t.receipt_chain_hash
+              ~default:account.receipt_chain_hash
+              ~f:Mina_base.Receipt.Chain_hash.of_base58_check_exn
+        ; voting_for =
+            Option.value_map ~default:account.voting_for
+              ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
+        ; zkapp
+        ; permissions
+        }
+        : Mina_base.Account.t )
 
     let of_account :
            Mina_base.Account.t
@@ -167,22 +198,6 @@ module Accounts = struct
               ; vesting_increment = t.vesting_increment
               }
       in
-      let token_permissions =
-        match account.token_permissions with
-        | Mina_base.Token_permissions.Token_owned { disable_new_accounts } ->
-            Some
-              { Runtime_config.Accounts.Single.Token_permissions.token_owned =
-                  true
-              ; disable_new_accounts
-              ; account_disabled = false
-              }
-        | Not_owned { account_disabled } ->
-            Some
-              { token_owned = false
-              ; disable_new_accounts = false
-              ; account_disabled
-              }
-      in
       let permissions =
         let auth_required a =
           match a with
@@ -194,58 +209,80 @@ module Accounts = struct
               Proof
           | Signature ->
               Signature
-          | Both ->
-              Both
           | Impossible ->
               Impossible
         in
-        let { Mina_base.Permissions.Poly.stake
-            ; edit_state
+        let { Mina_base.Permissions.Poly.edit_state
             ; send
             ; receive
+            ; access
             ; set_delegate
             ; set_permissions
             ; set_verification_key
+            ; set_zkapp_uri
+            ; edit_action_state
+            ; set_token_symbol
+            ; increment_nonce
+            ; set_voting_for
+            ; set_timing
             } =
           account.permissions
         in
         Some
-          { Runtime_config.Accounts.Single.Permissions.stake
-          ; edit_state = auth_required edit_state
+          { Runtime_config.Accounts.Single.Permissions.edit_state =
+              auth_required edit_state
           ; send = auth_required send
           ; receive = auth_required receive
+          ; access = auth_required access
           ; set_delegate = auth_required set_delegate
           ; set_permissions = auth_required set_permissions
           ; set_verification_key = auth_required set_verification_key
+          ; set_zkapp_uri = auth_required set_zkapp_uri
+          ; edit_action_state = auth_required edit_action_state
+          ; set_token_symbol = auth_required set_token_symbol
+          ; increment_nonce = auth_required increment_nonce
+          ; set_voting_for = auth_required set_voting_for
+          ; set_timing = auth_required set_timing
           }
       in
-      let snapp =
-        Option.map account.snapp ~f:(fun { app_state; verification_key } ->
-            let state = Snapp_state.V.to_list app_state in
+      let zkapp =
+        Option.map account.zkapp
+          ~f:(fun
+               { app_state
+               ; verification_key
+               ; zkapp_version
+               ; action_state
+               ; last_action_slot
+               ; proved_state
+               ; zkapp_uri
+               }
+             ->
+            let app_state = Zkapp_state.V.to_list app_state in
             let verification_key =
-              Option.map verification_key ~f:(fun vk ->
-                  With_hash.data vk
-                  |> Binable.to_string
-                       ( module Pickles.Side_loaded.Verification_key.Stable
-                                .Latest )
-                  |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet )
+              Option.map verification_key ~f:With_hash.data
             in
-            { Runtime_config.Accounts.Single.Snapp_account.state
+            let action_state = Pickles_types.Vector.to_list action_state in
+            let last_action_slot =
+              Mina_numbers.Global_slot_since_genesis.to_int last_action_slot
+            in
+            { Runtime_config.Accounts.Single.Zkapp_account.app_state
             ; verification_key
+            ; zkapp_version
+            ; action_state
+            ; last_action_slot
+            ; proved_state
+            ; zkapp_uri
             } )
       in
       { pk =
-          Some
-            (Signature_lib.Public_key.Compressed.to_base58_check
-               account.public_key )
+          Signature_lib.Public_key.Compressed.to_base58_check account.public_key
       ; sk = Option.map ~f:Signature_lib.Private_key.to_base58_check sk
       ; balance = account.balance
       ; delegate =
           Option.map ~f:Signature_lib.Public_key.Compressed.to_base58_check
             account.delegate
       ; timing
-      ; token = Some (Mina_base.Token_id.to_uint64 account.token_id)
-      ; token_permissions
+      ; token = Some (Mina_base.Token_id.to_string account.token_id)
       ; nonce = account.nonce
       ; receipt_chain_hash =
           Some
@@ -253,15 +290,16 @@ module Accounts = struct
                account.receipt_chain_hash )
       ; voting_for =
           Some (Mina_base.State_hash.to_base58_check account.voting_for)
-      ; snapp
+      ; zkapp
       ; permissions
+      ; token_symbol = Some account.token_symbol
       }
   end
 
   let to_full :
       Runtime_config.Accounts.t -> (Private_key.t option * Account.t) list =
-    List.mapi
-      ~f:(fun i ({ Runtime_config.Accounts.pk; sk; _ } as account_config) ->
+    List.map
+      ~f:(fun ({ Runtime_config.Accounts.pk; sk; _ } as account_config) ->
         let sk =
           match sk with
           | Some sk -> (
@@ -273,20 +311,8 @@ module Accounts = struct
           | None ->
               None
         in
-        let pk =
-          match pk with
-          | Some pk ->
-              pk
-          | None ->
-              Public_key.Compressed.to_base58_check
-                (Quickcheck.random_value
-                   ~seed:
-                     (`Deterministic
-                       ("fake pk for genesis ledger " ^ string_of_int i) )
-                   Public_key.Compressed.gen )
-        in
         let account =
-          Single.to_account_with_pk { account_config with pk = Some pk }
+          Single.to_account_with_pk { account_config with pk }
           |> Or_error.ok_exn
         in
         (sk, account) )
@@ -299,7 +325,9 @@ module Accounts = struct
 
   let gen : (Private_key.t option * Account.t) Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
-    let%bind balance = Int.gen_incl 10 500 >>| Currency.Balance.of_int in
+    let%bind balance =
+      Int.gen_incl 10 500 >>| Currency.Balance.of_nanomina_int_exn
+    in
     gen_with_balance balance
 
   let generate n : (Private_key.t option * Account.t) list =
@@ -436,7 +464,8 @@ let make_constraint_constants
                 State_hash.of_base58_check_exn previous_state_hash
             ; previous_length = Mina_numbers.Length.of_int previous_length
             ; previous_global_slot =
-                Mina_numbers.Global_slot.of_int previous_global_slot
+                Mina_numbers.Global_slot_since_genesis.of_int
+                  previous_global_slot
             } )
   }
 
@@ -471,7 +500,7 @@ let runtime_config_of_constraint_constants
               State_hash.to_base58_check previous_state_hash
           ; previous_length = Mina_numbers.Length.to_int previous_length
           ; previous_global_slot =
-              Mina_numbers.Global_slot.to_int previous_global_slot
+              Mina_numbers.Global_slot_since_genesis.to_int previous_global_slot
           } )
   }
 
@@ -519,6 +548,24 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; txpool_max_size =
       Option.value ~default:default.txpool_max_size
         (config.daemon >>= fun cfg -> cfg.txpool_max_size)
+  ; zkapp_proof_update_cost =
+      Option.value ~default:default.zkapp_proof_update_cost
+        (config.daemon >>= fun cfg -> cfg.zkapp_proof_update_cost)
+  ; zkapp_signed_single_update_cost =
+      Option.value ~default:default.zkapp_signed_single_update_cost
+        (config.daemon >>= fun cfg -> cfg.zkapp_signed_single_update_cost)
+  ; zkapp_signed_pair_update_cost =
+      Option.value ~default:default.zkapp_signed_pair_update_cost
+        (config.daemon >>= fun cfg -> cfg.zkapp_signed_pair_update_cost)
+  ; zkapp_transaction_cost_limit =
+      Option.value ~default:default.zkapp_transaction_cost_limit
+        (config.daemon >>= fun cfg -> cfg.zkapp_transaction_cost_limit)
+  ; max_event_elements =
+      Option.value ~default:default.max_event_elements
+        (config.daemon >>= fun cfg -> cfg.max_event_elements)
+  ; max_action_elements =
+      Option.value ~default:default.max_action_elements
+        (config.daemon >>= fun cfg -> cfg.max_action_elements)
   ; num_accounts =
       Option.value_map ~default:default.num_accounts
         (config.ledger >>= fun cfg -> cfg.num_accounts)
@@ -545,6 +592,24 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
           { txpool_max_size =
               Some precomputed_values.genesis_constants.txpool_max_size
           ; peer_list_url = None
+          ; zkapp_proof_update_cost =
+              Some precomputed_values.genesis_constants.zkapp_proof_update_cost
+          ; zkapp_signed_single_update_cost =
+              Some
+                precomputed_values.genesis_constants
+                  .zkapp_signed_single_update_cost
+          ; zkapp_signed_pair_update_cost =
+              Some
+                precomputed_values.genesis_constants
+                  .zkapp_signed_pair_update_cost
+          ; zkapp_transaction_cost_limit =
+              Some
+                precomputed_values.genesis_constants
+                  .zkapp_transaction_cost_limit
+          ; max_event_elements =
+              Some precomputed_values.genesis_constants.max_event_elements
+          ; max_action_elements =
+              Some precomputed_values.genesis_constants.max_action_elements
           }
     ; genesis =
         Some
@@ -558,3 +623,174 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
     ; ledger = None
     ; epoch_data = None
     }
+
+let%test_module "Runtime config" =
+  ( module struct
+    [@@@warning "-32"]
+
+    let logger = Logger.null ()
+
+    let pk = "B62qk8p3nBVdtVRVsBGiSanoHBV8KrSGv4Gnxbm2jtj6xrvhFqa5SqU"
+
+    let non_zkapp_ledger =
+      (* only required fields are `pk and `balance` *)
+      let s =
+        sprintf
+          {json| {"accounts": [ { "pk": "%s",
+                                  "balance": "42.999999999"
+                                }
+                              ]
+                 }
+          |json}
+          pk
+      in
+      let json = Yojson.Safe.from_string s in
+      Runtime_config.Ledger.of_yojson json |> Result.ok_or_failwith
+
+    let nondefault_token =
+      let owner =
+        Account_id.create
+          (Signature_lib.Public_key.Compressed.of_base58_check_exn pk)
+          Token_id.default
+      in
+      Account_id.derive_token_id ~owner
+
+    let non_zkapp_ledger_nondefault_token =
+      (* only required fields are `pk and `balance` *)
+      let token_id = Token_id.to_string nondefault_token in
+      let s =
+        sprintf
+          {json| {"accounts": [ { "pk": "%s",
+                                  "balance": "1023.893",
+                                  "token": "%s"
+                                }
+                              ]
+                 }
+          |json}
+          pk token_id
+      in
+      let json = Yojson.Safe.from_string s in
+      Runtime_config.Ledger.of_yojson json |> Result.ok_or_failwith
+
+    let zkapp_ledger =
+      (* in zkApp account, all fields are required *)
+      let s =
+        sprintf
+          {json| {"accounts": [ { "pk": "%s",
+                                  "balance": "1087.37",
+                                  "zkapp": { "app_state": [ "14", "0", "0", "0", "0", "0", "0", "0" ],
+                                             "verification_key": null,
+                                             "zkapp_version": "0",
+                                             "action_state": [ "0", "0", "0", "0", "0" ],
+                                             "last_action_slot": 0,
+                                             "proved_state": false,
+                                             "zkapp_uri": "http://zkapps_r_us.com"
+                                           }
+                                }
+                              ]
+                 }
+          |json}
+          pk
+      in
+      let json = Yojson.Safe.from_string s in
+      Runtime_config.Ledger.of_yojson json |> Result.ok_or_failwith
+
+    (* omitted account fields in runtime config same as those given by `Account.create` on same public key *)
+    let%test_unit "non-zkApp ledger" =
+      let runtime_accounts =
+        match non_zkapp_ledger.base with
+        | Runtime_config.Ledger.Accounts accts ->
+            accts
+        | _ ->
+            failwith "Expected accounts in ledger"
+      in
+      let accounts =
+        Accounts.to_full runtime_accounts
+        |> List.map ~f:(fun (_sk, account) -> account)
+      in
+      assert (List.length accounts = 1) ;
+      let account = List.hd_exn accounts in
+      let test_account =
+        let account_id =
+          Mina_base.Account_id.create
+            (Public_key.Compressed.of_base58_check_exn pk)
+            Token_id.default
+        in
+        (* balance not the same as in the runtime config; it's required there, so not testing that *)
+        let balance = Currency.Balance.of_mina_int_exn 5_000 in
+        Mina_base.Account.create account_id balance
+      in
+      (* test field-by-field, to track down any errors *)
+      assert (
+        Public_key.Compressed.equal account.public_key test_account.public_key ) ;
+      assert (Token_id.equal account.token_id test_account.token_id) ;
+      assert (
+        Account.Token_symbol.equal account.token_symbol
+          test_account.token_symbol ) ;
+      assert (Account.Nonce.equal account.nonce test_account.nonce) ;
+      assert (
+        Receipt.Chain_hash.equal account.receipt_chain_hash
+          test_account.receipt_chain_hash ) ;
+      assert (Option.is_some account.delegate) ;
+      assert (
+        Option.equal Public_key.Compressed.equal account.delegate
+          test_account.delegate ) ;
+      assert (State_hash.equal account.voting_for test_account.voting_for) ;
+      assert (Account.Timing.equal account.timing test_account.timing) ;
+      assert (Permissions.equal account.permissions test_account.permissions) ;
+      assert (Option.equal Zkapp_account.equal account.zkapp test_account.zkapp)
+
+    (* if nondefault token, no delegate created from runtime config *)
+    let%test_unit "non-zkApp ledger, nondefault token" =
+      let runtime_accounts =
+        match non_zkapp_ledger_nondefault_token.base with
+        | Runtime_config.Ledger.Accounts accts ->
+            accts
+        | _ ->
+            failwith "Expected accounts in ledger"
+      in
+      let accounts =
+        Accounts.to_full runtime_accounts
+        |> List.map ~f:(fun (_sk, account) -> account)
+      in
+      assert (List.length accounts = 1) ;
+      let account = List.hd_exn accounts in
+      let test_account =
+        let account_id =
+          Mina_base.Account_id.create
+            (Public_key.Compressed.of_base58_check_exn pk)
+            nondefault_token
+        in
+        let balance = Currency.Balance.of_mina_int_exn 49_000_000 in
+        Mina_base.Account.create account_id balance
+      in
+      assert (Option.is_none test_account.delegate) ;
+      assert (Option.is_none account.delegate)
+
+    (* zkApp account fields in runtime config are all required, but we can make verification key `null` *)
+    let%test_unit "zkApp ledger" =
+      let runtime_accounts =
+        match zkapp_ledger.base with
+        | Runtime_config.Ledger.Accounts accts ->
+            accts
+        | _ ->
+            failwith "Expected accounts in ledger"
+      in
+      let accounts =
+        Accounts.to_full runtime_accounts
+        |> List.map ~f:(fun (_sk, account) -> account)
+      in
+      assert (List.length accounts = 1) ;
+      let account = List.hd_exn accounts in
+      let default = Mina_base.Zkapp_account.default in
+      let zkapp_account =
+        match account.zkapp with
+        | None ->
+            failwith "Expected zkApp account in account"
+        | Some zkapp ->
+            zkapp
+      in
+      assert (
+        Option.equal Verification_key_wire.equal zkapp_account.verification_key
+          default.verification_key )
+  end )

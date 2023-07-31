@@ -11,6 +11,8 @@ module Stable : sig
   end
 end]
 
+type t = Stable.Latest.t = Pos | Neg
+
 val to_field : t -> Field.t
 
 val of_field_exn : Field.t -> t
@@ -42,7 +44,7 @@ module Checked : sig
 
   val negate : var -> var
 
-  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+  val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 end
 
 [%%endif]

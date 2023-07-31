@@ -7,6 +7,8 @@ module type Extension_base_intf = sig
 
   type view
 
+  val name : string
+
   val create : logger:Logger.t -> Full_frontier.t -> t * view
 
   (* It is of upmost importance to make this synchronous. To prevent data races via context switching *)
@@ -20,6 +22,8 @@ module type Broadcasted_extension_intf = sig
   type extension
 
   type view
+
+  val name : string
 
   val create : extension * view -> t Deferred.t
 

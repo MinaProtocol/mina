@@ -1,0 +1,18 @@
+(library
+ (name internal_tracing_context_logger)
+ (public_name internal_tracing.context_logger)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries
+  ;; opam libraries
+  base.base_internalhash_types
+  core_kernel
+  sexplib0
+  async_kernel
+  ;; local libraries
+  logger)
+ (preprocess
+  (pps ppx_jane ppx_mina ppx_version ppx_deriving_yojson))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Internal tracing context logger helper"))

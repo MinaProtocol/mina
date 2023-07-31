@@ -1,0 +1,25 @@
+(library
+ (name logger_native)
+ (public_name logger.native)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   result
+   core
+   core_kernel
+   sexplib0
+   bin_prot.shape
+   base.caml
+   base.base_internalhash_types
+   ;; local libraries
+   itn_logger
+   interpolator_lib
+   mina_compile_config
+   ppx_version.runtime
+ )
+ (preprocess
+  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (instrumentation (backend bisect_ppx))
+ (implements logger)
+ (synopsis "Logging library"))
