@@ -438,6 +438,7 @@ module Network_manager = struct
       Util.run_cmd_or_hard_error "/" "kubectl" [ "config"; "current-context" ]
     in
     [%log info] "Using cluster: %s" current_cluster ;
+    (* check if namespace already exists *)
     let%bind all_namespaces_str =
       Util.run_cmd_or_hard_error "/" "kubectl"
         [ "get"; "namespaces"; "-ojsonpath={.items[*].metadata.name}" ]
@@ -463,6 +464,42 @@ module Network_manager = struct
         in
         Util.run_cmd_or_hard_error "/" "kubectl"
           [ "delete"; "namespace"; network_config.terraform.testnet_name ]
+        >>| Fn.const ()
+      else return ()
+    in
+    (* check if priority class already exists *)
+    let%bind all_priorityclasses_str =
+      Util.run_cmd_or_hard_error "/" "kubectl"
+        [ "get"; "priorityclasses"; "-ojsonpath={.items[*].metadata.name}" ]
+    in
+    let all_priorityclasses = String.split ~on:' ' all_priorityclasses_str in
+    let expected_priorityclass_name =
+      String.concat
+        [ network_config.terraform.testnet_name
+        ; "-nonpreemptible-priority-class"
+        ]
+    in
+    let%bind () =
+      if
+        List.mem all_priorityclasses expected_priorityclass_name
+          ~equal:String.equal
+      then
+        let%bind () =
+          if network_config.debug_arg then
+            Deferred.bind ~f:Malleable_error.return
+              (Util.prompt_continue
+                 "Existing priority class of same name detected, pausing \
+                  startup. Enter [y/Y] to continue on and remove existing \
+                  priority class, start clean, and run the test; press Cntrl-C \
+                  to quit out: " )
+          else
+            Malleable_error.return
+              ([%log info]
+                 "Existing priority class of same name detected; removing to \
+                  start clean" )
+        in
+        Util.run_cmd_or_hard_error "/" "kubectl"
+          [ "delete"; "priorityclasses"; expected_priorityclass_name ]
         >>| Fn.const ()
       else return ()
     in
