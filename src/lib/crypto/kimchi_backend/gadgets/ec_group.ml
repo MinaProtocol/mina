@@ -39,10 +39,9 @@ let is_on_curve_bignum_point (curve : Curve_params.t)
  *     L and R are not O (the point at infinity)
  *
  *   External checks: (not counting inputs and output)
- *     Bound checks:          6
- *     Multi-range-checks:    6
- *     Compact-range-checks:  3
- *     Total range-checks:    51
+ *     Bound checks:         6
+ *     Compact-range-checks: 3
+ *     Range-checks:         42
  *
  *   Rows: (not counting inputs/outputs and constants)
  *     Group addition:  26
@@ -205,7 +204,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Result (s^2) bound check already tracked by Foreign_field.mul.
    *)
   Foreign_field.(
-    External_checks.append_bound_check external_checks
+    External_checks.add_bound_check external_checks
     @@ Element.Standard.of_limbs (slope0, slope1, slope2)) ;
 
   (*
@@ -250,7 +249,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Right input (x) is gadget output (checked by caller).
    *           Addition chain result (right_delta) bound check added below.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks right_delta ;
+  Foreign_field.External_checks.add_bound_check external_checks right_delta ;
 
   (* C5: RxΔ * s = RxΔs *)
   let right_delta_s =
@@ -276,7 +275,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Bounds 6: Inputs (Rx and Lx) are gadget inputs (checked by caller).
    *           Addition chain result (delta_x) bound check below.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks delta_x ;
+  Foreign_field.External_checks.add_bound_check external_checks delta_x ;
 
   (* C7: Δx * s = Δxs *)
   let delta_x_s =
@@ -349,9 +348,8 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *
  *   External checks: (not counting inputs and output)
  *     Bound checks:         8 (+1 when a != 0)
- *     Multi-range-checks:   8
  *     Compact-range-checks: 4
- *     Total range-checks:   68 (+4 when a != 0)
+ *     Range-checks:         56 (+4 when a != 0)
  *
  *   Rows: (not counting inputs/outputs and constants)
  *     Group double:     34 (+2 when a != 0)
@@ -458,7 +456,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Result (slope_squared) check already tracked by Foreign_field.mul.
    *)
   Foreign_field.(
-    External_checks.append_bound_check external_checks
+    External_checks.add_bound_check external_checks
       (Element.Standard.of_limbs (slope0, slope1, slope2))) ;
 
   (* C2: Constrain result x-coordinate computation: x = s^2 - 2 * Px with length 2 chain
@@ -499,7 +497,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Right input (x) check value is gadget output (checked by caller).
    *           Addition chain result (delta_x) bound check added below.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks delta_x ;
+  Foreign_field.External_checks.add_bound_check external_checks delta_x ;
 
   (* C5: Δx * s = Δxs *)
   let delta_xs =
@@ -551,7 +549,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Right input (slope) already checked by (Bound 1).
    *           Result (2Pys) bound check already tracked by Foreign_field.mul.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks point_y2 ;
+  Foreign_field.External_checks.add_bound_check external_checks point_y2 ;
 
   (*
    * Constrain rest slope computation s = (3 * Px^2 + a)/(2 * Py)
@@ -565,7 +563,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Right input (Px) is gadget input (checked by caller).
    *           Result (3Px) is chained (no check required).
    *)
-  Foreign_field.External_checks.append_bound_check external_checks point_x2 ;
+  Foreign_field.External_checks.add_bound_check external_checks point_x2 ;
 
   (* Check if the elliptic curve a parameter requires more constraints
    * to be added in order to add final a (e.g. 3Px^2 + a where a != 0).
@@ -585,7 +583,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
      *)
 
     (* Add point_x3 bound check (Bounds 101) *)
-    Foreign_field.External_checks.append_bound_check external_checks point_x3 ;
+    Foreign_field.External_checks.add_bound_check external_checks point_x3 ;
 
     (* Copy point_x3_squared to point_y2s *)
     Foreign_field.Element.Standard.assert_equal
@@ -605,7 +603,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
      *)
 
     (* Add point_x3 bound check (Bounds 10b) *)
-    Foreign_field.External_checks.append_bound_check external_checks point_x3 ;
+    Foreign_field.External_checks.add_bound_check external_checks point_x3 ;
 
     (* Add curve constant a and constrain rest slope computation
      *   with s = (3 * Px^2 + a)/(2 * Py)
@@ -731,9 +729,8 @@ let compute_ia_points ?(point : Affine.bignum_point option)
  *
  *   External checks: (not counting inputs and output)
  *     Bound checks:         3 (+1 when a != 0 and +1 when b != 0)
- *     Multi-range-checks:   6
  *     Compact-range-checks: 3
- *     Total range-checks:   39
+ *     Range-checks:         30
  *
  *   Rows: (not counting inputs/outputs and constants)
  *     Curve check: 8 (+1 when a != 0 and +2 when b != 0)
@@ -768,8 +765,7 @@ let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
        *           Result bound check below
        *)
       (* Add x_squared_a bound check *)
-      Foreign_field.External_checks.append_bound_check external_checks
-        x_squared_a ;
+      Foreign_field.External_checks.add_bound_check external_checks x_squared_a ;
       x_squared_a )
     else x_squared
   in
@@ -804,16 +800,14 @@ let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
        *)
 
       (* Add x_cubed_ax_b bound check *)
-      Foreign_field.External_checks.append_bound_check external_checks
-        x_cubed_ax_b ;
+      Foreign_field.External_checks.add_bound_check external_checks x_cubed_ax_b ;
 
       x_cubed_ax_b )
     else x_cubed_ax
   in
 
   (* Safety check: make sure x_cubed_ax_b is canonical *)
-  Foreign_field.External_checks.append_canonical_check external_checks
-    x_cubed_ax_b ;
+  Foreign_field.External_checks.add_canonical_check external_checks x_cubed_ax_b ;
 
   (* C5: y^2 = y * y *)
   let y_squared =
@@ -886,9 +880,8 @@ let check_ia (type f) (module Circuit : Snark_intf.Run with type field = f)
  *
  *   External checks: (per crumb, not counting inputs and output)
  *     Bound checks:         42 (+1 when a != 0)
- *     Multi-range-checks:   34
  *     Compact-range-checks: 7
- *     Total range-checks:   291
+ *     Range-checks:         270
  *
  *   Rows: (per crumb, not counting inputs/outputs and constants)
  *     Scalar multiplication: ~84 (+2 when a != 0)
@@ -965,15 +958,15 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
          *   Initial acc and base are gadget inputs (checked by caller).
          *   Result bounds check below.
          *)
-        Foreign_field.External_checks.append_bound_check external_checks
+        Foreign_field.External_checks.add_bound_check external_checks
         @@ Affine.x sum ;
-        Foreign_field.External_checks.append_bound_check external_checks
+        Foreign_field.External_checks.add_bound_check external_checks
         @@ Affine.y sum ;
 
         (* Safety checks *)
-        Foreign_field.External_checks.append_canonical_check external_checks
+        Foreign_field.External_checks.add_canonical_check external_checks
         @@ Affine.x sum ;
-        Foreign_field.External_checks.append_canonical_check external_checks
+        Foreign_field.External_checks.add_canonical_check external_checks
         @@ Affine.y sum ;
 
         (* Group double: double_base = base + base *)
@@ -988,17 +981,15 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
                *   Initial base is gadget input (checked by caller).
                *   Result bounds check below.
                *)
-              Foreign_field.External_checks.append_bound_check external_checks
+              Foreign_field.External_checks.add_bound_check external_checks
               @@ Affine.x double_base ;
-              Foreign_field.External_checks.append_bound_check external_checks
+              Foreign_field.External_checks.add_bound_check external_checks
               @@ Affine.y double_base ;
 
               (* Safety checks *)
-              Foreign_field.External_checks.append_canonical_check
-                external_checks
+              Foreign_field.External_checks.add_canonical_check external_checks
               @@ Affine.x double_base ;
-              Foreign_field.External_checks.append_canonical_check
-                external_checks
+              Foreign_field.External_checks.add_canonical_check external_checks
               @@ Affine.y double_base ;
               double_base
           | Some doubles ->
@@ -1041,13 +1032,13 @@ let check_subgroup (type f)
    *           Right input is gadget input (checked by caller)
    *           Result bound check below
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.add_bound_check external_checks
   @@ Affine.x n_minus_one_point ;
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.add_bound_check external_checks
   @@ Affine.y n_minus_one_point ;
-  Foreign_field.External_checks.append_canonical_check external_checks
+  Foreign_field.External_checks.add_canonical_check external_checks
   @@ Affine.x n_minus_one_point ;
-  Foreign_field.External_checks.append_canonical_check external_checks
+  Foreign_field.External_checks.add_canonical_check external_checks
   @@ Affine.y n_minus_one_point ;
 
   (* C2: Compute -P *)
@@ -1059,7 +1050,7 @@ let check_subgroup (type f)
   (* Bounds 2: Input is gadget input (checked by caller)
    *           Result bound check below
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.add_bound_check external_checks
   @@ Affine.y minus_point ;
 
   (* C3: Assert (n - 1)P = -P *)
@@ -1124,10 +1115,7 @@ let%test_unit "Ec_group.add" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                6 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 18 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -1484,10 +1472,7 @@ let%test_unit "Ec_group.add_chained" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                12 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 36 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -1652,44 +1637,42 @@ let%test_unit "Ec_group.add_full" =
 
             (* Check left_input *)
             Foreign_field.(
-              External_checks.append_bound_check external_checks
+              External_checks.add_bound_check external_checks
               @@ Affine.x left_input) ;
             Foreign_field.(
-              External_checks.append_bound_check external_checks
+              External_checks.add_bound_check external_checks
               @@ Affine.y left_input) ;
             Foreign_field.(
-              External_checks.append_canonical_check external_checks
+              External_checks.add_canonical_check external_checks
               @@ Affine.x left_input) ;
             Foreign_field.(
-              External_checks.append_canonical_check external_checks
+              External_checks.add_canonical_check external_checks
               @@ Affine.y left_input) ;
 
             (* Check right_input *)
             Foreign_field.(
-              External_checks.append_bound_check external_checks
+              External_checks.add_bound_check external_checks
               @@ Affine.x right_input) ;
             Foreign_field.(
-              External_checks.append_bound_check external_checks
+              External_checks.add_bound_check external_checks
               @@ Affine.y right_input) ;
             Foreign_field.(
-              External_checks.append_canonical_check external_checks
+              External_checks.add_canonical_check external_checks
               @@ Affine.x right_input) ;
             Foreign_field.(
-              External_checks.append_canonical_check external_checks
+              External_checks.add_canonical_check external_checks
               @@ Affine.y right_input) ;
 
             (* Check result *)
             Foreign_field.(
-              External_checks.append_bound_check external_checks
+              External_checks.add_bound_check external_checks @@ Affine.x result) ;
+            Foreign_field.(
+              External_checks.add_bound_check external_checks @@ Affine.y result) ;
+            Foreign_field.(
+              External_checks.add_canonical_check external_checks
               @@ Affine.x result) ;
             Foreign_field.(
-              External_checks.append_bound_check external_checks
-              @@ Affine.y result) ;
-            Foreign_field.(
-              External_checks.append_canonical_check external_checks
-              @@ Affine.x result) ;
-            Foreign_field.(
-              External_checks.append_canonical_check external_checks
+              External_checks.add_canonical_check external_checks
               @@ Affine.y result) ;
 
             (* Check output matches expected result *)
@@ -1702,8 +1685,7 @@ let%test_unit "Ec_group.add_full" =
             (* Check for expected quantity of external checks *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 12) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 6) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 6) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 18) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
@@ -1800,10 +1782,7 @@ let%test_unit "Ec_group.double" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                8 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 24 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -2077,10 +2056,7 @@ let%test_unit "Ec_group.double_chained" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                16 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 48 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -2173,32 +2149,28 @@ let%test_unit "Ec_group.double_full" =
 
             (* Check input point *)
             Foreign_field.(
-              External_checks.append_bound_check external_checks
+              External_checks.add_bound_check external_checks @@ Affine.x point) ;
+            Foreign_field.(
+              External_checks.add_bound_check external_checks @@ Affine.y point) ;
+            Foreign_field.(
+              External_checks.add_canonical_check external_checks
               @@ Affine.x point) ;
             Foreign_field.(
-              External_checks.append_bound_check external_checks
-              @@ Affine.y point) ;
-            Foreign_field.(
-              External_checks.append_canonical_check external_checks
-              @@ Affine.x point) ;
-            Foreign_field.(
-              External_checks.append_canonical_check external_checks
+              External_checks.add_canonical_check external_checks
               @@ Affine.y point) ;
 
             (* Bound check result point (already done when a = 0) *)
             Foreign_field.(
-              External_checks.append_bound_check external_checks
-              @@ Affine.x result) ;
+              External_checks.add_bound_check external_checks @@ Affine.x result) ;
             Foreign_field.(
-              External_checks.append_bound_check external_checks
-              @@ Affine.y result) ;
+              External_checks.add_bound_check external_checks @@ Affine.y result) ;
 
             (* Canonical check result point *)
             Foreign_field.(
-              External_checks.append_canonical_check external_checks
+              External_checks.add_canonical_check external_checks
               @@ Affine.x result) ;
             Foreign_field.(
-              External_checks.append_canonical_check external_checks
+              External_checks.add_canonical_check external_checks
               @@ Affine.y result) ;
 
             (* Check output matches expected result *)
@@ -2213,8 +2185,7 @@ let%test_unit "Ec_group.double_full" =
               assert (Mina_stdlib.List.Length.equal external_checks.bounds 12)
             else assert (Mina_stdlib.List.Length.equal external_checks.bounds 13) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 4) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 8) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 24) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
@@ -2333,10 +2304,7 @@ let%test_unit "Ec_group.ops_mixed" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                14 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 42 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -2925,10 +2893,7 @@ let%test_unit "Ec_group.is_on_curve" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 1 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                6 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 18 ) ;
             () )
       in
 
@@ -3063,10 +3028,7 @@ let%test_unit "Ec_group.check_ia" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 1 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                6 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 18 ) ;
             () )
       in
 
@@ -4042,10 +4004,7 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 8 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                34 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 102 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -4137,9 +4096,7 @@ let%test_unit "Ec_group.scalar_mul_tiny_full" =
               assert (Mina_stdlib.List.Length.equal external_checks.bounds 42)
             else assert (Mina_stdlib.List.Length.equal external_checks.bounds 43) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 8) ;
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.multi_ranges 34 ) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 102) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks

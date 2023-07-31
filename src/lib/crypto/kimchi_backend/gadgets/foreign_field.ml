@@ -575,41 +575,36 @@ module External_checks = struct
   type 'field t =
     { mutable bounds : ('field Cvar.t standard_limbs * bool) list
     ; mutable canonicals : 'field Cvar.t standard_limbs list
-    ; mutable multi_ranges : 'field Cvar.t standard_limbs list
-    ; mutable limb_ranges : 'field Cvar.t list
+    ; mutable ranges : 'field Cvar.t list
     }
 
   (* Create a new context *)
   let create (type field)
       (module Circuit : Snark_intf.Run with type field = field) : field t =
-    { bounds = []
-    ; canonicals = []
-    ; multi_ranges = []
-    ; limb_ranges = []
-    }
+    { bounds = []; canonicals = []; ranges = [] }
 
-  (* Track a bound check *)
-  let append_bound_check (external_checks : 'field t)
+  (* Register a bound check to be performed *)
+  let add_bound_check (external_checks : 'field t)
       ?(do_multi_range_check = true) (x : 'field Element.Standard.t) =
     external_checks.bounds <-
       (Element.Standard.to_limbs x, do_multi_range_check)
       :: external_checks.bounds
 
-  (* Track a canonical check *)
-  let append_canonical_check (external_checks : 'field t)
+  (* Register a canonical check to be performed *)
+  let add_canonical_check (external_checks : 'field t)
       (x : 'field Element.Standard.t) =
     external_checks.canonicals <-
       Element.Standard.to_limbs x :: external_checks.canonicals
 
-  (* Track a multi-range-check *)
-  (* TODO: improve names of these from append_ to add_, push_ or insert_ *)
-  let append_multi_range_check (external_checks : 'field t)
+  (* Register a multi-range-check to be performed *)
+  let add_multi_range_check (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =
-    external_checks.multi_ranges <- x :: external_checks.multi_ranges
+    let x0, x1, x2 = x in
+    external_checks.ranges <- x0 :: x1 :: x2 :: external_checks.ranges
 
-  (* Tracks a limb-range-check *)
-  let append_limb_check (external_checks : 'field t) (x : 'field Cvar.t) =
-    external_checks.limb_ranges <- x :: external_checks.limb_ranges
+  (* Register a range-check to be performed *)
+  let add_range_check (external_checks : 'field t) (x : 'field Cvar.t) =
+    external_checks.ranges <- x :: external_checks.ranges
 end
 
 (* Common auxiliary functions for foreign field gadgets *)
@@ -953,8 +948,7 @@ let sub (type f) (module Circuit : Snark_intf.Run with type field = f)
  *
  *    Outputs:
  *      Inserts generic gate to constrain computation of high bound x'2 = x2 + 2^88 - f2 - 1
- *      Adds x to external_checks.multi_ranges
- *      Adds x'2 to external_checks.limb_ranges
+ *      Adds x and x'2 to external_checks.ranges
  *      Returns computed high bound
  *)
 let check_bound (type f) (module Circuit : Snark_intf.Run with type field = f)
@@ -980,10 +974,10 @@ let check_bound (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   if do_multi_range_check then
     (* Add external multi-range-check x *)
-    External_checks.append_multi_range_check external_checks (x0, x1, x2) ;
+    External_checks.add_multi_range_check external_checks (x0, x1, x2) ;
 
   (* Add external limb-check for x2_bound *)
-  External_checks.append_limb_check external_checks x2_bound ;
+  External_checks.add_range_check external_checks x2_bound ;
 
   x2_bound
 
@@ -1049,7 +1043,7 @@ let check_canonical (type f)
   Field.Assert.equal (Field.constant two_to_88) offset2 ;
 
   (* Add external check to multi range check the bound *)
-  External_checks.append_multi_range_check external_checks
+  External_checks.add_multi_range_check external_checks
   @@ Element.Standard.to_limbs bound ;
 
   (* Return the bound value *)
@@ -1062,9 +1056,9 @@ let constrain_external_checks (type field)
     (foreign_field_modulus : field standard_limbs) =
   let open Circuit in
   (* 1) Insert gates for bound checks
-   *    Note: internally this also adds a limb-check for the computed bound to
-   *          external_checks.limb_ranges and optionally adds a multi-range-check
-   *          for the original value to external_checks.multi_ranges.
+   *    Note: internally this also adds a range-check for the computed bound to
+   *          external_checks.ranges and optionally adds a multi-range-check
+   *          for the original value to external_checks.ranges.
    *          These are subsequently constrainted in (4) and (2) below.
    *)
   List.iter external_checks.bounds ~f:(fun (value, do_multi_range_check) ->
@@ -1079,7 +1073,7 @@ let constrain_external_checks (type field)
 
   (* 2) Insert gates for canonical checks
    *    Note: internally this also adds a multi-range-check for the computed bound to
-   *          external_checks.multi_ranges.
+   *          external_checks.ranges.
    *          These are subsequently constrainted in (2) below.
    *)
   List.iter external_checks.canonicals ~f:(fun value ->
@@ -1092,15 +1086,8 @@ let constrain_external_checks (type field)
       in
       () ) ;
 
-  (* 3) Add gates for external multi-range-checks *)
-  List.iter external_checks.multi_ranges ~f:(fun multi_range ->
-      let v0, v1, v2 = multi_range in
-      Range_check.multi (module Circuit) v0 v1 v2 ;
-      () ) ;
-
-  (* 4) Add gates for external limb-range-checks *)
-  List.iter (List.chunks_of external_checks.limb_ranges ~length:3)
-    ~f:(fun chunk ->
+  (* 3) Add gates for external limb-range-checks *)
+  List.iter (List.chunks_of external_checks.ranges ~length:3) ~f:(fun chunk ->
       match chunk with
       | [ v0 ] ->
           Range_check.multi (module Circuit) v0 Field.zero Field.zero
@@ -1421,10 +1408,10 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
   (*
    * Add external checks (and related)
    *)
-  External_checks.append_multi_range_check external_checks
+  External_checks.add_multi_range_check external_checks
     (quotient0, quotient1, quotient2) ;
 
-  External_checks.append_multi_range_check external_checks
+  External_checks.add_multi_range_check external_checks
     (quotient_hi_bound, product1_lo, product1_hi_0) ;
 
   let remainder0, remainder1 =
@@ -1435,7 +1422,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
       let remainder0, remainder1 =
         Range_check.compact_multi (module Circuit) remainder01 remainder2
       in
-      External_checks.append_bound_check external_checks
+      External_checks.add_bound_check external_checks
         ~do_multi_range_check:false
         (Element.Standard.of_limbs (remainder0, remainder1, remainder2)) ;
 
@@ -1614,14 +1601,13 @@ let%test_unit "foreign_field arithmetics gadgets" =
 
             (* Check that the inputs were foreign field elements *)
             let external_checks = External_checks.create (module Runner.Impl) in
-            External_checks.append_bound_check external_checks left_input ;
-            External_checks.append_bound_check external_checks right_input ;
+            External_checks.add_bound_check external_checks left_input ;
+            External_checks.add_bound_check external_checks right_input ;
 
             (* Sanity tests *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 2) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 0) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 0) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 0) ;
 
             (* Perform external checks *)
             constrain_external_checks
@@ -1829,22 +1815,21 @@ let%test_unit "foreign_field arithmetics gadgets" =
                     expected product ) ) ;
 
             (* Check left input *)
-            External_checks.append_bound_check external_checks left_input ;
-            External_checks.append_canonical_check external_checks left_input ;
+            External_checks.add_bound_check external_checks left_input ;
+            External_checks.add_canonical_check external_checks left_input ;
 
             (* Check right input *)
-            External_checks.append_bound_check external_checks right_input ;
-            External_checks.append_canonical_check external_checks right_input ;
+            External_checks.add_bound_check external_checks right_input ;
+            External_checks.add_canonical_check external_checks right_input ;
 
             (* Check result *)
-            External_checks.append_bound_check external_checks product ;
-            External_checks.append_canonical_check external_checks product ;
+            External_checks.add_bound_check external_checks product ;
+            External_checks.add_canonical_check external_checks product ;
 
             (* Sanity checks *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 4) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 3) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 6) ;
 
             (* Perform external checks *)
             constrain_external_checks
@@ -1949,30 +1934,29 @@ let%test_unit "foreign_field arithmetics gadgets" =
                     expected_sub subtraction ) ) ;
 
             (* Check left input *)
-            External_checks.append_bound_check external_checks left_input ;
-            External_checks.append_canonical_check external_checks left_input ;
+            External_checks.add_bound_check external_checks left_input ;
+            External_checks.add_canonical_check external_checks left_input ;
 
             (* Check right input *)
-            External_checks.append_bound_check external_checks right_input ;
-            External_checks.append_canonical_check external_checks right_input ;
+            External_checks.add_bound_check external_checks right_input ;
+            External_checks.add_canonical_check external_checks right_input ;
 
             (* Check product *)
-            External_checks.append_bound_check external_checks product ;
-            External_checks.append_canonical_check external_checks product ;
+            External_checks.add_bound_check external_checks product ;
+            External_checks.add_canonical_check external_checks product ;
 
             (* Check addition *)
-            External_checks.append_bound_check external_checks addition ;
-            External_checks.append_canonical_check external_checks addition ;
+            External_checks.add_bound_check external_checks addition ;
+            External_checks.add_canonical_check external_checks addition ;
 
             (* Check subtraction *)
-            External_checks.append_bound_check external_checks subtraction ;
-            External_checks.append_canonical_check external_checks subtraction ;
+            External_checks.add_bound_check external_checks subtraction ;
+            External_checks.add_canonical_check external_checks subtraction ;
 
             (* More sanity checks *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 6) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 5) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 6) ;
 
             (* Perform external checks *)
             constrain_external_checks

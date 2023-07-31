@@ -158,26 +158,24 @@ module External_checks : sig
   type 'field t =
     { mutable bounds : ('field Cvar.t standard_limbs * bool) list
     ; mutable canonicals : 'field Cvar.t standard_limbs list
-    ; mutable multi_ranges : 'field Cvar.t standard_limbs list
-    ; mutable limb_ranges : 'field Cvar.t list
+    ; mutable ranges : 'field Cvar.t list
     }
 
   (** Create a new context *)
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
 
-  (** Track a bound check *)
-  val append_bound_check :
+  (** Register a bound check to be performed *)
+  val add_bound_check :
     'field t -> ?do_multi_range_check:bool -> 'field Element.Standard.t -> unit
 
-  (** Track a canonical check *)
-  val append_canonical_check : 'field t -> 'field Element.Standard.t -> unit
+  (** Register a canonical check to be performed *)
+  val add_canonical_check : 'field t -> 'field Element.Standard.t -> unit
 
-  (** Track a multi-range-check *)
-  val append_multi_range_check :
-    'field t -> 'field Cvar.t standard_limbs -> unit
+  (** Register a multi-range-check to be performed *)
+  val add_multi_range_check : 'field t -> 'field Cvar.t standard_limbs -> unit
 
-  (** Tracks a limb-range-check *)
-  val append_limb_check : 'field t -> 'field Cvar.t -> unit
+  (** Register a range-check to be performed *)
+  val add_range_check : 'field t -> 'field Cvar.t -> unit
 end
 
 (* Type of operation *)
@@ -192,8 +190,7 @@ type op_mode = Add | Sub
  *
  *    Outputs:
  *      Inserts generic gate to constrain computation of high bound x'2 = x2 + 2^88 - f2 - 1
- *      Adds x to external_checks.multi_ranges
- *      Adds x'2 to external_checks.limb_ranges
+ *      Adds x and x'2 to external_checks.ranges
  *      Returns computed high bound
  *)
 val check_bound :
