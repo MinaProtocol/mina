@@ -1,3 +1,4 @@
 (tests
  (names test_base58_check)
- (libraries core_kernel base58_check alcotest))
+ (modes native js)
+ (libraries core_kernel base58_check digestif.ocaml alcotest))
