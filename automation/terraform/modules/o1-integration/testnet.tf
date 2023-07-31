@@ -20,7 +20,6 @@ module "kubernetes_testnet" {
   mina_agent_image              = var.mina_agent_image
   mina_bots_image               = var.mina_bots_image
   mina_points_image             = var.mina_points_image
-  enable_working_dir_persitence = var.enable_working_dir_persitence
   log_level                     = "Trace"
   log_snark_work_gossip         = true
 
