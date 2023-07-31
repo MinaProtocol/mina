@@ -25,6 +25,19 @@ spec:
       {{- if $.Values.priorityClass }}
       priorityClassName: {{ $.Values.priorityClass }}
       {{- end }}
+      initContainers:
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $.Values.mina.privkeyPass | quote }}
       containers:
       - name: mina
         resources:
