@@ -25,7 +25,7 @@ module Block_info = struct
       typ
       {sql| WITH RECURSIVE chain AS (
 
-              SELECT id,parent_id,global_slot_since_genesis,state_hash,ledger_hash FROM blocks b 
+              SELECT id,parent_id,global_slot_since_genesis,state_hash,ledger_hash FROM blocks b
               WHERE b.state_hash = $1
 
               UNION ALL
@@ -55,8 +55,8 @@ let find_command_ids_query s =
     {sql| WITH RECURSIVE chain AS (
 
             SELECT id,parent_id,global_slot_since_genesis FROM blocks b
-            WHERE b.state_hash = $1 
-            
+            WHERE b.state_hash = $1
+
             UNION ALL
 
             SELECT b.id,b.parent_id,b.global_slot_since_genesis FROM blocks b
@@ -94,16 +94,26 @@ module Block = struct
     Conn.find get_height_query block_id
 
   let max_slot_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int
+    Caqti_request.find Caqti_type.unit Caqti_type.int64
       {sql| SELECT MAX(global_slot_since_genesis) FROM blocks |sql}
 
   let get_max_slot (module Conn : Caqti_async.CONNECTION) () =
     Conn.find max_slot_query ()
 
+  let max_canonical_slot_query =
+    Caqti_request.find Caqti_type.unit Caqti_type.int64
+      {sql| SELECT MAX(global_slot_since_genesis) FROM blocks
+            WHERE chain_status = 'canonical'
+      |sql}
+
+  let get_max_canonical_slot (module Conn : Caqti_async.CONNECTION) () =
+    Conn.find max_canonical_slot_query ()
+
   let next_slot_query =
     Caqti_request.find_opt Caqti_type.int64 Caqti_type.int64
       {sql| SELECT global_slot_since_genesis FROM blocks
             WHERE global_slot_since_genesis >= $1
+            AND chain_status <> 'orphaned'
             ORDER BY global_slot_since_genesis ASC
             LIMIT 1
       |sql}
@@ -131,7 +141,7 @@ module Block = struct
     Conn.find genesis_block_id_query ()
 
   let state_hashes_by_slot_query =
-    Caqti_request.collect Caqti_type.int Caqti_type.string
+    Caqti_request.collect Caqti_type.int64 Caqti_type.string
       {sql| SELECT state_hash FROM blocks WHERE global_slot_since_genesis = $1 |sql}
 
   let get_state_hashes_by_slot (module Conn : Caqti_async.CONNECTION) slot =
