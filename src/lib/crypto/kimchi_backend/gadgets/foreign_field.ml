@@ -576,7 +576,6 @@ module External_checks = struct
     { mutable bounds : ('field Cvar.t standard_limbs * bool) list
     ; mutable canonicals : 'field Cvar.t standard_limbs list
     ; mutable multi_ranges : 'field Cvar.t standard_limbs list
-    ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
     ; mutable limb_ranges : 'field Cvar.t list
     }
 
@@ -586,7 +585,6 @@ module External_checks = struct
     { bounds = []
     ; canonicals = []
     ; multi_ranges = []
-    ; compact_multi_ranges = []
     ; limb_ranges = []
     }
 
@@ -608,12 +606,6 @@ module External_checks = struct
   let append_multi_range_check (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =
     external_checks.multi_ranges <- x :: external_checks.multi_ranges
-
-  (* Track a compact-multi-range-check *)
-  let append_compact_multi_range_check (external_checks : 'field t)
-      (x : 'field Cvar.t compact_limbs) =
-    external_checks.compact_multi_ranges <-
-      x :: external_checks.compact_multi_ranges
 
   (* Tracks a limb-range-check *)
   let append_limb_check (external_checks : 'field t) (x : 'field Cvar.t) =
@@ -1073,7 +1065,7 @@ let constrain_external_checks (type field)
    *    Note: internally this also adds a limb-check for the computed bound to
    *          external_checks.limb_ranges and optionally adds a multi-range-check
    *          for the original value to external_checks.multi_ranges.
-   *          These are subsequently constrainted in (5) and (2) below.
+   *          These are subsequently constrainted in (4) and (2) below.
    *)
   List.iter external_checks.bounds ~f:(fun (value, do_multi_range_check) ->
       let _bound =
@@ -1106,13 +1098,7 @@ let constrain_external_checks (type field)
       Range_check.multi (module Circuit) v0 v1 v2 ;
       () ) ;
 
-  (* 4) Add gates for external compact-multi-range-checks *)
-  List.iter external_checks.compact_multi_ranges ~f:(fun compact_multi_range ->
-      let v01, v2 = compact_multi_range in
-      let _v0, _v1 = Range_check.compact_multi (module Circuit) v01 v2 in
-      () ) ;
-
-  (* 5) Add gates for external limb-range-checks *)
+  (* 4) Add gates for external limb-range-checks *)
   List.iter (List.chunks_of external_checks.limb_ranges ~length:3)
     ~f:(fun chunk ->
       match chunk with
@@ -1635,9 +1621,6 @@ let%test_unit "foreign_field arithmetics gadgets" =
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 2) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 0) ;
             assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 0) ;
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
-                0 ) ;
             assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
 
             (* Perform external checks *)
@@ -1861,9 +1844,6 @@ let%test_unit "foreign_field arithmetics gadgets" =
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 4) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 3) ;
             assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
-                0 ) ;
             assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
 
             (* Perform external checks *)
@@ -1992,9 +1972,6 @@ let%test_unit "foreign_field arithmetics gadgets" =
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 6) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 5) ;
             assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
-                0 ) ;
             assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
 
             (* Perform external checks *)

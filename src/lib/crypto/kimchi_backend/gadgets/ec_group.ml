@@ -1127,9 +1127,6 @@ let%test_unit "Ec_group.add" =
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 6 ) ;
             assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 0 ) ;
-            assert (
               Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
 
             (* Check output matches expected result *)
@@ -1490,9 +1487,6 @@ let%test_unit "Ec_group.add_chained" =
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 12 ) ;
             assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 0 ) ;
-            assert (
               Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
 
             (* Check output matches expected result *)
@@ -1709,9 +1703,6 @@ let%test_unit "Ec_group.add_full" =
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 12) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 6) ;
             assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 6) ;
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
-                0 ) ;
             assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
@@ -1811,9 +1802,6 @@ let%test_unit "Ec_group.double" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 8 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 0 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
 
@@ -2092,9 +2080,6 @@ let%test_unit "Ec_group.double_chained" =
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 16 ) ;
             assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 0 ) ;
-            assert (
               Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
 
             (* Check output matches expected result *)
@@ -2229,9 +2214,6 @@ let%test_unit "Ec_group.double_full" =
             else assert (Mina_stdlib.List.Length.equal external_checks.bounds 13) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 4) ;
             assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 8) ;
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
-                0 ) ;
             assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
@@ -2353,9 +2335,6 @@ let%test_unit "Ec_group.ops_mixed" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 14 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 0 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
 
@@ -2949,9 +2928,6 @@ let%test_unit "Ec_group.is_on_curve" =
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 6 ) ;
             assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 0 ) ;
-            assert (
               Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
             () )
       in
@@ -3089,9 +3065,6 @@ let%test_unit "Ec_group.check_ia" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 6 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 0 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
             () )
@@ -4072,9 +4045,6 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 34 ) ;
             assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 0 ) ;
-            assert (
               Mina_stdlib.List.Length.equal unused_external_checks.limb_ranges 0 ) ;
 
             (* Check output matches expected result *)
@@ -4169,9 +4139,6 @@ let%test_unit "Ec_group.scalar_mul_tiny_full" =
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 8) ;
             assert (
               Mina_stdlib.List.Length.equal external_checks.multi_ranges 34 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
-                0 ) ;
             assert (Mina_stdlib.List.Length.equal external_checks.limb_ranges 0) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)

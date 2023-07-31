@@ -792,9 +792,6 @@ let%test_unit "Ecdsa.verify_light" =
             assert (
               Mina_stdlib.List.Length.equal unused_scalar_checks.multi_ranges 6 ) ;
             assert (
-              Mina_stdlib.List.Length.equal
-                unused_scalar_checks.compact_multi_ranges 0 ) ;
-            assert (
               Mina_stdlib.List.Length.equal unused_scalar_checks.limb_ranges 0 ) ;
 
             () )
@@ -924,8 +921,6 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
                 !base_bound_checks_count ) ;
             assert (Mina_stdlib.List.Length.equal base_checks.canonicals 19) ;
             assert (Mina_stdlib.List.Length.equal base_checks.multi_ranges 80) ;
-            assert (
-              Mina_stdlib.List.Length.equal base_checks.compact_multi_ranges 0 ) ;
             assert (Mina_stdlib.List.Length.equal base_checks.limb_ranges 0) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
@@ -941,8 +936,6 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
             assert (Mina_stdlib.List.Length.equal scalar_checks.bounds 5) ;
             assert (Mina_stdlib.List.Length.equal scalar_checks.canonicals 4) ;
             assert (Mina_stdlib.List.Length.equal scalar_checks.multi_ranges 6) ;
-            assert (
-              Mina_stdlib.List.Length.equal scalar_checks.compact_multi_ranges 0 ) ;
             assert (Mina_stdlib.List.Length.equal scalar_checks.limb_ranges 0) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)

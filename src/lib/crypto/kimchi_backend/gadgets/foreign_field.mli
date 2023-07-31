@@ -159,7 +159,6 @@ module External_checks : sig
     { mutable bounds : ('field Cvar.t standard_limbs * bool) list
     ; mutable canonicals : 'field Cvar.t standard_limbs list
     ; mutable multi_ranges : 'field Cvar.t standard_limbs list
-    ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
     ; mutable limb_ranges : 'field Cvar.t list
     }
 
@@ -176,10 +175,6 @@ module External_checks : sig
   (** Track a multi-range-check *)
   val append_multi_range_check :
     'field t -> 'field Cvar.t standard_limbs -> unit
-
-  (** Track a compact-multi-range-check *)
-  val append_compact_multi_range_check :
-    'field t -> 'field Cvar.t compact_limbs -> unit
 
   (** Tracks a limb-range-check *)
   val append_limb_check : 'field t -> 'field Cvar.t -> unit
