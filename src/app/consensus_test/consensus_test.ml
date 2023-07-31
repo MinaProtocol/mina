@@ -162,7 +162,7 @@ let process_precomputed_blocks ~context blocks =
   in
   return ()
 
-let main () ~blocks_dir =
+let main () ~blocks_dir ~output_dir =
   let logger = Logger.create () in
 
   [%log info] "Starting to read blocks dir"
@@ -189,7 +189,7 @@ let main () ~blocks_dir =
           unit Deferred.t =
         let block_json = BlockFileOutput.to_yojson block in
         let block_json_str = Yojson.Safe.to_string block_json in
-        let file_name = sprintf "compare/block_%d.json" i in
+        let file_name = sprintf "%s/block_%d.json" output_dir i in
         Writer.save file_name ~contents:block_json_str
       in
       let%bind () =
@@ -207,5 +207,8 @@ let () =
         (let%map blocks_dir =
            Param.flag "--blocks-dir" ~doc:"STRING Path of the blocks JSON data"
              Param.(required string)
+         and output_dir =
+           Param.flag "--output-dir" ~doc:"STRING Path of the output directory"
+             Param.(required string)
          in
-         main ~blocks_dir )))
+         main ~blocks_dir ~output_dir )))
