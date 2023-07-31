@@ -1,19 +1,3 @@
-(**
-  Steps that this program needs to accomplish.
-
-  1. Read in all block data in a list ordered by timestamp
-
-  2. For each block, check if the block is valid
-
-  3. If the block is valid, convert it into an OCaml block type
-
-  4. Initialize any PoS data structures
-
-  5. Run the PoS selection algorithm on the blocks
-
-  6. Print out the results
-*)
-
 open Core_kernel
 open Async
 
