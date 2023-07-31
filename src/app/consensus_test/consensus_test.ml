@@ -37,17 +37,10 @@ let current_chain : Mina_block.Precomputed.t list ref = ref []
 
 let read_directory dir_name =
   let extract_height_from_filename fname =
-    (*TODO: replace this with generic network *)
-    let prefix = "berkeley-" in
-    let prefix_len = String.length prefix in
-    match String.index_from fname (String.length prefix) '-' with
-    | None ->
-        failwith "Could not find block height number in filename"
-    | Some suffix_start ->
-        let number_str =
-          String.sub fname ~pos:prefix_len ~len:(suffix_start - prefix_len)
-        in
-        int_of_string number_str
+    let prefix_start = String.index_exn fname '-' + 1 in
+    let suffix_start = String.index_from_exn fname prefix_start '-' in
+    String.sub fname ~pos:prefix_start ~len:(suffix_start - prefix_start)
+    |> int_of_string
   in
   let blocks_in_dir dir =
     let%map blocks_array = Async.Sys.readdir dir in
