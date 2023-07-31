@@ -219,7 +219,10 @@ let () =
   Command.(
     run
       (let open Let_syntax in
-      async ~summary:"TODO"
+      async
+        ~summary:
+          "Run Mina PoS on a set of precomputed blocks and output the longest \
+           chain"
         (let%map blocks_dir =
            Param.flag "--blocks-dir" ~doc:"STRING Path of the blocks JSON data"
              Param.(required string)
