@@ -8,8 +8,11 @@ module Stable : sig
     (** The type is exposed as read-only [private] but if you find you need a
         function not provided by this module, typically one operating directly
         on arrays, please refrain from using it and do add it here.  *)
-    type 'a t = private { data : 'a array }
-    [@@unboxed] [@@deriving sexp, compare, hash, equal, yojson, hlist]
+    type 'a t [@@deriving sexp, compare, hash, equal, yojson]
+
+    val of_hlist : (unit, 'a array -> unit) H_list.t -> 'a t
+
+    val to_hlist : 'a t -> (unit, 'a array -> unit) H_list.t
   end
 end]
 
