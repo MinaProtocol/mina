@@ -3559,8 +3559,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         { stack_hash = Call_stack_digest.cons h_f h_tl; elt = f } :: tl
 
-  let zkapp_command_witnesses_exn ~constraint_constants ~global_slot ~state_body
-      ~fee_excess
+  let zkapp_command_witnesses_exn ?signature_kind ~constraint_constants
+      ~global_slot ~state_body ~fee_excess
       (zkapp_commands_with_context :
         ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
         * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
@@ -3717,7 +3717,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let next_commitment = Zkapp_command.commitment zkapp_command in
                 let memo_hash = Signed_command_memo.hash zkapp_command.memo in
                 let fee_payer_hash =
-                  Zkapp_command.Digest.Account_update.create
+                  Zkapp_command.Digest.Account_update.create ?signature_kind
                     (Account_update.of_fee_payer zkapp_command.fee_payer)
                 in
                 let next_full_commitment =

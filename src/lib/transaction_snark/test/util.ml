@@ -72,8 +72,9 @@ type pass_number = Pass_1 | Pass_2
 
 let pass_number_to_int = function Pass_1 -> 1 | Pass_2 -> 2
 
-let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
-    ?global_slot ?(state_body = genesis_state_body) ledger zkapp_commands =
+let check_zkapp_command_with_merges_exn ?signature_kind ?expected_failure
+    ?ignore_outside_snark ?global_slot ?(state_body = genesis_state_body) ledger
+    zkapp_commands =
   let module T = (val Lazy.force snark_module) in
   let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
@@ -102,8 +103,9 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
             in
             let partial_stmt =
               match
-                Ledger.apply_transaction_first_pass ~constraint_constants
-                  ~global_slot ~txn_state_view:state_view ledger
+                Ledger.apply_transaction_first_pass ?signature_kind
+                  ~constraint_constants ~global_slot ~txn_state_view:state_view
+                  ledger
                   (Mina_transaction.Transaction.Command
                      (Zkapp_command zkapp_command) )
               with
@@ -139,7 +141,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
            ->
           match
             Or_error.try_with (fun () ->
-                Transaction_snark.zkapp_command_witnesses_exn
+                Transaction_snark.zkapp_command_witnesses_exn ?signature_kind
                   ~constraint_constants ~global_slot ~state_body
                   ~fee_excess:Amount.Signed.zero
                   [ ( `Pending_coinbase_init_stack init_stack
@@ -185,7 +187,8 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                     Ledger.merkle_root ledger
                   in
                   let applied_txn =
-                    Ledger.apply_transaction_second_pass ledger partial_stmt
+                    Ledger.apply_transaction_second_pass ?signature_kind ledger
+                      partial_stmt
                     |> Or_error.ok_exn
                   in
                   (*Expected transaction statement*)

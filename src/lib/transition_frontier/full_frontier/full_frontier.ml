@@ -478,7 +478,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
       (* STEP 5 *)
       (*Validate transactions against the protocol state associated with the transaction*)
       let apply_first_pass =
-        Ledger.apply_transaction_first_pass
+        Ledger.apply_transaction_first_pass ?signature_kind:None
           ~constraint_constants:Context.constraint_constants
       in
       let apply_second_pass = Ledger.apply_transaction_second_pass in

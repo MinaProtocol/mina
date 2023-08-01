@@ -1796,12 +1796,12 @@ module T = struct
   let of_simple (p : Simple.t) : t =
     { body = Body.of_simple p.body; authorization = p.authorization }
 
-  let digest (t : t) = Body.digest t.body
+  let digest ?signature_kind (t : t) = Body.digest ?signature_kind t.body
 
   module Checked = struct
     type t = Body.Checked.t
 
-    let digest (t : t) = Body.Checked.digest t
+    let digest ?signature_kind (t : t) = Body.Checked.digest ?signature_kind t
   end
 end
 

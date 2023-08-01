@@ -145,7 +145,8 @@ module Call_forest = struct
       module Checked : sig
         include Digest_intf.S_checked
 
-        val create : Account_update.Checked.t -> t
+        val create :
+          ?signature_kind:Mina_signature_kind.t -> Account_update.Checked.t -> t
 
         val create_body :
              ?signature_kind:Mina_signature_kind.t
@@ -155,7 +156,8 @@ module Call_forest = struct
 
       include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
-      val create : Account_update.t -> t
+      val create :
+        ?signature_kind:Mina_signature_kind.t -> Account_update.t -> t
 
       val create_body :
         ?signature_kind:Mina_signature_kind.t -> Account_update.Body.t -> t
@@ -239,7 +241,9 @@ module Call_forest = struct
         let create_body = Account_update.Body.Checked.digest
       end
 
-      let create : Account_update.t -> t = Account_update.digest
+      let create :
+          ?signature_kind:Mina_signature_kind.t -> Account_update.t -> t =
+        Account_update.digest
 
       let create_body :
           ?signature_kind:Mina_signature_kind.t -> Account_update.Body.t -> t =

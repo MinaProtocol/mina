@@ -54,7 +54,8 @@ type pass_number = Pass_1 | Pass_2
     Raises if either the snark generation or application fails
 *)
 val check_zkapp_command_with_merges_exn :
-     ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
+     ?signature_kind:Mina_signature_kind.t
+  -> ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
   -> ?ignore_outside_snark:bool
   -> ?global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> ?state_body:Transaction_protocol_state.Block_data.t

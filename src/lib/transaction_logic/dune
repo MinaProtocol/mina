@@ -42,6 +42,7 @@
    random_oracle
    random_oracle_input
    signature_lib
+   mina_signature_kind
    sgn
    snarky.backendless
    snark_params
