@@ -4345,6 +4345,13 @@ module Queries = struct
                 in
                 let update =
                   Runtime_config.make
+                  (* add_genesis_winner must be set to false, because this
+                     config effectively creates a continuation of the current
+                     blockchain state and therefore the genesis ledger already
+                     contains the winner of the previous block. No need to
+                     artificially add it. In fact, it wouldn't work at all,
+                     because the new node would try to create this account at
+                     startup, even though it already exists, leading to an error.*)
                     ~ledger:
                       { ledger with
                         base = Accounts accounts
