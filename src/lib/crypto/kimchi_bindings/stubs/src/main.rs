@@ -26,7 +26,6 @@ use wires_15_stubs::{
     srs::{fp::*, fq::*},
     CamlCircuitGate,
     CamlLookupCommitments,
-    CamlLookupEvaluations,
     CamlOpeningProof,
     CamlPolyComm,
     CamlProofEvaluations,
@@ -96,7 +95,6 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlScalarChallenge::<T1> => "scalar_challenge");
     decl_type!(w, env, CamlRandomOracles::<T1> => "random_oracles");
     decl_type!(w, env, PointEvaluations::<T1> => "point_evaluations");
-    decl_type!(w, env, CamlLookupEvaluations<T1> => "lookup_evaluations");
     decl_type!(w, env, CamlProofEvaluations::<T1> => "proof_evaluations");
     decl_type!(w, env, CamlPolyComm::<T1> => "poly_comm");
     decl_type!(w, env, CamlRecursionChallenge::<T1, T2> => "recursion_challenge");
@@ -455,7 +453,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_ffadd => "example_with_ffadd");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_xor => "example_with_xor");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_rot => "example_with_rot");
-                //decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_foreign_field_mul => "example_with_foreign_field_mul");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_foreign_field_mul => "example_with_foreign_field_mul");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_range_check => "example_with_range_check");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_range_check0 => "example_with_range_check0");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_verify => "verify");
