@@ -755,11 +755,11 @@ module Proof_keys = struct
     }
   [@@deriving bin_io_unversioned]
 
-  let make ?level ?sub_window_per_window ?ledger_depth ?work_delay
+  let make ?level ?sub_windows_per_window ?ledger_depth ?work_delay
       ?block_window_duration_ms ?transaction_capacity ?coinbase_amount
       ?supercharged_coinbase_factor ?account_creation_fee ?fork () =
     { level
-    ; sub_windows_per_window = sub_window_per_window
+    ; sub_windows_per_window
     ; ledger_depth
     ; work_delay
     ; block_window_duration_ms
