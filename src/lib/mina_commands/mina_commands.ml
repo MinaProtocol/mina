@@ -67,18 +67,18 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
     =
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)
-  let%bind () = return () in
-  let%map best_tip = Mina_lib.best_tip t in
-  let consensus_state =
-    Transition_frontier.Breadcrumb.consensus_state best_tip
-  in
-  let global_slot_since_genesis =
-    Mina_numbers.Global_slot.to_int
-    @@ Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state
+  let%map () = return () in
+  let slot =
+    Account_nonce.to_int
+    @@ Consensus.Data.Consensus_time.to_global_slot
+         (Consensus.Data.Consensus_time.of_time_exn
+            ~constants:
+              (Mina_lib.config t).precomputed_values.consensus_constants
+            (Block_time.now (Mina_lib.config t).time_controller) )
   in
   let open Deferred.Let_syntax in
   match (Mina_lib.config t).slot_tx_end with
-  | Some slot_tx_end when global_slot_since_genesis >= slot_tx_end ->
+  | Some slot_tx_end when slot >= slot_tx_end ->
       [%log' warn (Mina_lib.top_level_logger t)] "can't produce" ;
       Deferred.return (Error (Error.of_string "can't produce"))
   | Some _ | None -> (
