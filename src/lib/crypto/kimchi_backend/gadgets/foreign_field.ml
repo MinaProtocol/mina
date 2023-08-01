@@ -1152,13 +1152,6 @@ let compute_high_bound (x : Bignum_bigint.t)
   assert (Bignum_bigint.(x_bound_hi < Common.two_to_limb)) ;
   x_bound_hi
 
-(* Perform integer bound addition for all limbs x' = x + f' *)
-let _compute_bound (x : Bignum_bigint.t)
-    (neg_foreign_field_modulus : Bignum_bigint.t) : Bignum_bigint.t =
-  let x_bound = Bignum_bigint.(x + neg_foreign_field_modulus) in
-  assert (Bignum_bigint.(x_bound < binary_modulus)) ;
-  x_bound
-
 (* Compute witness variables related for foreign field multplication *)
 let compute_witness_variables (type f)
     (module Circuit : Snark_intf.Run with type field = f)
