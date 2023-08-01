@@ -79,8 +79,10 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
   let open Deferred.Let_syntax in
   match (Mina_lib.config t).slot_tx_end with
   | Some slot_tx_end when slot >= slot_tx_end ->
-      [%log' warn (Mina_lib.top_level_logger t)] "can't produce" ;
-      Deferred.return (Error (Error.of_string "can't produce"))
+      [%log' warn (Mina_lib.top_level_logger t)]
+        "can't produce transaction in slot $slot, tx production ends at $end"
+        ~metadata:[ ("slot", `Int slot); ("end", `Int slot_tx_end) ] ;
+      Deferred.return (Error (Error.of_string "tx production has ended"))
   | Some _ | None -> (
       let%map result = Mina_lib.add_transactions t [ user_command_input ] in
       txn_count := !txn_count + 1 ;
@@ -120,19 +122,21 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
 
 let setup_and_submit_user_commands t user_command_list =
   let open Participating_state.Let_syntax in
-  let%bind _is_active = Mina_lib.active_or_bootstrapping t in
-  let%map best_tip = Mina_lib.best_tip t in
-  let consensus_state =
-    Transition_frontier.Breadcrumb.consensus_state best_tip
-  in
-  let global_slot_since_genesis =
-    Mina_numbers.Global_slot.to_int
-    @@ Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state
+  let%map _is_active = Mina_lib.active_or_bootstrapping t in
+  let slot =
+    Account_nonce.to_int
+    @@ Consensus.Data.Consensus_time.to_global_slot
+         (Consensus.Data.Consensus_time.of_time_exn
+            ~constants:
+              (Mina_lib.config t).precomputed_values.consensus_constants
+            (Block_time.now (Mina_lib.config t).time_controller) )
   in
   match (Mina_lib.config t).slot_tx_end with
-  | Some slot_tx_end when global_slot_since_genesis >= slot_tx_end ->
-      [%log' warn (Mina_lib.top_level_logger t)] "can't produce" ;
-      Deferred.return (Error (Error.of_string "can't produce"))
+  | Some slot_tx_end when slot >= slot_tx_end ->
+      [%log' warn (Mina_lib.top_level_logger t)]
+        "can't produce transactions in slot $slot, tx production ends at $end"
+        ~metadata:[ ("slot", `Int slot); ("end", `Int slot_tx_end) ] ;
+      Deferred.return (Error (Error.of_string "tx production has ended"))
   | Some _ | None ->
       [%log' warn (Mina_lib.top_level_logger t)]
         "batch-send-payments does not yet report errors"
