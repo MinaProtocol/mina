@@ -10,6 +10,15 @@ module Container_images = struct
     }
 end
 
+module Cluster_config = struct
+  type t =
+    { cluster_id : string
+    ; cluster_name : string
+    ; cluster_region : string
+    ; cluster_zone : string
+    }
+end
+
 module Test_Account = struct
   type t =
     { account_name : string
