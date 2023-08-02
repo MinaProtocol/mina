@@ -2724,7 +2724,7 @@ module For_tests = struct
       }
     |> Signed_command.forget_check
 
-  let account_update_send ?(use_full_commitment = true)
+  let account_update_send ?signature_kind ?(use_full_commitment = true)
       ?(double_sender_nonce = true)
       { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
       : Zkapp_command.t =
@@ -2811,13 +2811,13 @@ module For_tests = struct
       ; memo = Signed_command_memo.empty
       }
     in
-    let zkapp_command = Zkapp_command.of_simple zkapp_command in
+    let zkapp_command = Zkapp_command.of_simple ?signature_kind zkapp_command in
     let commitment = Zkapp_command.commitment zkapp_command in
     let full_commitment =
       Zkapp_command.Transaction_commitment.create_complete commitment
         ~memo_hash:(Signed_command_memo.hash zkapp_command.memo)
         ~fee_payer_hash:
-          (Zkapp_command.Digest.Account_update.create
+          (Zkapp_command.Digest.Account_update.create ?signature_kind
              (Account_update.of_fee_payer zkapp_command.fee_payer) )
     in
     let account_updates_signature =

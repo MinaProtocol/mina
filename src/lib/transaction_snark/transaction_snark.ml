@@ -4169,7 +4169,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
       , `Prover trivial_prover )
 
-    let create_zkapp_command ?receiver_auth ?empty_sender
+    let create_zkapp_command ?signature_kind ?receiver_auth ?empty_sender
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
         ~update ~receiver_update =
       let { Spec.fee
@@ -4381,7 +4381,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let ps =
         Zkapp_command.Call_forest.With_hashes.of_zkapp_command_simple_list
-          account_updates_data
+          ?signature_kind account_updates_data
       in
       let account_updates_hash = Zkapp_command.Call_forest.hash ps in
       let commitment : Zkapp_command.Transaction_commitment.t =
@@ -4643,8 +4643,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let update_states ?receiver_auth ?zkapp_prover_and_vk ?empty_sender
-        ~constraint_constants (spec : Update_states_spec.t) =
+    let update_states ?signature_kind ?receiver_auth ?zkapp_prover_and_vk
+        ?empty_sender ~constraint_constants (spec : Update_states_spec.t) =
       let prover, vk =
         match zkapp_prover_and_vk with
         | Some (prover, vk) ->
@@ -4661,7 +4661,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
           , `Full_txn_commitment full_commitment ) =
-        create_zkapp_command ~constraint_constants
+        create_zkapp_command ?signature_kind ~constraint_constants
           (Update_states_spec.spec_of_t ~vk spec)
           ~update:spec.snapp_update
           ~receiver_update:Mina_base.Account_update.Update.noop ?receiver_auth

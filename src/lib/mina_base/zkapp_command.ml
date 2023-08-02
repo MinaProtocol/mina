@@ -526,18 +526,21 @@ module Call_forest = struct
 
     let empty = Digest.Forest.empty
 
-    let hash_account_update ((p : Account_update.t), _) =
-      Digest.Account_update.create p
+    let hash_account_update ?signature_kind ((p : Account_update.t), _) =
+      Digest.Account_update.create ?signature_kind p
 
-    let accumulate_hashes xs : _ t = accumulate_hashes ~hash_account_update xs
+    let accumulate_hashes ?signature_kind xs : _ t =
+      accumulate_hashes
+        ~hash_account_update:(hash_account_update ?signature_kind)
+        xs
 
-    let of_zkapp_command_simple_list (xs : (Account_update.Simple.t * 'a) list)
-        : _ t =
+    let of_zkapp_command_simple_list ?signature_kind
+        (xs : (Account_update.Simple.t * 'a) list) : _ t =
       of_account_updates xs
         ~account_update_depth:(fun ((p : Account_update.Simple.t), _) ->
           p.body.call_depth )
       |> map ~f:(fun (p, x) -> (Account_update.of_simple p, x))
-      |> accumulate_hashes
+      |> accumulate_hashes ?signature_kind
 
     let of_account_updates (xs : (Account_update.Graphql_repr.t * 'a) list) :
         _ t =
@@ -576,17 +579,21 @@ module Call_forest = struct
 
     let empty = Digest.Forest.empty
 
-    let hash_account_update (p : Account_update.t) =
-      Digest.Account_update.create p
+    let hash_account_update ?signature_kind (p : Account_update.t) =
+      Digest.Account_update.create ?signature_kind p
 
-    let accumulate_hashes xs : t = accumulate_hashes ~hash_account_update xs
+    let accumulate_hashes ?signature_kind xs : t =
+      accumulate_hashes
+        ~hash_account_update:(hash_account_update ?signature_kind)
+        xs
 
-    let of_zkapp_command_simple_list (xs : Account_update.Simple.t list) : t =
+    let of_zkapp_command_simple_list ?signature_kind
+        (xs : Account_update.Simple.t list) : t =
       of_account_updates xs
         ~account_update_depth:(fun (p : Account_update.Simple.t) ->
           p.body.call_depth )
       |> map ~f:Account_update.of_simple
-      |> accumulate_hashes
+      |> accumulate_hashes ?signature_kind
 
     let of_account_updates (xs : Account_update.Graphql_repr.t list) : t =
       of_account_updates_map
@@ -815,7 +822,7 @@ include T
 
 [%%define_locally Stable.Latest.Wire.(gen)]
 
-let of_simple (w : Simple.t) : t =
+let of_simple ?signature_kind (w : Simple.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
   ; account_updates =
@@ -825,7 +832,7 @@ let of_simple (w : Simple.t) : t =
       |> Call_forest.map ~f:Account_update.of_simple
       |> Call_forest.accumulate_hashes
            ~hash_account_update:(fun (p : Account_update.t) ->
-             Digest.Account_update.create p )
+             Digest.Account_update.create ?signature_kind p )
   }
 
 let to_simple (t : t) : Simple.t =

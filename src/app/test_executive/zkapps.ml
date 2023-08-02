@@ -239,6 +239,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind.Deferred ( zkapp_update_all
                       , zkapp_command_update_all
+                      , zkapp_command_invalid_network_id
                       , zkapp_command_invalid_nonce
                       , zkapp_command_insufficient_funds
                       , zkapp_command_insufficient_replace_fee
@@ -307,6 +308,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Transaction_snark.For_tests.update_states ~constraint_constants
           zkapp_command_spec
       in
+      let%bind.Deferred zkapp_command_invalid_network_id =
+        Transaction_snark.For_tests.update_states
+          ~signature_kind:(Mina_signature_kind.Other_network "invalid")
+          ~constraint_constants zkapp_command_spec
+      in
       let%bind.Deferred zkapp_command_invalid_nonce =
         Transaction_snark.For_tests.update_states ~constraint_constants
           { zkapp_command_spec with
@@ -339,6 +345,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       ( snapp_update
       , zkapp_command_update_all
+      , zkapp_command_invalid_network_id
       , zkapp_command_invalid_nonce
       , zkapp_command_insufficient_funds
       , zkapp_command_insufficient_replace_fee
@@ -731,6 +738,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  (Error.of_string
                     "Ledger permissions do not match update permissions" ) ) )
         )
+    in
+    let%bind () =
+      section_hard "Send a zkapp with invalid network id"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_invalid_network_id "Verification_failed" )
     in
     let%bind () =
       section_hard "Send a zkapp with an insufficient fee"

@@ -312,7 +312,8 @@ module type Full = sig
     end
 
     val update_states :
-         ?receiver_auth:Control.Tag.t
+         ?signature_kind:Mina_signature_kind.t
+      -> ?receiver_auth:Control.Tag.t
       -> ?zkapp_prover_and_vk:
            ( unit
            , unit
