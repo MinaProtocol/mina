@@ -30,7 +30,7 @@ type inputs =
   ; mina_image : string
   ; archive_image : string option
   ; debug : bool
-  ; config_path : string
+  ; config_path : string option
   }
 
 let validate_inputs ~logger inputs (test_config : Test_config.t) :
@@ -45,13 +45,22 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
       "This test uses archive nodes.  archive-image argument cannot be absent \
        for this test" ;
     exit 1 )
-  else Deferred.unit
+  else
+    let (Test_inputs_with_cli_inputs ((module Inputs), _)) =
+      inputs.test_inputs
+    in
+    if
+      String.equal Inputs.Engine.name "abstract"
+      && Option.is_none inputs.config_path
+    then (
+      [%log fatal] "Must provide a config file when using the abstract engine" ;
+      exit 1 )
+    else Deferred.unit
 
 let engines : engine list =
-  let abstract_engine =
-    (module Integration_test_abstract_engine : Intf.Engine.S)
-  in
-  [ ("cloud", abstract_engine); ("local", abstract_engine) ]
+  [ ("abstract", (module Integration_test_abstract_engine : Intf.Engine.S))
+  ; ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))
+  ]
 
 let tests : test list =
   [ (module Block_production_priority.Make : Intf.Test.Functor_intf)
@@ -112,9 +121,10 @@ let report_test_errors ~log_error_set ~internal_error_set =
     List.fold severities ~init:`None ~f:max_sev
   in
   let combine_errors error_set =
-    Error_accumulator.combine
-      [ Error_accumulator.map error_set.soft_errors ~f:(fun err -> (`Soft, err))
-      ; Error_accumulator.map error_set.hard_errors ~f:(fun err -> (`Hard, err))
+    let open Error_accumulator in
+    combine
+      [ map error_set.soft_errors ~f:(fun err -> (`Soft, err))
+      ; map error_set.hard_errors ~f:(fun err -> (`Hard, err))
       ]
   in
   let internal_errors = combine_errors internal_error_set in
@@ -239,8 +249,7 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       deferred
 
 let test_name (test : test)
-    (inputs : (module Integration_test_lib.Intf.Test.Inputs_intf)) =
-  let (module Inputs) = inputs in
+    (module Inputs : Integration_test_lib.Intf.Test.Inputs_intf) =
   let module Test = (val test) (Inputs) in
   Test.test_name
 
@@ -253,15 +262,8 @@ let main inputs =
   let test_name = test_name inputs.test (module Test_inputs) in
   let module T = Test (Test_inputs) in
   let logger = Logger.create () in
-  (* TODO: provide as json file *)
   let images =
-    { Test_config.Container_images.mina = inputs.mina_image
-    ; archive_node =
-        Option.value inputs.archive_image ~default:"archive_image_unused"
-    ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
-    ; bots = "minaprotocol/mina-bots:latest"
-    ; points = "codaprotocol/coda-points-hack:32b.4"
-    }
+    Test_config.Container_images.mk inputs.mina_image inputs.archive_image
   in
   let%bind () = validate_inputs ~logger inputs T.config in
   [%log trace] "expanding network config" ;
@@ -404,7 +406,7 @@ let config_path_arg =
   let doc = "Path to the CI config file." in
   let env = Arg.env_var "MINA_CI_CONFIG_PATH" ~doc in
   Arg.(
-    required
+    value
     & opt (some non_dir_file) None
     & info [ "config-path"; "config" ] ~env ~docv:"MINA_CI_CONFIG_PATH" ~doc)
 
@@ -415,14 +417,6 @@ let mina_image_arg =
     required
     & opt (some string) None
     & info [ "mina-image" ] ~env ~docv:"MINA_IMAGE" ~doc)
-
-let images_arg =
-  let doc = "Identifier of the archive node docker image to test." in
-  let env = Arg.env_var "ARCHIVE_IMAGE" ~doc in
-  Arg.(
-    value
-    & opt (some string) None
-    & info [ "archive-image" ] ~env ~docv:"ARCHIVE_IMAGE" ~doc)
 
 let archive_image_arg =
   let doc = "Identifier of the archive node docker image to test." in
@@ -444,10 +438,10 @@ let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 let info engine_name =
   let doc =
     match engine_name with
+    | "abstract" ->
+        "Run mina integration tests with the abstract engine."
     | "cloud" ->
         "Run mina integration tests on a remote cloud provider."
-    | "local" ->
-        "Run mina integration tests locally with Minimina."
     | _ ->
         assert false
   in
@@ -457,7 +451,8 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
   let info = info engine_name in
   let module Inputs = Make_test_inputs (Engine) () in
   let set_config path =
-    Engine.Network.config_path := path ;
+    (* TODO: deal with path relativity? *)
+    Option.iter path ~f:(fun p -> Engine.Network.config_path := p) ;
     path
   in
   let test_inputs_with_cli_inputs_arg =

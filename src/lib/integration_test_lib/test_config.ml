@@ -8,6 +8,49 @@ module Container_images = struct
     ; bots : string
     ; points : string
     }
+
+  let required_value field json ~fail =
+    match Yojson.Safe.Util.member field json with
+    | `String value ->
+        value
+    | _ ->
+        failwith fail
+
+  let optional_value field json ~default =
+    match Yojson.Safe.Util.member field json with
+    | `String value ->
+        value
+    | `Null ->
+        default
+    | _ ->
+        failwithf "%s image parse error\n" field ()
+
+  let mina_images path =
+    let json = Yojson.Safe.from_file path in
+    let mina = required_value "mina" json ~fail:"Must provide mina image" in
+    let archive_node =
+      optional_value "archive_node" json ~default:"archive_image_unused"
+    in
+    let user_agent =
+      optional_value "user_agent" json
+        ~default:"codaprotocol/coda-user-agent:0.1.5"
+    in
+    let bots =
+      optional_value "bots" json ~default:"minaprotocol/mina-bots:latest"
+    in
+    let points =
+      optional_value "points" json
+        ~default:"codaprotocol/coda-points-hack:32b.4"
+    in
+    { mina; archive_node; user_agent; bots; points }
+
+  let mk mina archive_node =
+    { mina
+    ; archive_node = Option.value archive_node ~default:"archive_image_unused"
+    ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
+    ; bots = "minaprotocol/mina-bots:latest"
+    ; points = "codaprotocol/coda-points-hack:32b.4"
+    }
 end
 
 module Test_Account = struct
@@ -16,10 +59,11 @@ module Test_Account = struct
     ; balance : string
     ; timing : Mina_base.Account_timing.t
     }
+  [@@deriving to_yojson]
 end
 
 module Block_producer_node = struct
-  type t = { node_name : string; account_name : string }
+  type t = { node_name : string; account_name : string } [@@deriving to_yojson]
 end
 
 module Snark_coordinator_node = struct
@@ -35,16 +79,12 @@ type constants =
 
 type t =
   { requires_graphql : bool
-        (* temporary flag to enable/disable graphql ingress deployments *)
-        (* testnet topography *)
   ; genesis_ledger : Test_Account.t list
   ; block_producers : Block_producer_node.t list
   ; snark_coordinator : Snark_coordinator_node.t option
   ; snark_worker_fee : string
   ; num_archive_nodes : int
-  ; log_precomputed_blocks : bool
-        (* ; num_plain_nodes : int  *)
-        (* blockchain constants *)
+  ; log_precomputed_blocks : bool (* blockchain constants *)
   ; proof_config : Runtime_config.Proof_keys.t
   ; k : int
   ; delta : int
@@ -52,6 +92,7 @@ type t =
   ; slots_per_sub_window : int
   ; txpool_max_size : int
   }
+[@@deriving to_yojson]
 
 let proof_config_default : Runtime_config.Proof_keys.t =
   { level = Some Full
@@ -67,13 +108,13 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   }
 
 let default =
-  { requires_graphql = false
+  { requires_graphql = true
   ; genesis_ledger = []
   ; block_producers = []
   ; snark_coordinator = None
   ; snark_worker_fee = "0.025"
   ; num_archive_nodes = 0
-  ; log_precomputed_blocks = false (* ; num_plain_nodes = 0 *)
+  ; log_precomputed_blocks = false
   ; proof_config = proof_config_default
   ; k = 20
   ; slots_per_epoch = 3 * 8 * 20
