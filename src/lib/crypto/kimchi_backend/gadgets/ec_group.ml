@@ -541,6 +541,9 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       external_checks delta_xs result_y curve.modulus
   in
+  Foreign_field.result_row
+    (module Circuit)
+    ~label:"Ec_group.expected_point_y" expected_point_y None ;
   (* Bounds 6: Left input (delta_xs) checked by (Bound 5).
    *           Right input is gadget output (checked by caller).
    *           Addition result (Py) is chained (no check required).
