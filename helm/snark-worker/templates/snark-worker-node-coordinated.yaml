@@ -1,21 +1,22 @@
-{{ range .Values.minaSnarkCoordinatorsConfig }}
+{{ range until ($.Values.httpCoordinatedSnarkersConfig.count | int) }}
+{{ $name := printf "%s%03d" $.Values.httpCoordinatedSnarkersConfig.namePrefix (add . 1) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .name }}
+  name: {{ $name }}
   labels:
-    app: {{ .name }}
+    app: {{ $name }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ .name }}
+      app: {{ $name }}
   template:
     metadata:
       labels:
-        app: {{ .name }}
+        app: {{ $name }}
         testnet: {{ $.Values.testnetName }}
-        role: snark-coordinator
+        role: snark-worker
         version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
         syncStatus: INIT
       annotations:
@@ -58,7 +59,12 @@ spec:
           requests:
             memory: {{ $.Values.mina.memRequest }}
             cpu: {{ $.Values.mina.cpuRequest }}
+        image: {{ $.Values.mina.image }}
       containers:
+      {{ include "sideCar.resources.containerSpec" (dict "resources" $.Values.resources) | nindent 6 }}
+      {{ include "sideCar.bpfDebugger.containerSpec" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
+      {{ include "sideCar.logs.containerSpec" (dict "logs" $.Values.logs "name" $name) | nindent 6 }}
+      {{ include "sideCar.internalTrace.containerSpec" (dict "internalTrace" $.Values.internalTrace "name" $name) | nindent 6 }}
       - name: mina
         resources:
           limits:
@@ -97,7 +103,7 @@ spec:
           {{- end }}
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
-          "-run-snark-coordinator", "$(CODA_SNARK_KEY)",
+          "-run-snark-worker", "$(CODA_SNARK_KEY)",
           "-snark-worker-fee", "$(CODA_SNARK_FEE)",
           "-work-selection", "$(WORK_SELECTION)",
           "-enable-peer-exchange", "true",
@@ -121,7 +127,7 @@ spec:
         ]
         env:
         - name: "RAYON_NUM_THREADS"
-          value: "7"
+          value: "4"
         - name: DAEMON_REST_PORT
           value: {{ $.Values.mina.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT
@@ -131,9 +137,9 @@ spec:
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CODA_SNARK_KEY
-          value: {{ .publicKey | trim | quote }}
+          value: {{ $.Values.publicKey | trim | quote }}
         - name: CODA_SNARK_FEE
-          value: {{ .snarkFee | default $.Values.snarkFee | quote }}
+          value: {{ $.Values.snarkFee | quote }}
         - name: DAEMON_POD_IP
           valueFrom:
             fieldRef:
@@ -141,30 +147,37 @@ spec:
         - name: DAEMON_EXTERNAL_PORT
           value: {{ $.Values.mina.ports.p2p | quote }}
         - name: WORK_SELECTION
-          value: {{ .workSelectionAlgorithm | default "seq" | quote }}
+          value: {{$.Values.workSelectionAlgorithm | quote }}
         - name: MINA_LIBP2P_PASS
           value: {{ $.Values.mina.privkeyPass | quote }}
+        {{ if $.Values.mina.optimized }}
+        - name: MINA_SKIP_REDUNDANT_SNARK_VERIFICATIONS
+          value: "1"
+        - name: MINA_PARTIAL_STATEMENT_HASH
+          value: "1"
+        {{ end -}}
         {{ include "sideCar.bpfDebugger.envVar" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 8 }}
+        - name: MINA_SNARK_COORDINATOR_URL
+          value: http://snarker-http-coordinator
         - name: MINA_ITN_GRAPHQL_PORT
-          value: {{ .itnGraphqlPort | quote }}
+          value: {{ $.Values.itn.itnGraphqlPort | quote }}
         - name: UPTIME_PRIVKEY_PASS
           value:
         ports:
         - name: client-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.mina.ports.client }}
         - name: graphql-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.mina.ports.graphql }}
         - name: metrics-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.mina.ports.metrics }}
         - name: external-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.mina.ports.p2p }}
-          # hostPort: {{ $.Values.mina.ports.p2p }}
-{{$name := $.Values.coordinatorName }}
-{{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
+          #hostPort: {{ $.Values.mina.ports.p2p }}
+{{ $data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.snarkCoordinator.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
@@ -174,20 +187,16 @@ spec:
         {{- end }}
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
+        - name: scripts
+          mountPath: "/scripts"
         {{- if $.Values.logs.enable }}
         - name: {{ template "sideCar.logs.minaLogsVolumeName" }}
           mountPath: "/root/.mina-config"
         {{- end }}
-        - name: scripts
-          mountPath: "/scripts"
         {{- if $.Values.itn.enable }}
         - name: actual-uptime-keys
           mountPath: /root/uptime-keys/
         {{- end }}
-      {{ include "sideCar.resources.containerSpec" (dict "resources" $.Values.resources) | nindent 6 }}
-      {{ include "sideCar.bpfDebugger.containerSpec" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
-      {{ include "sideCar.logs.containerSpec" (dict "logs" $.Values.logs "name" $name) | nindent 6 }}
-      {{ include "sideCar.internalTrace.containerSpec" (dict "internalTrace" $.Values.internalTrace "name" $name) | nindent 6 }}
       volumes:
       {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
@@ -208,7 +217,7 @@ spec:
       {{- if $.Values.itn.enable }}
       - name: uptime-keys
         secret:
-          secretName: {{ .name }}-uptime-key-secret
+          secretName: {{ $name }}-uptime-key-secret
           defaultMode: 256
           items:
           - key: key
@@ -219,27 +228,11 @@ spec:
         emptyDir: {}
       {{- end}}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
+
 ---
-{{- if $.Values.itn.enable }}
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ .name }}-itn-graphql
-spec:
-  type: NodePort
-  publishNotReadyAddresses: true
-  selector:
-    app: {{ .name }}
-  ports:
-  - name: http-graphql
-    protocol: TCP
-    port: {{ .itnGraphqlPort }}
-    targetPort: {{ .itnGraphqlPort }}
-    nodePort: {{ .itnGraphqlPort }}
-{{- end }}
-{{ include "sideCar.resources.service" (dict "name" .name "resources" $.Values.resources) }}
-{{ include "sideCar.bpfDebugger.service" (dict "name" .name "bpfDebugger" $.Values.bpfDebugger) }}
-{{ include "sideCar.logs.service" (dict "name" .name "logs" $.Values.logs) }}
-{{ include "sideCar.internalTrace.service" (dict "name" .name "internalTrace" $.Values.internalTrace) }}
+{{ include "sideCar.resources.service" (dict "name" $name "resources" $.Values.resources) }}
+{{ include "sideCar.bpfDebugger.service" (dict "name" $name "bpfDebugger" $.Values.bpfDebugger) }}
+{{ include "sideCar.logs.service" (dict "name" $name "logs" $.Values.logs) }}
+{{ include "sideCar.internalTrace.service" (dict "name" $name "internalTrace" $.Values.internalTrace) }}
 ---
 {{ end }}

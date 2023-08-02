@@ -1,6 +1,6 @@
 {{- if $.Values.mina.exposeGraphql }}
-{{ range until ($.Values.snarkWorkersConfig.count | int) }}
-{{ $name := printf "%s%03d" $.Values.snarkWorkersConfig.namePrefix (add . 1) }}
+{{ range until ($.Values.httpCoordinatedSnarkersConfig.count | int) }}
+{{ $name := printf "%s%03d" $.Values.httpCoordinatedSnarkersConfig.namePrefix (add . 1) }}
 ---
 apiVersion: v1
 kind: Service

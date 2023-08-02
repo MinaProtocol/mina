@@ -1,0 +1,52 @@
+{{ if .Values.httpCoordinatedSnarkersConfig.count }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snarker-http-coordinator
+  labels:
+    app: snarker-http-coordinator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: snarker-http-coordinator
+  template:
+    metadata:
+      labels:
+        app: snarker-http-coordinator
+        testnet: {{ $.Values.testnetName }}
+        role: snark-http-coordinator
+        version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
+        component: snarker-http-coordinator
+    spec:
+      containers:
+      - name: main
+        resources:
+          limits:
+            memory: 2G
+            cpu: 1
+          requests:
+            memory: 2G
+            cpu: 1
+        image: {{ $.Values.mina.snarkCoordinatorImage | default "binier/mina-snark-worker-rs:latest" }}
+        command: ["sh", "-c"]
+        args:
+          - |
+            exec /snark-coordinator-rs/target/release/snark-coordinator-rs --max-key-len 9999
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: snarker-http-coordinator
+spec:
+  type: ClusterIP
+  selector:
+    app: snarker-http-coordinator
+  ports:
+  - name: tcp-daemon-rpc
+    port: 80
+    targetPort: 8080
+
+{{ end }}

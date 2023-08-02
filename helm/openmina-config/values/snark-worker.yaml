@@ -7,3 +7,9 @@ healthcheck:
   failureThreshold: 90
   periodSeconds: 10
   initialDelaySeconds: 60
+
+workerCpuRequest: 4
+workerMemRequest: 6Gi
+
+coordinatorName: snarker001
+workerReplicas: 8
