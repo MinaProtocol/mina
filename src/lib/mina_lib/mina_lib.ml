@@ -563,7 +563,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
           ()
     in
     let log_bootstrap_error_and_restart _tm =
-      [%log error] "Daemon has been in bootstrap for %0.0f minutes, restarting"
+      [%log error] "Daemon has been in bootstrap for %0.0f minutes"
         bootstrap_timeout_min ;
       raise Bootstrap_stuck_shutdown
     in
