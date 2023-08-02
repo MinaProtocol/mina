@@ -406,57 +406,65 @@ module Network_deployed = struct
 
   exception Invalid_keypair of Yojson.Safe.t
 
-  type t = node_info Map.t [@@deriving eq]
-
-  and node_info =
+  type node_info =
     { node_type : Node_type.t
     ; network_keypair : Network_keypair.t option
-    ; password : string
-    ; graphql_uri : string
+    ; graphql_uri : string option
     }
-  [@@deriving yojson]
+  [@@deriving to_yojson]
 
-  let network_keypair_of_yojson (sk : Yojson.Safe.t) =
-    match sk with
+  let equal_node_info m n =
+    let node_type = Node_type.equal m.node_type n.node_type in
+    let network_keypair =
+      Option.equal
+        (fun (m : Network_keypair.t) n ->
+          Public_key.equal m.keypair.public_key n.keypair.public_key
+          && String.equal m.public_key n.public_key
+          && String.equal m.privkey_password n.privkey_password
+          && String.equal m.keypair_name n.keypair_name )
+        m.network_keypair n.network_keypair
+    in
+    let graphql = Option.equal String.equal m.graphql_uri n.graphql_uri in
+    node_type && network_keypair && graphql
+
+  type t = node_info Map.t [@@deriving eq]
+
+  let network_keypair_of_yojson node_id (private_key : Yojson.Safe.t) =
+    match private_key with
     | `Null ->
         None
-    | `Assoc
-        [ ("private_key", `String private_key)
-        ; ("privkey_password", `String privkey_password)
-        ; ("keypair_name", `String keypair_name)
-        ] ->
+    | `String private_key ->
+        let keypair_name = node_id ^ "_key" in
         let keypair =
           Keypair.of_private_key_exn
           @@ Private_key.of_base58_check_exn private_key
         in
-        Some
-          Network_keypair.
-            { keypair
-            ; keypair_name
-            ; privkey_password
-            ; private_key
-            ; public_key =
-                Public_key.to_bigstring keypair.public_key
-                |> Bigstring.to_string
-            }
+        Some (Network_keypair.create_network_keypair ~keypair_name ~keypair)
     | _ ->
-        raise @@ Invalid_keypair sk
+        raise @@ Invalid_keypair private_key
+
+  let graphql_uri_of_yojson (uri : Yojson.Safe.t) =
+    match uri with
+    | `Null ->
+        None
+    | `String uri ->
+        Some uri
+    | _ ->
+        raise @@ Invalid_argument (Yojson.Safe.to_string uri)
 
   let of_yojson =
     let f accum = function
       | ( node_id
         , `Assoc
             [ ("node_type", `String nt)
-            ; ("network_keypair", keypair)
-            ; ("password", `String password)
-            ; ("graphql_uri", `String graphql_uri)
+            ; ("private_key", private_key)
+            ; ("graphql_uri", graphql_uri)
             ] ) ->
           Map.set accum ~key:node_id
             ~data:
               { node_type = Node_type.of_string nt
-              ; network_keypair = network_keypair_of_yojson keypair
-              ; password
-              ; graphql_uri
+              ; network_keypair = network_keypair_of_yojson node_id private_key
+              ; graphql_uri = graphql_uri_of_yojson graphql_uri
               }
       | node_id, t ->
           raise @@ Invalid_entry (node_id, t)

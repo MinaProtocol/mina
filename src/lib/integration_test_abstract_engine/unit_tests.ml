@@ -17,7 +17,7 @@ module Test_values = struct
 
   let start_node_raw_cmd =
     "minimina start-node --node-id {{node_id}} --fresh-state {{fresh_state}} \
-     --commit-sha {{commit_sha}}"
+     --git-commit {{git_commit}}"
 
   let deploy_network_action =
     sprintf
@@ -41,7 +41,7 @@ module Test_values = struct
         "args": {
           "node_id": "string",
           "fresh_state": "bool",
-          "commit_sha": "string"
+          "git_commit": "string"
         },
         "command": "%s"
       }
@@ -88,7 +88,7 @@ module Helper_tests = struct
     let args =
       [ ("node_id", `String "node0")
       ; ("fresh_state", `Bool true)
-      ; ("commit_sha", `String "0123456abcdef")
+      ; ("git_commit", `String "0123456abcdef")
       ]
     in
     assert (validate_args ~args ~action)
@@ -183,8 +183,6 @@ module Run_command_tests = struct
 end
 
 module Request_tests = struct
-  let ( = ) = String.equal
-
   let%test_unit "Create network request" =
     let constants : Test_config.constants =
       { constraints = Genesis_constants.Constraint_constants.compiled
@@ -194,12 +192,47 @@ module Request_tests = struct
     let network_config : Network_config.t' =
       { debug_arg = true; genesis_keypairs = Core.String.Map.empty; constants }
     in
-    let result =
-      Network_config.t'_to_yojson network_config |> Yojson.Safe.to_string
+    let expect =
+      {|
+        { "debug_arg":true,
+          "genesis_keypairs":{},
+          "constants":{
+            "constraints":{
+              "sub_windows_per_window":11,
+              "ledger_depth":35,
+              "work_delay":2,
+              "block_window_duration_ms":180000,
+              "transaction_capacity_log_2":7,
+              "pending_coinbase_depth":5,
+              "coinbase_amount":"720000000000",
+              "supercharged_coinbase_factor":1,
+              "account_creation_fee":"1",
+              "fork":null
+            },
+            "genesis":{
+              "protocol":{
+                "k":290,
+                "slots_per_epoch":7140,
+                "slots_per_sub_window":7,
+                "delta":0,
+                "genesis_state_timestamp":"2020-09-16 10:15:00.000000Z"
+              },
+              "txpool_max_size":3000,
+              "num_accounts":null,
+              "zkapp_proof_update_cost":10.26,
+              "zkapp_signed_single_update_cost":9.140000000000001,
+              "zkapp_signed_pair_update_cost":10.08,
+              "zkapp_transaction_cost_limit":69.45,
+              "max_event_elements":100,
+              "max_action_elements":100
+            }
+          }
+        }
+      |}
+      |> Yojson.Safe.from_string
     in
     assert (
-      result
-      = {|{"debug_arg":true,"genesis_keypairs":{},"constants":{"constraints":{"sub_windows_per_window":11,"ledger_depth":35,"work_delay":2,"block_window_duration_ms":180000,"transaction_capacity_log_2":7,"pending_coinbase_depth":5,"coinbase_amount":"720000000000","supercharged_coinbase_factor":1,"account_creation_fee":"1","fork":null},"genesis":{"protocol":{"k":290,"slots_per_epoch":7140,"slots_per_sub_window":7,"delta":0,"genesis_state_timestamp":"2020-09-16 10:15:00.000000Z"},"txpool_max_size":3000,"num_accounts":null,"zkapp_proof_update_cost":10.26,"zkapp_signed_single_update_cost":9.140000000000001,"zkapp_signed_pair_update_cost":10.08,"zkapp_transaction_cost_limit":69.45,"max_event_elements":100,"max_action_elements":100}}}|} )
+      Yojson.Safe.equal expect @@ Network_config.t'_to_yojson network_config )
 end
 
 module Parse_output_tests = struct
@@ -211,30 +244,97 @@ module Parse_output_tests = struct
     in
     assert (equal result { network_id = "network0" })
 
-  (* TODO: fix *)
-  (* let%test_unit "parse network deployed response" =
-     let open Node_type in
-     let open Network_deployed in
-     let result =
-       {|
-       { "node0": ("Archive_node", "gql0")
-       , "node1": ("Block_producer_node", "gql1")
-       , "node2": ("Seed_node", "gql2")
-       , "node3": ("Snark_worker", null)
-       , "node4": ("Snark_coordinator", "gql4")
-       }
-     |}
-       |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith
-     in
-     assert (
-       equal result
-       @@ of_alist_exn
-            [ ("node0", (Archive_node, Some "gql0"))
-            ; ("node1", (Block_producer_node, Some "gql1"))
-            ; ("node2", (Seed_node, Some "gql2"))
-            ; ("node3", (Snark_worker, None))
-            ; ("node4", (Snark_coordinator, Some "gql4"))
-            ] ) *)
+  let%test_unit "parse network deployed response" =
+    let open Node_type in
+    let open Network_deployed in
+    let result =
+      {|
+        { "node0": {
+            "node_type":"Archive_node",
+            "private_key":null,
+            "graphql_uri":"gql_archive"
+          },
+          "node1": {
+            "node_type":"Block_producer_node",
+            "private_key":null,
+            "graphql_uri":"gql_bp"
+          },
+          "node2": {
+            "node_type":"Seed_node",
+            "private_key":"EKEQpDAjj7dP3j7fQy4qBU7Kxns85wwq5xMn4zxdyQm83pEWzQ62",
+            "graphql_uri":"gql_seed"
+          },
+          "node3": {
+            "node_type":"Snark_worker",
+            "private_key":null,
+            "graphql_uri":"gql_snark"
+          },
+          "node4": {
+            "node_type":"Snark_coordinator",
+            "private_key":null,
+            "graphql_uri":null
+          }
+        }
+      |}
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith
+    in
+    let seed_keypair =
+      let open Signature_lib in
+      let keypair =
+        let private_key =
+          Private_key.of_base58_check_exn
+            "EKEQpDAjj7dP3j7fQy4qBU7Kxns85wwq5xMn4zxdyQm83pEWzQ62"
+        in
+        let public_key = Public_key.of_private_key_exn private_key in
+        Keypair.{ public_key; private_key }
+      in
+      Network_keypair.create_network_keypair ~keypair_name:"node2_key" ~keypair
+    in
+    let archive =
+      { node_type = Archive_node
+      ; network_keypair = None
+      ; graphql_uri = Some "gql_archive"
+      }
+    in
+    let bp =
+      { node_type = Block_producer_node
+      ; network_keypair = None
+      ; graphql_uri = Some "gql_bp"
+      }
+    in
+    let seed =
+      { node_type = Seed_node
+      ; network_keypair = Some seed_keypair
+      ; graphql_uri = Some "gql_seed"
+      }
+    in
+    let worker =
+      { node_type = Snark_worker
+      ; network_keypair = None
+      ; graphql_uri = Some "gql_snark"
+      }
+    in
+    let coordinator =
+      { node_type = Snark_coordinator
+      ; network_keypair = None
+      ; graphql_uri = None
+      }
+    in
+    let expect =
+      of_alist_exn
+        [ ("node0", archive)
+        ; ("node1", bp)
+        ; ("node2", seed)
+        ; ("node3", worker)
+        ; ("node4", coordinator)
+        ]
+    in
+    assert (
+      (* print_endline "=== Result ===" ;
+         Map.iter result ~f:(fun ni -> node_info_to_yojson ni |> Yojson.Safe.to_string |> print_endline) ;
+         print_endline "\n\n=== Expect ===" ;
+         Map.iter expect ~f:(fun ni -> node_info_to_yojson ni |> Yojson.Safe.to_string |> print_endline) ; *)
+      equal result expect )
 
   let%test_unit "parse node started" =
     let open Node_started in
