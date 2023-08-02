@@ -795,6 +795,9 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
                  ; right_input_lo = right_input0
                  ; right_input_mi = right_input1
                  ; right_input_hi = right_input2
+                 ; result_lo = result0
+                 ; result_mi = result1
+                 ; result_hi = result2
                  ; field_overflow
                  ; carry
                  ; foreign_field_modulus0
@@ -2011,7 +2014,9 @@ let%test_unit "foreign_field arithmetics gadgets" =
            "80000000000000000000000000000000000000000000000000000000000000d0" )
         secp256k1_modulus
     in
+
     let _cs = test_add ~cs secp256k1_max secp256k1_max secp256k1_modulus in
+
     let _cs = test_add ~cs pallas_max pallas_max secp256k1_modulus in
     let _cs = test_add ~cs vesta_modulus pallas_modulus secp256k1_modulus in
     let cs = test_add Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
@@ -2057,6 +2062,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
         ]
         [ Add; Sub; Sub; Add ] vesta_modulus
     in
+
     let _cs =
       test_add_chain ~cs
         [ vesta_max

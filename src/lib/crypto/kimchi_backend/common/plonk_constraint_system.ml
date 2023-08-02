@@ -239,6 +239,9 @@ module Plonk_constraint = struct
           ; out_1 : 'v
           ; out_2 : 'v
           ; out_3 : 'v
+          ; next_in1 : 'v
+          ; next_in2 : 'v
+          ; next_out : 'v
           }
       | ForeignFieldAdd of
           { left_input_lo : 'v
@@ -247,6 +250,9 @@ module Plonk_constraint = struct
           ; right_input_lo : 'v
           ; right_input_mi : 'v
           ; right_input_hi : 'v
+          ; result_lo : 'v
+          ; result_mi : 'v
+          ; result_hi : 'v
           ; field_overflow : 'v
           ; carry : 'v
           ; (* Coefficients *) foreign_field_modulus0 : 'f
@@ -471,6 +477,9 @@ module Plonk_constraint = struct
           ; out_1
           ; out_2
           ; out_3
+          ; next_in1
+          ; next_in2
+          ; next_out
           } ->
           Xor
             { in1 = f in1
@@ -488,6 +497,9 @@ module Plonk_constraint = struct
             ; out_1 = f out_1
             ; out_2 = f out_2
             ; out_3 = f out_3
+            ; next_in1 = f next_in1
+            ; next_in2 = f next_in2
+            ; next_out = f next_out
             }
       | ForeignFieldAdd
           { left_input_lo
@@ -496,6 +508,9 @@ module Plonk_constraint = struct
           ; right_input_lo
           ; right_input_mi
           ; right_input_hi
+          ; result_lo
+          ; result_mi
+          ; result_hi
           ; field_overflow
           ; carry
           ; (* Coefficients *) foreign_field_modulus0
@@ -510,6 +525,9 @@ module Plonk_constraint = struct
             ; right_input_lo = f right_input_lo
             ; right_input_mi = f right_input_mi
             ; right_input_hi = f right_input_hi
+            ; result_lo = f result_lo
+            ; result_mi = f result_mi
+            ; result_hi = f result_hi
             ; field_overflow = f field_overflow
             ; carry = f carry
             ; (* Coefficients *) foreign_field_modulus0
@@ -724,6 +742,11 @@ type ('f, 'rust_gates) t =
   ; (* Queue (of size 1) of generic gate. *)
     mutable pending_generic_gate :
       (V.t option * V.t option * V.t option * 'f array) option
+  ; (* Optional witness requirements on the current row.
+         If a cell is None, then there's no requirement for it.
+         Otherwise, then the cell's witness value must be equal to the value specified.
+    *)
+    mutable required_witness_row : V.t option array
   ; (* V.t's corresponding to constant values. We reuse them so we don't need to
        use a fresh generic constraint each time to create a constant.
     *)
@@ -924,6 +947,7 @@ end = struct
     ; equivalence_classes = V.Table.create ()
     ; auxiliary_input_size = 0
     ; pending_generic_gate = None
+    ; required_witness_row = Array.create ~len:Constants.columns None
     ; cached_constants = Hashtbl.create (module Fp)
     ; union_finds = V.Table.create ()
     }
@@ -967,6 +991,10 @@ end = struct
   (** Same as wire', except that the row must be given relatively to the end of the public-input rows. *)
   let wire sys key row col = wire' sys key (Row.After_public_input row) col
 
+  (** Set the next row witness data requirements *)
+  let set_next_row_witness_requirement sys (vars : V.t option array) =
+    sys.required_witness_row <- vars
+
   (** Adds a row/gate/constraint to a constraint system `sys`. *)
   let add_row sys (vars : V.t option array) kind coeffs =
     match sys.gates with
@@ -986,8 +1014,22 @@ end = struct
         sys.gates <- Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
         (* Increment row. *)
         sys.next_row <- sys.next_row + 1 ;
+
+        (* Check consistency of candidate row against row requirements *)
+        Array.iteri sys.required_witness_row ~f:(fun col value ->
+            match value with
+            | None ->
+                ()
+            | Some target ->
+                if Stdlib.(vars.(col) <> value) then (
+                  printf "Invalid witness value in column %d\n" col ;
+                  assert false ) ) ;
+
         (* Add to row. *)
-        sys.rows_rev <- vars :: sys.rows_rev
+        sys.rows_rev <- vars :: sys.rows_rev ;
+
+        (* Reset witness requirements for the next row. *)
+        sys.required_witness_row <- Array.create ~len:Constants.columns None
 
   (** Adds zero-knowledgeness to the gates/rows,
       and convert into Rust type [Gates.t].
@@ -1833,12 +1875,15 @@ end = struct
           ; out_1
           ; out_2
           ; out_3
+          ; next_in1
+          ; next_in2
+          ; next_out
           } ) ->
         (* | Column |          Curr    | Next (gadget responsibility) |
            | ------ | ---------------- | ---------------------------- |
-           |      0 | copy     `in1`   | copy     `in1'`              |
-           |      1 | copy     `in2`   | copy     `in2'`              |
-           |      2 | copy     `out`   | copy     `out'`              |
+           |      0 | copy     `in1`   | copy `in1'`                  |
+           |      1 | copy     `in2`   | copy `in2'`                  |
+           |      2 | copy     `out`   | copy `out'`                  |
            |      3 | plookup0 `in1_0` |                              |
            |      4 | plookup1 `in1_1` |                              |
            |      5 | plookup2 `in1_2` |                              |
@@ -1870,10 +1915,30 @@ end = struct
            ; Some (reduce_to_v out_3)
           |]
         in
+        (* Next row *)
+        let next_row =
+          [| Some (reduce_to_v next_in1)
+           ; Some (reduce_to_v next_in2)
+           ; Some (reduce_to_v next_out)
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+          |]
+        in
         (* The raw gate after a Xor16 gate is a Const to check that all values are zero.
            For that, the first coefficient is 1 and the rest will be zero.
            This will be included in the gadget for a chain of Xors, not here.*)
-        add_row sys curr_row Xor16 [||]
+        add_row sys curr_row Xor16 [||] ;
+        set_next_row_witness_requirement sys next_row
     | Plonk_constraint.T
         (ForeignFieldAdd
           { left_input_lo
@@ -1882,6 +1947,9 @@ end = struct
           ; right_input_lo
           ; right_input_mi
           ; right_input_hi
+          ; result_lo
+          ; result_mi
+          ; result_hi
           ; field_overflow
           ; carry
           ; (* Coefficients *) foreign_field_modulus0
@@ -1910,7 +1978,7 @@ end = struct
         //! |     13 |                          |                                |
         //! |     14 |                          |                                |
         *)
-        let vars =
+        let curr =
           [| (* Current row *) Some (reduce_to_v left_input_lo)
            ; Some (reduce_to_v left_input_mi)
            ; Some (reduce_to_v left_input_hi)
@@ -1928,12 +1996,32 @@ end = struct
            ; None
           |]
         in
-        add_row sys vars ForeignFieldAdd
+        (* Next row *)
+        let next =
+          [| Some (reduce_to_v result_lo)
+           ; Some (reduce_to_v result_mi)
+           ; Some (reduce_to_v result_hi)
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+          |]
+        in
+        add_row sys curr ForeignFieldAdd
           [| foreign_field_modulus0
            ; foreign_field_modulus1
            ; foreign_field_modulus2
            ; sign
-          |]
+          |] ;
+        set_next_row_witness_requirement sys next
     | Plonk_constraint.T
         (ForeignFieldMul
           { left_input0
@@ -2064,9 +2152,9 @@ end = struct
         //! |      5 |      `bound_limb2`  | `shifted_limb2`  |  `excess_limb2` |        `word_limb2`  |
         //! |      6 |      `bound_limb3`  | `shifted_limb3`  |  `excess_limb3` |        `word_limb3`  |
         //! |      7 |      `bound_crumb0` | `shifted_crumb0` | `excess_crumb0` |       `word_crumb0`  |
-        //! |      8 |      `bound_crumb1` | `shifted_crumb1` | `excess_crumb1` |       `word_crumb1`  | 
-        //! |      9 |      `bound_crumb2` | `shifted_crumb2` | `excess_crumb2` |       `word_crumb2`  | 
-        //! |     10 |      `bound_crumb3` | `shifted_crumb3` | `excess_crumb3` |       `word_crumb3`  | 
+        //! |      8 |      `bound_crumb1` | `shifted_crumb1` | `excess_crumb1` |       `word_crumb1`  |
+        //! |      9 |      `bound_crumb2` | `shifted_crumb2` | `excess_crumb2` |       `word_crumb2`  |
+        //! |     10 |      `bound_crumb3` | `shifted_crumb3` | `excess_crumb3` |       `word_crumb3`  |
         //! |     11 |      `bound_crumb4` | `shifted_crumb4` | `excess_crumb4` |       `word_crumb4`  |
         //! |     12 |      `bound_crumb5` | `shifted_crumb5` | `excess_crumb5` |       `word_crumb5`  |
         //! |     13 |      `bound_crumb6` | `shifted_crumb6` | `excess_crumb6` |       `word_crumb6`  |

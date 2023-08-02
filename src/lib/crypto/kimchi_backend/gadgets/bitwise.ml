@@ -297,6 +297,16 @@ let bxor (type f)
       let out_2 = of_bits out second third in
       let out_3 = of_bits out third fourth in
 
+      let next_in1 =
+        as_prover_next_var (module Circuit) in1 in1_0 in1_1 in1_2 in1_3 len_xor
+      in
+      let next_in2 =
+        as_prover_next_var (module Circuit) in2 in2_0 in2_1 in2_2 in2_3 len_xor
+      in
+      let next_out =
+        as_prover_next_var (module Circuit) out out_0 out_1 out_2 out_3 len_xor
+      in
+
       (* If length is more than 0, add the Xor gate *)
       with_label "xor_gate" (fun () ->
           (* Set up Xor gate *)
@@ -320,18 +330,11 @@ let bxor (type f)
                      ; out_1
                      ; out_2
                      ; out_3
+                     ; next_in1
+                     ; next_in2
+                     ; next_out
                      } )
             } ) ;
-
-      let next_in1 =
-        as_prover_next_var (module Circuit) in1 in1_0 in1_1 in1_2 in1_3 len_xor
-      in
-      let next_in2 =
-        as_prover_next_var (module Circuit) in2 in2_0 in2_1 in2_2 in2_3 len_xor
-      in
-      let next_out =
-        as_prover_next_var (module Circuit) out out_0 out_1 out_2 out_3 len_xor
-      in
 
       (* Next length is 4*n less bits *)
       let next_length = length - (4 * len_xor) in
