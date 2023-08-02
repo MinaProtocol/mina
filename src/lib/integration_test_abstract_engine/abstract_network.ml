@@ -7,26 +7,17 @@ open Ci_interaction
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
 
-type config =
-  { testnet_name : string
-  ; cluster : string
-  ; namespace : string
-  ; graphql_enabled : bool
-  ; network_id : Network_id.t
-  ; ingress_uri : string
-  ; current_commit_sha : string
-  }
-
 (* [config_path] is instantiated when command line args are parsed *)
 let config_path = ref ""
 
 module Node = struct
   type t =
-    { node_id : string
+    { node_id : Node_id.t
+    ; network_id : Network_id.t
     ; network_keypair : Network_keypair.t option
-    ; config : config
     ; node_type : Node_type.t
     ; password : string
+    ; graphql_uri : string
     }
 
   let id { node_id; _ } = node_id
@@ -34,30 +25,27 @@ module Node = struct
   let network_keypair { network_keypair; _ } = network_keypair
 
   (* TODO: remove *)
-  let base_kube_args t = [ "--cluster"; t.cluster; "--namespace"; t.namespace ]
+  let[@warning "-27"] get_logs_in_container ?container_id { node_id; _ } =
+    (* let container_id = Option.value container_id ~default:"" in
+       let%bind cwd = Unix.getcwd () in
+       Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "kubectl"
+         (base_kube_args config @ [ "logs"; "-c"; container_id; node_id ]) *)
+    failwith "get_logs_in_container"
 
-  (* TODO: remove *)
-  let get_logs_in_container ?container_id { node_id; config; _ } =
-    let container_id = Option.value container_id ~default:"" in
-    let%bind cwd = Unix.getcwd () in
-    Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "kubectl"
-      (base_kube_args config @ [ "logs"; "-c"; container_id; node_id ])
-
-  let start ?commit_sha ~fresh_state t : unit Malleable_error.t =
+  let start ?(git_commit = Mina_version.commit_id_short) ~fresh_state t :
+      unit Malleable_error.t =
     try
-      let commit_sha =
-        Option.value commit_sha ~default:t.config.current_commit_sha
-      in
       let args =
-        [ ("node_id", `String (id t))
+        [ ("node_id", `String t.node_id)
         ; ("fresh_state", `Bool fresh_state)
-        ; ("commit_sha", `String commit_sha)
+        ; ("git_commit", `String git_commit)
         ]
       in
       let%bind () =
         match%map run_command ~config:!config_path ~args "start_node" with
-        | Ok (Response.Node_started _) ->
-            ()
+        | Ok output ->
+            Yojson.Safe.from_string output
+            |> Node_started.of_yojson |> Result.ok_or_failwith |> ignore
         | _ ->
             failwith "invalid node started response"
       in
@@ -66,11 +54,12 @@ module Node = struct
 
   let stop t =
     try
-      let args = [ ("node_id", `String (id t)) ] in
+      let args = [ ("node_id", `String t.node_id) ] in
       let%bind () =
         match%map run_command ~config:!config_path ~args "stop_node" with
-        | Ok (Response.Node_stopped _) ->
-            ()
+        | Ok output ->
+            Yojson.Safe.from_string output
+            |> Node_stopped.of_yojson |> Result.ok_or_failwith |> ignore
         | _ ->
             failwith "invalid node stopped response"
       in
@@ -78,7 +67,7 @@ module Node = struct
     with Failure err -> Malleable_error.hard_error_string err
 
   let logger_metadata node =
-    [ ("namespace", `String node.config.namespace)
+    [ ("network_id", `String node.network_id)
     ; ("node_id", `String node.node_id)
     ]
 
@@ -87,11 +76,8 @@ module Node = struct
   module Graphql = struct
     (* TODO: fix *)
     let ingress_uri node =
-      let host =
-        sprintf "%s.%s" node.config.testnet_name node.config.ingress_uri
-      in
-      let path = sprintf "/%s/graphql" node.node_id in
-      Uri.make ~scheme:"http" ~host ~path ~port:80 ()
+      let path = sprintf "/%s/graphql" node.graphql_uri in
+      Uri.make ~scheme:"http" ~path ~port:80 ()
 
     module Client = Graphql_lib.Client.Make (struct
       let preprocess_variables_string = Fn.id
@@ -324,56 +310,50 @@ module Node = struct
   let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
       ?(initial_delay_sec = 0.) ~logger ~node ~query_name query_obj =
     let open Deferred.Let_syntax in
-    if not node.config.graphql_enabled then
-      Deferred.Or_error.error_string
-        "graphql is not enabled (hint: set `requires_graphql = true` in the \
-         test config)"
-    else
-      let uri = Graphql.ingress_uri node in
-      let metadata =
-        [ ("query", `String query_name)
-        ; ("uri", `String (Uri.to_string uri))
-        ; ("init_delay", `Float initial_delay_sec)
-        ]
-      in
-      [%log info]
-        "Attempting to send GraphQL request \"$query\" to \"$uri\" after \
-         $init_delay sec"
-        ~metadata ;
-      let rec retry n =
-        if n <= 0 then (
-          [%log error]
-            "GraphQL request \"$query\" to \"$uri\" failed too many times"
-            ~metadata ;
-          Deferred.Or_error.errorf
-            "GraphQL \"%s\" to \"%s\" request failed too many times" query_name
-            (Uri.to_string uri) )
-        else
-          match%bind Graphql.Client.query query_obj uri with
-          | Ok result ->
-              [%log info] "GraphQL request \"$query\" to \"$uri\" succeeded"
-                ~metadata ;
-              Deferred.Or_error.return result
-          | Error (`Failed_request err_string) ->
-              [%log warn]
-                "GraphQL request \"$query\" to \"$uri\" failed: \"$error\" \
-                 ($num_tries attempts left)"
-                ~metadata:
-                  ( metadata
-                  @ [ ("error", `String err_string)
-                    ; ("num_tries", `Int (n - 1))
-                    ] ) ;
-              let%bind () = after (Time.Span.of_sec retry_delay_sec) in
-              retry (n - 1)
-          | Error (`Graphql_error err_string) ->
-              [%log error]
-                "GraphQL request \"$query\" to \"$uri\" returned an error: \
-                 \"$error\" (this is a graphql error so not retrying)"
-                ~metadata:(("error", `String err_string) :: metadata) ;
-              Deferred.Or_error.error_string err_string
-      in
-      let%bind () = after (Time.Span.of_sec initial_delay_sec) in
-      retry num_tries
+    let uri = Graphql.ingress_uri node in
+    let metadata =
+      [ ("query", `String query_name)
+      ; ("uri", `String (Uri.to_string uri))
+      ; ("init_delay", `Float initial_delay_sec)
+      ]
+    in
+    [%log info]
+      "Attempting to send GraphQL request \"$query\" to \"$uri\" after \
+       $init_delay sec"
+      ~metadata ;
+    let rec retry n =
+      if n <= 0 then (
+        [%log error]
+          "GraphQL request \"$query\" to \"$uri\" failed too many times"
+          ~metadata ;
+        Deferred.Or_error.errorf
+          "GraphQL \"%s\" to \"%s\" request failed too many times" query_name
+          (Uri.to_string uri) )
+      else
+        match%bind Graphql.Client.query query_obj uri with
+        | Ok result ->
+            [%log info] "GraphQL request \"$query\" to \"$uri\" succeeded"
+              ~metadata ;
+            Deferred.Or_error.return result
+        | Error (`Failed_request err_string) ->
+            [%log warn]
+              "GraphQL request \"$query\" to \"$uri\" failed: \"$error\" \
+               ($num_tries attempts left)"
+              ~metadata:
+                ( metadata
+                @ [ ("error", `String err_string); ("num_tries", `Int (n - 1)) ]
+                ) ;
+            let%bind () = after (Time.Span.of_sec retry_delay_sec) in
+            retry (n - 1)
+        | Error (`Graphql_error err_string) ->
+            [%log error]
+              "GraphQL request \"$query\" to \"$uri\" returned an error: \
+               \"$error\" (this is a graphql error so not retrying)"
+              ~metadata:(("error", `String err_string) :: metadata) ;
+            Deferred.Or_error.error_string err_string
+    in
+    let%bind () = after (Time.Span.of_sec initial_delay_sec) in
+    retry num_tries
 
   let get_peer_ids ~logger t =
     let open Deferred.Or_error.Let_syntax in
@@ -745,9 +725,7 @@ module Node = struct
       ~(zkapp_commands : Mina_base.Zkapp_command.t list) =
     [%log info] "Sending zkapp transactions"
       ~metadata:
-        [ ("namespace", `String t.config.namespace)
-        ; ("pod_id", `String (id t))
-        ] ;
+        [ ("network_id", `String t.network_id); ("node_id", `String t.node_id) ] ;
     let open Deferred.Or_error.Let_syntax in
     let zkapp_commands_json =
       List.map zkapp_commands ~f:(fun zkapp_command ->
@@ -797,8 +775,8 @@ module Node = struct
       ~(pk : Signature_lib.Public_key.Compressed.t) =
     [%log info] "Retrieving zkapp_commands from transaction pool"
       ~metadata:
-        [ ("namespace", `String t.config.namespace)
-        ; ("pod_id", `String (id t))
+        [ ("network_id", `String t.network_id)
+        ; ("node_id", `String t.node_id)
         ; ("pub_key", Signature_lib.Public_key.Compressed.to_yojson pk)
         ] ;
     let open Deferred.Or_error.Let_syntax in
@@ -819,8 +797,8 @@ module Node = struct
     in
     [%log info] "Retrieved zkapp_commands from transaction pool"
       ~metadata:
-        [ ("namespace", `String t.config.namespace)
-        ; ("pod_id", `String (id t))
+        [ ("network_id", `String t.network_id)
+        ; ("node_id", `String t.node_id)
         ; ( "transaction ids"
           , `List (List.map ~f:(fun t -> `String t) transaction_ids) )
         ] ;
@@ -1021,74 +999,81 @@ module Node = struct
         "Node is not currently capturing structured log messages"
 
   let dump_archive_data ~logger (t : t) ~data_file =
+    let args = [ ("node_id", `String t.node_id) ] in
     if Node_type.(equal t.node_type Archive_node) then
-      let args = [ ("node_id", `String (id t)) ] in
       try
-        let%bind data =
+        let%bind dump =
           match%map
             run_command ~config:!config_path ~args "dump_archive_data"
           with
-          | Ok (Response.Archive_data_dump (_, logs)) ->
-              logs
-          | _ ->
-              failwith "invalid archive dump data response"
+          | Ok output ->
+              Yojson.Safe.from_string output
+              |> Archive_data_dump.of_yojson |> Result.ok_or_failwith
+          | Error err ->
+              raise @@ Archive_data_dump.Invalid_response err
         in
         [%log info] "Dumping archive data to file %s" data_file ;
         Malleable_error.return
         @@ Out_channel.with_file data_file ~f:(fun out_ch ->
-               Out_channel.output_string out_ch data )
+               Out_channel.output_string out_ch dump.data )
       with Failure err -> Malleable_error.hard_error_string err
     else
+      let node_type = Node_type.to_string t.node_type in
+      [%log error] "Node $node_id cannot dump archive data as a $node_type"
+        ~metadata:(("node_type", `String node_type) :: args) ;
       Malleable_error.hard_error_string
-      @@ sprintf "Node %s of type %s cannot dump archive data" (id t)
-           (Node_type.to_string t.node_type)
+      @@ sprintf "Node %s of type %s cannot dump archive data" t.node_id
+           node_type
 
   let run_replayer ~logger (t : t) =
     [%log info] "Running replayer on archived data node: %s" t.node_id ;
-    let args = [ ("node_id", `String (id t)) ] in
+    let args = [ ("node_id", `String t.node_id) ] in
     try
-      let%bind output =
+      let%bind replay =
         match%map run_command ~config:!config_path ~args "run_replayer" with
-        | Ok (Response.Replayer_run (_, output)) ->
-            output
-        | _ ->
-            failwith "invalid run replayer response"
+        | Ok output ->
+            Yojson.Safe.from_string output
+            |> Replayer_run.of_yojson |> Result.ok_or_failwith
+        | Error err ->
+            raise @@ Replayer_run.Invalid_response err
       in
-      Malleable_error.return output
+      Malleable_error.return replay.logs
     with Failure err -> Malleable_error.hard_error_string err
 
   let dump_mina_logs ~logger (t : t) ~log_file =
     [%log info] "Dumping logs from node: %s" t.node_id ;
-    let args = [ ("node_id", `String (id t)) ] in
+    let args = [ ("node_id", `String t.node_id) ] in
     try
-      let%bind logs =
+      let%bind dump =
         match%map run_command ~config:!config_path ~args "dump_mina_logs" with
-        | Ok (Response.Mina_logs_dump (_, logs)) ->
-            logs
-        | _ ->
-            failwith "invalid dump mina logs response"
+        | Ok output ->
+            Yojson.Safe.from_string output
+            |> Mina_logs_dump.of_yojson |> Result.ok_or_failwith
+        | Error err ->
+            raise @@ Mina_logs_dump.Invalid_response err
       in
       [%log info] "Dumping logs to file %s" log_file ;
       Malleable_error.return
       @@ Out_channel.with_file log_file ~f:(fun out_ch ->
-             Out_channel.output_string out_ch logs )
+             Out_channel.output_string out_ch dump.logs )
     with Failure err -> Malleable_error.hard_error_string err
 
   let dump_precomputed_blocks ~logger (t : t) =
     [%log info] "Dumping precomputed blocks from logs for node: %s" t.node_id ;
-    let args = [ ("node_id", `String (id t)) ] in
+    let args = [ ("node_id", `String t.node_id) ] in
     try
-      let%bind logs =
+      let%bind dump =
         match%map
           run_command ~config:!config_path ~args "dump_precomputed_blocks"
         with
-        | Ok (Response.Precomputed_block_dump (_, blocks)) ->
-            blocks
-        | _ ->
-            failwith "invalid dump precomputed blocks response"
+        | Ok output ->
+            Yojson.Safe.from_string output
+            |> Precomputed_block_dump.of_yojson |> Result.ok_or_failwith
+        | Error err ->
+            raise @@ Precomputed_block_dump.Invalid_response err
       in
       let log_lines =
-        String.split logs ~on:'\n'
+        String.split dump.blocks ~on:'\n'
         |> List.filter ~f:(String.is_prefix ~prefix:"{\"timestamp\":")
       in
       let jsons = List.map log_lines ~f:Yojson.Safe.from_string in
@@ -1183,33 +1168,6 @@ module Node = struct
         ; transactions_added_to_pool
         ; transaction_pool_size
         }
-end
-
-(* TODO: remove *)
-module Workload_to_deploy = struct
-  type t = { workload_id : string; pod_info : string }
-
-  (* TODO: remove *)
-  let base_kube_args { cluster; namespace; _ } =
-    [ "--cluster"; cluster; "--namespace"; namespace ]
-
-  let construct_workload workload_id pod_info : t = { workload_id; pod_info }
-
-  let[@warning "-27"] cons_pod_info ?network_keypair
-      ?(has_archive_container = false) primary_container_id =
-    ""
-
-  let[@warning "-27"] get_nodes_from_workload t ~config =
-    let node_id = "node_id" in
-    (* TODO: get from ci runner *)
-    let node_type = Node_type.Seed_node in
-    (* TODO: get from ci runner *)
-    let network_keypair = None in
-    (* TODO: get from ci runner *)
-    let password = "password" in
-    (* TODO: get from ci runner *)
-    Malleable_error.return
-      { Node.node_id; node_type; config; network_keypair; password }
 end
 
 type t =

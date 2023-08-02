@@ -44,7 +44,7 @@ module Engine = struct
       val network_keypair : t -> Network_keypair.t option
 
       val start :
-        ?commit_sha:string -> fresh_state:bool -> t -> unit Malleable_error.t
+        ?git_commit:string -> fresh_state:bool -> t -> unit Malleable_error.t
 
       val stop : t -> unit Malleable_error.t
 

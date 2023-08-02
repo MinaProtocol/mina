@@ -50,7 +50,7 @@ let parse_event_from_log_entry ~logger log_entry =
             Event_type.parse_daemon_event msg
         | None ->
             (* Currently unreachable, but we could include error logs here if
-               desired.
+                desired.
             *)
             Event_type.parse_error_log msg
       in
@@ -61,9 +61,7 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then (
     let%bind () = after (Time.Span.of_ms 10000.0) in
-    match%bind
-      Abstract_network.Node.get_filtered_log_entries ~last_log_index_seen node
-    with
+    match%bind Node.get_filtered_log_entries ~last_log_index_seen node with
     | Ok log_entries ->
         Array.iter log_entries ~f:(fun log_entry ->
             match parse_event_from_log_entry ~logger log_entry with
@@ -80,7 +78,7 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
     | Error err ->
         [%log error] "Encountered an error while polling $node for logs: $err"
           ~metadata:
-            [ ("node", `String node.app_id)
+            [ ("node", `String node.node_id)
             ; ("err", Error_json.error_to_yojson err)
             ] ;
         (* Declare the node to be offline. *)
@@ -93,9 +91,7 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
 let rec poll_start_filtered_log_node ~logger ~log_filter ~event_writer node =
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then
-    match%bind
-      Abstract_network.Node.start_filtered_log ~logger ~log_filter node
-    with
+    match%bind Node.start_filtered_log ~logger ~log_filter node with
     | Ok () ->
         return (Ok ())
     | Error _ ->
@@ -106,12 +102,12 @@ let rec poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
     (node : Node.t) =
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Requesting for $node to start its filtered logs"
-    ~metadata:[ ("node", `String node.app_id) ] ;
+    ~metadata:[ ("node", `String node.node_id) ] ;
   let%bind () =
     poll_start_filtered_log_node ~logger ~log_filter ~event_writer node
   in
   [%log info] "$node has started its filtered logs. Beginning polling"
-    ~metadata:[ ("node", `String node.app_id) ] ;
+    ~metadata:[ ("node", `String node.node_id) ] ;
   let%bind () =
     poll_get_filtered_log_entries_node ~last_log_index_seen:0 ~logger
       ~event_writer node
