@@ -2,7 +2,7 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let tests_enabled = false
+let tests_enabled = true
 
 (* Array to tuple helper *)
 let tuple6_of_array array =
@@ -788,7 +788,7 @@ let%test_unit "Ecdsa.verify_light" =
             assert (Mina_stdlib.List.Length.equal unused_scalar_checks.bounds 5) ;
             assert (
               Mina_stdlib.List.Length.equal unused_scalar_checks.canonicals 4 ) ;
-            assert (Mina_stdlib.List.Length.equal unused_scalar_checks.ranges 18) ;
+            assert (Mina_stdlib.List.Length.equal unused_scalar_checks.ranges 24) ;
 
             () )
       in
@@ -918,16 +918,16 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
 
             assert (Mina_stdlib.List.Length.equal base_checks.canonicals 19) ;
 
-            let base_multi_range_checks_count = ref 146 in
+            let base_range_checks_count = ref 440 in
             if Bignum_bigint.(curve.bignum.a <> zero) then
-              base_multi_range_checks_count :=
-                !base_multi_range_checks_count + 1 ;
+              base_range_checks_count :=
+                !base_range_checks_count + 1 ;
             if Bignum_bigint.(curve.bignum.b <> zero) then
-              base_multi_range_checks_count :=
-                !base_multi_range_checks_count + 1 ;
+              base_range_checks_count :=
+                !base_range_checks_count + 1 ;
             assert (
               Mina_stdlib.List.Length.equal base_checks.ranges
-                !base_multi_range_checks_count ) ;
+                !base_range_checks_count ) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
@@ -941,7 +941,7 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
             (* Sanity checks *)
             assert (Mina_stdlib.List.Length.equal scalar_checks.bounds 5) ;
             assert (Mina_stdlib.List.Length.equal scalar_checks.canonicals 4) ;
-            assert (Mina_stdlib.List.Length.equal scalar_checks.ranges 18) ;
+            assert (Mina_stdlib.List.Length.equal scalar_checks.ranges 24) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
