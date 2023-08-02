@@ -1534,7 +1534,7 @@ let standard_element_as_linear_combination_of_bytes (type f)
  *)
 let bytes_to_standard_element (type f)
     (module Circuit : Snark_intf.Run with type field = f)
-    (external_checks : f External_checks.t) ~(endian : Keccak.endianness)
+    ~(endian : Keccak.endianness) (external_checks : f External_checks.t)
     (bytestring : Circuit.Field.t list) (fmod : f standard_limbs)
     (fmod_bitlen : int) =
   let open Circuit in
@@ -1579,8 +1579,8 @@ let bytes_to_standard_element (type f)
   in
   (* Constrain the canonical value <f of the result *)
   let _bound = check_canonical (module Circuit) external_checks output fmod in
-  (* Constrain all the external checks derived *)
-  constrain_external_checks (module Circuit) external_checks fmod ;
+
+  (* Constraining all the external checks shall be done later *)
 
   (* return z' *)
   output

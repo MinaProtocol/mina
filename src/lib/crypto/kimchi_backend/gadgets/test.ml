@@ -120,20 +120,19 @@ let%test_unit "custom gates integration" =
 
             (* Create external checks context for tracking extra constraints
                that are required for soundness (not used in this test) *)
-            let unused_external_checks =
-              External_checks.create (module Runner.Impl)
-            in
+            let external_checks = External_checks.create (module Runner.Impl) in
 
             let out_ffmul =
               Foreign_field.mul
                 (module Runner.Impl)
-                unused_external_checks limbs limbs secp256k1_modulus
+                external_checks limbs limbs secp256k1_modulus
             in
 
             let out_ffadd =
               Foreign_field.add
                 (module Runner.Impl)
-                ~final:true out_ffmul foreign_elem secp256k1_modulus
+                ~final:true external_checks out_ffmul foreign_elem
+                secp256k1_modulus
             in
             let l0, l1, l2 = Element.Standard.to_limbs out_ffadd in
             Range_check.multi (module Runner.Impl) l0 l1 l2 ;
@@ -151,6 +150,99 @@ let%test_unit "custom gates integration" =
       test_gates ~cs "84c0d728b6928a0f"
         "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d"
         "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    in
+    () ) ;
+  ()
+
+let%test_unit "keccak ecdsa converter" =
+  ( if tests_enabled then
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
+    let open Foreign_field in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test the converter from Keccak format to ECDSA format.
+     * Tests the function bytes_to_standard_element
+     * together with standard_element_as_linear_combination_of_bytes
+     * and limb_as_linear_combination_of_bytes
+     * The circuit being created is the following:
+     * - 
+     *)
+    let test_converter ?cs bytestring endian =
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            let open Bitwise in
+            let secp256k1_modulus =
+              bignum_bigint_to_field_const_standard_limbs (module Runner.Impl)
+              @@ Common.bignum_bigint_of_hex
+                   "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
+            in
+
+            (* Set up snarky variables for input bytes *)
+            let bytestring =
+              List.map
+                ~f:(fun byte ->
+                  exists Field.typ ~compute:(fun () ->
+                      Common.field_of_hex (module Runner.Impl) byte ) )
+                bytestring
+            in
+
+            let external_checks = External_checks.create (module Runner.Impl) in
+
+            let _elem =
+              Foreign_field.bytes_to_standard_element
+                (module Runner.Impl)
+                ~endian external_checks bytestring secp256k1_modulus 256
+            in
+
+            constrain_external_checks
+              (module Runner.Impl)
+              external_checks secp256k1_modulus ;
+            () )
+      in
+      cs
+    in
+
+    let _cs =
+      test_converter
+        [ "3f"
+        ; "ff"
+        ; "e2"
+        ; "7b"
+        ; "14"
+        ; "ba"
+        ; "a7"
+        ; "40"
+        ; "db"
+        ; "0c"
+        ; "8b"
+        ; "b6"
+        ; "65"
+        ; "6d"
+        ; "e6"
+        ; "1d"
+        ; "28"
+        ; "71"
+        ; "a6"
+        ; "40"
+        ; "93"
+        ; "90"
+        ; "8a"
+        ; "f6"
+        ; "18"
+        ; "1f"
+        ; "46"
+        ; "35"
+        ; "1a"
+        ; "1c"
+        ; "19"
+        ; "09"
+        ]
+        Keccak.Little
     in
     () ) ;
   ()

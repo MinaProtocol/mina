@@ -358,9 +358,9 @@ val mul :
  *)
 val bytes_to_standard_element :
      (module Snark_intf.Run with type field = 'f)
-  -> 'f External_checks.t (* external_checks *)
   -> endian:Keccak.endianness
-  -> 'f Snarky_backendless.Cvar.t list
-  -> 'f standard_limbs
-  -> int
+  -> 'f External_checks.t (* external_checks *)
+  -> 'f Snarky_backendless.Cvar.t list (* bytes *)
+  -> 'f standard_limbs (* foreign_field_modulus *)
+  -> int (* length modulus in bits*)
   -> 'f Element.Standard.t
