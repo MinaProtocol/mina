@@ -12,12 +12,12 @@ import (
 )
 
 type FundParams struct {
-	Amount      uint64
-	Fee         uint64
-	Prefix      string
-	Num         int
-	Privkeys    []string
-	PasswordEnv string `json:",omitempty"`
+	Amount      uint64   `json:"amount"`
+	Fee         uint64   `json:"fee"`
+	Prefix      string   `json:"prefix"`
+	Num         int      `json:"num"`
+	Privkeys    []string `json:"privkeys"`
+	PasswordEnv string   `json:"passwordEnv,omitempty"`
 }
 
 type FundAction struct{}
@@ -26,6 +26,7 @@ func fundImpl(config Config, params FundParams, amountPerKey uint64, password st
 	var wg sync.WaitGroup
 	errs := make(chan error)
 	ctx, cancelF := context.WithCancel(config.Ctx)
+	defer cancelF()
 	for i, privkey := range params.Privkeys {
 		num := params.Num / len(params.Privkeys)
 		if i < params.Num%len(params.Privkeys) {
@@ -59,11 +60,7 @@ func fundImpl(config Config, params FundParams, amountPerKey uint64, password st
 		wg.Wait()
 		errs <- nil
 	}()
-	err := <-errs
-	if err != nil {
-		cancelF()
-	}
-	return err
+	return <-errs
 }
 
 func (FundAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {

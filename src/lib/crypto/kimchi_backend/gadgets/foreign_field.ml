@@ -857,8 +857,9 @@ let result_row (type f) (module Circuit : Snark_intf.Run with type field = f)
  *    Understand if concatenating sums is possible with input limbs < 2^88 with chunking
  *)
 let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (inputs : f Element.Standard.t list) (operations : op_mode list)
-    (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
+    (external_checks : f External_checks.t) (inputs : f Element.Standard.t list)
+    (operations : op_mode list) (foreign_field_modulus : f standard_limbs) :
+    f Element.Standard.t =
   let open Circuit in
   (* Check foreign field modulus < max allowed *)
   check_modulus (module Circuit) foreign_field_modulus ;
@@ -892,8 +893,13 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
       sum_setup (module Circuit) left.(0) right op foreign_field_modulus
     in
 
+    (* Add external check for multi-range-check of result *)
+    External_checks.append_multi_range_check external_checks
+    @@ Element.Standard.to_limbs result ;
+
     (* Update left input for next iteration *)
-    left.(0) <- result ; ()
+    left.(0) <- result ;
+    ()
   done ;
 
   let result = left.(0) in
@@ -913,11 +919,16 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      Returns the result
  *)
 let add (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
+    (external_checks : f External_checks.t) (left_input : f Element.Standard.t)
+    (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
   let result, _sign, _ovf =
     sum_setup (module Circuit) left_input right_input Add foreign_field_modulus
   in
+  (* Add external check for multi-range-check of result *)
+  External_checks.append_multi_range_check external_checks
+  @@ Element.Standard.to_limbs result ;
+
   result
 
 (* Definition of a gadget for a single foreign field subtraction
@@ -932,11 +943,15 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      Returns ther result
  *)
 let sub (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
+    (external_checks : f External_checks.t) (left_input : f Element.Standard.t)
+    (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
   let result, _sign, _ovf =
     sum_setup (module Circuit) left_input right_input Sub foreign_field_modulus
   in
+  (* Add external check for multi-range-check of result *)
+  External_checks.append_multi_range_check external_checks
+  @@ Element.Standard.to_limbs result ;
   result
 
 (* Bound check the supplied value
@@ -1495,8 +1510,9 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
  *)
 let bytes_to_standard_element (type f)
     (module Circuit : Snark_intf.Run with type field = f)
-    ~(endian : Keccak.endianness) (bytestring : Circuit.Field.t list)
-    (fmod : f standard_limbs) (fmod_bitlen : int) =
+    (external_checks : f External_checks.t) ~(endian : Keccak.endianness)
+    (bytestring : Circuit.Field.t list) (fmod : f standard_limbs)
+    (fmod_bitlen : int) =
   let open Circuit in
   (* Make the input bytestring a big endian value *)
   let bytestring =
@@ -1534,7 +1550,7 @@ let bytes_to_standard_element (type f)
   let zero = Element.Standard.of_limbs (Field.zero, Field.zero, Field.zero) in
   (* C4: Range check z' < f *)
   (* Altogether this is a call to Foreign_field.add in default mode *)
-  let output = add (module Circuit) elem zero fmod in
+  let output = add (module Circuit) external_checks elem zero fmod in
 
   (* return z' *)
   output
@@ -1581,11 +1597,14 @@ let%test_unit "foreign_field arithmetics gadgets" =
             let right_input =
               Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
             in
+
+            let external_checks = External_checks.create (module Runner.Impl) in
+
             (* Create the gadget *)
             let sum =
               add
                 (module Runner.Impl)
-                left_input right_input foreign_field_modulus
+                external_checks left_input right_input foreign_field_modulus
             in
             (* Result row *)
             result_row
@@ -1593,14 +1612,17 @@ let%test_unit "foreign_field arithmetics gadgets" =
               ~label:"foreign_field_add_test" sum None ;
 
             (* Check that the inputs were foreign field elements *)
-            let external_checks = External_checks.create (module Runner.Impl) in
             External_checks.add_bound_check external_checks left_input ;
             External_checks.add_bound_check external_checks right_input ;
 
             (* Sanity tests *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 2) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 0) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.ranges 0) ;
+
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 1) ;
+            assert (
+              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
+                0 ) ;
 
             (* Perform external checks *)
             constrain_external_checks
@@ -1667,11 +1689,15 @@ let%test_unit "foreign_field arithmetics gadgets" =
                 foreign_field_modulus
             in
 
+            let unused_external_checks =
+              External_checks.create (module Runner.Impl)
+            in
+
             (* Create the gadget *)
             let sum =
               sum_chain
                 (module Runner.Impl)
-                inputs operations foreign_field_modulus
+                unused_external_checks inputs operations foreign_field_modulus
             in
             result_row
               (module Runner.Impl)
@@ -1880,7 +1906,9 @@ let%test_unit "foreign_field arithmetics gadgets" =
 
             (* Add something *)
             let addition =
-              add (module Runner.Impl) product left_input foreign_field_modulus
+              add
+                (module Runner.Impl)
+                external_checks product left_input foreign_field_modulus
             in
             result_row
               (module Runner.Impl)
@@ -1890,7 +1918,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
             let subtraction =
               sub
                 (module Runner.Impl)
-                addition right_input foreign_field_modulus
+                external_checks addition right_input foreign_field_modulus
             in
             result_row
               (module Runner.Impl)
