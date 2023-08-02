@@ -255,6 +255,7 @@ module type Full = sig
     module Zkapp_command_snark : sig
       val main :
            ?witness:Zkapp_command_segment.Witness.t
+        -> signature_kind:Mina_signature_kind.t option
         -> Zkapp_command_segment.Spec.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Statement.With_sok.var
@@ -285,6 +286,7 @@ module type Full = sig
     val deploy_snapp :
          ?no_auth:bool
       -> ?permissions:Permissions.t
+      -> ?signature_kind:Mina_signature_kind.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Deploy_snapp_spec.t
       -> Zkapp_command.t

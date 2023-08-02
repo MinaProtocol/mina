@@ -76,15 +76,17 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
              in
              { body = Account_update.Body.of_simple p; authorization } )
       |> Zkapp_command.Call_forest.accumulate_hashes_predicated
+           ~signature_kind:None
   }
 
 (* replace dummy signatures, proofs with valid ones for fee payer, other zkapp_command
    [keymap] maps compressed public keys to private keys
 *)
-let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
-    Zkapp_command.t Async_kernel.Deferred.t =
+let replace_authorizations ?prover ~signature_kind ~keymap
+    (zkapp_command : Zkapp_command.t) : Zkapp_command.t Async_kernel.Deferred.t
+    =
   let txn_commitment, full_txn_commitment =
-    Zkapp_command.get_transaction_commitments zkapp_command
+    Zkapp_command.get_transaction_commitments ~signature_kind zkapp_command
   in
   let sign_for_account_update ~use_full_commitment sk =
     let commitment =

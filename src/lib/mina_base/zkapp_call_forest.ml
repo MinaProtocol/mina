@@ -16,7 +16,7 @@ let if_ = Zkapp_command.value_if
 
 let is_empty = List.is_empty
 
-let pop_exn ?signature_kind : t -> (Account_update.t * t) * t = function
+let pop_exn ~signature_kind : t -> (Account_update.t * t) * t = function
   | { stack_hash = _
     ; elt = { account_update; calls; account_update_digest = _ }
     }
@@ -25,8 +25,8 @@ let pop_exn ?signature_kind : t -> (Account_update.t * t) * t = function
   | _ ->
       failwith "pop_exn"
 
-let push ~account_update ~calls t =
-  Zkapp_command.Call_forest.cons ~calls account_update t
+let push ~signature_kind ~account_update ~calls t =
+  Zkapp_command.Call_forest.cons ~signature_kind ~calls account_update t
 
 let hash (t : t) = Zkapp_command.Call_forest.hash t
 
@@ -78,7 +78,7 @@ module Checked = struct
                 Field.Assert.equal
                   (hash :> Field.t)
                   ( Zkapp_command.Call_forest.Digest.Account_update.Checked
-                    .create account_update
+                    .create account_update ~signature_kind:None
                     :> Field.t ) ) )
       }
 
@@ -104,7 +104,7 @@ module Checked = struct
 
   let empty () : t = { hash = empty; data = V.create (fun () -> []) }
 
-  let pop_exn ?signature_kind ({ hash = h; data = r } : t) :
+  let pop_exn ~signature_kind ({ hash = h; data = r } : t) :
       (account_update * t) * t =
     with_label "Zkapp_call_forest.pop_exn" (fun () ->
         let hd_r =
@@ -122,7 +122,7 @@ module Checked = struct
           With_hash.of_data account_update
             ~hash_data:
               (Zkapp_command.Digest.Account_update.Checked.create
-                 ?signature_kind )
+                 ~signature_kind )
         in
         let subforest : t =
           let subforest = V.create (fun () -> (V.get hd_r).calls) in
@@ -150,7 +150,7 @@ module Checked = struct
             } )
           : (account_update * t) * t ) )
 
-  let pop ?signature_kind ~dummy ~dummy_tree_hash ({ hash = h; data = r } : t) :
+  let pop ~signature_kind ~dummy ~dummy_tree_hash ({ hash = h; data = r } : t) :
       (account_update * t) * t =
     with_label "Zkapp_call_forest.pop" (fun () ->
         let hd_r =
@@ -173,7 +173,7 @@ module Checked = struct
           With_hash.of_data account_update
             ~hash_data:
               (Zkapp_command.Digest.Account_update.Checked.create
-                 ?signature_kind )
+                 ~signature_kind )
         in
         let subforest : t =
           let subforest = V.create (fun () -> (V.get hd_r).calls) in
@@ -215,7 +215,7 @@ module Checked = struct
             } )
           : (account_update * t) * t ) )
 
-  let push
+  let push ~signature_kind
       ~account_update:
         { account_update = { hash = account_update_hash; data = account_update }
         ; control = auth
@@ -239,7 +239,8 @@ module Checked = struct
               let account_update : Account_update.t = { body; authorization } in
               let calls = V.get calls in
               let res =
-                Zkapp_command.Call_forest.cons ~calls account_update tl
+                Zkapp_command.Call_forest.cons ~signature_kind ~calls
+                  account_update tl
               in
               (* Sanity check; we're re-hashing anyway, might as well make sure it's
                  consistent.

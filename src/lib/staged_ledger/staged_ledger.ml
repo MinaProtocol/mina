@@ -355,7 +355,7 @@ module T = struct
       ~expected_merkle_root ~get_state f =
     let open Deferred.Or_error.Let_syntax in
     let apply_first_pass =
-      Ledger.apply_transaction_first_pass ?signature_kind:None
+      Ledger.apply_transaction_first_pass ~signature_kind:None
         ~constraint_constants
     in
     let apply_second_pass = Ledger.apply_transaction_second_pass in
@@ -2619,7 +2619,7 @@ let%test_module "staged ledger tests" =
                            |> Yojson.Safe.to_string ) ) ) ;
             let do_snarked_ledger_transition proof_opt =
               let apply_first_pass =
-                Ledger.apply_transaction_first_pass ?signature_kind:None
+                Ledger.apply_transaction_first_pass ~signature_kind:None
                   ~constraint_constants
               in
               let apply_second_pass = Ledger.apply_transaction_second_pass in

@@ -35,8 +35,8 @@ let apply_transaction_first_pass ~constraint_constants ~global_slot
     ~txn_state_view l txn : Ledger.Transaction_partially_applied.t Or_error.t =
   O1trace.sync_thread "apply_transaction_first_pass" (fun () ->
       within_mask l ~f:(fun l' ->
-          Ledger.apply_transaction_first_pass l' ~constraint_constants
-            ~global_slot ~txn_state_view txn ) )
+          Ledger.apply_transaction_first_pass l' ~signature_kind:None
+            ~constraint_constants ~global_slot ~txn_state_view txn ) )
 
 let%test_unit "invalid transactions do not dirty the ledger" =
   let open Core in

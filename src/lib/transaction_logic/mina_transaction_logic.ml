@@ -401,7 +401,7 @@ module type S = sig
        * Global_slot_since_genesis.t
 
   val apply_zkapp_command_unchecked :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t option
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
@@ -435,7 +435,7 @@ module type S = sig
       zkapp_command to include in the snark work spec / transaction snark witness.
   *)
   val apply_zkapp_command_unchecked_aux :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t option
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
@@ -460,7 +460,7 @@ module type S = sig
     -> (Transaction_applied.Zkapp_command_applied.t * 'acc) Or_error.t
 
   val apply_zkapp_command_first_pass_aux :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t option
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
@@ -486,7 +486,7 @@ module type S = sig
        Or_error.t
 
   val apply_zkapp_command_second_pass_aux :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t option
     -> init:'acc
     -> f:
          (   'acc
@@ -520,7 +520,7 @@ module type S = sig
     -> Transaction_applied.Coinbase_applied.t Or_error.t
 
   val apply_transaction_first_pass :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t option
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> global_slot:Global_slot_since_genesis.t
     -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
@@ -529,7 +529,7 @@ module type S = sig
     -> Transaction_partially_applied.t Or_error.t
 
   val apply_transaction_second_pass :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t option
     -> ledger
     -> Transaction_partially_applied.t
     -> Transaction_applied.t Or_error.t
@@ -1261,10 +1261,12 @@ module Make (L : Ledger_intf.S) :
         in
         Zkapp_command.Transaction_commitment.create ~account_updates_hash
 
-      let full_commitment ~account_update ~memo_hash ~commitment =
+      let full_commitment ~signature_kind ~account_update ~memo_hash ~commitment
+          =
         (* when called from Zkapp_command_logic.apply, the account_update is the fee payer *)
         let fee_payer_hash =
-          Zkapp_command.Digest.Account_update.create account_update
+          Zkapp_command.Digest.Account_update.create ~signature_kind
+            account_update
         in
         Zkapp_command.Transaction_commitment.create_complete commitment
           ~memo_hash ~fee_payer_hash
@@ -1905,7 +1907,7 @@ module Make (L : Ledger_intf.S) :
   (* apply zkapp command fee payer's while stubbing out the second pass ledger
      CAUTION: If you use the intermediate local states, you MUST update the
        [will_succeed] field to [false] if the [status] is [Failed].*)
-  let apply_zkapp_command_first_pass_aux (type user_acc) ?signature_kind
+  let apply_zkapp_command_first_pass_aux (type user_acc) ~signature_kind
       ~constraint_constants ~global_slot
       ~(state_view : Zkapp_precondition.Protocol_state.View.t)
       ~(init : user_acc) ~f
@@ -1960,10 +1962,12 @@ module Make (L : Ledger_intf.S) :
         } )
     in
     let user_acc = f init initial_state in
-    let account_updates = Zkapp_command.all_account_updates command in
+    let account_updates =
+      Zkapp_command.all_account_updates ~signature_kind command
+    in
     let%map global_state, local_state =
       Or_error.try_with (fun () ->
-          M.start ?signature_kind ~constraint_constants
+          M.start ~signature_kind ~constraint_constants
             { account_updates
             ; memo_hash = Signed_command_memo.hash command.memo
             ; will_succeed =
@@ -1984,7 +1988,7 @@ module Make (L : Ledger_intf.S) :
       }
     , user_acc )
 
-  let apply_zkapp_command_first_pass ?signature_kind ~constraint_constants
+  let apply_zkapp_command_first_pass ~signature_kind ~constraint_constants
       ~global_slot ~(state_view : Zkapp_precondition.Protocol_state.View.t)
       ?((* TODO: can this be ripped out from here? *)
         fee_excess = Amount.Signed.zero)
@@ -1995,13 +1999,13 @@ module Make (L : Ledger_intf.S) :
       =
     let open Or_error.Let_syntax in
     let%map partial_stmt, _user_acc =
-      apply_zkapp_command_first_pass_aux ?signature_kind ~constraint_constants
+      apply_zkapp_command_first_pass_aux ~signature_kind ~constraint_constants
         ~global_slot ~state_view ~fee_excess ~supply_increase ledger command
         ~init:None ~f:(fun _acc state -> Some state)
     in
     partial_stmt
 
-  let apply_zkapp_command_second_pass_aux (type user_acc) ?signature_kind
+  let apply_zkapp_command_second_pass_aux (type user_acc) ~signature_kind
       ~(init : user_acc) ~f ledger
       (c : Transaction_partially_applied.Zkapp_command_partially_applied.t) :
       (Transaction_applied.Zkapp_command_applied.t * user_acc) Or_error.t =
@@ -2039,7 +2043,7 @@ module Make (L : Ledger_intf.S) :
       else
         let%bind states =
           Or_error.try_with (fun () ->
-              M.step ?signature_kind
+              M.step ~signature_kind
                 ~constraint_constants:c.constraint_constants { perform }
                 (g_state, l_state) )
         in
@@ -2153,32 +2157,32 @@ module Make (L : Ledger_intf.S) :
               "Zkapp_command application failed but new accounts created or \
                some of the other account_update updates applied"
 
-  let apply_zkapp_command_second_pass ?signature_kind ledger c :
+  let apply_zkapp_command_second_pass ~signature_kind ledger c :
       Transaction_applied.Zkapp_command_applied.t Or_error.t =
     let open Or_error.Let_syntax in
     let%map x, () =
-      apply_zkapp_command_second_pass_aux ?signature_kind ~init:() ~f:Fn.const
+      apply_zkapp_command_second_pass_aux ~signature_kind ~init:() ~f:Fn.const
         ledger c
     in
     x
 
-  let apply_zkapp_command_unchecked_aux ?signature_kind ~constraint_constants
+  let apply_zkapp_command_unchecked_aux ~signature_kind ~constraint_constants
       ~global_slot ~state_view ~init ~f ?fee_excess ?supply_increase ledger
       command =
     let open Or_error.Let_syntax in
-    apply_zkapp_command_first_pass_aux ?signature_kind ~constraint_constants
+    apply_zkapp_command_first_pass_aux ~signature_kind ~constraint_constants
       ~global_slot ~state_view ?fee_excess ?supply_increase ledger command ~init
       ~f
     >>= fun (partial_stmt, user_acc) ->
-    apply_zkapp_command_second_pass_aux ?signature_kind ~init:user_acc ~f ledger
+    apply_zkapp_command_second_pass_aux ~signature_kind ~init:user_acc ~f ledger
       partial_stmt
 
-  let apply_zkapp_command_unchecked ?signature_kind ~constraint_constants
+  let apply_zkapp_command_unchecked ~signature_kind ~constraint_constants
       ~global_slot ~state_view ledger command =
     let open Or_error.Let_syntax in
-    apply_zkapp_command_first_pass ?signature_kind ~constraint_constants
+    apply_zkapp_command_first_pass ~signature_kind ~constraint_constants
       ~global_slot ~state_view ledger command
-    >>= apply_zkapp_command_second_pass_aux ledger ?signature_kind ~init:None
+    >>= apply_zkapp_command_second_pass_aux ledger ~signature_kind ~init:None
           ~f:(fun _acc (global_state, local_state) ->
             Some (local_state, global_state.fee_excess) )
     |> Result.map ~f:(fun (account_update_applied, state_res) ->
@@ -2463,7 +2467,7 @@ module Make (L : Ledger_intf.S) :
       ; burned_tokens
       }
 
-  let apply_transaction_first_pass ?signature_kind ~constraint_constants
+  let apply_transaction_first_pass ~signature_kind ~constraint_constants
       ~global_slot ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t)
       ledger (t : Transaction.t) : Transaction_partially_applied.t Or_error.t =
     let open Or_error.Let_syntax in
@@ -2478,7 +2482,7 @@ module Make (L : Ledger_intf.S) :
         Transaction_partially_applied.Signed_command { previous_hash; applied }
     | Command (Zkapp_command txn) ->
         let%map partially_applied =
-          apply_zkapp_command_first_pass ?signature_kind ~global_slot
+          apply_zkapp_command_first_pass ~signature_kind ~global_slot
             ~state_view:txn_state_view ~constraint_constants ledger txn
         in
         Transaction_partially_applied.Zkapp_command partially_applied
@@ -2493,7 +2497,7 @@ module Make (L : Ledger_intf.S) :
         in
         Transaction_partially_applied.Coinbase { previous_hash; applied }
 
-  let apply_transaction_second_pass ?signature_kind ledger
+  let apply_transaction_second_pass ~signature_kind ledger
       (t : Transaction_partially_applied.t) : Transaction_applied.t Or_error.t =
     let open Or_error.Let_syntax in
     let open Transaction_applied in
@@ -2504,7 +2508,7 @@ module Make (L : Ledger_intf.S) :
     | Zkapp_command partially_applied ->
         (* TODO: either here or in second phase of apply, need to update the prior global state statement for the fee payer segment to add the second phase ledger at the end *)
         let%map applied =
-          apply_zkapp_command_second_pass ?signature_kind ledger
+          apply_zkapp_command_second_pass ~signature_kind ledger
             partially_applied
         in
         { previous_hash = partially_applied.previous_hash
@@ -2520,9 +2524,10 @@ module Make (L : Ledger_intf.S) :
     let open Or_error in
     Mina_stdlib.Result.List.map txns
       ~f:
-        (apply_transaction_first_pass ~constraint_constants ~global_slot
-           ~txn_state_view ledger )
-    >>= Mina_stdlib.Result.List.map ~f:(apply_transaction_second_pass ledger)
+        (apply_transaction_first_pass ~signature_kind:None ~constraint_constants
+           ~global_slot ~txn_state_view ledger )
+    >>= Mina_stdlib.Result.List.map
+          ~f:(apply_transaction_second_pass ~signature_kind:None ledger)
 
   module For_tests = struct
     let validate_timing_with_min_balance = validate_timing_with_min_balance
@@ -2724,7 +2729,7 @@ module For_tests = struct
       }
     |> Signed_command.forget_check
 
-  let account_update_send ?signature_kind ?(use_full_commitment = true)
+  let account_update_send ~signature_kind ?(use_full_commitment = true)
       ?(double_sender_nonce = true)
       { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
       : Zkapp_command.t =
@@ -2811,13 +2816,13 @@ module For_tests = struct
       ; memo = Signed_command_memo.empty
       }
     in
-    let zkapp_command = Zkapp_command.of_simple ?signature_kind zkapp_command in
+    let zkapp_command = Zkapp_command.of_simple ~signature_kind zkapp_command in
     let commitment = Zkapp_command.commitment zkapp_command in
     let full_commitment =
       Zkapp_command.Transaction_commitment.create_complete commitment
         ~memo_hash:(Signed_command_memo.hash zkapp_command.memo)
         ~fee_payer_hash:
-          (Zkapp_command.Digest.Account_update.create ?signature_kind
+          (Zkapp_command.Digest.Account_update.create ~signature_kind
              (Account_update.of_fee_payer zkapp_command.fee_payer) )
     in
     let account_updates_signature =

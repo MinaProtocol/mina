@@ -1565,7 +1565,7 @@ module Body = struct
         ; Authorization_kind.Checked.to_input authorization_kind
         ]
 
-    let digest ?signature_kind (t : t) =
+    let digest ~signature_kind (t : t) =
       Random_oracle.Checked.(
         hash
           ~init:(Hash_prefix.zkapp_body ?signature_kind)
@@ -1640,7 +1640,7 @@ module Body = struct
       ; Authorization_kind.to_input authorization_kind
       ]
 
-  let digest ?signature_kind (t : t) =
+  let digest ~signature_kind (t : t) =
     Random_oracle.(
       hash
         ~init:(Hash_prefix.zkapp_body ?signature_kind)
@@ -1796,12 +1796,12 @@ module T = struct
   let of_simple (p : Simple.t) : t =
     { body = Body.of_simple p.body; authorization = p.authorization }
 
-  let digest ?signature_kind (t : t) = Body.digest ?signature_kind t.body
+  let digest ~signature_kind (t : t) = Body.digest ~signature_kind t.body
 
   module Checked = struct
     type t = Body.Checked.t
 
-    let digest ?signature_kind (t : t) = Body.Checked.digest ?signature_kind t
+    let digest ~signature_kind (t : t) = Body.Checked.digest ~signature_kind t
   end
 end
 

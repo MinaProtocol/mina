@@ -103,7 +103,7 @@ let check_zkapp_command_with_merges_exn ?signature_kind ?expected_failure
             in
             let partial_stmt =
               match
-                Ledger.apply_transaction_first_pass ?signature_kind
+                Ledger.apply_transaction_first_pass ~signature_kind
                   ~constraint_constants ~global_slot ~txn_state_view:state_view
                   ledger
                   (Mina_transaction.Transaction.Command
@@ -187,7 +187,7 @@ let check_zkapp_command_with_merges_exn ?signature_kind ?expected_failure
                     Ledger.merkle_root ledger
                   in
                   let applied_txn =
-                    Ledger.apply_transaction_second_pass ?signature_kind ledger
+                    Ledger.apply_transaction_second_pass ~signature_kind ledger
                       partial_stmt
                     |> Or_error.ok_exn
                   in
@@ -589,9 +589,9 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   let expect_snark_failure, applied_transaction =
     match
       Result.( >>= )
-        (Ledger.apply_transaction_first_pass ledger ~constraint_constants
-           ~global_slot ~txn_state_view txn_unchecked )
-        (Ledger.apply_transaction_second_pass ledger)
+        (Ledger.apply_transaction_first_pass ledger ~signature_kind:None
+           ~constraint_constants ~global_slot ~txn_state_view txn_unchecked )
+        (Ledger.apply_transaction_second_pass ~signature_kind:None ledger)
     with
     | Ok res ->
         ( if Option.is_some expected_failure then
@@ -661,7 +661,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   | Ok _ ->
       assert (not expect_snark_failure)
 
-let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
+let test_zkapp_command ~signature_kind ?expected_failure
+    ?(memo = Signed_command_memo.empty)
     ?(fee = Currency.Fee.(of_nanomina_int_exn 100)) ~fee_payer_pk ~signers
     ~initialize_ledger ~finalize_ledger zkapp_command =
   let fee_payer : Account_update.Fee_payer.t =
@@ -678,7 +679,8 @@ let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
       ~init:
         ({ fee_payer; account_updates = zkapp_command; memo } : Zkapp_command.t)
       ~f:(fun zkapp_command (pk_compressed, sk) ->
-        Zkapps_examples.insert_signatures pk_compressed sk zkapp_command )
+        Zkapps_examples.insert_signatures ~signature_kind pk_compressed sk
+          zkapp_command )
   in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       let aux = initialize_ledger ledger in

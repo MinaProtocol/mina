@@ -157,7 +157,8 @@ val test_transaction_union :
   -> unit
 
 val test_zkapp_command :
-     ?expected_failure:Transaction_status.Failure.t * pass_number
+     signature_kind:Mina_signature_kind.t option
+  -> ?expected_failure:Transaction_status.Failure.t * pass_number
   -> ?memo:Signed_command_memo.t
   -> ?fee:Currency.Fee.t
   -> fee_payer_pk:Account.key

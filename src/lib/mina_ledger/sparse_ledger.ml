@@ -94,11 +94,11 @@ let apply_user_command ~constraint_constants ~txn_global_slot =
 let apply_transaction_first_pass ~constraint_constants ~global_slot
     ~txn_state_view =
   apply_transaction_logic
-    (T.apply_transaction_first_pass ~constraint_constants ~global_slot
-       ~txn_state_view )
+    (T.apply_transaction_first_pass ~signature_kind:None ~constraint_constants
+       ~global_slot ~txn_state_view )
 
 let apply_transaction_second_pass =
-  apply_transaction_logic T.apply_transaction_second_pass
+  apply_transaction_logic (T.apply_transaction_second_pass ~signature_kind:None)
 
 let apply_transactions ~constraint_constants ~global_slot ~txn_state_view =
   apply_transaction_logic
@@ -131,7 +131,8 @@ let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
       :: acc )
 
 let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
-  T.apply_zkapp_command_second_pass_aux (ref ledger) c ~init
+  T.apply_zkapp_command_second_pass_aux ~signature_kind:None (ref ledger) c
+    ~init
     ~f:(fun
          acc
          ( { first_pass_ledger

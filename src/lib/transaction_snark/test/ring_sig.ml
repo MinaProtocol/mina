@@ -240,6 +240,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           let protocol_state = Zkapp_precondition.Protocol_state.accept in
           let ps =
             Zkapp_command.Call_forest.With_hashes.of_zkapp_command_simple_list
+              ~signature_kind:None
               [ sender_account_update_data; snapp_account_update_data ]
           in
           let account_updates_hash = Zkapp_command.Call_forest.hash ps in
@@ -250,7 +251,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           in
           let tx_statement : Zkapp_statement.t =
             { account_update =
-                Account_update.Body.digest
+                Account_update.Body.digest ~signature_kind:None
                   (Account_update.of_simple snapp_account_update_data).body
             ; calls = (Zkapp_command.Digest.Forest.empty :> field)
             }
@@ -278,6 +279,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 ~memo_hash
                 ~fee_payer_hash:
                   (Zkapp_command.Digest.Account_update.create
+                     ~signature_kind:None
                      (Account_update.of_fee_payer fee_payer) )
             in
             { fee_payer with
@@ -296,7 +298,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             }
           in
           let zkapp_command : Zkapp_command.t =
-            Zkapp_command.of_simple
+            Zkapp_command.of_simple ~signature_kind:None
               { fee_payer
               ; account_updates =
                   [ sender
