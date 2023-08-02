@@ -234,7 +234,7 @@ val check_canonical :
   -> 'f Element.Standard.t (* value *)
   -> 'f standard_limbs (* foreign_field_modulus *)
   -> 'f Element.Standard.t
-(* result *)
+(* bound *)
 
 (** Gadget to constrain external checks using supplied modulus *)
 val constrain_external_checks :

@@ -1533,8 +1533,15 @@ let bytes_to_standard_element (type f)
    *)
   let zero = Element.Standard.of_limbs (Field.zero, Field.zero, Field.zero) in
   (* C4: Range check z' < f *)
-  (* Altogether this is a call to Foreign_field.add in default mode *)
-  let output = add (module Circuit) external_checks elem zero fmod in
+  (* Altogether this is a call to Foreign_field.add in final=true mode *)
+  (* with a canonical check for the output *)
+  let output =
+    add (module Circuit) ~final:true external_checks elem zero fmod
+  in
+  (* Constrain the canonical value <f of the result *)
+  let _bound = check_canonical (module Circuit) external_checks output fmod in
+  (* Constrain all the external checks derived *)
+  constrain_external_checks (module Circuit) external_checks fmod ;
 
   (* return z' *)
   output
