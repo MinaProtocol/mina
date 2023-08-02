@@ -16,6 +16,7 @@ type failure =
       | `Token_symbol
       | `Send
       | `Receive ]
+[@@deriving yojson]
 
 type role =
   [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
@@ -255,8 +256,7 @@ let gen_fee ?fee_range ~num_updates (account : Account.t) =
     Currency.(
       Fee.(hi_fee <= (Balance.to_amount balance |> Currency.Amount.to_fee))) ) ;
   Option.value_map fee_range ~default:(Currency.Fee.gen_incl lo_fee hi_fee)
-    ~f:(fun (lo, hi) ->
-      Currency.Fee.(gen_incl (of_mina_string_exn lo) (of_mina_string_exn hi)) )
+    ~f:(fun (lo, hi) -> Currency.Fee.(gen_incl lo hi))
 
 (*Fee payer balance change is Neg*)
 let fee_to_amt fee =
@@ -307,11 +307,7 @@ let gen_balance_change ?permissions_auth (account : Account.t) ?failure
         if new_account then
           Currency.Amount.(
             gen_incl (of_mina_string_exn "50.0") (of_mina_string_exn "100.0"))
-        else
-          Currency.Amount.(
-            gen_incl
-              (of_mina_string_exn min_balance_change)
-              (of_mina_string_exn max_balance_change)) )
+        else Currency.Amount.(gen_incl min_balance_change max_balance_change) )
   in
   match sgn with
   | Pos ->
@@ -437,15 +433,20 @@ let gen_protocol_state_precondition
   let%bind global_slot_since_genesis =
     let open Mina_numbers in
     let%bind epsilon1 =
-      Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+      Global_slot_span.gen_incl
+        (Global_slot_span.of_int 0)
+        (Global_slot_span.of_int 10)
     in
     let%bind epsilon2 =
-      Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+      Global_slot_span.gen_incl
+        (Global_slot_span.of_int 0)
+        (Global_slot_span.of_int 10)
     in
     { lower =
-        Global_slot.sub psv.global_slot_since_genesis epsilon1
-        |> Option.value ~default:Global_slot.zero
-    ; upper = Global_slot.add psv.global_slot_since_genesis epsilon2
+        Global_slot_since_genesis.sub psv.global_slot_since_genesis epsilon1
+        |> Option.value ~default:Global_slot_since_genesis.zero
+    ; upper =
+        Global_slot_since_genesis.add psv.global_slot_since_genesis epsilon2
     }
     |> return |> Zkapp_basic.Or_ignore.gen
   in
@@ -546,16 +547,27 @@ let gen_invalid_protocol_state_precondition
   | Global_slot_since_genesis ->
       let open Mina_numbers in
       let%map global_slot_since_genesis =
-        let%map epsilon = Global_slot.(gen_incl (of_int 1) (of_int 10)) in
-        if lower || Global_slot.(psv.global_slot_since_genesis > epsilon) then
-          { lower = Global_slot.zero
+        let%map epsilon = Global_slot_span.(gen_incl (of_int 1) (of_int 10)) in
+        let increment =
+          Global_slot_span.to_uint32 epsilon
+          |> Global_slot_since_genesis.of_uint32
+        in
+        if
+          lower
+          || Global_slot_since_genesis.(
+               psv.global_slot_since_genesis > increment)
+        then
+          { lower = Global_slot_since_genesis.zero
           ; upper =
-              Global_slot.sub psv.global_slot_since_genesis epsilon
-              |> Option.value ~default:Global_slot.zero
+              Global_slot_since_genesis.sub psv.global_slot_since_genesis
+                epsilon
+              |> Option.value ~default:Global_slot_since_genesis.zero
           }
         else
-          { lower = Global_slot.add psv.global_slot_since_genesis epsilon
-          ; upper = Global_slot.max_value
+          { lower =
+              Global_slot_since_genesis.add psv.global_slot_since_genesis
+                epsilon
+          ; upper = Global_slot_since_genesis.max_value
           }
       in
       { protocol_state_precondition with
@@ -837,16 +849,20 @@ let gen_account_update_body_components (type a b c d) ?global_slot
     | Some global_slot ->
         let open Mina_numbers in
         let%bind epsilon1 =
-          Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+          Global_slot_span.gen_incl
+            (Global_slot_span.of_int 0)
+            (Global_slot_span.of_int 10)
         in
         let%bind epsilon2 =
-          Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+          Global_slot_span.gen_incl
+            (Global_slot_span.of_int 0)
+            (Global_slot_span.of_int 10)
         in
         Zkapp_precondition.Closed_interval.
           { lower =
-              Global_slot.sub global_slot epsilon1
-              |> Option.value ~default:Global_slot.zero
-          ; upper = Global_slot.add global_slot epsilon2
+              Global_slot_since_genesis.sub global_slot epsilon1
+              |> Option.value ~default:Global_slot_since_genesis.zero
+          ; upper = Global_slot_since_genesis.add global_slot epsilon2
           }
         |> return |> Zkapp_basic.Or_ignore.gen
   and may_use_token =
@@ -1112,7 +1128,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
   let fee_payer_acct_id = Account_id.create fee_payer_pk Token_id.default in
-  let ledger_accounts = Ledger.to_list ledger in
+  let ledger_accounts = Ledger.to_list_sequential ledger in
   (* table of public keys to accounts, updated when generating each account_update
 
      a Map would be more principled, but threading that map through the code
@@ -1144,11 +1160,12 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   (* table of public keys not in the ledger, to be used for new zkapp_command
      we have the corresponding private keys, so we can create signatures for those new zkapp_command
   *)
+  let ledger_account_ids =
+    List.map ledger_accounts ~f:Account.identifier |> Account_id.Set.of_list
+  in
   let ledger_account_list =
     Account_id.Set.union_list
-      [ Ledger.accounts ledger
-      ; Account_id.Set.of_hashtbl_keys account_state_tbl
-      ]
+      [ ledger_account_ids; Account_id.Set.of_hashtbl_keys account_state_tbl ]
     |> Account_id.Set.to_list
   in
   let ledger_pk_list =
@@ -1564,7 +1581,7 @@ let gen_list_of_zkapp_command_from ?global_slot ?failure ?max_account_updates
     match account_state_tbl with
     | None ->
         let tbl = Account_id.Table.create () in
-        let accounts = Ledger.to_list ledger in
+        let accounts = Ledger.to_list_sequential ledger in
         List.iter accounts ~f:(fun acct ->
             let acct_id = Account.identifier acct in
             Account_id.Table.update tbl acct_id ~f:(function
@@ -1776,7 +1793,11 @@ let%test_module _ =
             (list_with_length 100
                (gen_zkapp_command_from ~no_account_precondition:true
                   ~fee_payer_keypair ~keymap ~no_token_accounts:true
-                  ~fee_range:("2", "4") ~balance_change_range:("0", "0.00001")
+                  ~fee_range:
+                    Currency.Fee.(of_mina_string_exn "2", of_mina_string_exn "4")
+                  ~balance_change_range:
+                    Currency.Amount.
+                      (of_mina_string_exn "0", of_mina_string_exn "0.00001")
                   ~account_state_tbl:(Account_id.Table.create ())
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100

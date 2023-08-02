@@ -494,7 +494,7 @@ module Rpcs = struct
     module V2 = struct
       module T = struct
         type query =
-          ( Consensus.Data.Consensus_state.Value.Stable.V1.t
+          ( Consensus.Data.Consensus_state.Value.Stable.V2.t
           , State_hash.Stable.V1.t )
           With_hash.Stable.V1.t
         [@@deriving sexp]
@@ -1482,21 +1482,25 @@ let broadcast_state t state =
   Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
   Gossip_net.Any.broadcast_state t.gossip_net msg
 
-let broadcast_transaction_pool_diff t diff =
-  log_gossip t.logger (Gossip_net.Message.Transaction_pool_diff diff)
+let broadcast_transaction_pool_diff ?nonce t diff =
+  log_gossip t.logger
+    (Gossip_net.Message.Transaction_pool_diff
+       { message = diff; nonce = Option.value ~default:0 nonce } )
     ~log_msg:(Gossip_transaction_pool_diff { txns = diff }) ;
   Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
-  Gossip_net.Any.broadcast_transaction_pool_diff t.gossip_net diff
+  Gossip_net.Any.broadcast_transaction_pool_diff ?nonce t.gossip_net diff
 
-let broadcast_snark_pool_diff t diff =
+let broadcast_snark_pool_diff ?nonce t diff =
   Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_broadcasted) ;
-  log_gossip t.logger (Gossip_net.Message.Snark_pool_diff diff)
+  log_gossip t.logger
+    (Gossip_net.Message.Snark_pool_diff
+       { message = diff; nonce = Option.value ~default:0 nonce } )
     ~log_msg:
       (Gossip_snark_pool_diff
          { work =
              Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
          } ) ;
-  Gossip_net.Any.broadcast_snark_pool_diff t.gossip_net diff
+  Gossip_net.Any.broadcast_snark_pool_diff ?nonce t.gossip_net diff
 
 let find_map xs ~f =
   let open Async in

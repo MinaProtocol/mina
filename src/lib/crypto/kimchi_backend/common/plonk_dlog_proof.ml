@@ -108,14 +108,6 @@ module type Inputs_intf = sig
       -> Curve.Affine.Backend.t array
       -> t Promise.t
 
-    val create_and_verify_async :
-         Index.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.t array
-      -> Curve.Affine.Backend.t array
-      -> t Promise.t
-
     val verify : Verifier_index.t -> t -> bool
 
     val batch_verify : Verifier_index.t array -> t array -> bool Promise.t
@@ -237,13 +229,33 @@ module Make (Inputs : Inputs_intf) = struct
     ; challenge_polynomial_commitment = g t.sg
     }
 
-  let lookup_eval_of_backend
-      ({ sorted; aggreg; table; runtime } : 'f Kimchi_types.lookup_evaluations)
-      : _ Pickles_types.Plonk_types.Evals.Lookup.t =
-    { sorted; aggreg; table; runtime }
-
   let eval_of_backend
-      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+      ({ w
+       ; coefficients
+       ; z
+       ; s
+       ; generic_selector
+       ; poseidon_selector
+       ; complete_add_selector
+       ; mul_selector
+       ; emul_selector
+       ; endomul_scalar_selector
+       ; range_check0_selector
+       ; range_check1_selector
+       ; foreign_field_add_selector
+       ; foreign_field_mul_selector
+       ; xor_selector
+       ; rot_selector
+       ; lookup_aggregation
+       ; lookup_table
+       ; lookup_sorted
+       ; runtime_lookup_table
+       ; runtime_lookup_table_selector
+       ; xor_lookup_selector
+       ; lookup_gate_lookup_selector
+       ; range_check_lookup_selector
+       ; foreign_field_mul_lookup_selector
+       } :
         Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
     { w = tuple15_to_vec w
     ; coefficients = tuple15_to_vec coefficients
@@ -251,7 +263,27 @@ module Make (Inputs : Inputs_intf) = struct
     ; s = tuple6_to_vec s
     ; generic_selector
     ; poseidon_selector
-    ; lookup = Option.map ~f:lookup_eval_of_backend lookup
+    ; complete_add_selector
+    ; mul_selector
+    ; emul_selector
+    ; endomul_scalar_selector
+    ; range_check0_selector
+    ; range_check1_selector
+    ; foreign_field_add_selector
+    ; foreign_field_mul_selector
+    ; xor_selector
+    ; rot_selector
+    ; lookup_aggregation
+    ; lookup_table
+    ; lookup_sorted =
+        Vector.init Nat.N5.n ~f:(fun i ->
+            Option.try_with_join (fun () -> lookup_sorted.(i)) )
+    ; runtime_lookup_table
+    ; runtime_lookup_table_selector
+    ; xor_lookup_selector
+    ; lookup_gate_lookup_selector
+    ; range_check_lookup_selector
+    ; foreign_field_mul_lookup_selector
     }
 
   let of_backend (t : Backend.t) : t =
@@ -288,11 +320,6 @@ module Make (Inputs : Inputs_intf) = struct
         }
       ~openings:{ proof; evals; ft_eval1 = t.ft_eval1 }
 
-  let lookup_eval_to_backend
-      { Pickles_types.Plonk_types.Evals.Lookup.sorted; aggreg; table; runtime }
-      : 'f Kimchi_types.lookup_evaluations =
-    { sorted; aggreg; table; runtime }
-
   let eval_to_backend
       { Pickles_types.Plonk_types.Evals.w
       ; coefficients
@@ -300,7 +327,25 @@ module Make (Inputs : Inputs_intf) = struct
       ; s
       ; generic_selector
       ; poseidon_selector
-      ; lookup
+      ; complete_add_selector
+      ; mul_selector
+      ; emul_selector
+      ; endomul_scalar_selector
+      ; range_check0_selector
+      ; range_check1_selector
+      ; foreign_field_add_selector
+      ; foreign_field_mul_selector
+      ; xor_selector
+      ; rot_selector
+      ; lookup_aggregation
+      ; lookup_table
+      ; lookup_sorted
+      ; runtime_lookup_table
+      ; runtime_lookup_table_selector
+      ; xor_lookup_selector
+      ; lookup_gate_lookup_selector
+      ; range_check_lookup_selector
+      ; foreign_field_mul_lookup_selector
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
     ; coefficients = tuple15_of_vec coefficients
@@ -308,7 +353,25 @@ module Make (Inputs : Inputs_intf) = struct
     ; s = tuple6_of_vec s
     ; generic_selector
     ; poseidon_selector
-    ; lookup = Option.map ~f:lookup_eval_to_backend lookup
+    ; complete_add_selector
+    ; mul_selector
+    ; emul_selector
+    ; endomul_scalar_selector
+    ; range_check0_selector
+    ; range_check1_selector
+    ; foreign_field_add_selector
+    ; foreign_field_mul_selector
+    ; xor_selector
+    ; rot_selector
+    ; lookup_aggregation
+    ; lookup_table
+    ; lookup_sorted = Vector.to_array lookup_sorted
+    ; runtime_lookup_table
+    ; runtime_lookup_table_selector
+    ; xor_lookup_selector
+    ; lookup_gate_lookup_selector
+    ; range_check_lookup_selector
+    ; foreign_field_mul_lookup_selector
     }
 
   let vec_to_array (type t elt)
@@ -399,26 +462,6 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let%map.Promise res =
       Backend.create_async pk primary auxiliary challenges commitments
-    in
-    of_backend res
-
-  let create_and_verify_async ?message pk ~primary ~auxiliary =
-    let chal_polys =
-      match (message : message option) with Some s -> s | None -> []
-    in
-    let challenges =
-      List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
-          challenges )
-      |> Array.concat
-    in
-    let commitments =
-      Array.of_list_map chal_polys
-        ~f:(fun { Challenge_polynomial.commitment; _ } ->
-          G.Affine.to_backend (Finite commitment) )
-    in
-    let%map.Promise res =
-      Backend.create_and_verify_async pk primary auxiliary challenges
-        commitments
     in
     of_backend res
 

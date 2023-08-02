@@ -1,8 +1,10 @@
+open Core_kernel
 open Import
 open Types
 open Pickles_types
 open Hlist
 open Snarky_backendless.Request
+open Common
 open Backend
 
 module Wrap = struct
@@ -12,6 +14,7 @@ module Wrap = struct
     type max_local_max_proofs_verifieds
 
     open Impls.Wrap
+    open Wrap_main_inputs
     open Snarky_backendless.Request
 
     type _ t +=
@@ -28,10 +31,6 @@ module Wrap = struct
           ( ( ( Challenge.Constant.t
               , Challenge.Constant.t Scalar_challenge.t
               , Field.Constant.t Shifted_value.Type2.t
-              , Field.Constant.t Shifted_value.Type2.t option
-              , Challenge.Constant.t Scalar_challenge.t
-                Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
-                option
               , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
                 , Tock.Rounds.n )
                 Vector.t
@@ -79,11 +78,6 @@ module Wrap = struct
             ( ( ( Challenge.Constant.t
                 , Challenge.Constant.t Scalar_challenge.t
                 , Tock.Field.t Shifted_value.Type2.t
-                , Tock.Field.t Shifted_value.Type2.t option
-                , Challenge.Constant.t Scalar_challenge.t
-                  Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup
-                  .t
-                  option
                 , ( Challenge.Constant.t Scalar_challenge.t
                     Bulletproof_challenge.t
                   , Tock.Rounds.n )
@@ -151,7 +145,7 @@ module Step = struct
   end
 
   let create :
-      type proofs_verified local_signature local_branches statement return_value auxiliary_value prev_values max_proofs_verified.
+      type proofs_verified local_signature local_branches statement return_value auxiliary_value prev_values prev_ret_values max_proofs_verified.
          unit
       -> (module S
             with type local_signature = local_signature

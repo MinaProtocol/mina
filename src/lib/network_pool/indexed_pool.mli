@@ -9,29 +9,6 @@ open Mina_base
 open Mina_transaction
 open Mina_numbers
 
-module Command_error : sig
-  type t =
-    | Invalid_nonce of
-        [ `Expected of Account.Nonce.t
-        | `Between of Account.Nonce.t * Account.Nonce.t ]
-        * Account.Nonce.t
-    | Insufficient_funds of
-        [ `Balance of Currency.Amount.t ] * Currency.Amount.t
-    | (* NOTE: don't punish for this, attackers can induce nodes to banlist
-          each other that way! *)
-        Insufficient_replace_fee of
-        [ `Replace_fee of Currency.Fee.t ] * Currency.Fee.t
-    | Overflow
-    | Bad_token
-    | Expired of
-        [ `Valid_until of Mina_numbers.Global_slot.t ]
-        * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
-    | Unwanted_fee_token of Mina_base.Token_id.t
-  [@@deriving sexp, to_yojson]
-
-  val grounds_for_diff_rejection : t -> bool
-end
-
 val replace_fee : Currency.Fee.t
 
 module Config : sig
@@ -47,7 +24,7 @@ module Sender_local_state : sig
 end
 
 (** Transaction pool. This is a purely functional data structure. *)
-type t [@@deriving sexp_of]
+type t [@@deriving equal, compare, sexp_of]
 
 val config : t -> Config.t
 
@@ -150,15 +127,30 @@ val revalidate :
      t
   -> logger:Logger.t
   -> [ `Entire_pool | `Subset of Account_id.Set.t ]
-  -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
-     (** Lookup an account in the new ledger *)
+  -> (Account_id.t -> Account.t) (** Lookup an account in the new ledger *)
   -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
 (** Get the global slot since genesis according to the pool's time controller. *)
-val global_slot_since_genesis : t -> Mina_numbers.Global_slot.t
+val global_slot_since_genesis : t -> Mina_numbers.Global_slot_since_genesis.t
 
 module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception
       there is a bug. *)
-  val assert_invariants : t -> unit
+  val assert_pool_consistency : t -> unit
+
+  val applicable_by_fee :
+       t
+    -> Transaction_hash.User_command_with_valid_signature.Set.t
+       Currency.Fee_rate.Map.t
+
+  val all_by_sender :
+       t
+    -> ( Transaction_hash.User_command_with_valid_signature.t F_sequence.t
+       * Currency.Amount.t )
+       Account_id.Map.t
+
+  val currency_consumed :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Transaction_hash.User_command_with_valid_signature.t
+    -> Currency.Amount.t option
 end

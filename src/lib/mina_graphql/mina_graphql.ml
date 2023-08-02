@@ -249,7 +249,14 @@ module Types = struct
 
     let block_time = BlockTime.typ ()
 
-    let global_slot = GlobalSlot.typ ()
+    let global_slot_since_genesis = GlobalSlotSinceGenesis.typ ()
+
+    (* type annotation required because we're not using this yet *)
+    let global_slot_since_hard_fork :
+        (Mina_lib.t, GlobalSlotSinceHardFork.t option) typ =
+      GlobalSlotSinceHardFork.typ ()
+
+    let global_slot_span = GlobalSlotSpan.typ ()
 
     let length = Length.typ ()
 
@@ -314,7 +321,8 @@ module Types = struct
         ; field "slot" ~typ:(non_null uint32)
             ~args:Arg.[]
             ~resolve:(fun _ global_slot -> C.slot global_slot)
-        ; field "globalSlot" ~typ:(non_null global_slot)
+        ; field "globalSlot"
+            ~typ:(non_null global_slot_since_hard_fork)
             ~args:Arg.[]
             ~resolve:(fun _ (global_slot : Consensus.Data.Consensus_time.t) ->
               C.to_global_slot global_slot )
@@ -346,7 +354,7 @@ module Types = struct
             ~resolve:(fun _ (time, _) -> time)
         ; field "globalSlotSinceGenesis"
             ~args:Arg.[]
-            ~typ:(non_null global_slot)
+            ~typ:(non_null global_slot_since_genesis)
             ~resolve:(fun _ (_, slot) -> slot)
         ] )
 
@@ -378,7 +386,7 @@ module Types = struct
               | Produce_now info ->
                   [ of_time ~consensus_constants info.time ] )
         ; field "globalSlotSinceGenesis"
-            ~typ:(non_null @@ list @@ non_null global_slot)
+            ~typ:(non_null @@ list @@ non_null global_slot_since_genesis)
             ~doc:"Next block production global-slot-since-genesis "
             ~args:Arg.[]
             ~resolve:(fun _
@@ -659,7 +667,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some timing_info.initial_minimum_balance )
-        ; field "cliffTime" ~typ:global_slot
+        ; field "cliffTime" ~typ:global_slot_since_genesis
             ~doc:"The cliff time for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -677,7 +685,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some timing_info.cliff_amount )
-        ; field "vestingPeriod" ~typ:global_slot
+        ; field "vestingPeriod" ~typ:global_slot_span
             ~doc:"The vesting period for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -1658,7 +1666,9 @@ module Types = struct
           ; abstract_field "feePayer"
               ~typ:(non_null AccountObj.account)
               ~args:[] ~doc:"Account that pays the fees for the command"
-          ; abstract_field "validUntil" ~typ:(non_null global_slot) ~args:[]
+          ; abstract_field "validUntil"
+              ~typ:(non_null global_slot_since_genesis)
+              ~args:[]
               ~doc:
                 "The global slot number after which this transaction cannot be \
                  applied"
@@ -1734,7 +1744,7 @@ module Types = struct
           ~args:[] ~doc:"Account that the command is sent from"
           ~resolve:(fun { ctx = mina; _ } cmd ->
             AccountObj.get_best_ledger_account mina
-              (Signed_command.source cmd.With_hash.data) )
+              (Signed_command.fee_payer cmd.With_hash.data) )
       ; field_no_status "receiver" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that the command applies to"
           ~resolve:(fun { ctx = mina; _ } cmd ->
@@ -1742,10 +1752,12 @@ module Types = struct
               (Signed_command.receiver cmd.With_hash.data) )
       ; field_no_status "feePayer" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that pays the fees for the command"
+          ~deprecated:(Deprecated (Some "use source field instead"))
           ~resolve:(fun { ctx = mina; _ } cmd ->
             AccountObj.get_best_ledger_account mina
               (Signed_command.fee_payer cmd.With_hash.data) )
-      ; field_no_status "validUntil" ~typ:(non_null global_slot) ~args:[]
+      ; field_no_status "validUntil" ~typ:(non_null global_slot_since_genesis)
+          ~args:[]
           ~doc:
             "The global slot number after which this transaction cannot be \
              applied" ~resolve:(fun _ cmd ->
@@ -1825,15 +1837,7 @@ module Types = struct
             | Applied | Enqueued ->
                 None
             | Included_but_failed failures ->
-                let rec first_failure = function
-                  | (failure :: _) :: _ ->
-                      Some failure
-                  | [] :: others ->
-                      first_failure others
-                  | [] ->
-                      None
-                in
-                first_failure failures )
+                List.concat failures |> List.hd )
       ]
 
     let payment =
@@ -1846,7 +1850,7 @@ module Types = struct
           field_no_status "delegator" ~typ:(non_null AccountObj.account)
             ~args:[] ~resolve:(fun { ctx = mina; _ } cmd ->
               AccountObj.get_best_ledger_account mina
-                (Signed_command.source cmd.With_hash.data) )
+                (Signed_command.fee_payer cmd.With_hash.data) )
           :: field_no_status "delegatee" ~typ:(non_null AccountObj.account)
                ~args:[] ~resolve:(fun { ctx = mina; _ } cmd ->
                  AccountObj.get_best_ledger_account mina
@@ -2682,7 +2686,8 @@ module Types = struct
       let arg_typ =
         obj "VrfMessageInput" ~doc:"The inputs to a vrf evaluation"
           ~coerce:(fun global_slot epoch_seed delegator_index ->
-            { Consensus_vrf.Layout.Message.global_slot
+            { Consensus_vrf.Layout.Message.global_slot =
+                Mina_numbers.Global_slot_since_hard_fork.of_uint32 global_slot
             ; epoch_seed = Mina_base.Epoch_seed.of_base58_check_exn epoch_seed
             ; delegator_index
             } )
@@ -2695,7 +2700,8 @@ module Types = struct
                 ~typ:(non_null int)
             ]
           ~split:(fun f (t : input) ->
-            f t.global_slot
+            f
+              (Mina_numbers.Global_slot_since_hard_fork.to_uint32 t.global_slot)
               (Mina_base.Epoch_seed.to_base58_check t.epoch_seed)
               t.delegator_index )
     end
@@ -3135,31 +3141,31 @@ module Types = struct
           { senders : Signature_lib.Private_key.t list
           ; receiver : Signature_lib.Public_key.Compressed.t
           ; amount : Currency.Amount.t
-          ; fee_min : Currency.Fee.t
-          ; fee_max : Currency.Fee.t
-          ; memo : string
-          ; transactions_per_second : float
-          ; duration_in_minutes : int
+          ; min_fee : Currency.Fee.t
+          ; max_fee : Currency.Fee.t
+          ; memo_prefix : string
+          ; tps : float
+          ; duration_min : int
           }
 
         let arg_typ =
           obj "PaymentsDetails"
             ~doc:"Keys and other information for scheduling payments"
-            ~coerce:(fun senders receiver amount fee_min fee_max memo
-                         transactions_per_second duration_in_minutes ->
+            ~coerce:(fun senders receiver amount min_fee max_fee memo_prefix tps
+                         duration_min ->
               Result.return
                 { senders
                 ; receiver
                 ; amount
-                ; fee_min
-                ; fee_max
-                ; memo
-                ; transactions_per_second
-                ; duration_in_minutes
+                ; min_fee
+                ; max_fee
+                ; memo_prefix
+                ; tps
+                ; duration_min
                 } )
             ~split:(fun f (t : input) ->
-              f t.senders t.receiver t.amount t.fee_min t.fee_max t.memo
-                t.transactions_per_second t.duration_in_minutes )
+              f t.senders t.receiver t.amount t.min_fee t.max_fee t.memo_prefix
+                t.tps t.duration_min )
             ~fields:
               Arg.
                 [ arg "senders"
@@ -3171,13 +3177,14 @@ module Types = struct
                 ; arg "amount"
                     ~typ:(non_null CurrencyAmount.arg_typ)
                     ~doc:"Amount for payments"
-                ; arg "feeMin" ~typ:(non_null Fee.arg_typ) ~doc:"Minimum fee"
-                ; arg "feeMax" ~typ:(non_null Fee.arg_typ) ~doc:"Maximum fee"
-                ; arg "memo" ~doc:"Memo, up to 32 characters"
+                ; arg "minFee" ~typ:(non_null Fee.arg_typ) ~doc:"Minimum fee"
+                ; arg "maxFee" ~typ:(non_null Fee.arg_typ) ~doc:"Maximum fee"
+                ; arg "memoPrefix" ~doc:"Memo, up to 32 characters"
                     ~typ:(non_null string)
-                ; arg "transactionsPerSecond" ~doc:"Frequency of transactions"
+                ; arg "tps"
+                    ~doc:"Frequency of transactions (transactions per second)"
                     ~typ:(non_null float)
-                ; arg "durationInMinutes" ~doc:"Length of scheduler run"
+                ; arg "durationMin" ~doc:"Length of scheduler run, in minutes"
                     ~typ:(non_null int)
                 ]
       end
@@ -3187,16 +3194,16 @@ module Types = struct
           { fee_payers : Signature_lib.Private_key.t list
           ; num_zkapps_to_deploy : int
           ; num_new_accounts : int
-          ; transactions_per_second : float
-          ; duration_in_minutes : int
+          ; tps : float
+          ; duration_min : int
           ; memo_prefix : string
           ; no_precondition : bool
-          ; min_balance_change : string
-          ; max_balance_change : string
-          ; init_balance : string
-          ; min_fee : string
-          ; max_fee : string
-          ; deployment_fee : string
+          ; min_balance_change : Currency.Amount.t
+          ; max_balance_change : Currency.Amount.t
+          ; init_balance : Currency.Amount.t
+          ; min_fee : Currency.Fee.t
+          ; max_fee : Currency.Fee.t
+          ; deployment_fee : Currency.Fee.t
           ; account_queue_size : int
           ; max_cost : bool
           }
@@ -3204,17 +3211,17 @@ module Types = struct
         let arg_typ =
           obj "ZkappCommandsDetails"
             ~doc:"Keys and other information for scheduling zkapp commands"
-            ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
-                         transactions_per_second duration_in_minutes memo_prefix
-                         no_precondition min_balance_change max_balance_change
-                         init_balance min_fee max_fee deployment_fee
-                         account_queue_size max_cost ->
+            ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts tps
+                         duration_min memo_prefix no_precondition
+                         min_balance_change max_balance_change init_balance
+                         min_fee max_fee deployment_fee account_queue_size
+                         max_cost ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
                 ; num_new_accounts
-                ; transactions_per_second
-                ; duration_in_minutes
+                ; tps
+                ; duration_min
                 ; memo_prefix
                 ; no_precondition
                 ; min_balance_change
@@ -3227,11 +3234,11 @@ module Types = struct
                 ; max_cost
                 } )
             ~split:(fun f (t : input) ->
-              f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
-                t.transactions_per_second t.duration_in_minutes t.memo_prefix
-                t.no_precondition t.min_balance_change t.max_balance_change
-                t.init_balance t.min_fee t.max_fee t.deployment_fee
-                t.account_queue_size t.max_cost )
+              f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts t.tps
+                t.duration_min t.memo_prefix t.no_precondition
+                t.min_balance_change t.max_balance_change t.init_balance
+                t.min_fee t.max_fee t.deployment_fee t.account_queue_size
+                t.max_cost )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3247,27 +3254,28 @@ module Types = struct
                     ~doc:
                       "Number of zkapp accounts that the scheduler generates \
                        during the test"
-                ; arg "transactionsPerSecond" ~typ:(non_null float)
-                    ~doc:"Frequency of transactions"
-                ; arg "durationInMinutes" ~doc:"Length of scheduler run"
+                ; arg "tps" ~typ:(non_null float)
+                    ~doc:"Frequency of transactions (transactions per seconds)"
+                ; arg "durationMin" ~doc:"Length of scheduler run, in minutes"
                     ~typ:(non_null int)
                 ; arg "memoPrefix" ~doc:"Prefix of memo" ~typ:(non_null string)
                 ; arg "noPrecondition"
                     ~doc:"Disable the precondition in account updates"
                     ~typ:(non_null bool)
                 ; arg "minBalanceChange" ~doc:"Minimum balance change"
-                    ~typ:(non_null string)
+                    ~typ:(non_null CurrencyAmount.arg_typ)
                 ; arg "maxBalanceChange" ~doc:"Maximum balance change"
-                    ~typ:(non_null string)
-                ; arg "initBalance" ~typ:(non_null string)
+                    ~typ:(non_null CurrencyAmount.arg_typ)
+                ; arg "initBalance"
+                    ~typ:(non_null CurrencyAmount.arg_typ)
                     ~doc:
                       "Initial balance for zkApp accounts that we initially \
                        deploy for the purpose of test"
-                ; arg "minFee" ~doc:"Minimum fee" ~typ:(non_null string)
-                ; arg "maxFee" ~doc:"Maximum fee" ~typ:(non_null string)
+                ; arg "minFee" ~doc:"Minimum fee" ~typ:(non_null Fee.arg_typ)
+                ; arg "maxFee" ~doc:"Maximum fee" ~typ:(non_null Fee.arg_typ)
                 ; arg "deploymentFee"
                     ~doc:"Fee for the initial deployment of zkApp accounts"
-                    ~typ:(non_null string)
+                    ~typ:(non_null Fee.arg_typ)
                 ; arg "accountQueueSize"
                     ~doc:"The size of queue for recently used accounts"
                     ~typ:(non_null int)
@@ -3330,7 +3338,8 @@ module Types = struct
   let vrf_message : ('context, Consensus_vrf.Layout.Message.t option) typ =
     let open Consensus_vrf.Layout.Message in
     obj "VrfMessage" ~doc:"The inputs to a vrf evaluation" ~fields:(fun _ ->
-        [ field "globalSlot" ~typ:(non_null global_slot)
+        [ field "globalSlot"
+            ~typ:(non_null global_slot_since_hard_fork)
             ~args:Arg.[]
             ~resolve:(fun _ { global_slot; _ } -> global_slot)
         ; field "epochSeed" ~typ:(non_null epoch_seed)
@@ -3461,6 +3470,19 @@ module Types = struct
               | None ->
                   t.threshold_met )
         ] )
+
+  let get_filtered_log_entries =
+    obj "GetFilteredLogEntries" ~fields:(fun _ ->
+        [ field "logMessages"
+            ~typ:(non_null (list (non_null string)))
+            ~doc:"Structured log messages since the given offset"
+            ~args:Arg.[]
+            ~resolve:(fun _ (logs, _) -> logs)
+        ; field "isCapturing" ~typ:(non_null bool)
+            ~doc:"Whether we are capturing structured log messages"
+            ~args:Arg.[]
+            ~resolve:(fun _ (_, is_started) -> is_started)
+        ] )
 end
 
 module Subscriptions = struct
@@ -3526,6 +3548,16 @@ module Mutations = struct
       ~args:
         Arg.[ arg "input" ~typ:(non_null Types.Input.AddAccountInput.arg_typ) ]
       ~resolve:create_account_resolver
+
+  let start_filtered_log =
+    field "startFilteredLog"
+      ~doc:
+        "TESTING ONLY: Start filtering and recording all structured events in \
+         memory"
+      ~typ:(non_null bool)
+      ~args:Arg.[ arg "filter" ~typ:(non_null (list (non_null string))) ]
+      ~resolve:(fun { ctx = t; _ } () filter ->
+        Result.is_ok @@ Mina_lib.start_filtered_log t filter )
 
   let create_account =
     io_field "createAccount"
@@ -3784,7 +3816,7 @@ module Mutations = struct
           Transition_frontier.Breadcrumb.staged_ledger breadcrumb
           |> Staged_ledger.ledger
         in
-        let accounts = Ledger.to_list best_tip_ledger in
+        let%bind accounts = Ledger.to_list best_tip_ledger in
         let constraint_constants =
           Genesis_constants.Constraint_constants.compiled
         in
@@ -3841,7 +3873,8 @@ module Mutations = struct
                   Ledger.apply_zkapp_command_unchecked ~constraint_constants
                     ~global_slot:
                       ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
-                      |> Consensus.Data.Consensus_state.curr_global_slot )
+                      |> Consensus.Data.Consensus_state
+                         .global_slot_since_genesis )
                     ~state_view ledger zkapp_command
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)
@@ -3885,7 +3918,7 @@ module Mutations = struct
     let open Result.Let_syntax in
     (* TODO: We should put a more sensible default here. *)
     let valid_until =
-      Option.map ~f:Mina_numbers.Global_slot.of_uint32 valid_until
+      Option.map ~f:Mina_numbers.Global_slot_since_genesis.of_uint32 valid_until
     in
     let%bind fee =
       result_of_exn Currency.Fee.of_uint64 fee
@@ -3976,7 +4009,7 @@ module Mutations = struct
                     (from, to_, fee, valid_until, memo, nonce_opt) signature ->
         let body =
           Signed_command_payload.Body.Stake_delegation
-            (Set_delegate { delegator = from; new_delegate = to_ })
+            (Set_delegate { new_delegate = to_ })
         in
         match signature with
         | None ->
@@ -4002,10 +4035,7 @@ module Mutations = struct
                     signature ->
         let body =
           Signed_command_payload.Body.Payment
-            { source_pk = from
-            ; receiver_pk = to_
-            ; amount = Amount.of_uint64 amount
-            }
+            { receiver_pk = to_; amount = Amount.of_uint64 amount }
         in
         match signature with
         | None ->
@@ -4079,7 +4109,7 @@ module Mutations = struct
           in
           let body =
             Signed_command_payload.Body.Payment
-              { source_pk; receiver_pk; amount = Amount.of_uint64 amount }
+              { receiver_pk; amount = Amount.of_uint64 amount }
           in
           let memo = "" in
           let kp =
@@ -4341,6 +4371,7 @@ module Mutations = struct
 
   let commands =
     [ add_wallet
+    ; start_filtered_log
     ; create_account
     ; create_hd_account
     ; unlock_account
@@ -4385,186 +4416,187 @@ module Mutations = struct
         ~typ:(non_null string)
         ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
           return
-          @@
-          match (with_seq_no, input) with
-          | false, _ ->
-              Error "Missing sequence information"
-          | true, Error err ->
-              Error (sprintf "Invalid input to payment scheduler: %s" err)
-          | true, Ok payment_details ->
-              let max_memo_len = Signed_command_memo.max_input_length in
-              if List.is_empty payment_details.senders then
-                Error "Empty list of senders"
-              else if String.length payment_details.memo > max_memo_len then
-                Error
-                  (sprintf "Memo too long, limited to %d characters"
-                     max_memo_len )
-              else if
-                Currency.Fee.( < ) payment_details.fee_max
-                  payment_details.fee_min
-              then Error "Maximum fee less than mininum fee"
-              else
-                let logger = Mina_lib.top_level_logger mina in
-                let senders = payment_details.senders |> Array.of_list in
-                let num_senders = Array.length senders in
-                let sources =
-                  Array.map senders ~f:(fun sender ->
-                      Signature_lib.Public_key.of_private_key_exn sender
-                      |> Signature_lib.Public_key.compress )
-                in
-                Option.value_map (get_ledger_and_breadcrumb mina)
-                  ~default:(Error "Could not get best tip ledger")
-                  ~f:(fun (ledger, _tip) ->
-                    let nonce_opts =
-                      Array.map sources ~f:(fun source ->
-                          let open Option.Let_syntax in
-                          let acct_id =
-                            Account_id.create source Token_id.default
-                          in
-                          let%bind loc =
-                            Ledger.location_of_account ledger acct_id
-                          in
-                          let%map { nonce; _ } = Ledger.get ledger loc in
-                          nonce )
-                      |> Array.zip_exn sources
-                    in
-                    let missing_nonces =
-                      Array.filter nonce_opts ~f:(fun (_source, nonce_opt) ->
-                          Option.is_none nonce_opt )
-                    in
-                    if not @@ Array.is_empty missing_nonces then
-                      let missing_nonce_pks =
-                        Array.to_list missing_nonces
-                        |> List.map ~f:(fun (source, _nonce_opt) ->
-                               Signature_lib.Public_key.Compressed.to_yojson
-                                 source
-                               |> Yojson.Safe.to_string )
-                      in
-                      Error
-                        (sprintf "Could not get nonces for accounts: %s"
-                           (String.concat ~sep:"," missing_nonce_pks) )
-                    else
-                      let nonces =
-                        Array.map nonce_opts ~f:(fun (_source, nonce_opt) ->
-                            Option.value_exn nonce_opt )
-                      in
-                      let memo =
-                        Signed_command_memo.create_from_string_exn
-                          payment_details.memo
-                      in
-                      let uuid = Uuid.create_random Random.State.default in
-                      let ivar = Ivar.create () in
-                      ( match
-                          Uuid.Table.add scheduler_tbl ~key:uuid ~data:ivar
-                        with
-                      | `Ok ->
-                          ()
-                      | `Duplicate ->
-                          failwith
-                            "Unexpected duplicate scheduled payments handle" ) ;
-                      let wait_span =
-                        1. /. payment_details.transactions_per_second
-                        |> Time.Span.of_sec
-                      in
-                      let duration_span =
-                        Time.Span.of_min
-                          (Float.of_int payment_details.duration_in_minutes)
-                      in
-                      let tm_start = Time.now () in
-                      let tm_end = Time.add tm_start duration_span in
-                      let rec go ndx tm_next =
-                        if Time.( >= ) (Time.now ()) tm_end then (
-                          [%log info]
-                            "Scheduled payments with handle %s has expired"
-                            (Uuid.to_string uuid) ;
-                          Uuid.Table.remove scheduler_tbl uuid ;
-                          Deferred.unit )
-                        else if Ivar.is_full ivar then (
-                          [%log info]
-                            "Stopping scheduled payments with handle %s"
-                            (Uuid.to_string uuid) ;
-                          Uuid.Table.remove scheduler_tbl uuid ;
-                          Deferred.unit )
-                        else
-                          let sender = senders.(ndx) in
-                          let source_pk =
-                            Signature_lib.Public_key.of_private_key_exn sender
-                            |> Signature_lib.Public_key.compress
-                          in
-                          let receiver_pk = payment_details.receiver in
-                          let fee =
-                            Quickcheck.random_value ~seed:`Nondeterministic
-                            @@ Currency.Fee.gen_incl payment_details.fee_min
-                                 payment_details.fee_max
-                          in
-                          let body =
-                            Signed_command_payload.Body.Payment
-                              { source_pk
-                              ; receiver_pk
-                              ; amount = payment_details.amount
-                              }
-                          in
-                          let valid_until = None in
-                          let nonce = nonces.(ndx) in
-                          let payload =
-                            Signed_command_payload.create ~fee
-                              ~fee_payer_pk:source_pk ~nonce ~valid_until ~memo
-                              ~body
-                          in
-                          let signature =
-                            Ok (Signed_command.sign_payload sender payload)
-                          in
-                          [%log info]
-                            "Payment scheduler with handle %s is sending a \
-                             payment from sender %s"
-                            (Uuid.to_string uuid)
-                            ( Signature_lib.Public_key.Compressed.to_yojson
-                                source_pk
-                            |> Yojson.Safe.to_string )
-                            ~metadata:
-                              [ ( "receiver"
-                                , Signature_lib.Public_key.Compressed.to_yojson
-                                    receiver_pk )
-                              ; ("nonce", Account.Nonce.to_yojson nonce)
-                              ; ("fee", Currency.Fee.to_yojson fee)
-                              ; ( "amount"
-                                , Currency.Amount.to_yojson
-                                    payment_details.amount )
-                              ; ("memo", `String payment_details.memo)
-                              ] ;
-                          let%bind () =
-                            let fee = Currency.Fee.to_uint64 fee in
-                            let memo = Some payment_details.memo in
-                            match%bind
-                              send_signed_user_command ~mina
-                                ~nonce_opt:(Some nonce) ~signer:source_pk ~memo
-                                ~fee ~fee_payer_pk:source_pk ~valid_until ~body
-                                ~signature
-                            with
-                            | Ok _cmd_with_status ->
-                                Deferred.unit
-                            | Error err ->
-                                [%log error]
-                                  "Payment scheduler with handle %s got error \
-                                   when sending payment from sender %s"
-                                  (Uuid.to_string uuid)
-                                  ( Signature_lib.Public_key.Compressed.to_yojson
-                                      source_pk
-                                  |> Yojson.Safe.to_string )
-                                  ~metadata:[ ("error", `String err) ] ;
-                                Deferred.unit
-                          in
-                          (* next nonce for this sender *)
-                          nonces.(ndx) <- Account.Nonce.succ nonce ;
-                          let%bind () = Async_unix.at tm_next in
-                          let next_tm_next = Time.add tm_next wait_span in
-                          go ((ndx + 1) mod num_senders) next_tm_next
-                      in
-                      [%log info] "Starting payment scheduler with handle %s"
-                        (Uuid.to_string uuid) ;
-                      let tm_next = Time.add tm_start wait_span in
-                      don't_wait_for @@ go 0 tm_next ;
-                      Ok (Uuid.to_string uuid) ) )
+          @@ O1trace.sync_thread "itn_schedule_payments"
+          @@ fun () ->
+          let%bind.Result () =
+            Result.ok_if_true with_seq_no ~error:"Missing sequence information"
+          in
+          let%bind.Result payment_details =
+            Result.map_error
+              ~f:(sprintf "Invalid input to payment scheduler: %s")
+              input
+          in
+          let max_memo_len = Signed_command_memo.max_input_length in
+          let%bind.Result () =
+            Result.ok_if_true ~error:"Empty list of senders"
+            @@ not
+            @@ List.is_empty payment_details.senders
+          in
+          let%bind.Result () =
+            (* TODO subtract expected length of suffix from the memo prefix length check *)
+            Result.ok_if_true
+              ~error:
+                (sprintf "Memo too long, limited to %d characters" max_memo_len)
+              (String.length payment_details.memo_prefix <= max_memo_len)
+          in
+          let%bind.Result () =
+            let open Currency.Fee in
+            Result.ok_if_true ~error:"Maximum fee less than mininum fee"
+              (payment_details.max_fee >= payment_details.min_fee)
+          in
+          let logger = Mina_lib.top_level_logger mina in
+          let senders = payment_details.senders |> Array.of_list in
+          let num_senders = Array.length senders in
+          let sources =
+            Array.map senders ~f:(fun sender ->
+                Signature_lib.Public_key.of_private_key_exn sender
+                |> Signature_lib.Public_key.compress )
+          in
+          let%bind.Result ledger, _tip =
+            Result.of_option ~error:"Could not get best tip ledger"
+              (get_ledger_and_breadcrumb mina)
+          in
+          let nonce_opts =
+            Array.map sources ~f:(fun source ->
+                let open Option.Let_syntax in
+                let acct_id = Account_id.create source Token_id.default in
+                let%bind loc = Ledger.location_of_account ledger acct_id in
+                let%map { nonce; _ } = Ledger.get ledger loc in
+                nonce )
+            |> Array.zip_exn sources
+          in
+          let missing_nonces =
+            Array.filter nonce_opts ~f:(fun (_source, nonce_opt) ->
+                Option.is_none nonce_opt )
+          in
+          let%bind.Result () =
+            if Array.is_empty missing_nonces then Ok ()
+            else
+              let missing_nonce_pks =
+                Array.to_list missing_nonces
+                |> List.map ~f:(fun (source, _nonce_opt) ->
+                       Signature_lib.Public_key.Compressed.to_yojson source
+                       |> Yojson.Safe.to_string )
+              in
+              Error
+                (sprintf "Could not get nonces for accounts: %s"
+                   (String.concat ~sep:"," missing_nonce_pks) )
+          in
+          let nonces =
+            Array.map nonce_opts ~f:(fun (_source, nonce_opt) ->
+                Option.value_exn nonce_opt )
+          in
+          let uuid = Uuid.create_random Random.State.default in
+          let ivar = Ivar.create () in
+          ( match Uuid.Table.add scheduler_tbl ~key:uuid ~data:ivar with
+          | `Ok ->
+              ()
+          | `Duplicate ->
+              failwith "Unexpected duplicate scheduled payments handle" ) ;
+          let wait_span = 1. /. payment_details.tps |> Time.Span.of_sec in
+          let wait_span_ms = Time.Span.to_ms wait_span |> int_of_float in
+          let duration_span =
+            Time.Span.of_min (Float.of_int payment_details.duration_min)
+          in
+          let tm_start = Time.now () in
+          let tm_end = Time.add tm_start duration_span in
+          let send_payments counter =
+            let ndx = counter mod num_senders in
+            O1trace.thread "itn_send_scheduled_payments"
+            @@ fun () ->
+            let sender = senders.(ndx) in
+            let source_pk =
+              Signature_lib.Public_key.of_private_key_exn sender
+              |> Signature_lib.Public_key.compress
+            in
+            let receiver_pk = payment_details.receiver in
+            let fee =
+              Quickcheck.random_value ~seed:`Nondeterministic
+              @@ Currency.Fee.gen_incl payment_details.min_fee
+                   payment_details.max_fee
+            in
+            let body =
+              Signed_command_payload.Body.Payment
+                { receiver_pk; amount = payment_details.amount }
+            in
+            let valid_until = None in
+            let nonce = nonces.(ndx) in
+            let memo = sprintf "%s-%d" payment_details.memo_prefix counter in
+            let payload =
+              Signed_command_payload.create ~fee ~fee_payer_pk:source_pk ~nonce
+                ~valid_until
+                ~memo:(Signed_command_memo.create_from_string_exn memo)
+                ~body
+            in
+            let signature = Ok (Signed_command.sign_payload sender payload) in
+            [%log info]
+              "Payment scheduler with handle %s is sending a payment from \
+               sender %s"
+              (Uuid.to_string uuid)
+              ( Signature_lib.Public_key.Compressed.to_yojson source_pk
+              |> Yojson.Safe.to_string )
+              ~metadata:
+                [ ( "receiver"
+                  , Signature_lib.Public_key.Compressed.to_yojson receiver_pk )
+                ; ("nonce", Account.Nonce.to_yojson nonce)
+                ; ("fee", Currency.Fee.to_yojson fee)
+                ; ("amount", Currency.Amount.to_yojson payment_details.amount)
+                ; ("memo", `String memo)
+                ] ;
+            let fee = Currency.Fee.to_uint64 fee in
+            match%map
+              send_signed_user_command ~mina ~nonce_opt:(Some nonce)
+                ~signer:source_pk ~memo:(Some memo) ~fee ~fee_payer_pk:source_pk
+                ~valid_until ~body ~signature
+            with
+            | Ok _cmd_with_status ->
+                (* next nonce for this sender *)
+                nonces.(ndx) <- Account.Nonce.succ nonce
+            | Error err ->
+                [%log error]
+                  "Payment scheduler with handle %s got error when sending \
+                   payment from sender %s"
+                  (Uuid.to_string uuid)
+                  ( Signature_lib.Public_key.Compressed.to_yojson source_pk
+                  |> Yojson.Safe.to_string )
+                  ~metadata:[ ("error", `String err) ]
+          in
+          let rec go counter tm_next =
+            let open Time in
+            if now () >= tm_end then (
+              [%log info] "Scheduled payments with handle %s has expired"
+                (Uuid.to_string uuid) ;
+              Uuid.Table.remove scheduler_tbl uuid ;
+              Deferred.unit )
+            else if Ivar.is_full ivar then (
+              [%log info] "Stopping scheduled payments with handle %s"
+                (Uuid.to_string uuid) ;
+              Uuid.Table.remove scheduler_tbl uuid ;
+              Deferred.unit )
+            else
+              let%bind () = send_payments counter in
+              let%bind () = Async_unix.at tm_next in
+              let next_tm_next = add tm_next wait_span in
+              let now = now () in
+              let next_tm_next =
+                if next_tm_next <= now then
+                  (* This is done to ensure there is no effect of transactions coming out one by one,
+                     let there be some pause under any cricumstances *)
+                  let span = diff now next_tm_next |> Span.to_ms in
+                  let additive =
+                    wait_span_ms - (int_of_float span % wait_span_ms)
+                    |> float_of_int |> Span.of_ms
+                  in
+                  add now additive
+                else next_tm_next
+              in
+              go (counter + 1) next_tm_next
+          in
+          [%log info] "Starting payment scheduler with handle %s"
+            (Uuid.to_string uuid) ;
+          let tm_next = Time.add tm_start wait_span in
+          don't_wait_for @@ go 0 tm_next ;
+          Ok (Uuid.to_string uuid) )
 
     let account_of_id id ledger =
       Mina_ledger.Ledger.location_of_account ledger id
@@ -4579,38 +4611,44 @@ module Mutations = struct
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
         ~constraint_constants ~logger ~memo_prefix ~wait_span ~stop_signal
         ~stop_time ~uuid keypairs =
+      O1trace.thread "itn_deploy_zkapps"
+      @@ fun () ->
       let fee_payer_accounts =
         Array.map fee_payer_array ~f:(fun key -> account_of_kp key ledger)
       in
       let fee_payer_nonces =
         Array.map fee_payer_accounts ~f:(fun account -> ref account.nonce)
       in
-      let ndx = ref 0 in
       let num_fee_payers = Array.length fee_payer_array in
-      Deferred.List.iter keypairs ~f:(fun kp ->
-          if Time.(now () >= stop_time) then (
-            [%log info]
-              "Scheduled zkapp commands with handle %s has expired, stop \
-               deployment of zkapp accounts"
-              (Uuid.to_string uuid) ;
-            Uuid.Table.remove scheduler_tbl uuid ;
-            return () )
-          else if Ivar.is_full stop_signal then (
-            [%log info]
-              "Scheduled zkapp commands with handle %s received stop signal, \
-               stop deployment of zkapp accounts"
-              (Uuid.to_string uuid) ;
-            Uuid.Table.remove scheduler_tbl uuid ;
-            return () )
+      let finished () =
+        if Time.(now () >= stop_time) then (
+          [%log info]
+            "Scheduled zkapp commands with handle %s has expired, stop \
+             deployment of zkapp accounts"
+            (Uuid.to_string uuid) ;
+          Uuid.Table.remove scheduler_tbl uuid ;
+          true )
+        else if Ivar.is_full stop_signal then (
+          [%log info]
+            "Scheduled zkapp commands with handle %s received stop signal, \
+             stop deployment of zkapp accounts"
+            (Uuid.to_string uuid) ;
+          Uuid.Table.remove scheduler_tbl uuid ;
+          true )
+        else false
+      in
+      Deferred.List.iteri keypairs ~f:(fun i kp ->
+          let ndx = i mod num_fee_payers in
+          if finished () then Deferred.unit
           else
-            let fee_payer_keypair = fee_payer_array.(!ndx) in
-            let memo = sprintf "%s-%s" memo_prefix (Int.to_string !ndx) in
+            let fee_payer_keypair = fee_payer_array.(ndx) in
+            let memo = sprintf "%s-%d" memo_prefix i in
             let spec =
               { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
-                  (fee_payer_keypair, !(fee_payer_nonces.(!ndx)))
-              ; fee = Currency.Fee.of_mina_string_exn deployment_fee
+                  (fee_payer_keypair, !(fee_payer_nonces.(ndx)))
+              ; fee = deployment_fee
               ; fee_payer = None
-              ; amount = Currency.Amount.of_mina_string_exn init_balance
+              ; amount = init_balance
               ; zkapp_account_keypairs = [ kp ]
               ; memo = Signed_command_memo.create_from_string_exn memo
               ; new_zkapp_account = true
@@ -4632,19 +4670,21 @@ module Mutations = struct
                 spec
             in
             let%bind () = after wait_span in
-            let rec go () =
+            Deferred.repeat_until_finished ()
+            @@ fun () ->
+            if finished () then Deferred.return (`Finished ())
+            else
               match%bind send_zkapp_command mina zkapp_command with
               | Ok _ ->
-                  fee_payer_nonces.(!ndx) :=
-                    Account.Nonce.succ !(fee_payer_nonces.(!ndx)) ;
-                  ndx := (!ndx + 1) mod num_fee_payers ;
+                  fee_payer_nonces.(ndx) :=
+                    Account.Nonce.succ !(fee_payer_nonces.(ndx)) ;
                   [%log info]
                     "Successfully submitted zkApp command that creates a zkApp \
                      account"
                     ~metadata:
                       [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
                       ] ;
-                  Deferred.unit
+                  Deferred.return (`Finished ())
               | Error err ->
                   [%log info] "Failed to setup a zkApp account, try again"
                     ~metadata:
@@ -4652,9 +4692,7 @@ module Mutations = struct
                       ; ("error", `String err)
                       ] ;
                   let%bind () = after wait_span in
-                  go ()
-            in
-            go () )
+                  Deferred.return (`Repeat ()) )
 
     let is_zkapp_deployed kp ledger =
       match
@@ -4698,11 +4736,10 @@ module Mutations = struct
               ~wait_span ~stop_signal ~stop_time ~uuid keypairs )
           else return ()
         in
+        let%bind accounts = Ledger.to_list ledger in
         [%log debug] "The accounts were not in the best tip $ledger, try again"
           ~metadata:
-            [ ( "ledger"
-              , `List (List.map (Ledger.to_list ledger) ~f:Account.to_yojson) )
-            ] ;
+            [ ("ledger", `List (List.map accounts ~f:Account.to_yojson)) ] ;
         let%bind () =
           Async.after
             (Time.Span.of_ms
@@ -4729,7 +4766,8 @@ module Mutations = struct
           if not with_seq_no then return @@ Error "Missing sequence information"
           else
             return
-            @@
+            @@ O1trace.sync_thread "itn_schedule_zkapp_commands"
+            @@ fun () ->
             match input with
             | Error err ->
                 Error
@@ -4755,12 +4793,14 @@ module Mutations = struct
                         "Unexpected duplicate scheduled zkApp commands handle"
                   ) ;
                   let wait_span =
-                    1. /. zkapp_command_details.transactions_per_second
-                    |> Time.Span.of_sec
+                    1. /. zkapp_command_details.tps |> Time.Span.of_sec
+                  in
+                  let wait_span_ms =
+                    Time.Span.to_ms wait_span |> int_of_float
                   in
                   let duration_span =
                     Time.Span.of_min
-                      (Float.of_int zkapp_command_details.duration_in_minutes)
+                      (Float.of_int zkapp_command_details.duration_min)
                   in
                   let tm_start = Time.now () in
                   let tm_end = Time.add tm_start duration_span in
@@ -4832,7 +4872,8 @@ module Mutations = struct
                                 ~key:(Account.identifier a) ~data:(a, role)
                             else ()
                           in
-                          let rec go ~account_state_tbl ~ndx ~tm_next ~counter =
+                          let rec go ~account_state_tbl ~tm_next ~counter =
+                            let ndx = counter mod num_fee_payers in
                             if Time.( >= ) (Time.now ()) tm_end then (
                               [%log info]
                                 "Scheduled zkApp commands with handle %s has \
@@ -4850,6 +4891,8 @@ module Mutations = struct
                             else
                               let fee_payer = fee_payer_array.(ndx) in
                               let%bind () =
+                                O1trace.thread "itn_send_zkapp_commands"
+                                @@ fun () ->
                                 match get_ledger_and_breadcrumb mina with
                                 | None ->
                                     [%log info]
@@ -4879,19 +4922,10 @@ module Mutations = struct
                                       number_of_accounts_generated
                                       < zkapp_command_details.num_new_accounts
                                     in
-                                    let (fee_payer_account : Account.t), _ =
-                                      Account_id.Table.find_exn
-                                        account_state_tbl
-                                        (Account_id.of_public_key
-                                           fee_payer.public_key )
-                                    in
                                     let memo =
-                                      Printf.sprintf "%s-%s-%s-%s"
+                                      sprintf "%s-%d"
                                         zkapp_command_details.memo_prefix
-                                        (Int.to_string_hum ndx)
-                                        (Mina_numbers.Account_nonce.to_string
-                                           fee_payer_account.nonce )
-                                        (Int.to_string_hum counter)
+                                        counter
                                     in
                                     let zkapp_command_with_dummy_auth =
                                       Quickcheck.Generator.generate
@@ -4966,10 +5000,26 @@ module Mutations = struct
                                             ] )
                               in
                               let%bind () = Async_unix.at tm_next in
-                              let next_tm_next = Time.add tm_next wait_span in
-                              go ~account_state_tbl
-                                ~ndx:((ndx + 1) mod num_fee_payers)
-                                ~tm_next:next_tm_next ~counter:(counter + 1)
+                              let open Time in
+                              let next_tm_next = add tm_next wait_span in
+                              let now = now () in
+                              let next_tm_next =
+                                if next_tm_next <= now then
+                                  (* This is done to ensure there is no effect of transactions coming out one by one,
+                                     let there be some pause under any cricumstances *)
+                                  let span =
+                                    diff now next_tm_next |> Span.to_ms
+                                  in
+                                  let additive =
+                                    wait_span_ms
+                                    - (int_of_float span % wait_span_ms)
+                                    |> float_of_int |> Span.of_ms
+                                  in
+                                  add now additive
+                                else next_tm_next
+                              in
+                              go ~account_state_tbl ~tm_next:next_tm_next
+                                ~counter:(counter + 1)
                           in
 
                           upon
@@ -5002,8 +5052,9 @@ module Mutations = struct
                                     Time.add (Time.now ()) wait_span
                                   in
                                   don't_wait_for
-                                  @@ go ~account_state_tbl ~ndx:0 ~tm_next
-                                       ~counter:0 ) ;
+                                  @@ go ~account_state_tbl ~tm_next
+                                       ~counter:
+                                         (List.length zkapp_account_keypairs) ) ;
 
                           Ok (Uuid.to_string uuid) ) ) )
 
@@ -5019,6 +5070,8 @@ module Mutations = struct
           let logger = Mina_lib.top_level_logger mina in
           if not with_seq_no then return @@ Error "Missing sequence information"
           else
+            O1trace.sync_thread "itn_stop_scheduled_transactions"
+            @@ fun () ->
             try
               let uuid = Uuid.of_string handle in
               match Uuid.Table.find scheduler_tbl uuid with
@@ -5054,6 +5107,8 @@ module Mutations = struct
             ]
         ~typ:(non_null string)
         ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
+          O1trace.thread "itn_update_gating"
+          @@ fun () ->
           if not with_seq_no then return @@ Error "Missing sequence information"
           else
             let%bind.Deferred.Result { trusted_peers
@@ -5123,6 +5178,8 @@ module Mutations = struct
             ]
         ~typ:(non_null string)
         ~resolve:(fun { ctx = with_seq_no, _; _ } () end_log_id ->
+          O1trace.thread "itn_flush_internal_logs"
+          @@ fun () ->
           if not with_seq_no then return @@ Error "Missing sequence information"
           else
             let n = Itn_logger.flush_queue end_log_id in
@@ -5341,6 +5398,13 @@ module Queries = struct
       ~doc:"The version of the node (git commit hash)"
       ~resolve:(fun _ _ -> Some Mina_version.commit_id)
 
+  let get_filtered_log_entries =
+    field "getFilteredLogEntries"
+      ~typ:(non_null Types.get_filtered_log_entries)
+      ~args:Arg.[ arg "offset" ~typ:(non_null int) ]
+      ~doc:"TESTING ONLY: Retrieve all new structured events in memory"
+      ~resolve:(fun { ctx = t; _ } () i -> Mina_lib.get_filtered_log_entries t i)
+
   let tracked_accounts_resolver { ctx = mina; _ } () =
     let wallets = Mina_lib.wallets mina in
     let block_production_pubkeys = Mina_lib.block_production_pubkeys mina in
@@ -5441,7 +5505,7 @@ module Queries = struct
             [] )
 
   let token_accounts =
-    field "tokenAccounts" ~doc:"Find all accounts for a token ID"
+    io_field "tokenAccounts" ~doc:"Find all accounts for a token ID"
       ~typ:(non_null (list (non_null Types.AccountObj.account)))
       ~args:
         Arg.
@@ -5451,25 +5515,28 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () token_id ->
         match get_ledger_and_breadcrumb mina with
         | Some (ledger, breadcrumb) ->
-            let accounts = Ledger.accounts ledger in
-            Account_id.Set.fold accounts ~init:[] ~f:(fun acct_objs acct_id ->
-                if Token_id.(Account_id.token_id acct_id <> token_id) then
-                  acct_objs
-                else
-                  (* account id in the ledger, lookup should always succeed *)
-                  let loc =
-                    Option.value_exn
-                    @@ Ledger.location_of_account ledger acct_id
-                  in
-                  let account = Option.value_exn @@ Ledger.get ledger loc in
-                  let partial_account =
-                    Types.AccountObj.Partial_account.of_full_account ~breadcrumb
-                      account
-                  in
-                  Types.AccountObj.lift mina account.public_key partial_account
-                  :: acct_objs )
+            let%map.Deferred accounts = Ledger.accounts ledger in
+            Ok
+              (Account_id.Set.fold accounts ~init:[]
+                 ~f:(fun acct_objs acct_id ->
+                   if Token_id.(Account_id.token_id acct_id <> token_id) then
+                     acct_objs
+                   else
+                     (* account id in the ledger, lookup should always succeed *)
+                     let loc =
+                       Option.value_exn
+                       @@ Ledger.location_of_account ledger acct_id
+                     in
+                     let account = Option.value_exn @@ Ledger.get ledger loc in
+                     let partial_account =
+                       Types.AccountObj.Partial_account.of_full_account
+                         ~breadcrumb account
+                     in
+                     Types.AccountObj.lift mina account.public_key
+                       partial_account
+                     :: acct_objs ) )
         | None ->
-            [] )
+            return (Ok []) )
 
   let token_owner =
     field "tokenOwner" ~doc:"Find the account that owns a given token"
@@ -5807,10 +5874,7 @@ module Queries = struct
         let open Deferred.Result.Let_syntax in
         let body =
           Signed_command_payload.Body.Payment
-            { source_pk = from
-            ; receiver_pk = to_
-            ; amount = Amount.of_uint64 amount
-            }
+            { receiver_pk = to_; amount = Amount.of_uint64 amount }
         in
         let%bind signature =
           match signature with
@@ -5930,6 +5994,7 @@ module Queries = struct
     [ sync_status
     ; daemon_status
     ; version
+    ; get_filtered_log_entries
     ; owned_wallets (* deprecated *)
     ; tracked_accounts
     ; wallet (* deprecated *)
@@ -5980,7 +6045,8 @@ module Queries = struct
         ~doc:"Slots won by a block producer for current epoch"
         ~resolve:(fun { ctx = with_seq_no, mina; _ } () ->
           Io.return
-          @@
+          @@ O1trace.sync_thread "itn_slots_won"
+          @@ fun () ->
           if not with_seq_no then Error "Missing sequence information"
           else
             let bp_keys = Mina_lib.block_production_pubkeys mina in
@@ -5995,7 +6061,8 @@ module Queries = struct
               in
               List.map (Queue.to_list vrf_state.queue)
                 ~f:(fun { global_slot; _ } ->
-                  Unsigned.UInt32.to_int global_slot ) )
+                  Mina_numbers.Global_slot_since_hard_fork.to_int global_slot )
+          )
 
     let internal_logs =
       io_field "internalLogs"
@@ -6008,7 +6075,8 @@ module Queries = struct
         ~doc:"Internal logs generated by the daemon"
         ~resolve:(fun { ctx = with_seq_no, _mina; _ } _ start_log_id ->
           Io.return
-          @@
+          @@ O1trace.sync_thread "itn_internal_logs"
+          @@ fun () ->
           if not with_seq_no then Error "Missing sequence information"
           else Ok (Itn_logger.get_logs start_log_id) )
 

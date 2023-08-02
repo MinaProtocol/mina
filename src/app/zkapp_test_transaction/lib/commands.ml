@@ -95,7 +95,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   let global_slot =
     Mina_state.Protocol_state.Body.consensus_state state_body
     |> Consensus.Data.Consensus_state.global_slot_since_genesis
-    |> Mina_numbers.Global_slot.succ
+    |> Mina_numbers.Global_slot_since_genesis.succ
   in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
@@ -188,7 +188,8 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   printf "(ZkApp transaction graphQL input %s\n\n%!"
     (graphql_zkapp_command zkapp_command) ;
   printf "Updated accounts\n" ;
-  List.iter (Ledger.to_list ledger) ~f:(fun acc ->
+  let%bind accounts = Ledger.to_list ledger in
+  List.iter accounts ~f:(fun acc ->
       printf "Account: %s\n%!"
         ( Genesis_ledger_helper_lib.Accounts.Single.of_account acc None
         |> Runtime_config.Accounts.Single.to_yojson |> Yojson.Safe.to_string ) ) ;
@@ -198,7 +199,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let global_slot =
     Mina_state.Protocol_state.Body.consensus_state state_body
     |> Consensus.Data.Consensus_state.global_slot_since_genesis
-    |> Mina_numbers.Global_slot.succ
+    |> Mina_numbers.Global_slot_since_genesis.succ
   in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
@@ -608,8 +609,8 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   in
   zkapp_command
 
-let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-    ~permissions ~current_auth =
+let update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~snapp_update
+    ~current_auth =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
@@ -622,7 +623,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; zkapp_account_keypairs = [ zkapp_keypair ]
     ; memo = Util.memo memo
     ; new_zkapp_account = false
-    ; snapp_update = { Account_update.Update.dummy with permissions }
+    ; snapp_update
     ; current_auth
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []

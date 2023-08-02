@@ -1,8 +1,10 @@
 (** Generic (polymorphic instance of [challenge_polynomial]) *)
 val challenge_polynomial :
-     (module Pickles_types.Shifted_value.Field_intf with type t = 'a)
-  -> 'a array
-  -> ('a -> 'a) Core_kernel.Staged.t
+     one:'a
+  -> add:('a -> 'b -> 'b)
+  -> mul:('b -> 'b -> 'b)
+  -> 'b array
+  -> ('b -> 'b) Core_kernel.Staged.t
 
 type 'a index' = 'a Pickles_types.Plonk_verification_key_evals.t
 
@@ -120,13 +122,6 @@ val finalize_other_proof :
        Import.Scalar_challenge.t
      , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
        Pickles_types.Shifted_value.Type2.t
-     , ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-         Pickles_types.Shifted_value.Type2.t
-       , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-         Snarky_backendless.Boolean.t )
-       Composition_types.Opt.t
-     , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-       Snarky_backendless.Boolean.t
      , ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Import.Scalar_challenge.t
          Import.Bulletproof_challenge.t

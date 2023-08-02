@@ -49,162 +49,7 @@ module Engine = struct
 
       val stop : t -> unit Malleable_error.t
 
-      type signed_command_result =
-        { id : string
-        ; hash : Transaction_hash.t
-        ; nonce : Mina_numbers.Account_nonce.t
-        }
-
-      val graphql_uri : t -> string
-
-      val send_payment :
-           logger:Logger.t
-        -> t
-        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
-        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
-        -> fee:Currency.Fee.t
-        -> signed_command_result Deferred.Or_error.t
-
-      val must_send_payment :
-           logger:Logger.t
-        -> t
-        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
-        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
-        -> fee:Currency.Fee.t
-        -> signed_command_result Malleable_error.t
-
-      val send_payment_with_raw_sig :
-           logger:Logger.t
-        -> t
-        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
-        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
-        -> fee:Currency.Fee.t
-        -> nonce:Mina_numbers.Account_nonce.t
-        -> memo:string
-        -> valid_until:Mina_numbers.Global_slot.t
-        -> raw_signature:string
-        -> signed_command_result Deferred.Or_error.t
-
-      val must_send_payment_with_raw_sig :
-           logger:Logger.t
-        -> t
-        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
-        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
-        -> fee:Currency.Fee.t
-        -> nonce:Mina_numbers.Account_nonce.t
-        -> memo:string
-        -> valid_until:Mina_numbers.Global_slot.t
-        -> raw_signature:string
-        -> signed_command_result Malleable_error.t
-
-      val send_delegation :
-           logger:Logger.t
-        -> t
-        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
-        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> fee:Currency.Fee.t
-        -> signed_command_result Deferred.Or_error.t
-
-      val must_send_delegation :
-           logger:Logger.t
-        -> t
-        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
-        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> fee:Currency.Fee.t
-        -> signed_command_result Malleable_error.t
-
-      val set_snark_worker :
-           logger:Logger.t
-        -> t
-        -> new_snark_pub_key:Signature_lib.Public_key.Compressed.t
-        -> unit Deferred.Or_error.t
-
-      val must_set_snark_worker :
-           logger:Logger.t
-        -> t
-        -> new_snark_pub_key:Signature_lib.Public_key.Compressed.t
-        -> unit Malleable_error.t
-
-      (** Send a batch of zkApp transactions.
-          Returned is a list of transaction id *)
-      val send_zkapp_batch :
-           logger:Logger.t
-        -> t
-        -> zkapp_commands:Mina_base.Zkapp_command.t list
-        -> string list Deferred.Or_error.t
-
-      val must_send_test_payments :
-           repeat_count:Unsigned.UInt32.t
-        -> repeat_delay_ms:Unsigned.UInt32.t
-        -> logger:Logger.t
-        -> t
-        -> senders:Signature_lib.Private_key.t list
-        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
-        -> fee:Currency.Fee.t
-        -> unit Malleable_error.t
-
-      type account_data =
-        { nonce : Mina_numbers.Account_nonce.t
-        ; total_balance : Currency.Balance.t
-        ; liquid_balance_opt : Currency.Balance.t option
-        ; locked_balance_opt : Currency.Balance.t option
-        }
-
-      val get_account_data :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> account_data Deferred.Or_error.t
-
-      val must_get_account_data :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> account_data Malleable_error.t
-
-      val get_account_permissions :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Mina_base.Permissions.t Deferred.Or_error.t
-
-      (** the returned Update.t is constructed from the fields of the
-          given account, as if it had been applied to the account
-      *)
-      val get_account_update :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Mina_base.Account_update.Update.t Deferred.Or_error.t
-
-      val get_pooled_zkapp_commands :
-           logger:Logger.t
-        -> t
-        -> pk:Signature_lib.Public_key.Compressed.t
-        -> string list Deferred.Or_error.t
-
-      val get_peer_id :
-        logger:Logger.t -> t -> (string * string list) Deferred.Or_error.t
-
-      val must_get_peer_id :
-        logger:Logger.t -> t -> (string * string list) Malleable_error.t
-
-      val get_best_chain :
-           ?max_length:int
-        -> logger:Logger.t
-        -> t
-        -> best_chain_block list Deferred.Or_error.t
-
-      val must_get_best_chain :
-           ?max_length:int
-        -> logger:Logger.t
-        -> t
-        -> best_chain_block list Malleable_error.t
+      val get_ingress_uri : t -> Uri.t
 
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
@@ -216,8 +61,6 @@ module Engine = struct
 
       val dump_precomputed_blocks :
         logger:Logger.t -> t -> unit Malleable_error.t
-
-      val get_metrics : logger:Logger.t -> t -> metrics_t Deferred.Or_error.t
     end
 
     type t
@@ -336,6 +179,11 @@ module Dsl = struct
       ; global_slot : int
       ; snarked_ledgers_generated : int
       ; blocks_generated : int
+      ; num_transition_frontier_loaded_from_persistence : int
+      ; num_persisted_frontier_loaded : int
+      ; num_persisted_frontier_fresh_boot : int
+      ; num_bootstrap_required : int
+      ; num_persisted_frontier_dropped : int
       ; node_initialization : bool String.Map.t
       ; gossip_received : Gossip_state.t String.Map.t
       ; best_tips_by_node : State_hash.t String.Map.t
@@ -371,6 +219,7 @@ module Dsl = struct
       | Block_height_growth
       | Zkapp_to_be_included_in_frontier
       | Persisted_frontier_loaded
+      | Transition_frontier_loaded_from_persistence
 
     val wait_condition_id : t -> wait_condition_id
 
@@ -402,6 +251,9 @@ module Dsl = struct
       has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
 
     val persisted_frontier_loaded : Engine.Network.Node.t -> t
+
+    val transition_frontier_loaded_from_persistence :
+      fresh_data:bool -> sync_needed:bool -> t
   end
 
   module type S = sig
