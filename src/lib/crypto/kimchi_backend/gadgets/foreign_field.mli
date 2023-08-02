@@ -203,7 +203,7 @@ val check_bound :
 (* bound *)
 
 (** Gadget to check the supplied value is a canonical foreign field element for the
- * supplied foreign field modulus
+ *  supplied foreign field modulus
  *
  *    This gadget checks in the circuit that a value is less than the foreign field modulus.
  *    Part of this involves computing a bound value that is both added to external_checks

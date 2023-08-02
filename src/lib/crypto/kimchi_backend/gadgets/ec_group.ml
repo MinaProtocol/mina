@@ -256,8 +256,12 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   Foreign_field.External_checks.add_bound_check external_checks
     ~do_multi_range_check:false right_delta ;
 
+  (* C5: RxΔ * s = RxΔs *)
+  let right_delta_s =
+    Foreign_field.mul
       (module Circuit)
       external_checks right_delta slope curve.modulus
+  in
 
   (* Bounds 5: Left input (right_delta) already covered by (Bounds 4)
    *           Right input (slope) already covered by (Bounds 1).
@@ -557,7 +561,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Right input (Py) is gadget input (checked by caller).
    *           Addition result (2Py) checked below (multiplication input)
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.add_bound_check external_checks
     ~do_multi_range_check:false point_y2 ;
 
   (* C8: 2Py * s = 2Pys *)
@@ -792,8 +796,8 @@ let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
        *           Result bound check below (multiplication input)
        *)
       (* Add x_squared_a bound check *)
-      Foreign_field.External_checks.add_bound_check
-        ~do_multi_range_check:false external_checks x_squared_a ;
+      Foreign_field.External_checks.add_bound_check ~do_multi_range_check:false
+        external_checks x_squared_a ;
       x_squared_a )
     else x_squared
   in
@@ -830,8 +834,8 @@ let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
        *)
 
       (* Add x_cubed_ax_b bound check *)
-      Foreign_field.External_checks.add_bound_check
-        ~do_multi_range_check:false external_checks x_cubed_ax_b ;
+      Foreign_field.External_checks.add_bound_check ~do_multi_range_check:false
+        external_checks x_cubed_ax_b ;
 
       x_cubed_ax_b )
     else x_cubed_ax

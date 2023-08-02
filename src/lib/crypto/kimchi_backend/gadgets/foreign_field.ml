@@ -894,7 +894,7 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
     in
 
     (* Add external check for multi-range-check of result *)
-    External_checks.append_multi_range_check external_checks
+    External_checks.add_multi_range_check external_checks
     @@ Element.Standard.to_limbs result ;
 
     (* Update left input for next iteration *)
@@ -926,7 +926,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
     sum_setup (module Circuit) left_input right_input Add foreign_field_modulus
   in
   (* Add external check for multi-range-check of result *)
-  External_checks.append_multi_range_check external_checks
+  External_checks.add_multi_range_check external_checks
   @@ Element.Standard.to_limbs result ;
 
   result
@@ -950,7 +950,7 @@ let sub (type f) (module Circuit : Snark_intf.Run with type field = f)
     sum_setup (module Circuit) left_input right_input Sub foreign_field_modulus
   in
   (* Add external check for multi-range-check of result *)
-  External_checks.append_multi_range_check external_checks
+  External_checks.add_multi_range_check external_checks
   @@ Element.Standard.to_limbs result ;
   result
 
@@ -1618,11 +1618,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
             (* Sanity tests *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 2) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 0) ;
-
             assert (Mina_stdlib.List.Length.equal external_checks.ranges 1) ;
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
-                0 ) ;
 
             (* Perform external checks *)
             constrain_external_checks
