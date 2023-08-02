@@ -12,7 +12,7 @@ let tuple6_of_array array =
   | _ ->
       assert false
 
-(* Gadget to assert signature scalars r,s \in Fn \ 0
+(* Gadget to assert signature scalars r,s \in [1, n] where n is the curve order.
  * Must be used when r and s are not public parameters
  *
  *   Scalar field external checks:
