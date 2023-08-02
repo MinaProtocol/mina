@@ -300,6 +300,13 @@ build_deb mina-zkapp-test-transaction
 ##################################### END ZKAPP TEST TXN PACKAGE #######################################
 
 ##################################### BERKELEY PACKAGE #######################################
+
+if [ -z ${DUNE_INSTRUMENT_WITH+x} ]; then
+MINA_DEB_NAME=mina-berkeley
+else
+MINA_DEB_NAME=mina-instrumented-berkeley
+fi 
+
 echo "------------------------------------------------------------"
 echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
