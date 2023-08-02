@@ -920,11 +920,9 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
 
             let base_range_checks_count = ref 440 in
             if Bignum_bigint.(curve.bignum.a <> zero) then
-              base_range_checks_count :=
-                !base_range_checks_count + 1 ;
+              base_range_checks_count := !base_range_checks_count + 1 ;
             if Bignum_bigint.(curve.bignum.b <> zero) then
-              base_range_checks_count :=
-                !base_range_checks_count + 1 ;
+              base_range_checks_count := !base_range_checks_count + 1 ;
             assert (
               Mina_stdlib.List.Length.equal base_checks.ranges
                 !base_range_checks_count ) ;
