@@ -323,7 +323,7 @@ val result_row :
  *
  *     left_input * right_input = quotient * foreign_field_modulus + remainder
  *
- *   where remainder is the product.
+ *   where remainder is the product in the foreign field (might not be canonical)
  *
  *   Inputs:
  *     external_checks       := Context to track required external checks
@@ -334,7 +334,7 @@ val result_row :
  *   Outputs:
  *     Inserts the ForeignFieldMul gate, followed by Zero gate into the circuit
  *     Appends required values to external_checks
- *     Returns the product
+ *     Returns the product (remainder term) of the multiplication
  *)
 val mul :
      (module Snark_intf.Run with type field = 'f)
