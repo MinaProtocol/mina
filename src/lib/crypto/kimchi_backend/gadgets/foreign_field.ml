@@ -1488,6 +1488,46 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   Element.Standard.of_limbs (remainder0, remainder1, remainder2)
 
+(* Helper to constrain that a limb is a linear combination
+   of a list of Cvar bytes in little endian order *)
+let limb_as_linear_combination_of_bytes (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (limb_bytes : Circuit.Field.t list) : Circuit.Field.t =
+  let open Circuit in
+  List.foldi limb_bytes ~init:Field.zero ~f:(fun i acc byte ->
+      let offset = Common.two_pow (module Circuit) (8 * i) in
+      Field.((constant offset * byte) + acc) )
+
+(* Helper to constrain that a standard element is a linear combination
+   of a list of Cvar bytes in little endian order *)
+let standard_element_as_linear_combination_of_bytes (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (bytestring : Circuit.Field.t list) : f Element.Standard.t =
+  let open Circuit in
+  (* Split bytes into chunks of 11 bytes *)
+  let chunks = List.chunks_of bytestring ~length:(Common.limb_bits / 8) in
+
+  (* Obtain limbs combining bytes of each chunk *)
+  let limbs =
+    List.map chunks ~f:(fun chunk ->
+        limb_as_linear_combination_of_bytes (module Circuit) chunk )
+  in
+
+  (* Fill up with zeros in case a small element is given *)
+  let limbs =
+    match limbs with
+    | [ l0 ] ->
+        (l0, Field.zero, Field.zero)
+    | [ l0; l1 ] ->
+        (l0, l1, Field.zero)
+    | [ l0; l1; l2 ] ->
+        (l0, l1, l2)
+    | _ ->
+        failwith "Invalid number of limbs"
+  in
+
+  Element.Standard.of_limbs limbs
+
 (* Gadget to constrain conversion of bytes array (output of Keccak gadget)
  * into foreign field element with standard limbs (input of ECDSA gadget).
  * Include the endianness of the bytes list.
@@ -1498,13 +1538,14 @@ let bytes_to_standard_element (type f)
     (bytestring : Circuit.Field.t list) (fmod : f standard_limbs)
     (fmod_bitlen : int) =
   let open Circuit in
-  (* Make the input bytestring a big endian value *)
+  (* Make the input bytestring a little endian value *)
   let bytestring =
-    match endian with Little -> List.rev bytestring | Big -> bytestring
+    match endian with Little -> bytestring | Big -> List.rev bytestring
   in
+  (* Most significant byte *)
+  let msb = List.last_exn bytestring in
 
-  (* Convert the bytestring into a bigint *)
-  let bytestring = Array.of_list bytestring in
+  (* Convert the bytestring into a standard element *)
 
   (* C1: Check modulus_bit_length = # of bits you unpack
    * This is partly implicit in the circuit given the number of byte outputs of Keccak:
@@ -1513,18 +1554,16 @@ let bytes_to_standard_element (type f)
    * · input_bitlen > fmod_bitlen : CONSTRAIN
    * Check that the most significant byte of the input is less than 2^(fmod_bitlen % 8)
    *)
-  let input_bitlen = Array.length bytestring * 8 in
+  let input_bitlen = List.length bytestring * 8 in
   if input_bitlen > fmod_bitlen then
     (* For the most significant one, constrain that it is less bits than required *)
-    Lookup.less_than_bits
-      (module Circuit)
-      ~bits:(fmod_bitlen % 8) bytestring.(0) ;
+    Lookup.less_than_bits (module Circuit) ~bits:(fmod_bitlen % 8) msb ;
+
   (* C2: Constrain bytes into standard foreign field element limbs => foreign field element z *)
   let elem =
-    Element.Standard.of_bignum_bigint (module Circuit)
-    @@ Common.cvar_field_bytes_to_bignum_bigint_as_prover (module Circuit)
-    @@ Array.to_list bytestring
+    standard_element_as_linear_combination_of_bytes (module Circuit) bytestring
   in
+
   (* C3: Reduce z modulo foreign_field_modulus
    *
    *   Constrain z' = z + 0 modulo foreign_field_modulus using foreign field addition gate
