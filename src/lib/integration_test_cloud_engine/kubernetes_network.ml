@@ -6,6 +6,10 @@ open Mina_transaction
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
 
+let config_path = ref "N/A"
+
+let id _ = "cloud"
+
 let mina_archive_container_id = "archive"
 
 let mina_archive_username = "mina"
@@ -96,7 +100,7 @@ module Node = struct
     Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
       (base_kube_args config @ [ "cp"; "-c"; container_id; tmp_file; dest_file ])
 
-  let start ~fresh_state node : unit Malleable_error.t =
+  let[@warning "-27"] start ?(git_commit = "") ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
     let%bind () =
       if fresh_state then
@@ -409,7 +413,7 @@ module Node = struct
       let%bind () = after (Time.Span.of_sec initial_delay_sec) in
       retry num_tries
 
-  let get_peer_id ~logger t =
+  let get_peer_ids ~logger t =
     let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
       ~metadata:(logger_metadata t) ;
@@ -417,7 +421,7 @@ module Node = struct
     let%bind query_result_obj =
       exec_graphql_request ~logger ~node:t ~query_name:"query_peer_id" query_obj
     in
-    [%log info] "get_peer_id, finished exec_graphql_request" ;
+    [%log info] "get_peer_ids, finished exec_graphql_request" ;
     let self_id_obj = query_result_obj.daemonStatus.addrsAndPorts.peer in
     let%bind self_id =
       match self_id_obj with
@@ -433,8 +437,8 @@ module Node = struct
       (String.concat ~sep:" " peer_ids) ;
     return (self_id, peer_ids)
 
-  let must_get_peer_id ~logger t =
-    get_peer_id ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+  let must_get_peer_ids ~logger t =
+    get_peer_ids ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let get_best_chain ?max_length ~logger t =
     let open Deferred.Or_error.Let_syntax in
