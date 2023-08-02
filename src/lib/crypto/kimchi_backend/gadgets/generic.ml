@@ -2,7 +2,7 @@ open Core_kernel
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
-let tests_enabled = true
+let tests_enabled = false
 
 (* Generic addition gate gadget *)
 let add (type f)

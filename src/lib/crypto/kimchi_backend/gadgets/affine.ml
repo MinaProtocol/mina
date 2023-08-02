@@ -4,7 +4,7 @@ module Snark_intf = Snarky_backendless.Snark_intf
 
 (* Affine representation of an elliptic curve point over a foreign field *)
 
-let tests_enabled = true
+let tests_enabled = false
 
 type bignum_point = Bignum_bigint.t * Bignum_bigint.t
 

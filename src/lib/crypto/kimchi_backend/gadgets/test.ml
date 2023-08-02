@@ -1,3 +1,5 @@
+open Core_kernel
+
 let tests_enabled = true
 
 let%test_unit "custom gates integration" =
@@ -155,7 +157,7 @@ let%test_unit "custom gates integration" =
   ()
 
 let%test_unit "keccak ecdsa converter" =
-  ( if tests_enabled then
+  if tests_enabled then (
     let (* Import the gadget test runner *)
     open Kimchi_gadgets_test_runner in
     let open Foreign_field in
@@ -175,7 +177,6 @@ let%test_unit "keccak ecdsa converter" =
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
-            let open Bitwise in
             let secp256k1_modulus =
               bignum_bigint_to_field_const_standard_limbs (module Runner.Impl)
               @@ Common.bignum_bigint_of_hex
@@ -186,7 +187,8 @@ let%test_unit "keccak ecdsa converter" =
             let bytestring =
               List.map
                 ~f:(fun byte ->
-                  exists Field.typ ~compute:(fun () -> Field.of_int byte) )
+                  exists Field.typ ~compute:(fun () ->
+                      Field.Constant.of_int byte ) )
                 bytestring
             in
 
@@ -206,42 +208,158 @@ let%test_unit "keccak ecdsa converter" =
       cs
     in
 
+    (* Test 1 limb *)
     let _cs =
       test_converter
-        [ 0x3f
+        [ 0x84; 0xc0; 0xd7; 0x28; 0xb6; 0x92; 0x8a; 0x0f; 0x4c; 0x29; 0xab ]
+        Keccak.Little
+    in
+    (* Test 2 limbs *)
+    let _cs =
+      test_converter
+        [ 0x28
+        ; 0x74
+        ; 0xab
+        ; 0x98
+        ; 0xc8
+        ; 0x23
+        ; 0xa8
         ; 0xff
-        ; 0xe2
-        ; 0x7b
-        ; 0x14
+        ; 0x4d
+        ; 0x91
         ; 0xba
-        ; 0xa7
-        ; 0x40
-        ; 0xdb
-        ; 0x0c
-        ; 0x8b
-        ; 0xb6
-        ; 0x65
-        ; 0x6d
-        ; 0xe6
-        ; 0x1d
-        ; 0x28
-        ; 0x71
-        ; 0xa6
-        ; 0x40
-        ; 0x93
-        ; 0x90
-        ; 0x8a
-        ; 0xf6
-        ; 0x18
-        ; 0x1f
-        ; 0x46
-        ; 0x35
-        ; 0x1a
-        ; 0x1c
-        ; 0x19
-        ; 0x09
+        ; 0x81
+        ; 0x97
+        ; 0xc7
+        ; 0x81
+        ; 0xd6
+        ; 0x86
+        ; 0xa8
+        ; 0xd2
+        ; 0xb8
+        ; 0x27
+        ; 0x97
         ]
         Keccak.Little
     in
+    (* Test 256 bits (f-1) *)
+    let cs =
+      test_converter
+        [ 0x2e
+        ; 0xfc
+        ; 0xff
+        ; 0xff
+        ; 0xfe
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ]
+        Keccak.Little
+    in
+    print_endline "256 BITS > F" ;
+    (* Test f < x < 257 bits *)
+    let _cs =
+      test_converter ~cs
+        [ 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ; 0xff
+        ]
+        Keccak.Little
+    in
+
+    (* NEGATIVE TESTS *)
+    (* Fails because input is larger than 256 bits *)
+    assert (
+      Common.is_error (fun () ->
+          test_converter
+            [ 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x00
+            ; 0x01
+            ]
+            Keccak.Little ) ) ;
+
     () ) ;
   ()

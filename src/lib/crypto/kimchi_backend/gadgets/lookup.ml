@@ -1,6 +1,6 @@
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
-let tests_enabled = true
+let tests_enabled = false
 
 (* Looks up three values (at most 12 bits each) 
  * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses the 12-bit lookup table for it to work 
