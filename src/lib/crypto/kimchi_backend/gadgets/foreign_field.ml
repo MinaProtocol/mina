@@ -1618,7 +1618,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
             (* Sanity tests *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 2) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 0) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.ranges 1) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 3) ;
 
             (* Perform external checks *)
             constrain_external_checks
@@ -1973,7 +1973,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
             (* More sanity checks *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 6) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 5) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.ranges 6) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 12) ;
 
             (* Perform external checks *)
             constrain_external_checks
