@@ -3,7 +3,7 @@ resource "kubernetes_priority_class" "testnet_priority_class" {
     name = "${var.testnet_name}-nonpreemptible-priority-class"
   }
 
-  value = var.pod_priority
+  value             = var.pod_priority
   preemption_policy = "Never"
-  global_default = false
+  global_default    = false
 }
