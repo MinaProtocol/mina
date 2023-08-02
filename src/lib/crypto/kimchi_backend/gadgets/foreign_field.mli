@@ -246,6 +246,7 @@ val constrain_external_checks :
 (** Gadget for a chain of foreign field sums (additions or subtractions)
  *
  *    Inputs:
+ *      external_checks       := Context to track required external checks
  *      inputs                := All the inputs to the chain of sums
  *      operations            := List of operation modes Add or Sub indicating whether the
  *                               corresponding addition is a subtraction
@@ -259,6 +260,7 @@ val constrain_external_checks :
  *)
 val sum_chain :
      (module Snark_intf.Run with type field = 'f)
+  -> 'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t list (* inputs *)
   -> op_mode list (* operations *)
   -> 'f standard_limbs (* foreign_field_modulus *)
@@ -270,6 +272,7 @@ val sum_chain :
  *    Inputs:
  *      final                 := Whether it is the final operation of a chain.
  *                               Default is false (does not add final result row)
+ *      external_checks       := Context to track required external checks
  *      left_input            := Foreign field element
  *      right_input           := Foreign field element
  *      foreign_field_modulus := Foreign field modulus
@@ -281,6 +284,7 @@ val sum_chain :
 val add :
      (module Snark_intf.Run with type field = 'f)
   -> ?final:bool
+  -> 'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
@@ -292,6 +296,7 @@ val add :
  *    Inputs:
  *      final                 := Whether it is the final operation of a chain.
  *                               Default is false (does not add final result row)
+ *      external_checks       := Context to track required external checks
  *      left_input            := Foreign field element
  *      right_input           := Foreign field element
  *      foreign_field_modulus := Foreign field modulus
@@ -303,6 +308,7 @@ val add :
 val sub :
      (module Snark_intf.Run with type field = 'f)
   -> ?final:bool
+  -> 'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
@@ -323,7 +329,7 @@ val result_row :
  *
  *     left_input * right_input = quotient * foreign_field_modulus + remainder
  *
- *   where remainder is the product.
+ *   where remainder is the product in the foreign field (might not be canonical)
  *
  *   Inputs:
  *     external_checks       := Context to track required external checks
@@ -334,7 +340,7 @@ val result_row :
  *   Outputs:
  *     Inserts the ForeignFieldMul gate, followed by Zero gate into the circuit
  *     Appends required values to external_checks
- *     Returns the product
+ *     Returns the product (remainder term) of the multiplication
  *)
 val mul :
      (module Snark_intf.Run with type field = 'f)
@@ -352,6 +358,7 @@ val mul :
  *)
 val bytes_to_standard_element :
      (module Snark_intf.Run with type field = 'f)
+  -> 'f External_checks.t (* external_checks *)
   -> endian:Keccak.endianness
   -> 'f Snarky_backendless.Cvar.t list
   -> 'f standard_limbs
