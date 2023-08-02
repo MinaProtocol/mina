@@ -1017,6 +1017,56 @@ let combine t1 t2 =
   ; epoch_data = opt_fallthrough ~default:t1.epoch_data t2.epoch_data
   }
 
+let make_fork_config ~staged_ledger ~global_slot ~protocol_state_hash
+    (runtime_config : t) =
+  let rec map_results ~f = function
+    | [] ->
+        Result.return []
+    | r :: rs ->
+        let open Result.Let_syntax in
+        let%bind r' = f r in
+        let%map rs = map_results ~f rs in
+        r' :: rs
+  in
+  let accounts_or_error =
+    Staged_ledger.ledger staged_ledger
+    |> Mina_base.Ledger.foldi ~init:[] ~f:(fun _ accum act -> act :: accum)
+    |> map_results ~f:Json_layout.Accounts.Single.of_account
+  in
+  Result.map accounts_or_error ~f:(fun accounts ->
+      let ledger = Option.value_exn runtime_config.ledger in
+      let previous_length =
+        let open Option.Let_syntax in
+        let%bind proof = runtime_config.proof in
+        let%map fork = proof.fork in
+        fork.previous_length + global_slot
+      in
+      let fork =
+        Fork_config.
+          { previous_state_hash =
+              Mina_base.State_hash.to_base58_check protocol_state_hash
+          ; previous_length = Option.value ~default:global_slot previous_length
+          ; previous_global_slot = global_slot
+          }
+      in
+      let update =
+        make
+        (* add_genesis_winner must be set to false, because this
+           config effectively creates a continuation of the current
+           blockchain state and therefore the genesis ledger already
+           contains the winner of the previous block. No need to
+           artificially add it. In fact, it wouldn't work at all,
+           because the new node would try to create this account at
+           startup, even though it already exists, leading to an error.*)
+          ~ledger:
+            { ledger with
+              base = Accounts accounts
+            ; add_genesis_winner = Some false
+            }
+          ~proof:(Proof_keys.make ~fork ()) ()
+      in
+      combine runtime_config update )
+
 module Test_configs = struct
   let bootstrap =
     lazy
