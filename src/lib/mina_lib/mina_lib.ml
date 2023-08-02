@@ -585,23 +585,23 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
       | None ->
           ()
     in
-    let handle_status_change state status =
-      ( match status with
+    let handle_status_change sync_status =
+      ( match sync_status with
       | `Offline ->
           start_offline_timeout ()
       | _ ->
           stop_offline_timeout () ) ;
-      match state with
+      match sync_status with
       | `Bootstrap ->
           start_bootstrap_timeout ()
       | _ ->
           stop_bootstrap_timeout ()
     in
     Observer.on_update_exn observer ~f:(function
-      | Initialized value ->
-          handle_status_change `Listening value
-      | Changed (state, value) ->
-          handle_status_change state value
+      | Initialized sync_status ->
+          handle_status_change sync_status
+      | Changed (_old_sync_status, new_sync_status) ->
+          handle_status_change new_sync_status
       | Invalidated ->
           () ) ) ;
   (* recompute Mina status on an interval *)
