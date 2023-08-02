@@ -186,8 +186,7 @@ let%test_unit "keccak ecdsa converter" =
             let bytestring =
               List.map
                 ~f:(fun byte ->
-                  exists Field.typ ~compute:(fun () ->
-                      Common.field_of_hex (module Runner.Impl) byte ) )
+                  exists Field.typ ~compute:(fun () -> Field.of_int byte) )
                 bytestring
             in
 
@@ -209,38 +208,38 @@ let%test_unit "keccak ecdsa converter" =
 
     let _cs =
       test_converter
-        [ "3f"
-        ; "ff"
-        ; "e2"
-        ; "7b"
-        ; "14"
-        ; "ba"
-        ; "a7"
-        ; "40"
-        ; "db"
-        ; "0c"
-        ; "8b"
-        ; "b6"
-        ; "65"
-        ; "6d"
-        ; "e6"
-        ; "1d"
-        ; "28"
-        ; "71"
-        ; "a6"
-        ; "40"
-        ; "93"
-        ; "90"
-        ; "8a"
-        ; "f6"
-        ; "18"
-        ; "1f"
-        ; "46"
-        ; "35"
-        ; "1a"
-        ; "1c"
-        ; "19"
-        ; "09"
+        [ 0x3f
+        ; 0xff
+        ; 0xe2
+        ; 0x7b
+        ; 0x14
+        ; 0xba
+        ; 0xa7
+        ; 0x40
+        ; 0xdb
+        ; 0x0c
+        ; 0x8b
+        ; 0xb6
+        ; 0x65
+        ; 0x6d
+        ; 0xe6
+        ; 0x1d
+        ; 0x28
+        ; 0x71
+        ; 0xa6
+        ; 0x40
+        ; 0x93
+        ; 0x90
+        ; 0x8a
+        ; 0xf6
+        ; 0x18
+        ; 0x1f
+        ; 0x46
+        ; 0x35
+        ; 0x1a
+        ; 0x1c
+        ; 0x19
+        ; 0x09
         ]
         Keccak.Little
     in
