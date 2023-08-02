@@ -8,7 +8,7 @@ type t =
   ; public_key : string
   ; private_key : string
   }
-[@@deriving to_yojson]
+[@@deriving eq, to_yojson]
 
 let create_network_keypair ~keypair_name ~keypair =
   let open Keypair in

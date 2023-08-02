@@ -5,20 +5,6 @@ open Signature_lib
 open Mina_base
 open Integration_test_lib
 
-let aws_region = "us-west-2"
-
-let aws_route53_zone_id = "ZJPR9NA6W9M7F"
-
-let project_id = "o1labs-192920"
-
-let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1"
-
-let cluster_name = "mina-integration-west1"
-
-let cluster_region = "us-west1"
-
-let cluster_zone = "us-west1a"
-
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
@@ -30,19 +16,15 @@ module Network_config = struct
     { name : string; public_key : string; worker_nodes : int }
   [@@deriving to_yojson]
 
-  type terraform_config =
-    { k8s_context : string
-    ; cluster_name : string
-    ; cluster_region : string
-    ; aws_route53_zone_id : string
-    ; testnet_name : string
+  type config =
+    { network_id : string
+    ; config_dir : string
     ; deploy_graphql_ingress : bool
     ; mina_image : string
     ; mina_agent_image : string
     ; mina_bots_image : string
     ; mina_points_image : string
     ; mina_archive_image : string
-          (* this field needs to be sent as a string to terraform, even though it's a json encoded value *)
     ; runtime_config : Yojson.Safe.t
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; block_producer_configs : block_producer_config list
@@ -52,17 +34,12 @@ module Network_config = struct
     ; mina_archive_schema_aux_files : string list
     ; snark_coordinator_config : snark_coordinator_config option
     ; snark_worker_fee : string
-    ; cpu_request : int
-    ; mem_request : string
-    ; worker_cpu_request : int
-    ; worker_mem_request : string
     }
   [@@deriving to_yojson]
 
   (* TODO: replace with t' *)
   type t =
-    { mina_automation_location : string
-    ; debug_arg : bool
+    { debug_arg : bool
     ; genesis_keypairs :
         (Network_keypair.t Core.String.Map.t
         [@to_yojson
@@ -73,14 +50,13 @@ module Network_config = struct
                    (k, Network_keypair.to_yojson v) :: accum )
                  map )] )
     ; constants : Test_config.constants
-    ; terraform : terraform_config
+    ; config : config
     }
   [@@deriving to_yojson]
 
   (* TODO: remove *)
   type t' =
-    { mina_automation_location : string
-    ; debug_arg : bool
+    { debug_arg : bool
     ; genesis_keypairs :
         (Network_keypair.t Core.String.Map.t
         [@to_yojson
@@ -94,16 +70,13 @@ module Network_config = struct
     }
   [@@deriving to_yojson]
 
-  let terraform_config_to_assoc t =
-    let[@warning "-8"] (`Assoc assoc : Yojson.Safe.t) =
-      terraform_config_to_yojson t
-    in
-    assoc
+  let testnet_log_filter t = t.config.network_id
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
-    let { genesis_ledger
+    let { requires_graphql
+        ; genesis_ledger
         ; block_producers
         ; snark_coordinator
         ; snark_worker_fee
@@ -125,8 +98,7 @@ module Network_config = struct
     let user_len = Int.min 5 (String.length user_sanitized) in
     let user = String.sub user_sanitized ~pos:0 ~len:user_len in
     let git_commit = Mina_version.commit_id_short in
-    (* see ./src/app/test_executive/README.md for information regarding the namespace name format and length restrictions *)
-    let testnet_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
+    let network_id = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
     (* check to make sure the test writer hasn't accidentally created duplicate names of accounts and keys *)
     let key_names_list =
       List.map genesis_ledger ~f:(fun acct -> acct.account_name)
@@ -334,16 +306,13 @@ module Network_config = struct
     in
 
     (* NETWORK CONFIG *)
-    { mina_automation_location = cli_inputs.mina_automation_location
-    ; debug_arg = debug
+    { debug_arg = debug
     ; genesis_keypairs
     ; constants
-    ; terraform =
-        { cluster_name
-        ; cluster_region
-        ; k8s_context = cluster_id
-        ; testnet_name
-        ; deploy_graphql_ingress = true
+    ; config =
+        { network_id
+        ; config_dir = cli_inputs.mina_automation_location
+        ; deploy_graphql_ingress = requires_graphql
         ; mina_image = images.mina
         ; mina_agent_image = images.user_agent
         ; mina_bots_image = images.bots
@@ -357,50 +326,25 @@ module Network_config = struct
         ; mina_archive_schema_aux_files
         ; snark_coordinator_config
         ; snark_worker_fee
-        ; aws_route53_zone_id
-        ; cpu_request = 6
-        ; mem_request = "12Gi"
-        ; worker_cpu_request = 6
-        ; worker_mem_request = "8Gi"
         }
     }
+end
 
-  let to_terraform network_config =
-    let open Terraform in
-    [ Block.Terraform
-        { Block.Terraform.required_version = ">= 0.12.0"
-        ; backend =
-            Backend.Local
-              { path =
-                  "terraform-" ^ network_config.terraform.testnet_name
-                  ^ ".tfstate"
-              }
-        }
-    ; Block.Provider
-        { Block.Provider.provider = "google"
-        ; region = cluster_region
-        ; zone = Some cluster_zone
-        ; project = Some project_id
-        ; alias = None
-        }
-    ; Block.Module
-        { Block.Module.local_name = "integration_testnet"
-        ; providers = [ ("google.gke", "google") ]
-        ; source = "../../modules/o1-integration"
-        ; args = terraform_config_to_assoc network_config.terraform
-        }
-    ]
+module Config_file = struct
+  type t = { version : int; actions : action list } [@@deriving eq, yojson]
 
-  let testnet_log_filter network_config =
-    Printf.sprintf
-      {|
-        resource.labels.project_id="%s"
-        resource.labels.location="%s"
-        resource.labels.cluster_name="%s"
-        resource.labels.namespace_name="%s"
-      |}
-      project_id cluster_region cluster_name
-      network_config.terraform.testnet_name
+  and action = { name : string; args : Yojson.Safe.t; command : string }
+  [@@deriving eq, yojson]
+
+  exception Invalid_version of Yojson.Safe.t
+
+  exception Invalid_actions of Yojson.Safe.t
+
+  exception Invalid_args of Yojson.Safe.t
+
+  exception Invalid_arg_type_should_be_string of string * Yojson.Safe.t
+
+  exception Invalid_command of Yojson.Safe.t
 end
 
 module Network_id = struct
@@ -423,77 +367,187 @@ module Node_type = struct
   let to_string nt = to_yojson nt |> Yojson.Safe.to_string
 
   let of_string s = of_yojson @@ `List [ `String s ] |> Result.ok_or_failwith
+
+  let is_archive_node = function Archive_node -> true | _ -> false
+
+  let is_block_producer = function Block_producer_node -> true | _ -> false
+
+  let is_seed_node = function Seed_node -> true | _ -> false
+
+  let is_snark_worker = function Snark_worker -> true | _ -> false
+
+  let is_snark_coordinator = function Snark_coordinator -> true | _ -> false
 end
 
-module Network_deploy_response = struct
+(** Logproc takes care of these logs so we bypass them here *)
+module Node_logs = struct
+  type t = string [@@deriving eq]
+
+  let to_yojson s = `String s
+
+  let of_yojson = function
+    | `String s ->
+        Ok s
+    | x ->
+        Error (Yojson.Safe.to_string x)
+end
+
+module Network_created = struct
+  type t = { network_id : Network_id.t } [@@deriving eq, of_yojson]
+end
+
+module Network_deployed = struct
   module Map = Map.Make (String)
   include Map
 
-  type t = (Node_type.t * string option) Map.t [@@deriving eq]
+  exception Invalid_entry of string * Yojson.Safe.t
+
+  exception Invalid_output of string
+
+  exception Invalid_keypair of Yojson.Safe.t
+
+  type t = node_info Map.t [@@deriving eq]
+
+  and node_info =
+    { node_type : Node_type.t
+    ; network_keypair : Network_keypair.t option
+    ; password : string
+    ; graphql_uri : string
+    }
+  [@@deriving yojson]
+
+  let network_keypair_of_yojson (sk : Yojson.Safe.t) =
+    match sk with
+    | `Null ->
+        None
+    | `Assoc
+        [ ("private_key", `String private_key)
+        ; ("privkey_password", `String privkey_password)
+        ; ("keypair_name", `String keypair_name)
+        ] ->
+        let keypair =
+          Keypair.of_private_key_exn
+          @@ Private_key.of_base58_check_exn private_key
+        in
+        Some
+          Network_keypair.
+            { keypair
+            ; keypair_name
+            ; privkey_password
+            ; private_key
+            ; public_key =
+                Public_key.to_bigstring keypair.public_key
+                |> Bigstring.to_string
+            }
+    | _ ->
+        raise @@ Invalid_keypair sk
 
   let of_yojson =
     let f accum = function
-      | node_id, `Tuple [ `String nt; `String gql_uri ] ->
-          Map.set accum ~key:node_id ~data:(Node_type.of_string nt, Some gql_uri)
-      | node_id, `Tuple [ `String nt; `Null ] ->
-          Map.set accum ~key:node_id ~data:(Node_type.of_string nt, None)
-      | _ ->
-          failwith "invalid network_deploy_response yojson entry"
+      | ( node_id
+        , `Assoc
+            [ ("node_type", `String nt)
+            ; ("network_keypair", keypair)
+            ; ("password", `String password)
+            ; ("graphql_uri", `String graphql_uri)
+            ] ) ->
+          Map.set accum ~key:node_id
+            ~data:
+              { node_type = Node_type.of_string nt
+              ; network_keypair = network_keypair_of_yojson keypair
+              ; password
+              ; graphql_uri
+              }
+      | node_id, t ->
+          raise @@ Invalid_entry (node_id, t)
     in
     function
     | `Assoc a_list ->
         Ok (List.fold a_list ~init:(Map.empty : t) ~f)
-    | _ ->
-        Error "invalid network_deploy_response yojson"
+    | t ->
+        raise @@ Invalid_output (Yojson.Safe.to_string t)
 end
 
-module Access_token = struct
-  type t = string [@@deriving eq, yojson]
+module Node_started = struct
+  type t = { node_id : Node_id.t } [@@deriving eq, of_yojson]
+
+  exception Invalid_response of string
 end
 
-module Response = struct
-  (** Logproc takes care of these logs so we bypass them here *)
-  module Node_logs = struct
-    type t = string [@@deriving eq]
+module Node_stopped = struct
+  type t = { node_id : Node_id.t } [@@deriving eq, of_yojson]
 
-    let to_yojson s = `String s
+  exception Invalid_response of string
+end
 
-    let of_yojson = function
-      | `String s ->
-          Ok s
-      | x ->
-          Error (Yojson.Safe.to_string x)
-  end
+module Archive_data_dump = struct
+  type t = { node_id : Node_id.t; data : string } [@@deriving eq, of_yojson]
 
+  exception Invalid_response of string
+end
+
+module Mina_logs_dump = struct
+  type t = { node_id : Node_id.t; logs : Node_logs.t }
+  [@@deriving eq, of_yojson]
+
+  exception Invalid_response of string
+end
+
+module Precomputed_block_dump = struct
+  type t = { node_id : Node_id.t; blocks : string } [@@deriving eq, of_yojson]
+
+  exception Invalid_response of string
+end
+
+module Replayer_run = struct
+  type t = { node_id : Node_id.t; logs : Node_logs.t }
+  [@@deriving eq, of_yojson]
+
+  exception Invalid_response of string
+end
+
+module Command_output = struct
   type t =
-    | Network_created of Network_id.t
-    | Network_deployed of Network_deploy_response.t
+    | Network_created of Network_created.t
+    | Network_deployed of Network_deployed.t
     | Network_destroyed
-    | Node_started of Node_id.t
-    | Node_stopped of Node_id.t
-    | Archive_data_dump of Node_id.t * string
-    | Mina_logs_dump of Node_id.t * Node_logs.t
-    | Precomputed_block_dump of Node_id.t * string
-    | Replayer_run of Node_id.t * string
+    | Node_started of Node_started.t
+    | Node_stopped of Node_stopped.t
+    | Archive_data_dump of Archive_data_dump.t
+    | Mina_logs_dump of Mina_logs_dump.t
+    | Precomputed_block_dump of Precomputed_block_dump.t
+    | Replayer_run of Replayer_run.t
   [@@deriving eq, of_yojson]
 end
 
 module Arg_type = struct
+  (* TODO: what other arg types? *)
   let bool = "bool"
 
   let int = "int"
 
   let string = "string"
-end
 
-exception Invalid_config of string
+  exception Invalid_arg_type of Yojson.Safe.t
+
+  let arg_type (t : Yojson.Safe.t) =
+    match t with
+    | `Bool _ ->
+        bool
+    | `Int _ ->
+        int
+    | `String _ ->
+        string
+    | _ ->
+        raise @@ Invalid_arg_type t
+end
 
 let version config =
   match Yojson.Safe.Util.member "version" config with
   | `Int version ->
       version
-  | _ ->
-      raise @@ Invalid_config "config version should be an int"
+  | t ->
+      raise @@ Config_file.Invalid_version t
 
 let action name config =
   let open Yojson.Safe in
@@ -501,302 +555,111 @@ let action name config =
   | `List actions ->
       List.find_exn actions ~f:(fun action ->
           Util.member "name" action |> equal @@ `String name )
-  | _ ->
-      raise @@ Invalid_config "config actions should be a list"
+  | t ->
+      raise @@ Config_file.Invalid_actions t
+
+let args_of_action action =
+  let open Yojson.Safe in
+  let a_list =
+    match Util.member "args" action with
+    | `Assoc a_list ->
+        a_list
+    | t ->
+        raise @@ Config_file.Invalid_args t
+  in
+  List.map a_list ~f:(function
+    | name, `String type_name ->
+        (name, type_name)
+    | name, t ->
+        raise @@ Config_file.Invalid_arg_type_should_be_string (name, t) )
 
 let raw_cmd t =
   match Yojson.Safe.Util.member "command" t with
   | `String raw_cmd ->
       raw_cmd
-  | _ ->
-      raise @@ Invalid_config "config command should be a string"
+  | cmd ->
+      raise @@ Config_file.Invalid_command cmd
 
-let validate_arg_type arg_type (arg_value : Yojson.Safe.t) =
-  let ( = ) = String.equal in
-  match arg_value with
-  | `Bool _ ->
-      arg_type = Arg_type.bool
-  | `Int _ ->
-      arg_type = Arg_type.int
-  | `String _ ->
-      arg_type = Arg_type.string
-  | _ ->
-      failwith "unimplemented"
+let validate_arg_type arg_typ arg_value =
+  String.equal arg_typ @@ Arg_type.arg_type arg_value
+
+exception Invalid_config_args_num
+
+exception Missing_config_arg of string * string
+
+exception Invalid_config_arg_type of string * Yojson.Safe.t * string
 
 let validate_args ~args ~action =
-  let open Yojson.Safe in
-  let[@warning "-8"] (`Assoc a_list : t) = Util.member "args" action in
-  let () = assert (List.(length a_list = length args)) in
+  let arg_list = args_of_action action in
+  let () =
+    if not List.(length arg_list = length args) then
+      raise @@ Invalid_config_args_num
+  in
   let rec aux = function
     | [] ->
         true
-    | (arg_name, (`String arg_type : t)) :: rest ->
+    | (arg_name, arg_type) :: rest ->
         let arg_value =
-          List.find_map_exn args ~f:(fun (name, value) ->
-              Option.some_if (String.equal name arg_name) value )
+          try
+            List.find_map_exn args ~f:(fun (name, value) ->
+                Option.some_if (String.equal name arg_name) value )
+          with Not_found_s _ ->
+            raise @@ Missing_config_arg (arg_name, arg_type)
         in
-        validate_arg_type arg_type arg_value && aux rest
-    | _ ->
-        assert false
+        if validate_arg_type arg_type arg_value then aux rest
+        else raise @@ Invalid_config_arg_type (arg_name, arg_value, arg_type)
   in
-  aux a_list
-
-let strip_quotes s = String.substr_replace_all s ~pattern:"\"" ~with_:""
+  aux arg_list
 
 let rec interpolate_args ~args raw_cmd =
-  let res =
-    match args with
-    | [] ->
-        raw_cmd
-    | (arg, value) :: args ->
-        let pattern = sprintf "{{%s}}" arg in
-        interpolate_args ~args
-        @@ String.substr_replace_all raw_cmd ~pattern
-             ~with_:(Yojson.Safe.to_string value)
-  in
-  strip_quotes res
+  match args with
+  | [] ->
+      raw_cmd
+  | (arg, value) :: args ->
+      let pattern = sprintf "{{%s}}" arg in
+      interpolate_args ~args
+      @@ String.substr_replace_all raw_cmd ~pattern
+           ~with_:(Yojson.Safe.to_string value |> Util.drop_outer_quotes)
 
 let prog_and_args ~args action =
   let raw_cmd = raw_cmd action in
-  let () = assert (validate_args ~args ~action) in
   let cmd_list = interpolate_args ~args raw_cmd |> String.split ~on:' ' in
   (List.hd_exn cmd_list, List.tl_exn cmd_list)
 
-(* TODO: how to report errors? *)
-let[@warning "-27"] run_command ?(timeout_seconds = 1) ?(dir = ".") ~config
-    ~args cmd_name =
-  let open Yojson.Safe in
-  let config = from_file config in
+let run_command ?(suppress_logs = false) ?(timeout_seconds = 1) ?(dir = ".")
+    ~config ~args cmd_name =
+  let config = Yojson.Safe.from_file config in
   let version = version config in
   let action = action cmd_name config in
-  let prog, args = prog_and_args ~args action in
+  let action_args = args_of_action action in
+  let () = assert (validate_args ~args ~action) in
+  let prog, arg_values = prog_and_args ~args action in
+  let cmd = String.concat ~sep:" " (prog :: arg_values) in
   let%map output =
-    Integration_test_lib.Util.run_cmd_or_error_timeout ~timeout_seconds dir prog
-      args
+    Util.run_cmd_or_error_timeout ~suppress_logs ~timeout_seconds dir prog
+      arg_values
   in
   match output with
   | Ok output ->
-      Yojson.Safe.from_string output |> Response.of_yojson
+      if not suppress_logs then
+        [%log' spam (Logger.create ())]
+          "Successful command execution\nCommand: %s\nOutput: %s" cmd output ;
+      Ok output
   | _ ->
-      let cmd = String.concat ~sep:" " (prog :: args) in
+      if not suppress_logs then
+        [%log' error (Logger.create ())] "Failed to run command: %s" cmd ;
       Error
-        (sprintf "Failed to run command: %s\nConfig version: %d\n" cmd version)
-
-module Unit_tests = struct
-  module Test_values = struct
-    let deploy_network_raw_cmd =
-      "minimina network deploy --network-id {{network_id}}"
-
-    let start_node_raw_cmd =
-      "minimina start-node --node-id {{node_id}} --fresh-state {{fresh_state}} \
-       --commit-sha {{commit_sha}}"
-
-    let deploy_network_action =
-      sprintf
-        {|
-        {
-          "name": "deploy_network",
-          "args": {
-            "network_id": "string"
-          },
-          "command": "%s"
-        }
-      |}
-        deploy_network_raw_cmd
-      |> String.strip
-
-    let start_node_action =
-      sprintf
-        {|
-        {
-          "name": "start_node",
-          "args": {
-            "node_id": "string",
-            "fresh_state": "bool",
-            "commit_sha": "string"
-          },
-          "command": "%s"
-        }
-      |}
-        start_node_raw_cmd
-      |> String.strip
-
-    let config =
-      sprintf
-        {|
-          {
-            "version": 1,
-            "actions": [%s,%s]
-          }
-        |}
-        deploy_network_action start_node_action
-      |> Yojson.Safe.from_string
-  end
-
-  open Test_values
-
-  let%test_unit "version" =
-    let res = version config in
-    let expect = 1 in
-    assert (res = expect)
-
-  let%test_unit "raw command" =
-    let res = raw_cmd @@ Yojson.Safe.from_string deploy_network_action in
-    assert (String.equal res deploy_network_raw_cmd)
-
-  let%test_unit "validate arg types" =
-    let bool_value = `Bool true in
-    let int_value = `Int 42 in
-    let string_value = `String "hello" in
-    assert (validate_arg_type Arg_type.bool bool_value) ;
-    assert (validate_arg_type Arg_type.int int_value) ;
-    assert (validate_arg_type Arg_type.string string_value)
-
-  let%test_unit "validate args" =
-    let action = action "start_node" config in
-    let args =
-      [ ("node_id", `String "node0")
-      ; ("fresh_state", `Bool true)
-      ; ("commit_sha", `String "0123456abcdef")
-      ]
-    in
-    assert (validate_args ~args ~action)
-
-  let%test_unit "interpolate string args" =
-    let res =
-      interpolate_args
-        ~args:[ ("network_id", `String "network0") ]
-        deploy_network_raw_cmd
-    in
-    let expect = "minimina network deploy --network-id network0" in
-    assert (String.equal res expect)
-
-  let%test_unit "prog and args" =
-    let action = Yojson.Safe.from_string start_node_action in
-    let args =
-      [ ("node_id", `String "node0")
-      ; ("fresh_state", `Bool true)
-      ; ("commit_sha", `String "0123456abcdef")
-      ]
-    in
-    let prog, res_args = prog_and_args ~args action in
-    let expect =
-      String.split ~on:' ' @@ interpolate_args ~args start_node_raw_cmd
-    in
-    assert (String.equal prog @@ List.hd_exn expect) ;
-    assert (List.equal String.equal res_args @@ List.tl_exn expect)
-end
-
-module Request_unit_tests = struct
-  let ( = ) = String.equal
-
-  let%test_unit "Create network request" =
-    let constants : Test_config.constants =
-      { constraints = Genesis_constants.Constraint_constants.compiled
-      ; genesis = Genesis_constants.compiled
-      }
-    in
-    let network_config : Network_config.t' =
-      { mina_automation_location = "loc"
-      ; debug_arg = true
-      ; genesis_keypairs = Core.String.Map.empty
-      ; constants
-      }
-    in
-    let result =
-      Network_config.t'_to_yojson network_config |> Yojson.Safe.to_string
-    in
-    assert (
-      result
-      = {|{"mina_automation_location":"loc","debug_arg":true,"genesis_keypairs":{},"constants":{"constraints":{"sub_windows_per_window":11,"ledger_depth":35,"work_delay":2,"block_window_duration_ms":180000,"transaction_capacity_log_2":7,"pending_coinbase_depth":5,"coinbase_amount":"720000000000","supercharged_coinbase_factor":1,"account_creation_fee":"1","fork":null},"genesis":{"protocol":{"k":290,"slots_per_epoch":7140,"slots_per_sub_window":7,"delta":0,"genesis_state_timestamp":"2020-09-16 10:15:00.000000Z"},"txpool_max_size":3000,"num_accounts":null,"zkapp_proof_update_cost":10.26,"zkapp_signed_single_update_cost":9.140000000000001,"zkapp_signed_pair_update_cost":10.08,"zkapp_transaction_cost_limit":69.45,"max_event_elements":100,"max_action_elements":100}}}|} )
-end
-
-module Response_unit_tests = struct
-  open Response
-
-  let ( = ) = equal
-
-  let%test_unit "Parse network created response" =
-    let result =
-      `List [ `String "Network_created"; `String "node0" ]
-      |> of_yojson |> Result.ok_or_failwith
-    in
-    assert (result = Network_created "node0")
-
-  let%test_unit "Parse network deployed response" =
-    let open Node_type in
-    let open Network_deploy_response in
-    let result =
-      {|
-        { "node0": ("Archive_node", "gql0")
-        , "node1": ("Block_producer_node", "gql1")
-        , "node2": ("Seed_node", "gql2")
-        , "node3": ("Snark_worker", null)
-        , "node4": ("Snark_coordinator", "gql4")
-        }
-      |}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith
-    in
-    let ( = ) = equal in
-    assert (
-      result
-      = of_alist_exn
-          [ ("node0", (Archive_node, Some "gql0"))
-          ; ("node1", (Block_producer_node, Some "gql1"))
-          ; ("node2", (Seed_node, Some "gql2"))
-          ; ("node3", (Snark_worker, None))
-          ; ("node4", (Snark_coordinator, Some "gql4"))
-          ] )
-
-  let%test_unit "Parse network destroyed response" =
-    let result =
-      {|["Network_destroyed"]|} |> Yojson.Safe.from_string |> of_yojson
-      |> Result.ok_or_failwith
-    in
-    assert (result = Network_destroyed)
-
-  let ( = ) = equal
-
-  let%test_unit "Node started response" =
-    let result =
-      {|["Node_started","node0"]|} |> Yojson.Safe.from_string |> of_yojson
-      |> Result.ok_or_failwith
-    in
-    assert (result = Node_started "node0")
-
-  let%test_unit "Node stopped response" =
-    let result =
-      {|["Node_stopped","node0"]|} |> Yojson.Safe.from_string |> of_yojson
-      |> Result.ok_or_failwith
-    in
-    assert (result = Node_stopped "node0")
-
-  let%test_unit "Archive data dump response" =
-    let result =
-      {|["Archive_data_dump","node0","data0"]|} |> Yojson.Safe.from_string
-      |> of_yojson |> Result.ok_or_failwith
-    in
-    assert (result = Archive_data_dump ("node0", "data0"))
-
-  let%test_unit "Mina logs dump response" =
-    let raw_logs = "{\"log0\":\"msg0\"}\n{\"log1\":\"msg1\"}" in
-    let result =
-      `List [ `String "Mina_logs_dump"; `String "node0"; `String raw_logs ]
-      |> of_yojson |> Result.ok_or_failwith
-    in
-    assert (result = Mina_logs_dump ("node0", raw_logs))
-
-  let%test_unit "Precomputed block dump response" =
-    let result =
-      {|["Precomputed_block_dump","node0","blocks"]|} |> Yojson.Safe.from_string
-      |> of_yojson |> Result.ok_or_failwith
-    in
-    assert (result = Precomputed_block_dump ("node0", "blocks"))
-
-  let%test_unit "Replayer run response" =
-    let result =
-      {|["Replayer_run","node0","logs0"]|} |> Yojson.Safe.from_string
-      |> of_yojson |> Result.ok_or_failwith
-    in
-    assert (result = Replayer_run ("node0", "logs0"))
-end
+        (sprintf
+           "Failed to run command: %s\n\
+           \ Config version: %d\n\
+           \ Expected args types:\n\
+           \     %s\n\
+           \ Attempted args:\n\
+           \     %s\n"
+           cmd version
+           ( String.concat ~sep:", "
+           @@ List.map action_args ~f:(fun (name, type_name) ->
+                  name ^ ": " ^ type_name ) )
+           ( String.concat ~sep:", "
+           @@ List.map args ~f:(fun (name, value) ->
+                  name ^ ": " ^ Yojson.Safe.to_string value ) ) )

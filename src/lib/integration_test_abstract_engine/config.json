@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "actions": [
+    {
+      "name": "start_network",
+      "args": {},
+      "command": "minimina network start"
+    },
+    {
+      "name": "get_network_status",
+      "args": {
+        "network_id": "string"
+      },
+      "command": "minimina network status --network-id {{network_id}}"
+    },
+    {
+      "name": "get_logs",
+      "args": {
+        "network_id": "string",
+        "node_id": "string"
+      },
+      "command": "minimina node logs --node-id {{node_id}} --network-id {{network_id}}"
+    },
+    {
+      "name": "echo",
+      "args": {
+        "msg": "string"
+      },
+      "command": "echo \"{\"msg\":\"{{msg}}\"}\""
+    },
+    {
+      "name": "cat",
+      "args": {
+        "path": "string"
+      },
+      "command": "cat {{path}}"
+    }
+  ]
+}
