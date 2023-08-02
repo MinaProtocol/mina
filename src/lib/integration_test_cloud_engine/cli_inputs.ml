@@ -8,7 +8,7 @@ let term =
       "Location of the Mina automation repository to use when deploying the \
        network."
     in
-    let env = Arg.env_var "MINA_AUTOMATION_LOCATION" ~doc in
+    let env = Cmd.Env.info "MINA_AUTOMATION_LOCATION" ~doc in
     Arg.(
       value & opt string "./automation"
       & info
