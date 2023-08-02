@@ -1085,6 +1085,7 @@ let constrain_external_checks (type field)
           do_multi_range_check foreign_field_modulus
       in
       () ) ;
+  external_checks.bounds <- [] ;
 
   (* 2) Insert gates for canonical checks
    *    Note: internally this also adds a multi-range-check for the computed bound to
@@ -1100,6 +1101,7 @@ let constrain_external_checks (type field)
           foreign_field_modulus
       in
       () ) ;
+  external_checks.canonicals <- [] ;
 
   (* 3) Add gates for external limb-range-checks *)
   List.iter (List.chunks_of external_checks.ranges ~length:3) ~f:(fun chunk ->
@@ -1111,7 +1113,8 @@ let constrain_external_checks (type field)
       | [ v0; v1; v2 ] ->
           Range_check.multi (module Circuit) v0 v1 v2
       | _ ->
-          assert false )
+          assert false ) ;
+  external_checks.ranges <- []
 
 (* Compute non-zero intermediate products (foreign field multiplication helper)
  *
