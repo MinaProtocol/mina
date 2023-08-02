@@ -2,7 +2,7 @@ open Core_kernel
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
-let tests_enabled = false
+let tests_enabled = true
 
 (* Helper to create RangeCheck0 gate, configured in various ways
  *     - is_64bit   : create 64-bit range check

@@ -3,7 +3,7 @@
 open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
-let tests_enabled = false
+let tests_enabled = true
 
 let tuple3_of_array array =
   match array with [| a1; a2; a3 |] -> (a1, a2, a3) | _ -> assert false
