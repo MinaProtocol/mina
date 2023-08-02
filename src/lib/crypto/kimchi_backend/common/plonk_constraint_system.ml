@@ -1022,7 +1022,7 @@ end = struct
                 ()
             | Some target ->
                 if Stdlib.(vars.(col) <> value) then (
-                  printf "Invalid witness value in column %d\n" col ;
+                  printf "Invalid witness value in row %d column %d\n" (List.length sys.rows_rev) col ;
                   assert false ) ) ;
 
         (* Add to row. *)
