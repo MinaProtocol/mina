@@ -123,6 +123,7 @@ module Block = struct
     Caqti_request.find_opt Caqti_type.int64 Caqti_type.int64
       {sql| SELECT global_slot_since_genesis FROM blocks
             WHERE global_slot_since_genesis >= $1
+            AND chain_status <> 'orphaned'
             ORDER BY global_slot_since_genesis ASC
             LIMIT 1
       |sql}
