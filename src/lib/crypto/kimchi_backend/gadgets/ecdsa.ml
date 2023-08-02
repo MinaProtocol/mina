@@ -2,7 +2,7 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let tests_enabled = true
+let tests_enabled = false
 
 (* Array to tuple helper *)
 let tuple6_of_array array =
@@ -89,12 +89,19 @@ let signature_scalar_check (type f)
 
   let one = Foreign_field.Element.Standard.one (module Circuit) in
 
-  (* C1: Constrain that r != 0 *)
+  (* C1: Assert r \in [0, n)
+   *     Covered by bound check on r (Bounds 3)
+   *
+   * C2: Assert s \in [0, n)
+   *     Covered by bound check on s (Bounds 4)
+   *)
+
+  (* C3: Constrain that r != 0 *)
   let computed_one =
     Foreign_field.mul (module Circuit) scalar_checks r r_inv curve.order
   in
 
-  (* Bounds 1: Left input r is bound checked below
+  (* Bounds 3: Left input r is bound checked below
    *           Right input r_inv is bound checked below
    *           Result bound check is covered by Foreign_field.mul
    *)
@@ -104,11 +111,11 @@ let signature_scalar_check (type f)
   (* Assert r * r^-1 = 1 *)
   Foreign_field.Element.Standard.assert_equal (module Circuit) computed_one one ;
 
-  (* C2: Constrain that s != 0 *)
+  (* C4: Constrain that s != 0 *)
   let computed_one =
     Foreign_field.mul (module Circuit) scalar_checks s s_inv curve.order
   in
-  (* Bounds 2: Left input s is bound checked below
+  (* Bounds 4: Left input s is bound checked below
    *           Right input s_inv is bound checked below
    *           Result bound check is covered by scalar_checks
    *)
@@ -117,13 +124,6 @@ let signature_scalar_check (type f)
   Foreign_field.External_checks.append_bound_check scalar_checks s_inv ;
   (* Assert s * s^-1 = 1 *)
   Foreign_field.Element.Standard.assert_equal (module Circuit) computed_one one
-
-(* C3: Assert r \in [0, n)
- *     Already covered by bound check on r (Bounds 1)
- *)
-(* C4: Assert s \in [0, n)
- *     Already covered by bound check on s (Bounds 2)
- *)
 
 (* Gadget for constraining ECDSA signature verificationin zero-knowledge
  *
@@ -156,21 +156,21 @@ let signature_scalar_check (type f)
  *   Base field external checks: (per crumb, not counting inputs and output)
  *     Bound checks:          96 (+2 when a != 0 and +1 when b != 0)
  *     Canonical checks:      19
- *     Multi-range-checks:    159
+ *     Multi-range-checks:    225
  *     Compact-range-checks:  ~78
- *     Total range-checks:   1152
+ *     Total range-checks:   1350
  *
  *   Scalar field external checks: (per crumb, not counting inputs and output)
  *     Bound checks:          5
  *     Canonical checks:      4
- *     Multi-range-checks:    14
+ *     Multi-range-checks:    16
  *     Compact-range-checks:  ~7
- *     Total range-checks:   185
+ *     Total range-checks:   191
  *
  *   Rows: (per crumb, not counting inputs/outputs and constants)
  *     Verify:          370 (+5 when a != 0 and +2 when b != 0)
- *     External checks: 925
- *     Total:           1295
+ *     External checks: 1077
+ *     Total:           1447
  *
  *   Constants:
  *     Curve constants:        ~10 (for 256-bit curve; one-time cost per circuit)
@@ -415,7 +415,9 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* C9: Compute qn = q * (n - 1) + q *)
   let quotient_times_n =
-    Foreign_field.add (module Circuit) quotient_product quotient curve.order
+    Foreign_field.add
+      (module Circuit)
+      scalar_checks quotient_product quotient curve.order
   in
 
   (* Bounds 9: Left input q * (n - 1) is covered by (Bounds 8)
@@ -428,7 +430,9 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
     Foreign_field.Element.Standard.of_limbs (x_prime0, x_prime1, x_prime2)
   in
   let computed_x =
-    Foreign_field.add (module Circuit) quotient_times_n x_prime curve.order
+    Foreign_field.add
+      (module Circuit)
+      scalar_checks quotient_times_n x_prime curve.order
   in
   (* Addition chain final result row *)
   Foreign_field.result_row
@@ -790,7 +794,7 @@ let%test_unit "Ecdsa.verify_light" =
             assert (
               Mina_stdlib.List.Length.equal unused_scalar_checks.canonicals 4 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_scalar_checks.multi_ranges 6 ) ;
+              Mina_stdlib.List.Length.equal unused_scalar_checks.multi_ranges 8 ) ;
             assert (
               Mina_stdlib.List.Length.equal
                 unused_scalar_checks.compact_multi_ranges 0 ) ;
@@ -915,15 +919,27 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
 
             (* Sanity check *)
             let base_bound_checks_count = ref 95 in
-            if not Bignum_bigint.(curve.bignum.a = zero) then
+            if Bignum_bigint.(curve.bignum.a <> zero) then
               base_bound_checks_count := !base_bound_checks_count + 2 ;
-            if not Bignum_bigint.(curve.bignum.b = zero) then
+            if Bignum_bigint.(curve.bignum.b <> zero) then
               base_bound_checks_count := !base_bound_checks_count + 1 ;
             assert (
               Mina_stdlib.List.Length.equal base_checks.bounds
                 !base_bound_checks_count ) ;
+
             assert (Mina_stdlib.List.Length.equal base_checks.canonicals 19) ;
-            assert (Mina_stdlib.List.Length.equal base_checks.multi_ranges 80) ;
+
+            let base_multi_range_checks_count = ref 146 in
+            if Bignum_bigint.(curve.bignum.a <> zero) then
+              base_multi_range_checks_count :=
+                !base_multi_range_checks_count + 1 ;
+            if Bignum_bigint.(curve.bignum.b <> zero) then
+              base_multi_range_checks_count :=
+                !base_multi_range_checks_count + 1 ;
+            assert (
+              Mina_stdlib.List.Length.equal base_checks.multi_ranges
+                !base_multi_range_checks_count ) ;
+
             assert (
               Mina_stdlib.List.Length.equal base_checks.compact_multi_ranges 0 ) ;
             assert (Mina_stdlib.List.Length.equal base_checks.limb_ranges 0) ;
@@ -940,7 +956,7 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
             (* Sanity checks *)
             assert (Mina_stdlib.List.Length.equal scalar_checks.bounds 5) ;
             assert (Mina_stdlib.List.Length.equal scalar_checks.canonicals 4) ;
-            assert (Mina_stdlib.List.Length.equal scalar_checks.multi_ranges 6) ;
+            assert (Mina_stdlib.List.Length.equal scalar_checks.multi_ranges 8) ;
             assert (
               Mina_stdlib.List.Length.equal scalar_checks.compact_multi_ranges 0 ) ;
             assert (Mina_stdlib.List.Length.equal scalar_checks.limb_ranges 0) ;

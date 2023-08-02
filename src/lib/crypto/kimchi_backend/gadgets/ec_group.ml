@@ -39,14 +39,14 @@ let is_on_curve_bignum_point (curve : Curve_params.t)
  *     L and R are not O (the point at infinity)
  *
  *   External checks: (not counting inputs and output)
- *     Bound checks:          6
- *     Multi-range-checks:    6
+ *     Bound checks:          12
+ *     Multi-range-checks:    12
  *     Compact-range-checks:  3
- *     Total range-checks:    51
+ *     Total range-checks:    93
  *
  *   Rows: (not counting inputs/outputs and constants)
- *     Group addition:  26
- *     External checks: ~896
+ *     Group addition:  35
+ *     External checks: 135
  *
  *   Supported group axioms:
  *     Closure
@@ -360,14 +360,14 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      P is not O (the point at infinity)
  *
  *   External checks: (not counting inputs and output)
- *     Bound checks:         8 (+1 when a != 0)
- *     Multi-range-checks:   8
+ *     Bound checks:         12 (+1 when a != 0)
+ *     Multi-range-checks:   14 (+1 when a != 0)
  *     Compact-range-checks: 4
- *     Total range-checks:   68 (+4 when a != 0)
+ *     Total range-checks:  102 (+4 when a != 0)
  *
  *   Rows: (not counting inputs/outputs and constants)
- *     Group double:     34 (+2 when a != 0)
- *     External checks: ~885
+ *     Group double:    36 (+2 when a != 0)
+ *     External checks: 123
  *
  *   Note: See group addition notes (above) about group properties supported by this implementation
  *)
@@ -769,7 +769,7 @@ let compute_ia_points ?(point : Affine.bignum_point option)
  *     Total range-checks:   39
  *
  *   Rows: (not counting inputs/outputs and constants)
- *     Curve check: 8 (+1 when a != 0 and +2 when b != 0)
+ *     Curve check: 20 (+1 when a != 0 and +2 when b != 0)
  *
  *   Constants:
  *     Curve constants:        ~10 (for 256-bit curve; one-time cost per circuit)
@@ -923,13 +923,13 @@ let check_ia (type f) (module Circuit : Snark_intf.Run with type field = f)
  *
  *   External checks: (per crumb, not counting inputs and output)
  *     Bound checks:         42 (+1 when a != 0)
- *     Multi-range-checks:   34
+ *     Multi-range-checks:   64 (+1 when a != 0)
  *     Compact-range-checks: 7
- *     Total range-checks:   291
+ *     Total range-checks:   381
  *
  *   Rows: (per crumb, not counting inputs/outputs and constants)
- *     Scalar multiplication: ~84 (+2 when a != 0)
- *     External checks:       ~441
+ *     Scalar multiplication: ~156 (+2 when a != 0)
+ *     External checks:       ~434
  *
  *   Constants:
  *     Curve constants:        ~10 (for 256-bit curve; one-time cost per circuit)
@@ -1662,7 +1662,10 @@ let%test_unit "Ec_group.add_full" =
             let open Runner.Impl in
             (* Prepare test public inputs *)
             let curve =
-              Curve_params.to_circuit_constants (module Runner.Impl) curve
+              Curve_params.to_circuit_constants
+                ~use_precomputed_gen_doubles:false
+                (module Runner.Impl)
+                curve
             in
             let left_input =
               Affine.of_bignum_bigint_coordinates
@@ -2212,7 +2215,9 @@ let%test_unit "Ec_group.double_full" =
             let open Runner.Impl in
             (* Prepare test public inputs *)
             let curve =
-              Curve_params.to_circuit_constants (module Runner.Impl) curve
+              Curve_params.to_circuit_constants
+                (module Runner.Impl)
+                ~use_precomputed_gen_doubles:false curve
             in
             let point =
               Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
