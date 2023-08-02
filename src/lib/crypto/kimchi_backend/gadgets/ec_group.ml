@@ -41,7 +41,7 @@ let is_on_curve_bignum_point (curve : Curve_params.t)
  *   External checks: (not counting inputs and output)
  *     Bound checks:         12
  *     Compact-range-checks: 3
- *     Range-checks:         42
+ *     Range-checks:         72
  *
  *   Rows: (not counting inputs/outputs and constants)
  *     Group addition:  35
@@ -359,9 +359,9 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      P is not O (the point at infinity)
  *
  *   External checks: (not counting inputs and output)
- *     Bound checks:         8 (+1 when a != 0)
+ *     Bound checks:         12 (+1 when a != 0)
  *     Compact-range-checks: 4
- *     Range-checks:         56 (+4 when a != 0)
+ *     Range-checks:         42 (+3 when a != 0)
  *
  *   Rows: (not counting inputs/outputs and constants)
  *     Group double:    36 (+2 when a != 0)
@@ -759,7 +759,7 @@ let compute_ia_points ?(point : Affine.bignum_point option)
  *   External checks: (not counting inputs and output)
  *     Bound checks:         3 (+1 when a != 0 and +1 when b != 0)
  *     Compact-range-checks: 3
- *     Range-checks:         30
+ *     Range-checks:         21 (+3 when a != 0 and +3 when b != 0)
  *
  *   Rows: (not counting inputs/outputs and constants)
  *     Curve check: 20 (+1 when a != 0 and +2 when b != 0)
@@ -915,8 +915,9 @@ let check_ia (type f) (module Circuit : Snark_intf.Run with type field = f)
  *
  *   External checks: (per crumb, not counting inputs and output)
  *     Bound checks:         42 (+1 when a != 0)
+ *     Canonical checks:     8
  *     Compact-range-checks: 7
- *     Range-checks:         270
+ *     Range-checks:         192
  *
  *   Rows: (per crumb, not counting inputs/outputs and constants)
  *     Scalar multiplication: ~156 (+2 when a != 0)
@@ -1150,7 +1151,7 @@ let%test_unit "Ec_group.add" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.ranges 18 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 36 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -1507,7 +1508,7 @@ let%test_unit "Ec_group.add_chained" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.ranges 36 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 72 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -1723,7 +1724,7 @@ let%test_unit "Ec_group.add_full" =
             (* Check for expected quantity of external checks *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 12) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 6) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.ranges 18) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 36) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
@@ -1819,8 +1820,12 @@ let%test_unit "Ec_group.double" =
                 Mina_stdlib.List.Length.equal unused_external_checks.bounds 9 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.ranges 24 ) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.ranges 42 )
+            else
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.ranges 45 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -2093,8 +2098,12 @@ let%test_unit "Ec_group.double_chained" =
                 Mina_stdlib.List.Length.equal unused_external_checks.bounds 18 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.ranges 48 ) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.ranges 84 )
+            else
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.ranges 90 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -2225,7 +2234,9 @@ let%test_unit "Ec_group.double_full" =
               assert (Mina_stdlib.List.Length.equal external_checks.bounds 12)
             else assert (Mina_stdlib.List.Length.equal external_checks.bounds 13) ;
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 4) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.ranges 24) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (Mina_stdlib.List.Length.equal external_checks.ranges 42)
+            else assert (Mina_stdlib.List.Length.equal external_checks.ranges 45) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
@@ -2343,8 +2354,12 @@ let%test_unit "Ec_group.ops_mixed" =
                 Mina_stdlib.List.Length.equal unused_external_checks.bounds 15 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.ranges 42 ) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.ranges 78 )
+            else
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.ranges 81 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -2933,15 +2948,14 @@ let%test_unit "Ec_group.is_on_curve" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 1 ) ;
 
-            let multi_range_check_checks_count = ref 6 in
-            if not Bignum_bigint.(curve.bignum.a = zero) then
-              multi_range_check_checks_count :=
-                !multi_range_check_checks_count + 1 ;
-            if not Bignum_bigint.(curve.bignum.b = zero) then
-              multi_range_check_checks_count :=
-                !multi_range_check_checks_count + 1 ;
+            let range_check_count = ref 18 in
+            if Bignum_bigint.(curve.bignum.a <> zero) then
+              range_check_count := !range_check_count + 3 ;
+            if Bignum_bigint.(curve.bignum.b <> zero) then
+              range_check_count := !range_check_count + 3 ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.ranges 18 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges
+                !range_check_count ) ;
             () )
       in
 
@@ -3076,15 +3090,14 @@ let%test_unit "Ec_group.check_ia" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 1 ) ;
 
-            let multi_range_check_checks_count = ref 7 in
+            let range_check_count = ref 21 in
             if not Bignum_bigint.(curve.bignum.a = zero) then
-              multi_range_check_checks_count :=
-                !multi_range_check_checks_count + 1 ;
+              range_check_count := !range_check_count + 3 ;
             if not Bignum_bigint.(curve.bignum.b = zero) then
-              multi_range_check_checks_count :=
-                !multi_range_check_checks_count + 1 ;
+              range_check_count := !range_check_count + 3 ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.ranges 18 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges
+                !range_check_count ) ;
             () )
       in
 
@@ -4058,11 +4071,10 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
             else
               assert (
                 Mina_stdlib.List.Length.equal unused_external_checks.bounds 43 ) ;
-
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.canonicals 8 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.ranges 102 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 192 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -4155,7 +4167,7 @@ let%test_unit "Ec_group.scalar_mul_tiny_full" =
             else assert (Mina_stdlib.List.Length.equal external_checks.bounds 43) ;
 
             assert (Mina_stdlib.List.Length.equal external_checks.canonicals 8) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.ranges 102) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 192) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
