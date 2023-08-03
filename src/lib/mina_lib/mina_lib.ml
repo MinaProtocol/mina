@@ -1361,14 +1361,17 @@ let start t =
     | None ->
         ()
   in
+  let built_with_commit_sha =
+    if t.config.uptime_send_node_commit then Some Mina_version.commit_id_short
+    else None
+  in
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
     ~transition_frontier:t.components.transition_frontier
     ~time_controller:t.config.time_controller
     ~block_produced_bvar:t.components.block_produced_bvar
     ~uptime_submitter_keypair:t.config.uptime_submitter_keypair
-    ~graphql_control_port:t.config.graphql_control_port
-    ~built_with_commit_sha:(Some Mina_version.commit_id_short)
+    ~graphql_control_port:t.config.graphql_control_port ~built_with_commit_sha
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)
     ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;

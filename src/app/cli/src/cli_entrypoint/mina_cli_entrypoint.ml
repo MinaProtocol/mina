@@ -477,6 +477,13 @@ let setup_daemon logger =
          for the associated private key that is being tracked by this daemon. \
          You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
+  and uptime_send_node_commit =
+    flag "--uptime-send-node-commit-sha"
+      ~aliases:[ "uptime-send-node-commit-sha" ]
+      ~doc:
+        "true|false Whether to send the commit SHA used to build the node to \
+         the uptime service. (default: false)"
+      no_arg
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -1357,8 +1364,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~log_block_creation ~precomputed_values ~start_time
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~stop_time ~node_status_url
-                 ~graphql_control_port:itn_graphql_port () )
+                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
+                 ~node_status_url ~graphql_control_port:itn_graphql_port () )
           in
           { mina
           ; client_trustlist
