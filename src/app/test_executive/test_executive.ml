@@ -49,13 +49,18 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
     let (Test_inputs_with_cli_inputs ((module Inputs), _)) =
       inputs.test_inputs
     in
-    if
-      String.equal Inputs.Engine.name "abstract"
-      && Option.is_none inputs.config_path
-    then (
-      [%log fatal] "Must provide a config file when using the abstract engine" ;
-      exit 1 )
-    else Deferred.unit
+    match Inputs.Engine.name with
+    | "abstract" ->
+        if Option.is_none inputs.config_path then (
+          [%log fatal]
+            "Must provide a config file when using the abstract engine" ;
+          exit 1 )
+        else Deferred.unit
+    | _ ->
+        [%log debug]
+          "Config file is only used for the abstract engine. It will be \
+           ignored." ;
+        Deferred.unit
 
 let engines : engine list =
   [ ("abstract", (module Integration_test_abstract_engine : Intf.Engine.S))
