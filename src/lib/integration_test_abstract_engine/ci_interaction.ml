@@ -515,11 +515,36 @@ module Replayer_run = struct
   exception Invalid_response of string
 end
 
+module Network_status = struct
+  type t = Deploy_error of string | Status of Node_id.t Core.String.Map.t
+  [@@deriving eq]
+
+  exception Invalid_status of string * string
+
+  let of_yojson (t : Yojson.Safe.t) =
+    match t with
+    | `Assoc [ ("deploy_error", `String error) ] ->
+        Ok (Deploy_error error)
+    | `Assoc statuses ->
+        let status_map =
+          let open Core.String.Map in
+          List.fold statuses ~init:empty ~f:(fun acc -> function
+            | node_id, `String status ->
+                set acc ~key:node_id ~data:status
+            | node_id, error ->
+                raise @@ Invalid_status (node_id, Yojson.Safe.to_string error) )
+        in
+        Ok (Status status_map)
+    | _ ->
+        Error (Yojson.Safe.to_string t)
+end
+
 module Command_output = struct
   type t =
     | Network_created of Network_created.t
     | Network_deployed of Network_deployed.t
     | Network_destroyed
+    | Network_status of Network_status.t
     | Node_started of Node_started.t
     | Node_stopped of Node_stopped.t
     | Archive_data_dump of Archive_data_dump.t
@@ -665,7 +690,7 @@ module Config_file = struct
     | Ok output ->
         if not suppress_logs then
           [%log' spam (Logger.create ())]
-            "Successful command execution\nCommand: %s\nOutput: %s" cmd output ;
+            "Successful command execution\n Command: %s\n Output: %s" cmd output ;
         Ok output
     | _ ->
         if not suppress_logs then
@@ -684,5 +709,5 @@ module Config_file = struct
                     name ^ ": " ^ type_name ) )
              ( String.concat ~sep:", "
              @@ List.map args ~f:(fun (name, value) ->
-                    name ^ ": " ^ Yojson.Safe.to_string value ) ) )
+                    name ^ " = " ^ Yojson.Safe.to_string value ) ) )
 end

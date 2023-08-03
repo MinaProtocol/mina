@@ -386,7 +386,7 @@ module Parse_output_tests = struct
     in
     assert (equal result { node_id = "node0"; logs })
 
-  let%test_unit "parse precomputed block dump response" =
+  let%test_unit "parse precomputed block dump" =
     let open Precomputed_block_dump in
     let result =
       {|{"node_id":"node0","blocks":"blocks"}|} |> Yojson.Safe.from_string
@@ -394,7 +394,7 @@ module Parse_output_tests = struct
     in
     assert (equal result { node_id = "node0"; blocks = "blocks" })
 
-  let%test_unit "Replayer run response" =
+  let%test_unit "parse replayer run" =
     let open Replayer_run in
     let logs = "{\"log0\":\"msg0\"}\n{\"log1\":\"msg1\"}" in
     let result =
@@ -402,6 +402,36 @@ module Parse_output_tests = struct
       |> of_yojson |> Result.ok_or_failwith
     in
     assert (equal result { node_id = "node0"; logs })
+
+  let%test_unit "parse network status deploy error" =
+    let open Network_status in
+    let err_msg = "this is an error msg" in
+    let deploy_error = sprintf {|{"deploy_error":"%s"}|} err_msg in
+    let res =
+      Yojson.Safe.from_string deploy_error |> of_yojson |> Result.ok_or_failwith
+    in
+    assert (equal res @@ Deploy_error err_msg)
+
+  let%test_unit "parse network status" =
+    let open Network_status in
+    let node0 = "node0" in
+    let node1 = "node1" in
+    let status0 = sprintf "%s's status" node0 in
+    let status1 = sprintf "%s's status" node1 in
+    let status =
+      sprintf {|{"%s":"%s", "%s":"%s"}|} node0 status0 node1 status1
+    in
+    let res =
+      Yojson.Safe.from_string status |> of_yojson |> Result.ok_or_failwith
+    in
+    let expect_status_map =
+      let open Core.String.Map in
+      List.fold
+        [ (node0, status0); (node1, status1) ]
+        ~init:empty
+        ~f:(fun acc (key, data) -> set acc ~key ~data)
+    in
+    assert (equal res @@ Status expect_status_map)
 end
 
 let () = ignore @@ Async.Scheduler.go ()

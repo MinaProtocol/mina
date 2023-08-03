@@ -24,14 +24,6 @@ module Node = struct
 
   let network_keypair { network_keypair; _ } = network_keypair
 
-  (* TODO: remove *)
-  let[@warning "-27"] get_logs_in_container ?container_id { node_id; _ } =
-    (* let container_id = Option.value container_id ~default:"" in
-       let%bind cwd = Unix.getcwd () in
-       Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "kubectl"
-         (base_kube_args config @ [ "logs"; "-c"; container_id; node_id ]) *)
-    failwith "get_logs_in_container"
-
   let start ?(git_commit = Mina_version.commit_id_short) ~fresh_state t :
       unit Malleable_error.t =
     try
