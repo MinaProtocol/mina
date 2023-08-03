@@ -17,12 +17,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   type dsl = Dsl.t
 
   let config =
-    let k = 2 in
-
     let open Test_config in
     { default with
-      k
-    ; slots_per_epoch = 3 * 8 * k
+      k = 2
+    ; slots_per_epoch = 20
     ; requires_graphql = true
     ; genesis_ledger =
         [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
@@ -75,15 +73,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let start_time = Time.now () in
     let%bind () =
       section "send out padding transactions"
-        (let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+        (let fee = Currency.Fee.of_nanomina_int_exn 3_000_000 in
          send_padding_transactions block_producer_nodes ~fee ~logger
            ~n:(2 * padding_payments ~transactions_sent ~num_proofs ~config) )
     in
     let%bind () =
+      let soft_timeout = Network_time_span.Slots 16 in
+      let hard_timeout = Network_time_span.Slots 24 in
       section "wait for a ledger proof being emitted"
         (wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1
-              ~test_config:config ) )
+           (Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
+              (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1
+                 ~test_config:config ) ) )
     in
     let%bind () =
       section

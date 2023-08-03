@@ -235,7 +235,8 @@ module Block_produced = struct
       let%map staking_epoch_ledger_hash =
         frozen_ledger_hash_of_string ledger_hash_str
       in
-      Frozen_ledger_hash.equal staking_epoch_ledger_hash genesis_ledger_hash
+      not
+      @@ Frozen_ledger_hash.equal staking_epoch_ledger_hash genesis_ledger_hash
     in
     let%map next_epoch_ledger_updated =
       let%bind ledger_hash_str =
@@ -245,7 +246,7 @@ module Block_produced = struct
       let%map next_epoch_ledger_hash =
         frozen_ledger_hash_of_string ledger_hash_str
       in
-      Frozen_ledger_hash.equal next_epoch_ledger_hash genesis_ledger_hash
+      not @@ Frozen_ledger_hash.equal next_epoch_ledger_hash genesis_ledger_hash
     in
     { block_height
     ; global_slot
