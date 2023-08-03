@@ -126,19 +126,6 @@ let rot_aux (type f)
                  ; bound_crumb5 = of_bits bound 4 6
                  ; bound_crumb6 = of_bits bound 2 4
                  ; bound_crumb7 = of_bits bound 0 2
-                 ; shifted
-                 ; shifted_limb0 = of_bits shifted 52 64
-                 ; shifted_limb1 = of_bits shifted 40 52
-                 ; shifted_limb2 = of_bits shifted 28 40
-                 ; shifted_limb3 = of_bits shifted 16 28
-                 ; shifted_crumb0 = of_bits shifted 14 16
-                 ; shifted_crumb1 = of_bits shifted 12 14
-                 ; shifted_crumb2 = of_bits shifted 10 12
-                 ; shifted_crumb3 = of_bits shifted 8 10
-                 ; shifted_crumb4 = of_bits shifted 6 8
-                 ; shifted_crumb5 = of_bits shifted 4 6
-                 ; shifted_crumb6 = of_bits shifted 2 4
-                 ; shifted_crumb7 = of_bits shifted 0 2
                  ; two_to_rot =
                      Common.bignum_bigint_to_field
                        (module Circuit)
