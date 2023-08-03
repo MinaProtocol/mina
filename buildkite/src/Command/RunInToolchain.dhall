@@ -36,12 +36,12 @@ let runInToolchainBuster : List Text -> Text -> List Cmd.Type =
         (innerScript)
     ]
 
-let runInToolchainStretch : List Text -> Text -> List Cmd.Type =
+let runInToolchainBionic : List Text -> Text -> List Cmd.Type =
   \(environment : List Text) ->
   \(innerScript : Text) ->
     [ Mina.fixPermissionsCommand ] # [
       Cmd.runInDocker
-        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchainStretch, extraEnv = environment })
+        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchainBionic, extraEnv = environment })
         (innerScript)
     ]
 
@@ -63,5 +63,5 @@ in
   , runInToolchainBookworm = runInToolchainBookworm
   , runInToolchainBullseye = runInToolchainBullseye
   , runInToolchainBuster = runInToolchainBuster
-  , runInToolchainStretch = runInToolchainStretch
+  , runInToolchainBionic = runInToolchainBionic
 }
