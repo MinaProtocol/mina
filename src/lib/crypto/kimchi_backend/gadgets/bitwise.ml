@@ -576,7 +576,7 @@ let bnot64_unchecked (type f)
 (**************)
 
 let%test_unit "bitwise rotation gadget" =
-  if tests_enabled then
+  if tests_enabled then (
     let (* Import the gadget test runner *)
     open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -627,8 +627,6 @@ let%test_unit "bitwise rotation gadget" =
     in
 
     let _cs = test_rot "0" 0 Left "0" in
-    ()
-(*
     let _cs = test_rot "0" 32 Right "0" in
     let _cs = test_rot "1" 1 Left "2" in
     let _cs = test_rot "1" 63 Left "9223372036854775808" in
@@ -645,8 +643,8 @@ let%test_unit "bitwise rotation gadget" =
     (* Negatve tests *)
     assert (Common.is_error (fun () -> test_rot "0" 1 Left "1")) ;
     assert (Common.is_error (fun () -> test_rot "1" 64 Left "1")) ;
-    assert (Common.is_error (fun () -> test_rot ~cs "0" 0 Left "0")) ) ;
-  ()
+    assert (Common.is_error (fun () -> test_rot ~cs "0" 0 Left "0")) ;
+    () )
 
 let%test_unit "bitwise shift gadgets" =
   if tests_enabled then (
@@ -939,4 +937,3 @@ let%test_unit "bitwise not gadget" =
             "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
             "0" 255 ) ) ) ;
   ()
-*)
