@@ -34,7 +34,6 @@ module Engine = struct
       -> debug:bool
       -> test_config:Test_config.t
       -> images:Test_config.Container_images.t
-      -> cluster_config:Test_config.Cluster_config.t
       -> t
   end
 

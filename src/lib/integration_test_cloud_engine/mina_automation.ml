@@ -96,7 +96,7 @@ module Network_config = struct
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
-      ~(cluster_config : Test_config.Cluster_config.t) =
+      =
     let { requires_graphql
         ; genesis_ledger
         ; block_producers
@@ -332,13 +332,13 @@ module Network_config = struct
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
-    ; cluster_zone = cluster_config.cluster_zone
+    ; cluster_zone = cli_inputs.cluster_config.cluster_zone
     ; genesis_keypairs
     ; constants
     ; terraform =
-        { cluster_name = cluster_config.cluster_name
-        ; cluster_region = cluster_config.cluster_region
-        ; k8s_context = cluster_config.cluster_id
+        { cluster_name = cli_inputs.cluster_config.cluster_name
+        ; cluster_region = cli_inputs.cluster_config.cluster_region
+        ; k8s_context = cli_inputs.cluster_config.cluster_id
         ; testnet_name
         ; deploy_graphql_ingress = requires_graphql
         ; mina_image = images.mina
@@ -354,8 +354,7 @@ module Network_config = struct
         ; mina_archive_schema_aux_files
         ; snark_coordinator_config
         ; snark_worker_fee
-        ; aws_route53_zone_id =
-            Integration_test_lib.Constants.aws_route53_zone_id
+        ; aws_route53_zone_id = Constants.aws_route53_zone_id
         ; cpu_request = 6
         ; mem_request = "12Gi"
         ; worker_cpu_request = 6
@@ -379,7 +378,7 @@ module Network_config = struct
         { Block.Provider.provider = "google"
         ; region = network_config.terraform.cluster_region
         ; zone = Some network_config.cluster_zone
-        ; project = Some Integration_test_lib.Constants.project_id
+        ; project = Some Constants.project_id
         ; alias = None
         }
     ; Block.Module
@@ -398,8 +397,7 @@ module Network_config = struct
         resource.labels.cluster_name="%s"
         resource.labels.namespace_name="%s"
       |}
-      Integration_test_lib.Constants.project_id
-      network_config.terraform.cluster_region
+      Constants.project_id network_config.terraform.cluster_region
       network_config.terraform.cluster_name
       network_config.terraform.testnet_name
 end

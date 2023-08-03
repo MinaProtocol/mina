@@ -30,7 +30,6 @@ type inputs =
   ; mina_image : string
   ; archive_image : string option
   ; debug : bool
-  ; cluster_config : Test_config.Cluster_config.t
   }
 
 let validate_inputs ~logger inputs (test_config : Test_config.t) :
@@ -279,7 +278,6 @@ let main inputs =
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
       ~debug:inputs.debug ~test_config:T.config ~images
-      ~cluster_config:inputs.cluster_config
   in
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
@@ -430,34 +428,6 @@ let archive_image_arg =
       ( opt (some string) None
       & info [ "archive-image" ] ~env ~docv:"ARCHIVE_IMAGE" ~doc ))
 
-let cluster_id_arg =
-  let doc = "Identifier of the cluster in which the test should run" in
-  Arg.(
-    value
-      (opt string Integration_test_lib.Constants.default_cluster_id
-         (info [ "cluster-id" ] ~doc) ))
-
-let cluster_name_arg =
-  let doc = "Name of the cluster in which the test should run" in
-  Arg.(
-    value
-      (opt string Integration_test_lib.Constants.default_cluster_name
-         (info [ "cluster-name" ] ~doc) ))
-
-let cluster_region_arg =
-  let doc = "Region of the cluster in which the test should run" in
-  Arg.(
-    value
-      (opt string Integration_test_lib.Constants.default_cluster_region
-         (info [ "cluster-region" ] ~doc) ))
-
-let cluster_zone_arg =
-  let doc = "Zone of the cluster in which the test should run" in
-  Arg.(
-    value
-      (opt string Integration_test_lib.Constants.default_cluster_zone
-         (info [ "cluster-zone" ] ~doc) ))
-
 let debug_arg =
   let doc =
     "Enable debug mode. On failure, the test executive will pause for user \
@@ -480,21 +450,12 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs test_inputs test mina_image archive_image debug cluster_id
-        cluster_name cluster_zone cluster_region =
-      { test_inputs
-      ; test
-      ; mina_image
-      ; archive_image
-      ; debug
-      ; cluster_config =
-          { cluster_id; cluster_name; cluster_zone; cluster_region }
-      }
+    let cons_inputs test_inputs test mina_image archive_image debug =
+      { test_inputs; test; mina_image; archive_image; debug }
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
-      $ mina_image_arg $ archive_image_arg $ debug_arg $ cluster_id_arg
-      $ cluster_name_arg $ cluster_zone_arg $ cluster_region_arg)
+      $ mina_image_arg $ archive_image_arg $ debug_arg)
   in
   let term = Term.(const start $ inputs_term) in
   (term, info)
