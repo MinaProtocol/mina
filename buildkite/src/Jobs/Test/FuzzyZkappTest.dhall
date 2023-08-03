@@ -12,15 +12,16 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let buildTestCmd : Text -> Text -> Natural -> Natural -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(timeout : Natural) -> \(individual_test_timeout : Natural) -> \(cmd_target : Size) ->
+let buildTestCmd : Text -> Text -> Natural -> Natural -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(timeout : Natural)  -> \(individual_test_timeout : Natural) -> \(cmd_target : Size) ->
   let timeout = Natural/show timeout in
   let individual_test_timeout = Natural/show individual_test_timeout in
+  let key = "fuzzy-zkapp-unit-test-${profile}" in
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchain ([] : List Text)
-        "buildkite/scripts/fuzzy-zkapp-test.sh ${profile} ${path} ${timeout} ${individual_test_timeout}",
+      commands = RunInToolchain.runInToolchain ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"]
+        "buildkite/scripts/fuzzy-zkapp-test.sh ${profile} ${path} ${timeout} ${individual_test_timeout} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev",
       label = "Fuzzy zkapp unit tests",
-      key = "fuzzy-zkapp-unit-test-${profile}",
+      key = key,
       target = cmd_target,
       docker = None Docker.Type,
       artifact_paths = [ S.contains "core_dumps/*" ]
