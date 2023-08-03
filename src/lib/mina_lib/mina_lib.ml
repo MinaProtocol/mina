@@ -893,18 +893,46 @@ let get_current_nonce t aid =
       Ok (`Min ledger_nonce, nonce)
 
 let add_transactions t (uc_inputs : User_command_input.t list) =
-  let result_ivar = Ivar.create () in
-  Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (uc_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
-  |> Deferred.don't_wait_for ;
-  Ivar.read result_ivar
+  let slot =
+    Mina_numbers.Account_nonce.to_int
+    @@ Consensus.Data.Consensus_time.to_global_slot
+         (Consensus.Data.Consensus_time.of_time_exn
+            ~constants:(config t).precomputed_values.consensus_constants
+            (Block_time.now (config t).time_controller) )
+  in
+  match (config t).slot_tx_end with
+  | Some slot_tx_end when slot >= slot_tx_end ->
+      [%log' warn (top_level_logger t)]
+        "can't add transactions at slot $slot, tx production ends at $end"
+        ~metadata:[ ("slot", `Int slot); ("end", `Int slot_tx_end) ] ;
+      Deferred.return (Error (Error.of_string "tx production has ended"))
+  | Some _ | None ->
+      let result_ivar = Ivar.create () in
+      Strict_pipe.Writer.write t.pipes.user_command_input_writer
+        (uc_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
+      |> Deferred.don't_wait_for ;
+      Ivar.read result_ivar
 
 let add_full_transactions t user_command =
-  let result_ivar = Ivar.create () in
-  Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
-    (user_command, Ivar.fill result_ivar)
-  |> Deferred.don't_wait_for ;
-  Ivar.read result_ivar
+  let slot =
+    Mina_numbers.Account_nonce.to_int
+    @@ Consensus.Data.Consensus_time.to_global_slot
+         (Consensus.Data.Consensus_time.of_time_exn
+            ~constants:(config t).precomputed_values.consensus_constants
+            (Block_time.now (config t).time_controller) )
+  in
+  match (config t).slot_tx_end with
+  | Some slot_tx_end when slot >= slot_tx_end ->
+      [%log' warn (top_level_logger t)]
+        "can't add transactions at slot $slot, tx production ends at $end"
+        ~metadata:[ ("slot", `Int slot); ("end", `Int slot_tx_end) ] ;
+      Deferred.return (Error (Error.of_string "tx production has ended"))
+  | Some _ | None ->
+      let result_ivar = Ivar.create () in
+      Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
+        (user_command, Ivar.fill result_ivar)
+      |> Deferred.don't_wait_for ;
+      Ivar.read result_ivar
 
 let next_producer_timing t = t.next_producer_timing
 
@@ -1212,7 +1240,8 @@ let start t =
       ~log_block_creation:t.config.log_block_creation
       ~precomputed_values:t.config.precomputed_values
       ~block_reward_threshold:t.config.block_reward_threshold
-      ~block_produced_bvar:t.components.block_produced_bvar ;
+      ~block_produced_bvar:t.components.block_produced_bvar
+      ~slot_tx_end:t.config.slot_tx_end ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
