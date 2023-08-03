@@ -4299,18 +4299,17 @@ module Queries = struct
             `Assoc [ ("error", `String "Daemon is bootstrapping") ]
         | `Active best_tip -> (
             let block = Transition_frontier.Breadcrumb.(block best_tip) in
-            let global_slot =
-              Mina_block.blockchain_length block |> Unsigned.UInt32.to_int
-            in
-            let staged_ledger =
+            let global_slot = Mina_block.blockchain_length block in
+            let ledger =
               Transition_frontier.Breadcrumb.staged_ledger best_tip
+              |> Staged_ledger.ledger
             in
             let protocol_state =
               Transition_frontier.Breadcrumb.protocol_state best_tip
             in
             let runtime_config = Mina_lib.runtime_config mina in
             match
-              Runtime_config.make_fork_config ~staged_ledger ~global_slot
+              Runtime_config.make_fork_config ~ledger ~global_slot
                 ~protocol_state_hash:protocol_state.previous_state_hash
                 runtime_config
             with

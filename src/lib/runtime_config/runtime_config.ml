@@ -1,12 +1,24 @@
 open Core_kernel
 
 module Fork_config = struct
+  (* previous_global_slot here is a global slot since genesis. previous
+     length is a number of blocks produced since genesis, which might be
+     smaller than previous_global_slot or equal if a block was produced
+     in every slot possible, which may or may not be the case. *)
   type t =
     { previous_state_hash : string
     ; previous_length : int
     ; previous_global_slot : int
     }
   [@@deriving yojson, dhall_type, bin_io_unversioned]
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind previous_global_slot = Int.gen_incl 0 1_000_000 in
+    let%bind previous_length = Int.gen_incl 0 previous_global_slot in
+    let%map state_hash = Mina_base.State_hash.gen in
+    let previous_state_hash = Mina_base.State_hash.to_base58_check state_hash in
+    { previous_state_hash; previous_length; previous_global_slot }
 end
 
 let yojson_strip_fields ~keep_fields = function
@@ -47,6 +59,15 @@ let dump_on_error yojson x =
 let of_yojson_generic ~fields of_yojson json =
   dump_on_error json @@ of_yojson
   @@ yojson_strip_fields ~keep_fields:fields json
+
+let rec map_results ~f = function
+  | [] ->
+      Result.return []
+  | r :: rs ->
+      let open Result.Let_syntax in
+      let%bind r' = f r in
+      let%map rs = map_results ~f rs in
+      r' :: rs
 
 module Json_layout = struct
   module Accounts = struct
@@ -237,86 +258,6 @@ module Json_layout = struct
         ; voting_for = None
         ; snapp = None
         ; permissions = None
-        }
-
-      let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
-        let open Result.Let_syntax in
-        let open Signature_lib in
-        let%map snapp =
-          match a.snapp with
-          | None ->
-              return None
-          | Some snapp ->
-              let state = Mina_base.Snapp_state.V.to_list snapp.app_state in
-              let%map verification_key =
-                match snapp.verification_key with
-                | None ->
-                    return None
-                | Some vk ->
-                    Binable.to_string
-                      (module Pickles.Side_loaded.Verification_key.Stable.Latest)
-                      vk.With_hash.data
-                    |> Base64.encode ~alphabet:Base64.uri_safe_alphabet
-                    |> Result.map ~f:Option.return
-                    |> Result.map_error ~f:(fun (`Msg m) -> m)
-              in
-              Some Snapp_account.{ state; verification_key }
-        in
-        { pk = Some (Public_key.Compressed.to_base58_check a.public_key)
-        ; sk = None
-        ; balance = a.balance
-        ; delegate =
-            Option.map a.delegate ~f:(fun pk ->
-                Public_key.Compressed.to_base58_check pk )
-        ; timing =
-            ( match a.timing with
-            | Untimed ->
-                None
-            | Timed t ->
-                let open Timed in
-                Some
-                  { initial_minimum_balance = t.initial_minimum_balance
-                  ; cliff_time = t.cliff_time
-                  ; cliff_amount = t.cliff_amount
-                  ; vesting_period = t.vesting_period
-                  ; vesting_increment = t.vesting_increment
-                  } )
-        ; token = Some (Mina_base.Token_id.to_uint64 a.token_id)
-        ; token_permissions =
-            Some
-              ( match a.token_permissions with
-              | Token_owned { disable_new_accounts } ->
-                  { token_owned = true
-                  ; account_disabled = false
-                  ; disable_new_accounts
-                  }
-              | Not_owned { account_disabled } ->
-                  { token_owned = false
-                  ; account_disabled
-                  ; disable_new_accounts = false
-                  } )
-        ; nonce = a.nonce
-        ; receipt_chain_hash =
-            Some
-              (Mina_base.Receipt.Chain_hash.to_base58_check a.receipt_chain_hash)
-        ; voting_for = Some (Mina_base.State_hash.to_base58_check a.voting_for)
-        ; snapp
-        ; permissions =
-            Some
-              Permissions.
-                { stake = a.permissions.stake
-                ; edit_state =
-                    Auth_required.of_account_perm a.permissions.edit_state
-                ; send = Auth_required.of_account_perm a.permissions.send
-                ; receive = Auth_required.of_account_perm a.permissions.receive
-                ; set_delegate =
-                    Auth_required.of_account_perm a.permissions.set_delegate
-                ; set_permissions =
-                    Auth_required.of_account_perm a.permissions.set_permissions
-                ; set_verification_key =
-                    Auth_required.of_account_perm
-                      a.permissions.set_verification_key
-                }
         }
     end
 
@@ -550,6 +491,91 @@ module Accounts = struct
       Result.bind ~f:of_json_layout (Json_layout.Accounts.Single.of_yojson json)
 
     let default = Json_layout.Accounts.Single.default
+
+    let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
+      let open Result.Let_syntax in
+      let open Signature_lib in
+      let%map snapp =
+        match a.snapp with
+        | None ->
+            return None
+        | Some snapp ->
+            let state = Mina_base.Snapp_state.V.to_list snapp.app_state in
+            let%map verification_key =
+              match snapp.verification_key with
+              | None ->
+                  return None
+              | Some vk ->
+                  Binable.to_string
+                    (module Pickles.Side_loaded.Verification_key.Stable.Latest)
+                    vk.With_hash.data
+                  |> Base64.encode ~alphabet:Base64.uri_safe_alphabet
+                  |> Result.map ~f:Option.return
+                  |> Result.map_error ~f:(fun (`Msg m) -> m)
+            in
+            Some Snapp_account.{ state; verification_key }
+      in
+      { pk = Some (Public_key.Compressed.to_base58_check a.public_key)
+      ; sk = None
+      ; balance = a.balance
+      ; delegate =
+          Option.map a.delegate ~f:(fun pk ->
+              Public_key.Compressed.to_base58_check pk )
+      ; timing =
+          ( match a.timing with
+          | Untimed ->
+              None
+          | Timed t ->
+              let open Timed in
+              Some
+                { initial_minimum_balance = t.initial_minimum_balance
+                ; cliff_time = t.cliff_time
+                ; cliff_amount = t.cliff_amount
+                ; vesting_period = t.vesting_period
+                ; vesting_increment = t.vesting_increment
+                } )
+      ; token = Some (Mina_base.Token_id.to_uint64 a.token_id)
+      ; token_permissions =
+          Some
+            ( match a.token_permissions with
+            | Token_owned { disable_new_accounts } ->
+                { token_owned = true
+                ; account_disabled = false
+                ; disable_new_accounts
+                }
+            | Not_owned { account_disabled } ->
+                { token_owned = false
+                ; account_disabled
+                ; disable_new_accounts = false
+                } )
+      ; nonce = a.nonce
+      ; receipt_chain_hash =
+          Some
+            (Mina_base.Receipt.Chain_hash.to_base58_check a.receipt_chain_hash)
+      ; voting_for = Some (Mina_base.State_hash.to_base58_check a.voting_for)
+      ; snapp
+      ; permissions =
+          Some
+            Permissions.
+              { stake = a.permissions.stake
+              ; edit_state =
+                  Auth_required.of_account_perm a.permissions.edit_state
+              ; send = Auth_required.of_account_perm a.permissions.send
+              ; receive = Auth_required.of_account_perm a.permissions.receive
+              ; set_delegate =
+                  Auth_required.of_account_perm a.permissions.set_delegate
+              ; set_permissions =
+                  Auth_required.of_account_perm a.permissions.set_permissions
+              ; set_verification_key =
+                  Auth_required.of_account_perm
+                    a.permissions.set_verification_key
+              }
+      }
+
+    let gen =
+      Quickcheck.Generator.map Mina_base.Account.gen ~f:(fun a ->
+          (* This will never fail with a proper account generator. *)
+          of_account a |> Result.ok_or_failwith )
   end
 
   type single = Single.t =
@@ -664,6 +690,28 @@ module Ledger = struct
 
   let of_yojson json =
     Result.bind ~f:of_json_layout (Json_layout.Ledger.of_yojson json)
+
+  let gen =
+    let open Quickcheck in
+    let open Generator.Let_syntax in
+    let%bind accounts = Generator.list Accounts.Single.gen in
+    let num_accounts = List.length accounts in
+    let balances =
+      List.mapi accounts ~f:(fun number a -> (number, a.balance))
+    in
+    let%bind hash =
+      Mina_base.Ledger_hash.(Generator.map ~f:to_base58_check gen)
+      |> Option.quickcheck_generator
+    in
+    let%bind name = String.gen_nonempty in
+    let%map add_genesis_winner = Bool.quickcheck_generator in
+    { base = Accounts accounts
+    ; num_accounts = Some num_accounts
+    ; balances
+    ; hash
+    ; name = Some name
+    ; add_genesis_winner = Some add_genesis_winner
+    }
 end
 
 module Proof_keys = struct
@@ -705,6 +753,8 @@ module Proof_keys = struct
           Error
             "Runtime_config.Proof_keys.Level.of_json_layout: Expected the \
              field 'level' to contain a string"
+
+    let gen = Quickcheck.Generator.of_list [ Full; Check; None ]
   end
 
   module Transaction_capacity = struct
@@ -737,6 +787,16 @@ module Proof_keys = struct
     let of_yojson json =
       Result.bind ~f:of_json_layout
         (Json_layout.Proof_keys.Transaction_capacity.of_yojson json)
+
+    let gen =
+      let open Quickcheck in
+      let log_2_gen =
+        Generator.map ~f:(fun i -> Log_2 i) @@ Int.gen_incl 0 10
+      in
+      let txns_per_second_x10_gen =
+        Generator.map ~f:(fun i -> Txns_per_second_x10 i) @@ Int.gen_incl 0 1000
+      in
+      Generator.union [ log_2_gen; txns_per_second_x10_gen ]
 
     let small : t = Log_2 2
   end
@@ -850,6 +910,37 @@ module Proof_keys = struct
         opt_fallthrough ~default:t1.account_creation_fee t2.account_creation_fee
     ; fork = opt_fallthrough ~default:t1.fork t2.fork
     }
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind level = Level.gen in
+    let%bind sub_windows_per_window = Int.gen_incl 0 1000 in
+    let%bind ledger_depth = Int.gen_incl 0 64 in
+    let%bind work_delay = Int.gen_incl 0 1000 in
+    let%bind block_window_duration_ms = Int.gen_incl 1_000 360_000 in
+    let%bind transaction_capacity = Transaction_capacity.gen in
+    let%bind coinbase_amount =
+      Currency.Amount.(gen_incl zero (of_int 1_000_000_000))
+    in
+    let%bind supercharged_coinbase_factor = Int.gen_incl 0 100 in
+    let%bind account_creation_fee =
+      Currency.Fee.(gen_incl one (of_int 10_000_000_000))
+    in
+    let%map fork =
+      let open Quickcheck.Generator in
+      union [ map ~f:Option.some Fork_config.gen; return None ]
+    in
+    { level = Some level
+    ; sub_windows_per_window = Some sub_windows_per_window
+    ; ledger_depth = Some ledger_depth
+    ; work_delay = Some work_delay
+    ; block_window_duration_ms = Some block_window_duration_ms
+    ; transaction_capacity = Some transaction_capacity
+    ; coinbase_amount = Some coinbase_amount
+    ; supercharged_coinbase_factor = Some supercharged_coinbase_factor
+    ; account_creation_fee = Some account_creation_fee
+    ; fork
+    }
 end
 
 module Genesis = struct
@@ -883,6 +974,23 @@ module Genesis = struct
         opt_fallthrough ~default:t1.genesis_state_timestamp
           t2.genesis_state_timestamp
     }
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind k = Int.gen_incl 0 1000 in
+    let%bind delta = Int.gen_incl 0 1000 in
+    let%bind slots_per_epoch = Int.gen_incl 1 1_000_000 in
+    let%bind slots_per_sub_window = Int.gen_incl 1 1_000 in
+    let%map genesis_state_timestamp =
+      Time.(gen_incl epoch (of_string "2050-01-01 00:00:00Z"))
+      |> Quickcheck.Generator.map ~f:Time.to_string
+    in
+    { k = Some k
+    ; delta = Some delta
+    ; slots_per_epoch = Some slots_per_epoch
+    ; slots_per_sub_window = Some slots_per_sub_window
+    ; genesis_state_timestamp = Some genesis_state_timestamp
+    }
 end
 
 module Daemon = struct
@@ -905,6 +1013,14 @@ module Daemon = struct
         opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
     ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
     }
+
+  (* Peer list URL should usually be None. This option is better provided with
+     a command line argument. Putting it in the config makes the network explicitly
+     rely on a certain number of nodes, reducing decentralisation. *)
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map txpool_max_size = Int.gen_incl 0 1000 in
+    { txpool_max_size = Some txpool_max_size; peer_list_url = None }
 end
 
 module Epoch_data = struct
@@ -1017,21 +1133,26 @@ let combine t1 t2 =
   ; epoch_data = opt_fallthrough ~default:t1.epoch_data t2.epoch_data
   }
 
-let make_fork_config ~staged_ledger ~global_slot ~protocol_state_hash
+let gen =
+  let open Quickcheck.Generator.Let_syntax in
+  let%map daemon = Daemon.gen
+  and genesis = Genesis.gen
+  and proof = Proof_keys.gen
+  and ledger = Ledger.gen in
+  { daemon = Some daemon
+  ; genesis = Some genesis
+  ; proof = Some proof
+  ; ledger = Some ledger
+  ; epoch_data =
+      None (* Leave it empty until we know better what should go there. *)
+  }
+
+let make_fork_config ~ledger ~global_slot ~protocol_state_hash
     (runtime_config : t) =
-  let rec map_results ~f = function
-    | [] ->
-        Result.return []
-    | r :: rs ->
-        let open Result.Let_syntax in
-        let%bind r' = f r in
-        let%map rs = map_results ~f rs in
-        r' :: rs
-  in
+  let global_slot = Mina_numbers.Global_slot.to_int global_slot in
   let accounts_or_error =
-    Staged_ledger.ledger staged_ledger
-    |> Mina_base.Ledger.foldi ~init:[] ~f:(fun _ accum act -> act :: accum)
-    |> map_results ~f:Json_layout.Accounts.Single.of_account
+    Mina_base.Ledger.foldi ~init:[] ~f:(fun _ accum act -> act :: accum) ledger
+    |> map_results ~f:Accounts.Single.of_account
   in
   Result.map accounts_or_error ~f:(fun accounts ->
       let ledger = Option.value_exn runtime_config.ledger in
