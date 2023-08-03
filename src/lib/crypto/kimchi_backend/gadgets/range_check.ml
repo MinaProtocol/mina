@@ -157,10 +157,16 @@ let range_check1 (type f)
 let bits64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (v0 : Circuit.Field.t) =
+  let open Circuit in
+  let zero_f = Field.Constant.zero in
+  let zero_var = exists Field.typ ~compute:(fun () -> zero_f) in
   range_check0
     (module Circuit)
-    ~label:"range_check64" ~is_compact:false v0 Circuit.Field.zero
-    Circuit.Field.zero
+    ~label:"range_check64" ~is_compact:false v0 zero_var zero_var ;
+
+  (* Doing this afterwards or else it can break chainability with Xor16's and Zero *)
+  Field.Assert.equal (Field.constant zero_f) zero_var ;
+  ()
 
 (* multi-range-check gadget - checks v0,v1,v2 \in [0, 2^88) *)
 let multi (type f)
