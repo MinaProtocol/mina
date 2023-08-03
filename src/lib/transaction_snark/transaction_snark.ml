@@ -3941,7 +3941,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         , Pickles.Provers.
             [ base; merge; opt_signed_opt_signed; opt_signed; proved ] ) =
       system
-        ~signature_kind:(Some Mina_signature_kind.(Other_network "invalid"))
+        ~signature_kind:None
+          (*(Some Mina_signature_kind.(Other_network "invalid"))*)
         ~proof_level ~constraint_constants
 
     module Proof = (val p)
@@ -4795,13 +4796,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let multiple_transfers (spec : Multiple_transfers_spec.t) =
+    let multiple_transfers ~signature_kind (spec : Multiple_transfers_spec.t) =
       let ( `Zkapp_command zkapp_command
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment _commitment
           , `Full_txn_commitment _full_commitment ) =
-        create_zkapp_command ~signature_kind:None
+        create_zkapp_command ~signature_kind
           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
           (Multiple_transfers_spec.spec_of_t spec)
           ~update:spec.snapp_update ~receiver_update:spec.snapp_update
@@ -4810,7 +4811,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       assert (List.is_empty snapp_zkapp_command) ;
       let account_updates =
         let sender_account_update = Option.value_exn sender_account_update in
-        Zkapp_command.Call_forest.cons ~signature_kind:None
+        Zkapp_command.Call_forest.cons ~signature_kind
           (Account_update.of_simple sender_account_update)
           zkapp_command.account_updates
       in

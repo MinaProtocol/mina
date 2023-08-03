@@ -358,7 +358,7 @@ module T = struct
       Ledger.apply_transaction_first_pass ~signature_kind:None
         ~constraint_constants
     in
-    let apply_second_pass = Ledger.apply_transaction_second_pass in
+    let apply_second_pass = Ledger.apply_transaction_second_pass ~signature_kind:None in
     let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
         sparse_ledger txn =
       let open Or_error.Let_syntax in
@@ -544,7 +544,7 @@ module T = struct
     in
     let%map partially_applied_transaction =
       to_staged_ledger_or_error
-        (Ledger.apply_transaction_first_pass ~constraint_constants ~global_slot
+        (Ledger.apply_transaction_first_pass ~signature_kind:None ~constraint_constants ~global_slot
            ~txn_state_view ledger txn )
     in
     let target_ledger_hash = Ledger.merkle_root ledger in
@@ -578,7 +578,7 @@ module T = struct
     in
     let%bind applied_txn =
       to_staged_ledger_or_error
-        (Ledger.apply_transaction_second_pass ledger
+        (Ledger.apply_transaction_second_pass ledger ~signature_kind:None
            pre_stmt.partially_applied_transaction )
     in
     let second_pass_ledger_target_hash = Ledger.merkle_root ledger in
@@ -2622,7 +2622,7 @@ let%test_module "staged ledger tests" =
                 Ledger.apply_transaction_first_pass ~signature_kind:None
                   ~constraint_constants
               in
-              let apply_second_pass = Ledger.apply_transaction_second_pass in
+              let apply_second_pass = Ledger.apply_transaction_second_pass ~signature_kind:None in
               let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
                   sparse_ledger txn =
                 let open Or_error.Let_syntax in
@@ -2777,7 +2777,7 @@ let%test_module "staged ledger tests" =
           | Zkapp_command zkapp_command_valid, _fee_payer_keypair, keymap ->
               let zkapp_command_with_auths =
                 Async.Thread_safe.block_on_async_exn (fun () ->
-                    Zkapp_command_builder.replace_authorizations ~keymap
+                    Zkapp_command_builder.replace_authorizations ~signature_kind:None ~keymap
                       (Zkapp_command.Valid.forget zkapp_command_valid) )
               in
               let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =

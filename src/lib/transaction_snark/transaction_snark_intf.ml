@@ -388,6 +388,6 @@ module type Full = sig
       [@@deriving sexp]
     end
 
-    val multiple_transfers : Multiple_transfers_spec.t -> Zkapp_command.t
+    val multiple_transfers : signature_kind:Mina_signature_kind.t option -> Multiple_transfers_spec.t -> Zkapp_command.t
   end
 end

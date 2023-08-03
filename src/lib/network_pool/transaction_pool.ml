@@ -1681,7 +1681,7 @@ let%test_module _ =
           ~f:(function
             | Zkapp_command zkapp_command_dummy_auths ->
                 let%map cmd =
-                  Zkapp_command_builder.replace_authorizations ~keymap ~prover
+                  Zkapp_command_builder.replace_authorizations ~signature_kind:None ~keymap ~prover
                     (Zkapp_command.Valid.forget zkapp_command_dummy_auths)
                 in
                 { With_status.data = User_command.Zkapp_command cmd
@@ -1822,7 +1822,7 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
 
-    let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
+    let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~signature_kind ~sender_idx
         ~receiver_idx ~fee ~nonce ~amount () =
       let sender_kp = test_keys.(sender_idx) in
       let sender_nonce = Account.Nonce.of_int nonce in
@@ -1876,7 +1876,7 @@ let%test_module _ =
         }
       in
       let zkapp_command =
-        Transaction_snark.For_tests.multiple_transfers test_spec
+        Transaction_snark.For_tests.multiple_transfers ~signature_kind test_spec
       in
       let zkapp_command =
         Or_error.ok_exn
@@ -2087,6 +2087,7 @@ let%test_module _ =
               let applied, _ =
                 Or_error.ok_exn
                 @@ Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                     ~signature_kind:None
                      ~constraint_constants
                      ~global_slot:dummy_state_view.global_slot_since_genesis
                      ~state_view:dummy_state_view ledger p
@@ -2248,7 +2249,21 @@ let%test_module _ =
           >>= mk_now_invalid_test test
                 ~mk_command:
                   (mk_transfer_zkapp_command ?valid_period:None
-                     ?fee_payer_idx:None ) )
+                     ?fee_payer_idx:None ~signature_kind:None ) )
+
+    let%test "Zkapp command with a different network id won't pass verification" =
+      Thread_safe.block_on_async_exn (fun () ->
+        let%bind test = setup_test () in
+        let zkapp_command = mk_transfer_zkapp_command ~signature_kind:(Some Mina_signature_kind.(Other_network "invalid")) ~sender_idx:0 ~receiver_idx:1 ~fee:minimum_fee ~nonce:0 ~amount:10000 ()
+        in
+        match%map Test.Resource_pool.Diff.verify test.txn_pool 
+          (Envelope.Incoming.wrap 
+            ~data:[ User_command.forget_check zkapp_command ]
+            ~sender:Envelope.Sender.Local)
+      with 
+      | Error e -> failwith (Error.to_string_hum e)
+      | Ok _ -> false
+        )
 
     let mk_expired_not_accepted_test t ~padding cmds =
       assert_pool_txs t [] ;
@@ -2403,13 +2418,13 @@ let%test_module _ =
             List.take independent_cmds (List.length independent_cmds / 2)
           in
           let expires_later1 =
-            mk_transfer_zkapp_command
+            mk_transfer_zkapp_command ~signature_kind:None
               ~valid_period:{ lower = curr_slot; upper = curr_slot_plus_three }
               ~fee_payer_idx:(0, 1) ~sender_idx:1 ~receiver_idx:9
               ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:1 ()
           in
           let expires_later2 =
-            mk_transfer_zkapp_command
+            mk_transfer_zkapp_command ~signature_kind:None
               ~valid_period:{ lower = curr_slot; upper = curr_slot_plus_seven }
               ~fee_payer_idx:(2, 1) ~sender_idx:3 ~receiver_idx:9
               ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:1 ()
@@ -2904,7 +2919,7 @@ let%test_module _ =
           in
           let%bind () =
             let send_command =
-              mk_transfer_zkapp_command ~fee_payer_idx:(0, 1) ~sender_idx:0
+              mk_transfer_zkapp_command ~signature_kind:None ~fee_payer_idx:(0, 1) ~sender_idx:0
                 ~fee:minimum_fee ~nonce:2 ~receiver_idx:1 ~amount:1_000_000 ()
             in
             run_test_cases send_command

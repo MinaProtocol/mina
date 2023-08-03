@@ -1521,6 +1521,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
         account_updates
         |> Zkapp_command.Call_forest.map ~f:Account_update.of_simple
         |> Zkapp_command.Call_forest.accumulate_hashes_predicated
+             ~signature_kind:None
     ; memo
     }
   in
@@ -1528,7 +1529,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   let receipt_elt =
     let _txn_commitment, full_txn_commitment =
       (* also computed in replace_authorizations, but easier just to re-compute here *)
-      Zkapp_command.get_transaction_commitments
+      Zkapp_command.get_transaction_commitments ~signature_kind:None
         zkapp_command_dummy_authorizations
     in
     Receipt.Zkapp_command_elt.Zkapp_command_commitment full_txn_commitment
@@ -1712,7 +1713,7 @@ let gen_max_cost_zkapp_command_from
         None
     | Some (a, role) ->
         Some ({ a with nonce = Account.Nonce.succ a.nonce }, role) ) ;
-  Zkapp_command.of_simple
+  Zkapp_command.of_simple ~signature_kind:None
     { fee_payer; account_updates; memo = Signed_command_memo.empty }
 
 let%test_module _ =

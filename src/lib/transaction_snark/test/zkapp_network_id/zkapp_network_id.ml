@@ -19,8 +19,5 @@ let%test_module "Zkapp network id tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.check_zkapp_command_with_merges_exn
-                    ~signature_kind:
-                      Mina_signature_kind.(Other_network "invalid")
-                    ledger [ zkapp_command ] ) ) )
+                  U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
   end )
