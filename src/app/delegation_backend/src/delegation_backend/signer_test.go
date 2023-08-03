@@ -1,6 +1,7 @@
 package delegation_backend
 
 import (
+	"encoding/json"
 	"testing"
 
 	"golang.org/x/crypto/blake2b"
@@ -25,22 +26,19 @@ func testVerifySig(pkStr string, sigStr string, data []byte, t *testing.T) {
 func testVerifyRequest(name string, networkId uint8, t *testing.T) {
 	body := readTestFile(name, t)
 	var req submitRequest
-	var err error
-	req, err = unmarshalPayload(body)
-	if err != nil {
+
+	if err := json.Unmarshal(body, &req); err != nil {
 		t.Log("failed decoding test file")
 		t.FailNow()
 	}
-	j, err := req.GetData().MakeSignPayload()
+	j, err := req.Data.MakeSignPayload()
 	if err != nil {
 		t.Log("failed making sign test file")
 		t.FailNow()
 	}
 	hash := blake2b.Sum256(j)
 	t.Logf("sign payload:\n%s", j)
-	submitter := req.GetSubmitter()
-	sig := req.GetSig()
-	if !verifySig(&submitter, &sig, hash[:], networkId) {
+	if !verifySig(&req.Submitter, &req.Sig, hash[:], networkId) {
 		t.Log("signature verification failed")
 		t.FailNow()
 	}

@@ -1,6 +1,7 @@
 package delegation_backend
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -9,14 +10,11 @@ func TestUnmarshalSuccess(t *testing.T) {
 	for _, f := range testNames {
 		body := readTestFile(f, t)
 
-		req, err := unmarshalPayload(body)
-		if err != nil {
+		var req submitRequest
+
+		if err := json.Unmarshal(body, &req); err != nil {
 			t.Logf("failed decoding test file %s", f)
 			t.Logf(err.Error())
-			t.FailNow()
-		}
-		if req == nil {
-			t.Logf("unmarshal returned empty payload %s", f)
 			t.FailNow()
 		}
 		if !req.CheckRequiredFields() {

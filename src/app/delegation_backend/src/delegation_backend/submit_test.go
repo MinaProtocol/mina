@@ -31,7 +31,7 @@ func mkB64B(b []byte) *Base64 {
 }
 
 func TestSignPayloadGeneration(t *testing.T) {
-	req := new(submitRequestV0)
+	req := new(submitRequest)
 	req.Data.PeerId = "MLF0jAGTpL84LLerLddNs5M10NCHM+BwNeMxK78+"
 	req.Data.Block = mkB64("zLgvHQzxSh8MWlTjXK+cMA==")
 	req.Data.CreatedAt, _ = time.Parse(time.RFC3339, "2021-07-01T19:21:33+03:00")
@@ -110,7 +110,7 @@ func TestNoLengthProvided(t *testing.T) {
 }
 
 func TestTooLarge(t *testing.T) {
-	var req submitRequestV0
+	var req submitRequest
 	if err := json.Unmarshal(readTestFile("req-no-snark", t), &req); err != nil {
 		t.Log("failed decoding test file")
 		t.FailNow()
@@ -143,7 +143,7 @@ func TestUnauthorized(t *testing.T) {
 
 func TestPkLimitExceeded(t *testing.T) {
 	body := readTestFile("req-with-snark", t)
-	var req submitRequestV0
+	var req submitRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		t.Log("failed decoding test file")
 		t.FailNow()
@@ -177,7 +177,7 @@ func TestSuccess(t *testing.T) {
 	testNames := []string{"req-no-snark", "req-with-snark"}
 	for _, f := range testNames {
 		body := readTestFile(f, t)
-		var req submitRequestV0
+		var req submitRequest
 		if err := json.Unmarshal(body, &req); err != nil {
 			t.Logf("failed decoding test file %s", f)
 			t.FailNow()
@@ -188,8 +188,8 @@ func TestSuccess(t *testing.T) {
 			t.Logf("Failed testing %s: %v", f, rep)
 			t.FailNow()
 		}
-		bhStr := req.Data.GetBlockDataHash()
-		paths := makePaths(tm.Now(), bhStr, req.GetSubmitter())
+		bhStr := req.GetBlockDataHash()
+		paths := makePaths(tm.Now(), bhStr, req.Submitter)
 		var meta MetaToBeSaved
 		meta.CreatedAt = req.Data.CreatedAt.Format(time.RFC3339)
 		meta.PeerId = req.Data.PeerId
@@ -208,7 +208,7 @@ func TestSuccess(t *testing.T) {
 
 func Test40x(t *testing.T) {
 	body := readTestFile("req-with-snark", t)
-	var req submitRequestV0
+	var req submitRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		t.Log("failed decoding test file")
 		t.FailNow()
