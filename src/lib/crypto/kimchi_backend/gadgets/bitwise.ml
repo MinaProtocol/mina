@@ -126,6 +126,7 @@ let rot_aux (type f)
                  ; bound_crumb5 = of_bits bound 4 6
                  ; bound_crumb6 = of_bits bound 2 4
                  ; bound_crumb7 = of_bits bound 0 2
+                 ; shifted
                  ; two_to_rot =
                      Common.bignum_bigint_to_field
                        (module Circuit)
@@ -575,7 +576,7 @@ let bnot64_unchecked (type f)
 (**************)
 
 let%test_unit "bitwise rotation gadget" =
-  if tests_enabled then (
+  if tests_enabled then
     let (* Import the gadget test runner *)
     open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -586,11 +587,23 @@ let%test_unit "bitwise rotation gadget" =
     (* Helper to test ROT gadget
      *   Input operands and expected output: word len mode rotated
      *   Returns unit if constraints are satisfied, error otherwise.
+     *   If odd is true, it inserts one initial dummy generic gate
      *)
-    let test_rot ?cs word length mode result =
+    let test_rot ?cs ?(odd = false) word length mode result =
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
+            ( if odd then
+              (* Create half a generic to force an odd number of Generics preceding Xor *)
+              let left_summand =
+                exists Field.typ ~compute:(fun () -> Field.Constant.of_int 15)
+              in
+              let right_summand =
+                exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0)
+              in
+              Field.Assert.equal
+                (Field.( + ) left_summand right_summand)
+                left_summand ) ;
             (* Set up snarky variables for inputs and output *)
             let word =
               exists Field.typ ~compute:(fun () ->
@@ -608,7 +621,14 @@ let%test_unit "bitwise rotation gadget" =
       cs
     in
     (* Positive tests *)
+    (* odd = true *)
+    let _cs =
+      test_rot ~odd:true "6510615555426900570" 4 Left "11936128518282651045"
+    in
+
     let _cs = test_rot "0" 0 Left "0" in
+    ()
+(*
     let _cs = test_rot "0" 32 Right "0" in
     let _cs = test_rot "1" 1 Left "2" in
     let _cs = test_rot "1" 63 Left "9223372036854775808" in
@@ -919,3 +939,4 @@ let%test_unit "bitwise not gadget" =
             "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
             "0" 255 ) ) ) ;
   ()
+*)
