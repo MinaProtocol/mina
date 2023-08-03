@@ -25,7 +25,7 @@ module Network_manager = struct
   let create ~logger (network_config : Network_config.t) =
     let open Malleable_error.Let_syntax in
     let%bind current_cluster =
-      (* TODO: replace with run_command *)
+      (* TODO: replace with Config_file.run_command *)
       Util.run_cmd_or_hard_error "/" "kubectl" [ "config"; "current-context" ]
     in
     [%log info] "Using cluster: %s" current_cluster ;
@@ -52,7 +52,7 @@ module Network_manager = struct
                  "Existing namespace of same name detected; removing to start \
                   clean"
         in
-        (* TODO: replace with run_command *)
+        (* TODO: replace with Config_file.run_command *)
         Util.run_cmd_or_hard_error "/" "kubectl"
           [ "delete"; "namespace"; network_config.config.network_id ]
         >>| Fn.const ()
@@ -104,13 +104,13 @@ module Network_manager = struct
 
   (* TODO: use output *)
   let deploy t =
+    let open Network_deployed in
     let logger = t.logger in
     if t.deployed then failwith "network already deployed" ;
     [%log info] "Deploying network" ;
-    let%bind output =
-      let open Network_deployed in
+    let%bind network_deployed =
       match%map
-        run_command
+        Config_file.run_command
           ~config:!Abstract_network.config_path
           ~args:[] "deploy_network"
       with
@@ -120,39 +120,33 @@ module Network_manager = struct
       | Error err ->
           raise @@ Invalid_output err
     in
-    let _ = Map.is_empty output in
     t.deployed <- true ;
-    let seeds = Core.String.Map.empty in
-    let block_producers = Core.String.Map.empty in
-    let snark_coordinators = Core.String.Map.empty in
-    let snark_workers = Core.String.Map.empty in
-    let archive_nodes = Core.String.Map.empty in
     let network =
-      { Abstract_network.constants = t.constants
+      let open Abstract_network in
+      { constants = t.constants
       ; testnet_log_filter = t.testnet_log_filter
       ; genesis_keypairs = t.genesis_keypairs
-      ; seeds
-      ; block_producers
-      ; snark_coordinators
-      ; snark_workers
-      ; archive_nodes
+      ; archive_nodes = Node.Collections.archive_nodes network_deployed
+      ; block_producers = Node.Collections.block_producers network_deployed
+      ; seeds = Node.Collections.seeds network_deployed
+      ; snark_coordinators =
+          Node.Collections.snark_coordinators network_deployed
+      ; snark_workers = Node.Collections.snark_workers network_deployed
       ; network_id = t.network_id
       }
     in
-    let nodes_to_string =
-      Fn.compose (String.concat ~sep:", ")
-        (List.map ~f:Abstract_network.Node.id)
+    let nodes_to_string nodes =
+      Core.String.Map.data nodes
+      |> Fn.compose (String.concat ~sep:", ")
+           (List.map ~f:Abstract_network.Node.id)
     in
     [%log info] "Network deployed" ;
     [%log info] "network id: %s" t.network_id ;
     [%log info] "snark coordinators: %s"
-      (nodes_to_string (Core.String.Map.data network.snark_coordinators)) ;
-    [%log info] "snark workers: %s"
-      (nodes_to_string (Core.String.Map.data network.snark_workers)) ;
-    [%log info] "block producers: %s"
-      (nodes_to_string (Core.String.Map.data network.block_producers)) ;
-    [%log info] "archive nodes: %s"
-      (nodes_to_string (Core.String.Map.data network.archive_nodes)) ;
+      (nodes_to_string network.snark_coordinators) ;
+    [%log info] "snark workers: %s" (nodes_to_string network.snark_workers) ;
+    [%log info] "block producers: %s" (nodes_to_string network.block_producers) ;
+    [%log info] "archive nodes: %s" (nodes_to_string network.archive_nodes) ;
     Malleable_error.return network
 
   let destroy t =

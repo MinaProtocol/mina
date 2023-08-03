@@ -36,13 +36,16 @@ module Node = struct
       unit Malleable_error.t =
     try
       let args =
-        [ ("node_id", `String t.node_id)
+        [ ("network_id", `String t.network_id)
+        ; ("node_id", `String t.node_id)
         ; ("fresh_state", `Bool fresh_state)
         ; ("git_commit", `String git_commit)
         ]
       in
       let%bind () =
-        match%map run_command ~config:!config_path ~args "start_node" with
+        match%map
+          Config_file.run_command ~config:!config_path ~args "start_node"
+        with
         | Ok output ->
             Yojson.Safe.from_string output
             |> Node_started.of_yojson |> Result.ok_or_failwith |> ignore
@@ -54,9 +57,13 @@ module Node = struct
 
   let stop t =
     try
-      let args = [ ("node_id", `String t.node_id) ] in
+      let args =
+        [ ("network_id", `String t.network_id); ("node_id", `String t.node_id) ]
+      in
       let%bind () =
-        match%map run_command ~config:!config_path ~args "stop_node" with
+        match%map
+          Config_file.run_command ~config:!config_path ~args "stop_node"
+        with
         | Ok output ->
             Yojson.Safe.from_string output
             |> Node_stopped.of_yojson |> Result.ok_or_failwith |> ignore
@@ -71,10 +78,39 @@ module Node = struct
     ; ("node_id", `String node.node_id)
     ]
 
+  module Collections = struct
+    let f network_id (node_info : Network_deployed.node_info) =
+      { node_id = node_info.node_id
+      ; network_id
+      ; network_keypair = node_info.network_keypair
+      ; node_type = node_info.node_type
+      ; password = "naughty blue worm"
+      ; graphql_uri = Option.value node_info.graphql_uri ~default:""
+      }
+
+    open Network_deployed
+    open Core.String.Map
+
+    let network_id t = data t |> List.hd_exn |> network_id
+
+    let archive_nodes t =
+      filter ~f:is_archive_node t |> map ~f:(f @@ network_id t)
+
+    let block_producers t =
+      filter ~f:is_block_producer t |> map ~f:(f @@ network_id t)
+
+    let seeds t = filter ~f:is_seed_node t |> map ~f:(f @@ network_id t)
+
+    let snark_coordinators t =
+      filter t ~f:is_snark_coordinator |> map ~f:(f @@ network_id t)
+
+    let snark_workers t =
+      filter ~f:is_snark_worker t |> map ~f:(f @@ network_id t)
+  end
+
   module Scalars = Graphql_lib.Scalars
 
   module Graphql = struct
-    (* TODO: fix *)
     let ingress_uri node =
       let path = sprintf "/%s/graphql" node.graphql_uri in
       Uri.make ~scheme:"http" ~path ~port:80 ()
@@ -998,13 +1034,52 @@ module Node = struct
       Deferred.Or_error.error_string
         "Node is not currently capturing structured log messages"
 
+  let get_metrics ~logger t =
+    let open Deferred.Or_error.Let_syntax in
+    [%log info] "Getting node's metrics" ~metadata:(logger_metadata t) ;
+    let query_obj = Graphql.Query_metrics.make () in
+    let%bind query_result_obj =
+      exec_graphql_request ~logger ~node:t ~query_name:"query_metrics" query_obj
+    in
+    [%log info] "get_metrics, finished exec_graphql_request" ;
+    let block_production_delay =
+      Array.to_list
+      @@ query_result_obj.daemonStatus.metrics.blockProductionDelay
+    in
+    let metrics = query_result_obj.daemonStatus.metrics in
+    let transaction_pool_diff_received = metrics.transactionPoolDiffReceived in
+    let transaction_pool_diff_broadcasted =
+      metrics.transactionPoolDiffBroadcasted
+    in
+    let transactions_added_to_pool = metrics.transactionsAddedToPool in
+    let transaction_pool_size = metrics.transactionPoolSize in
+    [%log info]
+      "get_metrics, result of graphql query (block_production_delay; \
+       tx_received; tx_broadcasted; txs_added_to_pool; tx_pool_size) (%s; %d; \
+       %d; %d; %d)"
+      ( String.concat ~sep:", "
+      @@ List.map ~f:string_of_int block_production_delay )
+      transaction_pool_diff_received transaction_pool_diff_broadcasted
+      transactions_added_to_pool transaction_pool_size ;
+    return
+      Intf.
+        { block_production_delay
+        ; transaction_pool_diff_broadcasted
+        ; transaction_pool_diff_received
+        ; transactions_added_to_pool
+        ; transaction_pool_size
+        }
+
   let dump_archive_data ~logger (t : t) ~data_file =
-    let args = [ ("node_id", `String t.node_id) ] in
+    let args =
+      [ ("network_id", `String t.network_id); ("node_id", `String t.node_id) ]
+    in
     if Node_type.(equal t.node_type Archive_node) then
       try
         let%bind dump =
           match%map
-            run_command ~config:!config_path ~args "dump_archive_data"
+            Config_file.run_command ~config:!config_path ~args
+              "dump_archive_data"
           with
           | Ok output ->
               Yojson.Safe.from_string output
@@ -1027,10 +1102,14 @@ module Node = struct
 
   let run_replayer ~logger (t : t) =
     [%log info] "Running replayer on archived data node: %s" t.node_id ;
-    let args = [ ("node_id", `String t.node_id) ] in
+    let args =
+      [ ("network_id", `String t.network_id); ("node_id", `String t.node_id) ]
+    in
     try
       let%bind replay =
-        match%map run_command ~config:!config_path ~args "run_replayer" with
+        match%map
+          Config_file.run_command ~config:!config_path ~args "run_replayer"
+        with
         | Ok output ->
             Yojson.Safe.from_string output
             |> Replayer_run.of_yojson |> Result.ok_or_failwith
@@ -1042,10 +1121,14 @@ module Node = struct
 
   let dump_mina_logs ~logger (t : t) ~log_file =
     [%log info] "Dumping logs from node: %s" t.node_id ;
-    let args = [ ("node_id", `String t.node_id) ] in
+    let args =
+      [ ("network_id", `String t.network_id); ("node_id", `String t.node_id) ]
+    in
     try
       let%bind dump =
-        match%map run_command ~config:!config_path ~args "dump_mina_logs" with
+        match%map
+          Config_file.run_command ~config:!config_path ~args "dump_mina_logs"
+        with
         | Ok output ->
             Yojson.Safe.from_string output
             |> Mina_logs_dump.of_yojson |> Result.ok_or_failwith
@@ -1060,11 +1143,14 @@ module Node = struct
 
   let dump_precomputed_blocks ~logger (t : t) =
     [%log info] "Dumping precomputed blocks from logs for node: %s" t.node_id ;
-    let args = [ ("node_id", `String t.node_id) ] in
+    let args =
+      [ ("network_id", `String t.network_id); ("node_id", `String t.node_id) ]
+    in
     try
       let%bind dump =
         match%map
-          run_command ~config:!config_path ~args "dump_precomputed_blocks"
+          Config_file.run_command ~config:!config_path ~args
+            "dump_precomputed_blocks"
         with
         | Ok output ->
             Yojson.Safe.from_string output
@@ -1132,42 +1218,6 @@ module Node = struct
       in
       Malleable_error.return ()
     with Failure err -> Malleable_error.hard_error_string err
-
-  let get_metrics ~logger t =
-    let open Deferred.Or_error.Let_syntax in
-    [%log info] "Getting node's metrics" ~metadata:(logger_metadata t) ;
-    let query_obj = Graphql.Query_metrics.make () in
-    let%bind query_result_obj =
-      exec_graphql_request ~logger ~node:t ~query_name:"query_metrics" query_obj
-    in
-    [%log info] "get_metrics, finished exec_graphql_request" ;
-    let block_production_delay =
-      Array.to_list
-      @@ query_result_obj.daemonStatus.metrics.blockProductionDelay
-    in
-    let metrics = query_result_obj.daemonStatus.metrics in
-    let transaction_pool_diff_received = metrics.transactionPoolDiffReceived in
-    let transaction_pool_diff_broadcasted =
-      metrics.transactionPoolDiffBroadcasted
-    in
-    let transactions_added_to_pool = metrics.transactionsAddedToPool in
-    let transaction_pool_size = metrics.transactionPoolSize in
-    [%log info]
-      "get_metrics, result of graphql query (block_production_delay; \
-       tx_received; tx_broadcasted; txs_added_to_pool; tx_pool_size) (%s; %d; \
-       %d; %d; %d)"
-      ( String.concat ~sep:", "
-      @@ List.map ~f:string_of_int block_production_delay )
-      transaction_pool_diff_received transaction_pool_diff_broadcasted
-      transactions_added_to_pool transaction_pool_size ;
-    return
-      Intf.
-        { block_production_delay
-        ; transaction_pool_diff_broadcasted
-        ; transaction_pool_diff_received
-        ; transactions_added_to_pool
-        ; transaction_pool_size
-        }
 end
 
 type t =

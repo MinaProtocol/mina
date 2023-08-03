@@ -72,6 +72,7 @@ module Network_config = struct
 
   let testnet_log_filter t = t.config.network_id
 
+  (* TODO: double check *)
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
@@ -330,23 +331,6 @@ module Network_config = struct
     }
 end
 
-module Config_file = struct
-  type t = { version : int; actions : action list } [@@deriving eq, yojson]
-
-  and action = { name : string; args : Yojson.Safe.t; command : string }
-  [@@deriving eq, yojson]
-
-  exception Invalid_version of Yojson.Safe.t
-
-  exception Invalid_actions of Yojson.Safe.t
-
-  exception Invalid_args of Yojson.Safe.t
-
-  exception Invalid_arg_type_should_be_string of string * Yojson.Safe.t
-
-  exception Invalid_command of Yojson.Safe.t
-end
-
 module Network_id = struct
   type t = string [@@deriving eq, yojson]
 end
@@ -397,17 +381,16 @@ module Network_created = struct
 end
 
 module Network_deployed = struct
-  module Map = Map.Make (String)
-  include Map
-
-  exception Invalid_entry of string * Yojson.Safe.t
+  exception Invalid_entry of string
 
   exception Invalid_output of string
 
   exception Invalid_keypair of Yojson.Safe.t
 
   type node_info =
-    { node_type : Node_type.t
+    { node_id : Node_id.t
+    ; node_type : Node_type.t
+    ; network_id : Network_id.t
     ; network_keypair : Network_keypair.t option
     ; graphql_uri : string option
     }
@@ -427,7 +410,21 @@ module Network_deployed = struct
     let graphql = Option.equal String.equal m.graphql_uri n.graphql_uri in
     node_type && network_keypair && graphql
 
-  type t = node_info Map.t [@@deriving eq]
+  let is_archive_node node_info = Node_type.is_archive_node node_info.node_type
+
+  let is_block_producer node_info =
+    Node_type.is_block_producer node_info.node_type
+
+  let is_seed_node node_info = Node_type.is_seed_node node_info.node_type
+
+  let is_snark_coordinator node_info =
+    Node_type.is_snark_coordinator node_info.node_type
+
+  let is_snark_worker node_info = Node_type.is_snark_worker node_info.node_type
+
+  let network_id { network_id; _ } = network_id
+
+  type t = node_info Core.String.Map.t [@@deriving eq]
 
   let network_keypair_of_yojson node_id (private_key : Yojson.Safe.t) =
     match private_key with
@@ -453,25 +450,29 @@ module Network_deployed = struct
         raise @@ Invalid_argument (Yojson.Safe.to_string uri)
 
   let of_yojson =
-    let f accum = function
-      | ( node_id
-        , `Assoc
-            [ ("node_type", `String nt)
-            ; ("private_key", private_key)
-            ; ("graphql_uri", graphql_uri)
-            ] ) ->
-          Map.set accum ~key:node_id
+    let f network_id accum = function
+      | `Assoc
+          [ ( node_id
+            , `Assoc
+                [ ("node_type", `String nt)
+                ; ("private_key", private_key)
+                ; ("graphql_uri", graphql_uri)
+                ] )
+          ] ->
+          Core.String.Map.set accum ~key:node_id
             ~data:
-              { node_type = Node_type.of_string nt
+              { node_id
+              ; network_id
+              ; node_type = Node_type.of_string nt
               ; network_keypair = network_keypair_of_yojson node_id private_key
               ; graphql_uri = graphql_uri_of_yojson graphql_uri
               }
-      | node_id, t ->
-          raise @@ Invalid_entry (node_id, t)
+      | t ->
+          raise @@ Invalid_entry (Yojson.Safe.to_string t)
     in
     function
-    | `Assoc a_list ->
-        Ok (List.fold a_list ~init:(Map.empty : t) ~f)
+    | `Assoc [ ("network_id", `String network_id); ("nodes", `List nodes) ] ->
+        Ok (List.fold nodes ~init:Core.String.Map.empty ~f:(f network_id))
     | t ->
         raise @@ Invalid_output (Yojson.Safe.to_string t)
 end
@@ -529,7 +530,6 @@ module Command_output = struct
 end
 
 module Arg_type = struct
-  (* TODO: what other arg types? *)
   let bool = "bool"
 
   let int = "int"
@@ -550,124 +550,139 @@ module Arg_type = struct
         raise @@ Invalid_arg_type t
 end
 
-let version config =
-  match Yojson.Safe.Util.member "version" config with
-  | `Int version ->
-      version
-  | t ->
-      raise @@ Config_file.Invalid_version t
+module Config_file = struct
+  type t = { version : int; actions : action list } [@@deriving eq, yojson]
 
-let action name config =
-  let open Yojson.Safe in
-  match Util.member "actions" config with
-  | `List actions ->
-      List.find_exn actions ~f:(fun action ->
-          Util.member "name" action |> equal @@ `String name )
-  | t ->
-      raise @@ Config_file.Invalid_actions t
+  and action = { name : string; args : Yojson.Safe.t; command : string }
+  [@@deriving eq, yojson]
 
-let args_of_action action =
-  let open Yojson.Safe in
-  let a_list =
-    match Util.member "args" action with
-    | `Assoc a_list ->
-        a_list
+  exception Invalid_version of Yojson.Safe.t
+
+  exception Invalid_actions of Yojson.Safe.t
+
+  exception Invalid_args of Yojson.Safe.t
+
+  exception Invalid_arg_type_should_be_string of string * Yojson.Safe.t
+
+  exception Invalid_command of Yojson.Safe.t
+
+  exception Invalid_args_num
+
+  exception Missing_arg of string * string
+
+  exception Invalid_arg_type of string * Yojson.Safe.t * string
+
+  let version config =
+    match Yojson.Safe.Util.member "version" config with
+    | `Int version ->
+        version
     | t ->
-        raise @@ Config_file.Invalid_args t
-  in
-  List.map a_list ~f:(function
-    | name, `String type_name ->
-        (name, type_name)
-    | name, t ->
-        raise @@ Config_file.Invalid_arg_type_should_be_string (name, t) )
+        raise @@ Invalid_version t
 
-let raw_cmd t =
-  match Yojson.Safe.Util.member "command" t with
-  | `String raw_cmd ->
-      raw_cmd
-  | cmd ->
-      raise @@ Config_file.Invalid_command cmd
+  let action name config =
+    let open Yojson.Safe in
+    match Util.member "actions" config with
+    | `List actions ->
+        List.find_exn actions ~f:(fun action ->
+            Util.member "name" action |> equal @@ `String name )
+    | t ->
+        raise @@ Invalid_actions t
 
-let validate_arg_type arg_typ arg_value =
-  String.equal arg_typ @@ Arg_type.arg_type arg_value
+  let args_of_action action =
+    let open Yojson.Safe in
+    let a_list =
+      match Util.member "args" action with
+      | `Assoc a_list ->
+          a_list
+      | t ->
+          raise @@ Invalid_args t
+    in
+    List.map a_list ~f:(function
+      | name, `String type_name ->
+          (name, type_name)
+      | name, t ->
+          raise @@ Invalid_arg_type_should_be_string (name, t) )
 
-exception Invalid_config_args_num
+  let raw_cmd t =
+    match Yojson.Safe.Util.member "command" t with
+    | `String raw_cmd ->
+        raw_cmd
+    | cmd ->
+        raise @@ Invalid_command cmd
 
-exception Missing_config_arg of string * string
+  let validate_arg_type arg_typ arg_value =
+    String.equal arg_typ @@ Arg_type.arg_type arg_value
 
-exception Invalid_config_arg_type of string * Yojson.Safe.t * string
+  let validate_args ~args ~action =
+    let arg_list = args_of_action action in
+    let () =
+      if not List.(length arg_list = length args) then raise @@ Invalid_args_num
+    in
+    let rec aux = function
+      | [] ->
+          true
+      | (arg_name, arg_type) :: rest ->
+          let arg_value =
+            try
+              List.find_map_exn args ~f:(fun (name, value) ->
+                  Option.some_if (String.equal name arg_name) value )
+            with Not_found_s _ -> raise @@ Missing_arg (arg_name, arg_type)
+          in
+          if validate_arg_type arg_type arg_value then aux rest
+          else raise @@ Invalid_arg_type (arg_name, arg_value, arg_type)
+    in
+    aux arg_list
 
-let validate_args ~args ~action =
-  let arg_list = args_of_action action in
-  let () =
-    if not List.(length arg_list = length args) then
-      raise @@ Invalid_config_args_num
-  in
-  let rec aux = function
+  let rec interpolate_args ~args raw_cmd =
+    match args with
     | [] ->
-        true
-    | (arg_name, arg_type) :: rest ->
-        let arg_value =
-          try
-            List.find_map_exn args ~f:(fun (name, value) ->
-                Option.some_if (String.equal name arg_name) value )
-          with Not_found_s _ ->
-            raise @@ Missing_config_arg (arg_name, arg_type)
-        in
-        if validate_arg_type arg_type arg_value then aux rest
-        else raise @@ Invalid_config_arg_type (arg_name, arg_value, arg_type)
-  in
-  aux arg_list
+        raw_cmd
+    | (arg, value) :: args ->
+        let pattern = sprintf "{{%s}}" arg in
+        interpolate_args ~args
+        @@ String.substr_replace_all raw_cmd ~pattern
+             ~with_:(Yojson.Safe.to_string value |> Util.drop_outer_quotes)
 
-let rec interpolate_args ~args raw_cmd =
-  match args with
-  | [] ->
-      raw_cmd
-  | (arg, value) :: args ->
-      let pattern = sprintf "{{%s}}" arg in
-      interpolate_args ~args
-      @@ String.substr_replace_all raw_cmd ~pattern
-           ~with_:(Yojson.Safe.to_string value |> Util.drop_outer_quotes)
+  let prog_and_args ~args action =
+    let raw_cmd = raw_cmd action in
+    let cmd_list = interpolate_args ~args raw_cmd |> String.split ~on:' ' in
+    (List.hd_exn cmd_list, List.tl_exn cmd_list)
 
-let prog_and_args ~args action =
-  let raw_cmd = raw_cmd action in
-  let cmd_list = interpolate_args ~args raw_cmd |> String.split ~on:' ' in
-  (List.hd_exn cmd_list, List.tl_exn cmd_list)
-
-let run_command ?(suppress_logs = false) ?(timeout_seconds = 1) ?(dir = ".")
-    ~config ~args cmd_name =
-  let config = Yojson.Safe.from_file config in
-  let version = version config in
-  let action = action cmd_name config in
-  let action_args = args_of_action action in
-  let () = assert (validate_args ~args ~action) in
-  let prog, arg_values = prog_and_args ~args action in
-  let cmd = String.concat ~sep:" " (prog :: arg_values) in
-  let%map output =
-    Util.run_cmd_or_error_timeout ~suppress_logs ~timeout_seconds dir prog
-      arg_values
-  in
-  match output with
-  | Ok output ->
-      if not suppress_logs then
-        [%log' spam (Logger.create ())]
-          "Successful command execution\nCommand: %s\nOutput: %s" cmd output ;
-      Ok output
-  | _ ->
-      if not suppress_logs then
-        [%log' error (Logger.create ())] "Failed to run command: %s" cmd ;
-      Error
-        (sprintf
-           "Failed to run command: %s\n\
-           \ Config version: %d\n\
-           \ Expected args types:\n\
-           \     %s\n\
-           \ Attempted args:\n\
-           \     %s\n"
-           cmd version
-           ( String.concat ~sep:", "
-           @@ List.map action_args ~f:(fun (name, type_name) ->
-                  name ^ ": " ^ type_name ) )
-           ( String.concat ~sep:", "
-           @@ List.map args ~f:(fun (name, value) ->
-                  name ^ ": " ^ Yojson.Safe.to_string value ) ) )
+  let run_command ?(suppress_logs = false) ?(timeout_seconds = 1) ?(dir = ".")
+      ~config ~args cmd_name =
+    let config = Yojson.Safe.from_file config in
+    let version = version config in
+    let action = action cmd_name config in
+    let action_args = args_of_action action in
+    let () = assert (validate_args ~args ~action) in
+    let prog, arg_values = prog_and_args ~args action in
+    let cmd = String.concat ~sep:" " (prog :: arg_values) in
+    let%map output =
+      Util.run_cmd_or_error_timeout ~suppress_logs ~timeout_seconds dir prog
+        arg_values
+    in
+    match output with
+    | Ok output ->
+        if not suppress_logs then
+          [%log' spam (Logger.create ())]
+            "Successful command execution\nCommand: %s\nOutput: %s" cmd output ;
+        Ok output
+    | _ ->
+        if not suppress_logs then
+          [%log' error (Logger.create ())] "Failed to run command: %s" cmd ;
+        Error
+          (sprintf
+             "Failed to run command: %s\n\
+             \ Config version: %d\n\
+             \ Expected args types:\n\
+             \     %s\n\
+             \ Attempted args:\n\
+             \     %s\n"
+             cmd version
+             ( String.concat ~sep:", "
+             @@ List.map action_args ~f:(fun (name, type_name) ->
+                    name ^ ": " ^ type_name ) )
+             ( String.concat ~sep:", "
+             @@ List.map args ~f:(fun (name, value) ->
+                    name ^ ": " ^ Yojson.Safe.to_string value ) ) )
+end

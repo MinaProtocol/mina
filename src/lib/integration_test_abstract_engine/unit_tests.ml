@@ -63,7 +63,9 @@ end
 
 open Test_values
 
-module Helper_tests = struct
+module Config_tests = struct
+  open Config_file
+
   let%test_unit "version" =
     let res = version config in
     let expect = 1 in
@@ -119,6 +121,8 @@ module Helper_tests = struct
 end
 
 module Run_command_tests = struct
+  open Config_file
+
   module Arg_failures = struct
     let ( = ) = String.equal
 
@@ -126,7 +130,7 @@ module Run_command_tests = struct
       let arg, value = ("msg", `Int 42) in
       try
         ignore @@ run_command ~config:config_file ~args:[ (arg, value) ] "echo"
-      with Invalid_config_arg_type (arg_name, arg_value, arg_type) ->
+      with Invalid_arg_type (arg_name, arg_value, arg_type) ->
         assert (
           arg_name = "msg" && arg_type = Arg_type.string
           && Yojson.Safe.equal arg_value value )
@@ -137,7 +141,7 @@ module Run_command_tests = struct
         @@ run_command ~config:config_file
              ~args:[ ("msg", `String "hello"); ("num", `Int 42) ]
              "echo"
-      with Invalid_config_args_num -> ()
+      with Invalid_args_num -> ()
 
     let%test_unit "run command missing arg failure" =
       try
@@ -145,7 +149,7 @@ module Run_command_tests = struct
         @@ run_command ~config:config_file
              ~args:[ ("msg0", `String "hello") ]
              "echo"
-      with Missing_config_arg (arg_name, arg_type) ->
+      with Missing_arg (arg_name, arg_type) ->
         assert (arg_name = "msg" && arg_type = Arg_type.string)
   end
 
@@ -249,31 +253,39 @@ module Parse_output_tests = struct
     let open Network_deployed in
     let result =
       {|
-        { "node0": {
-            "node_type":"Archive_node",
-            "private_key":null,
-            "graphql_uri":"gql_archive"
-          },
-          "node1": {
-            "node_type":"Block_producer_node",
-            "private_key":null,
-            "graphql_uri":"gql_bp"
-          },
-          "node2": {
-            "node_type":"Seed_node",
-            "private_key":"EKEQpDAjj7dP3j7fQy4qBU7Kxns85wwq5xMn4zxdyQm83pEWzQ62",
-            "graphql_uri":"gql_seed"
-          },
-          "node3": {
-            "node_type":"Snark_worker",
-            "private_key":null,
-            "graphql_uri":"gql_snark"
-          },
-          "node4": {
-            "node_type":"Snark_coordinator",
-            "private_key":null,
-            "graphql_uri":null
-          }
+        { "network_id":"network0",
+          "nodes": [
+            { "node0": {
+                "node_type":"Archive_node",
+                "private_key":null,
+                "graphql_uri":"gql_archive"
+              }
+            },
+            { "node1": {
+                "node_type":"Block_producer_node",
+                "private_key":null,
+                "graphql_uri":"gql_bp"
+              }
+            },
+            { "node2": {
+                "node_type":"Seed_node",
+                "private_key":"EKEQpDAjj7dP3j7fQy4qBU7Kxns85wwq5xMn4zxdyQm83pEWzQ62",
+                "graphql_uri":"gql_seed"
+              }
+            },
+            { "node3": {
+                "node_type":"Snark_worker",
+                "private_key":null,
+                "graphql_uri":"gql_snark"
+              }
+            },
+            { "node4": {
+                "node_type":"Snark_coordinator",
+                "private_key":null,
+                "graphql_uri":null
+              }
+            }
+          ]
         }
       |}
       |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith
@@ -291,37 +303,47 @@ module Parse_output_tests = struct
       Network_keypair.create_network_keypair ~keypair_name:"node2_key" ~keypair
     in
     let archive =
-      { node_type = Archive_node
+      { node_id = "node0"
+      ; network_id = "network0"
+      ; node_type = Archive_node
       ; network_keypair = None
       ; graphql_uri = Some "gql_archive"
       }
     in
     let bp =
-      { node_type = Block_producer_node
+      { node_id = "node1"
+      ; node_type = Block_producer_node
+      ; network_id = "network0"
       ; network_keypair = None
       ; graphql_uri = Some "gql_bp"
       }
     in
     let seed =
-      { node_type = Seed_node
+      { node_id = "node2"
+      ; node_type = Seed_node
+      ; network_id = "network0"
       ; network_keypair = Some seed_keypair
       ; graphql_uri = Some "gql_seed"
       }
     in
     let worker =
-      { node_type = Snark_worker
+      { node_id = "node3"
+      ; node_type = Snark_worker
+      ; network_id = "network0"
       ; network_keypair = None
       ; graphql_uri = Some "gql_snark"
       }
     in
     let coordinator =
-      { node_type = Snark_coordinator
+      { node_id = "node4"
+      ; node_type = Snark_coordinator
+      ; network_id = "network0"
       ; network_keypair = None
       ; graphql_uri = None
       }
     in
     let expect =
-      of_alist_exn
+      Core.String.Map.of_alist_exn
         [ ("node0", archive)
         ; ("node1", bp)
         ; ("node2", seed)
@@ -329,12 +351,7 @@ module Parse_output_tests = struct
         ; ("node4", coordinator)
         ]
     in
-    assert (
-      (* print_endline "=== Result ===" ;
-         Map.iter result ~f:(fun ni -> node_info_to_yojson ni |> Yojson.Safe.to_string |> print_endline) ;
-         print_endline "\n\n=== Expect ===" ;
-         Map.iter expect ~f:(fun ni -> node_info_to_yojson ni |> Yojson.Safe.to_string |> print_endline) ; *)
-      equal result expect )
+    assert (equal result expect)
 
   let%test_unit "parse node started" =
     let open Node_started in
