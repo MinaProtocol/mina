@@ -1576,18 +1576,29 @@ let%test_unit "foreign_field arithmetics gadgets" =
 
     (* Helper to test foreign_field_add gadget
      *   Inputs:
+     *     - odd: whether to include an odd number of generic gate preceding FFAdd
      *     - left_input
      *     - right_input
      *     - foreign_field_modulus
      * Checks with multi range checks the size of the inputs.
      *)
-    let test_add ?cs (left_input : Bignum_bigint.t)
+    let test_add ?cs ?(odd = false) (left_input : Bignum_bigint.t)
         (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
         =
       (* Generate and verify proof *)
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
+            ( if odd then
+              let left_summand =
+                exists Field.typ ~compute:(fun () -> Field.Constant.of_int 15)
+              in
+              let right_summand =
+                exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0)
+              in
+              Field.Assert.equal
+                (Field.( + ) left_summand right_summand)
+                left_summand ) ;
             (* Prepare test inputs *)
             let expected =
               Bignum_bigint.((left_input + right_input) % foreign_field_modulus)
@@ -1724,17 +1735,28 @@ let%test_unit "foreign_field arithmetics gadgets" =
     (* Helper to test foreign_field_mul gadget
      *  Inputs:
      *     cs                    := optional constraint system to reuse
+     *     odd                   := whether to test odd or even dummy generics ahead
      *     left_input            := left multiplicand
      *     right_input           := right multiplicand
      *     foreign_field_modulus := foreign field modulus
      *)
-    let test_mul ?cs (left_input : Bignum_bigint.t)
+    let test_mul ?cs ?(odd = false) (left_input : Bignum_bigint.t)
         (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
         =
       (* Generate and verify proof *)
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
+            ( if odd then
+              let left_summand =
+                exists Field.typ ~compute:(fun () -> Field.Constant.of_int 15)
+              in
+              let right_summand =
+                exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0)
+              in
+              Field.Assert.equal
+                (Field.( + ) left_summand right_summand)
+                left_summand ) ;
             (* Prepare test inputs *)
             let expected =
               Bignum_bigint.(left_input * right_input % foreign_field_modulus)
@@ -2008,6 +2030,16 @@ let%test_unit "foreign_field arithmetics gadgets" =
     in
     let vesta_max = Bignum_bigint.(vesta_modulus - Bignum_bigint.one) in
 
+    (* Test with odd = true *)
+    let _cs =
+      test_add ~odd:true
+        (Common.bignum_bigint_of_hex
+           "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
+        (Common.bignum_bigint_of_hex
+           "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
+        secp256k1_modulus
+    in
+
     (* Single foreign field addition tests *)
     let cs =
       test_add
@@ -2090,6 +2122,17 @@ let%test_unit "foreign_field arithmetics gadgets" =
           () ) ) ;
 
     (* Foreign field multiplication tests *)
+
+    (* Test with odd = true *)
+    let _cs =
+      test_mul ~odd:true
+        (Common.bignum_bigint_of_hex
+           "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
+        (Common.bignum_bigint_of_hex
+           "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
+        secp256k1_modulus
+    in
+
     (* zero_mul: 0 * 0 *)
     let cs = test_mul Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
     (* one_mul: max * 1 *)
