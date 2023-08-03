@@ -708,6 +708,16 @@ let%test_unit "bitwise xor gadget" =
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
+            (* Create half a generic to force a possible generic in the middle *)
+            let left_summand =
+              exists Field.typ ~compute:(fun () -> Field.Constant.of_int 15)
+            in
+            let right_summand =
+              exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0)
+            in
+            Field.Assert.equal
+              (Field.( + ) left_summand right_summand)
+              left_summand ;
             (* Set up snarky variables for inputs and output *)
             let left_input =
               exists Field.typ ~compute:(fun () ->
