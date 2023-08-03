@@ -477,11 +477,6 @@ let setup_daemon logger =
          for the associated private key that is being tracked by this daemon. \
          You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
-  and verify_local_snark_works =
-    flag "--verify-local-snark-works" no_arg
-      ~doc:
-        "Verify snark works coming from workers connected to this snark \
-         coordinator"
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -1352,8 +1347,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                    }
                  ~snark_coordinator_key:run_snark_coordinator_flag
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-                 ~skip_local_snark_work_verification:
-                   (not verify_local_snark_works)
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~persistent_root_location:(conf_dir ^/ "root")
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
