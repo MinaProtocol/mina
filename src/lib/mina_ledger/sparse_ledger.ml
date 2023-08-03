@@ -82,9 +82,8 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
 module T = Mina_transaction_logic.Make (L)
 
 let apply_transaction_logic f t x =
-  let open Or_error.Let_syntax in
   let t' = ref t in
-  let%map app = f t' x in
+  let%map.Or_error app = f t' x in
   (!t', app)
 
 let apply_user_command ~constraint_constants ~txn_global_slot =
