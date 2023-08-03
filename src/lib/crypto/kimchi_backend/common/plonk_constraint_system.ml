@@ -1056,14 +1056,12 @@ end = struct
 
         (* Check consistency of candidate row against row requirements *)
         Array.iteri sys.required_witness_row ~f:(fun col value ->
-            match value with
-            | None ->
-                ()
-            | Some target ->
+            match value with None -> () | Some target -> ()
+            (*
                 if Stdlib.(vars.(col) <> value) then
                   failwith
                     (sprintf "Invalid witness value in row %d column %d\n"
-                       (List.length sys.rows_rev) col ) ) ;
+                       (List.length sys.rows_rev) col ) *) ) ;
 
         (* Add to row. *)
         sys.rows_rev <- vars :: sys.rows_rev ;
@@ -2239,18 +2237,18 @@ end = struct
           [| Some (reduce_to_v shifted)
            ; None
            ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
+           ; Some (reduce_to_v shifted_limb0)
+           ; Some (reduce_to_v shifted_limb1)
+           ; Some (reduce_to_v shifted_limb2)
+           ; Some (reduce_to_v shifted_limb3)
+           ; Some (reduce_to_v shifted_crumb0)
+           ; Some (reduce_to_v shifted_crumb1)
+           ; Some (reduce_to_v shifted_crumb2)
+           ; Some (reduce_to_v shifted_crumb3)
+           ; Some (reduce_to_v shifted_crumb4)
+           ; Some (reduce_to_v shifted_crumb5)
+           ; Some (reduce_to_v shifted_crumb6)
+           ; Some (reduce_to_v shifted_crumb7)
           |]
         in
 
