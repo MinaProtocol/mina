@@ -703,21 +703,24 @@ let%test_unit "bitwise xor gadget" =
     (* Helper to test XOR gadget
      *   Inputs operands and expected output: left_input xor right_input
      *   Returns true if constraints are satisfied, false otherwise.
+     *   If cs is provided, it is used to generate the proof, otherwise a new
+     *   If odd is true, it inserts one initial generic gate
      *)
-    let test_xor ?cs left_input right_input output_xor length =
+    let test_xor ?cs ?(odd = false) left_input right_input output_xor length =
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
-            (* Create half a generic to force a possible generic in the middle *)
-            let left_summand =
-              exists Field.typ ~compute:(fun () -> Field.Constant.of_int 15)
-            in
-            let right_summand =
-              exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0)
-            in
-            Field.Assert.equal
-              (Field.( + ) left_summand right_summand)
-              left_summand ;
+            ( if odd then
+              (* Create half a generic to force an odd number of Generics preceding Xor *)
+              let left_summand =
+                exists Field.typ ~compute:(fun () -> Field.Constant.of_int 15)
+              in
+              let right_summand =
+                exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0)
+              in
+              Field.Assert.equal
+                (Field.( + ) left_summand right_summand)
+                left_summand ) ;
             (* Set up snarky variables for inputs and output *)
             let left_input =
               exists Field.typ ~compute:(fun () ->
@@ -741,8 +744,12 @@ let%test_unit "bitwise xor gadget" =
       in
       cs
     in
-
-    (* Positive tests *)
+    (* Positive test with odd = true *)
+    let _cs =
+      test_xor ~odd:true "cad1f05900fcad2f" "deadbeef010301db"
+        "147c4eb601ffacf4" 64
+    in
+    (* Positive tests with odd = false *)
     let cs16 = test_xor "1" "0" "1" 16 in
     let _cs = test_xor ~cs:cs16 "0" "1" "1" 16 in
     let _cs = test_xor ~cs:cs16 "2" "1" "3" 16 in
