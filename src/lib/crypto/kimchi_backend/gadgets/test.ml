@@ -280,7 +280,6 @@ let%test_unit "keccak ecdsa converter" =
         ]
         Keccak.Little
     in
-    print_endline "256 BITS > F" ;
     (* Test f < x < 257 bits *)
     let _cs =
       test_converter ~cs
