@@ -5,13 +5,17 @@ set -eu
 cd src/lib/crypto/proof-systems
 
 CURR=$(git rev-parse HEAD)
+
 # temporarily skip SSL verification (for CI)
-git config http.sslVerify false
-git fetch origin
-git config http.sslVerify true
+if [ "${BUILDKITE:-false}" == true ]
+then
+    git config http.sslVerify false
+    git fetch origin
+    git config http.sslVerify true
+fi
 
 declare -A BRANCH_MAPPING=(
-  ["rampup"]="compatible" 
+  ["rampup"]="compatible"
   ["berkeley"]="berkeley"
   ["develop"]="develop"
   ["izmir"]="master"

@@ -98,6 +98,9 @@ type nonrec 'caml_g lookup_commitments =
   ; runtime : 'caml_g poly_comm option
   }
 
+type nonrec 'caml_f runtime_table_cfg =
+  { id : int32; first_column : 'caml_f array }
+
 type nonrec 'caml_g prover_commitments =
   { w_comm :
       'caml_g poly_comm

@@ -73,7 +73,7 @@ spec:
             env:
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: gcr.io/o1labs-192920/mina-rosetta:1.4.0beta2-fix-replayer-start-ledger-hash-2627643-bullseye
+            image: gcr.io/o1labs-192920/mina-rosetta:1.4.0beta2-fix-replayer-not-orphaned-slot-5827016-bullseye
             imagePullPolicy: IfNotPresent
             name: mainnet-replayer-cronjob
             resources:

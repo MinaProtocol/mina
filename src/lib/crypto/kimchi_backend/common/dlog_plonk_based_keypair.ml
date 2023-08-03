@@ -59,7 +59,19 @@ module type Inputs_intf = sig
   module Index : sig
     type t
 
-    val create : Gate_vector.t -> int -> int -> Urs.t -> t
+    (** [create
+          gates
+          nb_public
+          runtime_tables_cfg
+          nb_prev_challanges
+          srs] *)
+    val create :
+         Gate_vector.t
+      -> int
+      -> Scalar_field.t Kimchi_types.runtime_table_cfg array
+      -> int
+      -> Urs.t
+      -> t
   end
 
   module Curve : sig
@@ -169,8 +181,11 @@ module Make (Inputs : Inputs_intf) = struct
           assert (prev_challenges = prev_challenges') ;
           prev_challenges'
     in
+    (* TODO(dw) pass runtime table cfg info *)
+    let runtime_table_cfg = [||] in
     let index =
-      Inputs.Index.create gates public_input_size prev_challenges (load_urs ())
+      Inputs.Index.create gates public_input_size runtime_table_cfg
+        prev_challenges (load_urs ())
     in
     { index; cs }
 
