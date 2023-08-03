@@ -104,7 +104,7 @@ module Block = struct
     Conn.find get_height_query block_id
 
   let max_slot_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int
+    Caqti_request.find Caqti_type.unit Caqti_type.int64
       {sql| SELECT MAX(global_slot_since_genesis) FROM blocks |sql}
 
   let get_max_slot (module Conn : Caqti_async.CONNECTION) () =
@@ -123,6 +123,7 @@ module Block = struct
     Caqti_request.find_opt Caqti_type.int64 Caqti_type.int64
       {sql| SELECT global_slot_since_genesis FROM blocks
             WHERE global_slot_since_genesis >= $1
+            AND chain_status <> 'orphaned'
             ORDER BY global_slot_since_genesis ASC
             LIMIT 1
       |sql}
@@ -131,7 +132,7 @@ module Block = struct
     Conn.find_opt next_slot_query slot
 
   let state_hashes_by_slot_query =
-    Caqti_request.collect Caqti_type.int Caqti_type.string
+    Caqti_request.collect Caqti_type.int64 Caqti_type.string
       {sql| SELECT state_hash FROM blocks WHERE global_slot_since_genesis = $1 |sql}
 
   let get_state_hashes_by_slot (module Conn : Caqti_async.CONNECTION) slot =
