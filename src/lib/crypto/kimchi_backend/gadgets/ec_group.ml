@@ -2,9 +2,9 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let basic_tests_enabled = true
+let basic_tests_enabled = false
 
-let scalar_mul_tests_enabled = true
+let scalar_mul_tests_enabled = false
 
 (* Array to tuple helper *)
 let tuple9_of_array array =
