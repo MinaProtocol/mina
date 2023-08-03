@@ -243,13 +243,27 @@ let%test_unit "range_check64 gadget" =
     in
 
     (* Helper to test range_check64 gadget
-     *   Input: value to be range checked in [0, 2^64)
+     *   Input: value  to be range checked in [0, 2^64)
+     *          odd    whether or not to have initial odd number of generics
      *)
-    let test_range_check64 ?cs base10 =
+    let test_range_check64 ?cs ?(odd = false) base10 =
       let open Runner.Impl in
       let value = Common.field_of_base10 (module Runner.Impl) base10 in
 
       let make_circuit value =
+        ( if odd then
+          (* Create half a generic to force an odd number of Generics preceding RC *)
+          let left_summand =
+            exists Field.typ ~compute:(fun () -> Field.Constant.of_int 5)
+          in
+          let right_summand =
+            exists Field.typ ~compute:(fun () -> Field.Constant.of_int 4)
+          in
+          let sum_result =
+            exists Field.typ ~compute:(fun () -> Field.Constant.of_int 9)
+          in
+          Field.Assert.equal (Field.( + ) left_summand right_summand) sum_result
+        ) ;
         (* Circuit definition *)
         let value = exists Field.typ ~compute:(fun () -> value) in
         bits64 (module Runner.Impl) value ;
@@ -265,6 +279,9 @@ let%test_unit "range_check64 gadget" =
     in
 
     (* Positive tests *)
+    (* odd = true *)
+    let _cs = test_range_check64 ~odd:true "9884868923950902332" in
+
     let cs = test_range_check64 "0" in
     let _cs = test_range_check64 ~cs "4294967" in
     let _cs = test_range_check64 ~cs "18446744073709551615" in
@@ -289,13 +306,25 @@ let%test_unit "multi_range_check gadget" =
     in
 
     (* Helper to test multi_range_check gadget *)
-    let test_multi_range_check ?cs v0 v1 v2 =
+    let test_multi_range_check ?cs ?(odd = false) v0 v1 v2 =
       let open Runner.Impl in
       let v0 = Common.field_of_base10 (module Runner.Impl) v0 in
       let v1 = Common.field_of_base10 (module Runner.Impl) v1 in
       let v2 = Common.field_of_base10 (module Runner.Impl) v2 in
 
       let make_circuit v0 v1 v2 =
+        ( if odd then
+          let left_summand =
+            exists Field.typ ~compute:(fun () -> Field.Constant.of_int 5)
+          in
+          let right_summand =
+            exists Field.typ ~compute:(fun () -> Field.Constant.of_int 4)
+          in
+          let sum_result =
+            exists Field.typ ~compute:(fun () -> Field.Constant.of_int 9)
+          in
+          Field.Assert.equal (Field.( + ) left_summand right_summand) sum_result
+        ) ;
         (* Circuit definition *)
         let values =
           exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
@@ -313,6 +342,12 @@ let%test_unit "multi_range_check gadget" =
     in
 
     (* Positive tests *)
+    (* odd = true *)
+    let _cs =
+      test_multi_range_check ~odd:true "309485009821345068724781055"
+        "309485009821345068724781055" "309485009821345068724781055"
+    in
+    (* odd = false *)
     let cs =
       test_multi_range_check "0" "4294967" "309485009821345068724781055"
     in
