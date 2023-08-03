@@ -22,67 +22,12 @@ module Proof_data = struct
   [@@deriving bin_io_unversioned]
 end
 
-let get_backend_payload_version ~logger ~interruptor ~url =
-  let open Interruptible.Let_syntax in
-  let make_interruptible f = Interruptible.lift f interruptor in
-  match%bind
-    make_interruptible
-      (Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
-           Cohttp_async.Client.get url ) )
-  with
-  | Ok ({ status; _ }, body) -> (
-      let status_code = Cohttp.Code.code_of_status status in
-      let succeeded = status_code = 200 in
-      if not succeeded then (
-        [%log warn] "Failure to obtain service payload version at URL $url" ;
-        Interruptible.return None )
-      else
-        match%map
-          make_interruptible
-            (Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
-                 Cohttp_async.Body.to_string body ) )
-        with
-        | Ok body_s ->
-            int_of_string_opt body_s
-        | Error exn ->
-            [%log warn]
-              "Error when obtaining service payload version body response at \
-               URL $url"
-              ~metadata:
-                [ ("url", `String (Uri.to_string url))
-                ; ("error", `String (Exn.to_string exn))
-                ] ;
-            None )
-  | Error exn ->
-      [%log warn] "Error when obtaining service payload version at URL $url"
-        ~metadata:
-          [ ("url", `String (Uri.to_string url))
-          ; ("error", `String (Exn.to_string exn))
-          ] ;
-      Interruptible.return None
-
 let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     ~state_hash ~produced block_data =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
-  let%bind version =
-    match%map get_backend_payload_version ~logger ~interruptor ~url with
-    | None ->
-        [%log warn] "Defaulting to payload version 0" ;
-        0
-    | Some version ->
-        [%log info] "Using payload version %d" version ;
-        version
-  in
-  let json =
-    match version with
-    | 0 ->
-        let request = Payload.V0.create_request block_data submitter_keypair in
-        Payload.request_to_yojson Payload.V0.block_data_to_yojson request
-    | _ ->
-        let request = Payload.V1.create_request block_data submitter_keypair in
-        Payload.request_to_yojson Payload.V1.block_data_to_yojson request
-  in
+  let request = Payload.create_request block_data submitter_keypair in
+  let json = Payload.request_to_yojson request in
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in

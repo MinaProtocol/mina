@@ -120,7 +120,7 @@ func unmarshalPayload(payload []byte) (submitRequest, error) {
 	}
 }
 
-func (h *SubmitH) submitPost(w http.ResponseWriter, r *http.Request) {
+func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.ContentLength == -1 {
 		w.WriteHeader(411)
 		return
@@ -216,21 +216,6 @@ func (h *SubmitH) submitPost(w http.ResponseWriter, r *http.Request) {
 	_, err2 := io.Copy(w, bytes.NewReader([]byte("{\"status\":\"ok\"}")))
 	if err2 != nil {
 		h.app.Log.Debugf("Error while responding with ok status to the user: %v", err2)
-	}
-}
-
-func (h *SubmitH) submitGet(w http.ResponseWriter, r *http.Request) {
-	_, err := fmt.Fprintf(w, "%d", LATEST_PAYLOAD_VERSION)
-	if err != nil {
-		h.app.Log.Debugf("Error while responding with latest payload version to the user: %v", err)
-	}
-}
-
-func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		h.submitPost(w, r)
-	} else if r.Method == http.MethodGet {
-		h.submitGet(w, r)
 	}
 }
 
