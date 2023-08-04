@@ -15,6 +15,7 @@ mina:
   # optimized: false
   useCustomEntrypoint: true
   customEntrypoint: /scripts/unset-k8s-env.sh
+  downloadConfig: true
 
 healthcheck:
   enabled: false
@@ -35,502 +36,502 @@ httpCoordinatedSnarkersConfig:
 
 minaSnarkCoordinatorsConfig:
   - name: snarker001
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: seq
     workers: 1
     itnGraphqlPort: 30200
   - name: snarker002
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30201
   - name: snarker003
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30202
   - name: snarker004
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30203
   - name: snarker005
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30204
   - name: snarker006
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30205
   - name: snarker007
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30206
   - name: snarker008
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30207
   - name: snarker009
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30208
   - name: snarker010
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30209
   - name: snarker011
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30210
   - name: snarker012
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30211
   - name: snarker013
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30212
   - name: snarker014
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30213
   - name: snarker015
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30214
   - name: snarker016
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30215
   - name: snarker017
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30216
   - name: snarker018
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30217
   - name: snarker019
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30218
   - name: snarker020
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30219
   - name: snarker021
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30220
   - name: snarker022
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30221
   - name: snarker023
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30222
   - name: snarker024
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30223
   - name: snarker025
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30224
   - name: snarker026
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30225
   - name: snarker027
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30226
   - name: snarker028
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30227
   - name: snarker029
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30228
   - name: snarker030
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30229
   - name: snarker031
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30230
   - name: snarker032
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30231
   - name: snarker033
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30232
   - name: snarker034
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30233
   - name: snarker035
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30234
   - name: snarker036
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30235
   - name: snarker037
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30236
   - name: snarker038
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30237
   - name: snarker039
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30238
   - name: snarker040
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30239
   - name: snarker041
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30240
   - name: snarker042
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30241
   - name: snarker043
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30242
   - name: snarker044
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30243
   - name: snarker045
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30244
   - name: snarker046
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30245
   - name: snarker047
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30246
   - name: snarker048
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30247
   - name: snarker049
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30248
   - name: snarker050
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30249
   - name: snarker051
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30250
   - name: snarker052
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30251
   - name: snarker053
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30252
   - name: snarker054
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30253
   - name: snarker055
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30254
   - name: snarker056
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30255
   - name: snarker057
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30256
   - name: snarker058
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30257
   - name: snarker059
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30258
   - name: snarker060
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30259
   - name: snarker061
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30260
   - name: snarker062
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30261
   - name: snarker063
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30262
   - name: snarker064
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30263
   - name: snarker065
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30264
   - name: snarker066
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30265
   - name: snarker067
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30266
   - name: snarker068
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30267
   - name: snarker069
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30268
   - name: snarker070
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30269
   - name: snarker071
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30270
   - name: snarker072
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30271
   - name: snarker073
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30272
   - name: snarker074
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30273
   - name: snarker075
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30274
   - name: snarker076
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30275
   - name: snarker077
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30276
   - name: snarker078
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30277
   - name: snarker079
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30278
   - name: snarker080
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30279
   - name: snarker081
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30280
   - name: snarker082
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30281
   - name: snarker083
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30282
   - name: snarker084
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30283
   - name: snarker085
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30284
   - name: snarker086
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30285
   - name: snarker087
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30286
   - name: snarker088
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30287
   - name: snarker089
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30288
   - name: snarker090
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30289
   - name: snarker091
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30290
   - name: snarker092
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30291
   - name: snarker093
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30292
   - name: snarker094
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30293
   - name: snarker095
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30294
   - name: snarker096
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30295
   - name: snarker097
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30296
   - name: snarker098
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30297
   - name: snarker099
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30298
   - name: snarker100
-    publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+    publicKey: B62qn7A38x3UM8x1tQKsHZs5cGtuApEMY1ecyNhWGjgkkjLFgZcobzP
     workSelectionAlgorithm: rand
     workers: 1
     itnGraphqlPort: 30299
