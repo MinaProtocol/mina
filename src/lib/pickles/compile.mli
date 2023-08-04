@@ -176,9 +176,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          * (   ( ( Impls.Wrap.Field.t
                  , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
                  , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
-                 , ( Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
-                   , Impls.Wrap.Boolean.var )
-                   Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                    , Impls.Wrap.Boolean.var )
                    Pickles_types__Opt.t
@@ -209,9 +206,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          ( Import.Challenge.Constant.t
          , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
          , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-         , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-           , bool )
-           Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
            , bool )
            Import.Types.Opt.t
@@ -238,9 +232,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
       -> ( Import.Challenge.Constant.t
          , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
          , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-         , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-           , bool )
-           Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
            , bool )
            Import.Types.Opt.t
@@ -365,9 +356,6 @@ val wrap_main_dummy_override :
      * (   ( ( Impls.Wrap.Field.t
              , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
              , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
-             , ( Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
-               , Impls.Wrap.Boolean.var )
-               Opt.t
              , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                , Impls.Wrap.Boolean.var )
                Pickles_types__Opt.t
@@ -396,9 +384,6 @@ module Make_adversarial_test : functor
           ( Import.Challenge.Constant.t
           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
           , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-          , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-            , bool )
-            Import.Types.Opt.t
           , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
             , bool )
             Import.Types.Opt.t
@@ -425,9 +410,6 @@ module Make_adversarial_test : functor
        -> ( Import.Challenge.Constant.t
           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
           , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-          , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-            , bool )
-            Import.Types.Opt.t
           , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
             , bool )
             Import.Types.Opt.t

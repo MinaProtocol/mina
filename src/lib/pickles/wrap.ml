@@ -86,7 +86,6 @@ module For_tests_only = struct
         ( ( Import.Challenge.Constant.t
           , scalar_challenge_constant
           , shifted_tick_field
-          , (shifted_tick_field, bool) Opt.t
           , (scalar_challenge_constant, bool) Opt.t
           , bool )
           Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t

@@ -110,7 +110,6 @@ let wrap_main
           , _
           , _
           , _
-          , _
           , _ )
           Types.Wrap.Statement.In_circuit.t
        -> unit )
@@ -154,7 +153,6 @@ let wrap_main
           ( _
           , _
           , _ Shifted_value.Type1.t
-          , _
           , _
           , _
           , _
@@ -268,12 +266,12 @@ let wrap_main
                 ; rot
                 ; lookup
                 ; runtime_tables
-                ; uses_lookups
+                ; uses_lookups = _
                 ; table_width_at_least_1
                 ; table_width_at_least_2
                 ; table_width_3
-                ; lookups_per_row_3
-                ; lookups_per_row_4
+                ; lookups_per_row_3 = _
+                ; lookups_per_row_4 = _
                 ; lookup_pattern_xor
                 ; lookup_pattern_range_check
                 } =

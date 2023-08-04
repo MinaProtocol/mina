@@ -54,8 +54,8 @@ struct
     in
     Timer.clock __LOC__ ; t
 
-  let f full_signature num_choices choices_length ~feature_flags ~num_chunks
-      ~max_proofs_verified =
+  let f _full_signature _num_choices _choices_length ~feature_flags:_
+      ~num_chunks:_ ~max_proofs_verified =
     Common.wrap_domains
       ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
 end
