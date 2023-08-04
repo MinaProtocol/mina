@@ -274,14 +274,12 @@ module Wrap = struct
           module V1 = struct
             type ( 'challenge
                  , 'scalar_challenge
-                 , 'fp
                  , 'bool
                  , 'bulletproof_challenges
                  , 'branch_data )
                  t =
                   ( 'challenge
                   , 'scalar_challenge
-                  , 'fp
                   , 'bool
                   , 'bulletproof_challenges
                   , 'branch_data )
@@ -465,7 +463,6 @@ module Wrap = struct
         module V1 = struct
           type ( 'challenge
                , 'scalar_challenge
-               , 'fp
                , 'bool
                , 'messages_for_next_wrap_proof
                , 'digest
@@ -474,7 +471,6 @@ module Wrap = struct
                t =
                 ( 'challenge
                 , 'scalar_challenge
-                , 'fp
                 , 'bool
                 , 'messages_for_next_wrap_proof
                 , 'digest
@@ -487,7 +483,6 @@ module Wrap = struct
             { deferred_values :
                 ( 'challenge
                 , 'scalar_challenge
-                , 'fp
                 , 'bool
                 , 'bp_chals
                 , 'index )
@@ -713,7 +708,6 @@ module Wrap = struct
         module V1 = struct
           type ( 'challenge
                , 'scalar_challenge
-               , 'fp
                , 'bool
                , 'messages_for_next_wrap_proof
                , 'digest
@@ -723,7 +717,6 @@ module Wrap = struct
                t =
                 ( 'challenge
                 , 'scalar_challenge
-                , 'fp
                 , 'bool
                 , 'messages_for_next_wrap_proof
                 , 'digest
@@ -736,7 +729,6 @@ module Wrap = struct
             { proof_state :
                 ( 'challenge
                 , 'scalar_challenge
-                , 'fp
                 , 'bool
                 , 'messages_for_next_wrap_proof
                 , 'digest

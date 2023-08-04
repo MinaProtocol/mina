@@ -288,14 +288,12 @@ module Wrap : sig
           module V1 : sig
             type ( 'challenge
                  , 'scalar_challenge
-                 , 'fp
                  , 'bool
                  , 'bulletproof_challenges
                  , 'branch_data )
                  t =
                   ( 'challenge
                   , 'scalar_challenge
-                  , 'fp
                   , 'bool
                   , 'bulletproof_challenges
                   , 'branch_data )
@@ -319,7 +317,6 @@ module Wrap : sig
         val map_challenges :
              ( 'challenge
              , 'scalar_challenge
-             , 'fp
              , 'bool
              , 'bulletproof_challenges
              , 'branch_data )
@@ -328,7 +325,6 @@ module Wrap : sig
           -> scalar:('scalar_challenge -> 'scalar_challenge2)
           -> ( 'challenge2
              , 'scalar_challenge2
-             , 'fp
              , 'bool
              , 'bulletproof_challenges
              , 'branch_data )
@@ -423,7 +419,7 @@ module Wrap : sig
       val to_minimal :
            ('a, 'b, 'c, _, 'd, 'e, 'f, 'bool) In_circuit.t
         -> to_option:('d -> 'b Plonk.In_circuit.Lookup.t option)
-        -> ('a, 'b, 'c, 'bool, 'e, 'f) Minimal.t
+        -> ('a, 'b, 'bool, 'e, 'f) Minimal.t
     end
 
     module Stable : sig
@@ -546,7 +542,6 @@ module Wrap : sig
         module V1 : sig
           type ( 'challenge
                , 'scalar_challenge
-               , 'fp
                , 'bool
                , 'messages_for_next_wrap_proof
                , 'digest
@@ -555,7 +550,6 @@ module Wrap : sig
                t =
                 ( 'challenge
                 , 'scalar_challenge
-                , 'fp
                 , 'bool
                 , 'messages_for_next_wrap_proof
                 , 'digest
@@ -568,7 +562,6 @@ module Wrap : sig
             { deferred_values :
                 ( 'challenge
                 , 'scalar_challenge
-                , 'fp
                 , 'bool
                 , 'bp_chals
                 , 'index )
@@ -690,7 +683,7 @@ module Wrap : sig
     val to_minimal :
          ('a, 'b, 'c, _, 'd, 'bool, 'e, 'f, 'g, 'h) In_circuit.t
       -> to_option:('d -> 'b Deferred_values.Plonk.In_circuit.Lookup.t option)
-      -> ('a, 'b, 'c, 'bool, 'e, 'f, 'g, 'h) Minimal.t
+      -> ('a, 'b, 'bool, 'e, 'f, 'g, 'h) Minimal.t
   end
 
   (** The component of the proof accumulation state that is only computed on by
@@ -854,7 +847,6 @@ module Wrap : sig
         module V1 : sig
           type ( 'challenge
                , 'scalar_challenge
-               , 'fp
                , 'bool
                , 'messages_for_next_wrap_proof
                , 'digest
@@ -864,7 +856,6 @@ module Wrap : sig
                t =
                 ( 'challenge
                 , 'scalar_challenge
-                , 'fp
                 , 'bool
                 , 'messages_for_next_wrap_proof
                 , 'digest
@@ -877,7 +868,6 @@ module Wrap : sig
             { proof_state :
                 ( 'challenge
                 , 'scalar_challenge
-                , 'fp
                 , 'bool
                 , 'messages_for_next_wrap_proof
                 , 'digest
@@ -896,7 +886,6 @@ module Wrap : sig
 
       type ( 'challenge
            , 'scalar_challenge
-           , 'fp
            , 'bool
            , 'messages_for_next_wrap_proof
            , 'digest
@@ -906,7 +895,6 @@ module Wrap : sig
            t =
         ( 'challenge
         , 'scalar_challenge
-        , 'fp
         , 'bool
         , 'messages_for_next_wrap_proof
         , 'digest
@@ -1046,7 +1034,7 @@ module Wrap : sig
            (   'd
             -> 'b Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t option
            )
-      -> ('a, 'b, 'c, 'bool, 'e, 'f, 'g, 'h, 'i) Minimal.t
+      -> ('a, 'b, 'bool, 'e, 'f, 'g, 'h, 'i) Minimal.t
   end
 end
 
