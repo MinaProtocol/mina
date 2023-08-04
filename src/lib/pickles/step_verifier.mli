@@ -52,9 +52,6 @@ val finalize_other_proof :
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
        Import.Scalar_challenge.t
      , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-     , ( Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-       , Step_main_inputs.Impl.Boolean.var )
-       Composition_types.Opt.t
      , ( Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Import.Scalar_challenge.t
        , Step_main_inputs.Impl.Boolean.var )
@@ -140,9 +137,6 @@ val verify :
      , Step_main_inputs.Impl.field Limb_vector.Challenge.t
        Composition_types.Scalar_challenge.t
      , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-     , ( Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-       , Step_main_inputs.Impl.Boolean.var )
-       Pickles_types.Opt.t
      , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
          Composition_types.Scalar_challenge.t
        , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t

@@ -134,10 +134,6 @@ module Wrap : sig
     -> ( ( Impl.Field.t
          , Impl.Field.t Composition_types.Scalar_challenge.t
          , Impl.Field.t Pickles_types.Shifted_value.Type1.t
-         , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
-           , Impl.field Snarky_backendless.Cvar.t
-             Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Opt.t
          , ( Impl.Field.t Composition_types.Scalar_challenge.t
            , Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
@@ -157,7 +153,6 @@ module Wrap : sig
        , ( Limb_vector.Challenge.Constant.t
          , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
          , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-         , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t option
          , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
            option
          , bool

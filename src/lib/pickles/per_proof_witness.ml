@@ -60,9 +60,6 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       ( challenge
       , scalar_challenge
       , Impl.Field.t Shifted_value.Type1.t
-      , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
-        , Impl.Boolean.var )
-        Opt.t
       , (scalar_challenge, Impl.Boolean.var) Opt.t
       , Impl.Boolean.var
       , unit
@@ -112,7 +109,6 @@ module Constant = struct
         ( challenge
         , scalar_challenge
         , Tick.Field.t Shifted_value.Type1.t
-        , Tick.Field.t Shifted_value.Type1.t option
         , scalar_challenge option
         , bool
         , unit

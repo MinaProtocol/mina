@@ -479,7 +479,6 @@ struct
          , _
          , _ Shifted_value.Type2.t
          , _
-         , _
          , _ )
          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
     with_label "incrementally_verify_proof" (fun () ->
@@ -864,7 +863,6 @@ struct
         ( Field.t
         , _
         , Field.t Shifted_value.Type1.t
-        , _
         , _
         , _
         , Field.Constant.t Branch_data.Checked.t

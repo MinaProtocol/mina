@@ -26,7 +26,6 @@ let expand_deferred (type n most_recent_width)
     ~(proof_state :
        ( Challenge.Constant.t
        , Challenge.Constant.t Scalar_challenge.t
-       , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
        , bool
        , n Pickles__.Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
        , Digest.Constant.t

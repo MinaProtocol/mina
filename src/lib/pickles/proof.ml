@@ -44,7 +44,6 @@ module Base = struct
               , Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
                 Scalar_challenge.Stable.V2.t
-              , Tick.Field.Stable.V1.t Shifted_value.Type1.Stable.V1.t
               , bool
               , 'messages_for_next_wrap_proof
               , Digest.Constant.Stable.V1.t
@@ -73,7 +72,6 @@ module Base = struct
       { statement :
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.t
-          , Tick.Field.t Shifted_value.Type1.t
           , bool
           , 'messages_for_next_wrap_proof
           , Digest.Constant.t

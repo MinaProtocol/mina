@@ -411,7 +411,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   *)
   let checked (type t)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-      ~shift ~env (plonk : (_, _, _, _ Opt.t, _ Opt.t, _) In_circuit.t) evals =
+      ~shift ~env (plonk : (_, _, _, _ Opt.t, _) In_circuit.t) evals =
     let actual =
       derive_plonk ~with_label:Impl.with_label
         (module Impl.Field)

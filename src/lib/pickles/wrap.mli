@@ -1,7 +1,10 @@
 open Pickles_types
+open Import
+
+type scalar_challenge_constant = Challenge.Constant.t Scalar_challenge.t
 
 val wrap :
-     max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
+     max_proofs_verified:'max_proofs_verified Nat.t
   -> (module Pickles_types.Hlist.Maxes.S
         with type length = 'max_proofs_verified
          and type ns = 'max_local_max_proofs_verifieds )
@@ -11,142 +14,118 @@ val wrap :
   -> (   ( Impls.Wrap.Impl.Field.t
          , Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
          , Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-         , ( Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-           , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-             Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Opt.t
          , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
            , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Opt.t
          , Impls.Wrap.Impl.Boolean.var
-         , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-         , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-         , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-         , ( Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-             Kimchi_backend_common.Scalar_challenge.t
-             Composition_types.Bulletproof_challenge.t
-           , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
-           Pickles_types.Vector.t
-           Pickles_types.Hlist0.Id.t
-         , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t )
-         Import.Types.Wrap.Statement.In_circuit.t
+         , Pasta_bindings.Fq.t Challenge.t
+         , Pasta_bindings.Fq.t Challenge.t
+         , Pasta_bindings.Fq.t Challenge.t
+         , ( Pasta_bindings.Fq.t Challenge.t Kimchi_types.scalar_challenge
+             Bulletproof_challenge.t
+           , Nat.z Backend.Tick.Rounds.plus_n )
+           Vector.vec
+         , Pasta_bindings.Fq.t Challenge.t )
+         Types.Wrap.Statement.In_circuit.t
       -> unit )
   -> typ:('a, 'b) Impls.Step.Typ.t
   -> step_vk:Kimchi_bindings.Protocol.VerifierIndex.Fp.t
-  -> actual_wrap_domains:(Core_kernel.Int.t, 'c) Pickles_types.Vector.t
+  -> actual_wrap_domains:(int, 'c) Vector.vec
   -> step_plonk_indices:'d
   -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> actual_feature_flags:bool Plonk_types.Features.t
   -> ?tweak_statement:
-       (   ( Import.Challenge.Constant.t
-           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-           , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-           , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-             , bool )
-             Import.Types.Opt.t
+       (   ( Challenge.Constant.t
+           , scalar_challenge_constant
+           , Pasta_bindings.Fp.t Shifted_value.Type1.t
            , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
              , bool )
              Import.Types.Opt.t
            , bool
            , 'max_proofs_verified
-             Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-           , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
+             Reduced_messages_for_next_proof_over_same_field.Wrap.t
+           , (int64, Nat.N4.n) Vector.vec
            , ( 'b
-             , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
+             , ( Backend.Tock.Proof.G.Affine.t
                , 'actual_proofs_verified )
-               Pickles_types.Vector.t
-             , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
-                   Import.Bulletproof_challenge.t
+               Vector.vec
+             , ( ( Challenge.Constant.t Kimchi_types.scalar_challenge
+                   Bulletproof_challenge.t
                  , 'e )
-                 Pickles_types.Vector.t
+                 Vector.vec
                , 'actual_proofs_verified )
-               Pickles_types.Vector.t )
-             Proof.Base.Messages_for_next_proof_over_same_field.Step.t
-           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Import.Types.Bulletproof_challenge.t
-             Import.Types.Step_bp_vec.t
-           , Import.Types.Branch_data.t )
-           Import.Types.Wrap.Statement.In_circuit.t
-        -> ( Import.Challenge.Constant.t
-           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-           , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-           , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-             , bool )
-             Import.Types.Opt.t
+               Vector.vec )
+             Reduced_messages_for_next_proof_over_same_field.Step.t
+           , Challenge.Constant.t Kimchi_types.scalar_challenge
+             Bulletproof_challenge.t
+             Step_bp_vec.t
+           , Branch_data.t )
+           Types.Wrap.Statement.In_circuit.t
+        -> ( Challenge.Constant.t
+           , scalar_challenge_constant
+           , Pasta_bindings.Fp.t Shifted_value.Type1.t
            , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
              , bool )
              Import.Types.Opt.t
            , bool
            , 'max_proofs_verified
-             Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-           , ( Limb_vector.Constant.Hex64.t
-             , Composition_types.Digest.Limbs.n )
-             Pickles_types.Vector.vec
+             Reduced_messages_for_next_proof_over_same_field.Wrap.t
+           , (int64, Nat.N4.n) Vector.vec
            , ( 'b
-             , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
+             , ( Backend.Tock.Proof.G.Affine.t
                , 'actual_proofs_verified )
-               Pickles_types.Vector.t
-             , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
-                   Import.Bulletproof_challenge.t
+               Vector.vec
+             , ( ( Challenge.Constant.t Kimchi_types.scalar_challenge
+                   Bulletproof_challenge.t
                  , 'e )
-                 Pickles_types.Vector.t
+                 Vector.vec
                , 'actual_proofs_verified )
-               Pickles_types.Vector.t )
-             Proof.Base.Messages_for_next_proof_over_same_field.Step.t
-           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Import.Types.Bulletproof_challenge.t
-             Import.Types.Step_bp_vec.t
-           , Import.Types.Branch_data.t )
-           Import.Types.Wrap.Statement.In_circuit.t )
-  -> Kimchi_pasta.Pallas_based_plonk.Keypair.t
+               Vector.vec )
+             Reduced_messages_for_next_proof_over_same_field.Step.t
+           , Challenge.Constant.t Kimchi_types.scalar_challenge
+             Bulletproof_challenge.t
+             Step_bp_vec.t
+           , Branch_data.t )
+           Types.Wrap.Statement.In_circuit.t )
+  -> Backend.Tock.Keypair.t
   -> ( 'b
-     , ( ( Impls.Wrap.Challenge.Constant.t
-         , Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
-         , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
-         , ( Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Import.Types.Bulletproof_challenge.t
+     , ( ( Challenge.Constant.t
+         , Challenge.Constant.t Kimchi_types.scalar_challenge
+         , Pasta_bindings.Fq.t Shifted_value.Type2.t
+         , ( Challenge.Constant.t Kimchi_types.scalar_challenge
+             Bulletproof_challenge.t
            , Backend.Tock.Rounds.n )
-           Pickles_types.Vector.t
+           Vector.vec
          , Impls.Wrap.Digest.Constant.t
          , bool )
-         Import.Types.Step.Proof_state.Per_proof.In_circuit.t
+         Types.Step.Proof_state.Per_proof.In_circuit.t
        , 'max_proofs_verified )
-       Pickles_types.Vector.t
-     , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
-         * Kimchi_pasta.Basic.Fp.Stable.Latest.t
-       , 'actual_proofs_verified )
-       Pickles_types.Vector.t
-     , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
-           Import.Bulletproof_challenge.t
+       Vector.vec
+     , (Backend.Tock.Proof.G.Affine.t, 'actual_proofs_verified) Vector.vec
+     , ( ( Challenge.Constant.t Kimchi_types.scalar_challenge
+           Bulletproof_challenge.t
          , 'e )
-         Pickles_types.Vector.t
+         Vector.vec
        , 'actual_proofs_verified )
-       Pickles_types.Vector.t
+       Vector.vec
      , 'max_local_max_proofs_verifieds
-       Pickles_types.Hlist.H1.T
-         (Proof.Base.Messages_for_next_proof_over_same_field.Wrap)
-       .t
-     , ( ( Backend.Tock.Field.t
-         , Backend.Tock.Field.t array )
-         Pickles_types.Plonk_types.All_evals.t
+       Hlist0.H1(Reduced_messages_for_next_proof_over_same_field.Wrap).t
+     , ( (Pasta_bindings.Fq.t, Pasta_bindings.Fq.t array) Plonk_types.All_evals.t
        , 'max_proofs_verified )
-       Pickles_types.Vector.t )
+       Vector.vec )
      Proof.Base.Step.t
   -> ( 'max_proofs_verified
-       Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+       Reduced_messages_for_next_proof_over_same_field.Wrap.t
      , ( 'b
-       , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
-           * Kimchi_pasta.Basic.Fp.Stable.Latest.t
-         , 'actual_proofs_verified )
-         Pickles_types.Vector.t
-       , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
-             Import.Bulletproof_challenge.t
+       , (Backend.Tock.Proof.G.Affine.t, 'actual_proofs_verified) Vector.vec
+       , ( ( Challenge.Constant.t Kimchi_types.scalar_challenge
+             Bulletproof_challenge.t
            , 'e )
-           Pickles_types.Vector.t
+           Vector.vec
          , 'actual_proofs_verified )
-         Pickles_types.Vector.t )
-       Proof.Base.Messages_for_next_proof_over_same_field.Step.t )
+         Vector.vec )
+       Reduced_messages_for_next_proof_over_same_field.Step.t )
      Proof.Base.Wrap.t
      Promise.t
 

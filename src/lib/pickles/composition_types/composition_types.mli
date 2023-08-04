@@ -107,7 +107,6 @@ module Wrap : sig
           type ( 'challenge
                , 'scalar_challenge
                , 'fp
-               , 'fp_opt
                , 'scalar_challenge_opt
                , 'bool )
                t =
@@ -125,15 +124,15 @@ module Wrap : sig
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
           val map_challenges :
-               ('a, 'b, 'c, 'fp_opt, ('b, 'e) Opt.t, 'bool) t
+               ('a, 'b, 'c, ('b, 'e) Opt.t, 'bool) t
             -> f:('a -> 'f)
             -> scalar:('b -> 'g)
-            -> ('f, 'g, 'c, 'fp_opt, ('g, 'e) Opt.t, 'bool) t
+            -> ('f, 'g, 'c, ('g, 'e) Opt.t, 'bool) t
 
           val map_fields :
-               ('a, 'b, 'c, ('c, 'e) Opt.t, ('d, 'e) Opt.t, 'bool) t
+               ('a, 'b, 'c, ('d, 'e) Opt.t, 'bool) t
             -> f:('c -> 'f)
-            -> ('a, 'b, 'f, ('f, 'e) Opt.t, ('d, 'e) Opt.t, 'bool) t
+            -> ('a, 'b, 'f, ('d, 'e) Opt.t, 'bool) t
 
           val typ :
                'f Spec.impl
@@ -159,14 +158,12 @@ module Wrap : sig
             -> ( ( 'c
                  , 'e Scalar_challenge.t
                  , 'fp
-                 , ('fp, 'boolean) Opt.t
                  , ('e Scalar_challenge.t, 'boolean) Opt.t
                  , 'boolean )
                  t
                , ( 'd
                  , 'b Scalar_challenge.t
                  , 'a
-                 , 'a option
                  , 'b Scalar_challenge.t option
                  , bool )
                  t
@@ -178,7 +175,6 @@ module Wrap : sig
              ( 'challenge
              , 'scalar_challenge
              , 'fp
-             , 'fp_opt
              , 'lookup_opt
              , 'bool )
              In_circuit.t
@@ -265,14 +261,12 @@ module Wrap : sig
           module V1 : sig
             type ( 'challenge
                  , 'scalar_challenge
-                 , 'fp
                  , 'bool
                  , 'bulletproof_challenges
                  , 'branch_data )
                  t =
                   ( 'challenge
                   , 'scalar_challenge
-                  , 'fp
                   , 'bool
                   , 'bulletproof_challenges
                   , 'branch_data )
@@ -296,7 +290,6 @@ module Wrap : sig
         val map_challenges :
              ( 'challenge
              , 'scalar_challenge
-             , 'fp
              , 'bool
              , 'bulletproof_challenges
              , 'branch_data )
@@ -305,7 +298,6 @@ module Wrap : sig
           -> scalar:('scalar_challenge -> 'scalar_challenge2)
           -> ( 'challenge2
              , 'scalar_challenge2
-             , 'fp
              , 'bool
              , 'bulletproof_challenges
              , 'branch_data )
@@ -316,7 +308,6 @@ module Wrap : sig
         type ( 'challenge
              , 'scalar_challenge
              , 'fp
-             , 'fp_opt
              , 'lookup_opt
              , 'bulletproof_challenges
              , 'branch_data
@@ -325,7 +316,6 @@ module Wrap : sig
           ( ( 'challenge
             , 'scalar_challenge
             , 'fp
-            , 'fp_opt
             , 'lookup_opt
             , 'bool )
             Plonk.In_circuit.t
@@ -360,10 +350,6 @@ module Wrap : sig
           -> ( ( ( 'c
                  , 'e Scalar_challenge.t
                  , 'fp
-                 , ( 'fp
-                   , 'f Snarky_backendless.Cvar.t
-                     Snarky_backendless__Snark_intf.Boolean0.t )
-                   Opt.t
                  , ( 'e Scalar_challenge.t
                    , 'f Snarky_backendless.Cvar.t
                      Snarky_backendless__Snark_intf.Boolean0.t )
@@ -381,7 +367,6 @@ module Wrap : sig
              , ( ( 'd
                  , 'b Scalar_challenge.t
                  , 'a
-                 , 'a option
                  , 'b Scalar_challenge.t option
                  , bool )
                  Plonk.In_circuit.t
@@ -397,9 +382,9 @@ module Wrap : sig
       end
 
       val to_minimal :
-           ('a, 'b, 'c, _, 'd, 'e, 'f, 'bool) In_circuit.t
+           ('a, 'b, 'c, 'd, 'e, 'f, 'bool) In_circuit.t
         -> to_option:('d -> 'b option)
-        -> ('a, 'b, 'c, 'bool, 'e, 'f) Minimal.t
+        -> ('a, 'b, 'bool, 'e, 'f) Minimal.t
     end
 
     module Stable : sig
@@ -522,7 +507,6 @@ module Wrap : sig
         module V1 : sig
           type ( 'challenge
                , 'scalar_challenge
-               , 'fp
                , 'bool
                , 'messages_for_next_wrap_proof
                , 'digest
@@ -531,7 +515,6 @@ module Wrap : sig
                t =
                 ( 'challenge
                 , 'scalar_challenge
-                , 'fp
                 , 'bool
                 , 'messages_for_next_wrap_proof
                 , 'digest
@@ -544,7 +527,6 @@ module Wrap : sig
             { deferred_values :
                 ( 'challenge
                 , 'scalar_challenge
-                , 'fp
                 , 'bool
                 , 'bp_chals
                 , 'index )
@@ -563,7 +545,6 @@ module Wrap : sig
       type ( 'challenge
            , 'scalar_challenge
            , 'fp
-           , 'fp_opt
            , 'lookup_opt
            , 'bool
            , 'messages_for_next_wrap_proof
@@ -574,7 +555,6 @@ module Wrap : sig
         ( ( 'challenge
           , 'scalar_challenge
           , 'fp
-          , 'fp_opt
           , 'lookup_opt
           , 'bool )
           Deferred_values.Plonk.In_circuit.t
@@ -622,7 +602,6 @@ module Wrap : sig
         -> ( ( ( 'c
                , 'e Scalar_challenge.t
                , 'fp
-               , ('fp, 'boolean) Opt.t
                , ('e Scalar_challenge.t, 'boolean) Opt.t
                , ('f Snarky_backendless.Cvar.t
                   Snarky_backendless__Snark_intf.Boolean0.t
@@ -641,7 +620,6 @@ module Wrap : sig
            , ( ( 'd
                , 'b Scalar_challenge.t
                , 'a
-               , 'a option
                , 'b Scalar_challenge.t option
                , bool )
                Deferred_values.Plonk.In_circuit.t
@@ -659,9 +637,9 @@ module Wrap : sig
     end
 
     val to_minimal :
-         ('a, 'b, 'c, _, 'd, 'bool, 'e, 'f, 'g, 'h) In_circuit.t
+         ('a, 'b, 'c, 'd, 'bool, 'e, 'f, 'g, 'h) In_circuit.t
       -> to_option:('d -> 'b option)
-      -> ('a, 'b, 'c, 'bool, 'e, 'f, 'g, 'h) Minimal.t
+      -> ('a, 'b, 'bool, 'e, 'f, 'g, 'h) Minimal.t
   end
 
   (** The component of the proof accumulation state that is only computed on by
@@ -825,7 +803,6 @@ module Wrap : sig
         module V1 : sig
           type ( 'challenge
                , 'scalar_challenge
-               , 'fp
                , 'bool
                , 'messages_for_next_wrap_proof
                , 'digest
@@ -835,7 +812,6 @@ module Wrap : sig
                t =
                 ( 'challenge
                 , 'scalar_challenge
-                , 'fp
                 , 'bool
                 , 'messages_for_next_wrap_proof
                 , 'digest
@@ -848,7 +824,6 @@ module Wrap : sig
             { proof_state :
                 ( 'challenge
                 , 'scalar_challenge
-                , 'fp
                 , 'bool
                 , 'messages_for_next_wrap_proof
                 , 'digest
@@ -867,7 +842,6 @@ module Wrap : sig
 
       type ( 'challenge
            , 'scalar_challenge
-           , 'fp
            , 'bool
            , 'messages_for_next_wrap_proof
            , 'digest
@@ -877,7 +851,6 @@ module Wrap : sig
            t =
         ( 'challenge
         , 'scalar_challenge
-        , 'fp
         , 'bool
         , 'messages_for_next_wrap_proof
         , 'digest
@@ -892,7 +865,6 @@ module Wrap : sig
       type ( 'challenge
            , 'scalar_challenge
            , 'fp
-           , 'fp_opt
            , 'lookup_opt
            , 'bool
            , 'messages_for_next_wrap_proof
@@ -904,7 +876,6 @@ module Wrap : sig
         ( ( 'challenge
           , 'scalar_challenge
           , 'fp
-          , 'fp_opt
           , 'lookup_opt
           , 'bool )
           Proof_state.Deferred_values.Plonk.In_circuit.t
@@ -985,7 +956,7 @@ module Wrap : sig
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
       val to_data :
-           ('a, 'b, 'c, 'fp_opt, 'd, 'bool, 'e, 'e, 'e, 'f, 'g) t
+           ('a, 'b, 'c, 'd, 'bool, 'e, 'e, 'e, 'f, 'g) t
         -> option_map:
              ('d -> f:('h -> ('h * unit) Hlist.HlistId.t) -> 'j Hlist0.Id.t)
         -> ('c, 'a, 'b, 'e, 'f, 'g, 'j, 'fp_opt2, 'bool) flat_repr
@@ -995,13 +966,13 @@ module Wrap : sig
            ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp option, 'bool) flat_repr
         -> option_map:
              ('g Hlist0.Id.t -> f:(('h * unit) Hlist.HlistId.t -> 'h) -> 'j)
-        -> ('b, 'c, 'a, 'fp_opt2, 'j, 'bool, 'd, 'd, 'd, 'e, 'f) t
+        -> ('b, 'c, 'a, 'j, 'bool, 'd, 'd, 'd, 'e, 'f) t
     end
 
     val to_minimal :
-         ('a, 'b, 'c, _, 'd, 'bool, 'e, 'f, 'g, 'h, 'i) In_circuit.t
+         ('a, 'b, 'c, 'd, 'bool, 'e, 'f, 'g, 'h, 'i) In_circuit.t
       -> to_option:('d -> 'b option)
-      -> ('a, 'b, 'c, 'bool, 'e, 'f, 'g, 'h, 'i) Minimal.t
+      -> ('a, 'b, 'bool, 'e, 'f, 'g, 'h, 'i) Minimal.t
   end
 end
 
@@ -1090,7 +1061,6 @@ module Step : sig
             -> ( 'challenge
                , 'scalar_challenge
                , 'fp
-               , 'fp_opt
                , 'lookup_opt
                , 'bool )
                Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
@@ -1101,7 +1071,6 @@ module Step : sig
             -> ( 'challenge
                , 'scalar_challenge
                , 'fp
-               , 'fp_opt
                , 'lookup_opt
                , 'bool )
                Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
