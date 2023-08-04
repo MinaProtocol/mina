@@ -38,16 +38,15 @@ val finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a
 val ft_comm :
      add:('comm -> 'comm -> 'comm)
   -> scale:('comm -> 'scalar -> 'comm)
-  -> endoscale:('comm -> 'c -> 'comm)
+  -> endoscale:'c
   -> negate:('comm -> 'comm)
   -> verification_key:'comm array Pickles_types.Plonk_verification_key_evals.t
-  -> alpha:'c
+  -> alpha:'d
   -> plonk:
-       ( 'd
-       , 'e
+       ( 'e
+       , 'f
        , 'scalar
        , 'g
-       , 'f
        , 'bool )
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
   -> t_comm:'comm array
@@ -194,8 +193,6 @@ val tock_public_input_of_statement :
   -> ( Limb_vector.Challenge.Constant.t
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-     , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-       option
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
        option
      , bool
@@ -224,8 +221,6 @@ val tock_unpadded_public_input_of_statement :
   -> ( Limb_vector.Challenge.Constant.t
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-     , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-       option
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
        option
      , bool

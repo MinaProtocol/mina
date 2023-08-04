@@ -26,9 +26,6 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       ( challenge
       , scalar_challenge
       , Impl.Field.t Pickles_types.Shifted_value.Type1.t
-      , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
-        , Impl.Boolean.var )
-        Pickles_types.Opt.t
       , (scalar_challenge, Impl.Boolean.var) Pickles_types.Opt.t
       , Impl.Boolean.var
       , unit
@@ -83,7 +80,6 @@ module Constant : sig
         ( challenge
         , scalar_challenge
         , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-        , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t option
         , scalar_challenge option
         , bool
         , unit

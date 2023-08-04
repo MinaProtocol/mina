@@ -15,7 +15,6 @@ val expand_deferred :
   -> proof_state:
        ( Challenge.Constant.t
        , Challenge.Constant.t Kimchi_types.scalar_challenge
-       , Pasta_bindings.Fp.t Shifted_value.Type1.t
        , bool
        , 'n Reduced_messages_for_next_proof_over_same_field.Wrap.t
        , Types.Digest.Constant.t
@@ -27,7 +26,6 @@ val expand_deferred :
   -> ( ( Challenge.Constant.t
        , Challenge.Constant.t Kimchi_types.scalar_challenge
        , Pasta_bindings.Fp.t Shifted_value.Type1.t
-       , 'a
        , Challenge.Constant.t Kimchi_types.scalar_challenge option
        , bool )
        Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t

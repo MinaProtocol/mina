@@ -94,9 +94,6 @@ val incrementally_verify_proof :
        ( Wrap_main_inputs.Impl.Field.t
        , Wrap_main_inputs.Impl.Field.t Import.Scalar_challenge.t
        , Wrap_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-       , ( Wrap_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-         , Wrap_main_inputs.Impl.Boolean.var )
-         Pickles_types.Opt.t
        , ( Wrap_main_inputs.Impl.Field.t Import.Scalar_challenge.t
          , Wrap_main_inputs.Impl.Boolean.var )
          Pickles_types.Opt.t
