@@ -36,6 +36,8 @@ exception Snark_worker_signal_interrupt of Signal.t
 
 exception Offline_shutdown
 
+exception Bootstrap_stuck_shutdown
+
 val time_controller : t -> Block_time.Controller.t
 
 val subscription : t -> Mina_subscriptions.t
