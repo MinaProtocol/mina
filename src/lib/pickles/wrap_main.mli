@@ -9,7 +9,9 @@ val wrap_main :
      , 'max_local_max_proofs_verifieds )
      Full_signature.t
   -> ('prev_varss, 'branches) Pickles_types.Hlist.Length.t
-  -> ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+  -> ( ( Wrap_main_inputs.Inner_curve.Constant.t
+       , Wrap_main_inputs.Inner_curve.Constant.t option )
+       Wrap_verifier.index'
      , 'branches )
      Pickles_types.Vector.t
      Core_kernel.Lazy.t

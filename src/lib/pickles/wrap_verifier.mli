@@ -6,8 +6,8 @@ val challenge_polynomial :
   -> 'b array
   -> ('b -> 'b) Core_kernel.Staged.t
 
-type 'a index' =
-  ('a, 'a option) Pickles_types.Plonk_verification_key_evals.Step.t
+type ('a, 'a_opt) index' =
+  ('a, 'a_opt) Pickles_types.Plonk_verification_key_evals.Step.t
 
 module Challenge : module type of Import.Challenge.Make (Impls.Wrap)
 
@@ -65,7 +65,9 @@ val incrementally_verify_proof :
   -> srs:Kimchi_bindings.Protocol.SRS.Fp.t
   -> verification_key:
        ( Wrap_main_inputs.Inner_curve.t
-       , Wrap_main_inputs.Inner_curve.t option )
+       , ( Wrap_main_inputs.Inner_curve.t
+         , Impls.Wrap.Boolean.var )
+         Pickles_types.Plonk_types.Opt.t )
        Pickles_types.Plonk_verification_key_evals.Step.t
   -> xi:Scalar_challenge.t
   -> sponge:Opt.t
@@ -144,5 +146,15 @@ val finalize_other_proof :
 val choose_key :
   'n.
      'n One_hot_vector.t
-  -> (Wrap_main_inputs.Inner_curve.t index', 'n) Pickles_types.Vector.t
-  -> Wrap_main_inputs.Inner_curve.t index'
+  -> ( ( Wrap_main_inputs.Inner_curve.t
+       , ( Wrap_main_inputs.Inner_curve.t
+         , Impls.Wrap.Boolean.var )
+         Pickles_types.Plonk_types.Opt.t )
+       index'
+     , 'n )
+     Pickles_types.Vector.t
+  -> ( Wrap_main_inputs.Inner_curve.t
+     , ( Wrap_main_inputs.Inner_curve.t
+       , Impls.Wrap.Boolean.var )
+       Pickles_types.Plonk_types.Opt.t )
+     index'

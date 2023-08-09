@@ -181,7 +181,7 @@ struct
 
   module One_hot_vector = One_hot_vector.Make (Impl)
 
-  type 'a index' = ('a, 'a option) Plonk_verification_key_evals.Step.t
+  type ('a, 'a_opt) index' = ('a, 'a_opt) Plonk_verification_key_evals.Step.t
 
   type 'a index = 'a Plonk_verification_key_evals.t
 
@@ -189,23 +189,60 @@ struct
   let choose_key :
       type n.
          n One_hot_vector.t
-      -> (Inner_curve.t index', n) Vector.t
-      -> Inner_curve.t index' =
+      -> ( (Inner_curve.t, (Inner_curve.t, Boolean.var) Plonk_types.Opt.t) index'
+         , n )
+         Vector.t
+      -> (Inner_curve.t, (Inner_curve.t, Boolean.var) Plonk_types.Opt.t) index'
+      =
     let open Tuple_lib in
-    let map =
-      Plonk_verification_key_evals.Step.map ~f_opt:(fun _ -> (* TODO *) None)
+    let map ~f_bool ~f =
+      Plonk_verification_key_evals.Step.map ~f ~f_opt:(function
+        | Plonk_types.Opt.None ->
+            Plonk_types.Opt.None
+        | Plonk_types.Opt.Maybe (b, x) ->
+            Plonk_types.Opt.Maybe (f_bool b, f x)
+        | Plonk_types.Opt.Some x ->
+            Plonk_types.Opt.Some (f x) )
     in
-    let map2 =
-      Plonk_verification_key_evals.Step.map2 ~f_opt:(fun _ _ -> (* TODO *) None)
+    let map2 ~f_bool ~f =
+      Plonk_verification_key_evals.Step.map2 ~f ~f_opt:(fun x y ->
+          match (x, y) with
+          | Plonk_types.Opt.None, Plonk_types.Opt.None ->
+              Plonk_types.Opt.None
+          | Plonk_types.Opt.Some x, Plonk_types.Opt.Some y ->
+              Plonk_types.Opt.Some (f x y)
+          | _ ->
+              let to_maybe = function
+                | Plonk_types.Opt.None ->
+                    (Boolean.false_, (Field.zero, Field.zero))
+                | Plonk_types.Opt.Maybe (b, x) ->
+                    (b, x)
+                | Plonk_types.Opt.Some x ->
+                    (Boolean.true_, x)
+              in
+              let b1, x1 = to_maybe x in
+              let b2, x2 = to_maybe y in
+              Plonk_types.Opt.Maybe (f_bool b1 b2, f x1 x2) )
     in
     fun bs keys ->
       let open Field in
       Vector.map2
         (bs :> (Boolean.var, n) Vector.t)
         keys
-        ~f:(fun b key -> map key ~f:(fun g -> Double.map g ~f:(( * ) (b :> t))))
-      |> Vector.reduce_exn ~f:(map2 ~f:(Double.map2 ~f:( + )))
-      |> map ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
+        ~f:(fun b key ->
+          map key
+            ~f:(fun g -> Double.map g ~f:(( * ) (b :> t)))
+            ~f_bool:(fun b_inner -> Boolean.(b &&& b_inner)) )
+      |> Vector.reduce_exn
+           ~f:
+             (map2 ~f:(Double.map2 ~f:( + ))
+                ~f_bool:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
+                  Boolean.Unsafe.of_cvar
+                    Field.(add (b1 :> Field.t) (b2 :> Field.t)) ) )
+      |> map
+           ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
+           ~f_bool:(fun (b : Boolean.var) ->
+             Boolean.Unsafe.of_cvar (Util.seal (module Impl) (b :> t)) )
 
   (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
