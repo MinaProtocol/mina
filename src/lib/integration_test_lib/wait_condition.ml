@@ -372,12 +372,13 @@ struct
       if String.equal event_node_id node_id then Predicate_passed
       else Predicate_continuation ()
     in
-    let soft_timeout_in_slots = 4 in
+    (*Loading from persisted frontier does not depend on slot time*)
+    let soft_timeout_in_min = 5. in
     { id = Persisted_frontier_loaded
     ; description = "persisted transition frontier to load"
     ; predicate =
         Event_predicate (Event_type.Persisted_frontier_loaded, (), check)
-    ; soft_timeout = Slots soft_timeout_in_slots
-    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    ; soft_timeout = Literal (Time.Span.of_min soft_timeout_in_min)
+    ; hard_timeout = Literal (Time.Span.of_min (soft_timeout_in_min *. 2.))
     }
 end
