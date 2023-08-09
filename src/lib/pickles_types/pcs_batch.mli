@@ -47,7 +47,7 @@ open Plonk_types.Poly_comm
 val combine_split_commitments :
      (_, 'n, 'm) t
   -> scale_and_add:(acc:'g_acc -> xi:'f -> 'g -> 'g_acc)
-  -> init:('g -> 'g_acc)
+  -> init:('g -> 'g_acc option)
   -> xi:'f
   -> ('g Without_degree_bound.t, 'n) Vector.t
   -> ('g With_degree_bound.t, 'm) Vector.t

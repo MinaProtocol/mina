@@ -298,8 +298,10 @@ struct
                   )
                 ~xi
                 ~init:(function
-                  | `Finite x -> `Finite x | `Maybe_finite x -> `Maybe_finite x
-                  )
+                  | `Finite x ->
+                      Some (`Finite x)
+                  | `Maybe_finite x ->
+                      Some (`Maybe_finite x) )
                 (Vector.map without_degree_bound
                    ~f:(Array.map ~f:(fun x -> `Finite x)) )
                 (Vector.map with_degree_bound

@@ -424,15 +424,17 @@ struct
           ~xi
           ~init:(function
             | Plonk_types.Opt.None ->
-                assert false
+                None
             | Plonk_types.Opt.Maybe (keep, p) ->
-                { non_zero = Boolean.(keep &&& Point.finite p)
-                ; point = Point.underlying p
-                }
+                Some
+                  { non_zero = Boolean.(keep &&& Point.finite p)
+                  ; point = Point.underlying p
+                  }
             | Plonk_types.Opt.Some p ->
-                { non_zero = Boolean.(true_ &&& Point.finite p)
-                ; point = Point.underlying p
-                } )
+                Some
+                  { non_zero = Boolean.(true_ &&& Point.finite p)
+                  ; point = Point.underlying p
+                  } )
           without_bound with_bound
       in
       Boolean.Assert.is_true non_zero ;
@@ -783,8 +785,16 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
-          let num_commitments_without_degree_bound = Nat.N45.n in
+          let len_1, len_1_add = Plonk_types.(Columns.add Permuts_minus_1.n) in
+          let len_2, len_2_add = Plonk_types.(Columns.add len_1) in
+          let _len_3, len_3_add = Nat.N9.add len_2 in
+          let len_4, len_4_add = Nat.N6.add Nat.N5.n in
+          let len_5, len_5_add = Nat.N45.add len_4 in
+          let num_commitments_without_degree_bound = len_5 in
           let without_degree_bound =
+            let append_chain len second first =
+              Vector.append first second len
+            in
             (* sg_old
                x_hat
                ft_comm
@@ -794,27 +804,48 @@ struct
                w_comms
                all but last sigma_comm
             *)
-            Vector.append
-              (Vector.map sg_old
-                 ~f:
-                   (Array.map ~f:(fun (keep, p) ->
-                        Plonk_types.Opt.Maybe (keep, p) ) ) )
-              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
-                :: [| m.psm_comm |] :: [| m.complete_add_comm |]
-                :: [| m.mul_comm |] :: [| m.emul_comm |]
-                :: [| m.endomul_scalar_comm |]
-                :: Vector.append w_comm
-                     (Vector.append
-                        (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
-                        (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
-                        (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
-                     (snd
-                        Plonk_types.(
-                          Columns.add (fst (Columns.add Permuts_minus_1.n))) )
-              |> Vector.map ~f:(Array.map ~f:(fun g -> Plonk_types.Opt.Some g))
-              )
-              (snd
-                 (Max_proofs_verified.add num_commitments_without_degree_bound) )
+            Vector.map sg_old
+              ~f:
+                (Array.map ~f:(fun (keep, p) ->
+                     Plonk_types.Opt.Maybe (keep, p) ) )
+            |> append_chain
+                 (snd (Max_proofs_verified.add len_5))
+                 ( [ [| x_hat |]
+                   ; [| ft_comm |]
+                   ; z_comm
+                   ; [| m.generic_comm |]
+                   ; [| m.psm_comm |]
+                   ; [| m.complete_add_comm |]
+                   ; [| m.mul_comm |]
+                   ; [| m.emul_comm |]
+                   ; [| m.endomul_scalar_comm |]
+                   ]
+                 |> append_chain len_3_add
+                      (Vector.append w_comm
+                         (Vector.append
+                            (Vector.map m.coefficients_comm ~f:(fun g ->
+                                 [| g |] ) )
+                            (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                            len_1_add )
+                         len_2_add )
+                 |> Vector.map
+                      ~f:(Array.map ~f:(fun g -> Plonk_types.Opt.Some g))
+                 |> append_chain len_5_add
+                      ( [ m.range_check0_comm
+                        ; m.range_check1_comm
+                        ; m.foreign_field_add_comm
+                        ; m.foreign_field_mul_comm
+                        ; m.xor_comm
+                        ; m.rot_comm
+                        ]
+                      |> append_chain len_4_add
+                           [ m.runtime_tables_selector
+                           ; m.lookup_selector_xor
+                           ; m.lookup_selector_lookup
+                           ; m.lookup_selector_range_check
+                           ; m.lookup_selector_ffmul
+                           ]
+                      |> Vector.map ~f:(fun x -> [| x |]) ) )
           in
           check_bulletproof
             ~pcs_batch:
