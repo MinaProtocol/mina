@@ -31,6 +31,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { node_name = "node-b"; account_name = "node-b-key" }
         ; { node_name = "node-c"; account_name = "node-c-key" }
         ]
+    ; proof_config =
+        { proof_config_default with block_window_duration_ms = Some 45000 }
     }
 
   (*
