@@ -1252,9 +1252,9 @@ module Messages = struct
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ bool_typ ~(lookup : Opt.Flag.t) ~(runtime_tables : Opt.Flag.t)
-        ~dummy:z elt =
-      Opt.typ bool_typ lookup
+    let opt_typ bool_typ ~(uses_lookup : Opt.Flag.t)
+        ~(runtime_tables : Opt.Flag.t) ~dummy:z elt =
+      Opt.typ bool_typ uses_lookup
         ~dummy:
           (dummy z ~runtime_tables:Opt.Flag.(not (equal runtime_tables No)))
         (typ bool_typ ~runtime_tables ~dummy:z elt)
@@ -1286,10 +1286,25 @@ module Messages = struct
 
   let typ (type n f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
-      ({ lookup; runtime_tables; _ } : Opt.Flag.t Features.t) ~dummy
+      ({ runtime_tables; _ } as feature_flags : Opt.Flag.t Features.t) ~dummy
       ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
       =
     let open Snarky_backendless.Typ in
+    let uses_lookup =
+      let { Features.range_check0
+          ; range_check1
+          ; foreign_field_add = _ (* Doesn't use lookup *)
+          ; foreign_field_mul
+          ; xor
+          ; rot
+          ; lookup
+          ; runtime_tables = _ (* Fixme *)
+          } =
+        feature_flags
+      in
+      Array.reduce_exn ~f:Opt.Flag.( ||| )
+        [| range_check0; range_check1; foreign_field_mul; xor; rot; lookup |]
+    in
     let { Poly.w = w_lens; z; t } = commitment_lengths in
     let array ~length elt = padded_array_typ ~dummy ~length elt in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
@@ -1299,7 +1314,8 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     let lookup =
-      Lookup.opt_typ Impl.Boolean.typ ~lookup ~runtime_tables ~dummy:[| dummy |]
+      Lookup.opt_typ Impl.Boolean.typ ~uses_lookup ~runtime_tables
+        ~dummy:[| dummy |]
         (wo [ 1 ])
     in
     of_hlistable
