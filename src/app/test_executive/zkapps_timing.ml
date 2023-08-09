@@ -39,6 +39,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { node_name = "node-c"; account_name = "node-c-key" }
         ]
     ; num_archive_nodes = 1
+    ; proof_config =
+        { proof_config_default with block_window_duration_ms = Some 60000 }
     }
 
   let run network t =

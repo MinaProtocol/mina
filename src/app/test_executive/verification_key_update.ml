@@ -94,6 +94,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; worker_nodes = 2
           }
     ; snark_worker_fee = "0.0001"
+    ; proof_config =
+        { proof_config_default with block_window_duration_ms = Some 45000 }
     }
 
   let logger = Logger.create ()
