@@ -88,9 +88,7 @@ type deferred_values_and_hints =
         , scalar_challenge_constant
         , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
         , (Tick.Field.t Shifted_value.Type1.t, bool) Opt.t
-        , ( scalar_challenge_constant Deferred_values.Plonk.In_circuit.Lookup.t
-          , bool )
-          Opt.t
+        , (scalar_challenge_constant, bool) Opt.t
         , bool )
         Deferred_values.Plonk.In_circuit.t
       , scalar_challenge_constant
@@ -269,13 +267,12 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
           ; alpha = plonk0.alpha
           ; beta = chal plonk0.beta
           ; gamma = chal plonk0.gamma
-          ; lookup =
-              Opt.map plonk.lookup ~f:(fun l ->
-                  { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                    .In_circuit
-                    .Lookup
-                    .joint_combiner = Option.value_exn plonk0.joint_combiner
-                  } )
+          ; joint_combiner =
+              ( match plonk0.joint_combiner with
+              | None ->
+                  Plonk_types.Opt.None
+              | Some x ->
+                  Plonk_types.Opt.Some x )
           }
       }
   ; x_hat_evals = x_hat
@@ -420,7 +417,8 @@ let%test_module "gate finalization" =
           { deferred_values with
             plonk =
               { deferred_values.plonk with
-                lookup = Opt.to_option_unsafe deferred_values.plonk.lookup
+                joint_combiner =
+                  Opt.to_option_unsafe deferred_values.plonk.joint_combiner
               }
           }
       (* Prepare all of the evaluations (i.e. all of the columns in the proof that we open)
@@ -887,7 +885,7 @@ let wrap
                   { next_statement.proof_state.deferred_values with
                     plonk =
                       { next_statement.proof_state.deferred_values.plonk with
-                        lookup =
+                        joint_combiner =
                           (* TODO: This assumes wrap circuits do not use lookup *)
                           None
                       }

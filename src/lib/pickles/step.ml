@@ -106,9 +106,7 @@ struct
         , Challenge.Constant.t Scalar_challenge.t
         , Tick.Field.t Shifted_value.Type1.t
         , Tick.Field.t Shifted_value.Type1.t option
-        , Challenge.Constant.t Scalar_challenge.t
-          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
-          option
+        , Challenge.Constant.t Scalar_challenge.t option
         , bool
         , Digest.Constant.t
         , Digest.Constant.t
@@ -278,17 +276,7 @@ struct
                      ; alpha = plonk0.alpha
                      ; beta = plonk0.beta
                      ; gamma = plonk0.gamma
-                     ; lookup =
-                         Option.map (Opt.to_option_unsafe plonk.lookup)
-                           ~f:(fun l ->
-                             { Composition_types.Wrap.Proof_state
-                               .Deferred_values
-                               .Plonk
-                               .In_circuit
-                               .Lookup
-                               .joint_combiner =
-                                 Option.value_exn plonk0.joint_combiner
-                             } )
+                     ; joint_combiner = plonk0.joint_combiner
                      }
                  ; combined_inner_product =
                      deferred_values.combined_inner_product

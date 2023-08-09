@@ -473,12 +473,12 @@ struct
 
   (* Just for exhaustiveness over fields *)
   let iter2 ~chal ~scalar_chal
-      { Plonk.Minimal.alpha = alpha_0
+      { Plonk.Minimal.In_circuit.alpha = alpha_0
       ; beta = beta_0
       ; gamma = gamma_0
       ; zeta = zeta_0
       }
-      { Plonk.Minimal.alpha = alpha_1
+      { Plonk.Minimal.In_circuit.alpha = alpha_1
       ; beta = beta_1
       ; gamma = gamma_1
       ; zeta = zeta_1
@@ -490,8 +490,8 @@ struct
     with_label __LOC__ (fun () -> scalar_chal zeta_0 zeta_1)
 
   let assert_eq_plonk
-      (m1 : (_, Field.t Import.Scalar_challenge.t, _) Plonk.Minimal.t)
-      (m2 : (_, Scalar_challenge.t, _) Plonk.Minimal.t) =
+      (m1 : (_, Field.t Import.Scalar_challenge.t, _) Plonk.Minimal.In_circuit.t)
+      (m2 : (_, Scalar_challenge.t, _) Plonk.Minimal.In_circuit.t) =
     iter2 m1 m2
       ~chal:(fun c1 c2 -> Field.Assert.equal c1 c2)
       ~scalar_chal:(fun ({ inner = t1 } : _ Import.Scalar_challenge.t)
@@ -712,14 +712,15 @@ struct
               , [] )
         in
         let joint_combiner =
-          if G.lookup_verification_enabled then failwith "TODO" else None
+          if G.lookup_verification_enabled then failwith "TODO"
+          else Types.Opt.None
         in
         assert_eq_plonk
           { alpha = plonk.alpha
           ; beta = plonk.beta
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
-          ; joint_combiner
+          ; joint_combiner = plonk.joint_combiner
           ; feature_flags = plonk.feature_flags
           }
           { alpha

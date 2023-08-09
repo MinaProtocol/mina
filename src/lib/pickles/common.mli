@@ -197,9 +197,6 @@ val tock_public_input_of_statement :
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
        option
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-       .Lookup
-       .t
        option
      , bool
      , ( Limb_vector.Constant.Hex64.t
@@ -228,9 +225,6 @@ val tock_unpadded_public_input_of_statement :
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
        option
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-       .Lookup
-       .t
        option
      , bool
      , ( Limb_vector.Constant.Hex64.t

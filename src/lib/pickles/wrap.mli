@@ -16,9 +16,6 @@ val wrap :
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Plonk_types.Opt.t
          , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Plonk_types.Opt.t
@@ -49,10 +46,6 @@ val wrap :
              , bool )
              Import.Types.Opt.t
            , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-               Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-               .In_circuit
-               .Lookup
-               .t
              , bool )
              Import.Types.Opt.t
            , bool
@@ -82,10 +75,6 @@ val wrap :
              , bool )
              Import.Types.Opt.t
            , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-               Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-               .In_circuit
-               .Lookup
-               .t
              , bool )
              Import.Types.Opt.t
            , bool

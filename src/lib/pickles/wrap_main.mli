@@ -26,7 +26,9 @@ val wrap_main :
                Pickles_types.Shifted_value.Type1.t
              , Wrap_main_inputs.Impl.Boolean.var )
              Pickles_types.Plonk_types.Opt.t
-           , 'a
+           , ( Wrap_verifier.Scalar_challenge.t
+             , Wrap_main_inputs.Impl.Boolean.var )
+             Pickles_types.Plonk_types.Opt.t
            , Impls.Wrap.Boolean.var
            , Impls.Wrap.Field.t
            , Impls.Wrap.Field.t

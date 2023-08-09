@@ -167,10 +167,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                    , Impls.Wrap.Boolean.var )
                    Plonk_types.Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-                     Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                     .In_circuit
-                     .Lookup
-                     .t
                    , Impls.Wrap.Boolean.var )
                    Pickles_types__Plonk_types.Opt.t
                  , Impls.Wrap.Boolean.var )
@@ -202,9 +198,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -234,9 +227,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -347,10 +337,6 @@ val wrap_main_dummy_override :
                , Impls.Wrap.Boolean.var )
                Plonk_types.Opt.t
              , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-                 Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                 .In_circuit
-                 .Lookup
-                 .t
                , Impls.Wrap.Boolean.var )
                Pickles_types__Plonk_types.Opt.t
              , Impls.Wrap.Boolean.var )
@@ -380,10 +366,6 @@ module Make_adversarial_test : functor
             , bool )
             Import.Types.Opt.t
           , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-              .In_circuit
-              .Lookup
-              .t
             , bool )
             Import.Types.Opt.t
           , bool
@@ -413,10 +395,6 @@ module Make_adversarial_test : functor
             , bool )
             Import.Types.Opt.t
           , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-              .In_circuit
-              .Lookup
-              .t
             , bool )
             Import.Types.Opt.t
           , bool
