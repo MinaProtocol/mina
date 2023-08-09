@@ -82,6 +82,13 @@ module Step = struct
     ; foreign_field_add_comm : 'opt_comm
     ; foreign_field_mul_comm : 'opt_comm
     ; rot_comm : 'opt_comm
+    ; lookup_table_comm : 'opt_comm Plonk_types.Lookup_sorted_minus_1_vec.t
+    ; lookup_table_ids : 'opt_comm
+    ; runtime_tables_selector : 'opt_comm
+    ; lookup_selector_lookup : 'opt_comm
+    ; lookup_selector_xor : 'opt_comm
+    ; lookup_selector_range_check : 'opt_comm
+    ; lookup_selector_ffmul : 'opt_comm
     }
   [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
 
@@ -100,6 +107,13 @@ module Step = struct
       ; foreign_field_add_comm
       ; foreign_field_mul_comm
       ; rot_comm
+      ; lookup_table_comm
+      ; lookup_table_ids
+      ; runtime_tables_selector
+      ; lookup_selector_lookup
+      ; lookup_selector_xor
+      ; lookup_selector_range_check
+      ; lookup_selector_ffmul
       } ~f ~f_opt =
     { sigma_comm = Vector.map ~f sigma_comm
     ; coefficients_comm = Vector.map ~f coefficients_comm
@@ -115,6 +129,13 @@ module Step = struct
     ; foreign_field_add_comm = f_opt foreign_field_add_comm
     ; foreign_field_mul_comm = f_opt foreign_field_mul_comm
     ; rot_comm = f_opt rot_comm
+    ; lookup_table_comm = Vector.map ~f:f_opt lookup_table_comm
+    ; lookup_table_ids = f_opt lookup_table_ids
+    ; runtime_tables_selector = f_opt runtime_tables_selector
+    ; lookup_selector_lookup = f_opt lookup_selector_lookup
+    ; lookup_selector_xor = f_opt lookup_selector_xor
+    ; lookup_selector_range_check = f_opt lookup_selector_range_check
+    ; lookup_selector_ffmul = f_opt lookup_selector_ffmul
     }
 
   let map2 t1 t2 ~f ~f_opt =
@@ -135,6 +156,18 @@ module Step = struct
     ; foreign_field_mul_comm =
         f_opt t1.foreign_field_mul_comm t2.foreign_field_mul_comm
     ; rot_comm = f_opt t1.rot_comm t2.rot_comm
+    ; lookup_table_comm =
+        Vector.map2 ~f:f_opt t1.lookup_table_comm t2.lookup_table_comm
+    ; lookup_table_ids = f_opt t1.lookup_table_ids t2.lookup_table_ids
+    ; runtime_tables_selector =
+        f_opt t1.runtime_tables_selector t2.runtime_tables_selector
+    ; lookup_selector_lookup =
+        f_opt t1.lookup_selector_lookup t2.lookup_selector_lookup
+    ; lookup_selector_xor = f_opt t1.lookup_selector_xor t2.lookup_selector_xor
+    ; lookup_selector_range_check =
+        f_opt t1.lookup_selector_range_check t2.lookup_selector_range_check
+    ; lookup_selector_ffmul =
+        f_opt t1.lookup_selector_ffmul t2.lookup_selector_ffmul
     }
 
   let typ g g_opt =
@@ -147,6 +180,13 @@ module Step = struct
       ; g
       ; g
       ; g
+      ; g_opt
+      ; g_opt
+      ; g_opt
+      ; g_opt
+      ; g_opt
+      ; g_opt
+      ; Vector.typ g_opt Plonk_types.Lookup_sorted_minus_1.n
       ; g_opt
       ; g_opt
       ; g_opt
@@ -172,6 +212,13 @@ module Step = struct
       ; foreign_field_add_comm = _
       ; foreign_field_mul_comm = _
       ; rot_comm = _
+      ; lookup_table_comm = _
+      ; lookup_table_ids = _
+      ; runtime_tables_selector = _
+      ; lookup_selector_lookup = _
+      ; lookup_selector_xor = _
+      ; lookup_selector_range_check = _
+      ; lookup_selector_ffmul = _
       } : _ Stable.Latest.t =
     { sigma_comm
     ; coefficients_comm

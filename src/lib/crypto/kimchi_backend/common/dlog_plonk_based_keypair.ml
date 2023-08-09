@@ -215,6 +215,11 @@ module Make (Inputs : Inputs_intf) = struct
       | `With_degree_bound _ ->
           assert false
     in
+    let lookup f =
+      let open Option.Let_syntax in
+      let%bind l = t.lookup_index in
+      f l >>| g
+    in
     { sigma_comm =
         Pickles_types.Vector.init Pickles_types.Plonk_types.Permuts.n
           ~f:(fun i -> g t.evals.sigma_comm.(i))
@@ -233,5 +238,16 @@ module Make (Inputs : Inputs_intf) = struct
     ; foreign_field_add_comm = Option.map ~f:g t.evals.foreign_field_add_comm
     ; foreign_field_mul_comm = Option.map ~f:g t.evals.foreign_field_mul_comm
     ; rot_comm = Option.map ~f:g t.evals.rot_comm
+    ; lookup_table_comm =
+        Pickles_types.Vector.init
+          Pickles_types.Plonk_types.Lookup_sorted_minus_1.n ~f:(fun i ->
+            lookup (fun l -> Option.try_with (fun () -> l.lookup_table.(i))) )
+    ; lookup_table_ids = lookup (fun l -> l.table_ids)
+    ; runtime_tables_selector = lookup (fun l -> l.runtime_tables_selector)
+    ; lookup_selector_lookup = lookup (fun l -> l.lookup_selectors.lookup)
+    ; lookup_selector_xor = lookup (fun l -> l.lookup_selectors.xor)
+    ; lookup_selector_range_check =
+        lookup (fun l -> l.lookup_selectors.range_check)
+    ; lookup_selector_ffmul = lookup (fun l -> l.lookup_selectors.ffmul)
     }
 end

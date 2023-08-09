@@ -59,6 +59,13 @@ module Step : sig
     ; foreign_field_add_comm : 'opt_comm
     ; foreign_field_mul_comm : 'opt_comm
     ; rot_comm : 'opt_comm
+    ; lookup_table_comm : 'opt_comm Plonk_types.Lookup_sorted_minus_1_vec.t
+    ; lookup_table_ids : 'opt_comm
+    ; runtime_tables_selector : 'opt_comm
+    ; lookup_selector_lookup : 'opt_comm
+    ; lookup_selector_xor : 'opt_comm
+    ; lookup_selector_range_check : 'opt_comm
+    ; lookup_selector_ffmul : 'opt_comm
     }
   [@@deriving sexp, equal, compare, hash, yojson, hlist]
 

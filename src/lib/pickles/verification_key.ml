@@ -236,6 +236,13 @@ let dummy_step_commitments g =
   ; foreign_field_add_comm = None
   ; foreign_field_mul_comm = None
   ; rot_comm = None
+  ; lookup_table_comm = Vector.init Lookup_sorted_minus_1.n ~f:(fun _ -> None)
+  ; lookup_table_ids = None
+  ; runtime_tables_selector = None
+  ; lookup_selector_lookup = None
+  ; lookup_selector_xor = None
+  ; lookup_selector_range_check = None
+  ; lookup_selector_ffmul = None
   }
 
 let dummy =
