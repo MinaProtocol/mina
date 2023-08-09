@@ -6,7 +6,8 @@ val challenge_polynomial :
   -> 'b array
   -> ('b -> 'b) Core_kernel.Staged.t
 
-type 'a index' = 'a Pickles_types.Plonk_verification_key_evals.t
+type 'a index' =
+  ('a, 'a option) Pickles_types.Plonk_verification_key_evals.Step.t
 
 module Challenge : module type of Import.Challenge.Make (Impls.Wrap)
 
@@ -63,8 +64,9 @@ val incrementally_verify_proof :
   -> step_domains:(Import.Domains.t, 'a) Pickles_types.Vector.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fp.t
   -> verification_key:
-       Wrap_main_inputs.Inner_curve.t
-       Pickles_types.Plonk_verification_key_evals.t
+       ( Wrap_main_inputs.Inner_curve.t
+       , Wrap_main_inputs.Inner_curve.t option )
+       Pickles_types.Plonk_verification_key_evals.Step.t
   -> xi:Scalar_challenge.t
   -> sponge:Opt.t
   -> public_input:

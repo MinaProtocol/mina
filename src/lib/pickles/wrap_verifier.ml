@@ -181,7 +181,7 @@ struct
 
   module One_hot_vector = One_hot_vector.Make (Impl)
 
-  type 'a index' = 'a Plonk_verification_key_evals.t
+  type 'a index' = ('a, 'a option) Plonk_verification_key_evals.Step.t
 
   type 'a index = 'a Plonk_verification_key_evals.t
 
@@ -192,8 +192,12 @@ struct
       -> (Inner_curve.t index', n) Vector.t
       -> Inner_curve.t index' =
     let open Tuple_lib in
-    let map = Plonk_verification_key_evals.map in
-    let map2 = Plonk_verification_key_evals.map2 in
+    let map =
+      Plonk_verification_key_evals.Step.map ~f_opt:(fun _ -> (* TODO *) None)
+    in
+    let map2 =
+      Plonk_verification_key_evals.Step.map2 ~f_opt:(fun _ _ -> (* TODO *) None)
+    in
     fun bs keys ->
       let open Field in
       Vector.map2
@@ -498,10 +502,35 @@ struct
                         ({ inner = t2 } : Scalar_challenge.t) ->
         Field.Assert.equal t1 t2 )
 
+  let index_to_field_elements ~g (m : _ Plonk_verification_key_evals.Step.t) =
+    let { Plonk_verification_key_evals.Step.sigma_comm
+        ; coefficients_comm
+        ; generic_comm
+        ; psm_comm
+        ; complete_add_comm
+        ; mul_comm
+        ; emul_comm
+        ; endomul_scalar_comm
+        } =
+      m
+    in
+    List.map
+      ( Vector.to_list sigma_comm
+      @ Vector.to_list coefficients_comm
+      @ [ generic_comm
+        ; psm_comm
+        ; complete_add_comm
+        ; mul_comm
+        ; emul_comm
+        ; endomul_scalar_comm
+        ] )
+      ~f:g
+    |> Array.concat
+
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
       ~actual_proofs_verified_mask ~step_domains ~srs
-      ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
+      ~verification_key:(m : _ Plonk_verification_key_evals.Step.t) ~xi ~sponge
       ~(public_input :
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
          array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
@@ -522,7 +551,7 @@ struct
           with_label "absorb verifier index" (fun () ->
               let index_sponge = Sponge.create sponge_params in
               Array.iter
-                (Types.index_to_field_elements
+                (index_to_field_elements
                    ~g:(fun (z : Inputs.Inner_curve.t) ->
                      List.to_array (Inner_curve.to_field_elements z) )
                    m )
@@ -662,7 +691,10 @@ struct
           with_label __LOC__ (fun () ->
               Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast
                 ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
-                ~verification_key:m ~plonk ~alpha ~t_comm )
+                ~verification_key:
+                  (Plonk_verification_key_evals.Step.forget_optional_commitments
+                     m )
+                ~plonk ~alpha ~t_comm )
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)

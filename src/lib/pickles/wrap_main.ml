@@ -216,7 +216,10 @@ let wrap_main
           with_label __LOC__ (fun () ->
               Wrap_verifier.choose_key which_branch
                 (Vector.map (Lazy.force step_keys)
-                   ~f:(Plonk_verification_key_evals.map ~f:Inner_curve.constant) ) )
+                   ~f:
+                     (Plonk_verification_key_evals.Step.map
+                        ~f:Inner_curve.constant ~f_opt:(fun _ ->
+                          (* TODO *) None ) ) ) )
         in
         let prev_step_accs =
           with_label __LOC__ (fun () ->

@@ -203,4 +203,35 @@ module Make (Inputs : Inputs_intf) = struct
     ; emul_comm = g t.evals.emul_comm
     ; endomul_scalar_comm = g t.evals.endomul_scalar_comm
     }
+
+  let full_vk_commitments (t : Inputs.Verifier_index.t) :
+      ( Inputs.Curve.Affine.t
+      , Inputs.Curve.Affine.t option )
+      Pickles_types.Plonk_verification_key_evals.Step.t =
+    let g c : Inputs.Curve.Affine.t =
+      match Inputs.Poly_comm.of_backend_without_degree_bound c with
+      | `Without_degree_bound x ->
+          x.(0)
+      | `With_degree_bound _ ->
+          assert false
+    in
+    { sigma_comm =
+        Pickles_types.Vector.init Pickles_types.Plonk_types.Permuts.n
+          ~f:(fun i -> g t.evals.sigma_comm.(i))
+    ; coefficients_comm =
+        Pickles_types.Vector.init Pickles_types.Plonk_types.Columns.n
+          ~f:(fun i -> g t.evals.coefficients_comm.(i))
+    ; generic_comm = g t.evals.generic_comm
+    ; psm_comm = g t.evals.psm_comm
+    ; complete_add_comm = g t.evals.complete_add_comm
+    ; mul_comm = g t.evals.mul_comm
+    ; emul_comm = g t.evals.emul_comm
+    ; endomul_scalar_comm = g t.evals.endomul_scalar_comm
+    ; xor_comm = Option.map ~f:g t.evals.xor_comm
+    ; range_check0_comm = Option.map ~f:g t.evals.range_check0_comm
+    ; range_check1_comm = Option.map ~f:g t.evals.range_check1_comm
+    ; foreign_field_add_comm = Option.map ~f:g t.evals.foreign_field_add_comm
+    ; foreign_field_mul_comm = Option.map ~f:g t.evals.foreign_field_mul_comm
+    ; rot_comm = Option.map ~f:g t.evals.rot_comm
+    }
 end

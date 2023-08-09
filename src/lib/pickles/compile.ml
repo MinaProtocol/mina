@@ -640,7 +640,7 @@ struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
+             Tick.Keypair.full_vk_commitments (fst (Lazy.force vk)) ) )
     in
     Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =

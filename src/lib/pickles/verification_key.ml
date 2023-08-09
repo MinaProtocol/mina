@@ -65,6 +65,12 @@ module Verifier_index_json = struct
     ; mul_comm : 'polyComm
     ; emul_comm : 'polyComm
     ; endomul_scalar_comm : 'polyComm
+    ; xor_comm : 'polyComm option
+    ; range_check0_comm : 'polyComm option
+    ; range_check1_comm : 'polyComm option
+    ; foreign_field_add_comm : 'polyComm option
+    ; foreign_field_mul_comm : 'polyComm option
+    ; rot_comm : 'polyComm option
     }
   [@@deriving yojson]
 
@@ -171,6 +177,12 @@ module Stable = struct
              ; emul_comm = g c.emul_comm
              ; complete_add_comm = g c.complete_add_comm
              ; endomul_scalar_comm = g c.endomul_scalar_comm
+             ; xor_comm = None
+             ; range_check0_comm = None
+             ; range_check1_comm = None
+             ; foreign_field_add_comm = None
+             ; foreign_field_mul_comm = None
+             ; rot_comm = None
              } )
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None
@@ -205,6 +217,25 @@ let dummy_commitments g =
   ; mul_comm = g
   ; emul_comm = g
   ; endomul_scalar_comm = g
+  }
+
+let dummy_step_commitments g =
+  let open Plonk_types in
+  { Plonk_verification_key_evals.Step.sigma_comm =
+      Vector.init Permuts.n ~f:(fun _ -> g)
+  ; coefficients_comm = Vector.init Columns.n ~f:(fun _ -> g)
+  ; generic_comm = g
+  ; psm_comm = g
+  ; complete_add_comm = g
+  ; mul_comm = g
+  ; emul_comm = g
+  ; endomul_scalar_comm = g
+  ; xor_comm = None
+  ; range_check0_comm = None
+  ; range_check1_comm = None
+  ; foreign_field_add_comm = None
+  ; foreign_field_mul_comm = None
+  ; rot_comm = None
   }
 
 let dummy =

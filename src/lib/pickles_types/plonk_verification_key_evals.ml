@@ -65,3 +65,121 @@ let typ g =
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
+
+module Step = struct
+  type ('comm, 'opt_comm) t =
+    { sigma_comm : 'comm Plonk_types.Permuts_vec.t
+    ; coefficients_comm : 'comm Plonk_types.Columns_vec.t
+    ; generic_comm : 'comm
+    ; psm_comm : 'comm
+    ; complete_add_comm : 'comm
+    ; mul_comm : 'comm
+    ; emul_comm : 'comm
+    ; endomul_scalar_comm : 'comm
+    ; xor_comm : 'opt_comm
+    ; range_check0_comm : 'opt_comm
+    ; range_check1_comm : 'opt_comm
+    ; foreign_field_add_comm : 'opt_comm
+    ; foreign_field_mul_comm : 'opt_comm
+    ; rot_comm : 'opt_comm
+    }
+  [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+
+  let map
+      { sigma_comm
+      ; coefficients_comm
+      ; generic_comm
+      ; psm_comm
+      ; complete_add_comm
+      ; mul_comm
+      ; emul_comm
+      ; endomul_scalar_comm
+      ; xor_comm
+      ; range_check0_comm
+      ; range_check1_comm
+      ; foreign_field_add_comm
+      ; foreign_field_mul_comm
+      ; rot_comm
+      } ~f ~f_opt =
+    { sigma_comm = Vector.map ~f sigma_comm
+    ; coefficients_comm = Vector.map ~f coefficients_comm
+    ; generic_comm = f generic_comm
+    ; psm_comm = f psm_comm
+    ; complete_add_comm = f complete_add_comm
+    ; mul_comm = f mul_comm
+    ; emul_comm = f emul_comm
+    ; endomul_scalar_comm = f endomul_scalar_comm
+    ; xor_comm = f_opt xor_comm
+    ; range_check0_comm = f_opt range_check0_comm
+    ; range_check1_comm = f_opt range_check1_comm
+    ; foreign_field_add_comm = f_opt foreign_field_add_comm
+    ; foreign_field_mul_comm = f_opt foreign_field_mul_comm
+    ; rot_comm = f_opt rot_comm
+    }
+
+  let map2 t1 t2 ~f ~f_opt =
+    { sigma_comm = Vector.map2 ~f t1.sigma_comm t2.sigma_comm
+    ; coefficients_comm =
+        Vector.map2 ~f t1.coefficients_comm t2.coefficients_comm
+    ; generic_comm = f t1.generic_comm t2.generic_comm
+    ; psm_comm = f t1.psm_comm t2.psm_comm
+    ; complete_add_comm = f t1.complete_add_comm t2.complete_add_comm
+    ; mul_comm = f t1.mul_comm t2.mul_comm
+    ; emul_comm = f t1.emul_comm t2.emul_comm
+    ; endomul_scalar_comm = f t1.endomul_scalar_comm t2.endomul_scalar_comm
+    ; xor_comm = f_opt t1.xor_comm t2.xor_comm
+    ; range_check0_comm = f_opt t1.range_check0_comm t2.range_check0_comm
+    ; range_check1_comm = f_opt t1.range_check1_comm t2.range_check1_comm
+    ; foreign_field_add_comm =
+        f_opt t1.foreign_field_add_comm t2.foreign_field_add_comm
+    ; foreign_field_mul_comm =
+        f_opt t1.foreign_field_mul_comm t2.foreign_field_mul_comm
+    ; rot_comm = f_opt t1.rot_comm t2.rot_comm
+    }
+
+  let typ g g_opt =
+    Snarky_backendless.Typ.of_hlistable
+      [ Vector.typ g Plonk_types.Permuts.n
+      ; Vector.typ g Plonk_types.Columns.n
+      ; g
+      ; g
+      ; g
+      ; g
+      ; g
+      ; g
+      ; g_opt
+      ; g_opt
+      ; g_opt
+      ; g_opt
+      ; g_opt
+      ; g_opt
+      ]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
+
+  let forget_optional_commitments
+      { sigma_comm
+      ; coefficients_comm
+      ; generic_comm
+      ; psm_comm
+      ; complete_add_comm
+      ; mul_comm
+      ; emul_comm
+      ; endomul_scalar_comm
+      ; xor_comm = _
+      ; range_check0_comm = _
+      ; range_check1_comm = _
+      ; foreign_field_add_comm = _
+      ; foreign_field_mul_comm = _
+      ; rot_comm = _
+      } : _ Stable.Latest.t =
+    { sigma_comm
+    ; coefficients_comm
+    ; generic_comm
+    ; psm_comm
+    ; complete_add_comm
+    ; mul_comm
+    ; emul_comm
+    ; endomul_scalar_comm
+    }
+end
