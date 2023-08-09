@@ -561,8 +561,7 @@ struct
         ; emul_comm
         ; endomul_scalar_comm
         ] )
-      ~f:g
-    |> Array.concat
+      ~f:(fun x -> Plonk_types.Opt.Some (g x))
 
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
@@ -587,12 +586,18 @@ struct
         let index_digest =
           with_label "absorb verifier index" (fun () ->
               let index_sponge = Sponge.create sponge_params in
-              Array.iter
+              List.iter
                 (index_to_field_elements
                    ~g:(fun (z : Inputs.Inner_curve.t) ->
                      List.to_array (Inner_curve.to_field_elements z) )
                    m )
-                ~f:(fun x -> Sponge.absorb index_sponge x) ;
+                ~f:(function
+                  | Plonk_types.Opt.None ->
+                      ()
+                  | Plonk_types.Opt.Maybe _ ->
+                      failwith "TODO"
+                  | Plonk_types.Opt.Some x ->
+                      Array.iter x ~f:(fun x -> Sponge.absorb index_sponge x) ) ;
               Sponge.squeeze_field index_sponge )
         in
         let open Plonk_types.Messages in
