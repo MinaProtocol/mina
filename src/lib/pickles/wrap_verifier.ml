@@ -387,32 +387,52 @@ struct
     let combine batch ~xi without_bound with_bound =
       let { Curve_opt.non_zero; point } =
         Pcs_batch.combine_split_commitments batch
-          ~scale_and_add:(fun ~(acc : Curve_opt.t) ~xi (keep, (p : Point.t)) ->
+          ~scale_and_add:(fun ~(acc : Curve_opt.t) ~xi
+                              (p : (Point.t, Boolean.var) Plonk_types.Opt.t) ->
             (* match acc.non_zero, keep with
                | false, false -> acc
                | true, false -> acc
                | false, true -> { point= p; non_zero= true }
                | true, true -> { point= p + xi * acc; non_zero= true }
             *)
-            let point =
-              Inner_curve.(
-                if_ keep
-                  ~then_:
-                    (if_ acc.non_zero
-                       ~then_:(Point.add p (Scalar_challenge.endo acc.point xi))
-                       ~else_:
-                         ((* In this branch, the accumulator was zero, so there is no harm in
-                             putting the potentially junk underlying point here. *)
-                          Point.underlying p ) )
-                  ~else_:acc.point)
+            let point keep p =
+              let point =
+                Inner_curve.(
+                  if_ keep
+                    ~then_:
+                      (if_ acc.non_zero
+                         ~then_:
+                           (Point.add p (Scalar_challenge.endo acc.point xi))
+                         ~else_:
+                           ((* In this branch, the accumulator was zero, so there is no harm in
+                               putting the potentially junk underlying point here. *)
+                            Point.underlying p ) )
+                    ~else_:acc.point)
+              in
+              let non_zero =
+                Boolean.(keep &&& Point.finite p ||| acc.non_zero)
+              in
+              { Curve_opt.non_zero; point }
             in
-            let non_zero = Boolean.(keep &&& Point.finite p ||| acc.non_zero) in
-            { Curve_opt.non_zero; point } )
+            match p with
+            | Plonk_types.Opt.None ->
+                acc
+            | Plonk_types.Opt.Maybe (keep, p) ->
+                point keep p
+            | Plonk_types.Opt.Some p ->
+                point Boolean.true_ p )
           ~xi
-          ~init:(fun (keep, p) ->
-            { non_zero = Boolean.(keep &&& Point.finite p)
-            ; point = Point.underlying p
-            } )
+          ~init:(function
+            | Plonk_types.Opt.None ->
+                assert false
+            | Plonk_types.Opt.Maybe (keep, p) ->
+                { non_zero = Boolean.(keep &&& Point.finite p)
+                ; point = Point.underlying p
+                }
+            | Plonk_types.Opt.Some p ->
+                { non_zero = Boolean.(true_ &&& Point.finite p)
+                ; point = Point.underlying p
+                } )
           without_bound with_bound
       in
       Boolean.Assert.is_true non_zero ;
@@ -774,7 +794,11 @@ struct
                w_comms
                all but last sigma_comm
             *)
-            Vector.append sg_old
+            Vector.append
+              (Vector.map sg_old
+                 ~f:
+                   (Array.map ~f:(fun (keep, p) ->
+                        Plonk_types.Opt.Maybe (keep, p) ) ) )
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
                 :: [| m.psm_comm |] :: [| m.complete_add_comm |]
                 :: [| m.mul_comm |] :: [| m.emul_comm |]
@@ -787,7 +811,8 @@ struct
                      (snd
                         Plonk_types.(
                           Columns.add (fst (Columns.add Permuts_minus_1.n))) )
-              |> Vector.map ~f:(Array.map ~f:(fun g -> (Boolean.true_, g))) )
+              |> Vector.map ~f:(Array.map ~f:(fun g -> Plonk_types.Opt.Some g))
+              )
               (snd
                  (Max_proofs_verified.add num_commitments_without_degree_bound) )
           in
@@ -798,7 +823,8 @@ struct
             ~sponge:sponge_before_evaluations ~xi ~advice ~openings_proof
             ~polynomials:
               ( Vector.map without_degree_bound
-                  ~f:(Array.map ~f:(fun (keep, x) -> (keep, `Finite x)))
+                  ~f:
+                    (Array.map ~f:(Plonk_types.Opt.map ~f:(fun x -> `Finite x)))
               , [] )
         in
         let joint_combiner =
