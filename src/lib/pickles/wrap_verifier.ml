@@ -551,6 +551,7 @@ struct
         } =
       m
     in
+    let g_opt = Plonk_types.Opt.map ~f:g in
     List.map
       ( Vector.to_list sigma_comm
       @ Vector.to_list coefficients_comm
@@ -562,6 +563,21 @@ struct
         ; endomul_scalar_comm
         ] )
       ~f:(fun x -> Plonk_types.Opt.Some (g x))
+    @ [ g_opt m.range_check0_comm
+      ; g_opt m.range_check1_comm
+      ; g_opt m.foreign_field_mul_comm
+      ; g_opt m.foreign_field_add_comm
+      ; g_opt m.xor_comm
+      ; g_opt m.rot_comm
+      ]
+    @ List.map ~f:g_opt (Vector.to_list m.lookup_table_comm)
+    @ [ g_opt m.lookup_table_ids
+      ; g_opt m.runtime_tables_selector
+      ; g_opt m.lookup_selector_xor
+      ; g_opt m.lookup_selector_lookup
+      ; g_opt m.lookup_selector_range_check
+      ; g_opt m.lookup_selector_ffmul
+      ]
 
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
