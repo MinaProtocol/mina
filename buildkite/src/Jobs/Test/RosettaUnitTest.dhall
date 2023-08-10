@@ -12,11 +12,11 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(cmd_target : Size) ->
+let buildTestCmd : Text -> Text -> Text -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(ignore_paths: Text) -> \(cmd_target : Size) ->
   let key = "rosetta-unit-test-${profile}" in
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchain ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"] "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev",
+      commands = RunInToolchain.runInToolchain ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"] "buildkite/scripts/unit-test.sh ${profile} ${path} ${ignore_paths} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev",
       label = "Rosetta unit tests",
       key = key,
       target = cmd_target,
@@ -44,6 +44,6 @@ Pipeline.build
         name = "RosettaUnitTest"
       },
     steps = [
-      buildTestCmd "dev" "src/app/rosetta" Size.Small
+      buildTestCmd "dev" "src/app/rosetta" "None" Size.Small
     ]
   }
