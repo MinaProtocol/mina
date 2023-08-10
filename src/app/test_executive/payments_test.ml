@@ -420,7 +420,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
              ~amount:Currency.Amount.one ~fee ~node:sender 10
          in
-         (*Enough snark work from key1 should have been added by now, change the worker key*)
+         let%bind () =
+           section "blocks are produced"
+             (wait_for t (Wait_condition.blocks_to_be_produced 2))
+         in
+         (*At least a few snark work from key1 should have been added by now, change the worker key*)
          let%bind () =
            section_hard
              "change snark worker key from snark-node-key1 to snark-node-key2"
