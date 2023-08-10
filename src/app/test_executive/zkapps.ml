@@ -746,17 +746,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Network.Node.get_ingress_uri node)
            zkapp_command_update_all )
     in
+    (*Transaction pool ledger may not be updated after the most recent block which causes this transaction to fail with invalid nonce instead of insufficient replace fee (last if branch in Indexed_pool.add_from_gossip_exn)*)
+    let%bind () =
+      section_hard "Send a zkapp with an insufficient replace fee"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_insufficient_replace_fee "Insufficient_replace_fee"
+           ~retries:5 )
+    in
     let%bind () =
       section_hard "Send a zkapp with an invalid proof"
         (send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri node)
            zkapp_command_invalid_proof "Verification_failed" )
-    in
-    let%bind () =
-      section_hard "Send a zkapp with an insufficient replace fee"
-        (send_invalid_zkapp ~logger
-           (Network.Node.get_ingress_uri node)
-           zkapp_command_insufficient_replace_fee "Insufficient_replace_fee" )
     in
     let%bind () =
       section_hard "Send a zkApp transaction with an invalid nonce"
