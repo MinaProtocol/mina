@@ -196,6 +196,7 @@ struct
         all_equal ~equal:[%equal: State_hash.t option]
           ~compare:[%compare: State_hash.t option]
       in
+      (*Possibly a bug here: Does state.best_tips_by_node get updated when a node is restarted? Or is this still referring to the state before the restart? *)
       let best_tips =
         List.map nodes ~f:(fun node ->
             String.Map.find state.best_tips_by_node (Node.id node) )

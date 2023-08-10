@@ -66,6 +66,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            "%s started again, will now wait for this node to initialize"
            (Node.id node_c) ;
          let%bind () = wait_for t (Wait_condition.node_to_initialize node_c) in
+         (*nodes_to_synchronize succeeds even when node_c hasn't started boostrap. Adding explicit wait here for node_c to to start transition router*)
+         let%bind () =
+           wait_for t @@ Wait_condition.persisted_frontier_loaded node_c
+         in
          wait_for t
            ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]
            |> Wait_condition.with_timeouts
