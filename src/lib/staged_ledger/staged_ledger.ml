@@ -1870,25 +1870,26 @@ module T = struct
             ~supercharge_coinbase `First
         in
         let res1, res2 =
-          if Sequence.is_empty res.commands_rev then
-            let res = try_with_coinbase () in
-            (res, None)
-          else
-            match Resources.available_space res with
-            | 0 ->
+          match Resources.available_space res with
+          | 0 ->
+              if Sequence.is_empty res.commands_rev then
+                (*No user commands or coinbase and a parition without any space? Something went wrong. Try adding a coinbase and be done*)
+                let res = try_with_coinbase () in
+                (res, None)
+              else
                 (*generate the next prediff with a coinbase at least*)
                 let res2 = second_pre_diff res y ~add_coinbase:true cw_seq_2 in
                 ((res, log1), Some res2)
-            | 1 ->
-                (*There's a slot available in the first partition, fill it with coinbase and create another pre_diff for the slots in the second partiton with the remaining user commands and work *)
-                incr_coinbase_and_compute res `One
-            | 2 ->
-                (*There are two slots which cannot be filled using user commands, so we split the coinbase into two parts and fill those two spots*)
-                incr_coinbase_and_compute res `Two
-            | _ ->
-                (* Too many slots left in the first partition. Either there wasn't enough work to add transactions or there weren't enough transactions. Create a new pre_diff for just the first partition*)
-                let res = try_with_coinbase () in
-                (res, None)
+          | 1 ->
+              (*There's a slot available in the first partition, fill it with coinbase and create another pre_diff for the slots in the second partiton with the remaining user commands and work *)
+              incr_coinbase_and_compute res `One
+          | 2 ->
+              (*There are two slots which cannot be filled using user commands, so we split the coinbase into two parts and fill those two spots*)
+              incr_coinbase_and_compute res `Two
+          | _ ->
+              (* Too many slots left in the first partition. Either there wasn't enough work to add transactions or there weren't enough transactions. Create a new pre_diff for just the first partition*)
+              let res = try_with_coinbase () in
+              (res, None)
         in
         let coinbase_added =
           Resources.coinbase_added (fst res1)
