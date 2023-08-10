@@ -65,7 +65,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          [%log info]
            "%s started again, will now wait for this node to initialize"
            (Node.id node_c) ;
-         let%bind () = wait_for t (Wait_condition.node_to_initialize node_c) in
+         (*nodes_to_synchronize succeeds even when node_c hasn't started boostrap. Wait for a log event rather than accumulated state such as node_to_initialize or nodes_to_synchronize*)
+         let%bind () =
+           wait_for t (Wait_condition.restarted_node_to_initialize node_c)
+         in
          wait_for t
            ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]
            |> Wait_condition.with_timeouts

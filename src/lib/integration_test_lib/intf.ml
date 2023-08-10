@@ -229,7 +229,12 @@ module Dsl = struct
       -> t
       -> t
 
+    (*Check if the node initiliazed from the network state accuulated since the
+       beginning of the test*)
     val node_to_initialize : Engine.Network.Node.t -> t
+
+    (*Check if the node initiliazed since it restarted*)
+    val restarted_node_to_initialize : Engine.Network.Node.t -> t
 
     val nodes_to_initialize : Engine.Network.Node.t list -> t
 

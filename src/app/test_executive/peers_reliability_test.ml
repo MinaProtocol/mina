@@ -193,7 +193,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind () =
            wait_for t @@ Wait_condition.persisted_frontier_loaded node_c
          in
-         let%bind () = wait_for t @@ Wait_condition.node_to_initialize node_c in
+         let%bind () =
+           wait_for t @@ Wait_condition.restarted_node_to_initialize node_c
+         in
          wait_for t
            ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]
            |> Wait_condition.with_timeouts
