@@ -230,31 +230,42 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let send_zkapp ~logger node zkapp_command =
     send_zkapp_batch ~logger node [ zkapp_command ]
 
-  let send_invalid_zkapp ~logger node_uri zkapp_command substring =
+  let send_invalid_zkapp ?retries ~logger node_uri zkapp_command substring =
     [%log info] "Sending zkApp, expected to fail" ;
-    match%bind.Deferred
-      Integration_test_lib.Graphql_requests.send_zkapp_batch ~logger node_uri
-        ~zkapp_commands:[ zkapp_command ]
-    with
-    | Ok _zkapp_ids ->
-        [%log error] "ZkApp transaction succeeded, expected error \"%s\""
-          substring ;
-        Malleable_error.hard_error_format
-          "ZkApp transaction succeeded, expected error \"%s\"" substring
-    | Error err ->
-        let err_str = Error.to_string_mach err in
-        if String.is_substring ~substring err_str then (
-          [%log info] "ZkApp transaction failed as expected"
-            ~metadata:[ ("error", `String err_str) ] ;
-          Malleable_error.return () )
-        else (
-          [%log error]
-            "Error sending zkApp, for a reason other than the expected \"%s\""
-            substring
-            ~metadata:[ ("error", `String err_str) ] ;
+    let rec go n =
+      match%bind.Deferred
+        Integration_test_lib.Graphql_requests.send_zkapp_batch ~logger node_uri
+          ~zkapp_commands:[ zkapp_command ]
+      with
+      | Ok _zkapp_ids ->
+          [%log error] "ZkApp transaction succeeded, expected error \"%s\""
+            substring ;
           Malleable_error.hard_error_format
-            "ZkApp transaction failed: %s, but expected \"%s\"" err_str
-            substring )
+            "ZkApp transaction succeeded, expected error \"%s\"" substring
+      | Error err ->
+          let err_str = Error.to_string_mach err in
+          if String.is_substring ~substring err_str then (
+            [%log info] "ZkApp transaction failed as expected"
+              ~metadata:[ ("error", `String err_str) ] ;
+            Malleable_error.return () )
+          else (
+            [%log error]
+              "Error sending zkApp, for a reason other than the expected \"%s\""
+              substring
+              ~metadata:[ ("error", `String err_str) ] ;
+            if n <= 0 then
+              Malleable_error.hard_error_format
+                "ZkApp transaction failed: %s, but expected \"%s\"" err_str
+                substring
+            else (
+              (*Transaction pool race conditions may cause unexpected failures*)
+              [%log info] "Retrying..." ;
+              let%bind.Malleable_error () =
+                Malleable_error.lift (after (Time.Span.of_sec 2.0))
+              in
+              go (n - 1) ) )
+    in
+    match retries with None -> go 0 | Some n -> go n
 
   let send_invalid_payment ~logger node_uri ~sender_pub_key ~receiver_pub_key
       ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature ~expected_failure :
