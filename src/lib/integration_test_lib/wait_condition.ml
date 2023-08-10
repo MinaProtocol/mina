@@ -85,6 +85,23 @@ struct
 
   let node_to_initialize node = nodes_to_initialize [ node ]
 
+  let restarted_node_to_initialize node =
+    let check () event_node
+        (_node_initialized : Event_type.Node_initialization.t) =
+      let event_node_id = Node.id event_node in
+      let node_id = Node.id node in
+      if String.equal event_node_id node_id then Predicate_passed
+      else Predicate_continuation ()
+    in
+    (*Node initialization does not depend on slot time*)
+    let soft_timeout_in_min = 5. in
+    { id = Nodes_to_initialize
+    ; description = "Restarted node to initialize"
+    ; predicate = Event_predicate (Event_type.Node_initialization, (), check)
+    ; soft_timeout = Literal (Time.Span.of_min soft_timeout_in_min)
+    ; hard_timeout = Literal (Time.Span.of_min (soft_timeout_in_min *. 2.))
+    }
+
   (* let blocks_produced ?(active_stake_percentage = 1.0) n = *)
   let blocks_to_be_produced n =
     let init state = Predicate_continuation state.blocks_generated in
@@ -196,6 +213,7 @@ struct
         all_equal ~equal:[%equal: State_hash.t option]
           ~compare:[%compare: State_hash.t option]
       in
+      (*Possibly a bug here: Does state.best_tips_by_node get updated when a node is restarted? Or is this still referring to the state before the restart? *)
       let best_tips =
         List.map nodes ~f:(fun node ->
             String.Map.find state.best_tips_by_node (Node.id node) )
@@ -372,12 +390,13 @@ struct
       if String.equal event_node_id node_id then Predicate_passed
       else Predicate_continuation ()
     in
-    let soft_timeout_in_slots = 4 in
+    (*Loading from persisted frontier does not depend on slot time*)
+    let soft_timeout_in_min = 5. in
     { id = Persisted_frontier_loaded
     ; description = "persisted transition frontier to load"
     ; predicate =
         Event_predicate (Event_type.Persisted_frontier_loaded, (), check)
-    ; soft_timeout = Slots soft_timeout_in_slots
-    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    ; soft_timeout = Literal (Time.Span.of_min soft_timeout_in_min)
+    ; hard_timeout = Literal (Time.Span.of_min (soft_timeout_in_min *. 2.))
     }
 end
