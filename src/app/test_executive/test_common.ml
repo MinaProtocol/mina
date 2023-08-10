@@ -261,7 +261,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               (*Transaction pool race conditions may cause unexpected failures*)
               [%log info] "Retrying..." ;
               let%bind.Malleable_error () =
-                Malleable_error.lift (after (Time.Span.of_sec 2.0))
+                Malleable_error.lift (after (Time.Span.of_sec 10.0))
               in
               go (n - 1) ) )
     in

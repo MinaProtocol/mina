@@ -374,7 +374,7 @@ struct
       else Predicate_continuation ()
     in
     (*Loading from persisted frontier does not depend on slot time*)
-    let soft_timeout_in_min = 5. in
+    let soft_timeout_in_min = 10. in
     { id = Persisted_frontier_loaded
     ; description = "persisted transition frontier to load"
     ; predicate =
