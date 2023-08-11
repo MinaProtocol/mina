@@ -14,7 +14,7 @@ let add_plonk_constraint c =
 
 let fresh_int i = exists Field.typ ~compute:(fun () -> Field.Constant.of_int i)
 
-let main_rot () =
+let main_xor () =
   add_plonk_constraint
     (Xor
        { in1 = fresh_int 0
@@ -35,55 +35,57 @@ let main_rot () =
        } ) ;
   add_plonk_constraint (Raw { kind = Zero; values = [||]; coeffs = [||] })
 
-let _tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
-  Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
-    ~auxiliary_typ:Typ.unit
-    ~branches:(module Nat.N1)
-    ~max_proofs_verified:(module Nat.N0)
-    ~name:"optional_custom_gates"
-    ~constraint_constants:
-      (* TODO(mrmr1993): This was misguided.. Delete. *)
-      { sub_windows_per_window = 0
-      ; ledger_depth = 0
-      ; work_delay = 0
-      ; block_window_duration_ms = 0
-      ; transaction_capacity = Log_2 0
-      ; pending_coinbase_depth = 0
-      ; coinbase_amount = Unsigned.UInt64.of_int 0
-      ; supercharged_coinbase_factor = 0
-      ; account_creation_fee = Unsigned.UInt64.of_int 0
-      ; fork = None
-      }
-    ~choices:(fun ~self:_ ->
-      [ { identifier = "main"
-        ; prevs = []
-        ; main =
-            (fun _ ->
-              main_rot () ;
-              { previous_proof_statements = []
-              ; public_output = ()
-              ; auxiliary_output = ()
-              } )
-        ; feature_flags =
-            { range_check0 = false
-            ; range_check1 = false
-            ; foreign_field_add = false
-            ; foreign_field_mul = false
-            ; xor = true
-            ; rot = false
-            ; lookup = false
-            ; runtime_tables = false
-            }
+module Make_test (Inputs : sig
+  val feature_flags : bool Plonk_types.Features.t
+end) =
+struct
+  open Inputs
+
+  let _tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
+    Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
+      ~auxiliary_typ:Typ.unit
+      ~branches:(module Nat.N1)
+      ~max_proofs_verified:(module Nat.N0)
+      ~name:"optional_custom_gates"
+      ~constraint_constants:
+        (* TODO(mrmr1993): This was misguided.. Delete. *)
+        { sub_windows_per_window = 0
+        ; ledger_depth = 0
+        ; work_delay = 0
+        ; block_window_duration_ms = 0
+        ; transaction_capacity = Log_2 0
+        ; pending_coinbase_depth = 0
+        ; coinbase_amount = Unsigned.UInt64.of_int 0
+        ; supercharged_coinbase_factor = 0
+        ; account_creation_fee = Unsigned.UInt64.of_int 0
+        ; fork = None
         }
-      ] )
-    ()
+      ~choices:(fun ~self:_ ->
+        [ { identifier = "main"
+          ; prevs = []
+          ; main =
+              (fun _ ->
+                if feature_flags.xor then main_xor () ;
+                { previous_proof_statements = []
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
+          ; feature_flags
+          }
+        ] )
+      ()
 
-module Proof = (val proof)
+  module Proof = (val proof)
 
-let public_input, (), proof =
-  Async.Thread_safe.block_on_async_exn (fun () -> prove ())
+  let public_input, (), proof =
+    Async.Thread_safe.block_on_async_exn (fun () -> prove ())
 
-let () =
-  Or_error.ok_exn
-    (Async.Thread_safe.block_on_async_exn (fun () ->
-         Proof.verify [ (public_input, proof) ] ) )
+  let () =
+    Or_error.ok_exn
+      (Async.Thread_safe.block_on_async_exn (fun () ->
+           Proof.verify [ (public_input, proof) ] ) )
+end
+
+module Xor = Make_test (struct
+  let feature_flags = Plonk_types.Features.{ none_bool with xor = true }
+end)
