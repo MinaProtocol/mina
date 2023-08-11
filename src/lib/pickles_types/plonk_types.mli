@@ -127,6 +127,7 @@ module Permuts_minus_1 = Nat.N6
 module Permuts_minus_1_vec = Vector.Vector_6
 module Lookup_sorted_minus_1 = Nat.N4
 module Lookup_sorted_minus_1_vec = Vector.Vector_4
+module Lookup_sorted = Nat.N5
 module Lookup_sorted_vec = Vector.Vector_5
 
 module Messages : sig
