@@ -18,7 +18,7 @@ let buildTestCmd : Text -> Text -> Text -> Size -> Command.Type = \(profile : Te
   Command.build
     Command.Config::{
       commands = RunInToolchain.runInToolchain ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"] "buildkite/scripts/unit-test.sh ${profile} ${path} ${ignore_paths} && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev",
-      label = "${profile} unit-tests",
+      label = "${profile} staged-ledger unit-tests",
       key = command_key,
       target = cmd_target,
       docker = None Docker.Type,
@@ -34,7 +34,7 @@ Pipeline.build
         S.strictlyStart (S.contains "src/lib"),
         S.strictlyStart (S.contains "src/nonconsensus"),
         S.strictly (S.contains "Makefile"),
-        S.exactly "buildkite/src/Jobs/Test/DaemonUnitTest" "dhall",
+        S.exactly "buildkite/src/Jobs/Test/StagedLedgerUnitTest" "dhall",
         S.exactly "scripts/link-coredumps" "sh",
         S.exactly "buildkite/scripts/unit-test" "sh"
       ]
@@ -44,9 +44,9 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = unitDirtyWhen,
         path = "Test",
-        name = "DaemonUnitTest"
+        name = "StagedLedgerUnitTest"
       },
     steps = [
-      buildTestCmd "dev" "src/lib" "src/lib/transaction_snark/;src/lib/staged_ledger/;src/lib/mina_lib/" Size.XLarge
+      buildTestCmd "dev" "src/lib/staged_ledger/" "None" Size.XLarge
     ]
   }
