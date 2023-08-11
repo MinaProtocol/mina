@@ -57,6 +57,64 @@ let main_range_check0 () =
          compact = Field.Constant.zero
        } )
 
+let main_range_check1 () =
+  add_plonk_constraint
+    (RangeCheck1
+       { v2 = fresh_int 0
+       ; v12 = fresh_int 0
+       ; v2c0 = fresh_int 0
+       ; v2p0 = fresh_int 0
+       ; v2p1 = fresh_int 0
+       ; v2p2 = fresh_int 0
+       ; v2p3 = fresh_int 0
+       ; v2c1 = fresh_int 0
+       ; v2c2 = fresh_int 0
+       ; v2c3 = fresh_int 0
+       ; v2c4 = fresh_int 0
+       ; v2c5 = fresh_int 0
+       ; v2c6 = fresh_int 0
+       ; v2c7 = fresh_int 0
+       ; v2c8 = fresh_int 0
+       ; v2c9 = fresh_int 0
+       ; v2c10 = fresh_int 0
+       ; v2c11 = fresh_int 0
+       ; v0p0 = fresh_int 0
+       ; v0p1 = fresh_int 0
+       ; v1p0 = fresh_int 0
+       ; v1p1 = fresh_int 0
+       ; v2c12 = fresh_int 0
+       ; v2c13 = fresh_int 0
+       ; v2c14 = fresh_int 0
+       ; v2c15 = fresh_int 0
+       ; v2c16 = fresh_int 0
+       ; v2c17 = fresh_int 0
+       ; v2c18 = fresh_int 0
+       ; v2c19 = fresh_int 0
+       } )
+
+let main_rot () =
+  add_plonk_constraint
+    (Rot64
+       { word = fresh_int 0
+       ; rotated = fresh_int 0
+       ; excess = fresh_int 0
+       ; bound_limb0 = fresh_int 0xFFF
+       ; bound_limb1 = fresh_int 0xFFF
+       ; bound_limb2 = fresh_int 0xFFF
+       ; bound_limb3 = fresh_int 0xFFF
+       ; bound_crumb0 = fresh_int 3
+       ; bound_crumb1 = fresh_int 3
+       ; bound_crumb2 = fresh_int 3
+       ; bound_crumb3 = fresh_int 3
+       ; bound_crumb4 = fresh_int 3
+       ; bound_crumb5 = fresh_int 3
+       ; bound_crumb6 = fresh_int 3
+       ; bound_crumb7 = fresh_int 3
+       ; two_to_rot = Field.Constant.one
+       } ) ;
+  add_plonk_constraint
+    (Raw { kind = Zero; values = [| fresh_int 0 |]; coeffs = [||] })
+
 module Make_test (Inputs : sig
   val feature_flags : bool Plonk_types.Features.t
 end) =
@@ -87,8 +145,10 @@ struct
           ; prevs = []
           ; main =
               (fun _ ->
+                if feature_flags.rot then main_rot () ;
                 if feature_flags.xor then main_xor () ;
                 if feature_flags.range_check0 then main_range_check0 () ;
+                if feature_flags.range_check1 then main_range_check1 () ;
                 { previous_proof_statements = []
                 ; public_output = ()
                 ; auxiliary_output = ()
@@ -116,4 +176,13 @@ end)
 module Range_check0 = Make_test (struct
   let feature_flags =
     Plonk_types.Features.{ none_bool with range_check0 = true }
+end)
+
+module Range_check1 = Make_test (struct
+  let feature_flags =
+    Plonk_types.Features.{ none_bool with range_check1 = true }
+end)
+
+module Rot = Make_test (struct
+  let feature_flags = Plonk_types.Features.{ none_bool with rot = true }
 end)
