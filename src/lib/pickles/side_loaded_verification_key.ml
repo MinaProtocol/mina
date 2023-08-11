@@ -219,8 +219,7 @@ module Stable = struct
         let public =
           let (T (input, conv, _conv_inv)) =
             Impls.Wrap.input
-              ~feature_flags:
-                (* TODO: Is this right? *) Plonk_types.Features.none ()
+              ~feature_flags:Plonk_types.Features.maybe ()
           in
           let (Typ typ) = input in
           typ.size_in_field_elements

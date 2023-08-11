@@ -100,6 +100,8 @@ module Features : sig
 
   val none : options
 
+  val maybe : options
+
   val none_bool : flags
 
   val map : 'a t -> f:('a -> 'b) -> 'b t

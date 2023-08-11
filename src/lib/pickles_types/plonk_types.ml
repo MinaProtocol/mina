@@ -315,6 +315,17 @@ module Features = struct
     ; runtime_tables = Opt.Flag.No
     }
 
+  let maybe =
+    { range_check0 = Opt.Flag.Maybe
+    ; range_check1 = Opt.Flag.Maybe
+    ; foreign_field_add = Opt.Flag.Maybe
+    ; foreign_field_mul = Opt.Flag.Maybe
+    ; xor = Opt.Flag.Maybe
+    ; rot = Opt.Flag.Maybe
+    ; lookup = Opt.Flag.Maybe
+    ; runtime_tables = Opt.Flag.Maybe
+    }
+
   let none_bool =
     { range_check0 = false
     ; range_check1 = false
