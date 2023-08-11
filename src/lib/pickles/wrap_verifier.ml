@@ -757,12 +757,21 @@ struct
               Types.Opt.None
           | Maybe (b, l) ->
               failwith "TODO"
-          | Some l ->
-              let joint_combiner = sample_scalar () in
-              Array.iter l.sorted ~f:(fun z ->
-                  let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
-                  absorb sponge Without_degree_bound z ) ;
-              Types.Opt.Some joint_combiner
+          | Some l -> (
+              match (m.lookup_table_comm, m.runtime_tables_selector) with
+              | _ :: Some _ :: _, _ | _, Some _ ->
+                  let joint_combiner = sample_scalar () in
+                  Array.iter l.sorted ~f:(fun z ->
+                      let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
+                      absorb sponge Without_degree_bound z ) ;
+                  Types.Opt.Some joint_combiner
+              | _ :: None :: _, None ->
+                  Array.iter l.sorted ~f:(fun z ->
+                      let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
+                      absorb sponge Without_degree_bound z ) ;
+                  Types.Opt.Some { inner = Field.zero }
+              | _ ->
+                  failwith "TODO" )
         in
         let lookup_table_comm =
           match (messages.lookup, joint_combiner) with
