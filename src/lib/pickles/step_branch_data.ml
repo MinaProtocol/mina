@@ -161,7 +161,30 @@ let create
         ~wrap_rounds:Backend.Tock.Rounds.n ~feature_flags
       (* TODO *)
     in
-    Fix_domains.domains
+    let lookup_table_length_log2 =
+      let { Plonk_types.Features.range_check0
+          ; range_check1
+          ; foreign_field_add = _
+          ; foreign_field_mul
+          ; xor
+          ; rot
+          ; lookup
+          ; runtime_tables
+          } =
+        actual_feature_flags
+      in
+      let total_length =
+        ( if range_check0 || range_check1 || foreign_field_mul || rot then
+          Int.pow 2 12
+        else 0 )
+        + (if xor then 3 else Int.pow 2 8)
+        + (if lookup then 0 (* TODO: Need more info. *) else 0)
+        + if runtime_tables then 0 (* TODO: Need more info. *) else 0
+      in
+      let zk_rows = 3 in
+      Int.ceil_log2 (total_length + zk_rows + 1)
+    in
+    Fix_domains.domains ~min_log2:lookup_table_length_log2
       (module Impls.Step)
       (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
       etyp main
