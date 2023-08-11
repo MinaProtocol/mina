@@ -3,7 +3,7 @@
 set -eo pipefail
 
 if [[ $# -ne 3 ]]; then
-    echo "Usage: $0 <dune-profile> <path-to-top-level-directory> <paths-to-ignore-space-delimited>"
+    echo "Usage: $0 <dune-profile> <path-to-top-level-directory> <paths-to-ignore-semicolon-delimited>"
     exit 1
 fi
 
@@ -14,6 +14,8 @@ ignore_paths=$3
 #for some reason empty string/single space is not considered an argument when passed in dhall files
 if [[ "${ignore_paths}" == "None" ]]; then
     ignore_paths=()
+else
+    ignore_paths=($(echo $ignore_paths | tr ";" "\n"))
 fi
 
 source ~/.profile
@@ -38,7 +40,7 @@ while read -r line;
 do 
     source_path=${line%"$dune_filename"}
     execute="Y"
-    for ignore_path in ${ignore_paths}; 
+    for ignore_path in ${ignore_paths[@]};
     do
         if [[ "${source_path}" == "${ignore_path}"* ]]; then #ignore sub-directories too
             execute="N"
