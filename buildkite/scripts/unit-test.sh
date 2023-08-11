@@ -3,7 +3,7 @@
 set -eo pipefail
 
 if [[ $# -ne 3 ]]; then
-    echo "Usage: $0 <dune-profile> <path-to-top-level-directory> <paths-to-ignore-semicolon-delimited>"
+    echo "Usage: $0 <dune-profile> <path-to-top-level-directory> <paths-to-ignore-comma-delimited>"
     exit 1
 fi
 
@@ -15,8 +15,9 @@ ignore_paths=$3
 if [[ "${ignore_paths}" == "None" ]]; then
     ignore_paths=()
 else
-    ignore_paths=($(echo $ignore_paths | tr ";" "\n"))
+    ignore_paths=($(echo $ignore_paths | tr "," "\n"))
 fi
+echo "Ignore Paths after ${ignore_paths} and array ${ignore_paths[@]}"
 
 source ~/.profile
 
@@ -48,13 +49,13 @@ else
     grep --include=dune -ERl "${build_path}" -e "\(inline_tests|\(tests" |
     while read -r line;
     do
-        source_path=${line%"$dune_filename"}
+        source_path=${line%"$dune_filename"} #cut "dune" from the path
         execute="Y"
         for ignore_path in ${ignore_paths[@]};
         do
             if [[ "${source_path}" == "${ignore_path}"* ]]; then #ignore sub-directories too
-            execute="N"
-            break
+                execute="N"
+                break
             fi
             execute="Y"
         done
@@ -69,7 +70,7 @@ else
             time dune runtest "${source_path}" --profile="${profile}" -j16 || \
             (./scripts/link-coredumps.sh && false))
         else
-            echo "Skipping ${source_path}"
+            echo "--- Skipping ${source_path}"
         fi
     done
 fi
