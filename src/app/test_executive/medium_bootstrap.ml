@@ -110,9 +110,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Wait_condition.transition_frontier_loaded_from_persistence
                 ~fresh_data:false ~sync_needed:false )
          in
-         let%bind () =
-           wait_for t (Wait_condition.restarted_node_to_initialize node_c)
-         in
          wait_for t
            (Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]) )
     in
