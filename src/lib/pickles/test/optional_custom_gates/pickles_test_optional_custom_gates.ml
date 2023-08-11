@@ -35,6 +35,28 @@ let main_xor () =
        } ) ;
   add_plonk_constraint (Raw { kind = Zero; values = [||]; coeffs = [||] })
 
+let main_range_check0 () =
+  add_plonk_constraint
+    (RangeCheck0
+       { v0 = fresh_int 0
+       ; v0p0 = fresh_int 0
+       ; v0p1 = fresh_int 0
+       ; v0p2 = fresh_int 0
+       ; v0p3 = fresh_int 0
+       ; v0p4 = fresh_int 0
+       ; v0p5 = fresh_int 0
+       ; v0c0 = fresh_int 0
+       ; v0c1 = fresh_int 0
+       ; v0c2 = fresh_int 0
+       ; v0c3 = fresh_int 0
+       ; v0c4 = fresh_int 0
+       ; v0c5 = fresh_int 0
+       ; v0c6 = fresh_int 0
+       ; v0c7 = fresh_int 0
+       ; (* Coefficients *)
+         compact = Field.Constant.zero
+       } )
+
 module Make_test (Inputs : sig
   val feature_flags : bool Plonk_types.Features.t
 end) =
@@ -66,6 +88,7 @@ struct
           ; main =
               (fun _ ->
                 if feature_flags.xor then main_xor () ;
+                if feature_flags.range_check0 then main_range_check0 () ;
                 { previous_proof_statements = []
                 ; public_output = ()
                 ; auxiliary_output = ()
@@ -88,4 +111,9 @@ end
 
 module Xor = Make_test (struct
   let feature_flags = Plonk_types.Features.{ none_bool with xor = true }
+end)
+
+module Range_check0 = Make_test (struct
+  let feature_flags =
+    Plonk_types.Features.{ none_bool with range_check0 = true }
 end)
