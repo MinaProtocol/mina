@@ -216,9 +216,28 @@ module Wrap = struct
     let to_bits x = Field.unpack x ~length:Field.size_in_bits
   end
 
-  let input () =
+  let input ~feature_flags () =
     let lookup =
-      { Types.Wrap.Lookup_parameters.use = No
+      { Types.Wrap.Lookup_parameters.use =
+          (let { Plonk_types.Features.range_check0
+               ; range_check1
+               ; foreign_field_add = _ (* Doesn't use lookup *)
+               ; foreign_field_mul
+               ; xor
+               ; rot
+               ; lookup
+               ; runtime_tables = _ (* Fixme *)
+               } =
+             feature_flags
+           in
+           Array.reduce_exn ~f:Plonk_types.Opt.Flag.( ||| )
+             [| range_check0
+              ; range_check1
+              ; foreign_field_mul
+              ; xor
+              ; rot
+              ; lookup
+             |] )
       ; zero =
           { value =
               { challenge = Limb_vector.Challenge.Constant.zero
@@ -245,10 +264,8 @@ module Wrap = struct
                Impl.run_checked (Other_field.check x) ;
                t )
            , Fn.id ) )
-        (* Wrap circuit: no features needed. *)
-        (In_circuit.spec (module Impl) lookup Plonk_types.Features.none)
+        (In_circuit.spec (module Impl) lookup feature_flags)
     in
-    let feature_flags = Plonk_types.Features.none in
     let typ =
       Typ.transport typ
         ~there:(In_circuit.to_data ~option_map:Option.map ~to_opt:Fn.id)

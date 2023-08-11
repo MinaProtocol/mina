@@ -667,7 +667,7 @@ struct
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
-      let (T (typ, conv, _conv_inv)) = input () in
+      let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
       let main x () : unit = wrap_main (conv x) in
       let () = if true then log_wrap main typ name self.id in
       let self_id = Type_equal.Id.uid self.id in

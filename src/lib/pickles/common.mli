@@ -191,7 +191,9 @@ val tick_public_input_of_statement :
   -> Backend.Tick.Field.Vector.elt list
 
 val tock_public_input_of_statement :
-     ( Limb_vector.Challenge.Constant.t
+     feature_flags:
+       Pickles_types.Plonk_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
+  -> ( Limb_vector.Challenge.Constant.t
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
@@ -219,7 +221,9 @@ val tock_public_input_of_statement :
   -> Backend.Tock.Field.Vector.elt list
 
 val tock_unpadded_public_input_of_statement :
-     ( Limb_vector.Challenge.Constant.t
+     feature_flags:
+       Pickles_types.Plonk_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
+  -> ( Limb_vector.Challenge.Constant.t
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t

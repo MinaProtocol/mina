@@ -130,7 +130,10 @@ module Wrap : sig
   end
 
   val input :
-       unit
+       feature_flags:
+         Pickles_types.Plonk_types.Opt.Flag.t
+         Pickles_types.Plonk_types.Features.t
+    -> unit
     -> ( ( Impl.Field.t
          , Impl.Field.t Composition_types.Scalar_challenge.t
          , Impl.Field.t Pickles_types.Shifted_value.Type1.t

@@ -857,7 +857,7 @@ let wrap
     |> Wrap_hack.pad_accumulator
   in
   let%map.Promise next_proof =
-    let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
+    let (T (input, conv, _conv_inv)) = Impls.Wrap.input ~feature_flags () in
     Common.time "wrap proof" (fun () ->
         [%log internal] "Wrap_generate_witness_conv" ;
         Impls.Wrap.generate_witness_conv
@@ -886,8 +886,9 @@ let wrap
                     plonk =
                       { next_statement.proof_state.deferred_values.plonk with
                         joint_combiner =
-                          (* TODO: This assumes wrap circuits do not use lookup *)
-                          None
+                          Plonk_types.Opt.to_option
+                            next_statement.proof_state.deferred_values.plonk
+                              .joint_combiner
                       }
                   }
               }

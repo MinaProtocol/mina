@@ -303,7 +303,8 @@ struct
       let module O = Tock.Oracles in
       let o =
         let public_input =
-          tock_public_input_of_statement prev_statement_with_hashes
+          tock_public_input_of_statement ~feature_flags
+            prev_statement_with_hashes
         in
         O.create dlog_vk
           ( Vector.map2
