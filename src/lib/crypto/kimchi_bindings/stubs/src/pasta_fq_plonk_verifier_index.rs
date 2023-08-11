@@ -83,21 +83,27 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
         let shift: [Fq; PERMUTS] = shifts.try_into().expect("wrong size");
 
         let feature_flags = FeatureFlags {
-            range_check0: false,
-            range_check1: false,
-            foreign_field_add: false,
-            foreign_field_mul: false,
-            rot: false,
-            xor: false,
-            lookup_features: LookupFeatures {
-                patterns: LookupPatterns {
-                    xor: false,
-                    lookup: false,
-                    range_check: false,
-                    foreign_field_mul: false,
-                },
-                joint_lookup_used: false,
-                uses_runtime_tables: false,
+            range_check0: evals.range_check0_comm.is_some(),
+            range_check1: evals.range_check1_comm.is_some(),
+            foreign_field_add: evals.foreign_field_add_comm.is_some(),
+            foreign_field_mul: evals.foreign_field_mul_comm.is_some(),
+            rot: evals.rot_comm.is_some(),
+            xor: evals.xor_comm.is_some(),
+            lookup_features: {
+                if let Some(li) = index.lookup_index.as_ref() {
+                    li.lookup_info.features
+                } else {
+                    LookupFeatures {
+                        patterns: LookupPatterns {
+                            xor: false,
+                            lookup: false,
+                            range_check: false,
+                            foreign_field_mul: false,
+                        },
+                        joint_lookup_used: false,
+                        uses_runtime_tables: false,
+                    }
+                }
             },
         };
 
