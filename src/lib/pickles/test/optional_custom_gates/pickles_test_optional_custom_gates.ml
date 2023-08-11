@@ -115,6 +115,74 @@ let main_rot () =
   add_plonk_constraint
     (Raw { kind = Zero; values = [| fresh_int 0 |]; coeffs = [||] })
 
+let main_foreign_field_add () =
+  add_plonk_constraint
+    (ForeignFieldAdd
+       { left_input_lo = fresh_int 0
+       ; left_input_mi = fresh_int 0
+       ; left_input_hi = fresh_int 0
+       ; right_input_lo = fresh_int 0
+       ; right_input_mi = fresh_int 0
+       ; right_input_hi = fresh_int 0
+       ; field_overflow = fresh_int 0
+       ; carry = fresh_int 0
+       ; foreign_field_modulus0 = Field.Constant.of_int 1
+       ; foreign_field_modulus1 = Field.Constant.of_int 0
+       ; foreign_field_modulus2 = Field.Constant.of_int 0
+       ; sign = Field.Constant.of_int 0
+       } ) ;
+  add_plonk_constraint
+    (Raw { kind = Zero; values = [| fresh_int 0 |]; coeffs = [||] })
+
+let main_foreign_field_mul () =
+  add_plonk_constraint
+    (ForeignFieldMul
+       { left_input0 = fresh_int 0
+       ; left_input1 = fresh_int 0
+       ; left_input2 = fresh_int 0
+       ; right_input0 = fresh_int 0
+       ; right_input1 = fresh_int 0
+       ; right_input2 = fresh_int 0
+       ; remainder01 = fresh_int 0
+       ; remainder2 = fresh_int 0
+       ; quotient0 = fresh_int 0
+       ; quotient1 = fresh_int 0
+       ; quotient2 = fresh_int 0
+       ; quotient_hi_bound =
+           exists Field.typ ~compute:(fun () ->
+               let open Field.Constant in
+               let two_to_21 = of_int Int.(2 lsl 21) in
+               let two_to_42 = two_to_21 * two_to_21 in
+               let two_to_84 = two_to_42 * two_to_42 in
+               two_to_84 - one - one )
+       ; product1_lo = fresh_int 0
+       ; product1_hi_0 = fresh_int 0
+       ; product1_hi_1 = fresh_int 0
+       ; carry0 = fresh_int 0
+       ; carry1_0 = fresh_int 0
+       ; carry1_12 = fresh_int 0
+       ; carry1_24 = fresh_int 0
+       ; carry1_36 = fresh_int 0
+       ; carry1_48 = fresh_int 0
+       ; carry1_60 = fresh_int 0
+       ; carry1_72 = fresh_int 0
+       ; carry1_84 = fresh_int 0
+       ; carry1_86 = fresh_int 0
+       ; carry1_88 = fresh_int 0
+       ; carry1_90 = fresh_int 0
+       ; foreign_field_modulus2 = Field.Constant.one
+       ; neg_foreign_field_modulus0 = Field.Constant.zero
+       ; neg_foreign_field_modulus1 = Field.Constant.zero
+       ; neg_foreign_field_modulus2 =
+           Field.Constant.(
+             let two_to_22 = of_int Int.(2 lsl 22) in
+             let two_to_44 = two_to_22 * two_to_22 in
+             let two_to_88 = two_to_44 * two_to_44 in
+             two_to_88 - one)
+       } ) ;
+  add_plonk_constraint
+    (Raw { kind = Zero; values = [| fresh_int 0 |]; coeffs = [||] })
+
 module Make_test (Inputs : sig
   val feature_flags : bool Plonk_types.Features.t
 end) =
@@ -149,6 +217,10 @@ struct
                 if feature_flags.xor then main_xor () ;
                 if feature_flags.range_check0 then main_range_check0 () ;
                 if feature_flags.range_check1 then main_range_check1 () ;
+                if feature_flags.foreign_field_add then
+                  main_foreign_field_add () ;
+                if feature_flags.foreign_field_mul then
+                  main_foreign_field_mul () ;
                 { previous_proof_statements = []
                 ; public_output = ()
                 ; auxiliary_output = ()
@@ -185,4 +257,14 @@ end)
 
 module Rot = Make_test (struct
   let feature_flags = Plonk_types.Features.{ none_bool with rot = true }
+end)
+
+module Foreign_field_add = Make_test (struct
+  let feature_flags =
+    Plonk_types.Features.{ none_bool with foreign_field_add = true }
+end)
+
+module Foreign_field_mul = Make_test (struct
+  let feature_flags =
+    Plonk_types.Features.{ none_bool with foreign_field_mul = true }
 end)
