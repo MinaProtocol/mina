@@ -34,21 +34,31 @@ dune build "${build_path}" --profile="${profile}" -j16
 dune_filename="dune"
 source_paths_to_test=()
 
-#(inline_tests) and tests stanza in dune files enable inline tests
-grep --include=dune -ERl "${build_path}" -e "\(inline_tests|\(tests" | 
-while read -r line;
-do 
-    source_path=${line%"$dune_filename"}
-    execute="Y"
-    for ignore_path in ${ignore_paths[@]};
+if [[ "${ignore_paths}" == "" ]]; then
+    #run all the tests in the specified directory
+    echo "--- Run unit tests in ${build_path}"
+    time dune runtest "${build_path}" --profile="${profile}" -j16 || \
+    (./scripts/link-coredumps.sh && \
+    echo "--- Retrying failed unit tests" && \
+    time dune runtest "${build_path}" --profile="${profile}" -j16 || \
+    (./scripts/link-coredumps.sh && false))
+else
+    #There are paths to ignore, run each library separately
+    #(inline_tests) and tests stanza in dune files enable inline tests
+    grep --include=dune -ERl "${build_path}" -e "\(inline_tests|\(tests" |
+    while read -r line;
     do
-        if [[ "${source_path}" == "${ignore_path}"* ]]; then #ignore sub-directories too
+        source_path=${line%"$dune_filename"}
+        execute="Y"
+        for ignore_path in ${ignore_paths[@]};
+        do
+            if [[ "${source_path}" == "${ignore_path}"* ]]; then #ignore sub-directories too
             execute="N"
             break
-        fi
-        execute="Y"
-    done
-    if [[ "${execute}" == "Y" ]]; then
+            fi
+            execute="Y"
+        done
+        if [[ "${execute}" == "Y" ]]; then
             # Note: By attempting a re-run on failure here, we can avoid rebuilding and
             # skip running all of the tests that have already succeeded, since dune will
             # only retry those tests that failed.
@@ -58,7 +68,8 @@ do
             echo "--- Retrying failed unit tests" && \
             time dune runtest "${source_path}" --profile="${profile}" -j16 || \
             (./scripts/link-coredumps.sh && false))
-    else
-        echo "Skipping ${source_path}"
-    fi
-done
+        else
+            echo "Skipping ${source_path}"
+        fi
+    done
+fi
