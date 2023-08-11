@@ -9,8 +9,6 @@ open Tuple_lib
 open Import
 
 module G = struct
-  let lookup_verification_enabled = false
-
   (* given [chals], compute
      \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
   let challenge_polynomial ~one ~add ~mul chals =
@@ -540,13 +538,40 @@ struct
       ; beta = beta_0
       ; gamma = gamma_0
       ; zeta = zeta_0
+      ; joint_combiner = joint_combiner_0
       }
       { Plonk.Minimal.In_circuit.alpha = alpha_1
       ; beta = beta_1
       ; gamma = gamma_1
       ; zeta = zeta_1
+      ; joint_combiner = joint_combiner_1
       } =
-    if G.lookup_verification_enabled then failwith "TODO" else () ;
+    with_label __LOC__ (fun () ->
+        match (joint_combiner_0, joint_combiner_1) with
+        | None, None ->
+            ()
+        | Maybe (b0, j0), Maybe (b1, j1) ->
+            Boolean.Assert.(b0 = b1) ;
+            let (Typ { var_to_fields; _ }) = Scalar_challenge.typ in
+            Array.iter2_exn ~f:Field.Assert.equal
+              (fst @@ var_to_fields j0)
+              (fst @@ var_to_fields j1)
+        | Some j0, Some j1 ->
+            let (Typ { var_to_fields; _ }) = Scalar_challenge.typ in
+            Array.iter2_exn ~f:Field.Assert.equal
+              (fst @@ var_to_fields j0)
+              (fst @@ var_to_fields j1)
+        | j0, j1 ->
+            let sexp_of t =
+              Sexp.to_string
+              @@ Types.Opt.sexp_of_t
+                   (fun _ -> Sexp.Atom "")
+                   (fun _ -> Sexp.Atom "")
+                   t
+            in
+            failwithf
+              "incompatible optional states for joint_combiners: %s vs %s"
+              (sexp_of j0) (sexp_of j1) () ) ;
     with_label __LOC__ (fun () -> chal beta_0 beta_1) ;
     with_label __LOC__ (fun () -> chal gamma_0 gamma_1) ;
     with_label __LOC__ (fun () -> scalar_chal alpha_0 alpha_1) ;
@@ -726,8 +751,96 @@ struct
         absorb sponge PC (Boolean.true_, x_hat) ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
+        let joint_combiner =
+          match messages.lookup with
+          | None ->
+              Types.Opt.None
+          | Maybe (b, l) ->
+              failwith "TODO"
+          | Some l ->
+              let joint_combiner = sample_scalar () in
+              Array.iter l.sorted ~f:(fun z ->
+                  let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
+                  absorb sponge Without_degree_bound z ) ;
+              Types.Opt.Some joint_combiner
+        in
+        let lookup_table_comm =
+          match (messages.lookup, joint_combiner) with
+          | Types.Opt.None, Types.Opt.None ->
+              Types.Opt.None
+          | ( Types.Opt.Maybe (b_l, l)
+            , Types.Opt.Maybe (b_joint_combiner, joint_combiner) ) ->
+              failwith "TODO"
+          | Types.Opt.Some l, Types.Opt.Some joint_combiner ->
+              let (first_column :: second_column :: rest) =
+                Vector.map
+                  ~f:(Types.Opt.map ~f:(fun x -> [| x |]))
+                  m.lookup_table_comm
+              in
+              let second_column_with_runtime =
+                match (second_column, l.runtime) with
+                | Types.Opt.None, comm | comm, Types.Opt.None ->
+                    comm
+                | Types.Opt.Maybe _, _ | _, Types.Opt.Maybe _ ->
+                    failwith "TODO"
+                | Types.Opt.Some second_column, Types.Opt.Some runtime ->
+                    Types.Opt.Some
+                      (Array.map2_exn ~f:Inner_curve.( + ) second_column runtime)
+              in
+              let rest_rev =
+                Vector.rev (first_column :: second_column_with_runtime :: rest)
+              in
+              let table_ids =
+                Types.Opt.map m.lookup_table_ids ~f:(fun x -> [| x |])
+              in
+              Vector.fold ~init:table_ids rest_rev ~f:(fun acc comm ->
+                  match acc with
+                  | Types.Opt.None ->
+                      comm
+                  | Types.Opt.Maybe (b, acc) ->
+                      failwith "TODO"
+                  | Types.Opt.Some acc -> (
+                      match comm with
+                      | Types.Opt.None ->
+                          Types.Opt.Some acc
+                      | Types.Opt.Maybe (b, comm) ->
+                          failwith "TODO"
+                      | Types.Opt.Some comm ->
+                          let scaled_acc =
+                            Array.map acc ~f:(fun acc ->
+                                Scalar_challenge.endo acc joint_combiner )
+                          in
+                          Types.Opt.Some
+                            (Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm)
+                      ) )
+          | _, _ ->
+              assert false
+        in
+        let lookup_sorted =
+          (* FIXME *)
+          Vector.init Plonk_types.Lookup_sorted.n ~f:(fun i ->
+              match messages.lookup with
+              | Types.Opt.None ->
+                  Types.Opt.None
+              | Types.Opt.Maybe _ ->
+                  failwith "TODO"
+              | Types.Opt.Some l -> (
+                  try Types.Opt.Some l.sorted.(i) with _ -> Types.Opt.None ) )
+        in
         let beta = sample () in
         let gamma = sample () in
+        let () =
+          match messages.lookup with
+          | None ->
+              ()
+          | Maybe (b, l) ->
+              failwith "TODO"
+          | Some l ->
+              let aggreg =
+                Array.map l.aggreg ~f:(fun z -> (Boolean.true_, z))
+              in
+              absorb sponge Without_degree_bound aggreg
+        in
         let z_comm = messages.z_comm in
         absorb_g z_comm ;
         let alpha = sample_scalar () in
@@ -788,12 +901,21 @@ struct
           let len_1, len_1_add = Plonk_types.(Columns.add Permuts_minus_1.n) in
           let len_2, len_2_add = Plonk_types.(Columns.add len_1) in
           let _len_3, len_3_add = Nat.N9.add len_2 in
-          let len_4, len_4_add = Nat.N6.add Nat.N5.n in
-          let len_5, len_5_add = Nat.N45.add len_4 in
-          let num_commitments_without_degree_bound = len_5 in
+          let _len_4, len_4_add = Nat.N6.add Plonk_types.Lookup_sorted.n in
+          let len_5, len_5_add =
+            (* NB: Using explicit 11 because we can't get add on len_4 *)
+            Nat.N11.add Nat.N7.n
+          in
+          let len_6, len_6_add = Nat.N45.add len_5 in
+          let num_commitments_without_degree_bound = len_6 in
           let without_degree_bound =
             let append_chain len second first =
               Vector.append first second len
+            in
+            let undo_chunking =
+              Types.Opt.map ~f:(fun x ->
+                  assert (Array.length x = 1) ;
+                  x.(0) )
             in
             (* sg_old
                x_hat
@@ -809,7 +931,7 @@ struct
                 (Array.map ~f:(fun (keep, p) ->
                      Plonk_types.Opt.Maybe (keep, p) ) )
             |> append_chain
-                 (snd (Max_proofs_verified.add len_5))
+                 (snd (Max_proofs_verified.add len_6))
                  ( [ [| x_hat |]
                    ; [| ft_comm |]
                    ; z_comm
@@ -830,7 +952,7 @@ struct
                          len_2_add )
                  |> Vector.map
                       ~f:(Array.map ~f:(fun g -> Plonk_types.Opt.Some g))
-                 |> append_chain len_5_add
+                 |> append_chain len_6_add
                       ( [ m.range_check0_comm
                         ; m.range_check1_comm
                         ; m.foreign_field_add_comm
@@ -839,7 +961,13 @@ struct
                         ; m.rot_comm
                         ]
                       |> append_chain len_4_add
-                           [ m.runtime_tables_selector
+                           (Vector.map ~f:undo_chunking lookup_sorted)
+                      |> append_chain len_5_add
+                           [ undo_chunking
+                             @@ Plonk_types.Opt.map messages.lookup ~f:(fun l ->
+                                    l.aggreg )
+                           ; undo_chunking lookup_table_comm
+                           ; m.runtime_tables_selector
                            ; m.lookup_selector_xor
                            ; m.lookup_selector_lookup
                            ; m.lookup_selector_range_check
@@ -857,10 +985,6 @@ struct
                   ~f:
                     (Array.map ~f:(Plonk_types.Opt.map ~f:(fun x -> `Finite x)))
               , [] )
-        in
-        let joint_combiner =
-          if G.lookup_verification_enabled then failwith "TODO"
-          else Types.Opt.None
         in
         assert_eq_plonk
           { alpha = plonk.alpha

@@ -85,7 +85,7 @@ val incrementally_verify_proof :
        Import.Types.Step.Bulletproof.Advice.t
   -> messages:
        ( Wrap_main_inputs.Impl.Field.t * Wrap_main_inputs.Impl.Field.t
-       , 'c )
+       , Wrap_main_inputs.Impl.Boolean.var )
        Pickles_types.Plonk_types.Messages.In_circuit.t
   -> which_branch:'a One_hot_vector.t
   -> openings_proof:
