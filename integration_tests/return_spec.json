@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "return_spec": {
+    "create_network": {
+      "network_id": "string",
+      "nodes_map": [
+        {
+          "graphql_uri" : "string",
+          "network_id" : "string",
+          "network_keypair" : "string",
+          "node_id" : "string",
+          "node_type" : "string"
+        }
+      ]
+    },
+    "start_network": {
+      "network_id": "string"
+    },
+    "delete_network": {
+      "network_id": "string"
+    },
+    "start_node": {
+      "network_id": "string",
+      "node_id": "string"
+    },
+    "stop_node": {
+      "network_id": "string",
+      "node_id": "string"
+    },
+    "dump_archive_data": {
+      "data": "string",
+      "network_id": "string",
+      "node_id": "string"
+    },
+    "dump_mina_logs": {
+      "logs": "string",
+      "network_id": "string",
+      "node_id": "string"
+    },
+    "dump_precomputed_block": {
+      "blocks": "string",
+      "network_id": "string",
+      "node_id": "string"
+    },
+    "run_replayer": {
+      "logs": "string",
+      "network_id": "string",
+      "node_id": "string"
+    }
+  }
+}
