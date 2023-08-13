@@ -27,6 +27,7 @@
    mina_transaction_logic
    pickles
    pickles.backend
+   pickles_base
    pickles_types
    random_oracle_input
    random_oracle
