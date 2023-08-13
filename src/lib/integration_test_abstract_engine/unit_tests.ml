@@ -16,21 +16,42 @@ module Test_values = struct
     "minimina network deploy --network-id {{network_id}}"
 
   let start_node_raw_cmd =
-    "minimina start-node --node-id {{node_id}} --fresh-state {{fresh_state}} \
-     --git-commit {{git_commit}}"
+    "minimina node start --network-id {{network_id}} --node-id {{node_id}} \
+     --fresh-state {{fresh_state}} --git-commit {{git_commit}}"
 
   let deploy_network_action =
     sprintf
       {|
+        {
+          "name": "deploy_network",
+          "args": {
+            "network_id": "string"
+          },
+          "returns": [
+            {
+              "graphql_uri" : "string",
+              "network_id" : "string",
+              "network_keypair" : "string",
+              "node_id" : "string",
+              "node_type" : "string"
+            }
+          ],
+          "command": "%s"
+        }
+      |}
+      deploy_network_raw_cmd
+    |> String.strip
+
+  let json_deploy_network_response =
+    {|
       {
-        "name": "deploy_network",
-        "args": {
-          "network_id": "string"
-        },
-        "command": "%s"
+        "graphql_uri" : "",
+        "network_id" : "network0",
+        "network_keypair" : "EKEQpDAjj7dP3j7fQy4qBU7Kxns85wwq5xMn4zxdyQm83pEWzQ62",
+        "node_id" : "node0",
+        "node_type" : "Archive_node"
       }
     |}
-      deploy_network_raw_cmd
     |> String.strip
 
   let start_node_action =
@@ -39,6 +60,7 @@ module Test_values = struct
       {
         "name": "start_node",
         "args": {
+          "network_id": "string",
           "node_id": "string",
           "fresh_state": "bool",
           "git_commit": "string"
@@ -88,12 +110,15 @@ module Config_tests = struct
   let%test_unit "validate args" =
     let action = action "start_node" config in
     let args =
-      [ ("node_id", `String "node0")
+      [ ("network_id", `String "network0")
+      ; ("node_id", `String "node0")
       ; ("fresh_state", `Bool true)
       ; ("git_commit", `String "0123456abcdef")
       ]
     in
     assert (validate_args ~args ~action)
+
+  let%test_unit "TODO: validate_cmd_args" = assert false
 
   let%test_unit "interpolate string args" =
     let res =
@@ -104,17 +129,49 @@ module Config_tests = struct
     let expect = {|minimina network deploy --network-id network0|} in
     assert (res = expect)
 
+  (* let%test_unit "command returns" =
+     let returns =
+       returns_of_action @@ Yojson.Safe.from_string deploy_network_action
+     in
+     let[@warning "-8"] (Record record) = returns in
+     let expect =
+       [ ("graphql_uri", `Null)
+       ; ("network_id", `String "network0")
+       ; ( "network_keypair"
+         , `String "EKEQpDAjj7dP3j7fQy4qBU7Kxns85wwq5xMn4zxdyQm83pEWzQ62" )
+       ; ("node_id", `String "node0")
+       ; ("node_type", `String "Archive_node")
+       ]
+     in
+     let ( = ) =
+       List.equal (fun (a, b) (c, d) ->
+           String.equal a c && Yojson.Safe.equal b d )
+     in
+     assert (record = expect) *)
+
   let%test_unit "prog and args" =
     let action = Yojson.Safe.from_string start_node_action in
     let args =
-      [ ("node_id", `String "node0")
+      [ ("network_id", `String "network0")
+      ; ("node_id", `String "node0")
       ; ("fresh_state", `Bool true)
-      ; ("commit_sha", `String "0123456abcdef")
+      ; ("git_commit", `String "0123456abcdef")
       ]
     in
     let prog, res_args = prog_and_args ~args action in
     let expect =
-      String.split ~on:' ' @@ interpolate_args ~args start_node_raw_cmd
+      [ "minimina"
+      ; "node"
+      ; "start"
+      ; "--network-id"
+      ; "network0"
+      ; "--node-id"
+      ; "node0"
+      ; "--fresh-state"
+      ; "true"
+      ; "--git-commit"
+      ; "0123456abcdef"
+      ]
     in
     assert (prog = List.hd_exn expect) ;
     assert (List.equal ( = ) res_args @@ List.tl_exn expect)
@@ -141,7 +198,12 @@ module Run_command_tests = struct
         @@ run_command ~config:config_file
              ~args:[ ("msg", `String "hello"); ("num", `Int 42) ]
              "echo"
-      with Invalid_args_num -> ()
+      with Invalid_args_num (action_name, input_args, action_args) ->
+        let open String in
+        let input_args = concat ~sep:", " input_args in
+        let action_args = concat ~sep:", " action_args in
+        printf "Action: %s\n Input args: %s\n Expected args: %s\n" action_name
+          input_args action_args
 
     let%test_unit "run command missing arg failure" =
       try
@@ -157,19 +219,17 @@ module Run_command_tests = struct
     open Async.Deferred.Let_syntax
 
     let echo_command =
-      let arg, value = ("msg", `String "hello") in
       let%map output =
         run_command ~suppress_logs:true ~config:config_file
-          ~args:[ (arg, value) ]
+          ~args:[ ("msg", `String "hello") ]
           "echo"
       in
       if Result.is_error output then assert false
 
     let cat_command =
-      let arg, value = ("path", `String config_file) in
       match%map
         run_command ~suppress_logs:true ~config:config_file
-          ~args:[ (arg, value) ]
+          ~args:[ ("path", `String config_file) ]
           "cat"
       with
       | Ok output ->
