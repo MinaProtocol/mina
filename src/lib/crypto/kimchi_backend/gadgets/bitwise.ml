@@ -257,9 +257,6 @@ let bxor (type f)
     let open Circuit in
     (* If inputs are zero and length is zero, add the zero check *)
     if length = 0 then (
-      Field.Assert.equal Field.zero in1 ;
-      Field.Assert.equal Field.zero in2 ;
-      Field.Assert.equal Field.zero out ;
       with_label "xor_zero_check" (fun () ->
           assert_
             { annotation = Some __LOC__
@@ -270,7 +267,11 @@ let bxor (type f)
                      ; values = [| in1; in2; out |]
                      ; coeffs = [||]
                      } )
-            } ) )
+            } ) ;
+      Field.Assert.equal Field.zero in1 ;
+      Field.Assert.equal Field.zero in2 ;
+      Field.Assert.equal Field.zero out ;
+      () )
     else
       (* Define shorthand helper *)
       let of_bits =

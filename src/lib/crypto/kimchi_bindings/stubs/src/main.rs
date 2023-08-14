@@ -1,6 +1,10 @@
 use kimchi::circuits::{
     expr::FeatureFlag,
-    lookup::lookups::{LookupFeatures, LookupPattern, LookupPatterns},
+    lookup::{
+        lookups::{LookupFeatures, LookupPattern, LookupPatterns},
+        runtime_tables::caml::CamlRuntimeTableCfg,
+        tables::caml::CamlLookupTable,
+    },
 };
 use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
@@ -26,7 +30,6 @@ use wires_15_stubs::{
     srs::{fp::*, fq::*},
     CamlCircuitGate,
     CamlLookupCommitments,
-    CamlLookupEvaluations,
     CamlOpeningProof,
     CamlPolyComm,
     CamlProofEvaluations,
@@ -96,12 +99,14 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlScalarChallenge::<T1> => "scalar_challenge");
     decl_type!(w, env, CamlRandomOracles::<T1> => "random_oracles");
     decl_type!(w, env, PointEvaluations::<T1> => "point_evaluations");
-    decl_type!(w, env, CamlLookupEvaluations<T1> => "lookup_evaluations");
     decl_type!(w, env, CamlProofEvaluations::<T1> => "proof_evaluations");
     decl_type!(w, env, CamlPolyComm::<T1> => "poly_comm");
     decl_type!(w, env, CamlRecursionChallenge::<T1, T2> => "recursion_challenge");
     decl_type!(w, env, CamlOpeningProof::<T1, T2> => "opening_proof");
     decl_type!(w, env, CamlLookupCommitments::<T1> => "lookup_commitments");
+    decl_type!(w, env, CamlRuntimeTableCfg::<T1> => "runtime_table_cfg");
+    decl_type!(w, env, CamlLookupTable::<T1> => "lookup_table");
+
     decl_type!(w, env, CamlProverCommitments::<T1> => "prover_commitments");
     decl_type!(w, env, CamlProverProof<T1, T2> => "prover_proof");
 
