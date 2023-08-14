@@ -57,6 +57,10 @@ module Runtime = struct
   module Long_job_histogram = Histogram
 
   let long_async_job : Long_job_histogram.t = ()
+
+  let total_async_jobs : Counter.t = ()
+
+  let total_async_cycles : Counter.t = ()
 end
 
 module Cryptography = struct

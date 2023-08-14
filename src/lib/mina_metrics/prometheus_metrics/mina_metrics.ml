@@ -127,6 +127,14 @@ module Runtime = struct
     let help = "A histogram for long async jobs" in
     Long_job_histogram.v "long_async_job" ~help ~namespace ~subsystem
 
+  let total_async_jobs : Counter.t =
+    let help = "Total number of async jobs executed" in
+    Counter.v "total_async_jobs" ~help ~namespace ~subsystem
+
+  let total_async_cycles : Counter.t =
+    let help = "Total number of async cycles executed" in
+    Counter.v "total_async_cycles" ~help ~namespace ~subsystem
+
   let start_time = Core.Time.now ()
 
   let current_gc = ref (Gc.stat ())

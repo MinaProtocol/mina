@@ -1025,6 +1025,29 @@ let setup_daemon logger =
             |> Option.value ~default:[]
             |> List.map ~f:(fun x -> `String x)
           in
+          Async_kernel.every
+            (Time_ns.Span.of_span_float_round_nearest (sec 15.0))
+            (fun () ->
+              let update_counter counter n =
+                let open Mina_metrics in
+                let delta = n -. Counter.value counter in
+                if Float.(delta > 0.0) then Counter.inc counter delta
+              in
+              let num_jobs =
+                Async_kernel.Async_kernel_scheduler.num_jobs_run ()
+              in
+              let num_cycles =
+                Async_kernel.Async_kernel_scheduler.cycle_count ()
+              in
+              update_counter Mina_metrics.Runtime.total_async_jobs
+                (Int.to_float num_jobs) ;
+              update_counter Mina_metrics.Runtime.total_async_cycles
+                (Int.to_float num_cycles) ;
+              [%log debug] "Async scheduler stats: $num_jobs, $num_cycles"
+                ~metadata:
+                  [ ("num_jobs", `Int num_jobs)
+                  ; ("num_cycles", `Int num_cycles)
+                  ] ) ;
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
                ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest) )

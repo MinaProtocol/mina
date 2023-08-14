@@ -47,6 +47,10 @@ module Runtime : sig
   module Long_job_histogram : Histogram
 
   val long_async_job : Long_job_histogram.t
+
+  val total_async_jobs : Counter.t
+
+  val total_async_cycles : Counter.t
 end
 
 module Cryptography : sig
