@@ -1,8 +1,6 @@
 open Core_kernel
 open Async
 
-[@@@warning "-32"]
-
 module BlockFileOutput = struct
   type t =
     { height : int; parent_state_hash : string; previous_state_hash : string }
@@ -13,8 +11,6 @@ type select_outcome = CandidateLonger | EqualLength | CandidateShorter
 
 module type CONTEXT = sig
   val logger : Logger.t
-
-  val precomputed_values : Precomputed_values.t
 
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
