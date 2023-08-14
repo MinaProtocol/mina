@@ -84,7 +84,7 @@ type t =
   ; snark_coordinator : Snark_coordinator_node.t option
   ; snark_worker_fee : string
   ; num_archive_nodes : int
-  ; log_precomputed_blocks : bool (* blockchain constants *)
+  ; log_precomputed_blocks : bool
   ; proof_config : Runtime_config.Proof_keys.t
   ; k : int
   ; delta : int

@@ -6,6 +6,8 @@ open Mina_transaction
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
 
+let alias : (string * string) option ref = ref None
+
 let config_path = ref "N/A"
 
 let id _ = "cloud"

@@ -257,6 +257,10 @@ module Engine = struct
 
     val id : t -> string
 
+    (*** [alias] is instantiated when command line args are parsed *)
+    val alias : (string * string) option ref
+
+    (*** [config_path] is instantiated when command line args are parsed *)
     val config_path : string ref
   end
 

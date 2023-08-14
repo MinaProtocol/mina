@@ -7,8 +7,9 @@ open Ci_interaction
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
 
-(* [config_path] is instantiated when command line args are parsed *)
-let config_path = ref ""
+let config_path = config_path
+
+let alias = alias
 
 module Node = struct
   type t =

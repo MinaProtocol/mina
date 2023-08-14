@@ -54,14 +54,14 @@ let check_cmd_output ~prog ~args output =
       Or_error.errorf "command exited prematurely due to signal %d"
         (Signal.to_system_int signal)
 
-let run_cmd_or_error_timeout ?(suppress_logs = false) ?(env = `Extend [])
-    ~timeout_seconds dir prog args =
+let run_cmd_or_error_timeout ?(suppress_logs = false) ~timeout_seconds dir prog
+    args =
   if not suppress_logs then
     [%log' spam (Logger.create ())]
       "Running command (from %s): $command" dir
       ~metadata:[ ("command", `String (String.concat (prog :: args) ~sep:" ")) ] ;
   let open Deferred.Let_syntax in
-  let%bind process = Process.create_exn ~working_dir:dir ~env ~prog ~args () in
+  let%bind process = Process.create_exn ~working_dir:dir ~prog ~args () in
   let%bind res =
     match%map
       Timeout.await ()
