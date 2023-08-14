@@ -13,11 +13,12 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(cmd_target : Size) ->
+  let key = "rosetta-unit-test-${profile}" in
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchain ([] : List Text) "buildkite/scripts/unit-test.sh ${profile} ${path}",
+      commands = RunInToolchain.runInToolchain ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"] "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev",
       label = "Rosetta unit tests",
-      key = "rosetta-unit-test-${profile}",
+      key = key,
       target = cmd_target,
       docker = None Docker.Type,
       artifact_paths = [ S.contains "core_dumps/*" ]
