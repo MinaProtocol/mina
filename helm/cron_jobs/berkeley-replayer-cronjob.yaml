@@ -77,7 +77,7 @@ spec:
             env:
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: gcr.io/o1labs-192920/mina-rosetta:2.0.0rampup3-feature-berkeley-replayer-cronjob-snarked-ledger-check-f7dd759-bullseye
+            image: gcr.io/o1labs-192920/mina-rosetta:2.0.0rampup2-feature-replayer-check-snark-ledger-hash-berkeley-c6da972-bullseye
             imagePullPolicy: IfNotPresent
             name: berkeley-replayer-cronjob
             resources:
