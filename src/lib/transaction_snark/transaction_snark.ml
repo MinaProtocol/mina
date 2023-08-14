@@ -4581,6 +4581,93 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       zkapp_command
 
+    module Single_account_update_spec = struct
+      type t =
+        { fee : Currency.Fee.t
+        ; fee_payer : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+        ; zkapp_account_keypair : Signature_lib.Keypair.t
+        ; memo : Signed_command_memo.t
+        ; update : Account_update.Update.t
+        ; current_auth : Permissions.Auth_required.t
+        ; actions : Tick.Field.t array list
+        ; events : Tick.Field.t array list
+        ; call_data : Tick.Field.t
+        }
+    end
+
+    let single_account_update ~constraint_constants
+        (spec : Single_account_update_spec.t) : Zkapp_command.t =
+      let `VK vk, `Prover _prover =
+        create_trivial_snapp ~constraint_constants ()
+      in
+      let fee_payer : Account_update.Fee_payer.t =
+        { body =
+            { public_key =
+                Signature_lib.Public_key.compress
+                  (fst spec.fee_payer).public_key
+            ; fee = spec.fee
+            ; valid_until = None
+            ; nonce = snd spec.fee_payer
+            }
+        ; authorization = Signature.dummy
+        }
+      in
+      let account_update =
+        Account_update.
+          { body =
+              { public_key =
+                  Signature_lib.Public_key.compress
+                    spec.zkapp_account_keypair.public_key
+              ; update = spec.update
+              ; token_id = Token_id.default
+              ; balance_change = Amount.Signed.zero
+              ; increment_nonce = false
+              ; events = spec.events
+              ; actions = spec.events
+              ; call_data = spec.call_data
+              ; preconditions = Account_update.Preconditions.accept
+              ; use_full_commitment = true
+              ; implicit_account_creation_fee = false
+              ; may_use_token = No
+              ; authorization_kind =
+                  ( match spec.current_auth with
+                  | None ->
+                      Account_update.Authorization_kind.None_given
+                  | Proof ->
+                      Proof (With_hash.hash vk)
+                  | Signature | _ ->
+                      Signature )
+              }
+          ; authorization =
+              ( match spec.current_auth with
+              | None ->
+                  Control.None_given
+              | Proof ->
+                  Control.Proof Mina_base.Proof.blockchain_dummy
+              | Signature | _ ->
+                  Control.Signature Signature.dummy )
+          }
+      in
+      { fee_payer
+      ; memo = spec.memo
+      ; account_updates =
+          (let node =
+             Zkapp_command.Call_forest.Tree.
+               { account_update
+               ; calls = []
+               ; account_update_digest =
+                   Zkapp_command.Digest.Account_update.create account_update
+               }
+           in
+           [ With_stack_hash.
+               { elt = node
+               ; stack_hash =
+                   Zkapp_command.Digest.(
+                     Forest.cons (Tree.create node) Forest.empty)
+               }
+           ] )
+      }
+
     module Update_states_spec = struct
       type t =
         { fee : Currency.Fee.t

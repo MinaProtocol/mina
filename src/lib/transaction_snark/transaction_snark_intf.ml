@@ -288,6 +288,25 @@ module type Full = sig
       -> Deploy_snapp_spec.t
       -> Zkapp_command.t
 
+    module Single_account_update_spec : sig
+      type t =
+        { fee : Currency.Fee.t
+        ; fee_payer : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+        ; zkapp_account_keypair : Signature_lib.Keypair.t
+        ; memo : Signed_command_memo.t
+        ; update : Account_update.Update.t
+        ; current_auth : Permissions.Auth_required.t
+        ; actions : Tick.Field.t array list
+        ; events : Tick.Field.t array list
+        ; call_data : Tick.Field.t
+        }
+    end
+
+    val single_account_update :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> Single_account_update_spec.t
+      -> Zkapp_command.t
+
     module Update_states_spec : sig
       type t =
         { fee : Currency.Fee.t
