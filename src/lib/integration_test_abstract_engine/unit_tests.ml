@@ -415,53 +415,77 @@ module Parse_output_tests = struct
 
   let%test_unit "parse node started" =
     let open Node_started in
+    let network_id = "network0" in
+    let node_id = "node0" in
     let result =
-      {|{"node_id":"node0"}|} |> Yojson.Safe.from_string |> of_yojson
-      |> Result.ok_or_failwith
+      sprintf {|{"network_id":"%s", "node_id":"%s"}|} network_id node_id
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith
     in
-    assert (equal result { node_id = "node0" })
+    assert (equal result { network_id; node_id })
 
   let%test_unit "parse node stopped" =
     let open Node_stopped in
+    let network_id = "network0" in
+    let node_id = "node0" in
     let result =
-      {|{"node_id":"node0"}|} |> Yojson.Safe.from_string |> of_yojson
-      |> Result.ok_or_failwith
+      sprintf {|{"network_id":"%s", "node_id":"%s"}|} network_id node_id
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith
     in
-    assert (equal result { node_id = "node0" })
+    assert (equal result { network_id; node_id })
 
   let%test_unit "parse archive data dump" =
     let open Archive_data_dump in
+    let data = "datum0\ndatum1\ndatum2" in
+    let network_id = "network0" in
+    let node_id = "node0" in
     let result =
-      {|{"node_id":"node0","data":"data0"}|} |> Yojson.Safe.from_string
-      |> of_yojson |> Result.ok_or_failwith
+      sprintf {|{"network_id":"%s", "node_id":"%s", "data":"%s"}|} network_id
+        node_id data
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith
     in
-    assert (equal result { node_id = "node0"; data = "data0" })
+    assert (equal result { network_id; node_id; data })
 
   let%test_unit "parse mina logs dump" =
     let open Mina_logs_dump in
     let logs = "{\"log0\":\"msg0\"}\n{\"log1\":\"msg1\"}" in
+    let network_id = "network0" in
+    let node_id = "node0" in
     let result =
-      `Assoc [ ("node_id", `String "node0"); ("logs", `String logs) ]
+      `Assoc
+        [ ("network_id", `String network_id)
+        ; ("node_id", `String node_id)
+        ; ("logs", `String logs)
+        ]
       |> of_yojson |> Result.ok_or_failwith
     in
-    assert (equal result { node_id = "node0"; logs })
+    assert (equal result { network_id; node_id; logs })
 
   let%test_unit "parse precomputed block dump" =
     let open Precomputed_block_dump in
+    let node_id = "node0" in
+    let network_id = "network0" in
+    let blocks = "block0\nblock1\nblocks2" in
     let result =
-      {|{"node_id":"node0","blocks":"blocks"}|} |> Yojson.Safe.from_string
-      |> of_yojson |> Result.ok_or_failwith
+      sprintf {|{"blocks":"%s", "network_id":"%s", "node_id":"%s"}|} blocks
+        network_id node_id
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith
     in
-    assert (equal result { node_id = "node0"; blocks = "blocks" })
+    assert (equal result { network_id; node_id; blocks })
 
   let%test_unit "parse replayer run" =
     let open Replayer_run in
+    let node_id = "node0" in
+    let network_id = "network0" in
     let logs = "{\"log0\":\"msg0\"}\n{\"log1\":\"msg1\"}" in
     let result =
-      `Assoc [ ("node_id", `String "node0"); ("logs", `String logs) ]
+      `Assoc
+        [ ("network_id", `String network_id)
+        ; ("node_id", `String node_id)
+        ; ("logs", `String logs)
+        ]
       |> of_yojson |> Result.ok_or_failwith
     in
-    assert (equal result { node_id = "node0"; logs })
+    assert (equal result { network_id; node_id; logs })
 
   let%test_unit "parse network status deploy error" =
     let open Network_status in
