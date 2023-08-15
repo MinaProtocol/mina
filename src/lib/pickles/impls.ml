@@ -230,14 +230,9 @@ module Wrap = struct
                } =
              feature_flags
            in
-           Array.reduce_exn ~f:Plonk_types.Opt.Flag.( ||| )
-             [| range_check0
-              ; range_check1
-              ; foreign_field_mul
-              ; xor
-              ; rot
-              ; lookup
-             |] )
+           Plonk_types.Opt.Flag.(
+             range_check0 ||| range_check1 ||| foreign_field_mul ||| xor ||| rot
+             ||| lookup) )
       ; zero =
           { value =
               { challenge = Limb_vector.Challenge.Constant.zero
