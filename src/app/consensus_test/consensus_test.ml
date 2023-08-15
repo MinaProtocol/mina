@@ -82,11 +82,7 @@ let precomputed_block_to_block_file_output (block : Mina_block.Precomputed.t) :
   let parent_state_hash =
     protocol_state |> member "previous_state_hash" |> to_string
   in
-
-  { BlockFileOutput.height
-  ; BlockFileOutput.parent_state_hash
-  ; BlockFileOutput.previous_state_hash = parent_state_hash
-  }
+  { height; parent_state_hash; previous_state_hash = parent_state_hash }
 
 let compare_lengths candidate_length existing_length =
   if candidate_length > existing_length then CandidateLonger
