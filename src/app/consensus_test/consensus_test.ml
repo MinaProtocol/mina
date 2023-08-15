@@ -30,11 +30,11 @@ let context (logger : Logger.t) (precomputed_values : Precomputed_values.t) :
   end )
 
 let read_directory dir_name =
+  let height_pattern = Str.regexp ".*-\\([0-9]+\\)-.*" in
   let extract_height_from_filename fname =
-    let prefix_start = String.index_exn fname '-' + 1 in
-    let suffix_start = String.index_from_exn fname prefix_start '-' in
-    String.sub fname ~pos:prefix_start ~len:(suffix_start - prefix_start)
-    |> int_of_string
+    if Str.string_match height_pattern fname 0 then
+      int_of_string (Str.matched_group 1 fname)
+    else failwith "Invalid filename format"
   in
   let blocks_in_dir dir =
     let%map blocks_array = Async.Sys.readdir dir in
