@@ -43,7 +43,11 @@ module type Full = sig
 
   val finalize : t -> unit
 
-  val finalize_and_get_gates : t -> gates
+  val finalize_and_get_gates :
+       t
+    -> gates
+       * fp Kimchi_types.lookup_table array
+       * fp Kimchi_types.runtime_table_cfg array
 
   val digest : t -> Md5.t
 
