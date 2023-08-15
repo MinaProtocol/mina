@@ -660,7 +660,7 @@ struct
                   | Plonk_types.Opt.Maybe _ ->
                       failwith "TODO"
                   | Plonk_types.Opt.Some x ->
-                      Array.iter x ~f:(fun x -> Sponge.absorb index_sponge x) ) ;
+                      Array.iter ~f:(Sponge.absorb index_sponge) x ) ;
               Sponge.squeeze_field index_sponge )
         in
         let open Plonk_types.Messages in
