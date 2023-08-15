@@ -200,3 +200,13 @@ func UpdateGatingGql(config Config, nodeAddress NodeAddress, input GatingUpdate)
 	// TODO do something with resp.UpdateGating?
 	return nil
 }
+
+func StopDaemonGql(config Config, nodeAddress NodeAddress, delaySec int) (string, error) {
+	resp, err := wrapGqlRequest(config, nodeAddress, func(client graphql.Client) (any, error) {
+		return stopDaemon(config.Ctx, client, delaySec)
+	})
+	if err != nil {
+		return "", fmt.Errorf("error stoping daemon on %s (delay %d): %v", nodeAddress, delaySec, err)
+	}
+	return resp.(*stopDaemonResponse).StopDaemon, nil
+}
