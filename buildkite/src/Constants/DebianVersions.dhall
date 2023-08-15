@@ -90,7 +90,6 @@ let dirtyWhen = \(debVersion : DebVersion) ->
     , Buster = minimalDirtyWhen
     , Jammy = minimalDirtyWhen
     , Focal = minimalDirtyWhen
-    , Bionic = minimalDirtyWhen
   } debVersion
 
 in
