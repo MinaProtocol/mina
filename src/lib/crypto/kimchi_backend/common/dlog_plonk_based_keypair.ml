@@ -53,7 +53,11 @@ module type Inputs_intf = sig
 
     val set_prev_challenges : t -> int -> unit
 
-    val finalize_and_get_gates : t -> Gate_vector.t
+    val finalize_and_get_gates :
+         t
+      -> Gate_vector.t
+         * Scalar_field.t Kimchi_types.lookup_table array
+         * Scalar_field.t Kimchi_types.runtime_table_cfg array
   end
 
   module Index : sig
@@ -169,7 +173,9 @@ module Make (Inputs : Inputs_intf) = struct
     (set_urs_info, load)
 
   let create ~prev_challenges cs =
-    let gates = Inputs.Constraint_system.finalize_and_get_gates cs in
+    let gates, lookup_tables, runtime_table_cfg =
+      Inputs.Constraint_system.finalize_and_get_gates cs
+    in
     let public_input_size =
       Inputs.Constraint_system.get_primary_input_size cs
     in
@@ -182,10 +188,6 @@ module Make (Inputs : Inputs_intf) = struct
           assert (prev_challenges = prev_challenges') ;
           prev_challenges'
     in
-    (* TODO(dw) pass runtime table cfg info *)
-    let runtime_table_cfg = [||] in
-    (* TODO(dw) pass lookup tables info *)
-    let lookup_tables = [||] in
     let index =
       Inputs.Index.create gates public_input_size lookup_tables
         runtime_table_cfg prev_challenges (load_urs ())

@@ -700,6 +700,14 @@ type ('f, 'rust_gates) circuit =
     and a list of gates that corresponds to the circuit.
   *)
 
+type 'f lookup_tables =
+  | Unfinalized_tables_rev of 'f Kimchi_types.lookup_table list
+  | Compiled_tables of 'f Kimchi_types.lookup_table array
+
+type 'f runtime_lookup_tables_cfg =
+  | Unfinalized_runtime_rev of 'f Kimchi_types.runtime_table_cfg list
+  | Compiled_runtime of 'f Kimchi_types.runtime_table_cfg array
+
 (** The constraint system. *)
 type ('f, 'rust_gates) t =
   { (* Map of cells that share the same value (enforced by to the permutation). *)
@@ -713,6 +721,13 @@ type ('f, 'rust_gates) t =
        The finalized tag contains the digest of the circuit.
     *)
     mutable gates : ('f, 'rust_gates) circuit
+        (** The witness values corresponding to each lookup *)
+  ; mutable lookups : (Internal_var.t * Internal_var.t list) list
+        (** The user-provided lookup tables associated with this circuit. *)
+  ; mutable lookup_tables : 'f lookup_tables
+        (** The user-provided runtime table configurations associated with this
+        circuit. *)
+  ; mutable runtime_lookup_tables_cfg : 'f runtime_lookup_tables_cfg
   ; (* The row to use the next time we add a constraint. *)
     mutable next_row : int
   ; (* The size of the public input (which fills the first rows of our constraint system. *)
@@ -801,7 +816,11 @@ module Make
 
   val finalize : t -> unit
 
-  val finalize_and_get_gates : t -> Gates.t
+  val finalize_and_get_gates :
+       t
+    -> Gates.t
+       * Fp.t Kimchi_types.lookup_table array
+       * Fp.t Kimchi_types.runtime_table_cfg array
 
   val num_constraints : t -> int
 
@@ -919,6 +938,9 @@ end = struct
     ; prev_challenges = Set_once.create ()
     ; internal_vars = Internal_var.Table.create ()
     ; gates = Unfinalized_rev [] (* Gates.create () *)
+    ; lookups = []
+    ; lookup_tables = Unfinalized_tables_rev []
+    ; runtime_lookup_tables_cfg = Unfinalized_runtime_rev []
     ; rows_rev = []
     ; next_row = 0
     ; equivalence_classes = V.Table.create ()
@@ -995,14 +1017,21 @@ end = struct
     *)
   let rec finalize_and_get_gates sys =
     match sys with
-    | { gates = Compiled (_, gates); _ } ->
-        gates
+    | { gates = Compiled (_, gates)
+      ; lookup_tables = Compiled_tables tables
+      ; runtime_lookup_tables_cfg = Compiled_runtime runtime_tables_cfg
+      ; _
+      } ->
+        (gates, tables, runtime_tables_cfg)
     | { pending_generic_gate = Some (l, r, o, coeffs); _ } ->
         (* Finalize any pending generic constraint first. *)
         add_row sys [| l; r; o |] Generic coeffs ;
         sys.pending_generic_gate <- None ;
         finalize_and_get_gates sys
-    | { gates = Unfinalized_rev gates_rev; _ } ->
+    | { gates = Unfinalized_rev gates_rev
+      ; lookup_tables = Unfinalized_tables_rev lookup_tables_rev
+      ; runtime_lookup_tables_cfg = Unfinalized_runtime_rev runtime_tables_rev
+      } ->
         let rust_gates = Gates.create () in
 
         (* Create rows for public input. *)
@@ -1074,16 +1103,31 @@ end = struct
         (* drop the gates, we don't need them anymore *)
         sys.gates <- Compiled (md5_digest, rust_gates) ;
 
+        (* store the lookup tables *)
+        let lookup_tables = Array.of_list_rev lookup_tables_rev in
+        sys.lookup_tables <- Compiled_tables lookup_tables ;
+        let runtime_tables = Array.of_list_rev runtime_tables_rev in
+        sys.runtime_lookup_tables_cfg <- Compiled_runtime runtime_tables ;
+
         (* return the gates *)
-        rust_gates
+        (rust_gates, lookup_tables, runtime_tables)
+    | _ ->
+        failwith "Invariant not satisfied"
 
   (** Calls [finalize_and_get_gates] and ignores the result. *)
-  let finalize t = ignore (finalize_and_get_gates t : Gates.t)
+  let finalize t =
+    ignore
+      ( finalize_and_get_gates t
+        : Gates.t
+          * Fp.t Kimchi_types.lookup_table array
+          * Fp.t Kimchi_types.runtime_table_cfg array )
 
-  let num_constraints sys = finalize_and_get_gates sys |> Gates.len
+  let num_constraints sys =
+    let gates, _, _ = finalize_and_get_gates sys in
+    Gates.len gates
 
   let to_json (sys : t) : string =
-    let gates = finalize_and_get_gates sys in
+    let gates, _, _ = finalize_and_get_gates sys in
     let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
     Gates.to_json public_input_size gates
 
