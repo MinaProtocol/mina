@@ -272,7 +272,7 @@ module type Inputs_base = sig
     val of_bits : bool list -> t
 
     (** [is_square y] returns [true] if there exists an element [x] in the same
-        field such that [x^2 = y] *)
+        field such that [x^2 = y], i.e [y] is a quadratic residue modulo [p] *)
     val is_square : t -> bool
 
     val print : t -> unit
