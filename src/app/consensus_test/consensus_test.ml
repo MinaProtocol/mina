@@ -231,10 +231,12 @@ let () =
           "Run Mina PoS on a set of precomputed blocks and output the longest \
            chain"
         (let%map blocks_dir =
-           Param.flag "--blocks-dir" ~doc:"STRING Path of the blocks JSON data"
+           Param.flag "--precomputed-dir" ~aliases:[ "-precomputed-dir" ]
+             ~doc:"PATH Path of the blocks JSON data"
              Param.(required string)
          and output_dir =
-           Param.flag "--output-dir" ~doc:"STRING Path of the output directory"
+           Param.flag "--output-dir" ~aliases:[ "-output-dir" ]
+             ~doc:"PATH Path of the output directory"
              Param.(required string)
          and runtime_config_file =
            Param.flag "--config-file" ~aliases:[ "-config-file" ]
