@@ -40,6 +40,7 @@ func init() {
 	addAction(actions, lib.JoinAction{})
 	addAction(actions, lib.SampleAction{})
 	addAction(actions, lib.ExceptAction{})
+	addAction(actions, lib.StopDaemonAction{})
 
 }
 
@@ -128,6 +129,9 @@ func main() {
 	}
 	if config.MinaExec == "" {
 		config.MinaExec = "mina"
+	}
+	if config.StopDaemonDelaySec == 0 {
+		config.StopDaemonDelaySec = 10
 	}
 	outCache := map[string]map[int]map[string]lib.OutputCacheEntry{
 		"": {},

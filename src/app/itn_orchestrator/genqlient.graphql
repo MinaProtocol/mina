@@ -27,3 +27,7 @@ query slotsWon() {
 mutation updateGating($input: GatingUpdate!) {
     updateGating(input: $input)
 }
+
+mutation stopDaemon($delay: Int) {
+    stopDaemon(delaySeconds: $delay)
+}
