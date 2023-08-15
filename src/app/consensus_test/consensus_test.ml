@@ -174,28 +174,26 @@ let generate_context ~logger ~runtime_config_file =
     Option.value ~default:Runtime_config.default runtime_config_opt
   in
   let proof_level = Genesis_constants.Proof_level.compiled in
-  let%bind precomputed_values =
-    match%map
-      Genesis_ledger_helper.init_from_config_file ~logger
-        ~proof_level:(Some proof_level) runtime_config
-    with
-    | Ok (precomputed_values, _) ->
-        precomputed_values
-    | Error err ->
-        [%log fatal] "Failed initializing with configuration $config: $error"
-          ~metadata:
-            [ ("config", Runtime_config.to_yojson runtime_config)
-            ; ("error", Error_json.error_to_yojson err)
-            ] ;
+  [%log info] "Generating context with given runtime config." ;
+  match%map
+    Genesis_ledger_helper.init_from_config_file ~logger
+      ~proof_level:(Some proof_level) runtime_config
+  with
+  | Ok (precomputed_values, _) ->
+      [%log info] "Initialization from config successful." ;
+      context logger precomputed_values
+  | Error err ->
+      [%log fatal] "Failed initializing with configuration $config: $error"
+        ~metadata:
+          [ ("config", Runtime_config.to_yojson runtime_config)
+          ; ("error", Error_json.error_to_yojson err)
+          ] ;
+      context logger
         { (Lazy.force Precomputed_values.for_unit_tests) with proof_level }
-  in
-
-  let context = context logger precomputed_values in
-  return context
 
 let main () ~blocks_dir ~output_dir ~runtime_config_file =
   let logger = Logger.create () in
-
+  let%bind context = generate_context ~logger ~runtime_config_file in
   [%log info] "Starting to read blocks dir"
     ~metadata:[ ("blocks_dir", `String blocks_dir) ] ;
   let%bind block_sorted_filenames = read_directory blocks_dir in
@@ -203,7 +201,6 @@ let main () ~blocks_dir ~output_dir ~runtime_config_file =
     List.map block_sorted_filenames ~f:(fun json -> read_block_file json)
   in
   [%log info] "Finished reading blocks dir" ;
-  let%bind context = generate_context ~logger ~runtime_config_file in
   match precomputed_blocks with
   | [] ->
       failwith "No blocks found"
