@@ -1,4 +1,4 @@
-(** Wrapping integers for computing FFT domain *)
+(** Wrapping integers for computing NTT domain *)
 
 module Stable : sig
   module V1 : sig
