@@ -25,11 +25,11 @@ type Node struct {
 }
 
 type DiscoveryParams struct {
-	OffsetMin          int
-	Limit              int  `json:",omitempty"`
-	OnlyBlockProducers bool `json:",omitempty"`
-	NoBlockProducers   bool `json:",omitempty"`
-	Exactly            bool `json:",omitempty"`
+	OffsetMin          int  `json:"offsetMin"`
+	Limit              int  `json:"limit,omitempty"`
+	OnlyBlockProducers bool `json:"onlyBPs,omitempty"`
+	NoBlockProducers   bool `json:"noBPs,omitempty"`
+	Exactly            bool `json:"exactly,omitempty"`
 }
 
 func DiscoverParticipants(config Config, params DiscoveryParams, output func(NodeAddress)) error {
