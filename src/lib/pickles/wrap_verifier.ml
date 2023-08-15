@@ -626,6 +626,41 @@ struct
       ; g_opt m.lookup_selector_ffmul
       ]
 
+  (** Simulate an [Opt_sponge.t] locally in a block, but without running the
+      expensive optional logic that is otherwise required.
+
+      Invariant: This requires that the sponge 'state' (i.e. the state after
+      absorbing or squeezing) is consistent between the initial state and the
+      final state when using the sponge.
+  *)
+  let simulate_optional_sponge_with_alignment (sponge : Sponge.t) ~f = function
+    | Plonk_types.Opt.None ->
+        Plonk_types.Opt.None
+    | Plonk_types.Opt.Maybe (b, x) ->
+        (* Cache the sponge state before *)
+        let sponge_state_before = sponge.sponge_state in
+        let state_before = Array.copy sponge.state in
+        (* Use the sponge *)
+        let res = f sponge x in
+        (* Check that the sponge ends in a compatible state. *)
+        ( match (sponge_state_before, sponge.sponge_state) with
+        | Absorbed x, Absorbed y ->
+            [%test_eq: int] x y
+        | Squeezed x, Squeezed y ->
+            [%test_eq: int] x y
+        | Absorbed _, Squeezed _ ->
+            [%test_eq: string] "absorbed" "squeezed"
+        | Squeezed _, Absorbed _ ->
+            [%test_eq: string] "squeezed" "absorbed" ) ;
+        let state =
+          Array.map2_exn sponge.state state_before ~f:(fun then_ else_ ->
+              Field.if_ b ~then_ ~else_ )
+        in
+        sponge.state <- state ;
+        Plonk_types.Opt.Maybe (b, res)
+    | Plonk_types.Opt.Some x ->
+        Plonk_types.Opt.Some (f sponge x)
+
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
       ~actual_proofs_verified_mask ~step_domains ~srs
@@ -654,13 +689,13 @@ struct
                    ~g:(fun (z : Inputs.Inner_curve.t) ->
                      List.to_array (Inner_curve.to_field_elements z) )
                    m )
-                ~f:(function
-                  | Plonk_types.Opt.None ->
-                      ()
-                  | Plonk_types.Opt.Maybe _ ->
-                      failwith "TODO"
-                  | Plonk_types.Opt.Some x ->
-                      Array.iter ~f:(Sponge.absorb index_sponge) x ) ;
+                ~f:(fun x ->
+                  let (_ : (unit, _) Plonk_types.Opt.t) =
+                    simulate_optional_sponge_with_alignment index_sponge x
+                      ~f:(fun sponge x ->
+                        Array.iter ~f:(Sponge.absorb sponge) x )
+                  in
+                  () ) ;
               Sponge.squeeze_field index_sponge )
         in
         let open Plonk_types.Messages in
