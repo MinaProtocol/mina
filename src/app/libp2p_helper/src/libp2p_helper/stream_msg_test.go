@@ -154,7 +154,7 @@ func TestRemoveStreamHandler(t *testing.T) {
 	osResMsg := OpenStreamReq(os).handle(appA, osRpcSeqno)
 	osRpcSeqno_, errMsg := checkRpcResponseError(t, osResMsg)
 	require.Equal(t, osRpcSeqno, osRpcSeqno_)
-	require.Equal(t, "libp2p error: protocol not supported", errMsg)
+	require.Equal(t, "libp2p error: protocols not supported: [/mina/99]", errMsg)
 }
 
 func testResetStreamDo(t *testing.T, app *app, streamId uint64, rpcSeqno uint64) {
