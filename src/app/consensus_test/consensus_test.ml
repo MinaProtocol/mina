@@ -92,15 +92,15 @@ let compare_lengths candidate_length existing_length =
 let update_chain ~current_chain ~candidate_block ~select_outcome =
   match select_outcome with
   | Candidate_longer ->
-      candidate_block :: !current_chain
+      candidate_block :: current_chain
   | Equal_length -> (
-      match !current_chain with
+      match current_chain with
       | _ :: rest_of_list ->
           candidate_block :: rest_of_list
       | [] ->
-          !current_chain )
+          current_chain )
   | Candidate_shorter ->
-      !current_chain
+      current_chain
 
 let run_select ~context:(module Context : CONTEXT)
     (existing_block : Mina_block.Precomputed.t)
@@ -141,17 +141,16 @@ let run_select ~context:(module Context : CONTEXT)
       Candidate_shorter
 
 let process_precomputed_blocks ~context ~current_chain blocks =
-  Deferred.List.iter blocks ~f:(fun candidate_block ->
-      let existing_block = List.hd_exn !current_chain in
+  Deferred.List.fold blocks ~init:current_chain
+    ~f:(fun acc_chain candidate_block ->
+      let existing_block = List.hd_exn acc_chain in
       let select_outcome = run_select ~context existing_block candidate_block in
-      current_chain :=
-        update_chain ~current_chain ~candidate_block ~select_outcome ;
-      return () )
+      return
+        (update_chain ~current_chain:acc_chain ~candidate_block ~select_outcome) )
 
 let write_blocks_to_output_dir ~current_chain ~output_dir =
   let sorted_output =
-    List.map ~f:precomputed_block_to_block_file_output !current_chain
-    |> List.rev
+    List.map ~f:precomputed_block_to_block_file_output current_chain |> List.rev
   in
   let write_block_to_file i block : unit Deferred.t =
     let block_json_str =
@@ -196,7 +195,6 @@ let generate_context ~logger ~runtime_config_file =
 
 let main () ~blocks_dir ~output_dir ~runtime_config_file =
   let logger = Logger.create () in
-  let current_chain : Mina_block.Precomputed.t list ref = ref [] in
 
   [%log info] "Starting to read blocks dir"
     ~metadata:[ ("blocks_dir", `String blocks_dir) ] ;
@@ -212,9 +210,9 @@ let main () ~blocks_dir ~output_dir ~runtime_config_file =
   | first_block :: precomputed_blocks ->
       [%log info] "Starting to process blocks"
         ~metadata:[ ("num_blocks", `Int (List.length precomputed_blocks)) ] ;
-      current_chain := [ first_block ] ;
-      let%bind () =
-        process_precomputed_blocks ~context ~current_chain precomputed_blocks
+      let%bind current_chain =
+        process_precomputed_blocks ~current_chain:[ first_block ] ~context
+          precomputed_blocks
       in
       [%log info] "Finished processing blocks" ;
 
