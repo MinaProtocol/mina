@@ -416,6 +416,8 @@ github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI
 github.com/o1-labs/go-bs-lmdb v1.1.0 h1:qfZNYs5tMJ5Ym23avKIbpubfWJBtSJ1REhu51qb9U6M=
 github.com/o1-labs/go-bs-lmdb v1.1.0/go.mod h1:MGOPzEutRw24iN0qrSSbqOIzbgnyFQST/cKlnVSBmnI=
 github.com/o1-labs/go-bs-tests v0.0.6 h1:MytWPo5kOMgxK29UkU6ycWRJrMhuILUSQAtYpn5ek0g=
+github.com/o1-labs/go-libp2p-kad-dht-patcher v1.1.0 h1:YXmSCpS/VADts1gJbyEbFLsveun8t5HVfrRQbUHm7ds=
+github.com/o1-labs/go-libp2p-kad-dht-patcher v1.1.0/go.mod h1:ANWfn2GqDHigP/bw2boP1PnUG2WL3UNdfnfckVfJOIc=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.12.1/go.mod h1:zj2OWP4+oCPe1qIXoGWkgMRwljMUYCdkwsT2108oapk=
 github.com/onsi/ginkgo v1.14.0/go.mod h1:iSB4RoI2tjJc9BBv4NKIKWKya62Rps+oPG/Lv9klQyY=
