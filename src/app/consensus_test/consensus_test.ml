@@ -1,13 +1,13 @@
 open Core_kernel
 open Async
 
-module BlockFileOutput = struct
+module Block_file_output = struct
   type t =
     { height : int; parent_state_hash : string; previous_state_hash : string }
   [@@deriving to_yojson]
 end
 
-type select_outcome = CandidateLonger | EqualLength | CandidateShorter
+type select_outcome = Candidate_longer | Equal_length | Candidate_shorter
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -64,8 +64,7 @@ let read_block_file blocks_filename =
       | None ->
           failwithf "File %s is empty" blocks_filename () )
 
-let precomputed_block_to_block_file_output (block : Mina_block.Precomputed.t) :
-    BlockFileOutput.t =
+let precomputed_block_to_block_file_output (block : Mina_block.Precomputed.t) =
   let open Yojson.Safe.Util in
   let block_json = Mina_block.Precomputed.to_yojson block in
 
@@ -80,24 +79,27 @@ let precomputed_block_to_block_file_output (block : Mina_block.Precomputed.t) :
   let parent_state_hash =
     protocol_state |> member "previous_state_hash" |> to_string
   in
-  { height; parent_state_hash; previous_state_hash = parent_state_hash }
+  { Block_file_output.height
+  ; parent_state_hash
+  ; previous_state_hash = parent_state_hash
+  }
 
 let compare_lengths candidate_length existing_length =
-  if candidate_length > existing_length then CandidateLonger
-  else if candidate_length = existing_length then EqualLength
-  else CandidateShorter
+  if candidate_length > existing_length then Candidate_longer
+  else if candidate_length = existing_length then Equal_length
+  else Candidate_shorter
 
 let update_chain ~current_chain ~candidate_block ~select_outcome =
   match select_outcome with
-  | CandidateLonger ->
+  | Candidate_longer ->
       candidate_block :: !current_chain
-  | EqualLength -> (
+  | Equal_length -> (
       match !current_chain with
       | _ :: rest_of_list ->
           candidate_block :: rest_of_list
       | [] ->
           !current_chain )
-  | CandidateShorter ->
+  | Candidate_shorter ->
       !current_chain
 
 let run_select ~context:(module Context : CONTEXT)
@@ -136,7 +138,7 @@ let run_select ~context:(module Context : CONTEXT)
       in
       compare_lengths candidate_length existing_length
   | `Keep ->
-      CandidateShorter
+      Candidate_shorter
 
 let process_precomputed_blocks ~context ~current_chain blocks =
   let%bind () =
@@ -158,7 +160,7 @@ let write_blocks_to_output_dir ~current_chain ~output_dir =
   in
   let write_block_to_file i block : unit Deferred.t =
     let block_json_str =
-      block |> BlockFileOutput.to_yojson |> Yojson.Safe.to_string
+      block |> Block_file_output.to_yojson |> Yojson.Safe.to_string
     in
     let output_file = sprintf "%s/block_%d.json" output_dir i in
     Writer.save output_file ~contents:block_json_str
