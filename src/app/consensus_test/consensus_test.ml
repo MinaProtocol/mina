@@ -17,14 +17,12 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 end
 
-let context (logger : Logger.t) : (module CONTEXT) =
+let context (logger : Logger.t) (precomputed_values : Precomputed_values.t) :
+    (module CONTEXT) =
   ( module struct
     let logger = logger
 
-    let proof_level = Genesis_constants.Proof_level.None
-
-    let precomputed_values =
-      { (Lazy.force Precomputed_values.for_unit_tests) with proof_level }
+    let precomputed_values = precomputed_values
 
     let consensus_constants = precomputed_values.consensus_constants
 
@@ -179,7 +177,36 @@ let write_blocks_to_output_dir ~current_chain ~output_dir =
   in
   return ()
 
-let main () ~blocks_dir ~output_dir =
+let generate_context ~logger ~runtime_config_file =
+  let runtime_config_opt =
+    Option.map runtime_config_file ~f:(fun file ->
+        Yojson.Safe.from_file file |> Runtime_config.of_yojson
+        |> Result.ok_or_failwith )
+  in
+  let runtime_config =
+    Option.value ~default:Runtime_config.default runtime_config_opt
+  in
+  let proof_level = Genesis_constants.Proof_level.compiled in
+  let%bind precomputed_values =
+    match%map
+      Genesis_ledger_helper.init_from_config_file ~logger
+        ~proof_level:(Some proof_level) runtime_config
+    with
+    | Ok (precomputed_values, _) ->
+        precomputed_values
+    | Error err ->
+        [%log fatal] "Failed initializing with configuration $config: $error"
+          ~metadata:
+            [ ("config", Runtime_config.to_yojson runtime_config)
+            ; ("error", Error_json.error_to_yojson err)
+            ] ;
+        { (Lazy.force Precomputed_values.for_unit_tests) with proof_level }
+  in
+
+  let context = context logger precomputed_values in
+  return context
+
+let main () ~blocks_dir ~output_dir ~runtime_config_file =
   let logger = Logger.create () in
   let current_chain : Mina_block.Precomputed.t list ref = ref [] in
 
@@ -191,8 +218,7 @@ let main () ~blocks_dir ~output_dir =
         read_block_file json )
   in
   [%log info] "Finished reading blocks dir" ;
-  let context = context logger in
-
+  let%bind context = generate_context ~logger ~runtime_config_file in
   match precomputed_blocks with
   | [] ->
       failwith "No blocks found"
@@ -225,5 +251,9 @@ let () =
          and output_dir =
            Param.flag "--output-dir" ~doc:"STRING Path of the output directory"
              Param.(required string)
+         and runtime_config_file =
+           Param.flag "--config-file" ~aliases:[ "-config-file" ]
+             Param.(optional string)
+             ~doc:"PATH to the configuration file containing the genesis ledger"
          in
-         main ~blocks_dir ~output_dir )))
+         main ~blocks_dir ~output_dir ~runtime_config_file )))

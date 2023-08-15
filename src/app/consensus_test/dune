@@ -19,7 +19,9 @@
   data_hash_lib
   debug_assert
   error_json
+  genesis_ledger_helper
   genesis_constants
+  mina_runtime_config
   integers
   internal_tracing
   interruptible
