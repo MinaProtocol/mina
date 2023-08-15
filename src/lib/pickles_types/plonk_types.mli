@@ -21,6 +21,8 @@ module Opt : sig
 
   val to_option : ('a, bool) t -> 'a option
 
+  val of_option : 'a option -> ('a, 'bool) t
+
   module Flag : sig
     type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
 

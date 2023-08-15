@@ -496,12 +496,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; zeta_to_domain_size = env.zeta_to_n_minus_1 + F.one
         ; zeta_to_srs_length = pow2pow (module F) zeta env.srs_length_log2
         ; perm
-        ; joint_combiner =
-            ( match joint_combiner with
-            | None ->
-                Plonk_types.Opt.None
-            | Some joint_combiner ->
-                Some joint_combiner )
+        ; joint_combiner = Plonk_types.Opt.of_option joint_combiner
         ; feature_flags = actual_feature_flags
         }
 
@@ -524,12 +519,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; beta = plonk.beta
         ; gamma = plonk.gamma
         ; zeta = plonk.zeta
-        ; joint_combiner =
-            ( match plonk.joint_combiner with
-            | Plonk_types.Opt.None ->
-                None
-            | Some l | Maybe (_, l) ->
-                Some l )
+        ; joint_combiner = Plonk_types.Opt.to_option_unsafe plonk.joint_combiner
         ; feature_flags = plonk.feature_flags
         }
         evals

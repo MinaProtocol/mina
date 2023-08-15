@@ -267,12 +267,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
           ; alpha = plonk0.alpha
           ; beta = chal plonk0.beta
           ; gamma = chal plonk0.gamma
-          ; joint_combiner =
-              ( match plonk0.joint_combiner with
-              | None ->
-                  Plonk_types.Opt.None
-              | Some x ->
-                  Plonk_types.Opt.Some x )
+          ; joint_combiner = Plonk_types.Opt.of_option plonk0.joint_combiner
           }
       }
   ; x_hat_evals = x_hat
