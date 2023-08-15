@@ -23,13 +23,11 @@ module type Field_intf = sig
   val ( * ) : t -> t -> t
 
   (** [a / b] returns the unique value [c] such that [a * c = b mod p] where
-      [p] is the order of the field
-      TODO: what about [b = 0]? *)
+      [p] is the order of the field *)
   val ( / ) : t -> t -> t
 
   (** [inv x] returns the unique value [y] such that [x * y = one mod p]
-      where [p] is the order of the field
-      TODO: what about [x = 0]? *)
+      where [p] is the order of the field *)
   val inv : t -> t
 
   (** The neutral element for the addition *)
@@ -39,8 +37,7 @@ module type Field_intf = sig
   val one : t
 
   (** [of_int x] builds an element of type [t]. [x] is supposed to be the
-      canonical representation of the field element.
-      TODO: what if [x > p] if [p] is the ordre of the field? *)
+      canonical representation of the field element. *)
   val of_int : int -> t
 end
 
