@@ -29,15 +29,20 @@ let context (logger : Logger.t) (precomputed_values : Precomputed_values.t) :
     let constraint_constants = precomputed_values.constraint_constants
   end )
 
-let read_directory dir_name =
+let read_directory ~logger dir_name =
   let height_pattern = Str.regexp ".*-\\([0-9]+\\)-.*" in
   let extract_height_from_filename fname =
     if Str.string_match height_pattern fname 0 then
       int_of_string (Str.matched_group 1 fname)
-    else failwith "Invalid filename format"
+    else (
+      [%log error] "Invalid filename format: $filename"
+        ~metadata:[ ("filename", `String fname) ] ;
+      failwith "Invalid filename format" )
   in
   let blocks_in_dir dir =
+    [%log info] "Reading directory: $dir" ~metadata:[ ("dir", `String dir) ] ;
     let%map blocks_array = Async.Sys.readdir dir in
+    [%log info] "Sorting blocks based on height extracted from filename." ;
     Array.sort blocks_array ~compare:(fun a b ->
         Int.compare
           (extract_height_from_filename a)
@@ -45,6 +50,8 @@ let read_directory dir_name =
     let blocks_array =
       Array.map ~f:(fun fname -> Filename.concat dir fname) blocks_array
     in
+    [%log info] "Finished processing directory: $dir"
+      ~metadata:[ ("dir", `String dir) ] ;
     Array.to_list blocks_array
   in
   blocks_in_dir dir_name
@@ -194,13 +201,10 @@ let generate_context ~logger ~runtime_config_file =
 let main () ~blocks_dir ~output_dir ~runtime_config_file =
   let logger = Logger.create () in
   let%bind context = generate_context ~logger ~runtime_config_file in
-  [%log info] "Starting to read blocks dir"
-    ~metadata:[ ("blocks_dir", `String blocks_dir) ] ;
-  let%bind block_sorted_filenames = read_directory blocks_dir in
+  let%bind block_sorted_filenames = read_directory ~logger blocks_dir in
   let precomputed_blocks =
     List.map block_sorted_filenames ~f:(fun json -> read_block_file json)
   in
-  [%log info] "Finished reading blocks dir" ;
   match precomputed_blocks with
   | [] ->
       failwith "No blocks found"
