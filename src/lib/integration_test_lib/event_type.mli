@@ -33,7 +33,7 @@ module Node_down : sig
   include Event_type_intf with type t := t
 end
 
-module Node_offline : sig
+module Node_stopped : sig
   type t = unit
 
   include Event_type_intf with type t := t
@@ -125,7 +125,7 @@ type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
   | Node_down : Node_down.t t
-  | Node_offline : Node_offline.t t
+  | Node_stopped : Node_stopped.t t
   | Transition_frontier_diff_application
       : Transition_frontier_diff_application.t t
   | Block_produced : Block_produced.t t
