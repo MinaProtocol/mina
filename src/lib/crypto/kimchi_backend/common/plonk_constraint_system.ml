@@ -732,6 +732,9 @@ type ('f, 'rust_gates) t =
         (* The user-provided runtime table configurations associated with this
             circuit. *)
   ; mutable runtime_tables_cfg : 'f runtime_tables_cfg
+        (** The witness values corresponding to each lookup *)
+  ; mutable lookups : (Internal_var.t * (Internal_var.t * Internal_var.t)) list
+        (** The user-provided lookup tables associated with this circuit. *)
   ; (* The row to use the next time we add a constraint. *)
     mutable next_row : int
   ; (* The size of the public input (which fills the first rows of our constraint system. *)
@@ -816,7 +819,10 @@ module Make
        Snarky_backendless.Constraint.basic
     -> unit
 
-  val compute_witness : t -> (int -> Fp.t) -> Fp.t array array
+  val compute_witness :
+       t
+    -> (int -> Fp.t)
+    -> Fp.t array array * Fp.t Kimchi_types.runtime_table array
 
   val finalize : t -> unit
 
@@ -875,7 +881,7 @@ end = struct
       and a function that converts the indexed secret inputs to their concrete values.
    *)
   let compute_witness (sys : t) (external_values : int -> Fp.t) :
-      Fp.t array array =
+      Fp.t array array * Fp.t Kimchi_types.runtime_table array =
     let internal_values : Fp.t Internal_var.Table.t =
       Internal_var.Table.create ()
     in
@@ -922,8 +928,37 @@ end = struct
                 let value = compute lc in
                 res.(col_idx).(row_idx) <- value ;
                 Hashtbl.set internal_values ~key:var ~data:value ) ) ;
+
+    (* Set up the runtime table structure. *)
+    let runtime_tables =
+      match sys.runtime_lookup_tables_cfg with
+      | Unfinalized_runtime_rev _ ->
+          failwith
+            "Attempted to generate a witness for an unfinalized constraint \
+             system"
+      | Compiled_runtime cfgs ->
+          Array.map cfgs
+            ~f:(fun
+                 { Kimchi_types.id; first_column }
+                 :
+                 _ Kimchi_types.runtime_table
+               -> { id; data = Array.map first_column ~f:(fun _ -> Fp.zero) } )
+    in
+
+    (* Fill in the used entries of the runtime lookup tables. *)
+    List.iter sys.lookups ~f:(fun (id, (first, second)) ->
+        (* TODO: Update the entries in runtime_tables, filling in [second] in the
+           positions determined by [first].
+           This probably requires a map (id, first) => second_pos.
+        *)
+        let compute_value x = compute @@ find sys.internal_vars x in
+        let id = compute_value id in
+        let first = compute_value first in
+        let second = compute_value second in
+        ignore ((id, first, second) : _ * _ * _) ) ;
+
     (* Return the witness. *)
-    res
+    (res, runtime_tables)
 
   let union_find sys v =
     Hashtbl.find_or_add sys.union_finds v ~default:(fun () ->
