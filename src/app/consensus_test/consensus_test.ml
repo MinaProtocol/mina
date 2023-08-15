@@ -141,17 +141,12 @@ let run_select ~context:(module Context : CONTEXT)
       Candidate_shorter
 
 let process_precomputed_blocks ~context ~current_chain blocks =
-  let%bind () =
-    Deferred.List.iter blocks ~f:(fun candidate_block ->
-        let existing_block = List.hd_exn !current_chain in
-        let select_outcome =
-          run_select ~context existing_block candidate_block
-        in
-        current_chain :=
-          update_chain ~current_chain ~candidate_block ~select_outcome ;
-        return () )
-  in
-  return ()
+  Deferred.List.iter blocks ~f:(fun candidate_block ->
+      let existing_block = List.hd_exn !current_chain in
+      let select_outcome = run_select ~context existing_block candidate_block in
+      current_chain :=
+        update_chain ~current_chain ~candidate_block ~select_outcome ;
+      return () )
 
 let write_blocks_to_output_dir ~current_chain ~output_dir =
   let sorted_output =
@@ -168,8 +163,7 @@ let write_blocks_to_output_dir ~current_chain ~output_dir =
   let () =
     if not (Core.Sys.file_exists_exn output_dir) then Core.Unix.mkdir output_dir
   in
-  Deferred.List.iteri sorted_output ~f:(fun i block ->
-      write_block_to_file i block )
+  Deferred.List.iteri sorted_output ~f:write_block_to_file
 
 let generate_context ~logger ~runtime_config_file =
   let runtime_config_opt =
