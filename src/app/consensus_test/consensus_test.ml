@@ -57,14 +57,12 @@ let read_block_file blocks_filename =
     | Error err ->
         failwithf "Could not read block: %s" err ()
   in
-  let blocks_file = In_channel.create blocks_filename in
-  match In_channel.input_line blocks_file with
-  | Some line ->
-      In_channel.close blocks_file ;
-      read_block_line line
-  | None ->
-      In_channel.close blocks_file ;
-      failwithf "File %s is empty" blocks_filename ()
+  In_channel.with_file blocks_filename ~f:(fun blocks_file ->
+      match In_channel.input_line blocks_file with
+      | Some line ->
+          read_block_line line
+      | None ->
+          failwithf "File %s is empty" blocks_filename () )
 
 let precomputed_block_to_block_file_output (block : Mina_block.Precomputed.t) :
     BlockFileOutput.t =
