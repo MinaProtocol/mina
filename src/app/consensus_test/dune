@@ -74,7 +74,7 @@
   uri
   vrf_evaluator
   with_hash)
- (preprocessor_deps ../../config.mlh)
+ (preprocessor_deps %{env:CONFIG_PATH=../../config.ml})
  (instrumentation
   (backend bisect_ppx))
  (preprocess
