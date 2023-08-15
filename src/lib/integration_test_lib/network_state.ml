@@ -179,12 +179,13 @@ module Make
                 in
                 { state with node_initialization = node_initialization' } ) )
         : _ Event_router.event_subscription ) ;
-    (* handle_node_offline *)
+    (* handle_node_stopped *)
     ignore
-      ( Event_router.on event_router Event_type.Node_offline ~f:(fun node () ->
+      ( Event_router.on event_router Event_type.Node_stopped ~f:(fun node () ->
             update ~f:(fun state ->
                 [%log debug]
-                  "Updating network state with event of $node going offline"
+                  "Updating network state with event of $node being stopped \
+                   deliberately"
                   ~metadata:[ ("node", `String (Node.id node)) ] ;
                 let node_initialization' =
                   String.Map.set state.node_initialization ~key:(Node.id node)
