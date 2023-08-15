@@ -17,7 +17,7 @@ in
       Command.Config::{
         commands =
             -- Build test executive binary
-            RunInToolchain.runInToolchainBionic [
+            RunInToolchain.runInToolchain [
               "DUNE_PROFILE=${duneProfile}"
             ] "./buildkite/scripts/build-test-executive.sh"
             
