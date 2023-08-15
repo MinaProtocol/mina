@@ -17,23 +17,57 @@ DEBS3='deb-s3 upload '\
 
 DEBS='_build/mina-*.deb'
 
-# check for AWS Creds
+#check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run"
     exit 0
 fi
 
 set +x
-echo "Exporting Variables: "
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 source "${SCRIPTPATH}/export-git-env-vars.sh"
 set -x
 
 echo "Publishing debs: ${DEBS} to Release: ${MINA_DEB_RELEASE} and Codename: ${MINA_DEB_CODENAME}"
-set -x
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
 ${DEBS3} --component "${MINA_DEB_RELEASE}" --codename "${MINA_DEB_CODENAME}" "${DEBS}" \
 || (  scripts/clear-deb-s3-lockfile.sh \
    && ${DEBS3} --component "${MINA_DEB_RELEASE}" --codename "${MINA_DEB_CODENAME}" "${DEBS}")
 set +x
+
+# Verify upload is complete
+case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
+  rampup|berkeley|release/2.0.0|develop)
+    TESTNET_NAME="berkeley"
+  ;;
+  *)
+    TESTNET_NAME="mainnet"
+esac
+
+
+echo "Installing mina daemon package: mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
+echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
+apt-get update
+
+function verify_size_and_md5 {
+    DEB_NAME="$1=$MINA_DEB_VERSION"
+    SIZE=$(sudo apt-cache show $DEB_NAME | sed -n 's/^Size: //p')
+    MD5=$(sudo apt-cache show $DEB_NAME | sed -n 's/^MD5sum: //p')
+    FILENAME="_build/$1_${MINA_DEB_VERSION}.deb"
+    FILENAME_SIZE=$(stat -c "%s" $FILENAME)
+    FILENAME_MD5=$(md5sum ${FILENAME} | awk '{ print $1 }')
+
+    if [[ "$SIZE" -ne "$FILENAME_SIZE" ]]; then
+        echo "local deb file has $FILENAME_SIZE size while remote is $SIZE"
+        exit -1
+    fi
+
+    if [[ "$MD5" != "$FILENAME_MD5" ]]; then
+        echo "local deb file has $FILENAME_MD5 md5sum while remote is $MD5"
+        exit -1
+    fi
+}
+
+verify_size_and_md5 "mina-${TESTNET_NAME}"
+verify_size_and_md5 "mina-archive"
