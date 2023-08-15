@@ -191,7 +191,8 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) : sig
     (** Double the point *)
     val double : t -> t
 
-    (** [scalar g xs] computes the MSM of [g] with [xs] *)
+    (** [scalar g xs] computes the scalar multiplication of [g] with [xs], where
+        the scalar [xs] is given as a list of bits *)
     val scale : t -> Impl.Boolean.var list -> t
 
     val if_ : Impl.Boolean.var -> then_:t -> else_:t -> t
