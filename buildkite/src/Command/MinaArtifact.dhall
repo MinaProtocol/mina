@@ -70,16 +70,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         in
         DockerImage.generateStep daemonMainnetSpec,
 
-        -- test_executive image
-        let testExecutiveSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
-          service="mina-test-executive",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
-        }
-        in
-        DockerImage.generateStep testExecutiveSpec,
-
         -- archive image
         let archiveSpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
@@ -107,7 +97,5 @@ in
 {
   bullseye  = pipeline DebianVersions.DebVersion.Bullseye
   , buster  = pipeline DebianVersions.DebVersion.Buster
-  , stretch = pipeline DebianVersions.DebVersion.Stretch
   , focal   = pipeline DebianVersions.DebVersion.Focal
-  , bionic  = pipeline DebianVersions.DebVersion.Bionic
 }
