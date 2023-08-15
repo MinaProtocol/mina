@@ -168,12 +168,8 @@ let write_blocks_to_output_dir ~current_chain ~output_dir =
   let () =
     if not (Core.Sys.file_exists_exn output_dir) then Core.Unix.mkdir output_dir
   in
-  let%bind () =
-    Deferred.List.iteri sorted_output ~f:(fun i block ->
-        let%bind () = write_block_to_file i block in
-        return () )
-  in
-  return ()
+  Deferred.List.iteri sorted_output ~f:(fun i block ->
+      write_block_to_file i block )
 
 let generate_context ~logger ~runtime_config_file =
   let runtime_config_opt =
