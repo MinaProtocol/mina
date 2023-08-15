@@ -22,40 +22,21 @@ type FundParams struct {
 
 type FundAction struct{}
 
-func fundImpl(config Config, params FundParams, amountPerKey uint64, password string) error {
+func launchMultiple(ctx context.Context, perform func(ctx context.Context, spawnAction func(func() error))) error {
 	var wg sync.WaitGroup
 	errs := make(chan error)
-	ctx, cancelF := context.WithCancel(config.Ctx)
+	ctx, cancelF := context.WithCancel(ctx)
 	defer cancelF()
-	for i, privkey := range params.Privkeys {
-		num := params.Num / len(params.Privkeys)
-		if i < params.Num%len(params.Privkeys) {
-			num++
-		}
-		args := []string{
-			"advanced", "itn-create-accounts",
-			"--amount", strconv.FormatUint(amountPerKey*uint64(num), 10),
-			"--fee", strconv.FormatUint(params.Fee, 10),
-			"--key-prefix", fmt.Sprintf("%s-%d", params.Prefix, i),
-			"--num-accounts", strconv.Itoa(num),
-			"--privkey-path", privkey,
-		}
-		if config.Daemon != "" {
-			args = append(args, "--daemon-port", config.Daemon)
-		}
-		cmd := exec.CommandContext(ctx, config.MinaExec, args...)
-		cmd.Stderr = os.Stderr
-		cmd.Stdout = os.Stderr
-		cmd.Env = []string{"MINA_PRIVKEY_PASS=" + password}
+	perform(ctx, func(run func() error) {
 		wg.Add(1)
 		go func() {
-			if err := cmd.Run(); err != nil {
+			if err := run(); err != nil {
 				errs <- err
 			} else {
 				wg.Done()
 			}
 		}()
-	}
+	})
 	go func() {
 		wg.Wait()
 		errs <- nil
@@ -63,28 +44,105 @@ func fundImpl(config Config, params FundParams, amountPerKey uint64, password st
 	return <-errs
 }
 
+func fundImpl(config Config, ctx context.Context, params FundParams, amountPerKey uint64, password string) error {
+	return launchMultiple(ctx, func(ctx context.Context, spawnAction func(func() error)) {
+		for i, privkey := range params.Privkeys {
+			num := params.Num / len(params.Privkeys)
+			if i < params.Num%len(params.Privkeys) {
+				num++
+			}
+			args := []string{
+				"advanced", "itn-create-accounts",
+				"--amount", strconv.FormatUint(amountPerKey*uint64(num), 10),
+				"--fee", strconv.FormatUint(params.Fee, 10),
+				"--key-prefix", fmt.Sprintf("%s-%d", params.Prefix, i),
+				"--num-accounts", strconv.Itoa(num),
+				"--privkey-path", privkey,
+			}
+			if config.Daemon != "" {
+				args = append(args, "--daemon-port", config.Daemon)
+			}
+			cmd := exec.CommandContext(ctx, config.MinaExec, args...)
+			cmd.Stderr = os.Stderr
+			cmd.Stdout = os.Stderr
+			cmd.Env = []string{"MINA_PRIVKEY_PASS=" + password}
+			spawnAction(cmd.Run)
+		}
+	})
+}
+
+func runImpl(config Config, ctx context.Context, params FundParams, output OutputF) error {
+	amountPerKey := params.Amount / uint64(params.Num)
+	var err error
+	password := ""
+	if params.PasswordEnv != "" {
+		password, _ = os.LookupEnv(params.PasswordEnv)
+	}
+	for retryPause := 1; retryPause <= 16; retryPause = retryPause * 2 {
+		err = fundImpl(config, ctx, params, amountPerKey, password)
+		if err == nil {
+			break
+		}
+		if retryPause <= 8 {
+			config.Log.Warnf("Failed to run fund command, retrying in %d minutes: %s", retryPause, err.Error())
+			time.Sleep(time.Duration(retryPause) * time.Minute)
+		}
+	}
+	return err
+}
+
 func (FundAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
 	var params FundParams
 	if err := json.Unmarshal(rawParams, &params); err != nil {
 		return err
 	}
-	password := ""
-	if params.PasswordEnv != "" {
-		password, _ = os.LookupEnv(params.PasswordEnv)
-	}
-	amountPerKey := params.Amount / uint64(params.Num)
-	var err error
-	for retryPause := 1; retryPause <= 8; retryPause = retryPause * 2 {
-		err = fundImpl(config, params, amountPerKey, password)
-		if err == nil {
-			break
-		}
-		config.Log.Warnf("Failed to run fund command, retrying in %d minutes: %s", retryPause, err.Error())
-		time.Sleep(time.Duration(retryPause) * time.Minute)
-	}
-	return err
+	return runImpl(config, config.Ctx, params, output)
 }
 
 func (FundAction) Name() string { return "fund-keys" }
 
-var _ Action = FundAction{}
+func memorize(cache map[string]struct{}, keys []string) bool {
+	for _, k := range keys {
+		_, has := cache[k]
+		if has {
+			return false
+		}
+		cache[k] = struct{}{}
+	}
+	return true
+}
+
+// Run consequetive commands that do not use common private keys in parallel
+func (FundAction) RunMany(config Config, actionIOs []ActionIO) error {
+	if len(actionIOs) == 0 {
+		return nil
+	}
+	fundParams := make([]FundParams, len(actionIOs))
+	for i, aIO := range actionIOs {
+		if err := json.Unmarshal(aIO.Params, &fundParams[i]); err != nil {
+			return err
+		}
+	}
+	i := 0
+	for i < len(actionIOs) {
+		usedKeys := map[string]struct{}{}
+		err := launchMultiple(config.Ctx, func(ctx context.Context, spawnAction func(func() error)) {
+			for ; i < len(actionIOs); i++ {
+				fp := fundParams[i]
+				if memorize(usedKeys, fp.Privkeys) {
+					spawnAction(func() error {
+						return runImpl(config, ctx, fp, actionIOs[i].Output)
+					})
+				} else {
+					break
+				}
+			}
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var _ BatchAction = FundAction{}

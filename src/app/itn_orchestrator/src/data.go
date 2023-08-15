@@ -54,7 +54,17 @@ type Config struct {
 
 type OutputF = func(name string, value any, multiple bool, sensitive bool)
 
+type ActionIO struct {
+	Params json.RawMessage
+	Output OutputF
+}
+
 type Action interface {
 	Run(config Config, params json.RawMessage, output OutputF) error
 	Name() string
+}
+
+type BatchAction interface {
+	Action
+	RunMany(config Config, actionIOs []ActionIO) error
 }

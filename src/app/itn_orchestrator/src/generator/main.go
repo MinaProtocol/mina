@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"os"
 	"sort"
-	"strings"
 
 	lib "itn_orchestrator"
 )
@@ -49,6 +48,7 @@ type Params struct {
 	ExperimentName, PasswordEnv, FundKeyPrefix                                             string
 	Privkeys                                                                               []string
 	PaymentReceiver                                                                        itn_json_types.MinaPublicKey
+	PrivkeysPerFundCmd                                                                     int
 }
 
 type Command struct {
@@ -230,12 +230,17 @@ func (p *Params) Generate(round int) GeneratedRound {
 			withComment(fmt.Sprintf("Waiting for remainder of round %d and pause, %d min %d sec since start", round, roundStartMin+elapsed/60, elapsed%60),
 				wait((p.RoundDurationMin+p.PauseMin)*60-elapsed)))
 	}
+	offset := (round * p.PrivkeysPerFundCmd * 2) % len(p.Privkeys)
+	rem := p.Privkeys[offset:]
+	for len(rem) < p.PrivkeysPerFundCmd*2 {
+		rem = append(rem, p.Privkeys...)
+	}
 	return GeneratedRound{
 		Commands: cmds,
 		FundCommands: []Command{
 			fund(lib.FundParams{
 				PasswordEnv: p.PasswordEnv,
-				Privkeys:    p.Privkeys,
+				Privkeys:    rem[:p.PrivkeysPerFundCmd],
 				Prefix:      zkappsKeysDir + "/key",
 				Amount:      zkappAmount,
 				Fee:         1e9,
@@ -243,7 +248,7 @@ func (p *Params) Generate(round int) GeneratedRound {
 			}),
 			fund(lib.FundParams{
 				PasswordEnv: p.PasswordEnv,
-				Privkeys:    p.Privkeys,
+				Privkeys:    rem[p.PrivkeysPerFundCmd : p.PrivkeysPerFundCmd*2],
 				Prefix:      paymentsKeysDir + "/key-",
 				Amount:      paymentAmount,
 				Fee:         1e9,
@@ -263,7 +268,6 @@ func checkRatio(ratio float64, msg string) {
 func main() {
 	var mode string
 	var p Params
-	var privkeys string
 	flag.Float64Var(&p.BaseTps, "base-tps", 0.3, "Base tps rate for the whole network")
 	flag.Float64Var(&p.StressTps, "stress-tps", 1, "stress tps rate for the whole network")
 	flag.Float64Var(&p.MinStopRatio, "stop-min-ratio", 0.0, "float in range [0..1], minimum ratio of nodes to stop at an interval")
@@ -284,13 +288,21 @@ func main() {
 	checkRatio(p.MaxStopRatio, "wrong max stop ratio")
 	checkRatio(p.RedeployRatio, "wrong redeploy ratio")
 	flag.StringVar(&mode, "mode", "default", "mode of generation")
-	flag.StringVar(&privkeys, "privkey", "", "private key files to use for funding, comma-separated")
 	flag.StringVar(&p.FundKeyPrefix, "fund-keys-dir", "./fund-keys", "Dir for generated fund key prefixes")
 	flag.StringVar(&p.PasswordEnv, "password-env", "", "Name of environment variable to read privkey password from")
 	flag.StringVar((*string)(&p.PaymentReceiver), "payment-receiver", "", "Mina PK receiving payments")
 	flag.StringVar(&p.ExperimentName, "experiment-name", "exp-0", "Name of experiment")
+	flag.IntVar(&p.PrivkeysPerFundCmd, "privkeys-per-fund", 1, "Number of private keys to use per fund command")
 	flag.Parse()
-	p.Privkeys = strings.Split(privkeys, ",")
+	p.Privkeys = flag.Args()
+	if len(p.Privkeys) == 0 {
+		fmt.Fprintln(os.Stderr, "Specify funding private key files after all flags (separated by spaces)")
+		os.Exit(4)
+	}
+	if len(p.Privkeys) < p.PrivkeysPerFundCmd {
+		fmt.Fprintln(os.Stderr, "Number of private keys is less than --privkeys-per-fund")
+		os.Exit(4)
+	}
 	switch mode {
 	case "stop-ratio-distribution":
 		for i := 0; i < 10000; i++ {
