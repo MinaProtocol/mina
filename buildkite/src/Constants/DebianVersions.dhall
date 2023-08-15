@@ -13,7 +13,6 @@ let capitalName = \(debVersion : DebVersion) ->
     , Buster = "Buster"
     , Jammy = "Jammy"
     , Focal = "Focal"
-    , Bionic = "Bionic"
   } debVersion
 
 let lowerName = \(debVersion : DebVersion) ->
@@ -23,7 +22,6 @@ let lowerName = \(debVersion : DebVersion) ->
     , Buster = "buster"
     , Jammy = "jammy"
     , Focal = "focal"
-    , Bionic = "bionic"
   } debVersion
 
 --- Bionic and Stretch are so similar that they share a toolchain runner
