@@ -61,7 +61,7 @@ let read_block_file blocks_filename =
   match In_channel.input_line blocks_file with
   | Some line ->
       In_channel.close blocks_file ;
-      return (read_block_line line)
+      read_block_line line
   | None ->
       In_channel.close blocks_file ;
       failwithf "File %s is empty" blocks_filename ()
@@ -211,9 +211,8 @@ let main () ~blocks_dir ~output_dir ~runtime_config_file =
   [%log info] "Starting to read blocks dir"
     ~metadata:[ ("blocks_dir", `String blocks_dir) ] ;
   let%bind block_sorted_filenames = read_directory blocks_dir in
-  let%bind precomputed_blocks =
-    Deferred.List.map block_sorted_filenames ~f:(fun json ->
-        read_block_file json )
+  let precomputed_blocks =
+    List.map block_sorted_filenames ~f:(fun json -> read_block_file json)
   in
   [%log info] "Finished reading blocks dir" ;
   let%bind context = generate_context ~logger ~runtime_config_file in
