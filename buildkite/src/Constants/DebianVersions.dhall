@@ -4,7 +4,7 @@ let ContainerImages = ./ContainerImages.dhall
 let S = ../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
-let DebVersion = < Bookworm | Bullseye | Buster | Jammy | Focal | Bionic >
+let DebVersion = < Bookworm | Bullseye | Buster | Jammy | Focal >
 
 let capitalName = \(debVersion : DebVersion) ->
   merge {
@@ -36,7 +36,6 @@ let toolchainRunner = \(debVersion : DebVersion) ->
     , Buster = RunInToolchain.runInToolchainBuster
     , Jammy = RunInToolchain.runInToolchainBookworm
     , Focal = RunInToolchain.runInToolchainBullseye
-    , Bionic = RunInToolchain.runInToolchainBionic
   } debVersion
 
 --- Bionic and Stretch are so similar that they share a toolchain image
@@ -49,7 +48,6 @@ let toolchainImage = \(debVersion : DebVersion) ->
     , Buster = ContainerImages.minaToolchainBuster
     , Jammy = ContainerImages.minaToolchainBookworm
     , Focal = ContainerImages.minaToolchainBullseye
-    , Bionic = ContainerImages.minaToolchainBionic
   } debVersion
 
 let dependsOn = \(debVersion : DebVersion) ->
