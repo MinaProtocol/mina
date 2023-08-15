@@ -87,7 +87,7 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
             ] ;
         (* Declare the node to be offline. *)
         Pipe.write_without_pushback_if_open event_writer
-          (node, Event (Node_offline, ())) ;
+          (node, Event (Node_down, ())) ;
         (* Don't keep looping, the node may be restarting. *)
         return (Ok ()) )
   else Deferred.Or_error.error_string "Event writer closed"

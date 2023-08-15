@@ -112,7 +112,7 @@ def stop_daemon():
   Path('daemon-active').unlink()
   mina_process = None
   log("daemon fully stopped" )
-  log_event("node_offline", "daemon is being stopped by puppeteer script and is going offline")
+  log_event("node_stopped", "daemon is being stopped by puppeteer script and is going offline")
 
 # technically, doing the loops like this will eventually result in a stack overflow
 # however, you would need to do a lot of starts and stops to hit this condition
