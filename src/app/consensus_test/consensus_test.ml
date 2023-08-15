@@ -162,13 +162,15 @@ let write_blocks_to_output_dir ~current_chain ~output_dir =
     List.map ~f:precomputed_block_to_block_file_output !current_chain
     |> List.rev
   in
-  let write_block_to_file (i : int) (block : BlockFileOutput.t) :
-      unit Deferred.t =
+  let write_block_to_file i block : unit Deferred.t =
     let block_json_str =
       block |> BlockFileOutput.to_yojson |> Yojson.Safe.to_string
     in
     let output_file = sprintf "%s/block_%d.json" output_dir i in
     Writer.save output_file ~contents:block_json_str
+  in
+  let () =
+    if not (Core.Sys.file_exists_exn output_dir) then Core.Unix.mkdir output_dir
   in
   let%bind () =
     Deferred.List.iteri sorted_output ~f:(fun i block ->
