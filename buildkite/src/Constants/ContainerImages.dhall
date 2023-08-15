@@ -1,6 +1,5 @@
 -- TODO: Automatically push, tag, and update images #4862
 -- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBullseye
--- NOTE: minaToolchainBionic is also used for building Ubuntu Bionic packages in CI
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 {
