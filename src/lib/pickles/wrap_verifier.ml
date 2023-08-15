@@ -884,14 +884,60 @@ struct
                   match acc with
                   | Types.Opt.None ->
                       comm
-                  | Types.Opt.Maybe (b, acc) ->
-                      failwith "TODO"
+                  | Types.Opt.Maybe (has_acc, acc) -> (
+                      match comm with
+                      | Types.Opt.None ->
+                          Types.Opt.Maybe (has_acc, acc)
+                      | Types.Opt.Maybe (has_comm, comm) ->
+                          let scaled_acc =
+                            Array.map acc ~f:(fun acc ->
+                                Scalar_challenge.endo acc joint_combiner )
+                          in
+                          let sum =
+                            Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
+                          in
+                          let acc_with_comm =
+                            Array.map2_exn sum comm ~f:(fun sum comm ->
+                                Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
+                          in
+                          let res =
+                            Array.map2_exn acc acc_with_comm
+                              ~f:(fun acc acc_with_comm ->
+                                Inner_curve.if_ has_comm ~then_:acc_with_comm
+                                  ~else_:acc )
+                          in
+                          let b = Boolean.(has_acc ||| has_comm) in
+                          Types.Opt.Maybe (b, res)
+                      | Types.Opt.Some comm ->
+                          let scaled_acc =
+                            Array.map acc ~f:(fun acc ->
+                                Scalar_challenge.endo acc joint_combiner )
+                          in
+                          let sum =
+                            Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
+                          in
+                          let res =
+                            Array.map2_exn sum comm ~f:(fun sum comm ->
+                                Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
+                          in
+                          Types.Opt.Some res )
                   | Types.Opt.Some acc -> (
                       match comm with
                       | Types.Opt.None ->
                           Types.Opt.Some acc
-                      | Types.Opt.Maybe (b, comm) ->
-                          failwith "TODO"
+                      | Types.Opt.Maybe (has_comm, comm) ->
+                          let scaled_acc =
+                            Array.map acc ~f:(fun acc ->
+                                Scalar_challenge.endo acc joint_combiner )
+                          in
+                          let sum =
+                            Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
+                          in
+                          let res =
+                            Array.map2_exn sum acc ~f:(fun sum acc ->
+                                Inner_curve.if_ has_comm ~then_:sum ~else_:acc )
+                          in
+                          Types.Opt.Some res
                       | Types.Opt.Some comm ->
                           let scaled_acc =
                             Array.map acc ~f:(fun acc ->
