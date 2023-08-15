@@ -825,8 +825,51 @@ struct
                 match (second_column, l.runtime) with
                 | Types.Opt.None, comm | comm, Types.Opt.None ->
                     comm
-                | Types.Opt.Maybe _, _ | _, Types.Opt.Maybe _ ->
-                    failwith "TODO"
+                | ( Types.Opt.Maybe (has_second_column, second_column)
+                  , Types.Opt.Maybe (has_runtime, runtime) ) ->
+                    let second_with_runtime =
+                      let sum =
+                        Array.map2_exn ~f:Inner_curve.( + ) second_column
+                          runtime
+                      in
+                      Array.map2_exn second_column sum
+                        ~f:(fun second_column sum ->
+                          Inner_curve.if_ has_runtime ~then_:sum
+                            ~else_:second_column )
+                    in
+                    let res =
+                      Array.map2_exn second_with_runtime runtime
+                        ~f:(fun second_with_runtime runtime ->
+                          Inner_curve.if_ has_second_column
+                            ~then_:second_with_runtime ~else_:runtime )
+                    in
+                    let b = Boolean.(has_second_column ||| has_runtime) in
+                    Types.Opt.Maybe (b, res)
+                | ( Types.Opt.Maybe (has_second_column, second_column)
+                  , Types.Opt.Some runtime ) ->
+                    let res =
+                      let sum =
+                        Array.map2_exn ~f:Inner_curve.( + ) second_column
+                          runtime
+                      in
+                      Array.map2_exn runtime sum ~f:(fun runtime sum ->
+                          Inner_curve.if_ has_second_column ~then_:sum
+                            ~else_:runtime )
+                    in
+                    Types.Opt.Some res
+                | ( Types.Opt.Some second_column
+                  , Types.Opt.Maybe (has_runtime, runtime) ) ->
+                    let res =
+                      let sum =
+                        Array.map2_exn ~f:Inner_curve.( + ) second_column
+                          runtime
+                      in
+                      Array.map2_exn second_column sum
+                        ~f:(fun second_column sum ->
+                          Inner_curve.if_ has_runtime ~then_:sum
+                            ~else_:second_column )
+                    in
+                    Types.Opt.Some res
                 | Types.Opt.Some second_column, Types.Opt.Some runtime ->
                     Types.Opt.Some
                       (Array.map2_exn ~f:Inner_curve.( + ) second_column runtime)
