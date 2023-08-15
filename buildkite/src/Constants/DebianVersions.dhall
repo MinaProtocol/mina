@@ -55,7 +55,6 @@ let dependsOn = \(debVersion : DebVersion) ->
     , Buster = [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }]
     , Jammy = [{ name = "MinaArtifactJammy", key = "build-deb-pkg" }]
     , Focal = [{ name = "MinaArtifactFocal", key = "build-deb-pkg" }]
-    , Bionic = [{ name = "MinaArtifactBionic", key = "build-deb-pkg" }]
   } debVersion
 
 -- Most debian builds are only used for public releases
