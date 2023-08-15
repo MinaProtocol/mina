@@ -1040,7 +1040,28 @@ let setup_daemon logger =
                 ~metadata:
                   [ ("num_jobs", `Int num_jobs)
                   ; ("num_cycles", `Int num_cycles)
-                  ] ) ;
+                  ] ;
+              let threads_to_report =
+                [ "work_lib_all_unseen_works"
+                ; "work_lib_remove_old_assignments"
+                ; "work_lib_get_expensive_work"
+                ]
+              in
+              let thread_stats =
+                List.fold_left threads_to_report ~init:[]
+                  ~f:(fun acc thread_name ->
+                    match O1trace.Thread.find_thread thread_name with
+                    | None ->
+                        acc
+                    | Some thread ->
+                        let elapsed =
+                          O1trace.Execution_timer.elapsed_time_of_thread thread
+                        in
+                        (thread_name, `Float (Time_ns.Span.to_ms elapsed))
+                        :: acc )
+              in
+              [%log debug] "O1trace thread stats: $thread_stats"
+                ~metadata:[ ("thread_stats", `Assoc thread_stats) ] ) ;
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
                ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest) )

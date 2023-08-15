@@ -55,6 +55,8 @@ let load_state thread id = Univ_map.find thread.state id
 let set_state thread id value =
   thread.state <- Univ_map.set thread.state id value
 
+let find_thread name = Hashtbl.find threads name
+
 let iter_threads ~f = Hashtbl.iter threads ~f
 
 let dump_thread_graph () =

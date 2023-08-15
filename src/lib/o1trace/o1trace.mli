@@ -10,6 +10,8 @@ module Thread : sig
 
   val set_state : t -> 'a Type_equal.Id.t -> 'a -> unit
 
+  val find_thread : string -> t option
+
   val iter_threads : f:(t -> unit) -> unit
 
   val dump_thread_graph : unit -> bytes

@@ -88,22 +88,28 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       t
 
     let all_unseen_works t =
-      List.filter t.available_jobs ~f:(fun js ->
-          not
-          @@ Hashtbl.mem t.jobs_seen (One_or_two.map ~f:Work_spec.statement js) )
+      O1trace.sync_thread "work_lib_all_unseen_works" (fun () ->
+          List.filter t.available_jobs ~f:(fun js ->
+              not
+              @@ Hashtbl.mem t.jobs_seen
+                   (One_or_two.map ~f:Work_spec.statement js) ) )
 
     let remove_old_assignments t ~logger =
-      let now = Time.now () in
-      Hashtbl.filteri_inplace t.jobs_seen ~f:(fun ~key:work ~data:status ->
-          if
-            Job_status.is_old status ~now ~reassignment_wait:t.reassignment_wait
-          then (
-            [%log info]
-              ~metadata:[ ("work", Seen_key.to_yojson work) ]
-              "Waited too long to get work for $work. Ready to be reassigned" ;
-            Mina_metrics.(Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
-            false )
-          else true )
+      O1trace.sync_thread "work_lib_remove_old_assignments" (fun () ->
+          let now = Time.now () in
+          Hashtbl.filteri_inplace t.jobs_seen ~f:(fun ~key:work ~data:status ->
+              if
+                Job_status.is_old status ~now
+                  ~reassignment_wait:t.reassignment_wait
+              then (
+                [%log info]
+                  ~metadata:[ ("work", Seen_key.to_yojson work) ]
+                  "Waited too long to get work for $work. Ready to be \
+                   reassigned" ;
+                Mina_metrics.(
+                  Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
+                false )
+              else true ) )
 
     let remove t x =
       Hashtbl.remove t.jobs_seen (One_or_two.map ~f:Work_spec.statement x)
@@ -129,9 +135,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   let get_expensive_work ~snark_pool ~fee
       (jobs : ('a, 'b) Work_spec.t One_or_two.t list) :
       ('a, 'b) Work_spec.t One_or_two.t list =
-    List.filter jobs ~f:(fun job ->
-        does_not_have_better_fee ~snark_pool ~fee
-          (One_or_two.map job ~f:Work_spec.statement) )
+    O1trace.sync_thread "work_lib_get_expensive_work" (fun () ->
+        List.filter jobs ~f:(fun job ->
+            does_not_have_better_fee ~snark_pool ~fee
+              (One_or_two.map job ~f:Work_spec.statement) ) )
 
   let all_pending_work ~snark_pool statements =
     List.filter statements ~f:(fun st ->
