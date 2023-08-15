@@ -109,7 +109,6 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : s
     -> (module Field_intf with type t = 't)
     -> env:'t Scalars.Env.t
     -> shift:'t Shifted_value.Shift.t
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
     -> ( 't
        , 't
        , 'b )
@@ -132,7 +131,6 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : s
        (module Snarky_backendless.Snark_intf.Run with type field = 't)
     -> shift:'t Snarky_backendless.Cvar.t Shifted_value.Shift.t
     -> env:'t Snarky_backendless.Cvar.t Scalars.Env.t
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
     -> ( 't Snarky_backendless.Cvar.t
        , 't Snarky_backendless.Cvar.t
        , 't Snarky_backendless.Cvar.t Shifted_value.t
