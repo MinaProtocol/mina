@@ -127,28 +127,7 @@ module Step = struct
 
   let input ~proofs_verified ~wrap_rounds ~feature_flags =
     let open Types.Step.Statement in
-    let lookup :
-        ( Challenge.Constant.t
-        , Impl.Field.t
-        , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-        , Other_field.t Pickles_types.Shifted_value.Type2.t )
-        Types.Wrap.Lookup_parameters.t =
-      { use = Plonk_checks.lookup_tables_used feature_flags
-      ; zero =
-          { value =
-              { challenge = Limb_vector.Challenge.Constant.zero
-              ; scalar = Shifted_value Other_field.Constant.zero
-              }
-          ; var =
-              { challenge = Field.zero
-              ; scalar = Shifted_value (Field.zero, Boolean.false_)
-              }
-          }
-      }
-    in
-    let spec =
-      spec (module Impl) proofs_verified wrap_rounds lookup feature_flags
-    in
+    let spec = spec proofs_verified wrap_rounds in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (module Impl)
@@ -160,22 +139,8 @@ module Step = struct
            , Fn.id ) )
         spec
     in
-    let typ =
-      Typ.transport typ
-        ~there:(to_data ~option_map:Option.map ~to_opt:Fn.id)
-        ~back:
-          (of_data ~feature_flags ~option_map:Option.map
-             ~of_opt:Plonk_types.Opt.to_option )
-    in
-    Spec.ETyp.T
-      ( typ
-      , (fun x ->
-          of_data ~feature_flags ~option_map:Plonk_types.Opt.map (f x)
-            ~of_opt:Fn.id )
-      , fun x ->
-          f_inv
-            (to_data ~option_map:Plonk_types.Opt.map x
-               ~to_opt:Plonk_types.Opt.to_option_unsafe ) )
+    let typ = Typ.transport typ ~there:to_data ~back:of_data in
+    Spec.ETyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
 end
 
 module Wrap = struct

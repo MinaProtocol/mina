@@ -59,6 +59,56 @@ module Concrete_ : sig
     end
   end
 
+  module Wrap_wire_proof : sig
+    type fp_point := Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
+
+    type fq_point := Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
+
+    module Columns_vec = Pickles_types.Vector.Vector_15
+    module Coefficients_vec = Pickles_types.Vector.Vector_15
+    module Quotient_polynomial_vec = Pickles_types.Vector.Vector_7
+    module Permuts_minus_1_vec = Pickles_types.Vector.Vector_6
+
+    module Commitments : sig
+      module V1 : sig
+        type t =
+          { w_comm : fp_point Columns_vec.Stable.V1.t
+          ; z_comm : fp_point
+          ; t_comm : fp_point Quotient_polynomial_vec.Stable.V1.t
+          }
+      end
+    end
+
+    module Evaluations : sig
+      module V1 : sig
+        type t =
+          { w : fq_point Columns_vec.Stable.V1.t
+          ; coefficients : fq_point Columns_vec.Stable.V1.t
+          ; z : fq_point
+          ; s : fq_point Permuts_minus_1_vec.Stable.V1.t
+          ; generic_selector : fq_point
+          ; poseidon_selector : fq_point
+          ; complete_add_selector : fq_point
+          ; mul_selector : fq_point
+          ; emul_selector : fq_point
+          ; endomul_scalar_selector : fq_point
+          }
+      end
+    end
+
+    module V1 : sig
+      type t =
+        { commitments : Commitments.V1.t
+        ; evaluations : Evaluations.V1.t
+        ; ft_eval1 : Pasta_bindings.Fq.t
+        ; bulletproof :
+            ( fp_point
+            , Pasta_bindings.Fq.t )
+            Pickles_types.Plonk_types.Openings.Bulletproof.Stable.V1.t
+        }
+    end
+  end
+
   module Proof : sig
     (* We define some type aliases directly *)
     type challenge_constant =
@@ -73,12 +123,6 @@ module Concrete_ : sig
         module V2 : sig
           type digest_constant =
             Pickles_limb_vector.Constant.Make(Pickles_types.Nat.N4).t
-
-          type tock_proof =
-            ( tock_affine
-            , Pasta_bindings.Fq.t
-            , Pasta_bindings.Fq.t array )
-            Pickles_types.Plonk_types.Proof.Stable.V2.t
 
           type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
             { statement :
@@ -98,7 +142,7 @@ module Concrete_ : sig
                 ( Snark_params.Tick.Field.t
                 , Snark_params.Tick.Field.t array )
                 Pickles_types.Plonk_types.All_evals.t
-            ; proof : tock_proof
+            ; proof : Wrap_wire_proof.V1.t
             }
         end
       end
