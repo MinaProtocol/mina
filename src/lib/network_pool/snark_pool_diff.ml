@@ -66,7 +66,8 @@ module Make
     | Empty ->
         1
 
-  let max_per_15_seconds = 20
+  (* Effectively disable rate limitting for purpose of testing  *)
+  let max_per_15_seconds = 2000
 
   let summary = function
     | Add_solved_work (work, { proof = _; fee }) ->
