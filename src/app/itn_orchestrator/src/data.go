@@ -43,13 +43,13 @@ type Config struct {
 	UptimeBucket       *storage.BucketHandle
 	Sk                 ed25519.PrivateKey
 	Log                logging.StandardLogger
-	Daemon             string
 	MinaExec           string
 	NodeData           map[NodeAddress]NodeEntry
 	SlotDurationMs     int
 	GenesisTimestamp   time.Time
 	ControlExec        string
 	StopDaemonDelaySec int
+	FundDaemonPorts    []string
 }
 
 type OutputF = func(name string, value any, multiple bool, sensitive bool)

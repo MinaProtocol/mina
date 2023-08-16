@@ -44,7 +44,7 @@ func launchMultiple(ctx context.Context, perform func(ctx context.Context, spawn
 	return <-errs
 }
 
-func fundImpl(config Config, ctx context.Context, params FundParams, amountPerKey uint64, password string) error {
+func fundImpl(config Config, ctx context.Context, daemonPort string, params FundParams, amountPerKey uint64, password string) error {
 	return launchMultiple(ctx, func(ctx context.Context, spawnAction func(func() error)) {
 		for i, privkey := range params.Privkeys {
 			num := params.Num / len(params.Privkeys)
@@ -59,8 +59,8 @@ func fundImpl(config Config, ctx context.Context, params FundParams, amountPerKe
 				"--num-accounts", strconv.Itoa(num),
 				"--privkey-path", privkey,
 			}
-			if config.Daemon != "" {
-				args = append(args, "--daemon-port", config.Daemon)
+			if daemonPort != "" {
+				args = append(args, "--daemon-port", daemonPort)
 			}
 			cmd := exec.CommandContext(ctx, config.MinaExec, args...)
 			cmd.Stderr = os.Stderr
@@ -71,21 +71,29 @@ func fundImpl(config Config, ctx context.Context, params FundParams, amountPerKe
 	})
 }
 
-func runImpl(config Config, ctx context.Context, params FundParams, output OutputF) error {
+func runImpl(config Config, ctx context.Context, daemonPortIx int, params FundParams, output OutputF) error {
 	amountPerKey := params.Amount / uint64(params.Num)
 	var err error
 	password := ""
 	if params.PasswordEnv != "" {
 		password, _ = os.LookupEnv(params.PasswordEnv)
 	}
+	daemonPort := ""
+	if len(config.FundDaemonPorts) > 0 {
+		daemonPort = config.FundDaemonPorts[daemonPortIx]
+	}
 	for retryPause := 1; retryPause <= 16; retryPause = retryPause * 2 {
-		err = fundImpl(config, ctx, params, amountPerKey, password)
+		err = fundImpl(config, ctx, daemonPort, params, amountPerKey, password)
 		if err == nil {
 			break
 		}
 		if retryPause <= 8 {
 			config.Log.Warnf("Failed to run fund command, retrying in %d minutes: %s", retryPause, err.Error())
 			time.Sleep(time.Duration(retryPause) * time.Minute)
+		}
+		if len(config.FundDaemonPorts) > 0 {
+			daemonPortIx = (daemonPortIx + 1) % len(config.FundDaemonPorts)
+			daemonPort = config.FundDaemonPorts[daemonPortIx]
 		}
 	}
 	return err
@@ -96,7 +104,7 @@ func (FundAction) Run(config Config, rawParams json.RawMessage, output OutputF) 
 	if err := json.Unmarshal(rawParams, &params); err != nil {
 		return err
 	}
-	return runImpl(config, config.Ctx, params, output)
+	return runImpl(config, config.Ctx, 0, params, output)
 }
 
 func (FundAction) Name() string { return "fund-keys" }
@@ -125,13 +133,18 @@ func (FundAction) RunMany(config Config, actionIOs []ActionIO) error {
 	}
 	i := 0
 	for i < len(actionIOs) {
+		daemonPortIx := 0
+		if len(config.FundDaemonPorts) > 0 {
+			daemonPortIx = i % len(config.FundDaemonPorts)
+		}
 		usedKeys := map[string]struct{}{}
 		err := launchMultiple(config.Ctx, func(ctx context.Context, spawnAction func(func() error)) {
 			for ; i < len(actionIOs); i++ {
 				fp := fundParams[i]
+				out := actionIOs[i].Output
 				if memorize(usedKeys, fp.Privkeys) {
 					spawnAction(func() error {
-						return runImpl(config, ctx, fp, actionIOs[i].Output)
+						return runImpl(config, ctx, daemonPortIx, fp, out)
 					})
 				} else {
 					break
