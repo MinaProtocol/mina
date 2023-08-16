@@ -58,16 +58,27 @@ function verify_size_and_md5 {
     FILENAME_SIZE=$(stat -c "%s" $FILENAME)
     FILENAME_MD5=$(md5sum ${FILENAME} | awk '{ print $1 }')
 
+    echo "comparing sizes of $DEB_NAME between http://packages.o1test.net and local file.."
     if [[ "$SIZE" -ne "$FILENAME_SIZE" ]]; then
         echo "local deb file has $FILENAME_SIZE size while remote is $SIZE"
         exit -1
     fi
+    echo "$DEB_NAME has identical size locally and on http://packages.o1test.net"
 
+    echo "comparing md5 hashes of $DEB_NAME between http://packages.o1test.net and local file.."
     if [[ "$MD5" != "$FILENAME_MD5" ]]; then
         echo "local deb file has $FILENAME_MD5 md5sum while remote is $MD5"
         exit -1
     fi
+    echo "$DEB_NAME has identical md5 locally and on http://packages.o1test.net"
+
 }
 
-verify_size_and_md5 "mina-${TESTNET_NAME}"
-verify_size_and_md5 "mina-archive"
+# In order to prevent anyone to use freshly pushed packages prematurely we need to be sure those packages has correct
+# md5 and sizes before finishing script
+function verify_o1test_repo_is_synced {
+    verify_size_and_md5 "mina-${TESTNET_NAME}"
+    verify_size_and_md5 "mina-archive"
+}
+
+for i in {1..5}; do verify_o1test_repo_is_synced && break || sleep 60; done
