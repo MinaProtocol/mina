@@ -523,7 +523,7 @@ module Network_manager = struct
       let%bind () = Malleable_error.return (Thread.delay delay) in
       check_kube_capacity t ~logger ~retries:(retries - 1) ~delay
 
-  let create ~logger (network_config : Network_config.t) =
+  let create ~logger (network_config : Network_config.t) _ =
     let open Malleable_error.Let_syntax in
     let%bind current_cluster =
       Util.run_cmd_or_hard_error "/" "kubectl" [ "config"; "current-context" ]

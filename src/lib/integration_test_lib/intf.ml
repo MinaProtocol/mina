@@ -271,7 +271,7 @@ module Engine = struct
 
     type t
 
-    val create : logger:Logger.t -> Network_config.t -> t Malleable_error.t
+    val create : logger:Logger.t -> Network_config.t -> Test_config.t -> t Malleable_error.t
 
     val deploy : t -> Network.t Malleable_error.t
 
