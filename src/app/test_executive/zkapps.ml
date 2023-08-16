@@ -209,6 +209,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; send = Proof
         }
       in
+
       let (zkapp_command_spec : Transaction_snark.For_tests.Update_states_spec.t)
           =
         { sender = (fish2_kp, nonce)
@@ -220,7 +221,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; memo
         ; new_zkapp_account = false
         ; snapp_update =
-            { Account_update.Update., with
+            { Account_update.Update.dummy with
               permissions = Set new_permissions
             }
         ; current_auth =
@@ -238,6 +239,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       (zkapp_command, new_permissions)
     in
+
     let%bind.Deferred ( zkapp_update_all
                       , zkapp_command_update_all
                       , zkapp_command_invalid_nonce
@@ -347,19 +349,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let zkapp_command_single_account_update =
       let spec : Transaction_snark.For_tests.Single_account_update_spec.t =
-        { fee = fee 
+        { fee
         ; fee_payer = (fish2_kp, nonce)
-        ; zkapp_account_keypair = single_zkapp_keypair 
-        ; memo 
-        ; update = snapp_update 
-        ; current_auth = Permissions.Auth_required.Proof 
-        ; call_data = Snark_params.Tick.Field.zero 
+        ; zkapp_account_keypair = single_zkapp_keypair
+        ; memo
+        ; update = snapp_update
+        ; current_auth = Permissions.Auth_required.Proof
+        ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; actions = [] 
+        ; actions = []
         }
-      in 
-      Transaction_snark.For_tests.single_account_update ~constraint_constants 
-      spec 
+      in
+      Transaction_snark.For_tests.single_account_update ~constraint_constants
+        spec
     in
     let zkapp_command_invalid_signature =
       let p = zkapp_command_update_all in

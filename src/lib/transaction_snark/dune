@@ -32,6 +32,7 @@
    snarky_integer
    pickles.backend
    signature_lib
+   mina_signature_kind
    genesis_constants
    currency
    random_oracle

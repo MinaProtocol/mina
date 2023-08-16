@@ -295,7 +295,6 @@ module type Full = sig
         ; zkapp_account_keypair : Signature_lib.Keypair.t
         ; memo : Signed_command_memo.t
         ; update : Account_update.Update.t
-        ; current_auth : Permissions.Auth_required.t
         ; actions : Tick.Field.t array list
         ; events : Tick.Field.t array list
         ; call_data : Tick.Field.t
@@ -303,9 +302,10 @@ module type Full = sig
     end
 
     val single_account_update :
-         constraint_constants:Genesis_constants.Constraint_constants.t
+         ?chain:Mina_signature_kind.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Single_account_update_spec.t
-      -> Zkapp_command.t
+      -> Zkapp_command.t Async.Deferred.t
 
     module Update_states_spec : sig
       type t =

@@ -4588,31 +4588,53 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; zkapp_account_keypair : Signature_lib.Keypair.t
         ; memo : Signed_command_memo.t
         ; update : Account_update.Update.t
-        ; current_auth : Permissions.Auth_required.t
         ; actions : Tick.Field.t array list
         ; events : Tick.Field.t array list
         ; call_data : Tick.Field.t
         }
+
+      let spec_of_t ~vk
+          { fee
+          ; fee_payer
+          ; zkapp_account_keypair
+          ; memo
+          ; update = _
+          ; actions
+          ; events
+          ; call_data
+          } : Spec.t =
+        { fee
+        ; sender = fee_payer
+        ; fee_payer = None
+        ; receivers = []
+        ; amount = Currency.Amount.zero
+        ; zkapp_account_keypairs = [ zkapp_account_keypair ]
+        ; memo
+        ; new_zkapp_account = false
+        ; actions
+        ; events
+        ; call_data
+        ; preconditions = None
+        ; authorization_kind = Proof (With_hash.hash vk)
+        }
     end
 
-    let single_account_update ~constraint_constants
-        (spec : Single_account_update_spec.t) : Zkapp_command.t =
-      let `VK vk, `Prover _prover =
+    let single_account_update ?chain ~constraint_constants
+        (spec : Single_account_update_spec.t) : Zkapp_command.t Async.Deferred.t
+        =
+      let `VK vk, `Prover prover =
         create_trivial_snapp ~constraint_constants ()
       in
-      let fee_payer : Account_update.Fee_payer.t =
-        { body =
-            { public_key =
-                Signature_lib.Public_key.compress
-                  (fst spec.fee_payer).public_key
-            ; fee = spec.fee
-            ; valid_until = None
-            ; nonce = snd spec.fee_payer
-            }
-        ; authorization = Signature.dummy
-        }
+      let ( `Zkapp_command { Zkapp_command.fee_payer; memo; _ }
+          , `Sender_account_update _
+          , `Proof_zkapp_command _
+          , `Txn_commitment _
+          , `Full_txn_commitment _ ) =
+        create_zkapp_command ~constraint_constants
+          (Single_account_update_spec.spec_of_t ~vk spec)
+          ~update:spec.update ~receiver_update:Account_update.Update.noop
       in
-      let account_update =
+      let account_update_with_dummy_auth =
         Account_update.
           { body =
               { public_key =
@@ -4629,44 +4651,43 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; use_full_commitment = true
               ; implicit_account_creation_fee = false
               ; may_use_token = No
-              ; authorization_kind =
-                  ( match spec.current_auth with
-                  | None ->
-                      Account_update.Authorization_kind.None_given
-                  | Proof ->
-                      Proof (With_hash.hash vk)
-                  | Signature | _ ->
-                      Signature )
+              ; authorization_kind = Proof (With_hash.hash vk)
               }
-          ; authorization =
-              ( match spec.current_auth with
-              | None ->
-                  Control.None_given
-              | Proof ->
-                  Control.Proof Mina_base.Proof.blockchain_dummy
-              | Signature | _ ->
-                  Control.Signature Signature.dummy )
+          ; authorization = Control.Proof Mina_base.Proof.blockchain_dummy
           }
       in
-      { fee_payer
-      ; memo = spec.memo
-      ; account_updates =
-          (let node =
-             Zkapp_command.Call_forest.Tree.
-               { account_update
-               ; calls = []
-               ; account_update_digest =
-                   Zkapp_command.Digest.Account_update.create account_update
-               }
-           in
-           [ With_stack_hash.
-               { elt = node
-               ; stack_hash =
-                   Zkapp_command.Digest.(
-                     Forest.cons (Tree.create node) Forest.empty)
-               }
-           ] )
-      }
+      let tree_with_dummy_auth =
+        Zkapp_command.Call_forest.Tree.
+          { account_update = account_update_with_dummy_auth
+          ; calls = []
+          ; account_update_digest =
+              Zkapp_command.Digest.Account_update.create ?chain
+                account_update_with_dummy_auth
+          }
+      in
+      let statement = Zkapp_statement.of_tree tree_with_dummy_auth in
+      let%map.Async.Deferred tree =
+        let handler (Snarky_backendless.Request.With { request; respond }) =
+          match request with _ -> respond Unhandled
+        in
+        let%map.Async.Deferred (), (), (pi : Pickles.Side_loaded.Proof.t) =
+          prover ~handler statement
+        in
+        { tree_with_dummy_auth with
+          account_update =
+            { account_update_with_dummy_auth with authorization = Proof pi }
+        }
+      in
+      let forest =
+        [ With_stack_hash.
+            { elt = tree
+            ; stack_hash =
+                Zkapp_command.Digest.(
+                  Forest.cons (Tree.create tree) Forest.empty)
+            }
+        ]
+      in
+      ({ fee_payer; memo; account_updates = forest } : Zkapp_command.t)
 
     module Update_states_spec = struct
       type t =
