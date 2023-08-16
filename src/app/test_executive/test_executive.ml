@@ -31,7 +31,13 @@ type inputs =
   ; archive_image : string option
   ; debug : bool
   ; config_path : string option
+  ; mock_alias : (string * string) option
   }
+
+let test_name (test : test)
+    (module Inputs : Integration_test_lib.Intf.Test.Inputs_intf) =
+  let module Test = (val test) (Inputs) in
+  Test.test_name
 
 let validate_inputs ~logger inputs (test_config : Test_config.t) :
     unit Deferred.t =
@@ -49,6 +55,15 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
     let (Test_inputs_with_cli_inputs ((module Inputs), _)) =
       inputs.test_inputs
     in
+    if
+      String.(test_name inputs.test (module Inputs) = "mock")
+      && Option.is_none inputs.mock_alias
+      && (Option.is_none @@ Sys.getenv "MOCK_NETWORK")
+    then (
+      [%log fatal]
+        "Must provide either --mock command line arg or set MOCK_NETWORK env \
+         var" ;
+      ignore @@ exit 1 ) ;
     match Inputs.Engine.name with
     | "abstract" ->
         if Option.is_none inputs.config_path then (
@@ -254,11 +269,6 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       cleanup_deferred_ref := Some deferred ;
       deferred
 
-let test_name (test : test)
-    (module Inputs : Integration_test_lib.Intf.Test.Inputs_intf) =
-  let module Test = (val test) (Inputs) in
-  Test.test_name
-
 let main inputs =
   let (Test_inputs_with_cli_inputs ((module Test_inputs), cli_inputs)) =
     inputs.test_inputs
@@ -329,7 +339,7 @@ let main inputs =
           in
           [%log trace] "initializing network manager" ;
           let%bind net_manager =
-            Engine.Network_manager.create ~logger network_config
+            Engine.Network_manager.create ~logger network_config T.config
           in
           net_manager_ref := Some net_manager ;
           [%log trace] "deploying network" ;
@@ -361,7 +371,7 @@ let main inputs =
         [%log info] "starting the daemons within the pods" ;
         let start_print (node : Engine.Network.Node.t) =
           let open Malleable_error.Let_syntax in
-          [%log info] "starting %s ..." (Engine.Network.Node.id node) ;
+          [%log info] "starting %s..." (Engine.Network.Node.id node) ;
           let%bind res = Engine.Network.Node.start ~fresh_state:false node in
           [%log info] "%s started" (Engine.Network.Node.id node) ;
           Malleable_error.return res
@@ -375,7 +385,7 @@ let main inputs =
         (* TODO: parallelize (requires accumlative hard errors) *)
         let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
         let%bind () =
-          Dsl.wait_for dsl (Dsl.Wait_condition.nodes_to_initialize seed_nodes)
+          Dsl.(wait_for dsl @@ Wait_condition.nodes_to_initialize seed_nodes)
         in
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "daemons started" ;
@@ -416,12 +426,12 @@ let config_path_arg =
     & opt (some non_dir_file) None
     & info [ "config-path"; "config" ] ~env ~docv:"MINA_CI_CONFIG_PATH" ~doc)
 
-let alias_arg =
+let mock_alias_arg =
   let doc = "Alias to use for the mock network binary." in
   let env = Arg.env_var "MOCK_NETWORK" ~doc in
   Arg.(
     value
-    & opt (some @@ pair ~sep:',' string string) None
+    & opt (some string) None
     & info [ "mock-network"; "mock"; "alias" ] ~env ~docv:"MOCK_NETWORK" ~doc)
 
 let mina_image_arg =
@@ -468,7 +478,11 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Option.iter path ~f:(fun p -> Engine.Network.config_path := p) ;
     path
   in
-  let set_alias alias = Engine.Network.alias := alias in
+  let set_alias alias =
+    let alias = Option.map alias ~f:(fun a -> ("MOCK_NETWORK", a)) in
+    Engine.Network.alias := alias ;
+    alias
+  in
   let test_inputs_with_cli_inputs_arg =
     let wrap_cli_inputs cli_inputs =
       Test_inputs_with_cli_inputs ((module Inputs), cli_inputs)
@@ -477,15 +491,22 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
   in
   let inputs_term =
     let cons_inputs test_inputs test archive_image debug mina_image config_path
-        _ =
-      { test_inputs; test; mina_image; archive_image; debug; config_path }
+        mock_alias =
+      { test_inputs
+      ; test
+      ; mina_image
+      ; archive_image
+      ; debug
+      ; config_path
+      ; mock_alias
+      }
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg
       $ test_arg (module Inputs)
       $ archive_image_arg $ debug_arg $ mina_image_arg
       $ (const set_config $ config_path_arg)
-      $ (const set_alias $ alias_arg))
+      $ (const set_alias $ mock_alias_arg))
   in
   (Term.(const start $ inputs_term), info)
 

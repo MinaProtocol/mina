@@ -12,12 +12,11 @@ let log_filter_of_event_type ev_existential =
   let (module Ty) = event_type_module ev_type in
   match Ty.parse with
   | From_error_log _ ->
-      [] (* TODO: Do we need this? *)
+      []
   | From_daemon_log (struct_id, _) ->
       [ Structured_log_events.string_of_id struct_id ]
   | From_puppeteer_log _ ->
       []
-(* TODO: Do we need this? *)
 
 let all_event_types_log_filter =
   List.bind ~f:log_filter_of_event_type Event_type.all_event_types
@@ -66,6 +65,7 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
         Array.iter log_entries ~f:(fun log_entry ->
             match parse_event_from_log_entry ~logger log_entry with
             | Ok a ->
+                [%log debug] "Parsed %s's log entry" @@ Node.id node ;
                 Pipe.write_without_pushback_if_open event_writer (node, a)
             | Error e ->
                 [%log warn] "Error parsing log $error"

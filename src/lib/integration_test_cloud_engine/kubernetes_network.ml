@@ -102,7 +102,8 @@ module Node = struct
     Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
       (base_kube_args config @ [ "cp"; "-c"; container_id; tmp_file; dest_file ])
 
-  let[@warning "-27"] start ?(git_commit = "") ~fresh_state node : unit Malleable_error.t =
+  let[@warning "-27"] start ?(git_commit = "") ~fresh_state node :
+      unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
     let%bind () =
       if fresh_state then

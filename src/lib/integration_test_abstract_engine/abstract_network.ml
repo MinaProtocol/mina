@@ -29,10 +29,10 @@ module Node = struct
       unit Malleable_error.t =
     try
       let args =
-        [ ("network_id", `String t.network_id)
-        ; ("node_id", `String t.node_id)
-        ; ("fresh_state", `Bool fresh_state)
+        [ ("fresh_state", `Bool fresh_state)
         ; ("git_commit", `String git_commit)
+        ; ("network_id", `String t.network_id)
+        ; ("node_id", `String t.node_id)
         ]
       in
       let%bind () =
@@ -1000,8 +1000,9 @@ module Node = struct
     in
     match res with
     | Ok query_result_obj ->
-        let had_already_started = query_result_obj.startFilteredLog in
-        if had_already_started then return (Ok ())
+        if query_result_obj.startFilteredLog then (
+          [%log trace] "%s's log filter started" @@ id t ;
+          return (Ok ()) )
         else (
           [%log error]
             "Attempted to start structured log collection on $node, but it had \
@@ -1009,6 +1010,11 @@ module Node = struct
             ~metadata:[ ("node", `String t.node_id) ] ;
           return (Ok ()) )
     | Error e ->
+        [%log error] "Error encountered while starting $node's log filter: $err"
+          ~metadata:
+            [ ("node", `String (id t))
+            ; ("err", `String (Error.to_string_hum e))
+            ] ;
         return (Error e)
 
   let get_filtered_log_entries ~last_log_index_seen t =
@@ -1021,8 +1027,8 @@ module Node = struct
       exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec:10.0
         ~node:t ~query_name:"GetFilteredLogEntries" query_obj
     in
-    let res = query_result_obj.getFilteredLogEntries in
-    if res.isCapturing then return res.logMessages
+    let log_entries = query_result_obj.getFilteredLogEntries in
+    if log_entries.isCapturing then return log_entries.logMessages
     else
       Deferred.Or_error.error_string
         "Node is not currently capturing structured log messages"
@@ -1254,7 +1260,6 @@ let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
     ]
   |> Core.String.Map.of_alist_exn
 
-(* TODO: this info is returned from CI *)
 let all_pods t =
   List.concat
     [ Core.String.Map.to_alist t.seeds
@@ -1279,113 +1284,9 @@ let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
 
 let all_node_id t =
   let pods = all_pods t |> Core.Map.to_alist in
-  List.fold pods ~init:[] ~f:(fun acc (_, node) -> List.cons node.node_id acc)
+  List.fold pods ~init:[] ~f:(fun acc (_, node) -> node.node_id :: acc)
 
-(* TODO: remove *)
+(* TODO: expand or remove *)
 let initialize_infra ~logger network =
-  let open Malleable_error.Let_syntax in
-  let poll_interval = Time.Span.of_sec 15.0 in
-  let max_polls = 40 (* 10 mins *) in
-  let all_pods_set = all_node_id network |> String.Set.of_list in
-  let kube_get_pods () =
-    Integration_test_lib.Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/"
-      "kubectl"
-      [ "-n"
-      ; "namespace"
-      ; "get"
-      ; "pods"
-      ; "-ojsonpath={range \
-         .items[*]}{.metadata.name}{':'}{.status.phase}{'\\n'}{end}"
-      ]
-  in
-  let parse_pod_statuses result_str =
-    result_str |> String.split_lines
-    |> List.map ~f:(fun line ->
-           let parts = String.split line ~on:':' in
-           assert (Mina_stdlib.List.Length.Compare.(parts = 2)) ;
-           (List.nth_exn parts 0, List.nth_exn parts 1) )
-    |> List.filter ~f:(fun (pod_name, _) ->
-           String.Set.mem all_pods_set pod_name )
-    (* this filters out the archive bootstrap pods, since they aren't in all_pods_set.  in fact the bootstrap pods aren't tracked at all in the framework *)
-    |> String.Map.of_alist_exn
-  in
-  let rec poll n =
-    [%log debug] "Checking kubernetes pod statuses, n=%d" n ;
-    let is_successful_pod_status status = String.equal "Running" status in
-    match%bind Deferred.bind ~f:Malleable_error.return (kube_get_pods ()) with
-    | Ok str ->
-        let pod_statuses = parse_pod_statuses str in
-        [%log debug] "pod_statuses: \n %s"
-          ( String.Map.to_alist pod_statuses
-          |> List.map ~f:(fun (key, data) -> key ^ ": " ^ data ^ "\n")
-          |> String.concat ) ;
-        [%log debug] "all_pods: \n %s"
-          (String.Set.elements all_pods_set |> String.concat ~sep:", ") ;
-        let all_pods_are_present =
-          List.for_all (String.Set.elements all_pods_set) ~f:(fun pod_id ->
-              String.Map.mem pod_statuses pod_id )
-        in
-        let any_pods_are_not_running =
-          (* there could be duplicate keys... *)
-          List.exists
-            (String.Map.data pod_statuses)
-            ~f:(Fn.compose not is_successful_pod_status)
-        in
-        if not all_pods_are_present then (
-          let present_pods = String.Map.keys pod_statuses in
-          [%log fatal]
-            "Not all pods were found when querying namespace; this indicates a \
-             deployment error. Refusing to continue. \n\
-             Expected pods: [%s].  \n\
-             Present pods: [%s]"
-            (String.Set.elements all_pods_set |> String.concat ~sep:"; ")
-            (present_pods |> String.concat ~sep:"; ") ;
-          Malleable_error.hard_error_string ~exit_code:5
-            "Some pods were not found in namespace." )
-        else if any_pods_are_not_running then
-          let failed_pod_statuses =
-            List.filter (String.Map.to_alist pod_statuses)
-              ~f:(fun (_, status) -> not (is_successful_pod_status status))
-          in
-          if n > 0 then (
-            [%log debug] "Got bad pod statuses, polling again ($failed_statuses"
-              ~metadata:
-                [ ( "failed_statuses"
-                  , `Assoc
-                      (List.Assoc.map failed_pod_statuses ~f:(fun v ->
-                           `String v ) ) )
-                ] ;
-            let%bind () =
-              after poll_interval |> Deferred.bind ~f:Malleable_error.return
-            in
-            poll (n - 1) )
-          else (
-            [%log fatal]
-              "Got bad pod statuses, not all pods were assigned to nodes and \
-               ready in time.  pod statuses: ($failed_statuses"
-              ~metadata:
-                [ ( "failed_statuses"
-                  , `Assoc
-                      (List.Assoc.map failed_pod_statuses ~f:(fun v ->
-                           `String v ) ) )
-                ] ;
-            Malleable_error.hard_error_string ~exit_code:4
-              "Some pods either were not assigned to nodes or did not deploy \
-               properly." )
-        else return ()
-    | Error _ ->
-        [%log debug] "`kubectl get pods` timed out, polling again" ;
-        let%bind () =
-          after poll_interval |> Deferred.bind ~f:Malleable_error.return
-        in
-        poll n
-  in
-  [%log info] "Waiting for pods to be assigned nodes and become ready" ;
-  let res = poll max_polls in
-  match%bind.Deferred res with
-  | Error _ ->
-      [%log error] "Not all pods were assigned nodes, cannot proceed!" ;
-      res
-  | Ok _ ->
-      [%log info] "Pods assigned to nodes" ;
-      res
+  [%log trace] "initialize_infra: %s" network.network_id ;
+  Malleable_error.return ()

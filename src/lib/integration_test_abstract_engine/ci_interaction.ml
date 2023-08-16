@@ -474,13 +474,15 @@ module Network_deployed = struct
         raise @@ Invalid_argument (Yojson.Safe.to_string uri)
 
   let of_yojson =
-    let f network_id accum = function
-      | ( node_id
-        , `Assoc
-            [ ("graphql_uri", graphql_uri)
-            ; ("node_type", `String nt)
-            ; ("private_key", private_key)
-            ] ) ->
+    let f network_id accum : Yojson.Safe.t -> t = function
+      | `Assoc
+          [ ( node_id
+            , `Assoc
+                [ ("graphql_uri", graphql_uri)
+                ; ("node_type", `String nt)
+                ; ("private_key", private_key)
+                ] )
+          ] ->
           Core.String.Map.set accum ~key:node_id
             ~data:
               { node_id
@@ -489,18 +491,18 @@ module Network_deployed = struct
               ; network_keypair = network_keypair_of_yojson node_id private_key
               ; graphql_uri = graphql_uri_of_yojson graphql_uri
               }
-      | node_id, t ->
-          raise @@ Invalid_entry (node_id ^ ": " ^ Yojson.Safe.to_string t)
+      | t ->
+          raise @@ Invalid_entry (Yojson.Safe.to_string t)
     in
     function
-    | (`Assoc [ ("network_id", `String network_id); ("node_map", `Assoc nodes) ] :
+    | (`Assoc [ ("network_id", `String network_id); ("nodes", `List nodes) ] :
         Yojson.Safe.t ) ->
         Ok (List.fold nodes ~init:Core.String.Map.empty ~f:(f network_id))
-    | `Assoc [ ("network_id", `String network_id) ] ->
-        (* TODO: remove log *)
-        [%log' trace (Logger.create ())] "network_id: %s" network_id ;
+    | `Assoc [ ("network_id", `String _network_id) ] ->
+        (* TODO: remove *)
         Ok Core.String.Map.empty
     | t ->
+        print_endline @@ Yojson.Safe.pretty_to_string t ;
         raise @@ Invalid_output (Yojson.Safe.to_string t)
 end
 
@@ -611,11 +613,7 @@ end
 module Config_file = struct
   type t = { version : int; actions : action list } [@@deriving eq, yojson]
 
-  and action =
-    { name : string
-    ; args : Yojson.Safe.t
-    ; command : string
-    }
+  and action = { name : string; args : Yojson.Safe.t; command : string }
 
   exception Invalid_version of Yojson.Safe.t
 
@@ -677,17 +675,7 @@ module Config_file = struct
     | cmd ->
         raise @@ Invalid_command cmd
 
-  let arg_to_flag s =
-    "--" ^ String.substr_replace_all s ~pattern:"_" ~with_:"-"
-
-  let validate_cmd_args action =
-    let open List in
-    let args = args_of_action action |> map ~f:fst in
-    let raw_cmd = raw_cmd action in
-    let contains arg =
-      String.substr_index raw_cmd ~pattern:(arg_to_flag arg) |> Option.is_some
-    in
-    for_all args ~f:contains
+  let arg_to_flag s = "--" ^ String.substr_replace_all s ~pattern:"_" ~with_:"-"
 
   let validate_arg_type arg_typ arg_value =
     String.equal arg_typ @@ Arg_type.arg_type arg_value
@@ -725,19 +713,19 @@ module Config_file = struct
     | [] ->
         raw_cmd
     | (arg, value) :: args -> (
-          let pattern = sprintf "{{%s}}" arg in
-          match value with
-          | `Bool b ->
-              if b then
-                interpolate_args ~args
-                @@ String.substr_replace_all raw_cmd ~pattern
-                      ~with_:(arg_to_flag arg)
-              else
-                eliminate_bool_arg raw_cmd pattern |> interpolate_args ~args
-          | _ ->
+        let pattern = sprintf "{{%s}}" arg in
+        match value with
+        | `Bool b ->
+            if b then
               interpolate_args ~args
               @@ String.substr_replace_all raw_cmd ~pattern
-                    ~with_:(Yojson.Safe.to_string value |> Util.drop_outer_quotes) )
+                   ~with_:(arg_to_flag arg)
+            else eliminate_bool_arg raw_cmd pattern |> interpolate_args ~args
+        | _ ->
+            interpolate_args ~args
+            @@ String.substr_replace_all raw_cmd ~pattern
+                 ~with_:(Yojson.Safe.to_string value |> Util.drop_outer_quotes)
+        )
 
   let prog_and_args ~args action =
     let raw_cmd = raw_cmd action in

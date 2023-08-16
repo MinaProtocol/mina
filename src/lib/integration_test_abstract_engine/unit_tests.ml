@@ -17,7 +17,7 @@ module Test_values = struct
 
   let start_node_raw_cmd =
     "minimina node start --network-id {{network_id}} --node-id {{node_id}} \
-     --fresh-state {{fresh_state}} --git-commit {{git_commit}}"
+     {{fresh_state}} --git-commit {{git_commit}}"
 
   let deploy_network_action =
     sprintf
@@ -27,15 +27,6 @@ module Test_values = struct
           "args": {
             "network_id": "string"
           },
-          "returns": [
-            {
-              "graphql_uri" : "string",
-              "network_id" : "string",
-              "network_keypair" : "string",
-              "node_id" : "string",
-              "node_type" : "string"
-            }
-          ],
           "command": "%s"
         }
       |}
@@ -57,17 +48,17 @@ module Test_values = struct
   let start_node_action =
     sprintf
       {|
-      {
-        "name": "start_node",
-        "args": {
-          "network_id": "string",
-          "node_id": "string",
-          "fresh_state": "bool",
-          "git_commit": "string"
-        },
-        "command": "%s"
-      }
-    |}
+        {
+          "name": "start_node",
+          "args": {
+            "network_id": "string",
+            "node_id": "string",
+            "fresh_state": "bool",
+            "git_commit": "string"
+          },
+          "command": "%s"
+        }
+      |}
       start_node_raw_cmd
     |> String.strip
 
@@ -118,8 +109,6 @@ module Config_tests = struct
     in
     assert (validate_args ~args ~action)
 
-  let%test_unit "TODO: validate_cmd_args" = assert false
-
   let%test_unit "interpolate string args" =
     let res =
       interpolate_args
@@ -151,11 +140,14 @@ module Config_tests = struct
 
   let%test_unit "prog and args" =
     let action = Yojson.Safe.from_string start_node_action in
+    let node_id = "node0" in
+    let network_id = "network0" in
+    let git_commit = "0123456abcdef" in
     let args =
-      [ ("network_id", `String "network0")
-      ; ("node_id", `String "node0")
-      ; ("fresh_state", `Bool true)
-      ; ("git_commit", `String "0123456abcdef")
+      [ ("fresh_state", `Bool true)
+      ; ("git_commit", `String git_commit)
+      ; ("network_id", `String network_id)
+      ; ("node_id", `String node_id)
       ]
     in
     let prog, res_args = prog_and_args ~args action in
@@ -164,13 +156,12 @@ module Config_tests = struct
       ; "node"
       ; "start"
       ; "--network-id"
-      ; "network0"
+      ; network_id
       ; "--node-id"
-      ; "node0"
+      ; node_id
       ; "--fresh-state"
-      ; "true"
       ; "--git-commit"
-      ; "0123456abcdef"
+      ; git_commit
       ]
     in
     assert (prog = List.hd_exn expect) ;
@@ -186,7 +177,10 @@ module Run_command_tests = struct
     let%test_unit "run command arg type validation failure" =
       let arg, value = ("msg", `Int 42) in
       try
-        ignore @@ run_command ~config:config_file ~args:[ (arg, value) ] "echo"
+        ignore
+        @@ run_command ~suppress_logs:true ~config:config_file
+             ~args:[ (arg, value) ]
+             "echo"
       with Invalid_arg_type (arg_name, arg_value, arg_type) ->
         assert (
           arg_name = "msg" && arg_type = Arg_type.string
@@ -195,20 +189,20 @@ module Run_command_tests = struct
     let%test_unit "run command arg number failure" =
       try
         ignore
-        @@ run_command ~config:config_file
-             ~args:[ ("msg", `String "hello"); ("num", `Int 42) ]
+        @@ run_command ~suppress_logs:true ~config:config_file
+             ~args:[ ("msg", `String "hello") ]
              "echo"
       with Invalid_args_num (action_name, input_args, action_args) ->
         let open String in
         let input_args = concat ~sep:", " input_args in
         let action_args = concat ~sep:", " action_args in
-        printf "Action: %s\n Input args: %s\n Expected args: %s\n" action_name
+        printf "Action: %s\n  Input args: %s\n  Expected args: %s\n" action_name
           input_args action_args
 
     let%test_unit "run command missing arg failure" =
       try
         ignore
-        @@ run_command ~config:config_file
+        @@ run_command ~suppress_logs:true ~config:config_file
              ~args:[ ("msg0", `String "hello") ]
              "echo"
       with Missing_arg (arg_name, arg_type) ->
@@ -316,33 +310,33 @@ module Parse_output_tests = struct
         { "network_id":"network0",
           "nodes": [
             { "node0": {
-                "node_type":"Archive_node",
-                "private_key":null,
-                "graphql_uri":"gql_archive"
+                "graphql_uri": "gql_archive",
+                "node_type": "Archive_node",
+                "private_key": null
               }
             },
             { "node1": {
-                "node_type":"Block_producer_node",
-                "private_key":null,
-                "graphql_uri":"gql_bp"
+                "graphql_uri": "gql_bp",
+                "node_type": "Block_producer_node",
+                "private_key": null
               }
             },
             { "node2": {
-                "node_type":"Seed_node",
-                "private_key":"EKEQpDAjj7dP3j7fQy4qBU7Kxns85wwq5xMn4zxdyQm83pEWzQ62",
-                "graphql_uri":"gql_seed"
+                "graphql_uri": "gql_seed",
+                "node_type": "Seed_node",
+                "private_key": "EKEQpDAjj7dP3j7fQy4qBU7Kxns85wwq5xMn4zxdyQm83pEWzQ62"
               }
             },
             { "node3": {
-                "node_type":"Snark_worker",
-                "private_key":null,
-                "graphql_uri":"gql_snark"
+                "graphql_uri": "gql_snark",
+                "node_type": "Snark_worker",
+                "private_key": null
               }
             },
             { "node4": {
-                "node_type":"Snark_coordinator",
-                "private_key":null,
-                "graphql_uri":null
+                "graphql_uri": null,
+                "node_type": "Snark_coordinator",
+                "private_key": null
               }
             }
           ]

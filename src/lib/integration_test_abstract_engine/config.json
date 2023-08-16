@@ -35,7 +35,7 @@
         "fresh_state":"bool",
         "git_commit":"string"
       },
-      "command": "minimina node start --network-id {{network_id}} --node-id {{node_id}} --fresh-state {{fresh_state}} --git-commit {{git_commit}}"
+      "command": "minimina node start --network-id {{network_id}} --node-id {{node_id}} {{fresh_state}} --git-commit {{git_commit}}"
     },
     {
       "name": "stop_node",

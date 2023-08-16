@@ -24,7 +24,8 @@ module Network_manager = struct
   let run_cmd_or_hard_error t prog args =
     Util.run_cmd_or_hard_error t.testnet_dir prog args
 
-  let create ~logger (network_config : Network_config.t) (test_config : Test_config.t) =
+  let create ~logger (network_config : Network_config.t)
+      (test_config : Test_config.t) =
     let open Malleable_error.Let_syntax in
     let%bind () =
       if network_config.debug_arg then
