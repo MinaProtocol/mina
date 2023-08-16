@@ -2175,7 +2175,7 @@ end = struct
         let values =
           Array.init 15 ~f:(fun i ->
               (* Insert [None] if the index is beyond the end of the [values]
-                       array.
+                 array.
               *)
               Option.try_with (fun () -> reduce_to_v values.(i)) )
         in
