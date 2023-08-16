@@ -1584,7 +1584,8 @@ let%test_module _ =
 
       type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
 
-      let create ?permissions : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
+      let create ?permissions :
+          unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
        fun () ->
         let zkappify_account (account : Account.t) : Account.t =
           let zkapp =
@@ -1592,9 +1593,12 @@ let%test_module _ =
           in
           { account with
             zkapp
-          ; permissions = match permissions with
-          | Some p -> p 
-          | None -> Permissions.user_default
+          ; permissions =
+              ( match permissions with
+              | Some p ->
+                  p
+              | None ->
+                  Permissions.user_default )
           }
         in
         let pipe_r, pipe_w =
@@ -1827,7 +1831,7 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
 
-    let mk_single_account_update ?chain ~fee_payer_idx ~zkapp_account_idx ~fee
+    let mk_single_account_update ~chain ~fee_payer_idx ~zkapp_account_idx ~fee
         ~nonce ~ledger =
       let fee = Currency.Fee.of_nanomina_int_exn fee in
       let fee_payer_kp = test_keys.(fee_payer_idx) in
@@ -1845,20 +1849,19 @@ let%test_module _ =
           }
       in
       let%map zkapp_command =
-        Transaction_snark.For_tests.single_account_update ?chain
+        Transaction_snark.For_tests.single_account_update ~chain
           ~constraint_constants spec
       in
-          let zkapp_command =
-            Or_error.ok_exn
-              (Zkapp_command.Valid.to_valid ~status:Applied
-                 ~find_vk:
-                   (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
-                      ~get:Mina_ledger.Ledger.get
-                      ~location_of_account:Mina_ledger.Ledger.location_of_account )
-                 zkapp_command )
-          in
-          User_command.Zkapp_command zkapp_command
-
+      let zkapp_command =
+        Or_error.ok_exn
+          (Zkapp_command.Valid.to_valid ~status:Applied
+             ~find_vk:
+               (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                  ~get:Mina_ledger.Ledger.get
+                  ~location_of_account:Mina_ledger.Ledger.location_of_account )
+             zkapp_command )
+      in
+      User_command.Zkapp_command zkapp_command
 
     let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
         ~receiver_idx ~fee ~nonce ~amount () =
@@ -2949,24 +2952,24 @@ let%test_module _ =
           in
           return () )
 
-    let%test "Zkapp command with a different network id won't pass verification"
-        =
+    let%test "account update with a different network id that uses proof \
+              authorization would pass verification under dummy verifier" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
           let%bind zkapp_command =
             mk_single_account_update
-              ?chain:Mina_signature_kind.(Other_network "invalid")
+              ~chain:Mina_signature_kind.(Other_network "invalid")
               ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
               ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
           in
           match%map
             Test.Resource_pool.Diff.verify test.txn_pool
-              (Envelope.Incoming.wrap ~data:[ User_command.forget_check zkapp_command ]
+              (Envelope.Incoming.wrap
+                 ~data:[ User_command.forget_check zkapp_command ]
                  ~sender:Envelope.Sender.Local )
           with
           | Error e ->
-            failwith (Error.to_string_hum e)
+              failwith (Error.to_string_hum e)
           | Ok _ ->
-              false )
-
+              true )
   end )

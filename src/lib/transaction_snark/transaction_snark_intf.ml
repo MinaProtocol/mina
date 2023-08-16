@@ -302,7 +302,7 @@ module type Full = sig
     end
 
     val single_account_update :
-         ?chain:Mina_signature_kind.t
+         chain:Mina_signature_kind.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Single_account_update_spec.t
       -> Zkapp_command.t Async.Deferred.t

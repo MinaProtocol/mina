@@ -4619,7 +4619,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let single_account_update ?chain ~constraint_constants
+    let single_account_update ~chain ~constraint_constants
         (spec : Single_account_update_spec.t) : Zkapp_command.t Async.Deferred.t
         =
       let `VK vk, `Prover prover =
@@ -4656,13 +4656,19 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; authorization = Control.Proof Mina_base.Proof.blockchain_dummy
           }
       in
+      let account_update_digest_with_selected_chain =
+        Zkapp_command.Digest.Account_update.create ~chain
+          account_update_with_dummy_auth
+      in
+      let account_update_digest_with_current_chain =
+        Zkapp_command.Digest.Account_update.create
+          account_update_with_dummy_auth
+      in
       let tree_with_dummy_auth =
         Zkapp_command.Call_forest.Tree.
           { account_update = account_update_with_dummy_auth
           ; calls = []
-          ; account_update_digest =
-              Zkapp_command.Digest.Account_update.create ?chain
-                account_update_with_dummy_auth
+          ; account_update_digest = account_update_digest_with_selected_chain
           }
       in
       let statement = Zkapp_statement.of_tree tree_with_dummy_auth in
@@ -4683,7 +4689,13 @@ module Make_str (A : Wire_types.Concrete) = struct
             { elt = tree
             ; stack_hash =
                 Zkapp_command.Digest.(
-                  Forest.cons (Tree.create tree) Forest.empty)
+                  Forest.cons
+                    (Tree.create
+                       { tree with
+                         account_update_digest =
+                           account_update_digest_with_current_chain
+                       } )
+                    Forest.empty)
             }
         ]
       in

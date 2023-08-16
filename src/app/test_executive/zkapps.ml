@@ -209,7 +209,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; send = Proof
         }
       in
-
       let (zkapp_command_spec : Transaction_snark.For_tests.Update_states_spec.t)
           =
         { sender = (fish2_kp, nonce)
@@ -239,13 +238,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       (zkapp_command, new_permissions)
     in
-
     let%bind.Deferred ( zkapp_update_all
                       , zkapp_command_update_all
                       , zkapp_command_invalid_nonce
                       , zkapp_command_insufficient_funds
                       , zkapp_command_insufficient_replace_fee
-                      , zkapp_command_insufficient_fee ) =
+                      , zkapp_command_insufficient_fee
+                      , zkapp_command_single_account_update ) =
       let amount = Currency.Amount.zero in
       let nonce = Account.Nonce.of_int 1 in
       let memo =
@@ -330,7 +329,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Transaction_snark.For_tests.update_states ~constraint_constants
           spec_insufficient_replace_fee
       in
-      let%map.Deferred zkapp_command_insufficient_fee =
+      let%bind.Deferred zkapp_command_insufficient_fee =
         let spec_insufficient_fee :
             Transaction_snark.For_tests.Update_states_spec.t =
           { zkapp_command_spec with
@@ -340,28 +339,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Transaction_snark.For_tests.update_states ~constraint_constants
           spec_insufficient_fee
       in
+
+      let%map.Deferred zkapp_command_single_account_update =
+        let spec : Transaction_snark.For_tests.Single_account_update_spec.t =
+          { fee
+          ; fee_payer = (fish2_kp, nonce)
+          ; zkapp_account_keypair = single_zkapp_keypair
+          ; memo
+          ; update = snapp_update
+          ; call_data = Snark_params.Tick.Field.zero
+          ; events = []
+          ; actions = []
+          }
+        in
+        Transaction_snark.For_tests.single_account_update
+          ~chain:Mina_signature_kind.(Other_network "Invalid")
+          ~constraint_constants spec
+      in
       ( snapp_update
       , zkapp_command_update_all
       , zkapp_command_invalid_nonce
       , zkapp_command_insufficient_funds
       , zkapp_command_insufficient_replace_fee
-      , zkapp_command_insufficient_fee )
-    in
-    let zkapp_command_single_account_update =
-      let spec : Transaction_snark.For_tests.Single_account_update_spec.t =
-        { fee
-        ; fee_payer = (fish2_kp, nonce)
-        ; zkapp_account_keypair = single_zkapp_keypair
-        ; memo
-        ; update = snapp_update
-        ; current_auth = Permissions.Auth_required.Proof
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; actions = []
-        }
-      in
-      Transaction_snark.For_tests.single_account_update ~constraint_constants
-        spec
+      , zkapp_command_insufficient_fee
+      , zkapp_command_single_account_update )
     in
     let zkapp_command_invalid_signature =
       let p = zkapp_command_update_all in
@@ -750,6 +751,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  (Error.of_string
                     "Ledger permissions do not match update permissions" ) ) )
         )
+    in
+    let%bind () =
+      section_hard "Send a zkapp with a different chain id"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_single_account_update "Verification_failed" )
     in
     let%bind () =
       section_hard "Send a zkapp with an insufficient fee"
