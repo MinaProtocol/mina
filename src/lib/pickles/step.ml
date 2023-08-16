@@ -825,8 +825,9 @@ struct
                           } next_statement_hashed ->
                     [%log internal] "Backend_tick_proof_create_async" ;
                     let%map.Promise proof =
+                      (* TODO(dw) pass runtime tables *)
                       Backend.Tick.Proof.create_async ~primary:public_inputs
-                        ~auxiliary:auxiliary_inputs
+                        ~auxiliary:auxiliary_inputs ~runtime_tables:[||]
                         ~message:
                           (Lazy.force prev_challenge_polynomial_commitments)
                         pk
