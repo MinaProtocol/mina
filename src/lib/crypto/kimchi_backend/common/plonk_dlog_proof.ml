@@ -250,6 +250,11 @@ module Make (Inputs : Inputs_intf) = struct
        ; lookup_table
        ; lookup_sorted
        ; runtime_lookup_table
+       ; runtime_lookup_table_selector
+       ; xor_lookup_selector
+       ; lookup_gate_lookup_selector
+       ; range_check_lookup_selector
+       ; foreign_field_mul_lookup_selector
        } :
         Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
     { w = tuple15_to_vec w
@@ -271,10 +276,14 @@ module Make (Inputs : Inputs_intf) = struct
     ; lookup_aggregation
     ; lookup_table
     ; lookup_sorted =
-        (let max_columns_num = 5 in
-         Array.init max_columns_num ~f:(fun i ->
-             Option.try_with_join (fun () -> lookup_sorted.(i)) ) )
+        Vector.init Nat.N5.n ~f:(fun i ->
+            Option.try_with_join (fun () -> lookup_sorted.(i)) )
     ; runtime_lookup_table
+    ; runtime_lookup_table_selector
+    ; xor_lookup_selector
+    ; lookup_gate_lookup_selector
+    ; range_check_lookup_selector
+    ; foreign_field_mul_lookup_selector
     }
 
   let of_backend (t : Backend.t) : t =
@@ -332,6 +341,11 @@ module Make (Inputs : Inputs_intf) = struct
       ; lookup_table
       ; lookup_sorted
       ; runtime_lookup_table
+      ; runtime_lookup_table_selector
+      ; xor_lookup_selector
+      ; lookup_gate_lookup_selector
+      ; range_check_lookup_selector
+      ; foreign_field_mul_lookup_selector
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
     ; coefficients = tuple15_of_vec coefficients
@@ -351,10 +365,13 @@ module Make (Inputs : Inputs_intf) = struct
     ; rot_selector
     ; lookup_aggregation
     ; lookup_table
-    ; lookup_sorted =
-        Array.init 5 ~f:(fun i ->
-            Option.try_with_join (fun () -> lookup_sorted.(i)) )
+    ; lookup_sorted = Vector.to_array lookup_sorted
     ; runtime_lookup_table
+    ; runtime_lookup_table_selector
+    ; xor_lookup_selector
+    ; lookup_gate_lookup_selector
+    ; range_check_lookup_selector
+    ; foreign_field_mul_lookup_selector
     }
 
   let vec_to_array (type t elt)

@@ -22,6 +22,27 @@ let cluster_zone = "us-west1a"
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
+  (* This function computes the priority value of pods to use for the deployment. Pod priority will
+   * determine the order of the queue in which unscheduled pods are scheduled onto nodes. By
+   * computing the pod priority from the timestamp of the deployment, we ensure that earlier
+   * deployments will take scheduling priority over older deployments that are also waiting to be
+   * scheduled. For more information on pod priority, refer to the kubernetes documentation.
+   * https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass
+   *)
+  let compute_pod_priority () =
+    let pod_priority_genesis_timestamp = 1690569524 in
+    let max_pod_priority = 1000000000 in
+    let min_pod_priority = -2147483648 in
+    let current_timestamp =
+      Time.now () |> Time.to_span_since_epoch |> Time.Span.to_sec
+      |> Float.to_int
+    in
+    let priority =
+      max_pod_priority - (current_timestamp - pod_priority_genesis_timestamp)
+    in
+    assert (priority > min_pod_priority) ;
+    priority
+
   type block_producer_config =
     { name : string (* ; id : string *)
     ; keypair : Network_keypair.t
@@ -59,15 +80,13 @@ module Network_config = struct
     ; mem_request : string
     ; worker_cpu_request : int
     ; worker_mem_request : string
+    ; pod_priority : int
     }
   [@@deriving to_yojson]
 
   type t =
     { mina_automation_location : string
     ; debug_arg : bool
-    ; check_capacity : bool
-    ; check_capacity_delay : int
-    ; check_capacity_retries : int
     ; genesis_keypairs :
         (Network_keypair.t Core.String.Map.t
         [@to_yojson
@@ -326,9 +345,6 @@ module Network_config = struct
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
-    ; check_capacity = cli_inputs.check_capacity
-    ; check_capacity_delay = cli_inputs.check_capacity_delay
-    ; check_capacity_retries = cli_inputs.check_capacity_retries
     ; genesis_keypairs
     ; constants
     ; terraform =
@@ -355,6 +371,7 @@ module Network_config = struct
         ; mem_request = "12Gi"
         ; worker_cpu_request = 6
         ; worker_mem_request = "8Gi"
+        ; pod_priority = compute_pod_priority ()
         }
     }
 
@@ -428,107 +445,13 @@ module Network_manager = struct
   let run_cmd_or_hard_error t prog args =
     Util.run_cmd_or_hard_error t.testnet_dir prog args
 
-  let rec check_kube_capacity t ~logger ~(retries : int) ~(delay : float) :
-      unit Malleable_error.t =
-    let open Malleable_error.Let_syntax in
-    let%bind () =
-      Malleable_error.return ([%log info] "Running capacity check")
-    in
-    let%bind kubectl_top_nodes_output =
-      Util.run_cmd_or_hard_error "/" "kubectl"
-        [ "top"; "nodes"; "--sort-by=cpu"; "--no-headers" ]
-    in
-    let num_kube_nodes =
-      String.split_on_chars kubectl_top_nodes_output ~on:[ '\n' ] |> List.length
-    in
-    let%bind gcloud_descr_output =
-      Util.run_cmd_or_hard_error "/" "gcloud"
-        [ "container"
-        ; "clusters"
-        ; "describe"
-        ; cluster_name
-        ; "--project"
-        ; "o1labs-192920"
-        ; "--region"
-        ; cluster_region
-        ]
-    in
-    (* gcloud container clusters describe mina-integration-west1 --project o1labs-192920 --region us-west1
-        this command gives us lots of information, including the max number of nodes per node pool.
-    *)
-    let%bind max_node_count_str =
-      Util.run_cmd_or_hard_error "/" "bash"
-        [ "-c"
-        ; Format.sprintf "echo \"%s\" | grep \"maxNodeCount\" "
-            gcloud_descr_output
-        ]
-    in
-    let max_node_count_by_node_pool =
-      Re2.find_all_exn (Re2.of_string "[0-9]+") max_node_count_str
-      |> List.map ~f:(fun str -> Int.of_string str)
-    in
-    (* We can have any number of node_pools.  this string parsing will yield a list of ints, each int represents the
-        max_node_count for each node pool *)
-    let max_nodes =
-      List.fold max_node_count_by_node_pool ~init:0 ~f:(fun accum max_nodes ->
-          accum + (max_nodes * 3) )
-      (*
-        the max_node_count_by_node_pool is per zone.  us-west1 has 3 zones (we assume this never changes).
-          therefore to get the actual number of nodes a node_pool has, we multiply by 3.
-          then we sum up the number of nodes in all our node_pools to get the actual total maximum number of nodes that we can scale up to *)
-    in
-    let nodes_available = max_nodes - num_kube_nodes in
-    let cpus_needed_estimate =
-      6
-      * ( Core.Map.length t.seed_workloads
-        + Core.Map.length t.block_producer_workloads
-        + Core.Map.length t.snark_coordinator_workloads )
-      (* as of 2022/07, the seed, bps, and the snark coordinator use 6 cpus.  this is just a rough heuristic so we're not bothering to calculate memory needed *)
-    in
-    let cluster_nodes_needed =
-      Int.of_float
-        (Float.round_up (Float.( / ) (Float.of_int cpus_needed_estimate) 64.0))
-      (* assuming that each node on the cluster has 64 cpus, as we've configured it to be in GCP as of *)
-    in
-    if nodes_available >= cluster_nodes_needed then
-      let%bind () =
-        Malleable_error.return
-          ([%log info]
-             "Capacity check passed.  %d nodes are provisioned, the cluster \
-              can scale up to a max of %d nodes.  This test needs at least 1 \
-              node to be unprovisioned."
-             num_kube_nodes max_nodes )
-      in
-      Malleable_error.return ()
-    else if retries <= 0 then
-      let%bind () =
-        Malleable_error.return
-          ([%log info]
-             "Capacity check failed.  %d nodes are provisioned, the cluster \
-              can scale up to a max of %d nodes.  This test needs at least 1 \
-              node to be unprovisioned.  no more retries, thus exiting"
-             num_kube_nodes max_nodes )
-      in
-      exit 7
-    else
-      let%bind () =
-        Malleable_error.return
-          ([%log info]
-             "Capacity check failed.  %d nodes are provisioned, the cluster \
-              can scale up to a max of %d nodes.  This test needs at least 1 \
-              node to be unprovisioned.  sleeping for 60 seconds before \
-              retrying.  will retry %d more times"
-             num_kube_nodes max_nodes (retries - 1) )
-      in
-      let%bind () = Malleable_error.return (Thread.delay delay) in
-      check_kube_capacity t ~logger ~retries:(retries - 1) ~delay
-
   let create ~logger (network_config : Network_config.t) =
     let open Malleable_error.Let_syntax in
     let%bind current_cluster =
       Util.run_cmd_or_hard_error "/" "kubectl" [ "config"; "current-context" ]
     in
     [%log info] "Using cluster: %s" current_cluster ;
+    (* check if namespace already exists *)
     let%bind all_namespaces_str =
       Util.run_cmd_or_hard_error "/" "kubectl"
         [ "get"; "namespaces"; "-ojsonpath={.items[*].metadata.name}" ]
@@ -554,6 +477,42 @@ module Network_manager = struct
         in
         Util.run_cmd_or_hard_error "/" "kubectl"
           [ "delete"; "namespace"; network_config.terraform.testnet_name ]
+        >>| Fn.const ()
+      else return ()
+    in
+    (* check if priority class already exists *)
+    let%bind all_priorityclasses_str =
+      Util.run_cmd_or_hard_error "/" "kubectl"
+        [ "get"; "priorityclasses"; "-ojsonpath={.items[*].metadata.name}" ]
+    in
+    let all_priorityclasses = String.split ~on:' ' all_priorityclasses_str in
+    let expected_priorityclass_name =
+      String.concat
+        [ network_config.terraform.testnet_name
+        ; "-nonpreemptible-priority-class"
+        ]
+    in
+    let%bind () =
+      if
+        List.mem all_priorityclasses expected_priorityclass_name
+          ~equal:String.equal
+      then
+        let%bind () =
+          if network_config.debug_arg then
+            Deferred.bind ~f:Malleable_error.return
+              (Util.prompt_continue
+                 "Existing priority class of same name detected, pausing \
+                  startup. Enter [y/Y] to continue on and remove existing \
+                  priority class, start clean, and run the test; press Cntrl-C \
+                  to quit out: " )
+          else
+            Malleable_error.return
+              ([%log info]
+                 "Existing priority class of same name detected; removing to \
+                  start clean" )
+        in
+        Util.run_cmd_or_hard_error "/" "kubectl"
+          [ "delete"; "priorityclasses"; expected_priorityclass_name ]
         >>| Fn.const ()
       else return ()
     in
@@ -677,14 +636,6 @@ module Network_manager = struct
       ; deployed = false
       ; genesis_keypairs = network_config.genesis_keypairs
       }
-    in
-    (* check capacity *)
-    let%bind () =
-      if network_config.check_capacity then
-        check_kube_capacity t ~logger
-          ~delay:(Float.of_int network_config.check_capacity_delay)
-          ~retries:network_config.check_capacity_retries
-      else Malleable_error.return ()
     in
     (* making the main.tf.json *)
     let open Deferred.Let_syntax in

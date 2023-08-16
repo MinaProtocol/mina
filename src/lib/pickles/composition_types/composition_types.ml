@@ -64,6 +64,15 @@ module Wrap = struct
               let to_latest = Fn.id
             end
           end]
+
+          let map_challenges t ~f ~scalar =
+            { t with
+              alpha = scalar t.alpha
+            ; beta = f t.beta
+            ; gamma = f t.gamma
+            ; zeta = scalar t.zeta
+            ; joint_combiner = Option.map ~f:scalar t.joint_combiner
+            }
         end
 
         open Pickles_types
@@ -86,91 +95,10 @@ module Wrap = struct
                 ~value_of_hlist:of_hlist [ scalar_challenge ]
           end
 
-          module Optional_column_scalars = struct
-            type 'fp t = { lookup_gate : 'fp; runtime_tables : 'fp }
-            [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
-
-            let map ~f { lookup_gate; runtime_tables } =
-              { lookup_gate = f lookup_gate; runtime_tables = f runtime_tables }
-
-            let map2 ~f t1 t2 =
-              { lookup_gate = f t1.lookup_gate t2.lookup_gate
-              ; runtime_tables = f t1.runtime_tables t2.runtime_tables
-              }
-
-            let to_list { lookup_gate; runtime_tables } =
-              [ lookup_gate; runtime_tables ]
-
-            let to_data { lookup_gate; runtime_tables } =
-              Hlist.HlistId.[ lookup_gate; runtime_tables ]
-
-            let of_data Hlist.HlistId.[ lookup_gate; runtime_tables ] =
-              { lookup_gate; runtime_tables }
-
-            let of_feature_flags (feature_flags : _ Plonk_types.Features.t) =
-              { lookup_gate = feature_flags.lookup
-              ; runtime_tables = feature_flags.runtime_tables
-              }
-
-            let make_opt feature_flags t =
-              let flags = of_feature_flags feature_flags in
-              map2 flags t ~f:(fun flag v ->
-                  match v with
-                  | Some v ->
-                      Plonk_types.Opt.Maybe (flag, v)
-                  | None ->
-                      Plonk_types.Opt.None )
-
-            let refine_opt feature_flags t =
-              let flags = of_feature_flags feature_flags in
-              map2 flags t ~f:(fun flag v ->
-                  match (flag, v) with
-                  | Plonk_types.Opt.Flag.Yes, Plonk_types.Opt.Maybe (_, v) ->
-                      Plonk_types.Opt.Some v
-                  | Plonk_types.Opt.Flag.Yes, _ ->
-                      assert false
-                  | Plonk_types.Opt.Flag.Maybe, _ ->
-                      v
-                  | Plonk_types.Opt.Flag.No, _ ->
-                      Plonk_types.Opt.None )
-
-            let spec (type f) ((module Impl) : f impl) (zero : _ Zero_values.t)
-                (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
-                =
-              let opt_spec flag =
-                let opt_spec =
-                  Spec.T.Opt_unflagged
-                    { inner = B Field
-                    ; flag
-                    ; dummy1 = zero.value.scalar
-                    ; dummy2 = zero.var.scalar
-                    }
-                in
-                match flag with
-                | Plonk_types.Opt.Flag.No ->
-                    Spec.T.Constant (None, (fun _ _ -> (* TODO *) ()), opt_spec)
-                | _ ->
-                    opt_spec
-              in
-              let [ f1; f2 ] = of_feature_flags feature_flags |> to_data in
-              Spec.T.Struct [ opt_spec f1; opt_spec f2 ]
-
-            let typ (type f fp)
-                (module Impl : Snarky_backendless.Snark_intf.Run
-                  with type field = f ) (fp : (fp, _) Impl.Typ.t) ~dummy_scalar
-                (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
-                =
-              let opt_typ flag =
-                Plonk_types.Opt.typ Impl.Boolean.typ flag fp ~dummy:dummy_scalar
-              in
-              Snarky_backendless.Typ.of_hlistable
-                [ opt_typ feature_flags.lookup
-                ; opt_typ feature_flags.runtime_tables
-                ]
-                ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-                ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-          end
-
+          (** All scalar values deferred by a verifier circuit.
+              We expose them so the next guy (who can do scalar arithmetic) can check that they
+              were computed correctly from the evaluations in the proof and the challenges.
+          *)
           type ( 'challenge
                , 'scalar_challenge
                , 'fp
@@ -191,7 +119,6 @@ module Wrap = struct
                   (** scalar used on one of the permutation polynomial commitments. *)
             ; feature_flags : 'bool Plonk_types.Features.t
             ; lookup : 'lookup_opt
-            ; optional_column_scalars : 'fp_opt Optional_column_scalars.t
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
@@ -209,9 +136,6 @@ module Wrap = struct
               zeta_to_srs_length = f t.zeta_to_srs_length
             ; zeta_to_domain_size = f t.zeta_to_domain_size
             ; perm = f t.perm
-            ; optional_column_scalars =
-                Optional_column_scalars.map ~f:(Opt.map ~f)
-                  t.optional_column_scalars
             }
 
           let typ (type f fp)
@@ -252,9 +176,6 @@ module Wrap = struct
               ; Plonk_types.Opt.typ Impl.Boolean.typ uses_lookup
                   ~dummy:{ joint_combiner = dummy_scalar_challenge }
                   (Lookup.typ (Scalar_challenge.typ scalar_challenge))
-              ; Optional_column_scalars.typ
-                  (module Impl)
-                  ~dummy_scalar fp feature_flags
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -348,20 +269,45 @@ module Wrap = struct
       [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
       module Minimal = struct
-        type ( 'challenge
-             , 'scalar_challenge
-             , 'fp
-             , 'bool
-             , 'bulletproof_challenges
-             , 'index )
-             t =
-          ( ('challenge, 'scalar_challenge, 'bool) Plonk.Minimal.t
-          , 'scalar_challenge
-          , 'fp
-          , 'bulletproof_challenges
-          , 'index )
-          Stable.Latest.t
-        [@@deriving sexp, compare, yojson, hash, equal]
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type ( 'challenge
+                 , 'scalar_challenge
+                 , 'fp
+                 , 'bool
+                 , 'bulletproof_challenges
+                 , 'branch_data )
+                 t =
+                  ( 'challenge
+                  , 'scalar_challenge
+                  , 'fp
+                  , 'bool
+                  , 'bulletproof_challenges
+                  , 'branch_data )
+                  Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                  .Deferred_values
+                  .Minimal
+                  .V1
+                  .t =
+              { plonk :
+                  ( 'challenge
+                  , 'scalar_challenge
+                  , 'bool )
+                  Plonk.Minimal.Stable.V1.t
+              ; bulletproof_challenges : 'bulletproof_challenges
+              ; branch_data : 'branch_data
+              }
+            [@@deriving sexp, compare, yojson, hash, equal]
+          end
+        end]
+
+        let map_challenges { plonk; bulletproof_challenges; branch_data } ~f
+            ~scalar =
+          { plonk = Plonk.Minimal.map_challenges ~f ~scalar plonk
+          ; bulletproof_challenges
+          ; branch_data
+          }
       end
 
       let map_challenges
@@ -427,8 +373,19 @@ module Wrap = struct
             ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
       end
 
-      let to_minimal (t : _ In_circuit.t) ~to_option : _ Minimal.t =
-        { t with plonk = Plonk.to_minimal ~to_option t.plonk }
+      let to_minimal
+          ({ plonk
+           ; combined_inner_product
+           ; b
+           ; xi
+           ; bulletproof_challenges
+           ; branch_data
+           } :
+            _ In_circuit.t ) ~to_option : _ Minimal.t =
+        { plonk = Plonk.to_minimal ~to_option plonk
+        ; bulletproof_challenges
+        ; branch_data
+        }
     end
 
     (** The component of the proof accumulation state that is only computed on by the
@@ -503,24 +460,46 @@ module Wrap = struct
     end]
 
     module Minimal = struct
-      type ( 'challenge
-           , 'scalar_challenge
-           , 'fp
-           , 'bool
-           , 'messages_for_next_wrap_proof
-           , 'digest
-           , 'bp_chals
-           , 'index )
-           t =
-        ( ('challenge, 'scalar_challenge, 'bool) Deferred_values.Plonk.Minimal.t
-        , 'scalar_challenge
-        , 'fp
-        , 'messages_for_next_wrap_proof
-        , 'digest
-        , 'bp_chals
-        , 'index )
-        Stable.Latest.t
-      [@@deriving sexp, compare, yojson, hash, equal]
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type ( 'challenge
+               , 'scalar_challenge
+               , 'fp
+               , 'bool
+               , 'messages_for_next_wrap_proof
+               , 'digest
+               , 'bp_chals
+               , 'index )
+               t =
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'messages_for_next_wrap_proof
+                , 'digest
+                , 'bp_chals
+                , 'index )
+                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                .Minimal
+                .V1
+                .t =
+            { deferred_values :
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'bp_chals
+                , 'index )
+                Deferred_values.Minimal.Stable.V1.t
+            ; sponge_digest_before_evaluations : 'digest
+            ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
+                  (** Parts of the statement not needed by the other circuit. Represented as a hash inside the
+              circuit which is then "unhashed". *)
+            }
+          [@@deriving sexp, compare, yojson, hash, equal]
+        end
+      end]
     end
 
     module In_circuit = struct
@@ -569,10 +548,15 @@ module Wrap = struct
           ~value_of_hlist:of_hlist
     end
 
-    let to_minimal (t : _ In_circuit.t) ~to_option : _ Minimal.t =
-      { t with
-        deferred_values =
-          Deferred_values.to_minimal ~to_option t.deferred_values
+    let to_minimal
+        ({ deferred_values
+         ; sponge_digest_before_evaluations
+         ; messages_for_next_wrap_proof
+         } :
+          _ In_circuit.t ) ~to_option : _ Minimal.t =
+      { deferred_values = Deferred_values.to_minimal ~to_option deferred_values
+      ; sponge_digest_before_evaluations
+      ; messages_for_next_wrap_proof
       }
   end
 
@@ -737,18 +721,30 @@ module Wrap = struct
                , 'bp_chals
                , 'index )
                t =
-            ( ( 'challenge
-              , 'scalar_challenge
-              , 'bool )
-              Proof_state.Deferred_values.Plonk.Minimal.Stable.V1.t
-            , 'scalar_challenge
-            , 'fp
-            , 'messages_for_next_wrap_proof
-            , 'digest
-            , 'messages_for_next_step_proof
-            , 'bp_chals
-            , 'index )
-            Stable.V1.t
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'messages_for_next_wrap_proof
+                , 'digest
+                , 'messages_for_next_step_proof
+                , 'bp_chals
+                , 'index )
+                Mina_wire_types.Pickles_composition_types.Wrap.Statement.Minimal
+                .V1
+                .t =
+            { proof_state :
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'messages_for_next_wrap_proof
+                , 'digest
+                , 'bp_chals
+                , 'index )
+                Proof_state.Minimal.Stable.V1.t
+            ; messages_for_next_step_proof : 'messages_for_next_step_proof
+            }
           [@@deriving compare, yojson, sexp, hash, equal]
         end
       end]
@@ -824,8 +820,6 @@ module Wrap = struct
           ; Vector (B Branch_data, Nat.N1.n)
           ; feature_flags_spec
           ; Lookup_parameters.opt_spec impl lookup
-          ; Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars
-            .spec impl lookup.zero feature_flags
           ]
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
@@ -847,7 +841,6 @@ module Wrap = struct
                        ; perm
                        ; feature_flags
                        ; lookup
-                       ; optional_column_scalars
                        }
                    }
                ; sponge_digest_before_evaluations
@@ -876,11 +869,6 @@ module Wrap = struct
           ]
         in
         let index = [ branch_data ] in
-        let optional_column_scalars =
-          let open
-            Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars in
-          optional_column_scalars |> map ~f:to_opt |> to_data
-        in
         Hlist.HlistId.
           [ fp
           ; challenge
@@ -891,7 +879,6 @@ module Wrap = struct
           ; Plonk_types.Features.to_data feature_flags
           ; option_map lookup
               ~f:Proof_state.Deferred_values.Plonk.In_circuit.Lookup.to_struct
-          ; optional_column_scalars
           ]
 
       (** Construct a statement (as structured data) from the flat data-based representation. *)
@@ -905,7 +892,6 @@ module Wrap = struct
             ; index
             ; feature_flags
             ; lookup
-            ; optional_column_scalars
             ] ~feature_flags:flags ~option_map ~of_opt : _ t =
         let open Vector in
         let [ combined_inner_product
@@ -926,12 +912,6 @@ module Wrap = struct
         in
         let [ branch_data ] = index in
         let feature_flags = Plonk_types.Features.of_data feature_flags in
-        let optional_column_scalars =
-          let open
-            Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars in
-          of_data optional_column_scalars
-          |> make_opt feature_flags |> refine_opt flags |> map ~f:of_opt
-        in
         { proof_state =
             { deferred_values =
                 { xi
@@ -953,7 +933,6 @@ module Wrap = struct
                           ~f:
                             Proof_state.Deferred_values.Plonk.In_circuit.Lookup
                             .of_struct
-                    ; optional_column_scalars
                     }
                 }
             ; sponge_digest_before_evaluations
@@ -963,8 +942,12 @@ module Wrap = struct
         }
     end
 
-    let to_minimal (t : _ In_circuit.t) ~to_option : _ Minimal.t =
-      { t with proof_state = Proof_state.to_minimal ~to_option t.proof_state }
+    let to_minimal
+        ({ proof_state; messages_for_next_step_proof } : _ In_circuit.t)
+        ~to_option : _ Minimal.t =
+      { proof_state = Proof_state.to_minimal ~to_option proof_state
+      ; messages_for_next_step_proof
+      }
   end
 end
 
@@ -989,7 +972,175 @@ module Step = struct
 
   module Proof_state = struct
     module Deferred_values = struct
-      module Plonk = Wrap.Proof_state.Deferred_values.Plonk
+      module Plonk = struct
+        module Minimal = struct
+          [%%versioned
+          module Stable = struct
+            module V1 = struct
+              (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
+                  all that's needed to derive all the values in the [In_circuit] version below.
+
+                  See src/lib/pickles/plonk_checks/plonk_checks.ml for the computation of the [In_circuit] value
+                  from the [Minimal] value.
+              *)
+              type ('challenge, 'scalar_challenge) t =
+                { alpha : 'scalar_challenge
+                ; beta : 'challenge
+                ; gamma : 'challenge
+                ; zeta : 'scalar_challenge
+                }
+              [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+              let to_latest = Fn.id
+            end
+          end]
+
+          let to_wrap ~feature_flags { alpha; beta; gamma; zeta } :
+              _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.t =
+            { alpha; beta; gamma; zeta; joint_combiner = None; feature_flags }
+
+          let of_wrap
+              ({ alpha; beta; gamma; zeta; joint_combiner = _; feature_flags } :
+                _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.t ) =
+            { alpha; beta; gamma; zeta }
+        end
+
+        open Pickles_types
+
+        module In_circuit = struct
+          (** All scalar values deferred by a verifier circuit.
+              The values in [vbmul], [complete_add], [endomul], [endomul_scalar], and [perm]
+              are all scalars which will have been used to scale selector polynomials during the
+              computation of the linearized polynomial commitment.
+
+              Then, we expose them so the next guy (who can do scalar arithmetic) can check that they
+              were computed correctly from the evaluations in the proof and the challenges.
+          *)
+          type ('challenge, 'scalar_challenge, 'fp) t =
+            { alpha : 'scalar_challenge
+            ; beta : 'challenge
+            ; gamma : 'challenge
+            ; zeta : 'scalar_challenge
+                  (* TODO: zeta_to_srs_length is kind of unnecessary.
+                     Try to get rid of it when you can.
+                  *)
+            ; zeta_to_srs_length : 'fp
+            ; zeta_to_domain_size : 'fp
+            ; perm : 'fp
+                  (** scalar used on one of the permutation polynomial commitments. *)
+            }
+          [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
+
+          let to_wrap ~opt_none ~false_
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              } : _ Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t =
+            { alpha
+            ; beta
+            ; gamma
+            ; zeta
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; perm
+            ; feature_flags =
+                { range_check0 = false_
+                ; range_check1 = false_
+                ; foreign_field_add = false_
+                ; foreign_field_mul = false_
+                ; xor = false_
+                ; rot = false_
+                ; lookup = false_
+                ; runtime_tables = false_
+                }
+            ; lookup = opt_none
+            }
+
+          let of_wrap ~assert_none ~assert_false
+              ({ alpha
+               ; beta
+               ; gamma
+               ; zeta
+               ; zeta_to_srs_length
+               ; zeta_to_domain_size
+               ; perm
+               ; feature_flags
+               ; lookup
+               } :
+                _ Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
+            let () =
+              let { Plonk_types.Features.range_check0
+                  ; range_check1
+                  ; foreign_field_add
+                  ; foreign_field_mul
+                  ; xor
+                  ; rot
+                  ; lookup
+                  ; runtime_tables
+                  } =
+                feature_flags
+              in
+              assert_false range_check0 ;
+              assert_false range_check1 ;
+              assert_false foreign_field_add ;
+              assert_false foreign_field_mul ;
+              assert_false xor ;
+              assert_false rot ;
+              assert_false lookup ;
+              assert_false runtime_tables
+            in
+            assert_none lookup ;
+            { alpha
+            ; beta
+            ; gamma
+            ; zeta
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; perm
+            }
+
+          let map_challenges t ~f ~scalar =
+            { t with
+              alpha = scalar t.alpha
+            ; beta = f t.beta
+            ; gamma = f t.gamma
+            ; zeta = scalar t.zeta
+            }
+
+          let map_fields t ~f =
+            { t with
+              zeta_to_srs_length = f t.zeta_to_srs_length
+            ; zeta_to_domain_size = f t.zeta_to_domain_size
+            ; perm = f t.perm
+            }
+
+          let typ (type f fp)
+              (module Impl : Snarky_backendless.Snark_intf.Run
+                with type field = f ) ~dummy_scalar ~dummy_scalar_challenge
+              ~challenge ~scalar_challenge ~bool ~feature_flags
+              (fp : (fp, _, f) Snarky_backendless.Typ.t) =
+            Snarky_backendless.Typ.of_hlistable
+              [ Scalar_challenge.typ scalar_challenge
+              ; challenge
+              ; challenge
+              ; Scalar_challenge.typ scalar_challenge
+              ; fp
+              ; fp
+              ; fp
+              ]
+              ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+              ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+        end
+
+        let to_minimal (type challenge scalar_challenge fp)
+            (t : (challenge, scalar_challenge, fp) In_circuit.t) :
+            (challenge, scalar_challenge) Minimal.t =
+          { alpha = t.alpha; beta = t.beta; zeta = t.zeta; gamma = t.gamma }
+      end
 
       (** All the scalar-field values needed to finalize the verification of a proof
     by checking that the correct values were used in the "group operations" part of the
@@ -1014,13 +1165,8 @@ module Step = struct
       [@@deriving sexp, compare, yojson]
 
       module Minimal = struct
-        type ( 'challenge
-             , 'scalar_challenge
-             , 'bool
-             , 'fq
-             , 'bulletproof_challenges )
-             t =
-          ( ('challenge, 'scalar_challenge, 'bool) Plonk.Minimal.t
+        type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
+          ( ('challenge, 'scalar_challenge) Plonk.Minimal.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges )
@@ -1029,20 +1175,8 @@ module Step = struct
       end
 
       module In_circuit = struct
-        type ( 'challenge
-             , 'scalar_challenge
-             , 'fq
-             , 'fq_opt
-             , 'bool
-             , 'bulletproof_challenges )
-             t =
-          ( ( 'challenge
-            , 'scalar_challenge
-            , 'fq
-            , 'fq_opt
-            , ('scalar_challenge Plonk.In_circuit.Lookup.t, 'bool) Opt.t
-            , 'bool )
-            Plonk.In_circuit.t
+        type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
+          ( ('challenge, 'scalar_challenge, 'fq) Plonk.In_circuit.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges )
@@ -1099,10 +1233,7 @@ module Step = struct
              , 'digest
              , 'bool )
              t =
-          ( ( 'challenge
-            , 'scalar_challenge
-            , 'bool )
-            Deferred_values.Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges
@@ -1116,18 +1247,13 @@ module Step = struct
         type ( 'challenge
              , 'scalar_challenge
              , 'fq
-             , 'fq_opt
-             , 'lookup_opt
              , 'bulletproof_challenges
              , 'digest
              , 'bool )
              t =
           ( ( 'challenge
             , 'scalar_challenge
-            , 'fq
-            , 'fq_opt
-            , 'lookup_opt
-            , 'bool )
+            , 'fq )
             Deferred_values.Plonk.In_circuit.t
           , 'scalar_challenge
           , 'fq
@@ -1139,35 +1265,7 @@ module Step = struct
 
         (** A layout of the raw data in this value, which is needed for
           representing it inside the circuit. *)
-        let spec impl bp_log2 lookup feature_flags =
-          let feature_flags_spec =
-            let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =
-              (* Ensure that layout is the same *)
-              Plonk_types.Features.to_data feature_flags
-            in
-            let constant x =
-              Spec.T.Constant (x, (fun x y -> assert (Bool.equal x y)), B Bool)
-            in
-            let maybe_constant flag =
-              match flag with
-              | Plonk_types.Opt.Flag.Yes ->
-                  constant true
-              | Plonk_types.Opt.Flag.No ->
-                  constant false
-              | Plonk_types.Opt.Flag.Maybe ->
-                  Spec.T.B Bool
-            in
-            Spec.T.Struct
-              [ maybe_constant f1
-              ; maybe_constant f2
-              ; maybe_constant f3
-              ; maybe_constant f4
-              ; maybe_constant f5
-              ; maybe_constant f6
-              ; maybe_constant f7
-              ; maybe_constant f8
-              ]
-          in
+        let spec bp_log2 =
           Spec.T.Struct
             [ Vector (B Field, Nat.N5.n)
             ; Vector (B Digest, Nat.N1.n)
@@ -1175,11 +1273,6 @@ module Step = struct
             ; Vector (Scalar Challenge, Nat.N3.n)
             ; Vector (B Bulletproof_challenge, bp_log2)
             ; Vector (B Bool, Nat.N1.n)
-            ; feature_flags_spec
-            ; Wrap.Lookup_parameters.opt_spec impl lookup
-            ; Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-              .Optional_column_scalars
-              .spec impl lookup.zero feature_flags
             ]
 
         let to_data
@@ -1196,15 +1289,12 @@ module Step = struct
                      ; zeta_to_srs_length
                      ; zeta_to_domain_size
                      ; perm
-                     ; feature_flags
-                     ; lookup
-                     ; optional_column_scalars
                      }
                  }
              ; should_finalize
              ; sponge_digest_before_evaluations
              } :
-              _ t ) ~option_map ~to_opt =
+              _ t ) =
           let open Vector in
           let fq =
             [ combined_inner_product
@@ -1218,10 +1308,6 @@ module Step = struct
           let scalar_challenge = [ alpha; zeta; xi ] in
           let digest = [ sponge_digest_before_evaluations ] in
           let bool = [ should_finalize ] in
-          let optional_column_scalars =
-            let open Deferred_values.Plonk.In_circuit.Optional_column_scalars in
-            optional_column_scalars |> map ~f:to_opt |> to_data
-          in
           let open Hlist.HlistId in
           [ fq
           ; digest
@@ -1229,10 +1315,6 @@ module Step = struct
           ; scalar_challenge
           ; bulletproof_challenges
           ; bool
-          ; Plonk_types.Features.to_data feature_flags
-          ; option_map lookup
-              ~f:Deferred_values.Plonk.In_circuit.Lookup.to_struct
-          ; optional_column_scalars
           ]
 
         let of_data
@@ -1249,16 +1331,7 @@ module Step = struct
               ; Vector.[ alpha; zeta; xi ]
               ; bulletproof_challenges
               ; Vector.[ should_finalize ]
-              ; feature_flags
-              ; lookup
-              ; optional_column_scalars
-              ] ~feature_flags:flags ~option_map ~of_opt : _ t =
-          let feature_flags = Plonk_types.Features.of_data feature_flags in
-          let optional_column_scalars =
-            let open Deferred_values.Plonk.In_circuit.Optional_column_scalars in
-            of_data optional_column_scalars
-            |> make_opt feature_flags |> refine_opt flags |> map ~f:of_opt
-          in
+              ] : _ t =
           { deferred_values =
               { xi
               ; bulletproof_challenges
@@ -1272,48 +1345,18 @@ module Step = struct
                   ; zeta_to_srs_length
                   ; zeta_to_domain_size
                   ; perm
-                  ; feature_flags
-                  ; lookup =
-                      option_map lookup
-                        ~f:Deferred_values.Plonk.In_circuit.Lookup.of_struct
-                  ; optional_column_scalars
                   }
               }
           ; should_finalize
           ; sponge_digest_before_evaluations
           }
-
-        let map_lookup (t : _ t) ~f =
-          { t with
-            deferred_values =
-              { t.deferred_values with
-                plonk =
-                  { t.deferred_values.plonk with
-                    lookup = f t.deferred_values.plonk.lookup
-                  }
-              }
-          }
       end
 
-      let typ impl fq ~assert_16_bits ~zero ~feature_flags =
-        let open Deferred_values.Plonk.In_circuit.Lookup in
-        let lookup_config =
-          { Wrap.Lookup_parameters.use =
-              feature_flags.Plonk_types.Features.lookup
-          ; zero
-          }
-        in
+      let typ impl fq ~assert_16_bits ~zero =
         let open In_circuit in
-        Spec.typ impl fq ~assert_16_bits
-          (spec impl Backend.Tock.Rounds.n lookup_config feature_flags)
-        |> Snarky_backendless.Typ.transport
-             ~there:(to_data ~option_map:Option.map ~to_opt:Fn.id)
-             ~back:
-               (of_data ~option_map:Option.map ~feature_flags
-                  ~of_opt:Opt.to_option )
-        |> Snarky_backendless.Typ.transport_var
-             ~there:(to_data ~option_map:Opt.map ~to_opt:Opt.to_option_unsafe)
-             ~back:(of_data ~option_map:Opt.map ~feature_flags ~of_opt:Fn.id)
+        Spec.typ impl fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
+        |> Snarky_backendless.Typ.transport ~there:to_data ~back:of_data
+        |> Snarky_backendless.Typ.transport_var ~there:to_data ~back:of_data
     end
 
     type ('unfinalized_proofs, 'messages_for_next_step_proof) t =
@@ -1354,7 +1397,7 @@ module Step = struct
         , _ )
         Snarky_backendless.Typ.t =
       let per_proof feature_flags =
-        Per_proof.typ impl fq ~feature_flags ~assert_16_bits ~zero
+        Per_proof.typ impl fq ~assert_16_bits ~zero
       in
       let unfinalized_proofs =
         Vector.typ' (Vector.map proofs_verified ~f:per_proof)
@@ -1384,10 +1427,10 @@ module Step = struct
     let to_data
         { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
         ; messages_for_next_wrap_proof
-        } ~option_map ~to_opt =
+        } =
       let open Hlist.HlistId in
       [ Vector.map unfinalized_proofs
-          ~f:(Proof_state.Per_proof.In_circuit.to_data ~option_map ~to_opt)
+          ~f:Proof_state.Per_proof.In_circuit.to_data
       ; messages_for_next_step_proof
       ; messages_for_next_wrap_proof
       ]
@@ -1397,22 +1440,18 @@ module Step = struct
           [ unfinalized_proofs
           ; messages_for_next_step_proof
           ; messages_for_next_wrap_proof
-          ] ~feature_flags ~option_map ~of_opt =
+          ] =
       { proof_state =
           { unfinalized_proofs =
               Vector.map unfinalized_proofs
-                ~f:
-                  (Proof_state.Per_proof.In_circuit.of_data ~feature_flags
-                     ~option_map ~of_opt )
+                ~f:Proof_state.Per_proof.In_circuit.of_data
           ; messages_for_next_step_proof
           }
       ; messages_for_next_wrap_proof
       }
 
-    let spec impl proofs_verified bp_log2 lookup feature_flags =
-      let per_proof =
-        Proof_state.Per_proof.In_circuit.spec impl bp_log2 lookup feature_flags
-      in
+    let spec proofs_verified bp_log2 =
+      let per_proof = Proof_state.Per_proof.In_circuit.spec bp_log2 in
       Spec.T.Struct
         [ Vector (per_proof, proofs_verified)
         ; B Digest

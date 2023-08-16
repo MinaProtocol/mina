@@ -164,13 +164,6 @@ val tick_public_input_of_statement :
   -> ( ( ( Impls.Step.Challenge.Constant.t
          , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
          , Impls.Step.Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-         , Impls.Step.Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-           option
-         , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
-           Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
-           option
          , ( Limb_vector.Challenge.Constant.t
              Kimchi_backend_common.Scalar_challenge.t
              Composition_types.Bulletproof_challenge.t

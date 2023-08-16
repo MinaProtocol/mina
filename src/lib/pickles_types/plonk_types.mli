@@ -123,6 +123,7 @@ module Permuts_vec = Vector.Vector_7
 module Permuts = Nat.N7
 module Permuts_minus_1 = Nat.N6
 module Permuts_minus_1_vec = Vector.Vector_6
+module Lookup_sorted_vec = Vector.Vector_5
 
 module Messages : sig
   module Poly : sig
@@ -213,8 +214,13 @@ module Evals : sig
       ; rot_selector : ('f, 'bool) Opt.t
       ; lookup_aggregation : ('f, 'bool) Opt.t
       ; lookup_table : ('f, 'bool) Opt.t
-      ; lookup_sorted : ('f, 'bool) Opt.t array
+      ; lookup_sorted : ('f, 'bool) Opt.t Lookup_sorted_vec.t
       ; runtime_lookup_table : ('f, 'bool) Opt.t
+      ; runtime_lookup_table_selector : ('f, 'bool) Opt.t
+      ; xor_lookup_selector : ('f, 'bool) Opt.t
+      ; lookup_gate_lookup_selector : ('f, 'bool) Opt.t
+      ; range_check_lookup_selector : ('f, 'bool) Opt.t
+      ; foreign_field_mul_lookup_selector : ('f, 'bool) Opt.t
       }
     [@@deriving fields]
 
@@ -247,9 +253,18 @@ module Evals : sig
     ; rot_selector : 'a option
     ; lookup_aggregation : 'a option
     ; lookup_table : 'a option
-    ; lookup_sorted : 'a option array
+    ; lookup_sorted : 'a option Lookup_sorted_vec.t
     ; runtime_lookup_table : 'a option
+    ; runtime_lookup_table_selector : 'a option
+    ; xor_lookup_selector : 'a option
+    ; lookup_gate_lookup_selector : 'a option
+    ; range_check_lookup_selector : 'a option
+    ; foreign_field_mul_lookup_selector : 'a option
     }
+
+  (** {4 Generic helpers} *)
+
+  val validate_feature_flags : feature_flags:bool Features.t -> 'a t -> bool
 
   (** {4 Iterators} *)
 
@@ -268,13 +283,19 @@ end
 
 module Openings : sig
   module Bulletproof : sig
-    type ('g, 'fq) t =
-      { lr : ('g * 'g) array
-      ; z_1 : 'fq
-      ; z_2 : 'fq
-      ; delta : 'g
-      ; challenge_polynomial_commitment : 'g
-      }
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type ('g, 'fq) t =
+          { lr : ('g * 'g) array
+          ; z_1 : 'fq
+          ; z_2 : 'fq
+          ; delta : 'g
+          ; challenge_polynomial_commitment : 'g
+          }
+        [@@deriving compare, sexp, yojson, hash, equal]
+      end
+    end]
 
     val typ :
          ( 'a

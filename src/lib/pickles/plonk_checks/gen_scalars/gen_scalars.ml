@@ -130,7 +130,7 @@ module Tick : S = struct
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
        ; vanishes_on_last_4_rows
-       ; joint_combiner = _
+       ; joint_combiner
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
@@ -150,31 +150,7 @@ let () =
   output_string
     {ocaml|
 
-  let index_terms (type a)
-      ({ add = ( + )
-       ; sub = _
-       ; mul = ( * )
-       ; square = _
-       ; pow = _
-       ; var
-       ; field
-       ; cell
-       ; alpha_pow
-       ; double = _
-       ; zk_polynomial = _
-       ; omega_to_minus_3 = _
-       ; zeta_to_n_minus_1 = _
-       ; mds = _
-       ; endo_coefficient = _
-       ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
-       ; joint_combiner
-       ; beta
-       ; gamma
-       ; unnormalized_lagrange_basis = _
-       ; if_feature
-       } :
-        a Env.t) =
+  let index_terms (type a) (_ : a Env.t) =
     Column.Table.of_alist_exn
     [
 |ocaml}
@@ -216,12 +192,12 @@ module Tock : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
+       ; vanishes_on_last_4_rows = _
        ; joint_combiner = _
-       ; beta
-       ; gamma
-       ; unnormalized_lagrange_basis
-       ; if_feature
+       ; beta = _
+       ; gamma = _
+       ; unnormalized_lagrange_basis = _
+       ; if_feature = _
        } :
         a Env.t) =
 |ocaml}
@@ -237,31 +213,7 @@ let () =
   output_string
     {ocaml|
 
-  let index_terms (type a)
-      ({ add = ( + )
-       ; sub = _
-       ; mul = ( * )
-       ; square = _
-       ; pow = _
-       ; var
-       ; field
-       ; cell
-       ; alpha_pow
-       ; double = _
-       ; zk_polynomial = _
-       ; omega_to_minus_3 = _
-       ; zeta_to_n_minus_1 = _
-       ; mds = _
-       ; endo_coefficient = _
-       ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
-       ; joint_combiner
-       ; beta
-       ; gamma
-       ; unnormalized_lagrange_basis = _
-       ; if_feature
-       } :
-        a Env.t) =
+  let index_terms (type a) (_ : a Env.t) =
     Column.Table.of_alist_exn
     [
 |ocaml}

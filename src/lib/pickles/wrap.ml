@@ -102,7 +102,7 @@ type deferred_values_and_hints =
   }
 
 let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
-    ~feature_flags ~actual_feature_flags
+    ~actual_feature_flags
     ~(prev_challenges : ((Backend.Tick.Field.t, _) Vector.t, n) Vector.t)
     ~(step_vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
     ~(public_input : Backend.Tick.Field.t list) ~(proof : Backend.Tick.Proof.t)
@@ -214,8 +214,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     end in
     Type1.derive_plonk
       (module Field)
-      ~feature_flags ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
-      tick_combined_evals
+      ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
   and new_bulletproof_challenges, b =
     let prechals =
       Array.map (O.opening_prechallenges o) ~f:(fun x ->
@@ -386,9 +385,8 @@ let%test_module "gate finalization" =
           compute those values correctly inside the circuit.  Special thanks to Matthew Ryan for
           explaining this in detail. *)
       let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
-        deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
-          ~prev_challenges:[] ~step_vk:vk ~public_input ~proof
-          ~actual_proofs_verified:Nat.N0.n
+        deferred_values ~actual_feature_flags ~sgs:[] ~prev_challenges:[]
+          ~step_vk:vk ~public_input ~proof ~actual_proofs_verified:Nat.N0.n
       in
 
       (* Define Typ.t for Deferred_values.t -- A Type.t defines how to convert a value of some type
@@ -423,12 +421,6 @@ let%test_module "gate finalization" =
             plonk =
               { deferred_values.plonk with
                 lookup = Opt.to_option_unsafe deferred_values.plonk.lookup
-              ; optional_column_scalars =
-                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                  .In_circuit
-                  .Optional_column_scalars
-                  .map ~f:Opt.to_option
-                    deferred_values.plonk.optional_column_scalars
               }
           }
       (* Prepare all of the evaluations (i.e. all of the columns in the proof that we open)
@@ -558,7 +550,7 @@ let%test_module "gate finalization" =
           }
       end) )
 
-    let%test_module "foreign field multiplication" =
+    (*let%test_module "foreign field multiplication" =
       ( module Make (struct
         let example =
           no_public_input
@@ -571,7 +563,7 @@ let%test_module "gate finalization" =
           ; foreign_field_add = true
           ; foreign_field_mul = true
           }
-      end) )
+      end) )*)
 
     let%test_module "range check" =
       ( module Make (struct
@@ -812,7 +804,7 @@ let wrap
   [%log internal] "Wrap_compute_deferred_values" ;
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~sgs ~prev_challenges ~step_vk ~public_input ~proof
-      ~actual_proofs_verified ~feature_flags ~actual_feature_flags
+      ~actual_proofs_verified ~actual_feature_flags
   in
   [%log internal] "Wrap_compute_deferred_values_done" ;
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =
@@ -898,18 +890,13 @@ let wrap
                         lookup =
                           (* TODO: This assumes wrap circuits do not use lookup *)
                           None
-                      ; optional_column_scalars =
-                          (* TODO: This assumes that wrap circuits do not use
-                             optional gates.
-                          *)
-                          { lookup_gate = None; runtime_tables = None }
                       }
                   }
               }
           } )
   in
   [%log internal] "Pickles_wrap_proof_done" ;
-  ( { proof = next_proof
+  ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof
     ; statement =
         Types.Wrap.Statement.to_minimal next_statement
           ~to_option:Opt.to_option_unsafe

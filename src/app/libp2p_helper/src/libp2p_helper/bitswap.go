@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"capnproto.org/go/capnp/v3"
-	"github.com/ipfs/go-bitswap"
+  "github.com/ipfs/boxo/bitswap"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	exchange "github.com/ipfs/go-ipfs-exchange-interface"
