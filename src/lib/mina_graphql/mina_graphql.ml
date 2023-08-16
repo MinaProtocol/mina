@@ -5220,79 +5220,80 @@ module Mutations = struct
             else
               let clean_config = Option.value ~default:false clean_config in
               let conf_dir = (Mina_lib.config mina).conf_dir in
-              let%bind () =
-                if clean_config then
-                  let epoch_ledger_json_file =
-                    conf_dir ^/ "epoch_ledger.json"
-                  in
-                  let%bind () =
-                    match%bind Sys.file_exists epoch_ledger_json_file with
-                    | `Yes -> (
-                        let json =
-                          In_channel.with_file epoch_ledger_json_file
-                            ~f:(fun ic ->
-                              In_channel.input_all ic |> Yojson.Safe.from_string )
-                        in
-                        match json with
-                        | `Assoc items ->
-                            let find_uuid name =
-                              match
-                                List.Assoc.find items name ~equal:String.equal
-                              with
-                              | Some (`String s) ->
-                                  s
-                              | _ ->
-                                  failwithf
-                                    "In epoch ledger JSON file, expected to \
-                                     find entry for %s"
-                                    name ()
-                            in
-                            let staking_uuid = find_uuid "staking" in
-                            let next_uuid = find_uuid "next" in
-                            let rm_epoch_ledger uuid =
-                              let filename =
-                                conf_dir ^/ sprintf "epoch_ledger%s" uuid
+              if clean_config then
+                Exit_handlers.register_async_shutdown_handler
+                  ~logger:(Mina_lib.config mina).logger
+                  ~description:"Remove configuration data" (fun () ->
+                    let epoch_ledger_json_file =
+                      conf_dir ^/ "epoch_ledger.json"
+                    in
+                    let%bind () =
+                      match%bind Sys.file_exists epoch_ledger_json_file with
+                      | `Yes -> (
+                          let json =
+                            In_channel.with_file epoch_ledger_json_file
+                              ~f:(fun ic ->
+                                In_channel.input_all ic
+                                |> Yojson.Safe.from_string )
+                          in
+                          match json with
+                          | `Assoc items ->
+                              let find_uuid name =
+                                match
+                                  List.Assoc.find items name ~equal:String.equal
+                                with
+                                | Some (`String s) ->
+                                    s
+                                | _ ->
+                                    failwithf
+                                      "In epoch ledger JSON file, expected to \
+                                       find entry for %s"
+                                      name ()
                               in
-                              Sys.remove filename
-                            in
-                            let%bind () = rm_epoch_ledger staking_uuid in
-                            rm_epoch_ledger next_uuid
-                        | _ ->
-                            failwith "Expected JSON record" )
-                    | `No | `Unknown ->
-                        Deferred.unit
-                  in
-                  let files_to_remove =
-                    [ "epoch_ledger.json"; "root" ^/ "root" ]
-                  in
-                  let%bind () =
-                    Deferred.List.iter files_to_remove ~f:(fun file ->
-                        let path = conf_dir ^/ file in
+                              let staking_uuid = find_uuid "staking" in
+                              let next_uuid = find_uuid "next" in
+                              let rm_epoch_ledger uuid =
+                                let filename =
+                                  conf_dir ^/ sprintf "epoch_ledger%s" uuid
+                                in
+                                Sys.remove filename
+                              in
+                              let%bind () = rm_epoch_ledger staking_uuid in
+                              rm_epoch_ledger next_uuid
+                          | _ ->
+                              failwith "Expected JSON record" )
+                      | `No | `Unknown ->
+                          Deferred.unit
+                    in
+                    let files_to_remove =
+                      [ "epoch_ledger.json"; "root" ^/ "root" ]
+                    in
+                    let%bind () =
+                      Deferred.List.iter files_to_remove ~f:(fun file ->
+                          let path = conf_dir ^/ file in
+                          match%bind Sys.file_exists path with
+                          | `Yes ->
+                              Sys.remove path
+                          | `No | `Unknown ->
+                              Deferred.unit )
+                    in
+                    let dirs_to_remove =
+                      [ "root" ^/ "snarked_ledger"; "frontier" ]
+                    in
+                    Deferred.List.iter dirs_to_remove ~f:(fun dir ->
+                        let path = conf_dir ^/ dir in
                         match%bind Sys.file_exists path with
                         | `Yes ->
-                            Sys.remove path
+                            File_system.remove_dir path
                         | `No | `Unknown ->
-                            Deferred.unit )
-                  in
-                  let dirs_to_remove =
-                    [ "root" ^/ "snarked_ledger"; "frontier" ]
-                  in
-                  Deferred.List.iter dirs_to_remove ~f:(fun dir ->
-                      let path = conf_dir ^/ dir in
-                      match%bind Sys.file_exists path with
-                      | `Yes ->
-                          File_system.remove_dir path
-                      | `No | `Unknown ->
-                          Deferred.unit )
-                else Deferred.unit
-              in
+                            Deferred.unit ) ) ;
               let s =
-                if clean_config then
-                  sprintf
-                    "Cleaned configuration directory %s, stopping daemon in %d \
-                     seconds"
-                    conf_dir delay_secs
-                else sprintf "Stopping daemon in %d seconds" delay_secs
+                let clean_str =
+                  if clean_config then
+                    sprintf ", will clean configuration directory %s" conf_dir
+                  else ""
+                in
+                sprintf "Stopping daemon in %d seconds%s" delay_secs clean_str
               in
               let delay_span = delay_secs |> Float.of_int |> Time.Span.of_sec in
               Async.Deferred.don't_wait_for
