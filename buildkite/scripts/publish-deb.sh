@@ -17,7 +17,7 @@ DEBS3='deb-s3 upload '\
 
 DEBS='_build/mina-*.deb'
 
-#check for AWS Creds
+# check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run"
     exit 0
@@ -36,17 +36,9 @@ ${DEBS3} --component "${MINA_DEB_RELEASE}" --codename "${MINA_DEB_CODENAME}" "${
    && ${DEBS3} --component "${MINA_DEB_RELEASE}" --codename "${MINA_DEB_CODENAME}" "${DEBS}")
 set +x
 
-# Verify upload is complete
-case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-  rampup|berkeley|release/2.0.0|develop)
-    TESTNET_NAME="berkeley"
-  ;;
-  *)
-    TESTNET_NAME="mainnet"
-esac
+# Verify integrity of debs on remote repo
 
-
-echo "Installing mina daemon package: mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
+echo "Adding packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE"
 sudo echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | sudo tee /etc/apt/sources.list.d/mina.list
 sudo apt-get update
 
@@ -73,6 +65,14 @@ function verify_size_and_md5 {
     echo "$DEB_NAME has identical md5 locally and on http://packages.o1test.net"
 
 }
+
+case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
+  rampup|berkeley|release/2.0.0|develop)
+    TESTNET_NAME="berkeley"
+  ;;
+  *)
+    TESTNET_NAME="mainnet"
+esac
 
 # In order to prevent anyone to use freshly pushed packages prematurely we need to be sure those packages has correct
 # md5 and sizes before finishing script
