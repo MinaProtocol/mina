@@ -371,6 +371,7 @@ module Protocol = struct
       external create :
            Index.Fp.t
         -> FieldVectors.Fp.t array
+        -> Pasta_bindings.Fp.t Kimchi_types.runtime_table array
         -> Pasta_bindings.Fp.t array
         -> Pasta_bindings.Fq.t Kimchi_types.or_infinity array
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
@@ -380,6 +381,7 @@ module Protocol = struct
       external create_and_verify :
            Index.Fp.t
         -> FieldVectors.Fp.t array
+        -> Pasta_bindings.Fp.t Kimchi_types.runtime_table array
         -> Pasta_bindings.Fp.t array
         -> Pasta_bindings.Fq.t Kimchi_types.or_infinity array
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
@@ -490,6 +492,7 @@ module Protocol = struct
       external create :
            Index.Fq.t
         -> FieldVectors.Fq.t array
+        -> Pasta_bindings.Fq.t Kimchi_types.runtime_table array
         -> Pasta_bindings.Fq.t array
         -> Pasta_bindings.Fp.t Kimchi_types.or_infinity array
         -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
