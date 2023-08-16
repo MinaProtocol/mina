@@ -94,7 +94,7 @@ def start_daemon():
   log("touching /root/daemon-active" )
   Path('daemon-active').touch()
   log("daemon fully started" )
-  # log_event("node_initialized", "node has been initialized")
+  log_event("node_started", "node has been started")
 
 def stop_daemon():
   log("stop_daemon called" )

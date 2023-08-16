@@ -27,6 +27,10 @@ module Make
     ; global_slot : int
     ; snarked_ledgers_generated : int
     ; blocks_generated : int
+    ; node_on : bool String.Map.t
+          [@to_yojson
+            map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun b ->
+                `Bool b )]
     ; node_initialization : bool String.Map.t
           [@to_yojson
             map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun b ->
@@ -61,6 +65,7 @@ module Make
     ; global_slot = 0
     ; snarked_ledgers_generated = 0
     ; blocks_generated = 0
+    ; node_on = String.Map.empty
     ; node_initialization = String.Map.empty
     ; gossip_received = String.Map.empty
     ; best_tips_by_node = String.Map.empty
@@ -165,6 +170,8 @@ module Make
     handle_gossip_received Block_gossip ;
     handle_gossip_received Snark_work_gossip ;
     handle_gossip_received Transactions_gossip ;
+    (* handle_node_on *)
+    (* TODO !!!! *)
     (* handle_node_init *)
     ignore
       ( Event_router.on event_router Event_type.Node_initialization
@@ -201,15 +208,20 @@ module Make
         : _ Event_router.event_subscription ) ;
     (* handle_node_down *)
     ignore
-      ( Event_router.on event_router Event_type.Node_stopped ~f:(fun node () ->
+      ( Event_router.on event_router Event_type.Node_down ~f:(fun node () ->
             update ~f:(fun state ->
+                [%log info]
+                  (* TODO remove this log line before landing *)
+                  "received Node_down event from $node"
+                  ~metadata:[ ("node", `String (Node.id node)) ] ;
                 if
                   not
                     (String.Map.find_exn state.node_initialization
                        (Node.id node) )
                 then
                   let () =
-                    [%log debug]
+                    [%log info]
+                      (* TODO change this back to debug before landing *)
                       "Lucy cannot contact $node, but all is well because this \
                        node was stopped deliberately or just hasn't \
                        initialized yet"
