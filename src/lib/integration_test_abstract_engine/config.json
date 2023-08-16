@@ -7,21 +7,21 @@
       "command": "minimina network create"
     },
     {
-      "name": "deploy_network",
+      "name": "start_network",
       "args": {
-        "network_id":"string"
+        "network_id": "string"
       },
-      "command": "minimina network deploy --network-id {{network_id}}"
+      "command": "minimina network start --network-id {{network_id}}"
     },
     {
-      "name": "destroy_network",
+      "name": "delete_network",
       "args": {
-        "network_id":"string"
+        "network_id": "string"
       },
-      "command": "minimina network destroy --network-id {{network_id}}"
+      "command": "minimina network delete --network-id {{network_id}}"
     },
     {
-      "name": "get_network_status",
+      "name": "network_status",
       "args": {
         "network_id": "string"
       },
