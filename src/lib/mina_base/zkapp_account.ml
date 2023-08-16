@@ -344,8 +344,8 @@ let typ : (Checked.t, t) Typ.t =
   let open Poly in
   Typ.of_hlistable
     [ Zkapp_state.typ Field.typ
-    ; Flagged_option.option_typ
-        ~default:{ With_hash.data = None; hash = dummy_vk_hash () }
+    ; Flagged_option.lazy_option_typ
+        ~default:(lazy { With_hash.data = None; hash = dummy_vk_hash () })
         (Data_as_hash.typ ~hash:With_hash.hash)
       |> Typ.transport
            ~there:(Option.map ~f:(With_hash.map ~f:Option.some))
