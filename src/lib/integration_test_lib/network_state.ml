@@ -203,12 +203,16 @@ module Make
     ignore
       ( Event_router.on event_router Event_type.Node_stopped ~f:(fun node () ->
             update ~f:(fun state ->
-                if String.Map.find_exn state.node_initialization (Node.id node)
+                if
+                  not
+                    (String.Map.find_exn state.node_initialization
+                       (Node.id node) )
                 then
                   let () =
                     [%log debug]
-                      "Lucy has lost contact with $node, but all is well \
-                       because this node was stopped deliberately"
+                      "Lucy cannot contact $node, but all is well because this \
+                       node was stopped deliberately or just hasn't \
+                       initialized yet"
                       ~metadata:[ ("node", `String (Node.id node)) ]
                   in
                   state
