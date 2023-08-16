@@ -47,8 +47,8 @@ esac
 
 
 echo "Installing mina daemon package: mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
-echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
-apt-get update
+sudo echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | sudo tee /etc/apt/sources.list.d/mina.list
+sudo apt-get update
 
 function verify_size_and_md5 {
     DEB_NAME="$1=$MINA_DEB_VERSION"
