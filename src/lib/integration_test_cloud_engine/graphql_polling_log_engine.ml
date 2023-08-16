@@ -56,7 +56,7 @@ let parse_event_from_log_entry ~logger log_entry =
       in
       event )
 
-let rec poll_get_filtered_log_entries_node ~logger ~event_writer
+let rec get_filtered_log_entries_of_node ~logger ~event_writer
     ~last_log_index_seen node =
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then (
@@ -77,7 +77,7 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
         let last_log_index_seen =
           Array.length log_entries + last_log_index_seen
         in
-        poll_get_filtered_log_entries_node ~logger ~event_writer
+        get_filtered_log_entries_of_node ~logger ~event_writer
           ~last_log_index_seen node
     | Error err ->
         [%log error] "Encountered an error while polling $node for logs: $err"
@@ -85,14 +85,14 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
             [ ("node", `String node.app_id)
             ; ("err", Error_json.error_to_yojson err)
             ] ;
-        (* Declare the node to be offline. *)
+        (* Emit an event that declares the node to be down. *)
         Pipe.write_without_pushback_if_open event_writer
           (node, Event (Node_down, ())) ;
         (* Don't keep looping, the node may be restarting. *)
         return (Ok ()) )
   else Deferred.Or_error.error_string "Event writer closed"
 
-let rec poll_start_filtered_log_node ~logger ~log_filter ~event_writer node =
+let rec start_filtered_log_of_node ~logger ~log_filter ~event_writer node =
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then
     match%bind
@@ -103,7 +103,7 @@ let rec poll_start_filtered_log_node ~logger ~log_filter ~event_writer node =
     | Ok () ->
         return (Ok ())
     | Error _ ->
-        poll_start_filtered_log_node ~logger ~log_filter ~event_writer node
+        start_filtered_log_of_node ~logger ~log_filter ~event_writer node
   else Deferred.Or_error.error_string "Event writer closed"
 
 let rec poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
@@ -112,14 +112,16 @@ let rec poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
   [%log info] "Requesting for $node to start its filtered logs"
     ~metadata:[ ("node", `String node.app_id) ] ;
   let%bind () =
-    poll_start_filtered_log_node ~logger ~log_filter ~event_writer node
+    start_filtered_log_of_node ~logger ~log_filter ~event_writer node
   in
   [%log info] "$node has started its filtered logs. Beginning polling"
     ~metadata:[ ("node", `String node.app_id) ] ;
   let%bind () =
-    poll_get_filtered_log_entries_node ~last_log_index_seen:0 ~logger
+    (* if all goes well, the program will stay in the recursive function get_filtered_log_entries_of_node for good... *)
+    get_filtered_log_entries_of_node ~last_log_index_seen:0 ~logger
       ~event_writer node
   in
+  (* if the above recursive function fails, then the program falls through down to here, where this function will call itself to start over the logic of starting the filtered log and continuing again *)
   poll_node_for_logs_in_background ~log_filter ~logger ~event_writer node
 
 let poll_for_logs_in_background ~log_filter ~logger ~network ~event_writer =
