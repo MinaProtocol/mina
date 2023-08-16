@@ -5,6 +5,12 @@ open Signature_lib
 open Mina_base
 open Integration_test_lib
 
+(* [alias] is instantiated when command line args are parsed *)
+let alias = ref None
+
+(* [config_path] is instantiated when command line args are parsed *)
+let config_path = ref ""
+
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
@@ -72,7 +78,7 @@ module Network_config = struct
 
   let testnet_log_filter t = t.config.network_id
 
-  (* TODO: double check *)
+  (* TODO: add config file command call here *)
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
@@ -305,7 +311,6 @@ module Network_config = struct
             ; worker_nodes = node.worker_nodes
             }
     in
-
     (* NETWORK CONFIG *)
     { debug_arg = debug
     ; genesis_keypairs
@@ -344,13 +349,32 @@ module Node_type = struct
     | Archive_node
     | Block_producer_node
     | Seed_node
-    | Snark_worker
     | Snark_coordinator
-  [@@deriving eq, yojson]
+    | Snark_worker
+  [@@deriving eq, to_yojson]
 
   let to_string nt = to_yojson nt |> Yojson.Safe.to_string
 
-  let of_string s = of_yojson @@ `List [ `String s ] |> Result.ok_or_failwith
+  let of_yojson (t : Yojson.Safe.t) =
+    match t with
+    | `String nt -> (
+        match nt with
+        | "Archive_node" | "ArchiveNode" | "Archive" ->
+            Ok Archive_node
+        | "Block_producer_node" | "BlockProducerNode" | "BlockProducer" ->
+            Ok Block_producer_node
+        | "Seed_node" | "SeedNode" | "Seed" ->
+            Ok Seed_node
+        | "Snark_coordinator" | "SnarkCoordinator" ->
+            Ok Snark_coordinator
+        | "Snark_worker" | "SnarkWorker" ->
+            Ok Snark_worker
+        | _ ->
+            Error (sprintf "Invalid node type: %s" nt) )
+    | _ ->
+        Error (Yojson.Safe.to_string t)
+
+  let of_string s = of_yojson @@ `String s |> Result.ok_or_failwith
 
   let is_archive_node = function Archive_node -> true | _ -> false
 
@@ -388,11 +412,11 @@ module Network_deployed = struct
   exception Invalid_keypair of Yojson.Safe.t
 
   type node_info =
-    { node_id : Node_id.t
-    ; node_type : Node_type.t
+    { graphql_uri : string option
     ; network_id : Network_id.t
     ; network_keypair : Network_keypair.t option
-    ; graphql_uri : string option
+    ; node_id : Node_id.t
+    ; node_type : Node_type.t
     }
   [@@deriving to_yojson]
 
@@ -451,14 +475,12 @@ module Network_deployed = struct
 
   let of_yojson =
     let f network_id accum = function
-      | `Assoc
-          [ ( node_id
-            , `Assoc
-                [ ("node_type", `String nt)
-                ; ("private_key", private_key)
-                ; ("graphql_uri", graphql_uri)
-                ] )
-          ] ->
+      | ( node_id
+        , `Assoc
+            [ ("graphql_uri", graphql_uri)
+            ; ("node_type", `String nt)
+            ; ("private_key", private_key)
+            ] ) ->
           Core.String.Map.set accum ~key:node_id
             ~data:
               { node_id
@@ -467,49 +489,60 @@ module Network_deployed = struct
               ; network_keypair = network_keypair_of_yojson node_id private_key
               ; graphql_uri = graphql_uri_of_yojson graphql_uri
               }
-      | t ->
-          raise @@ Invalid_entry (Yojson.Safe.to_string t)
+      | node_id, t ->
+          raise @@ Invalid_entry (node_id ^ ": " ^ Yojson.Safe.to_string t)
     in
     function
-    | `Assoc [ ("network_id", `String network_id); ("nodes", `List nodes) ] ->
+    | (`Assoc [ ("network_id", `String network_id); ("node_map", `Assoc nodes) ] :
+        Yojson.Safe.t ) ->
         Ok (List.fold nodes ~init:Core.String.Map.empty ~f:(f network_id))
+    | `Assoc [ ("network_id", `String network_id) ] ->
+        (* TODO: remove log *)
+        [%log' trace (Logger.create ())] "network_id: %s" network_id ;
+        Ok Core.String.Map.empty
     | t ->
         raise @@ Invalid_output (Yojson.Safe.to_string t)
 end
 
 module Node_started = struct
-  type t = { node_id : Node_id.t } [@@deriving eq, of_yojson]
+  type t = { network_id : Network_id.t; node_id : Node_id.t }
+  [@@deriving eq, of_yojson]
 
   exception Invalid_response of string
 end
 
 module Node_stopped = struct
-  type t = { node_id : Node_id.t } [@@deriving eq, of_yojson]
+  type t = { network_id : Network_id.t; node_id : Node_id.t }
+  [@@deriving eq, of_yojson]
 
   exception Invalid_response of string
 end
 
 module Archive_data_dump = struct
-  type t = { node_id : Node_id.t; data : string } [@@deriving eq, of_yojson]
+  type t = { data : string; network_id : Network_id.t; node_id : Node_id.t }
+  [@@deriving eq, of_yojson]
 
   exception Invalid_response of string
 end
 
 module Mina_logs_dump = struct
-  type t = { node_id : Node_id.t; logs : Node_logs.t }
+  type t =
+    { logs : Node_logs.t; network_id : Network_id.t; node_id : Node_id.t }
   [@@deriving eq, of_yojson]
 
   exception Invalid_response of string
 end
 
 module Precomputed_block_dump = struct
-  type t = { node_id : Node_id.t; blocks : string } [@@deriving eq, of_yojson]
+  type t = { blocks : string; network_id : Network_id.t; node_id : Node_id.t }
+  [@@deriving eq, of_yojson]
 
   exception Invalid_response of string
 end
 
 module Replayer_run = struct
-  type t = { node_id : Node_id.t; logs : Node_logs.t }
+  type t =
+    { logs : Node_logs.t; network_id : Network_id.t; node_id : Node_id.t }
   [@@deriving eq, of_yojson]
 
   exception Invalid_response of string
@@ -578,8 +611,11 @@ end
 module Config_file = struct
   type t = { version : int; actions : action list } [@@deriving eq, yojson]
 
-  and action = { name : string; args : Yojson.Safe.t; command : string }
-  [@@deriving eq, yojson]
+  and action =
+    { name : string
+    ; args : Yojson.Safe.t
+    ; command : string
+    }
 
   exception Invalid_version of Yojson.Safe.t
 
@@ -589,9 +625,11 @@ module Config_file = struct
 
   exception Invalid_arg_type_should_be_string of string * Yojson.Safe.t
 
+  exception Invalid_list of Yojson.Safe.t list
+
   exception Invalid_command of Yojson.Safe.t
 
-  exception Invalid_args_num
+  exception Invalid_args_num of string * string list * string list
 
   exception Missing_arg of string * string
 
@@ -603,6 +641,10 @@ module Config_file = struct
         version
     | t ->
         raise @@ Invalid_version t
+
+  let action_name action =
+    let open Yojson.Safe in
+    Util.member "name" action |> to_string
 
   let action name config =
     let open Yojson.Safe in
@@ -628,12 +670,24 @@ module Config_file = struct
       | name, t ->
           raise @@ Invalid_arg_type_should_be_string (name, t) )
 
-  let raw_cmd t =
-    match Yojson.Safe.Util.member "command" t with
+  let raw_cmd action =
+    match Yojson.Safe.Util.member "command" action with
     | `String raw_cmd ->
         raw_cmd
     | cmd ->
         raise @@ Invalid_command cmd
+
+  let arg_to_flag s =
+    "--" ^ String.substr_replace_all s ~pattern:"_" ~with_:"-"
+
+  let validate_cmd_args action =
+    let open List in
+    let args = args_of_action action |> map ~f:fst in
+    let raw_cmd = raw_cmd action in
+    let contains arg =
+      String.substr_index raw_cmd ~pattern:(arg_to_flag arg) |> Option.is_some
+    in
+    for_all args ~f:contains
 
   let validate_arg_type arg_typ arg_value =
     String.equal arg_typ @@ Arg_type.arg_type arg_value
@@ -641,7 +695,11 @@ module Config_file = struct
   let validate_args ~args ~action =
     let arg_list = args_of_action action in
     let () =
-      if not List.(length arg_list = length args) then raise @@ Invalid_args_num
+      let open List in
+      if not (length arg_list = length args) then
+        let input_args = map args ~f:fst in
+        let action_args = map ~f:fst @@ args_of_action action in
+        raise @@ Invalid_args_num (action_name action, input_args, action_args)
     in
     let rec aux = function
       | [] ->
@@ -658,20 +716,40 @@ module Config_file = struct
     in
     aux arg_list
 
+  let eliminate_bool_arg raw_cmd pattern =
+    let pattern = " " ^ pattern in
+    String.substr_replace_all raw_cmd ~pattern ~with_:""
+
   let rec interpolate_args ~args raw_cmd =
     match args with
     | [] ->
         raw_cmd
-    | (arg, value) :: args ->
-        let pattern = sprintf "{{%s}}" arg in
-        interpolate_args ~args
-        @@ String.substr_replace_all raw_cmd ~pattern
-             ~with_:(Yojson.Safe.to_string value |> Util.drop_outer_quotes)
+    | (arg, value) :: args -> (
+          let pattern = sprintf "{{%s}}" arg in
+          match value with
+          | `Bool b ->
+              if b then
+                interpolate_args ~args
+                @@ String.substr_replace_all raw_cmd ~pattern
+                      ~with_:(arg_to_flag arg)
+              else
+                eliminate_bool_arg raw_cmd pattern |> interpolate_args ~args
+          | _ ->
+              interpolate_args ~args
+              @@ String.substr_replace_all raw_cmd ~pattern
+                    ~with_:(Yojson.Safe.to_string value |> Util.drop_outer_quotes) )
 
   let prog_and_args ~args action =
     let raw_cmd = raw_cmd action in
     let cmd_list = interpolate_args ~args raw_cmd |> String.split ~on:' ' in
     (List.hd_exn cmd_list, List.tl_exn cmd_list)
+
+  let evaluate_alias prog =
+    match !alias with
+    | Some (alias, value) when String.(alias = prog) ->
+        value
+    | _ ->
+        prog
 
   let run_command ?(suppress_logs = false) ?(timeout_seconds = 1) ?(dir = ".")
       ~config ~args cmd_name =
@@ -681,33 +759,36 @@ module Config_file = struct
     let action_args = args_of_action action in
     let () = assert (validate_args ~args ~action) in
     let prog, arg_values = prog_and_args ~args action in
+    let prog = evaluate_alias prog in
     let cmd = String.concat ~sep:" " (prog :: arg_values) in
     let%map output =
       Util.run_cmd_or_error_timeout ~suppress_logs ~timeout_seconds dir prog
         arg_values
     in
+    let logger = Logger.create () in
     match output with
     | Ok output ->
         if not suppress_logs then
-          [%log' spam (Logger.create ())]
-            "Successful command execution\n Command: %s\n Output: %s" cmd output ;
+          [%log spam] "Successful command execution\n Command: %s\n Output: %s"
+            cmd output ;
         Ok output
-    | _ ->
-        if not suppress_logs then
-          [%log' error (Logger.create ())] "Failed to run command: %s" cmd ;
+    | Error err ->
+        if not suppress_logs then [%log error] "Failed to run command: %s" cmd ;
         Error
           (sprintf
              "Failed to run command: %s\n\
              \ Config version: %d\n\
-             \ Expected args types:\n\
+             \ Expected arg types:\n\
              \     %s\n\
              \ Attempted args:\n\
-             \     %s\n"
+             \     %s\n\
+             \ Output: %s\n"
              cmd version
              ( String.concat ~sep:", "
              @@ List.map action_args ~f:(fun (name, type_name) ->
                     name ^ ": " ^ type_name ) )
              ( String.concat ~sep:", "
              @@ List.map args ~f:(fun (name, value) ->
-                    name ^ " = " ^ Yojson.Safe.to_string value ) ) )
+                    name ^ " = " ^ Yojson.Safe.to_string value ) )
+             (Error.to_string_hum err) )
 end
