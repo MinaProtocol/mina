@@ -20,8 +20,7 @@ end
 
 module Input = Random_oracle_input
 
-let params : Field.t Sponge.Params.t =
-  Sponge.Params.(map pasta_p_kimchi ~f:Field.of_string)
+let params : Field.t Sponge.Params.t = Kimchi_pasta_basic.poseidon_params_fp
 
 module Operations = struct
   let add_assign ~state i x = Field.(state.(i) <- state.(i) + x)
