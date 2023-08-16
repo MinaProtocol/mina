@@ -148,7 +148,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                     ; domain_log2 =
                         Branch_data.Domain_log2.of_int_exn domain_log2
                     }
-                ; bulletproof_challenges = Dummy.Ipa.Step.challenges
+                ; bulletproof_challenges = Lazy.force Dummy.Ipa.Step.challenges
                 ; plonk =
                     { alpha = scalar_chal ()
                     ; beta = chal ()
@@ -163,7 +163,8 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
             ; messages_for_next_wrap_proof =
                 { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
                 ; old_bulletproof_challenges =
-                    Vector.init h ~f:(fun _ -> Dummy.Ipa.Wrap.challenges)
+                    Vector.init h ~f:(fun _ ->
+                        Lazy.force Dummy.Ipa.Wrap.challenges )
                 }
             }
         ; messages_for_next_step_proof =
@@ -171,7 +172,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
             ; old_bulletproof_challenges =
                 (* Not sure if this should be w or h honestly ...*)
                 Vector.init most_recent_width ~f:(fun _ ->
-                    Dummy.Ipa.Step.challenges )
+                    Lazy.force Dummy.Ipa.Step.challenges )
                 (* TODO: Should this be wrap? *)
             ; challenge_polynomial_commitments =
                 Vector.init most_recent_width ~f:(fun _ ->
@@ -186,17 +187,19 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
             ; lookup = None
             }
         ; openings =
-            { proof =
-                { lr =
-                    Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ -> (g0, g0))
-                ; z_1 = Ro.tock ()
-                ; z_2 = Ro.tock ()
-                ; delta = g0
-                ; challenge_polynomial_commitment = g0
-                }
-            ; evals = Dummy.evals.evals.evals
-            ; ft_eval1 = Dummy.evals.ft_eval1
-            }
+            (let evals = Lazy.force Dummy.evals in
+             { proof =
+                 { lr =
+                     Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ ->
+                         (g0, g0) )
+                 ; z_1 = Ro.tock ()
+                 ; z_2 = Ro.tock ()
+                 ; delta = g0
+                 ; challenge_polynomial_commitment = g0
+                 }
+             ; evals = evals.evals.evals
+             ; ft_eval1 = evals.ft_eval1
+             } )
         }
     ; prev_evals =
         (let e =

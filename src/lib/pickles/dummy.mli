@@ -7,11 +7,13 @@ module Ipa : sig
         Composition_types.Bulletproof_challenge.t
       , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
       Pickles_types.Vector.t
+      lazy_t
 
     val challenges_computed :
       ( Backend.Tock.Field.t
       , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
       Pickles_types.Vector.t
+      lazy_t
 
     val sg : (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t) lazy_t
   end
@@ -23,11 +25,13 @@ module Ipa : sig
         Composition_types.Bulletproof_challenge.t
       , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
       Pickles_types.Vector.t
+      lazy_t
 
     val challenges_computed :
       ( Backend.Tick.Field.t
       , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
       Pickles_types.Vector.t
+      lazy_t
 
     val sg : (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t) lazy_t
   end
@@ -43,9 +47,11 @@ val evals :
   ( Backend.Tock.Field.t
   , Backend.Tock.Field.t array )
   Pickles_types.Plonk_types.All_evals.t
+  lazy_t
 
 (** [evals_combined] is a constant *)
 val evals_combined :
   ( Backend.Tock.Field.t
   , Backend.Tock.Field.t )
   Pickles_types.Plonk_types.All_evals.t
+  lazy_t
