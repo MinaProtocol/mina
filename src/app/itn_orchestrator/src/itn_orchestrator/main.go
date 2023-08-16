@@ -49,8 +49,8 @@ type AppConfig struct {
 	LogFile          string        `json:",omitempty"`
 	Key              itn_json_types.Ed25519Privkey
 	UptimeBucket     string
-	Daemon           string `json:",omitempty"`
-	MinaExec         string `json:",omitempty"`
+	FundDaemonPorts  []string `json:",omitempty"`
+	MinaExec         string   `json:",omitempty"`
 	SlotDurationMs   int
 	GenesisTimestamp itn_json_types.Time
 	ControlExec      string `json:",omitempty"`
@@ -120,7 +120,7 @@ func main() {
 		UptimeBucket:     client.Bucket(appConfig.UptimeBucket),
 		Sk:               ed25519.PrivateKey(appConfig.Key),
 		Log:              log,
-		Daemon:           appConfig.Daemon,
+		FundDaemonPorts:  appConfig.FundDaemonPorts,
 		MinaExec:         appConfig.MinaExec,
 		NodeData:         nodeData,
 		SlotDurationMs:   appConfig.SlotDurationMs,
