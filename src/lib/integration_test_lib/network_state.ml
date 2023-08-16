@@ -199,6 +199,30 @@ module Make
                 ; best_tips_by_node = best_tips_by_node'
                 } ) )
         : _ Event_router.event_subscription ) ;
+    (* handle_node_down *)
+    ignore
+      ( Event_router.on event_router Event_type.Node_stopped ~f:(fun node () ->
+            update ~f:(fun state ->
+                if String.Map.find_exn state.node_initialization (Node.id node)
+                then
+                  let () =
+                    [%log debug]
+                      "Lucy has lost contact with $node, but all is well \
+                       because this node was stopped deliberately"
+                      ~metadata:[ ("node", `String (Node.id node)) ]
+                  in
+                  state
+                else
+                  let () =
+                    [%log fatal]
+                      "Lucy has lost contact with $node, without the node \
+                       being deliberately stopped.  Aborting the test because \
+                       a node went down unexpectedly."
+                      ~metadata:[ ("node", `String (Node.id node)) ]
+                  in
+                  failwith
+                    "Aborting the test because a node went down unexpectedly." ) )
+        : _ Event_router.event_subscription ) ;
     (* handle_breadcrumb_added *)
     ignore
       ( Event_router.on event_router Event_type.Breadcrumb_added
