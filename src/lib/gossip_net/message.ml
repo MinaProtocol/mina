@@ -7,8 +7,10 @@ module Master = struct
   module T = struct
     type msg =
       | New_state of Mina_block.t
-      | Snark_pool_diff of Snark_pool.Resource_pool.Diff.t
-      | Transaction_pool_diff of Transaction_pool.Resource_pool.Diff.t
+      | Snark_pool_diff of
+          Snark_pool.Resource_pool.Diff.t Network_pool.With_nonce.t
+      | Transaction_pool_diff of
+          Transaction_pool.Resource_pool.Diff.t Network_pool.With_nonce.t
     [@@deriving sexp, to_yojson]
 
     type state_msg = Mina_block.t
@@ -31,8 +33,12 @@ module V2 = struct
   module T = struct
     type msg =
       | New_state of Mina_block.Stable.V2.t
-      | Snark_pool_diff of Snark_pool.Diff_versioned.Stable.V2.t
-      | Transaction_pool_diff of Transaction_pool.Diff_versioned.Stable.V2.t
+      | Snark_pool_diff of
+          Snark_pool.Diff_versioned.Stable.V2.t
+          Network_pool.With_nonce.Stable.V1.t
+      | Transaction_pool_diff of
+          Transaction_pool.Diff_versioned.Stable.V2.t
+          Network_pool.With_nonce.Stable.V1.t
     [@@deriving bin_io, sexp, version { rpc }]
 
     type state_msg = Mina_block.Stable.V2.t
