@@ -1483,7 +1483,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
        *     1. Omit adding the bound check to the external-checks (saves 1.8 rows)
        *     2. Omit doing a compact-multi-range-check on the remainder and do something simpler (saves 3.5 rows)
        *
-       * Instead of the compact-multi-range-check we do the following
+       * Instead of the compact-multi-range-check the caller MUST do the following
        *     1. Add copy constrains for remainder0 = x0, remainder1 = x1, remainder2 = x2
        *        (this is a precondition done outside this gadget)
        *     2. Compute the decomposition remainder01 = remainder0 + 2^L * remainder1 with a Generic gate
