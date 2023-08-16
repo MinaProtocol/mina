@@ -178,6 +178,7 @@ module Dsl = struct
       ; global_slot : int
       ; snarked_ledgers_generated : int
       ; blocks_generated : int
+      ; node_on : bool String.Map.t
       ; node_initialization : bool String.Map.t
       ; gossip_received : Gossip_state.t String.Map.t
       ; best_tips_by_node : State_hash.t String.Map.t
