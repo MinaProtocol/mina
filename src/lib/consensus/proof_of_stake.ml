@@ -82,12 +82,14 @@ module Make_str (A : Wire_types.Concrete) = struct
     outer_table
 
   let compute_delegatee_table_ledger_db keys ledger =
-    compute_delegatee_table keys ~iter_accounts:(fun f ->
-        Mina_ledger.Ledger.Db.iteri ledger ~f:(fun i acct -> f i acct) )
+    O1trace.sync_thread "compute_delegatee_table_ledger_db" (fun () ->
+        compute_delegatee_table keys ~iter_accounts:(fun f ->
+            Mina_ledger.Ledger.Db.iteri ledger ~f:(fun i acct -> f i acct) ) )
 
   let compute_delegatee_table_genesis_ledger keys ledger =
-    compute_delegatee_table keys ~iter_accounts:(fun f ->
-        Mina_ledger.Ledger.iteri ledger ~f:(fun i acct -> f i acct) )
+    O1trace.sync_thread "compute_delegatee_table_genesis_ledger" (fun () ->
+        compute_delegatee_table keys ~iter_accounts:(fun f ->
+            Mina_ledger.Ledger.iteri ledger ~f:(fun i acct -> f i acct) ) )
 
   module Typ = Snark_params.Tick.Typ
 
@@ -2738,145 +2740,153 @@ module Make_str (A : Wire_types.Concrete) = struct
       let open Local_state in
       let open Snapshot in
       let open Deferred.Let_syntax in
-      [%log info]
-        "Syncing local state; requesting $num_requested snapshots from peers"
-        ~metadata:
-          [ ("num_requested", `Int (local_state_sync_count requested_syncs))
-          ; ("requested_syncs", local_state_sync_to_yojson requested_syncs)
-          ; ("local_state", Local_state.to_yojson local_state)
-          ] ;
-      let sync { snapshot_id; expected_root = target_ledger_hash } =
-        (* if requested last epoch ledger is equal to the current epoch ledger
-           then we don't need to sync the ledger to the peers. *)
-        if
-          equal_snapshot_identifier snapshot_id Staking_epoch_snapshot
-          && Mina_base.(
-               Ledger_hash.equal
-                 (Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
-                 (Local_state.Snapshot.Ledger_snapshot.merkle_root
-                    !local_state.next_epoch_snapshot.ledger ))
-        then (
-          Local_state.Snapshot.Ledger_snapshot.remove
-            !local_state.staking_epoch_snapshot.ledger
-            ~location:(staking_epoch_ledger_location local_state) ;
-          match !local_state.next_epoch_snapshot.ledger with
-          | Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger _ ->
-              set_snapshot local_state Staking_epoch_snapshot
-                !local_state.next_epoch_snapshot ;
-              Deferred.Or_error.ok_unit
-          | Ledger_db next_epoch_ledger ->
-              let ledger =
-                Mina_ledger.Ledger.Db.create_checkpoint next_epoch_ledger
-                  ~directory_name:(staking_epoch_ledger_location local_state)
-                  ()
+      O1trace.thread "sync_local_state" (fun () ->
+          [%log info]
+            "Syncing local state; requesting $num_requested snapshots from \
+             peers"
+            ~metadata:
+              [ ("num_requested", `Int (local_state_sync_count requested_syncs))
+              ; ("requested_syncs", local_state_sync_to_yojson requested_syncs)
+              ; ("local_state", Local_state.to_yojson local_state)
+              ] ;
+          let sync { snapshot_id; expected_root = target_ledger_hash } =
+            (* if requested last epoch ledger is equal to the current epoch ledger
+               then we don't need to sync the ledger to the peers. *)
+            if
+              equal_snapshot_identifier snapshot_id Staking_epoch_snapshot
+              && Mina_base.(
+                   Ledger_hash.equal
+                     (Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
+                     (Local_state.Snapshot.Ledger_snapshot.merkle_root
+                        !local_state.next_epoch_snapshot.ledger ))
+            then (
+              Local_state.Snapshot.Ledger_snapshot.remove
+                !local_state.staking_epoch_snapshot.ledger
+                ~location:(staking_epoch_ledger_location local_state) ;
+              match !local_state.next_epoch_snapshot.ledger with
+              | Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger _ ->
+                  set_snapshot local_state Staking_epoch_snapshot
+                    !local_state.next_epoch_snapshot ;
+                  Deferred.Or_error.ok_unit
+              | Ledger_db next_epoch_ledger ->
+                  let ledger =
+                    Mina_ledger.Ledger.Db.create_checkpoint next_epoch_ledger
+                      ~directory_name:
+                        (staking_epoch_ledger_location local_state)
+                      ()
+                  in
+                  set_snapshot local_state Staking_epoch_snapshot
+                    { ledger = Ledger_snapshot.Ledger_db ledger
+                    ; delegatee_table =
+                        !local_state.next_epoch_snapshot.delegatee_table
+                    } ;
+                  Deferred.Or_error.ok_unit )
+            else
+              let ledger_hash_json =
+                Mina_base.Ledger_hash.to_yojson target_ledger_hash
               in
-              set_snapshot local_state Staking_epoch_snapshot
-                { ledger = Ledger_snapshot.Ledger_db ledger
-                ; delegatee_table =
-                    !local_state.next_epoch_snapshot.delegatee_table
-                } ;
-              Deferred.Or_error.ok_unit )
-        else
-          let ledger_hash_json =
-            Mina_base.Ledger_hash.to_yojson target_ledger_hash
-          in
-          [%log info] "Syncing epoch ledger with hash $target_ledger_hash"
-            ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
-          (* start with an existing epoch ledger, which may be faster
-             than syncing with an empty ledger, since ledgers accumulate
-             new leaves in increasing index order
-          *)
-          let%bind.Deferred.Or_error db_ledger =
-            let db_ledger_of_snapshot snapshot snapshot_location =
-              match snapshot.ledger with
-              | Ledger_snapshot.Ledger_db ledger ->
-                  Ok ledger
-              | Ledger_snapshot.Genesis_epoch_ledger ledger ->
-                  let module Ledger_transfer =
-                    Mina_ledger.Ledger_transfer.Make
-                      (Mina_ledger.Ledger)
-                      (Mina_ledger.Ledger.Db)
-                  in
-                  let fresh_db_ledger =
-                    Mina_ledger.Ledger.Db.create
-                      ~directory_name:snapshot_location
-                      ~depth:Context.constraint_constants.ledger_depth ()
-                  in
-                  Ledger_transfer.transfer_accounts ~src:ledger
-                    ~dest:fresh_db_ledger
-            in
-            match snapshot_id with
-            | Staking_epoch_snapshot ->
-                return
-                @@ db_ledger_of_snapshot !local_state.staking_epoch_snapshot
-                     (staking_epoch_ledger_location local_state)
-            | Next_epoch_snapshot ->
-                return
-                @@ db_ledger_of_snapshot !local_state.next_epoch_snapshot
-                     (next_epoch_ledger_location local_state)
-          in
-          let sync_ledger =
-            Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system db_ledger
-          in
-          let query_reader =
-            Mina_ledger.Sync_ledger.Db.query_reader sync_ledger
-          in
-          let response_writer =
-            Mina_ledger.Sync_ledger.Db.answer_writer sync_ledger
-          in
-          glue_sync_ledger ~preferred:[] query_reader response_writer ;
-          match%bind
-            Mina_ledger.Sync_ledger.Db.fetch sync_ledger target_ledger_hash
-              ~data:() ~equal:(fun () () -> true)
-          with
-          | `Ok ledger ->
-              [%log info]
-                "Succeeded in syncing epoch ledger with hash \
-                 $target_ledger_hash from peers"
+              [%log info] "Syncing epoch ledger with hash $target_ledger_hash"
                 ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
-              assert (
-                Mina_base.Ledger_hash.equal target_ledger_hash
-                  (Mina_ledger.Ledger.Db.merkle_root ledger) ) ;
-              reset_snapshot local_state snapshot_id ledger ;
-              Deferred.Or_error.ok_unit
-          | `Target_changed _ ->
-              [%log error] "Target changed when syncing epoch ledger" ;
-              return (Or_error.error_string "Epoch ledger target changed")
-      in
-      match requested_syncs with
-      | One required_sync ->
-          let open Async.Deferred.Let_syntax in
-          let start = Core.Time.now () in
-          let%map result = sync required_sync in
-          let { snapshot_id; _ } = required_sync in
-          ( match snapshot_id with
-          | Staking_epoch_snapshot ->
+              (* start with an existing epoch ledger, which may be faster
+                 than syncing with an empty ledger, since ledgers accumulate
+                 new leaves in increasing index order
+              *)
+              let%bind.Deferred.Or_error db_ledger =
+                let db_ledger_of_snapshot snapshot snapshot_location =
+                  O1trace.sync_thread "db_ledger_of_snapshot" (fun () ->
+                      match snapshot.ledger with
+                      | Ledger_snapshot.Ledger_db ledger ->
+                          Ok ledger
+                      | Ledger_snapshot.Genesis_epoch_ledger ledger ->
+                          let module Ledger_transfer =
+                            Mina_ledger.Ledger_transfer.Make
+                              (Mina_ledger.Ledger)
+                              (Mina_ledger.Ledger.Db)
+                          in
+                          let fresh_db_ledger =
+                            Mina_ledger.Ledger.Db.create
+                              ~directory_name:snapshot_location
+                              ~depth:Context.constraint_constants.ledger_depth
+                              ()
+                          in
+                          Ledger_transfer.transfer_accounts ~src:ledger
+                            ~dest:fresh_db_ledger )
+                in
+                match snapshot_id with
+                | Staking_epoch_snapshot ->
+                    return
+                    @@ db_ledger_of_snapshot !local_state.staking_epoch_snapshot
+                         (staking_epoch_ledger_location local_state)
+                | Next_epoch_snapshot ->
+                    return
+                    @@ db_ledger_of_snapshot !local_state.next_epoch_snapshot
+                         (next_epoch_ledger_location local_state)
+              in
+              let sync_ledger =
+                Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system
+                  db_ledger
+              in
+              let query_reader =
+                Mina_ledger.Sync_ledger.Db.query_reader sync_ledger
+              in
+              let response_writer =
+                Mina_ledger.Sync_ledger.Db.answer_writer sync_ledger
+              in
+              glue_sync_ledger ~preferred:[] query_reader response_writer ;
+              match%bind
+                Mina_ledger.Sync_ledger.Db.fetch sync_ledger target_ledger_hash
+                  ~data:() ~equal:(fun () () -> true)
+              with
+              | `Ok ledger ->
+                  [%log info]
+                    "Succeeded in syncing epoch ledger with hash \
+                     $target_ledger_hash from peers"
+                    ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
+                  assert (
+                    Mina_base.Ledger_hash.equal target_ledger_hash
+                      (Mina_ledger.Ledger.Db.merkle_root ledger) ) ;
+                  reset_snapshot local_state snapshot_id ledger ;
+                  Deferred.Or_error.ok_unit
+              | `Target_changed _ ->
+                  [%log error] "Target changed when syncing epoch ledger" ;
+                  return (Or_error.error_string "Epoch ledger target changed")
+          in
+          match requested_syncs with
+          | One required_sync ->
+              let open Async.Deferred.Let_syntax in
+              let start = Core.Time.now () in
+              let%map result = sync required_sync in
+              let { snapshot_id; _ } = required_sync in
+              ( match snapshot_id with
+              | Staking_epoch_snapshot ->
+                  Mina_metrics.(
+                    Counter.inc Bootstrap.staking_epoch_ledger_sync_ms
+                      Core.Time.(diff (now ()) start |> Span.to_ms))
+              | Next_epoch_snapshot ->
+                  Mina_metrics.(
+                    Counter.inc Bootstrap.next_epoch_ledger_sync_ms
+                      Core.Time.(diff (now ()) start |> Span.to_ms)) ) ;
+              result
+          | Both { staking; next } ->
+              (*Sync staking ledger before syncing the next ledger*)
+              let open Deferred.Or_error.Let_syntax in
+              let start = Core.Time.now () in
+              let%bind () =
+                sync
+                  { snapshot_id = Staking_epoch_snapshot
+                  ; expected_root = staking
+                  }
+              in
               Mina_metrics.(
                 Counter.inc Bootstrap.staking_epoch_ledger_sync_ms
-                  Core.Time.(diff (now ()) start |> Span.to_ms))
-          | Next_epoch_snapshot ->
+                  Core.Time.(diff (now ()) start |> Span.to_ms)) ;
+              let start = Core.Time.now () in
+              let%map () =
+                sync { snapshot_id = Next_epoch_snapshot; expected_root = next }
+              in
               Mina_metrics.(
                 Counter.inc Bootstrap.next_epoch_ledger_sync_ms
-                  Core.Time.(diff (now ()) start |> Span.to_ms)) ) ;
-          result
-      | Both { staking; next } ->
-          (*Sync staking ledger before syncing the next ledger*)
-          let open Deferred.Or_error.Let_syntax in
-          let start = Core.Time.now () in
-          let%bind () =
-            sync
-              { snapshot_id = Staking_epoch_snapshot; expected_root = staking }
-          in
-          Mina_metrics.(
-            Counter.inc Bootstrap.staking_epoch_ledger_sync_ms
-              Core.Time.(diff (now ()) start |> Span.to_ms)) ;
-          let start = Core.Time.now () in
-          let%map () =
-            sync { snapshot_id = Next_epoch_snapshot; expected_root = next }
-          in
-          Mina_metrics.(
-            Counter.inc Bootstrap.next_epoch_ledger_sync_ms
-              Core.Time.(diff (now ()) start |> Span.to_ms))
+                  Core.Time.(diff (now ()) start |> Span.to_ms)) )
 
     let received_within_window ~constants (epoch, slot) ~time_received =
       let open Int64 in
