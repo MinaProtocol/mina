@@ -2,9 +2,17 @@
 
 open Core_kernel
 
-let blockchain_dummy = Dummy_values.blockchain_proof
+let blockchain_dummy =
+  lazy
+    ( print_endline "blockchain_dummy" ;
+      Dummy_values.blockchain_proof () )
 
-let transaction_dummy = Dummy_values.transaction_proof
+let transaction_dummy =
+  lazy
+    ( print_endline "transaction_dummy" ;
+      Dummy_values.transaction_proof () )
+
+let ( ! ) = Lazy.force
 
 [%%versioned
 module Stable = struct

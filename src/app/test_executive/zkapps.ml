@@ -362,7 +362,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 | Proof _ ->
                     { other_p with
                       authorization =
-                        Control.Proof Mina_base.Proof.blockchain_dummy
+                        Control.Proof Mina_base.Proof.(!blockchain_dummy)
                     }
                 | _ ->
                     other_p )

@@ -84,7 +84,7 @@ module Dummy = struct
 
   let base_proof_expr =
     if generate_genesis_proof then
-      Some (Async.return [%expr Mina_base.Proof.blockchain_dummy])
+      Some (Async.return [%expr Mina_base.Proof.(!blockchain_dummy)])
     else None
 
   let compiled_values =

@@ -37,5 +37,5 @@ include Prod
 module For_tests = struct
   let mk_dummy_proof statement =
     create ~statement ~sok_digest:Sok_message.Digest.default
-      ~proof:Proof.transaction_dummy
+      ~proof:Proof.(!transaction_dummy)
 end
