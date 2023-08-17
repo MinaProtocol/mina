@@ -146,7 +146,7 @@ module Legacy = struct
   module State = State
 
   let params : Field.t Sponge.Params.t =
-    Sponge.Params.(map pasta_p_legacy ~f:Field.of_string)
+    Sponge.Params.(map pasta_p_legacy ~f:Kimchi_pasta_basic.Fp.of_string)
 
   module Rounds = struct
     let rounds_full = 63
