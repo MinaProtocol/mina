@@ -41,12 +41,13 @@ var _ Action = StopAction{}
 
 type StopDaemonParams struct {
 	Nodes []NodeAddress `json:"nodes"`
+	Clean bool          `json:"clean,omitempty"`
 }
 
 func StopDaemon(config Config, params StopDaemonParams) error {
 	errs := []error{}
 	for _, addr := range params.Nodes {
-		resp, err := StopDaemonGql(config, addr, config.StopDaemonDelaySec)
+		resp, err := StopDaemonGql(config, addr, params.Clean, config.StopDaemonDelaySec)
 		if err == nil {
 			config.Log.Infof("stopped daemon on %s: %s", addr, resp)
 		} else {
