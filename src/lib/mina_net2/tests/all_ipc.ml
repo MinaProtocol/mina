@@ -25,7 +25,7 @@ open Mina_net2
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
 
-type status = NotMet | Connected | Disconnected [@@deriving sexp]
+type status = NotMet | Connected | Disconnected [@@deriving sexp, yojson]
 
 type typed_msg = { a : int; b : string option }
 [@@deriving bin_io_unversioned, equal, sexp, compare]
@@ -120,12 +120,20 @@ let%test_module "all-ipc test" =
       }
 
     let rec iteratePcWhile label pc ls ~pred =
-      let checkDo (status, expectedPid) pid conn =
+      let checkDo (peer_label, status, expectedPid) pid conn =
         match (!status, conn, String.equal pid expectedPid) with
         | NotMet, true, true ->
+            [%log info] "$from_peer connected to $to_peer"
+              ~metadata:
+                [ ("from_peer", `String peer_label)
+                ; ("to_peer", `String label) ] ;
             status := Connected ;
             true
         | NotMet, false, true ->
+            [%log warn] "$from_peer disconnected from $to_peer before initial connection was established"
+              ~metadata:
+                [ ("from_peer", `String peer_label)
+                ; ("to_peer", `String label) ] ;
             status := Disconnected ;
             true
         | Connected, true, true ->
@@ -133,9 +141,21 @@ let%test_module "all-ipc test" =
         | Disconnected, false, true ->
             true
         | Connected, false, true ->
+            [%log info] "$from_peer disconnected from $to_peer"
+              ~metadata:
+                [ ("from_peer", `String peer_label)
+                ; ("to_peer", `String label) ] ;
             status := Disconnected ;
             true
-        | _, _, _ ->
+        | _, _, true ->
+            [%log error] "Unexpected connection event for peer: $from_peer connected to $to_peer where the connection status was $connection_status"
+              ~metadata:
+                [ ("from_peer", `String peer_label)
+                ; ("to_peer", `String label)
+                ; ("connection_status", status_to_yojson !status) ] ;
+            status := Connected ;
+            true
+        | _, _, false ->
             false
       in
       if pred () then Deferred.unit
@@ -149,10 +169,8 @@ let%test_module "all-ipc test" =
             [%log info]
               (if conn then "Connected $pid" else "Disconnected $pid")
               ~metadata:[ ("pid", `String pid); ("label", `String label) ] ;
-            let allFine : bool =
-              List.fold ls ~init:false ~f:(fun b p -> b || checkDo p pid conn)
-            in
-            if not allFine then
+            let any_fine = List.exists ls ~f:(fun p -> checkDo p pid conn) in
+            if not any_fine then
               raise (UnexpectedPeerConnectionStatus (label, conn, pid)) ;
             iteratePcWhile label pc ~pred ls
 
@@ -161,9 +179,9 @@ let%test_module "all-ipc test" =
       let carolStatus = ref NotMet in
       let yotaStatus = ref NotMet in
       let pcLs =
-        [ (bobStatus, ad.b_peerid)
-        ; (carolStatus, ad.c_peerid)
-        ; (yotaStatus, ad.y_peerid)
+        [ ("bob", bobStatus, ad.b_peerid)
+        ; ("carol", carolStatus, ad.c_peerid)
+        ; ("yota", yotaStatus, ad.y_peerid)
         ]
       in
       let pcIter pred = iteratePcWhile "alice" pc pcLs ~pred in
@@ -362,7 +380,7 @@ let%test_module "all-ipc test" =
     let bob b ad (pc, _) msgs =
       let aliceStatus = ref NotMet in
       let yotaStatus = ref NotMet in
-      let pcLs = [ (aliceStatus, ad.a_peerid); (yotaStatus, ad.y_peerid) ] in
+      let pcLs = [ ("alice", aliceStatus, ad.a_peerid); ("yota", yotaStatus, ad.y_peerid) ] in
       let pcIter pred = iteratePcWhile "bob" pc pcLs ~pred in
       (* Setup stream handler *)
       let streams_r, streams_w = Pipe.create () in
@@ -450,9 +468,9 @@ let%test_module "all-ipc test" =
       let bobStatus = ref NotMet in
       let yotaStatus = ref NotMet in
       let pcLs =
-        [ (aliceStatus, ad.a_peerid)
-        ; (bobStatus, ad.b_peerid)
-        ; (yotaStatus, ad.y_peerid)
+        [ ("alice", aliceStatus, ad.a_peerid)
+        ; ("bob", bobStatus, ad.b_peerid)
+        ; ("yota", yotaStatus, ad.y_peerid)
         ]
       in
       let pcIter pred = iteratePcWhile "carol" pc pcLs ~pred in
