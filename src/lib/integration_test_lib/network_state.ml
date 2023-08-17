@@ -75,13 +75,13 @@ module Make
     }
 
   let listen ~logger event_router =
-    let r, w = Broadcast_pipe.create empty in
+    let reader, writer = Broadcast_pipe.create empty in
     let update ~f =
       (* should be safe to ignore the write here, so long as `f` is synchronous *)
-      let state = f (Broadcast_pipe.Reader.peek r) in
+      let state = f (Broadcast_pipe.Reader.peek reader) in
       [%log debug] "updated network state to: $state"
         ~metadata:[ ("state", to_yojson state) ] ;
-      ignore (Broadcast_pipe.Writer.write w state : unit Deferred.t) ;
+      ignore (Broadcast_pipe.Writer.write writer state : unit Deferred.t) ;
       Deferred.return `Continue
     in
     (* handle_block_produced *)
@@ -171,7 +171,18 @@ module Make
     handle_gossip_received Snark_work_gossip ;
     handle_gossip_received Transactions_gossip ;
     (* handle_node_on *)
-    (* TODO !!!! *)
+    ignore
+      ( Event_router.on event_router Event_type.Node_started ~f:(fun node () ->
+            update ~f:(fun state ->
+                [%log info]
+                  "Updating network state with event of $node being started"
+                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                (* todo: downgrade to debug before landing *)
+                let node_on' =
+                  String.Map.set state.node_on ~key:(Node.id node) ~data:true
+                in
+                { state with node_on = node_on' } ) )
+        : _ Event_router.event_subscription ) ;
     (* handle_node_init *)
     ignore
       ( Event_router.on event_router Event_type.Node_initialization
@@ -198,11 +209,15 @@ module Make
                   String.Map.set state.node_initialization ~key:(Node.id node)
                     ~data:false
                 in
+                let node_on' =
+                  String.Map.set state.node_on ~key:(Node.id node) ~data:false
+                in
                 let best_tips_by_node' =
                   String.Map.remove state.best_tips_by_node (Node.id node)
                 in
                 { state with
                   node_initialization = node_initialization'
+                ; node_on = node_on'
                 ; best_tips_by_node = best_tips_by_node'
                 } ) )
         : _ Event_router.event_subscription ) ;
@@ -280,5 +295,5 @@ module Make
                 ; blocks_including_txn = blocks_including_txn'
                 } ) )
         : _ Event_router.event_subscription ) ;
-    (r, w)
+    (reader, writer)
 end

@@ -66,7 +66,8 @@ module Node_down = struct
 
   type t = unit [@@deriving to_yojson]
 
-  let structured_event_id = Lucy_node_down.node_down_structured_events_id
+  let structured_event_id =
+    Lucy_structured_events.node_down_structured_events_id
 
   let parse_func = Fn.const (Or_error.return ())
 
@@ -80,11 +81,12 @@ module Node_started = struct
 
   type t = unit [@@deriving to_yojson]
 
-  let puppeteer_event_type = "node_started"
+  let structured_event_id =
+    Lucy_structured_events.node_started_structured_events_id
 
   let parse_func = Fn.const (Or_error.return ())
 
-  let parse = From_puppeteer_log (puppeteer_event_type, parse_func)
+  let parse = From_daemon_log (structured_event_id, parse_func)
 end
 
 module Node_stopped = struct
@@ -92,11 +94,12 @@ module Node_stopped = struct
 
   type t = unit [@@deriving to_yojson]
 
-  let puppeteer_event_type = "node_stopped"
+  let structured_event_id =
+    Lucy_structured_events.node_stopped_structured_events_id
 
   let parse_func = Fn.const (Or_error.return ())
 
-  let parse = From_puppeteer_log (puppeteer_event_type, parse_func)
+  let parse = From_daemon_log (structured_event_id, parse_func)
 end
 
 module Transition_frontier_diff_application = struct
