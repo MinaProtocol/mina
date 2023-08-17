@@ -28,6 +28,6 @@ mutation updateGating($input: GatingUpdate!) {
     updateGating(input: $input)
 }
 
-mutation stopDaemon($delay: Int) {
-    stopDaemon(delaySeconds: $delay)
+mutation stopDaemon($clean: Boolean, $delay: Int) {
+    stopDaemon(cleanConfig: $clean, delaySeconds: $delay)
 }

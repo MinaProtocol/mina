@@ -44,7 +44,7 @@ func sampleStopRatio(minRatio, maxRatio float64) float64 {
 type Params struct {
 	BaseTps, StressTps, SenderRatio, ZkappRatio, RedeployRatio, MinStopRatio, MaxStopRatio float64
 	RoundDurationMin, PauseMin, Rounds, StopsPerRound, Gap                                 int
-	SendFromNonBpsOnly, StopOnlyBps                                                        bool
+	SendFromNonBpsOnly, StopOnlyBps, UseRestartScript                                      bool
 	ExperimentName, PasswordEnv, FundKeyPrefix                                             string
 	Privkeys                                                                               []string
 	PaymentReceiver                                                                        itn_json_types.MinaPublicKey
@@ -125,8 +125,14 @@ type RestartRefParams struct {
 	Clean bool             `json:"clean,omitempty"`
 }
 
-func restart(nodesRef int, nodesName string, clean bool) Command {
-	return Command{Action: lib.RestartAction{}.Name(), Params: RestartRefParams{
+func restart(useRestartScript bool, nodesRef int, nodesName string, clean bool) Command {
+	var name string
+	if useRestartScript {
+		name = lib.RestartAction{}.Name()
+	} else {
+		name = lib.StopDaemonAction{}.Name()
+	}
+	return Command{Action: name, Params: RestartRefParams{
 		Nodes: lib.LocalComplexValue(nodesRef, nodesName),
 		Clean: clean,
 	}}
@@ -197,11 +203,15 @@ func (p *Params) Generate(round int) GeneratedRound {
 		OffsetMin:        15,
 		NoBlockProducers: p.SendFromNonBpsOnly,
 	})))
-	cmds = append(cmds, sample(-1, "participant", []float64{p.SenderRatio}))
+	sendersOutName := "participant"
+	if 1-p.SenderRatio > 1e-6 {
+		sendersOutName = "group1"
+		cmds = append(cmds, sample(-1, "participant", []float64{p.SenderRatio}))
+	}
 	cmds = append(cmds, loadKeys(lib.KeyloaderParams{Dir: zkappsKeysDir}))
 	cmds = append(cmds, loadKeys(lib.KeyloaderParams{Dir: paymentsKeysDir}))
-	cmds = append(cmds, zkapps(-2, -3, "group1", zkappParams))
-	cmds = append(cmds, payments(-2, -4, "group1", paymentParams))
+	cmds = append(cmds, zkapps(-2, -3, sendersOutName, zkappParams))
+	cmds = append(cmds, payments(-2, -4, sendersOutName, paymentParams))
 	cmds = append(cmds, join(-1, "participant", -2, "participant"))
 	stopWaits := make([]int, p.StopsPerRound)
 	for i := 0; i < p.StopsPerRound; i++ {
@@ -220,9 +230,19 @@ func (p *Params) Generate(round int) GeneratedRound {
 			OnlyBlockProducers: p.StopOnlyBps,
 		}))
 		cmds = append(cmds, except(-1, "participant", -3-i*6, "group"))
-		cmds = append(cmds, sample(-1, "group", []float64{p.RedeployRatio * stopRatio, (1 - p.RedeployRatio) * stopRatio}))
-		cmds = append(cmds, restart(-1, "group1", true))
-		cmds = append(cmds, restart(-2, "group2", false))
+		redeployRatio := p.RedeployRatio * stopRatio
+		restartRatio := (1 - p.RedeployRatio) * stopRatio
+		if redeployRatio > 1e-6 && restartRatio > 1e-6 {
+			cmds = append(cmds, sample(-1, "group", []float64{redeployRatio, restartRatio}))
+			cmds = append(cmds, restart(p.UseRestartScript, -1, "group1", true))
+			cmds = append(cmds, restart(p.UseRestartScript, -2, "group2", false))
+		} else if redeployRatio > 1e-6 {
+			cmds = append(cmds, sample(-1, "group", []float64{redeployRatio}))
+			cmds = append(cmds, restart(p.UseRestartScript, -1, "group1", true))
+		} else if restartRatio > 1e-6 {
+			cmds = append(cmds, sample(-1, "group", []float64{restartRatio}))
+			cmds = append(cmds, restart(p.UseRestartScript, -1, "group1", false))
+		}
 		elapsed += waitSec
 	}
 	if round < p.Rounds-1 {
@@ -277,6 +297,7 @@ func main() {
 	flag.Float64Var(&p.RedeployRatio, "redeploy-ratio", 0.1, "float in range [0..1], ratio of redeploys of all node stops")
 	flag.BoolVar(&p.SendFromNonBpsOnly, "send-from-non-bps", false, "send only from non block producers")
 	flag.BoolVar(&p.StopOnlyBps, "stop-only-bps", false, "stop only block producers")
+	flag.BoolVar(&p.UseRestartScript, "use-restart-script", false, "use restart script insteadt of stop-daemon command")
 	flag.IntVar(&p.RoundDurationMin, "round-duration", 30, "duration of a round, minutes")
 	flag.IntVar(&p.PauseMin, "pause", 15, "duration of a pause between rounds, minutes")
 	flag.IntVar(&p.Rounds, "rounds", 4, "number of rounds to run experiment")

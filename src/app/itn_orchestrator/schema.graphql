@@ -102,6 +102,9 @@ type mutation {
 
   """Stop the Mina daemon"""
   stopDaemon(
+    """Whether to remove saved configuration data (default false)"""
+    cleanConfig: Boolean
+
     """Seconds to delay before stopping daemon (minimum 5)"""
     delaySeconds: Int
   ): String!
