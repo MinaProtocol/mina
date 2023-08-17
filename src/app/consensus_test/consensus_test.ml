@@ -215,7 +215,8 @@ let main () ~blocks_dir ~output_dir ~runtime_config_file =
   let%bind context = generate_context ~logger ~runtime_config_file in
   let%bind block_sorted_filenames = read_directory ~logger blocks_dir in
   let precomputed_blocks =
-    List.map block_sorted_filenames ~f:(fun json -> read_block_file json)
+    block_sorted_filenames
+    |> List.map ~f:read_block_file
     |> List.filter_map ~f:Fun.id
   in
   match precomputed_blocks with
