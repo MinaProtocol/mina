@@ -27,6 +27,33 @@ let context (logger : Logger.t) (precomputed_values : Precomputed_values.t) :
     let constraint_constants = precomputed_values.constraint_constants
   end )
 
+let generate_context ~logger ~runtime_config_file =
+  let runtime_config_opt =
+    Option.map runtime_config_file ~f:(fun file ->
+        Yojson.Safe.from_file file |> Runtime_config.of_yojson
+        |> Result.ok_or_failwith )
+  in
+  let runtime_config =
+    Option.value ~default:Runtime_config.default runtime_config_opt
+  in
+  let proof_level = Genesis_constants.Proof_level.compiled in
+  [%log info] "Generating context with given runtime config." ;
+  match%map
+    Genesis_ledger_helper.init_from_config_file ~logger
+      ~proof_level:(Some proof_level) runtime_config
+  with
+  | Ok (precomputed_values, _) ->
+      [%log info] "Initialization from config successful." ;
+      context logger precomputed_values
+  | Error err ->
+      [%log fatal] "Failed initializing with configuration $config: $error"
+        ~metadata:
+          [ ("config", Runtime_config.to_yojson runtime_config)
+          ; ("error", Error_json.error_to_yojson err)
+          ] ;
+      context logger
+        { (Lazy.force Precomputed_values.for_unit_tests) with proof_level }
+
 let read_directory ~logger dir_name =
   let height_pattern = Str.regexp ".*-\\([0-9]+\\)-.*" in
   let extract_height_from_filename fname =
@@ -105,23 +132,26 @@ let precomputed_block_to_block_file_output (block : Mina_block.Precomputed.t) =
   in
   { Block_file_output.height; previous_state_hash }
 
+let write_blocks_to_output_dir ~current_chain ~output_dir =
+  let sorted_output =
+    List.map ~f:precomputed_block_to_block_file_output current_chain |> List.rev
+  in
+  let write_block_to_file i block : unit Deferred.t =
+    let block_json_str =
+      block |> Block_file_output.to_yojson |> Yojson.Safe.to_string
+    in
+    let output_file = sprintf "%s/block_%d.json" output_dir i in
+    Writer.save output_file ~contents:block_json_str
+  in
+  let () =
+    if not (Core.Sys.file_exists_exn output_dir) then Core.Unix.mkdir output_dir
+  in
+  Deferred.List.iteri sorted_output ~f:write_block_to_file
+
 let compare_lengths candidate_length existing_length =
   if candidate_length > existing_length then Candidate_longer
   else if candidate_length = existing_length then Equal_length
   else Candidate_shorter
-
-let update_chain ~current_chain ~candidate_block ~select_outcome =
-  match select_outcome with
-  | Candidate_longer ->
-      candidate_block :: current_chain
-  | Equal_length -> (
-      match current_chain with
-      | _ :: rest_of_list ->
-          candidate_block :: rest_of_list
-      | [] ->
-          current_chain )
-  | Candidate_shorter ->
-      current_chain
 
 let run_select ~context (existing_block : Mina_block.Precomputed.t)
     (candidate_block : Mina_block.Precomputed.t) =
@@ -159,54 +189,26 @@ let run_select ~context (existing_block : Mina_block.Precomputed.t)
   | `Keep ->
       Candidate_shorter
 
+let update_chain ~current_chain ~candidate_block ~select_outcome =
+  match select_outcome with
+  | Candidate_longer ->
+      candidate_block :: current_chain
+  | Equal_length -> (
+      match current_chain with
+      | _ :: rest_of_list ->
+          candidate_block :: rest_of_list
+      | [] ->
+          current_chain )
+  | Candidate_shorter ->
+      current_chain
+
 let process_precomputed_blocks ~context ~current_chain blocks =
   List.fold blocks ~init:current_chain ~f:(fun acc_chain candidate_block ->
       let existing_block = List.hd_exn acc_chain in
       let select_outcome = run_select ~context existing_block candidate_block in
       update_chain ~current_chain:acc_chain ~candidate_block ~select_outcome )
 
-let write_blocks_to_output_dir ~current_chain ~output_dir =
-  let sorted_output =
-    List.map ~f:precomputed_block_to_block_file_output current_chain |> List.rev
-  in
-  let write_block_to_file i block : unit Deferred.t =
-    let block_json_str =
-      block |> Block_file_output.to_yojson |> Yojson.Safe.to_string
-    in
-    let output_file = sprintf "%s/block_%d.json" output_dir i in
-    Writer.save output_file ~contents:block_json_str
-  in
-  let () =
-    if not (Core.Sys.file_exists_exn output_dir) then Core.Unix.mkdir output_dir
-  in
-  Deferred.List.iteri sorted_output ~f:write_block_to_file
 
-let generate_context ~logger ~runtime_config_file =
-  let runtime_config_opt =
-    Option.map runtime_config_file ~f:(fun file ->
-        Yojson.Safe.from_file file |> Runtime_config.of_yojson
-        |> Result.ok_or_failwith )
-  in
-  let runtime_config =
-    Option.value ~default:Runtime_config.default runtime_config_opt
-  in
-  let proof_level = Genesis_constants.Proof_level.compiled in
-  [%log info] "Generating context with given runtime config." ;
-  match%map
-    Genesis_ledger_helper.init_from_config_file ~logger
-      ~proof_level:(Some proof_level) runtime_config
-  with
-  | Ok (precomputed_values, _) ->
-      [%log info] "Initialization from config successful." ;
-      context logger precomputed_values
-  | Error err ->
-      [%log fatal] "Failed initializing with configuration $config: $error"
-        ~metadata:
-          [ ("config", Runtime_config.to_yojson runtime_config)
-          ; ("error", Error_json.error_to_yojson err)
-          ] ;
-      context logger
-        { (Lazy.force Precomputed_values.for_unit_tests) with proof_level }
 
 let main () ~blocks_dir ~output_dir ~runtime_config_file =
   let logger = Logger.create () in
