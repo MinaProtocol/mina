@@ -2,9 +2,7 @@ open Core_kernel
 open Async
 
 module Block_file_output = struct
-  type t =
-    { height : int; parent_state_hash : string; previous_state_hash : string }
-  [@@deriving to_yojson]
+  type t = { height : int; previous_state_hash : string } [@@deriving to_yojson]
 end
 
 type select_outcome = Candidate_longer | Equal_length | Candidate_shorter
@@ -102,13 +100,10 @@ let precomputed_block_to_block_file_output (block : Mina_block.Precomputed.t) =
   let height =
     consensus_state |> member "blockchain_length" |> to_string |> int_of_string
   in
-  let parent_state_hash =
+  let previous_state_hash =
     protocol_state |> member "previous_state_hash" |> to_string
   in
-  { Block_file_output.height
-  ; parent_state_hash
-  ; previous_state_hash = parent_state_hash
-  }
+  { Block_file_output.height; previous_state_hash }
 
 let compare_lengths candidate_length existing_length =
   if candidate_length > existing_length then Candidate_longer
