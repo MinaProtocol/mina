@@ -2,13 +2,16 @@ open Core_kernel
 module Js = Js_of_ocaml.Js
 module Field = Pickles.Impls.Step.Field.Constant
 
-external get_ts_bindings : unit -> Js.Unsafe.any = "getTsBindings"
+external get_ts_bindings : unit -> Js.Unsafe.any Js.Optdef.t = "getTsBindings"
 
-let lookup (kind : string) (s : string) =
-  let prefix_hashes : Js.Unsafe.any =
-    Js.Unsafe.get (get_ts_bindings ()) (Js.string kind)
-  in
-  Js.Optdef.to_option (Js.Unsafe.get prefix_hashes (Js.string s))
+(* the ?. operator from JS *)
+let ( |. ) (value : _ Js.Optdef.t) (key : string) =
+  Js.(
+    if phys_equal value undefined then undefined
+    else Unsafe.get value (string key))
+
+let lookup kind prefix =
+  get_ts_bindings () |. kind |. prefix |> Js.Optdef.to_option
 
 let of_js x =
   Js.to_array x |> Array.map ~f:(Fn.compose Field.of_string Js.to_string)
