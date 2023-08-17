@@ -108,10 +108,22 @@ module Node = struct
         >>| ignore
       else Malleable_error.return ()
     in
+    let _, (event_writer : (t * Event_type.event) Pipe.Writer.t) =
+      Pipe.create ()
+    in
+    (* Emit an event that declares the node to be started *)
+    Pipe.write_without_pushback_if_open event_writer
+      (node, Event (Node_started, ())) ;
     run_in_container ~exit_code:11 node ~cmd:[ "/start.sh" ] >>| ignore
 
   let stop node =
     let open Malleable_error.Let_syntax in
+    let _, (event_writer : (t * Event_type.event) Pipe.Writer.t) =
+      Pipe.create ()
+    in
+    (* Emit an event that declares the node to be stopped, ie deliberately stopped. *)
+    Pipe.write_without_pushback_if_open event_writer
+      (node, Event (Node_stopped, ())) ;
     run_in_container ~exit_code:12 node ~cmd:[ "/stop.sh" ] >>| ignore
 
   let logger_infra_metadata node =
@@ -279,6 +291,21 @@ module Node = struct
     Malleable_error.return ()
 end
 
+let get_pod_ids_from_app_id app_id ~config =
+  let%bind cwd = Unix.getcwd () in
+  let open Malleable_error.Let_syntax in
+  let%bind pod_ids_str =
+    Integration_test_lib.Util.run_cmd_or_hard_error cwd "kubectl"
+      ( base_kube_args config
+      @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
+  in
+  let pod_ids =
+    String.split pod_ids_str ~on:'\n'
+    |> List.filter ~f:(Fn.compose not String.is_empty)
+    |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
+  in
+  return pod_ids
+
 module Workload_to_deploy = struct
   type t = { workload_id : string; pod_info : Node.pod_info }
 
@@ -289,37 +316,16 @@ module Workload_to_deploy = struct
     { network_keypair; has_archive_container; primary_container_id }
 
   let get_nodes_from_workload t ~config =
-    let%bind cwd = Unix.getcwd () in
     let open Malleable_error.Let_syntax in
-    let%bind app_id =
-      Deferred.bind ~f:Malleable_error.or_hard_error
-        (Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
-           ( base_kube_args config
-           @ [ "get"
-             ; "deployment"
-             ; t.workload_id
-             ; "-o"
-             ; "jsonpath={.spec.selector.matchLabels.app}"
-             ] ) )
-    in
-    let%bind pod_ids_str =
-      Integration_test_lib.Util.run_cmd_or_hard_error cwd "kubectl"
-        ( base_kube_args config
-        @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
-    in
-    let pod_ids =
-      String.split pod_ids_str ~on:'\n'
-      |> List.filter ~f:(Fn.compose not String.is_empty)
-      |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
-    in
+    let%bind pod_ids = get_pod_ids_from_app_id t.workload_id ~config in
     if List.is_empty pod_ids then
-      Malleable_error.hard_error_format "no pods found for app %s" app_id
+      Malleable_error.hard_error_format "no pods found for app %s" t.workload_id
     else
       (* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
       (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
       (* TODO fix this^ and have a more elegant solution *)
       let pod_info = t.pod_info in
-      return { Node.app_id; pod_ids; pod_info; config }
+      return { Node.app_id = t.workload_id; pod_ids; pod_info; config }
 end
 
 type t =
