@@ -42,6 +42,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let of_yojson = function
           | `String i ->
               Ok (Since_genesis (T.of_string i))
+          | `List [ `String "Since_genesis"; `String i ] ->
+              Ok (Since_genesis (T.of_string i))
           | _ ->
               Error "Global_slot.of_yojson: Expected `String"
       end

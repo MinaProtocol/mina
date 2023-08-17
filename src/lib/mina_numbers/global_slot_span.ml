@@ -37,6 +37,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let of_yojson = function
         | `String s ->
             Ok (Global_slot_span (T.of_string s))
+        | `List [ `String "Global_slot_span"; `String s ] ->
+            Ok (Global_slot_span (T.of_string s))
         | _ ->
             Error "Global_slot_span.of_yojson: expected string"
     end
