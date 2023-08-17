@@ -123,8 +123,7 @@ let update_chain ~current_chain ~candidate_block ~select_outcome =
   | Candidate_shorter ->
       current_chain
 
-let run_select ~context:(module Context : CONTEXT)
-    (existing_block : Mina_block.Precomputed.t)
+let run_select ~context (existing_block : Mina_block.Precomputed.t)
     (candidate_block : Mina_block.Precomputed.t) =
   let existing_consensus_state_with_hashes =
     { With_hash.hash =
@@ -141,8 +140,7 @@ let run_select ~context:(module Context : CONTEXT)
     }
   in
   match
-    Consensus.Hooks.select
-      ~context:(module Context)
+    Consensus.Hooks.select ~context
       ~existing:existing_consensus_state_with_hashes
       ~candidate:candidate_consensus_state_with_hashes
   with
