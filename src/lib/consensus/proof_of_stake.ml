@@ -81,10 +81,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       (Float.of_int num_delegators) ;
     outer_table
 
-  let compute_delegatee_table_sparse_ledger keys ledger =
-    compute_delegatee_table keys ~iter_accounts:(fun f ->
-        Mina_ledger.Sparse_ledger.iteri ledger ~f:(fun i acct -> f i acct) )
-
   let compute_delegatee_table_ledger_db keys ledger =
     compute_delegatee_table keys ~iter_accounts:(fun f ->
         Mina_ledger.Ledger.Db.iteri ledger ~f:(fun i acct -> f i acct) )
@@ -607,44 +603,19 @@ module Make_str (A : Wire_types.Concrete) = struct
         | Next_epoch_snapshot ->
             !t.next_epoch_snapshot <- v
 
-      let reset_snapshot ~context:(module Context : CONTEXT) (t : t) id
-          ~sparse_ledger =
-        let open Context in
-        let open Or_error.Let_syntax in
-        let module Ledger_transfer =
-          Mina_ledger.Ledger_transfer.From_sparse_ledger (Mina_ledger.Ledger.Db) in
+      let reset_snapshot (t : t) id ledger =
         let delegatee_table =
-          compute_delegatee_table_sparse_ledger
+          compute_delegatee_table_ledger_db
             (current_block_production_keys t)
-            sparse_ledger
+            ledger
         in
         match id with
         | Staking_epoch_snapshot ->
-            let location = staking_epoch_ledger_location t in
-            Snapshot.Ledger_snapshot.remove !t.staking_epoch_snapshot.ledger
-              ~location ;
-            let ledger =
-              Mina_ledger.Ledger.Db.create ~directory_name:location
-                ~depth:constraint_constants.ledger_depth ()
-            in
-            let%map (_ : Mina_ledger.Ledger.Db.t) =
-              Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger
-            in
             !t.staking_epoch_snapshot <-
               { delegatee_table
               ; ledger = Snapshot.Ledger_snapshot.Ledger_db ledger
               }
         | Next_epoch_snapshot ->
-            let location = next_epoch_ledger_location t in
-            Snapshot.Ledger_snapshot.remove !t.next_epoch_snapshot.ledger
-              ~location ;
-            let ledger =
-              Mina_ledger.Ledger.Db.create ~directory_name:location
-                ~depth:constraint_constants.ledger_depth ()
-            in
-            let%map (_ : Mina_ledger.Ledger.Db.t) =
-              Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger
-            in
             !t.next_epoch_snapshot <-
               { delegatee_table
               ; ledger = Snapshot.Ledger_snapshot.Ledger_db ledger
@@ -2816,7 +2787,7 @@ module Make_str (A : Wire_types.Concrete) = struct
              new leaves in increasing index order
           *)
           let%bind.Deferred.Or_error db_ledger =
-            let db_ledger_of_snapshot snapshot =
+            let db_ledger_of_snapshot snapshot snapshot_location =
               match snapshot.ledger with
               | Ledger_snapshot.Ledger_db ledger ->
                   Ok ledger
@@ -2828,6 +2799,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   in
                   let fresh_db_ledger =
                     Mina_ledger.Ledger.Db.create
+                      ~directory_name:snapshot_location
                       ~depth:Context.constraint_constants.ledger_depth ()
                   in
                   Ledger_transfer.transfer_accounts ~src:ledger
@@ -2837,8 +2809,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             | Staking_epoch_snapshot ->
                 return
                 @@ db_ledger_of_snapshot !local_state.staking_epoch_snapshot
+                     (staking_epoch_ledger_location local_state)
             | Next_epoch_snapshot ->
-                return @@ db_ledger_of_snapshot !local_state.next_epoch_snapshot
+                return
+                @@ db_ledger_of_snapshot !local_state.next_epoch_snapshot
+                     (next_epoch_ledger_location local_state)
           in
           let sync_ledger =
             Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system db_ledger
@@ -2854,32 +2829,16 @@ module Make_str (A : Wire_types.Concrete) = struct
             Mina_ledger.Sync_ledger.Db.fetch sync_ledger target_ledger_hash
               ~data:() ~equal:(fun () () -> true)
           with
-          | `Ok ledger -> (
+          | `Ok ledger ->
               [%log info]
                 "Succeeded in syncing epoch ledger with hash \
                  $target_ledger_hash from peers"
                 ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
-              let sparse_ledger =
-                Mina_ledger.Sparse_ledger.of_any_ledger
-                  (Mina_ledger.Ledger.Any_ledger.cast
-                     (module Mina_ledger.Ledger.Db)
-                     ledger )
-              in
               assert (
                 Mina_base.Ledger_hash.equal target_ledger_hash
-                  (Mina_ledger.Sparse_ledger.merkle_root sparse_ledger) ) ;
-              match
-                reset_snapshot
-                  ~context:(module Context)
-                  local_state snapshot_id ~sparse_ledger
-              with
-              | Ok () ->
-                  Deferred.Or_error.ok_unit
-              | Error e ->
-                  [%log error]
-                    "Could not reset snapshot from synced epoch ledger"
-                    ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-                  return (Error e) )
+                  (Mina_ledger.Ledger.Db.merkle_root ledger) ) ;
+              reset_snapshot local_state snapshot_id ledger ;
+              Deferred.Or_error.ok_unit
           | `Target_changed _ ->
               [%log error] "Target changed when syncing epoch ledger" ;
               return (Or_error.error_string "Epoch ledger target changed")
