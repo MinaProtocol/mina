@@ -35,12 +35,16 @@ let zkapp_account = create "MinaZkappAccount"
 
 let zkapp_payload = create "MinaZkappPayload"
 
+let zkapp_body_mainnet = create "MainnetZkappBody"
+
+let zkapp_body_testnet = create "TestnetZkappBody"
+
 let zkapp_body ?(chain = Mina_signature_kind.t) =
   match chain with
   | Mainnet ->
-      create ("Mainnet" ^ "ZkappBody")
+      zkapp_body_mainnet
   | Testnet ->
-      create ("Testnet" ^ "ZkappBody")
+      zkapp_body_testnet
   | Other_network chain_name ->
       create (chain_name ^ "ZkappBody")
 
