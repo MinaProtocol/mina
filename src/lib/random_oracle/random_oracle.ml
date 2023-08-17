@@ -16,6 +16,10 @@ module State = struct
   include Array
 
   let map2 = map2_exn
+
+  let to_array t = t
+
+  let of_array t = t
 end
 
 module Input = Random_oracle_input
