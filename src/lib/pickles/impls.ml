@@ -57,21 +57,24 @@ module Step = struct
       Field.t * Boolean.var
 
     let forbidden_shifted_values =
-      let size_in_bits = Constant.size_in_bits in
-      let other_mod = Wrap_impl.Bigint.to_bignum_bigint Constant.size in
-      let values = forbidden_shifted_values ~size_in_bits ~modulus:other_mod in
-      let f x =
-        let open Option.Let_syntax in
-        let hi = test_bit x (Field.size_in_bits - 1) in
-        let lo = B.shift_right x 1 in
-        let%map lo =
-          let modulus = Impl.Field.size in
-          if B.compare modulus lo <= 0 then None
-          else Some Impl.Bigint.(to_field (of_bignum_bigint lo))
-        in
-        (lo, hi)
-      in
-      values |> List.filter_map ~f
+      lazy
+        (let size_in_bits = Constant.size_in_bits in
+         let other_mod = Wrap_impl.Bigint.to_bignum_bigint Constant.size in
+         let values =
+           forbidden_shifted_values ~size_in_bits ~modulus:other_mod
+         in
+         let f x =
+           let open Option.Let_syntax in
+           let hi = test_bit x (Field.size_in_bits - 1) in
+           let lo = B.shift_right x 1 in
+           let%map lo =
+             let modulus = Impl.Field.size in
+             if B.compare modulus lo <= 0 then None
+             else Some Impl.Bigint.(to_field (of_bignum_bigint lo))
+           in
+           (lo, hi)
+         in
+         values |> List.filter_map ~f )
 
     let%test_unit "preserve circuit behavior for Step" =
       let expected_list =
@@ -84,7 +87,7 @@ module Step = struct
         ]
       in
       let str_list =
-        List.map forbidden_shifted_values ~f:(fun (a, b) ->
+        List.map (Lazy.force forbidden_shifted_values) ~f:(fun (a, b) ->
             (Tick.Field.to_string a, b) )
       in
       assert ([%equal: (string * bool) list] str_list expected_list)
@@ -112,7 +115,7 @@ module Step = struct
       in
       let (Typ typ_unchecked) = typ_unchecked in
       let%bind () = typ_unchecked.check t in
-      Checked.List.map forbidden_shifted_values ~f:(equal t)
+      Checked.List.map (Lazy.force forbidden_shifted_values) ~f:(equal t)
       >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
 
     let typ : _ Snarky_backendless.Typ.t =
@@ -206,15 +209,18 @@ module Wrap = struct
     type t = Field.t
 
     let forbidden_shifted_values =
-      let other_mod = Step.Impl.Bigint.to_bignum_bigint Constant.size in
-      let size_in_bits = Constant.size_in_bits in
-      let values = forbidden_shifted_values ~size_in_bits ~modulus:other_mod in
-      let f x =
-        let modulus = Impl.Field.size in
-        if B.compare modulus x <= 0 then None
-        else Some Impl.Bigint.(to_field (of_bignum_bigint x))
-      in
-      values |> List.filter_map ~f
+      lazy
+        (let other_mod = Step.Impl.Bigint.to_bignum_bigint Constant.size in
+         let size_in_bits = Constant.size_in_bits in
+         let values =
+           forbidden_shifted_values ~size_in_bits ~modulus:other_mod
+         in
+         let f x =
+           let modulus = Impl.Field.size in
+           if B.compare modulus x <= 0 then None
+           else Some Impl.Bigint.(to_field (of_bignum_bigint x))
+         in
+         values |> List.filter_map ~f )
 
     let%test_unit "preserve circuit behavior for Wrap" =
       let expected_list =
@@ -223,7 +229,7 @@ module Wrap = struct
         ]
       in
       let str_list =
-        List.map forbidden_shifted_values ~f:Wrap_field.to_string
+        List.map (Lazy.force forbidden_shifted_values) ~f:Wrap_field.to_string
       in
       assert ([%equal: string list] str_list expected_list)
 
@@ -239,7 +245,7 @@ module Wrap = struct
         let open Let_syntax in
         let equal x1 x2 = Field.Checked.equal x1 (Field.Var.constant x2) in
         let%bind () = t0.check t in
-        Checked.List.map forbidden_shifted_values ~f:(equal t)
+        Checked.List.map (Lazy.force forbidden_shifted_values) ~f:(equal t)
         >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
       in
       (typ_unchecked, check)
