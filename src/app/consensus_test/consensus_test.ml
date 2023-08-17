@@ -162,12 +162,10 @@ let run_select ~context:(module Context : CONTEXT)
       Candidate_shorter
 
 let process_precomputed_blocks ~context ~current_chain blocks =
-  Deferred.List.fold blocks ~init:current_chain
-    ~f:(fun acc_chain candidate_block ->
+  List.fold blocks ~init:current_chain ~f:(fun acc_chain candidate_block ->
       let existing_block = List.hd_exn acc_chain in
       let select_outcome = run_select ~context existing_block candidate_block in
-      return
-        (update_chain ~current_chain:acc_chain ~candidate_block ~select_outcome) )
+      update_chain ~current_chain:acc_chain ~candidate_block ~select_outcome )
 
 let write_blocks_to_output_dir ~current_chain ~output_dir =
   let sorted_output =
@@ -226,12 +224,11 @@ let main () ~blocks_dir ~output_dir ~runtime_config_file =
   | first_block :: precomputed_blocks ->
       [%log info] "Starting to process blocks"
         ~metadata:[ ("num_blocks", `Int (List.length precomputed_blocks)) ] ;
-      let%bind current_chain =
+      let current_chain =
         process_precomputed_blocks ~current_chain:[ first_block ] ~context
           precomputed_blocks
       in
       [%log info] "Finished processing blocks" ;
-
       [%log info] "Starting to write blocks to output dir"
         ~metadata:[ ("output_dir", `String output_dir) ] ;
       let%bind () = write_blocks_to_output_dir ~current_chain ~output_dir in
