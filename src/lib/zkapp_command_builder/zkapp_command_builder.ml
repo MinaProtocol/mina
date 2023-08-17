@@ -70,7 +70,7 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
                | None_given ->
                    Control.None_given
                | Proof _ ->
-                   Control.Proof Mina_base.Proof.blockchain_dummy
+                   Control.Proof Mina_base.Proof.(!blockchain_dummy)
                | Signature ->
                    Control.Signature Signature.dummy
              in
