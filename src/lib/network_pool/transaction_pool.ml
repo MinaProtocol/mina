@@ -1779,8 +1779,10 @@ let%test_module _ =
                 User_command.forget_check )
            txs )
 
-    let setup_test () =
-      let frontier, best_tip_diff_w = Mock_transition_frontier.create () in
+    let setup_test ?permissions () =
+      let frontier, best_tip_diff_w =
+        Mock_transition_frontier.create ?permissions ()
+      in
       let _, best_tip_ref = frontier in
       let frontier_pipe_r, frontier_pipe_w =
         Broadcast_pipe.create @@ Some frontier
@@ -2955,7 +2957,12 @@ let%test_module _ =
     let%test "account update with a different network id that uses proof \
               authorization would pass verification under dummy verifier" =
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind test = setup_test () in
+          let%bind test =
+            setup_test
+              ~permissions:
+                { Permissions.user_default with set_zkapp_uri = Proof }
+              ()
+          in
           let%bind zkapp_command =
             mk_single_account_update
               ~chain:Mina_signature_kind.(Other_network "invalid")

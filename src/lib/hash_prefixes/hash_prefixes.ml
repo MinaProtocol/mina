@@ -35,7 +35,14 @@ let zkapp_account = create "MinaZkappAccount"
 
 let zkapp_payload = create "MinaZkappPayload"
 
-let zkapp_body chain_name = create (chain_name ^ "MinaZkappBody")
+let zkapp_body ?(chain = Mina_signature_kind.t) =
+  match chain with
+  | Mainnet ->
+      create ("Mainnet" ^ "ZkappBody")
+  | Testnet ->
+      create ("Testnet" ^ "ZkappBody")
+  | Other_network chain_name ->
+      create (chain_name ^ "ZkappBody")
 
 let merkle_tree i = create (Printf.sprintf "MinaMklTree%03d" i)
 
