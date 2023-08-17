@@ -39,6 +39,7 @@ module Node = struct
     ; pod_ids : string list
     ; pod_info : pod_info
     ; config : config
+    ; event_writer : (t * Event_type.event) Pipe.Writer.t
     }
 
   let id { pod_ids; _ } = List.hd_exn pod_ids
@@ -108,21 +109,15 @@ module Node = struct
         >>| ignore
       else Malleable_error.return ()
     in
-    let _, (event_writer : (t * Event_type.event) Pipe.Writer.t) =
-      Pipe.create ()
-    in
     (* Emit an event that declares the node to be started *)
-    Pipe.write_without_pushback_if_open event_writer
+    Pipe.write_without_pushback_if_open node.event_writer
       (node, Event (Node_started, ())) ;
     run_in_container ~exit_code:11 node ~cmd:[ "/start.sh" ] >>| ignore
 
   let stop node =
     let open Malleable_error.Let_syntax in
-    let _, (event_writer : (t * Event_type.event) Pipe.Writer.t) =
-      Pipe.create ()
-    in
     (* Emit an event that declares the node to be stopped, ie deliberately stopped. *)
-    Pipe.write_without_pushback_if_open event_writer
+    Pipe.write_without_pushback_if_open node.event_writer
       (node, Event (Node_stopped, ())) ;
     run_in_container ~exit_code:12 node ~cmd:[ "/stop.sh" ] >>| ignore
 
@@ -315,7 +310,7 @@ module Workload_to_deploy = struct
       primary_container_id : Node.pod_info =
     { network_keypair; has_archive_container; primary_container_id }
 
-  let get_nodes_from_workload t ~config =
+  let get_nodes_from_workload t ~config ~event_writer =
     let open Malleable_error.Let_syntax in
     let%bind pod_ids = get_pod_ids_from_app_id t.workload_id ~config in
     if List.is_empty pod_ids then
@@ -325,7 +320,8 @@ module Workload_to_deploy = struct
       (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
       (* TODO fix this^ and have a more elegant solution *)
       let pod_info = t.pod_info in
-      return { Node.app_id = t.workload_id; pod_ids; pod_info; config }
+      return
+        { Node.app_id = t.workload_id; pod_ids; pod_info; config; event_writer }
 end
 
 type t =
@@ -339,7 +335,11 @@ type t =
         (* ; nodes_by_pod_id : Node.t Core.String.Map.t *)
   ; testnet_log_filter : string
   ; genesis_keypairs : Network_keypair.t Core.String.Map.t
+        (* ; event_writer : (Node.t * Event_type.event) Pipe.Writer.t *)
+  ; event_reader : (Node.t * Event_type.event) Pipe.Reader.t
   }
+
+let event_reader { event_reader; _ } = event_reader
 
 let constants { constants; _ } = constants
 

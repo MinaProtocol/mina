@@ -64,6 +64,8 @@ module Engine = struct
 
     type t
 
+    val event_reader : t -> (Node.t * Event_type.event) Pipe.Reader.t
+
     val constants : t -> Test_config.constants
 
     val constraint_constants : t -> Genesis_constants.Constraint_constants.t
@@ -149,7 +151,8 @@ module Dsl = struct
 
     val create :
          logger:Logger.t
-      -> event_reader:(Engine.Network.Node.t * Event_type.event) Pipe.Reader.t
+      -> event_readers:
+           (Engine.Network.Node.t * Event_type.event) Pipe.Reader.t list
       -> t
 
     val on :

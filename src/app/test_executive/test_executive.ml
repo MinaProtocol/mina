@@ -334,7 +334,10 @@ let main inputs =
           log_engine_ref := Some log_engine ;
           let event_router =
             Dsl.Event_router.create ~logger
-              ~event_reader:(Engine.Log_engine.event_reader log_engine)
+              ~event_readers:
+                [ Engine.Network.event_reader network
+                ; Engine.Log_engine.event_reader log_engine
+                ]
           in
           error_accumulator_ref :=
             Some (Dsl.watch_log_errors ~logger ~event_router ~on_fatal_error) ;

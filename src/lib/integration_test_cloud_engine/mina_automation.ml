@@ -667,6 +667,11 @@ module Network_manager = struct
     let%bind (_ : string) =
       run_cmd_or_hard_error t "terraform" [ "apply"; "-auto-approve" ]
     in
+    let ( event_reader
+        , (event_writer :
+            (Kubernetes_network.Node.t * Event_type.event) Pipe.Writer.t ) ) =
+      Pipe.create ()
+    in
     t.deployed <- true ;
     let config : Kubernetes_network.config =
       { testnet_name = t.testnet_name
@@ -679,7 +684,7 @@ module Network_manager = struct
       let%bind mp = accum_M in
       let%map node =
         Kubernetes_network.Workload_to_deploy.get_nodes_from_workload data
-          ~config
+          ~config ~event_writer
       in
       Core.String.Map.add_exn mp ~key ~data:node
     in
@@ -714,6 +719,7 @@ module Network_manager = struct
       ; archive_nodes (* ; all_nodes *)
       ; testnet_log_filter = t.testnet_log_filter
       ; genesis_keypairs = t.genesis_keypairs
+      ; event_reader
       }
     in
     let nodes_to_string =
