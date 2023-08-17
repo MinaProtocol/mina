@@ -29,9 +29,7 @@ struct
     Checked.map (to_bits t) ~f:(fun bits ->
         Random_oracle.Input.Legacy.bitstring bits )
 
-  let constant n =
-    Field.Var.constant
-      (Bigint.to_field (Bigint.of_bignum_bigint (N.to_bigint n)))
+  let constant n = Field.Var.constant (Field.of_int (N.to_int n))
 
   let () = assert (Int.(N.length_in_bits mod 16 = 0))
 
