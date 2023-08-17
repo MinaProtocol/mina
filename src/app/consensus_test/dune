@@ -26,7 +26,7 @@
   result
   stdio
   with_hash)
- (preprocessor_deps %{env:CONFIG_PATH=../../config.ml})
+ (preprocessor_deps %{env:CONFIG_PATH=../../config/devnet.mlh})
  (instrumentation
   (backend bisect_ppx))
  (preprocess

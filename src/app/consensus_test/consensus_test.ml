@@ -208,8 +208,6 @@ let process_precomputed_blocks ~context ~current_chain blocks =
       let select_outcome = run_select ~context existing_block candidate_block in
       update_chain ~current_chain:acc_chain ~candidate_block ~select_outcome )
 
-
-
 let main () ~blocks_dir ~output_dir ~runtime_config_file =
   let logger = Logger.create () in
   let%bind context = generate_context ~logger ~runtime_config_file in
