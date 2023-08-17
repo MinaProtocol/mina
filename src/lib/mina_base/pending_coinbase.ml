@@ -181,7 +181,7 @@ module Make_str (A : Wire_types.Concrete) = struct
            (Input.Chunked.append (Coinbase_data.to_input coinbase) (to_input h)) )
       |> of_hash
 
-    let empty = Random_oracle.salt "CoinbaseStack" |> Random_oracle.digest
+    let empty = Hash_prefix_create.salt "CoinbaseStack" |> Random_oracle.digest
 
     module Checked = struct
       type t = var
@@ -394,7 +394,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       |> of_hash
 
     let empty_hash =
-      Random_oracle.(digest (salt "PendingCoinbaseMerkleTree")) |> of_hash
+      Hash_prefix_create.salt "PendingCoinbaseMerkleTree"
+      |> Random_oracle.digest |> of_hash
 
     let of_digest = Fn.compose Fn.id of_hash
   end
