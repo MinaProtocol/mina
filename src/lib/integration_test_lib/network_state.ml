@@ -201,10 +201,12 @@ module Make
     ignore
       ( Event_router.on event_router Event_type.Node_stopped ~f:(fun node () ->
             update ~f:(fun state ->
-                [%log debug]
+                [%log info]
                   "Updating network state with event of $node being stopped \
                    deliberately"
                   ~metadata:[ ("node", `String (Node.id node)) ] ;
+
+                (* todo: downgrade to debug before landing *)
                 let node_initialization' =
                   String.Map.set state.node_initialization ~key:(Node.id node)
                     ~data:false
