@@ -57,19 +57,38 @@ let read_directory ~logger dir_name =
   blocks_in_dir dir_name
 
 let read_block_file blocks_filename =
-  let read_block_line line =
-    match Yojson.Safe.from_string line |> Mina_block.Precomputed.of_yojson with
+  let parse_json_from_line line =
+    match Yojson.Safe.from_string line with
+    | json ->
+        Some json
+    | exception _ ->
+        Format.printf "Warning: Could not parse JSON from line in file: %s\n"
+          blocks_filename ;
+        None
+  in
+  let block_of_json json =
+    match Mina_block.Precomputed.of_yojson json with
     | Ok block ->
-        block
+        Some block
     | Error err ->
-        failwithf "Could not read block: %s" err ()
+        Format.printf "Warning: Could not read block: %s: %s\n" err
+          blocks_filename ;
+        None
+  in
+  let read_block_line line =
+    match parse_json_from_line line with
+    | Some json ->
+        block_of_json json
+    | None ->
+        None
   in
   In_channel.with_file blocks_filename ~f:(fun blocks_file ->
       match In_channel.input_line blocks_file with
       | Some line ->
           read_block_line line
       | None ->
-          failwithf "File %s is empty" blocks_filename () )
+          Format.printf "Warning: File %s is empty\n" blocks_filename ;
+          None )
 
 let precomputed_block_to_block_file_output (block : Mina_block.Precomputed.t) =
   let open Yojson.Safe.Util in
@@ -204,6 +223,7 @@ let main () ~blocks_dir ~output_dir ~runtime_config_file =
   let%bind block_sorted_filenames = read_directory ~logger blocks_dir in
   let precomputed_blocks =
     List.map block_sorted_filenames ~f:(fun json -> read_block_file json)
+    |> List.filter_map ~f:Fun.id
   in
   match precomputed_blocks with
   | [] ->
@@ -227,21 +247,22 @@ let () =
   Command.(
     run
       (let open Let_syntax in
-      async
-        ~summary:
-          "Run Mina PoS on a set of precomputed blocks and output the longest \
-           chain"
-        (let%map blocks_dir =
-           Param.flag "--precomputed-dir" ~aliases:[ "-precomputed-dir" ]
-             ~doc:"PATH Path of the blocks JSON data"
-             Param.(required string)
-         and output_dir =
-           Param.flag "--output-dir" ~aliases:[ "-output-dir" ]
-             ~doc:"PATH Path of the output directory"
-             Param.(required string)
-         and runtime_config_file =
-           Param.flag "--config-file" ~aliases:[ "-config-file" ]
-             Param.(optional string)
-             ~doc:"PATH to the configuration file containing the genesis ledger"
-         in
-         main ~blocks_dir ~output_dir ~runtime_config_file )))
+       async
+         ~summary:
+           "Run Mina PoS on a set of precomputed blocks and output the longest \
+            chain"
+         (let%map blocks_dir =
+            Param.flag "--precomputed-dir" ~aliases:[ "-precomputed-dir" ]
+              ~doc:"PATH Path of the blocks JSON data"
+              Param.(required string)
+          and output_dir =
+            Param.flag "--output-dir" ~aliases:[ "-output-dir" ]
+              ~doc:"PATH Path of the output directory"
+              Param.(required string)
+          and runtime_config_file =
+            Param.flag "--config-file" ~aliases:[ "-config-file" ]
+              Param.(optional string)
+              ~doc:
+                "PATH to the configuration file containing the genesis ledger"
+          in
+          main ~blocks_dir ~output_dir ~runtime_config_file ) ) )
