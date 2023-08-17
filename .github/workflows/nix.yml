@@ -17,10 +17,6 @@ jobs:
         fetch-depth: 0
     - uses: cachix/install-nix-action@v20
     - uses: DeterminateSystems/magic-nix-cache-action@v2
-    #- uses: cachix/cachix-action@v12
-    #  with:
-    ##    name: mina
-    #    authToken: 'eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI1YjU1ZTQ3ZS0zYWUxLTQ1NjUtYWRjNC1kMjMwYTk1Y2M1YzYiLCJzY29wZXMiOiJjYWNoZSJ9.5qlAWw-hABTeJESvxhDhTmqRaQbLzbYLYkArv2g3FM0'
     - run: nix/pin.sh 
     - run: nix build mina
       env:
