@@ -60,8 +60,7 @@ module Constant = struct
          }
        in
        let evals =
-         Plonk_types.Evals.to_in_circuit
-           (Lazy.force Dummy.evals_combined).evals.evals
+         Plonk_types.Evals.to_in_circuit Dummy.(!evals_combined.evals.evals)
        in
        let env =
          let module Env_bool = struct
@@ -114,7 +113,7 @@ module Constant = struct
            { plonk = { plonk with alpha; beta; gamma; zeta }
            ; combined_inner_product = Shifted_value (tock ())
            ; xi = Scalar_challenge.create one_chal
-           ; bulletproof_challenges = Lazy.force Dummy.Ipa.Wrap.challenges
+           ; bulletproof_challenges = Dummy.(!Ipa.Wrap.challenges)
            ; b = Shifted_value (tock ())
            }
        ; should_finalize = false

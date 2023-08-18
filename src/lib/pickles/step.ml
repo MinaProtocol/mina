@@ -413,7 +413,7 @@ struct
                  t.statement.messages_for_next_step_proof
                    .old_bulletproof_challenges ~f:Ipa.Step.compute_challenges )
               Local_max_proofs_verified.n
-              (Lazy.force Dummy.Ipa.Step.challenges_computed)
+              Dummy.(!Ipa.Step.challenges_computed)
         ; wrap_proof =
             { opening =
                 { proof.openings.proof with challenge_polynomial_commitment }
@@ -715,7 +715,7 @@ struct
               { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges =
                   Vector.init Max_proofs_verified.n ~f:(fun _ ->
-                      Lazy.force Dummy.Ipa.Wrap.challenges_computed )
+                      Dummy.(!Ipa.Wrap.challenges_computed) )
               }
             in
             Wrap_hack.hash_messages_for_next_wrap_proof Max_proofs_verified.n t
@@ -884,7 +884,8 @@ struct
                    ; evals =
                        { With_public_input.evals = es; public_input = x_hat }
                    } ) )
-            lte Max_proofs_verified.n (Lazy.force Dummy.evals)
+            lte Max_proofs_verified.n
+            Dummy.(!evals)
       }
     , Option.value_exn !return_value
     , Option.value_exn !auxiliary_value
