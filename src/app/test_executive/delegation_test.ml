@@ -33,10 +33,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let logger = Logger.create () in
     (* fee for user commands *)
     let fee = Currency.Fee.of_int 10_000_000 in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
     in
     let node_a =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"

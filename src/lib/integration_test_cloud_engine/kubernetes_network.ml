@@ -397,7 +397,7 @@ let all_nodes t =
     ]
   |> Core.String.Map.of_alist_exn
 
-(* all_non_seed_pods returns everything in the network except seed nodes *)
+(* all_non_seed_nodes returns everything in the network except seed nodes *)
 let all_non_seed_nodes t =
   List.concat
     [ Core.String.Map.to_alist t.block_producers
