@@ -55,3 +55,5 @@ val evals_combined :
   , Backend.Tock.Field.t )
   Pickles_types.Plonk_types.All_evals.t
   lazy_t
+
+val ( ! ) : 'a lazy_t -> 'a
