@@ -1,7 +1,6 @@
 open Core_kernel
 open Backend
 open Pickles_types
-open Lazy.Let_syntax
 
 (* The actual "accumulator" for the wrap proof contains a vector of elements,
    each of which is a vector of bulletproof challenges.
@@ -26,21 +25,20 @@ module Padded_length = Nat.N2
 
 (* Pad up to length 2 by preprending dummy values. *)
 let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
-  Vector.extend_front_exn v Padded_length.n (Lazy.force dummy)
+  Vector.extend_front_exn v Padded_length.n dummy
 
 (* Specialized padding function. *)
 let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
-  pad_vector ~dummy:Dummy.Ipa.Wrap.challenges_computed chalss
+  pad_vector ~dummy:Dummy.(!Ipa.Wrap.challenges_computed) chalss
 
 (* Specialized padding function. *)
 let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
   pad_vector xs
     ~dummy:
-      (let%map chals = Dummy.Ipa.Wrap.challenges_computed in
-       { Tock.Proof.Challenge_polynomial.commitment =
-           Lazy.force Dummy.Ipa.Wrap.sg
-       ; challenges = Vector.to_array chals
-       } )
+      { Tock.Proof.Challenge_polynomial.commitment =
+          Lazy.force Dummy.Ipa.Wrap.sg
+      ; challenges = Vector.to_array Dummy.(!Ipa.Wrap.challenges_computed)
+      }
   |> Vector.to_list
 
 (* Hash the me only, padding first. *)
@@ -74,7 +72,7 @@ let pad_proof (type mlmb) (T p : (mlmb, _) Proof.t) :
                     pad_vector
                       p.statement.proof_state.messages_for_next_wrap_proof
                         .old_bulletproof_challenges
-                      ~dummy:Dummy.Ipa.Wrap.challenges
+                      ~dummy:Dummy.(Ipa.Wrap.challenges)
                 }
             }
         }
@@ -84,31 +82,31 @@ module Checked = struct
   let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
     pad_vector
       ~dummy:
-        (let%map chals = Dummy.Ipa.Wrap.challenges_computed in
-         Vector.map ~f:Impls.Wrap.Field.constant chals )
+        (Vector.map ~f:Impls.Wrap.Field.constant
+           Dummy.(!Ipa.Wrap.challenges_computed) )
       chalss
 
   let pad_commitments (commitments : _ Vector.t) =
     pad_vector
       ~dummy:
-        (let%map sg = Dummy.Ipa.Wrap.sg in
-         Tuple_lib.Double.map ~f:Impls.Step.Field.constant sg )
+        (Tuple_lib.Double.map ~f:Impls.Step.Field.constant
+           (Lazy.force Dummy.Ipa.Wrap.sg) )
       commitments
 
   (* We precompute the sponge states that would result from absorbing
      0, 1, or 2 dummy challenge vectors. This is used to speed up hashing
      inside the circuit. *)
   let dummy_messages_for_next_wrap_proof_sponge_states =
-    let module S = Tock_field_sponge.Field in
-    let full_state s = (S.state s, s.sponge_state) in
-    let sponge = S.create Tock_field_sponge.params in
-    let s0 = full_state sponge in
-    let%map chals = Dummy.Ipa.Wrap.challenges_computed in
-    Vector.iter ~f:(S.absorb sponge) chals ;
-    let s1 = full_state sponge in
-    Vector.iter ~f:(S.absorb sponge) chals ;
-    let s2 = full_state sponge in
-    [| s0; s1; s2 |]
+    lazy
+      (let module S = Tock_field_sponge.Field in
+      let full_state s = (S.state s, s.sponge_state) in
+      let sponge = S.create Tock_field_sponge.params in
+      let s0 = full_state sponge in
+      Vector.iter ~f:(S.absorb sponge) Dummy.(!Ipa.Wrap.challenges_computed) ;
+      let s1 = full_state sponge in
+      Vector.iter ~f:(S.absorb sponge) Dummy.(!Ipa.Wrap.challenges_computed) ;
+      let s2 = full_state sponge in
+      [| s0; s1; s2 |] )
 
   let hash_constant_messages_for_next_wrap_proof =
     hash_messages_for_next_wrap_proof

@@ -7,7 +7,6 @@ module Ipa : sig
         Composition_types.Bulletproof_challenge.t
       , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
       Pickles_types.Vector.t
-      lazy_t
 
     val challenges_computed :
       ( Backend.Tock.Field.t
@@ -25,7 +24,6 @@ module Ipa : sig
         Composition_types.Bulletproof_challenge.t
       , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
       Pickles_types.Vector.t
-      lazy_t
 
     val challenges_computed :
       ( Backend.Tick.Field.t
@@ -55,3 +53,5 @@ val evals_combined :
   , Backend.Tock.Field.t )
   Pickles_types.Plonk_types.All_evals.t
   lazy_t
+
+val ( ! ) : 'a lazy_t -> 'a
