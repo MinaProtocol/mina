@@ -32,35 +32,31 @@ let evals_combined =
 module Ipa = struct
   module Wrap = struct
     let challenges =
-      lazy
-        (Vector.init Tock.Rounds.n ~f:(fun _ ->
-             let prechallenge = Ro.scalar_chal () in
-             { Bulletproof_challenge.prechallenge } ) )
+      Vector.init Tock.Rounds.n ~f:(fun _ ->
+          let prechallenge = Ro.scalar_chal () in
+          { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
       lazy
-        (Vector.map !challenges ~f:(fun { prechallenge } : Tock.Field.t ->
+        (Vector.map challenges ~f:(fun { prechallenge } : Tock.Field.t ->
              Ipa.Wrap.compute_challenge prechallenge ) )
 
     let sg =
-      lazy (time "dummy wrap sg" (fun () -> Ipa.Wrap.compute_sg !challenges))
+      lazy (time "dummy wrap sg" (fun () -> Ipa.Wrap.compute_sg challenges))
   end
 
   module Step = struct
     let challenges =
-      lazy
-        (Vector.init Tick.Rounds.n ~f:(fun _ ->
-             let prechallenge = Ro.scalar_chal () in
-             { Bulletproof_challenge.prechallenge } ) )
+      Vector.init Tick.Rounds.n ~f:(fun _ ->
+          let prechallenge = Ro.scalar_chal () in
+          { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
       lazy
-        (Vector.map !challenges ~f:(fun { prechallenge } : Tick.Field.t ->
+        (Vector.map challenges ~f:(fun { prechallenge } : Tick.Field.t ->
              Ipa.Step.compute_challenge prechallenge ) )
 
     let sg =
-      lazy
-        (time "dummy wrap sg" (fun () ->
-             Ipa.Step.compute_sg (Lazy.force challenges) ) )
+      lazy (time "dummy wrap sg" (fun () -> Ipa.Step.compute_sg challenges))
   end
 end
