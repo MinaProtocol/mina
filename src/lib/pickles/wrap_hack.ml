@@ -72,7 +72,7 @@ let pad_proof (type mlmb) (T p : (mlmb, _) Proof.t) :
                     pad_vector
                       p.statement.proof_state.messages_for_next_wrap_proof
                         .old_bulletproof_challenges
-                      ~dummy:Dummy.(!Ipa.Wrap.challenges)
+                      ~dummy:Dummy.(Ipa.Wrap.challenges)
                 }
             }
         }
