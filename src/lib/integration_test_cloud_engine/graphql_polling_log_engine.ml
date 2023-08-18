@@ -82,7 +82,7 @@ let rec get_filtered_log_entries_of_node ~logger ~event_writer
     | Error err ->
         [%log error] "Encountered an error while polling $node for logs: $err"
           ~metadata:
-            [ ("node", `String node.app_id)
+            [ ("node", `String (Node.id node))
             ; ("err", Error_json.error_to_yojson err)
             ] ;
         (* Emit an event that declares the node to be down. *)
@@ -110,12 +110,12 @@ let rec poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
     (node : Node.t) =
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Requesting for $node to start its filtered logs"
-    ~metadata:[ ("node", `String node.app_id) ] ;
+    ~metadata:[ ("node", `String (Node.id node)) ] ;
   let%bind () =
     start_filtered_log_of_node ~logger ~log_filter ~event_writer node
   in
   [%log info] "$node has started its filtered logs. Beginning polling"
-    ~metadata:[ ("node", `String node.app_id) ] ;
+    ~metadata:[ ("node", `String (Node.id node)) ] ;
   let%bind () =
     (* if all goes well, the program will stay in the recursive function get_filtered_log_entries_of_node for good... *)
     get_filtered_log_entries_of_node ~last_log_index_seen:0 ~logger
@@ -125,7 +125,7 @@ let rec poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
   poll_node_for_logs_in_background ~log_filter ~logger ~event_writer node
 
 let poll_for_logs_in_background ~log_filter ~logger ~network ~event_writer =
-  Kubernetes_network.all_pods network
+  Kubernetes_network.all_nodes network
   |> Core.String.Map.data
   |> Deferred.Or_error.List.iter ~how:`Parallel
        ~f:(poll_node_for_logs_in_background ~log_filter ~logger ~event_writer)
