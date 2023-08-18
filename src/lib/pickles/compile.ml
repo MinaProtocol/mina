@@ -63,7 +63,7 @@ let pad_messages_for_next_wrap_proof
     (messages_for_next_wrap_proofs :
       local_max_proofs_verifieds
       H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t ) =
-  let dummy_chals = Dummy.(!Ipa.Wrap.challenges) in
+  let dummy_chals = Dummy.(Ipa.Wrap.challenges) in
   let module Messages =
     H1.T (Proof_.Messages_for_next_proof_over_same_field.Wrap) in
   let module Maxes = H1.T (Nat) in
