@@ -367,7 +367,7 @@ let main inputs =
           network |> Engine.Network.seeds |> Core.String.Map.data
         in
         let non_seed_pods =
-          network |> Engine.Network.all_non_seed_pods |> Core.String.Map.data
+          network |> Engine.Network.all_non_seed_nodes |> Core.String.Map.data
         in
         (* TODO: parallelize (requires accumlative hard errors) *)
         let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
