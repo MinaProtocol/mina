@@ -113,7 +113,7 @@ module Constant = struct
            { plonk = { plonk with alpha; beta; gamma; zeta }
            ; combined_inner_product = Shifted_value (tock ())
            ; xi = Scalar_challenge.create one_chal
-           ; bulletproof_challenges = Dummy.(Ipa.Wrap.challenges)
+           ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
            ; b = Shifted_value (tock ())
            }
        ; should_finalize = false
