@@ -55,29 +55,12 @@ let generate_context ~logger ~runtime_config_file =
         { (Lazy.force Precomputed_values.for_unit_tests) with proof_level }
 
 let read_directory ~logger dir_name =
-  let height_pattern = Str.regexp ".*-\\([0-9]+\\)-.*" in
-  let extract_height_from_filename fname =
-    if Str.string_match height_pattern fname 0 then
-      int_of_string (Str.matched_group 1 fname)
-    else (
-      [%log error] "Invalid filename format: $filename"
-        ~metadata:[ ("filename", `String fname) ] ;
-      failwith "Invalid filename format" )
-  in
   let blocks_in_dir dir =
     [%log info] "Reading directory: $dir" ~metadata:[ ("dir", `String dir) ] ;
     let%map blocks_array = Async.Sys.readdir dir in
-    [%log info] "Sorting blocks based on height extracted from filename." ;
-    Array.sort blocks_array ~compare:(fun a b ->
-        Int.compare
-          (extract_height_from_filename a)
-          (extract_height_from_filename b) ) ;
-    let blocks_array =
-      Array.map ~f:(fun fname -> Filename.concat dir fname) blocks_array
-    in
-    [%log info] "Finished processing directory: $dir"
-      ~metadata:[ ("dir", `String dir) ] ;
-    Array.to_list blocks_array
+    blocks_array
+    |> Array.map ~f:(fun fname -> Filename.concat dir fname)
+    |> Array.to_list
   in
   blocks_in_dir dir_name
 
@@ -208,6 +191,10 @@ let process_precomputed_blocks ~context ~current_chain blocks =
       let select_outcome = run_select ~context existing_block candidate_block in
       update_chain ~current_chain:acc_chain ~candidate_block ~select_outcome )
 
+let extract_timestamp (block : Mina_block.Precomputed.t) =
+  let bs = Mina_state.Protocol_state.blockchain_state block.protocol_state in
+  Block_time.to_time_exn bs.timestamp
+
 let main () ~blocks_dir ~output_dir ~runtime_config_file =
   let logger = Logger.create () in
   let%bind context = generate_context ~logger ~runtime_config_file in
@@ -216,6 +203,8 @@ let main () ~blocks_dir ~output_dir ~runtime_config_file =
     block_sorted_filenames
     |> List.map ~f:read_block_file
     |> List.filter_map ~f:Fun.id
+    |> List.sort ~compare:(fun a b ->
+           Time.compare (extract_timestamp a) (extract_timestamp b) )
   in
   match precomputed_blocks with
   | [] ->

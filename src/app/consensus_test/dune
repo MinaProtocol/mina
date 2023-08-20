@@ -8,6 +8,7 @@
   async_kernel
   async_unix
   base
+  block_time
   consensus
   core
   core_kernel
