@@ -4619,11 +4619,15 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let single_account_update ~chain ~constraint_constants
+    let single_account_update ?zkapp_prover_and_vk ~chain ~constraint_constants
         (spec : Single_account_update_spec.t) : Zkapp_command.t Async.Deferred.t
         =
       let `VK vk, `Prover prover =
-        create_trivial_snapp ~constraint_constants ()
+        match zkapp_prover_and_vk with
+        | Some (prover, vk) ->
+            (`VK vk, `Prover prover)
+        | None ->
+            create_trivial_snapp ~constraint_constants ()
       in
       let ( `Zkapp_command { Zkapp_command.fee_payer; memo; _ }
           , `Sender_account_update _

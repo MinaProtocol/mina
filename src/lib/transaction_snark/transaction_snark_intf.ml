@@ -302,7 +302,18 @@ module type Full = sig
     end
 
     val single_account_update :
-         chain:Mina_signature_kind.t
+         ?zkapp_prover_and_vk:
+           ( unit
+           , unit
+           , unit
+           , Zkapp_statement.t
+           , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+             Async.Deferred.t )
+           Pickles.Prover.t
+           * ( Pickles.Side_loaded.Verification_key.t
+             , Snark_params.Tick.Field.t )
+             With_hash.t
+      -> chain:Mina_signature_kind.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Single_account_update_spec.t
       -> Zkapp_command.t Async.Deferred.t

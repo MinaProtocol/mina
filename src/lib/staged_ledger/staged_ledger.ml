@@ -4213,13 +4213,12 @@ let%test_module "staged ledger tests" =
                         ({ f with commands = [ failed_command ] }, s)
                     }
                   in
-                  let%map res =
+                  match%map
                     Sl.apply ~constraint_constants ~global_slot !sl
                       (Staged_ledger_diff.forget diff)
                       ~logger ~verifier ~current_state_view ~state_and_body_hash
                       ~coinbase_receiver ~supercharge_coinbase:false
-                  in
-                  match res with
+                  with
                   | Ok _x ->
                       assert false
                   (*TODO: check transaction logic errors here. Verified that the error is here is [The source account has an insufficient balance]*)
@@ -4229,26 +4228,26 @@ let%test_module "staged ledger tests" =
                   | Error _ ->
                       assert false ) ) )
 
+    let gen_spec_keypair_and_global_slot =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind test_spec = Mina_transaction_logic.For_tests.Test_spec.gen in
+      let pks =
+        Public_key.Compressed.Set.of_list
+          (List.map (Array.to_list test_spec.init_ledger) ~f:(fun s ->
+               Public_key.compress (fst s).public_key ) )
+      in
+      let%map kp =
+        Quickcheck.Generator.filter Keypair.gen ~f:(fun kp ->
+            not
+              (Public_key.Compressed.Set.mem pks
+                 (Public_key.compress kp.public_key) ) )
+      and global_slot = Quickcheck.Generator.small_positive_int in
+      (test_spec, kp, global_slot)
+
     let%test_unit "Mismatched verification keys in zkApp accounts and \
                    transactions" =
       let open Transaction_snark.For_tests in
-      let gen =
-        let open Quickcheck.Generator.Let_syntax in
-        let%bind test_spec = Mina_transaction_logic.For_tests.Test_spec.gen in
-        let pks =
-          Public_key.Compressed.Set.of_list
-            (List.map (Array.to_list test_spec.init_ledger) ~f:(fun s ->
-                 Public_key.compress (fst s).public_key ) )
-        in
-        let%map kp =
-          Quickcheck.Generator.filter Keypair.gen ~f:(fun kp ->
-              not
-                (Public_key.Compressed.Set.mem pks
-                   (Public_key.compress kp.public_key) ) )
-        and global_slot = Quickcheck.Generator.small_positive_int in
-        (test_spec, kp, global_slot)
-      in
-      Quickcheck.test ~trials:1 gen
+      Quickcheck.test ~trials:1 gen_spec_keypair_and_global_slot
         ~f:(fun ({ init_ledger; specs = _ }, new_kp, global_slot) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
           let amount = Amount.of_mina_int_exn 10 in
@@ -4418,4 +4417,114 @@ let%test_module "staged ledger tests" =
                            |> Yojson.Safe.to_string ) )
                   | _ ->
                       failwith "expecting zkapp_command transaction" ) ) )
+
+    let%test_unit "Invalid account_update_hash" =
+      let open Transaction_snark.For_tests in
+      Quickcheck.test ~trials:1 gen_spec_keypair_and_global_slot
+        ~f:(fun ({ init_ledger; specs }, zkapp_account_keypair, global_slot) ->
+          let fee = Fee.of_nanomina_int_exn 1_000_000 in
+          let fee_payer = (List.hd_exn specs).sender in
+          let memo = Signed_command_memo.dummy in
+          let spec : Single_account_update_spec.t =
+            { fee_payer
+            ; fee
+            ; zkapp_account_keypair
+            ; memo
+            ; update =
+                { Account_update.Update.dummy with zkapp_uri = Set "abc" }
+            ; call_data = Snark_params.Tick.Field.zero
+            ; events = []
+            ; actions = []
+            }
+          in
+          Ledger.with_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let zkapp_account_pk =
+                    Signature_lib.Public_key.compress
+                      zkapp_account_keypair.public_key
+                  in
+                  let zkapp_prover_and_vk = (zkapp_prover, vk) in
+                  let%bind zkapp_command =
+                    single_account_update
+                      ~chain:Mina_signature_kind.(Other_network "invalid")
+                      ~zkapp_prover_and_vk ~constraint_constants spec
+                  in
+                  Mina_transaction_logic.For_tests.Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  Transaction_snark.For_tests.create_trivial_zkapp_account
+                    ~permissions:
+                      { Permissions.user_default with set_zkapp_uri = Proof }
+                    ~vk ~ledger zkapp_account_pk ;
+                  let invalid_zkapp_command =
+                    Or_error.ok_exn
+                      (Zkapp_command.Valid.to_valid ~status:Applied
+                         ~find_vk:
+                           (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                              ~get:Ledger.get
+                              ~location_of_account:Ledger.location_of_account )
+                         zkapp_command )
+                  in
+                  let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
+                  let global_slot =
+                    Mina_numbers.Global_slot_since_genesis.of_int global_slot
+                  in
+                  let current_state, current_state_view =
+                    dummy_state_and_view ~global_slot ()
+                  in
+                  let state_and_body_hash =
+                    let state_hashes =
+                      Mina_state.Protocol_state.hashes current_state
+                    in
+                    ( state_hashes.state_hash
+                    , state_hashes.state_body_hash |> Option.value_exn )
+                  in
+                  match
+                    Sl.create_diff ~constraint_constants ~global_slot !sl
+                      ~logger ~current_state_view
+                      ~transactions_by_fee:
+                        (Sequence.singleton
+                           (User_command.Zkapp_command invalid_zkapp_command) )
+                      ~get_completed_work:
+                        (stmt_to_work_zero_fee ~prover:self_pk)
+                      ~coinbase_receiver ~supercharge_coinbase:false
+                  with
+                  | Error e ->
+                      Error.raise (Pre_diff_info.Error.to_error e)
+                  | Ok (diff, _invalid_txns) -> (
+                      assert (
+                        List.length
+                          (Staged_ledger_diff.With_valid_signatures_and_proofs
+                           .commands diff )
+                        = 1 ) ;
+                      match%map
+                        Sl.apply ~constraint_constants ~global_slot !sl
+                          (Staged_ledger_diff.forget diff)
+                          ~logger ~verifier ~current_state_view
+                          ~state_and_body_hash ~coinbase_receiver
+                          ~supercharge_coinbase:false
+                      with
+                      | Ok _ ->
+                          assert false
+                      | Error e ->
+                          failwith (Staged_ledger_error.to_string e) )
+                  (*
+                  let%bind _proof, diff =
+                    create_and_apply sl ~global_slot ~state_and_body_hash
+                      ~protocol_state_view:current_state_view
+                      (Sequence.singleton
+                         (User_command.Zkapp_command invalid_zkapp_command) )
+                      stmt_to_work_one_prover
+                  in
+                  let command =
+                    Staged_ledger_diff.commands diff |> List.hd_exn
+                  in
+                  match command.status with
+                  | Failed failure_tbl ->
+                      failwith
+                        ( Transaction_status.Failure.Collection.to_yojson
+                            failure_tbl
+                        |> Yojson.Safe.to_string )
+                  | Applied -> *) ) ) )
   end )
