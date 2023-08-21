@@ -1084,9 +1084,9 @@ module Messages = struct
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ bool_typ ~(lookup : Opt.Flag.t) ~(runtime_tables : Opt.Flag.t)
-        ~dummy:z elt =
-      Opt.typ bool_typ lookup
+    let opt_typ bool_typ ~(uses_lookup : Opt.Flag.t)
+        ~(runtime_tables : Opt.Flag.t) ~dummy:z elt =
+      Opt.typ bool_typ uses_lookup
         ~dummy:
           (dummy z ~runtime_tables:Opt.Flag.(not (equal runtime_tables No)))
         (typ bool_typ ~runtime_tables ~dummy:z elt)
@@ -1131,7 +1131,8 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     let lookup =
-      Lookup.opt_typ Impl.Boolean.typ ~lookup ~runtime_tables ~dummy:[| dummy |]
+      Lookup.opt_typ Impl.Boolean.typ ~uses_lookup:lookup ~runtime_tables
+        ~dummy:[| dummy |]
         (wo [ 1 ])
     in
     of_hlistable
