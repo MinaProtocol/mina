@@ -90,6 +90,60 @@ pub fn caml_pasta_fq_plonk_proof_create(
 
 #[ocaml_gen::func]
 #[ocaml::func]
+pub fn caml_pasta_fq_plonk_proof_create_public_input_only(
+    verifier_index: CamlPastaFqPlonkVerifierIndex,
+    witness: CamlFqVector,
+    prev_challenges: Vec<CamlFq>,
+    prev_sgs: Vec<CamlGPallas>,
+) -> Result<CamlProverProof<CamlGPallas, CamlFq>, ocaml::Error> {
+    let verifier_index: VerifierIndex<Pallas> = verifier_index.into();
+
+    let prev = if prev_challenges.is_empty() {
+        Vec::new()
+    } else {
+        let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
+        prev_sgs
+            .into_iter()
+            .map(Into::<Pallas>::into)
+            .enumerate()
+            .map(|(i, sg)| {
+                let chals = prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
+                    .iter()
+                    .map(Into::<Fq>::into)
+                    .collect();
+                let comm = PolyComm::<Pallas> {
+                    unshifted: vec![sg],
+                    shifted: None,
+                };
+                RecursionChallenge { chals, comm }
+            })
+            .collect()
+    };
+
+    let witness: Vec<_> = (*witness.0).clone();
+
+    // public input
+    let public_input = witness[0..verifier_index.public].to_vec();
+
+    // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
+    // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
+    // to doing this instead.
+    let runtime = unsafe { ocaml::Runtime::recover_handle() };
+
+    // Release the runtime lock so that other threads can run using it while we generate the proof.
+    runtime.releasing_runtime(|| {
+        let group_map = GroupMap::<Fp>::setup();
+        let proof = ProverProof::create_recursive_public_input_only::<
+            DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
+            DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
+        >(&group_map, witness, &verifier_index, prev)
+        .map_err(|e| ocaml::Error::Error(e.into()))?;
+        Ok((proof, public_input).into())
+    })
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_verify(
     index: CamlPastaFqPlonkVerifierIndex,
     proof: CamlProverProof<CamlGPallas, CamlFq>,

@@ -419,6 +419,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_type_alias!(w, env, "t" => CamlPlonkVerifierIndex<CamlFq, CamlFqSrs, CamlPolyComm<CamlGPallas>>);
 
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_create => "create");
+                decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_for_public_input => "reduced_for_public_input_only");
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_read => "read");
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_write => "write");
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_shifts => "shifts");
@@ -463,6 +464,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
             decl_module!(w, env, "Fq", {
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_create => "create");
+                decl_func!(w, env, caml_pasta_fq_plonk_proof_create_public_input_only => "create_public_input_only");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_verify => "verify");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_batch_verify => "batch_verify");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_dummy => "dummy");

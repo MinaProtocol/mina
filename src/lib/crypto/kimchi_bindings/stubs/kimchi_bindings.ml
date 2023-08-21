@@ -284,6 +284,10 @@ module Protocol = struct
       external create : Index.Fq.t -> t
         = "caml_pasta_fq_plonk_verifier_index_create"
 
+      external reduced_for_public_input_only :
+        int -> int -> int -> SRS.Fq.t -> t
+        = "caml_pasta_fq_plonk_verifier_index_for_public_input"
+
       external read : int option -> SRS.Fq.t -> string -> t
         = "caml_pasta_fq_plonk_verifier_index_read"
 
@@ -472,6 +476,20 @@ module Protocol = struct
         -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
            , Pasta_bindings.Fq.t )
            Kimchi_types.prover_proof = "caml_pasta_fq_plonk_proof_create"
+
+      external create_public_input_only :
+           ( Pasta_bindings.Fq.t
+           , SRS.Fq.t
+           , Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
+           )
+           Kimchi_types.VerifierIndex.verifier_index
+        -> FieldVectors.Fq.t
+        -> Pasta_bindings.Fq.t array
+        -> Pasta_bindings.Fp.t Kimchi_types.or_infinity array
+        -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
+           , Pasta_bindings.Fq.t )
+           Kimchi_types.prover_proof
+        = "caml_pasta_fq_plonk_proof_create_public_input_only"
 
       external verify :
            ( Pasta_bindings.Fq.t

@@ -12,7 +12,11 @@ use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupPatterns};
 use kimchi::circuits::polynomials::permutation::Shifts;
 use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
-use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
+use kimchi::{
+    linearization::expr_linearization,
+    public_input_only_prover,
+    verifier_index::VerifierIndex
+};
 use mina_curves::pasta::{Fq, Pallas, Vesta};
 use poly_commitment::commitment::caml::CamlPolyComm;
 use poly_commitment::{commitment::PolyComm, srs::SRS};
@@ -206,6 +210,31 @@ pub fn caml_pasta_fq_plonk_verifier_index_create(
     }
     let verifier_index = index.as_ref().0.verifier_index();
     verifier_index.into()
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
+pub fn caml_pasta_fq_plonk_verifier_index_for_public_input(
+    num_public_inputs: ocaml::Int,
+    num_prev_challenges: ocaml::Int,
+    log2_size: ocaml::Int,
+    srs: CamlFqSrs,
+) -> CamlPastaFqPlonkVerifierIndex {
+    use kimchi::circuits::domains::EvaluationDomains;
+
+    let domain = EvaluationDomains::<Fq>::create(1 << log2_size).unwrap();
+    {
+        let ptr: &mut poly_commitment::srs::SRS<Pallas> =
+            unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+        ptr.add_lagrange_basis(domain.d1);
+    }
+
+    public_input_only_prover::verifier_index(
+        srs.clone(),
+        domain,
+        num_public_inputs as usize,
+        num_prev_challenges as usize,
+    ).into()
 }
 
 #[ocaml_gen::func]
