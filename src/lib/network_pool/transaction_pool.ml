@@ -3004,10 +3004,20 @@ let%test_module _ =
           in
           let to_verify =
             List.map zkapp_command_with_hashes_list
-              ~f:(fun ((p, (vk_opt, stmt)), _) ->
+              ~f:(fun ((p, (vk_opt, _stmt)), _) ->
                 match p.authorization with
                 | Proof pi ->
                     let vk = Option.value_exn vk_opt in
+                    let stmt =
+                      Zkapp_statement.Poly.
+                        { account_update =
+                            ( Zkapp_command.Digest.Account_update.create p
+                              :> Zkapp_command.Transaction_commitment.t )
+                        ; calls =
+                            ( Zkapp_command.Call_forest.hash []
+                              :> Zkapp_command.Transaction_commitment.t )
+                        }
+                    in
                     (vk.data, stmt, pi)
                 | _ ->
                     failwith "mk_single_account_update doesn't have proof auth" )
