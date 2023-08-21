@@ -736,8 +736,7 @@ module T = struct
     let txns_from_data data =
       List.fold_right ~init:(Ok []) data
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
-          let open Or_error.Let_syntax in
-          let%map acc = acc in
+          let%map.Or_error acc = acc in
           let t =
             d.transaction_with_info |> Ledger.Transaction_applied.transaction
           in
@@ -2623,8 +2622,7 @@ let%test_module "staged ledger tests" =
               let apply_second_pass = Ledger.apply_transaction_second_pass in
               let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
                   sparse_ledger txn =
-                let open Or_error.Let_syntax in
-                let%map _ledger, partial_txn =
+                let%map.Or_error _ledger, partial_txn =
                   Mina_ledger.Sparse_ledger.apply_transaction_first_pass
                     ~constraint_constants ~global_slot ~txn_state_view
                     sparse_ledger txn

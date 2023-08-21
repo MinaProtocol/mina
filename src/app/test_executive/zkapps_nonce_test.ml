@@ -83,8 +83,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind sender_pub_key = pub_key_of_node sender in
     let%bind receiver_pub_key = pub_key_of_node receiver in
     repeat_seq ~n ~f:(fun () ->
-        Network.Node.must_send_payment ~logger sender ~sender_pub_key
-          ~receiver_pub_key ~amount:Currency.Amount.one ~fee
+        Graphql_requests.must_send_online_payment ~logger
+          (Network.Node.get_ingress_uri sender)
+          ~sender_pub_key ~receiver_pub_key ~amount:Currency.Amount.one ~fee
         >>| ignore )
 
   let run network t =
@@ -279,7 +280,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Send a zkapp commands with fee payer nonce increments and nonce \
          preconditions"
-        (send_zkapp_batch ~logger node
+        (send_zkapp_batch ~logger
+           (Network.Node.get_ingress_uri node)
            [ invalid_nonce_zkapp_cmd_from_fish1; valid_zkapp_cmd_from_fish1 ] )
     in
     let%bind () =
@@ -298,7 +300,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Send zkapp commands with account updates for fish1 that sets send \
          permission to Proof and then tries to send funds "
-        (send_zkapp_batch ~logger node
+        (send_zkapp_batch ~logger
+           (Network.Node.get_ingress_uri node)
            [ set_permission_zkapp_cmd_from_fish1
            ; valid_fee_invalid_permission_zkapp_cmd_from_fish1
            ; invalid_fee_invalid_permission_zkapp_cmd_from_fish1
@@ -321,7 +324,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Verify account update after the updated permission failed by checking \
          account nonce"
         (let%bind { nonce = fish1_nonce; _ } =
-           Network.Node.get_account_data ~logger node
+           Graphql_requests.get_account_data ~logger
+             (Network.Node.get_ingress_uri node)
              ~account_id:fish1_account_id
            |> Deferred.bind ~f:Malleable_error.or_hard_error
          in
@@ -339,7 +343,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Verify invalid zkapp commands are removed from transaction pool"
         (let%bind pooled_zkapp_commands =
-           Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
+           Graphql_requests.get_pooled_zkapp_commands ~logger
+             (Network.Node.get_ingress_uri node)
+             ~pk:fish1_pk
            |> Deferred.bind ~f:Malleable_error.or_hard_error
          in
          [%log debug] "Pooled zkapp_commands $commands"
