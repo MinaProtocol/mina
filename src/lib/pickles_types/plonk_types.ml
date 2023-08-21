@@ -1237,29 +1237,36 @@ module Messages = struct
   module Lookup = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type 'g t = { sorted : 'g array; aggreg : 'g; runtime : 'g option }
         [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
       end
     end]
 
+    type 'g t =
+      { sorted : 'g Lookup_sorted_vec.t; aggreg : 'g; runtime : 'g option }
+    [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
+
     module In_circuit = struct
       type ('g, 'bool) t =
-        { sorted : 'g array; aggreg : 'g; runtime : ('g, 'bool) Opt.t }
+        { sorted : 'g Lookup_sorted_vec.t
+        ; aggreg : 'g
+        ; runtime : ('g, 'bool) Opt.t
+        }
       [@@deriving hlist]
     end
 
-    let sorted_length = 5
-
     let dummy ~runtime_tables z =
       { aggreg = z
-      ; sorted = Array.create ~len:sorted_length z
+      ; sorted = Vector.init Lookup_sorted.n ~f:(fun _ -> z)
       ; runtime = Option.some_if runtime_tables z
       }
 
     let typ bool_typ e ~runtime_tables ~dummy =
       Snarky_backendless.Typ.of_hlistable
-        [ Snarky_backendless.Typ.array ~length:sorted_length e
+        [ Vector.typ e Lookup_sorted.n
         ; e
         ; Opt.typ bool_typ runtime_tables e ~dummy
         ]
@@ -1276,6 +1283,8 @@ module Messages = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type 'g t =
         { w_comm : 'g Without_degree_bound.Stable.V1.t Columns_vec.Stable.V1.t
@@ -1286,6 +1295,14 @@ module Messages = struct
       [@@deriving sexp, compare, yojson, fields, hash, equal, hlist]
     end
   end]
+
+  type 'g t =
+    { w_comm : 'g Without_degree_bound.t Columns_vec.t
+    ; z_comm : 'g Without_degree_bound.t
+    ; t_comm : 'g Without_degree_bound.t
+    ; lookup : 'g Without_degree_bound.t Lookup.t option
+    }
+  [@@deriving sexp, compare, yojson, fields, hash, equal, hlist]
 
   module In_circuit = struct
     type ('g, 'bool) t =
@@ -1341,6 +1358,8 @@ end
 module Proof = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type ('g, 'fq, 'fqv) t =
         { messages : 'g Messages.Stable.V2.t
@@ -1349,6 +1368,10 @@ module Proof = struct
       [@@deriving sexp, compare, yojson, hash, equal]
     end
   end]
+
+  type ('g, 'fq, 'fqv) t =
+    { messages : 'g Messages.t; openings : ('g, 'fq, 'fqv) Openings.t }
+  [@@deriving sexp, compare, yojson, hash, equal]
 end
 
 module Shifts = struct

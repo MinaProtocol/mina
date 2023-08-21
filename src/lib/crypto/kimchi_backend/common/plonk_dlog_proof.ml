@@ -23,7 +23,7 @@ module type Stable_v1 = sig
     module Latest = V1
   end
 
-  type t = Stable.V1.t [@@deriving sexp, compare, yojson]
+  type t = Stable.V1.t [@@deriving sexp, compare, yojson, hash, equal]
 end
 
 module type Inputs_intf = sig
@@ -179,7 +179,7 @@ module Make (Inputs : Inputs_intf) = struct
         let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
 
         let create ~messages ~openings =
-          let open Pickles_types.Plonk_types.Proof in
+          let open Pickles_types.Plonk_types.Proof.Stable.Latest in
           { messages; openings }
       end
 
@@ -196,14 +196,49 @@ module Make (Inputs : Inputs_intf) = struct
     end
   end]
 
-  include (
-    Stable.Latest :
-      sig
-        type t [@@deriving compare, sexp, yojson, hash, equal, bin_io]
-      end
-      with type t := t )
+  module T = struct
+    type t = (G.Affine.t, Fq.t, Fq.t array) Pickles_types.Plonk_types.Proof.t
+    [@@deriving compare, sexp, yojson, hash, equal]
 
-  [%%define_locally Stable.Latest.(create)]
+    let id = "plong_dlog_proof_" ^ Inputs.id
+
+    type 'a creator =
+         messages:G.Affine.t Pickles_types.Plonk_types.Messages.t
+      -> openings:
+           (G.Affine.t, Fq.t, Fq.t array) Pickles_types.Plonk_types.Openings.t
+      -> 'a
+
+    let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
+
+    let create ~messages ~openings =
+      let open Pickles_types.Plonk_types.Proof in
+      { messages; openings }
+  end
+
+  include T
+
+  include (
+    struct
+      include Allocation_functor.Make.Basic (T)
+      include Allocation_functor.Make.Partial.Sexp (T)
+      include Allocation_functor.Make.Partial.Yojson (T)
+    end :
+      sig
+        include
+          Allocation_functor.Intf.Output.Basic_intf
+            with type t := t
+             and type 'a creator := 'a creator
+
+        include
+          Allocation_functor.Intf.Output.Sexp_intf
+            with type t := t
+             and type 'a creator := 'a creator
+
+        include
+          Allocation_functor.Intf.Output.Yojson_intf
+            with type t := t
+             and type 'a creator := 'a creator
+      end )
 
   let g t f = G.Affine.of_backend (f t)
 
@@ -313,7 +348,9 @@ module Make (Inputs : Inputs_intf) = struct
         ; lookup =
             Option.map t.commitments.lookup
               ~f:(fun l : _ Pickles_types.Plonk_types.Messages.Lookup.t ->
-                { sorted = Array.map ~f:wo l.sorted
+                { sorted =
+                    Vector.init Pickles_types.Plonk_types.Lookup_sorted.n
+                      ~f:(fun i -> (* TODO: Fixme *) wo l.sorted.(i))
                 ; aggreg = wo l.aggreg
                 ; runtime = Option.map ~f:wo l.runtime
                 } )
@@ -400,7 +437,7 @@ module Make (Inputs : Inputs_intf) = struct
         ; t_comm = pcwo t_comm
         ; lookup =
             Option.map lookup ~f:(fun t : _ Kimchi_types.lookup_commitments ->
-                { sorted = Array.map ~f:pcwo t.sorted
+                { sorted = Array.map ~f:pcwo (Vector.to_array t.sorted)
                 ; aggreg = pcwo t.aggreg
                 ; runtime = Option.map ~f:pcwo t.runtime
                 } )

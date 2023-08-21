@@ -796,12 +796,12 @@ struct
               match (m.lookup_table_comm, m.runtime_tables_selector) with
               | _ :: Some _ :: _, _ | _, Some _ ->
                   let joint_combiner = sample_scalar () in
-                  Array.iter l.sorted ~f:(fun z ->
+                  Vector.iter l.sorted ~f:(fun z ->
                       let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
                       absorb sponge Without_degree_bound z ) ;
                   Types.Opt.Some joint_combiner
               | _ :: None :: _, None ->
-                  Array.iter l.sorted ~f:(fun z ->
+                  Vector.iter l.sorted ~f:(fun z ->
                       let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
                       absorb sponge Without_degree_bound z ) ;
                   Types.Opt.Some { inner = Field.zero }
@@ -958,7 +958,8 @@ struct
               | Types.Opt.Maybe _ ->
                   failwith "TODO"
               | Types.Opt.Some l -> (
-                  try Types.Opt.Some l.sorted.(i) with _ -> Types.Opt.None ) )
+                  try Types.Opt.Some (Option.value_exn (Vector.nth l.sorted i))
+                  with _ -> Types.Opt.None ) )
         in
         let beta = sample () in
         let gamma = sample () in
