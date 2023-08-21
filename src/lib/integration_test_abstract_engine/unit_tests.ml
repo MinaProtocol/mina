@@ -72,6 +72,41 @@ module Test_values = struct
       |}
       deploy_network_action start_node_action
     |> Yojson.Safe.from_string
+
+  let network_config : Network_config.config =
+    let network_id = "network0" in
+    let config_dir = "." in
+    let deploy_graphql_ingress = true in
+    let mina_image = "mina" in
+    let mina_agent_image = "agent" in
+    let mina_bots_image = "bots" in
+    let mina_points_image = "points" in
+    let mina_archive_image = "archive" in
+    let runtime_config = `Null in
+    let block_producer_configs = [] in
+    let log_precomputed_blocks = false in
+    let archive_node_count = 0 in
+    let mina_archive_schema = "schema" in
+    let mina_archive_schema_aux_files = [] in
+    let snark_coordinator_config = None in
+    let snark_worker_fee = "0.01" in
+    { network_id
+    ; config_dir
+    ; deploy_graphql_ingress
+    ; mina_image
+    ; mina_agent_image
+    ; mina_bots_image
+    ; mina_points_image
+    ; mina_archive_image
+    ; runtime_config
+    ; block_producer_configs
+    ; log_precomputed_blocks
+    ; archive_node_count
+    ; mina_archive_schema
+    ; mina_archive_schema_aux_files
+    ; snark_coordinator_config
+    ; snark_worker_fee
+    }
 end
 
 open Test_values
@@ -117,26 +152,6 @@ module Config_tests = struct
     in
     let expect = {|minimina network deploy --network-id network0|} in
     assert (res = expect)
-
-  (* let%test_unit "command returns" =
-     let returns =
-       returns_of_action @@ Yojson.Safe.from_string deploy_network_action
-     in
-     let[@warning "-8"] (Record record) = returns in
-     let expect =
-       [ ("graphql_uri", `Null)
-       ; ("network_id", `String "network0")
-       ; ( "network_keypair"
-         , `String "EKEQpDAjj7dP3j7fQy4qBU7Kxns85wwq5xMn4zxdyQm83pEWzQ62" )
-       ; ("node_id", `String "node0")
-       ; ("node_type", `String "Archive_node")
-       ]
-     in
-     let ( = ) =
-       List.equal (fun (a, b) (c, d) ->
-           String.equal a c && Yojson.Safe.equal b d )
-     in
-     assert (record = expect) *)
 
   let%test_unit "prog and args" =
     let action = Yojson.Safe.from_string start_node_action in
@@ -247,57 +262,80 @@ module Request_tests = struct
       ; genesis = Genesis_constants.compiled
       }
     in
-    let network_config : Network_config.t' =
-      { debug_arg = true; genesis_keypairs = Core.String.Map.empty; constants }
+    let config = Test_values.network_config in
+    let network_config : Network_config.t =
+      { debug_arg = true
+      ; genesis_keypairs = Core.String.Map.empty
+      ; constants
+      ; config
+      }
     in
+    let network_config = Network_config.to_yojson network_config in
     let expect =
       {|
-        { "debug_arg":true,
-          "genesis_keypairs":{},
-          "constants":{
-            "constraints":{
-              "sub_windows_per_window":11,
-              "ledger_depth":35,
-              "work_delay":2,
-              "block_window_duration_ms":180000,
-              "transaction_capacity_log_2":7,
-              "pending_coinbase_depth":5,
-              "coinbase_amount":"720000000000",
-              "supercharged_coinbase_factor":1,
-              "account_creation_fee":"1",
-              "fork":null
+        { "debug_arg": true,
+          "genesis_keypairs": {},
+          "constants": {
+            "constraints": {
+              "sub_windows_per_window": 11,
+              "ledger_depth": 35,
+              "work_delay": 2,
+              "block_window_duration_ms": 180000,
+              "transaction_capacity_log_2": 7,
+              "pending_coinbase_depth": 5,
+              "coinbase_amount": "720000000000",
+              "supercharged_coinbase_factor": 1,
+              "account_creation_fee": "1",
+              "fork": null
             },
-            "genesis":{
-              "protocol":{
-                "k":290,
-                "slots_per_epoch":7140,
-                "slots_per_sub_window":7,
-                "delta":0,
-                "genesis_state_timestamp":"2020-09-16 10:15:00.000000Z"
+            "genesis": {
+              "protocol": {
+                "k": 290,
+                "slots_per_epoch": 7140,
+                "slots_per_sub_window": 7,
+                "delta": 0,
+                "genesis_state_timestamp": "2020-09-16 10:15:00.000000Z"
               },
-              "txpool_max_size":3000,
-              "num_accounts":null,
-              "zkapp_proof_update_cost":10.26,
-              "zkapp_signed_single_update_cost":9.140000000000001,
-              "zkapp_signed_pair_update_cost":10.08,
-              "zkapp_transaction_cost_limit":69.45,
-              "max_event_elements":100,
-              "max_action_elements":100
+              "txpool_max_size": 3000,
+              "num_accounts": null,
+              "zkapp_proof_update_cost": 10.26,
+              "zkapp_signed_single_update_cost": 9.140000000000001,
+              "zkapp_signed_pair_update_cost": 10.08,
+              "zkapp_transaction_cost_limit": 69.45,
+              "max_event_elements": 100,
+              "max_action_elements": 100
             }
+          },
+          "config": {                                         
+            "network_id": "network0",
+            "config_dir": ".",
+            "deploy_graphql_ingress": true,
+            "mina_image": "mina",
+            "mina_agent_image": "agent",
+            "mina_bots_image": "bots",
+            "mina_points_image": "points",
+            "mina_archive_image": "archive",
+            "runtime_config": "null",
+            "block_producer_configs": [],
+            "log_precomputed_blocks": false,
+            "archive_node_count": 0,
+            "mina_archive_schema": "schema",
+            "mina_archive_schema_aux_files": [],
+            "snark_coordinator_config": null,
+            "snark_worker_fee": "0.01"
           }
         }
       |}
       |> Yojson.Safe.from_string
     in
-    assert (
-      Yojson.Safe.equal expect @@ Network_config.t'_to_yojson network_config )
+    assert (Yojson.Safe.equal expect network_config)
 end
 
 module Parse_output_tests = struct
   let%test_unit "parse network created" =
     let open Network_created in
     let result =
-      {|{"network_id":"network0"}|} |> Yojson.Safe.from_string |> of_yojson
+      {|{"network_id": "network0"}|} |> Yojson.Safe.from_string |> of_yojson
       |> Result.ok_or_failwith
     in
     assert (equal result { network_id = "network0" })
@@ -307,7 +345,7 @@ module Parse_output_tests = struct
     let open Network_deployed in
     let result =
       {|
-        { "network_id":"network0",
+        { "network_id": "network0",
           "nodes": [
             { "node0": {
                 "graphql_uri": "gql_archive",
