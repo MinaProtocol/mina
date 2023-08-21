@@ -209,10 +209,10 @@ module Block_produced = struct
     let%bind global_slot =
       (* the associated field looks like "slot_number":["Since_hard_fork", 1] *)
       let%map global_slot_since_hard_fork =
-        find (list string) breadcrumb_consensus_state
+        find string breadcrumb_consensus_state
           [ "curr_global_slot"; "slot_number" ]
       in
-      List.nth_exn global_slot_since_hard_fork 1 |> Int.of_string
+      Int.of_string global_slot_since_hard_fork
     in
     let%map epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
     { block_height; global_slot; epoch; snarked_ledger_generated; state_hash }
