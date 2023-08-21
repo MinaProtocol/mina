@@ -793,14 +793,15 @@ struct
           | Maybe (b, l) ->
               failwith "TODO"
           | Some l -> (
-              let absorb_sorted_first_part () = 
+              let absorb_sorted_first_part () =
                 Vector.iter l.sorted ~f:(fun z ->
                     let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
                     absorb sponge Without_degree_bound z )
               in
               let absorb_sorted_second_part () =
                 match l.sorted_5th_column with
-                | None -> ()
+                | None ->
+                    ()
                 | Maybe (b, z) ->
                     let z = Array.map z ~f:(fun z -> (b, z)) in
                     absorb sponge Without_degree_bound z
@@ -963,18 +964,20 @@ struct
               assert false
         in
         let lookup_sorted =
-          (* FIXME *)
-          let lookup_sorted_minus_1 = Nat.to_int Plonk_types.Lookup_sorted_minus_1.n in
+          let lookup_sorted_minus_1 =
+            Nat.to_int Plonk_types.Lookup_sorted_minus_1.n
+          in
           Vector.init Plonk_types.Lookup_sorted.n ~f:(fun i ->
               match messages.lookup with
               | Types.Opt.None ->
                   Types.Opt.None
-              | Types.Opt.Maybe _ ->
-                  failwith "TODO"
-              | Types.Opt.Some l -> (
-                  if i = lookup_sorted_minus_1 then l.sorted_5th_column else (
-                  try Types.Opt.Some (Option.value_exn (Vector.nth l.sorted i))
-                  with _ -> Types.Opt.None ) ) )
+              | Types.Opt.Maybe (b, l) ->
+                  if i = lookup_sorted_minus_1 then l.sorted_5th_column
+                  else
+                    Types.Opt.Maybe (b, Option.value_exn (Vector.nth l.sorted i))
+              | Types.Opt.Some l ->
+                  if i = lookup_sorted_minus_1 then l.sorted_5th_column
+                  else Types.Opt.Some (Option.value_exn (Vector.nth l.sorted i)) )
         in
         let beta = sample () in
         let gamma = sample () in
@@ -983,7 +986,8 @@ struct
           | None ->
               ()
           | Maybe (b, l) ->
-              failwith "TODO"
+              let aggreg = Array.map l.aggreg ~f:(fun z -> (b, z)) in
+              absorb sponge Without_degree_bound aggreg
           | Some l ->
               let aggreg =
                 Array.map l.aggreg ~f:(fun z -> (Boolean.true_, z))
