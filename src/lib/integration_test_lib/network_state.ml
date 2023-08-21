@@ -226,35 +226,70 @@ module Make
     (* handle_node_down *)
     ignore
       ( Event_router.on event_router Event_type.Node_down ~f:(fun node () ->
-            update ~f:(fun state ->
+            [%log info]
+              (* TODO remove this log line before landing *)
+              "received Node_down event from $node"
+              ~metadata:[ ("node", `String (Node.id node)) ] ;
+
+            let state = Broadcast_pipe.Reader.peek reader in
+            if
+              not (String.Map.find_exn state.node_initialization (Node.id node))
+            then
+              let () =
                 [%log info]
-                  (* TODO remove this log line before landing *)
-                  "received Node_down event from $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
-                if
-                  not
-                    (String.Map.find_exn state.node_initialization
-                       (Node.id node) )
-                then
-                  let () =
-                    [%log info]
-                      (* TODO change this back to debug before landing *)
-                      "Lucy cannot contact $node, but all is well because this \
-                       node was stopped deliberately or just hasn't \
-                       initialized yet"
-                      ~metadata:[ ("node", `String (Node.id node)) ]
-                  in
-                  state
-                else
-                  let () =
-                    [%log fatal]
-                      "Lucy has lost contact with $node, without the node \
-                       being deliberately stopped.  Aborting the test because \
-                       a node went down unexpectedly."
-                      ~metadata:[ ("node", `String (Node.id node)) ]
-                  in
-                  failwith
-                    "Aborting the test because a node went down unexpectedly." ) )
+                  (* TODO change this back to debug before landing *)
+                  "Lucy cannot contact $node, but all is well because this \
+                   node was stopped deliberately or just hasn't initialized \
+                   yet"
+                  ~metadata:[ ("node", `String (Node.id node)) ]
+              in
+              update ~f:(fun state -> state)
+            else
+              (*
+                 let () =
+                   [%log fatal]
+                     "Lucy has lost contact with $node, without the node being \
+                      deliberately stopped.  Aborting the test because a node \
+                      went down unexpectedly."
+                     ~metadata:[ ("node", `String (Node.id node)) ]
+                 in
+
+                 failwith
+                    "Aborting the test because a node went down unexpectedly."
+              *)
+              let () =
+                [%log info]
+                  "Lucy has lost contact with $node, without the node being \
+                   deliberately stopped, meaning that the node crashed or was \
+                   somehow taken down.  Lucy will attempt to recover and\n\
+                  \                   restart this node."
+                  ~metadata:[ ("node", `String (Node.id node)) ]
+              in
+              let (_ : [> `Continue ] Deferred.t) =
+                update ~f:(fun state ->
+                    let node_initialization' =
+                      (* we're about to restart the node, which means it will soon be in a not-initialized state and will need to go through initialization, thus we need to set the node's initialization state to false *)
+                      String.Map.set state.node_initialization
+                        ~key:(Node.id node) ~data:false
+                    in
+                    let node_on' =
+                      (* it should already be "on" but setting here just to be sure *)
+                      String.Map.set state.node_on ~key:(Node.id node)
+                        ~data:true
+                    in
+                    { state with
+                      node_initialization = node_initialization'
+                    ; node_on = node_on'
+                    } )
+              in
+              let%bind (_
+                         : ( unit Malleable_error.Result_accumulator.t
+                           , Malleable_error.Hard_fail.t )
+                           result ) =
+                Node.start ~fresh_state:false node
+              in
+
+              Deferred.return `Continue )
         : _ Event_router.event_subscription ) ;
     (* handle_breadcrumb_added *)
     ignore
