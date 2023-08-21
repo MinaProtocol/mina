@@ -23,7 +23,6 @@
    pickles
    pickles.backend
    pickles_types
-   signature_lib
    with_hash
    )
  (instrumentation (backend bisect_ppx))
