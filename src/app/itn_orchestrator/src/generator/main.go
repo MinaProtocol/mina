@@ -44,7 +44,7 @@ func sampleStopRatio(minRatio, maxRatio float64) float64 {
 type Params struct {
 	BaseTps, StressTps, SenderRatio, ZkappRatio, RedeployRatio, MinStopRatio, MaxStopRatio float64
 	RoundDurationMin, PauseMin, Rounds, StopsPerRound, Gap                                 int
-	SendFromNonBpsOnly, StopOnlyBps, UseRestartScript                                      bool
+	SendFromNonBpsOnly, StopOnlyBps, UseRestartScript, MaxCost                             bool
 	ExperimentName, PasswordEnv, FundKeyPrefix                                             string
 	Privkeys                                                                               []string
 	PaymentReceiver                                                                        itn_json_types.MinaPublicKey
@@ -172,6 +172,8 @@ func (p *Params) Generate(round int) GeneratedRound {
 	paymentsKeysDir := fmt.Sprintf("%s/round-%d/payments", p.FundKeyPrefix, round)
 	tps := sampleTps(p.BaseTps, p.StressTps)
 	experimentName := fmt.Sprintf("%s-%d", p.ExperimentName, round)
+	onlyZkapps := math.Abs(1-p.ZkappRatio) < 1e-3
+	onlyPayments := p.ZkappRatio < 1e-3
 	zkappTps := tps * p.ZkappRatio
 	zkappParams := lib.ZkappSubParams{
 		ExperimentName:    experimentName,
@@ -184,8 +186,8 @@ func (p *Params) Generate(round int) GeneratedRound {
 		MinFee:            2e9,
 		MaxFee:            4e9,
 		DeploymentFee:     2e9,
+		MaxCost:           p.MaxCost,
 	}
-	zkappKeysNum, zkappAmount := lib.ZkappKeygenRequirements(zkappParams)
 	paymentParams := lib.PaymentSubParams{
 		ExperimentName: experimentName,
 		Tps:            tps - zkappTps,
@@ -196,7 +198,6 @@ func (p *Params) Generate(round int) GeneratedRound {
 		Amount:         1e5,
 		Receiver:       p.PaymentReceiver,
 	}
-	paymentKeysNum, paymentAmount := lib.PaymentKeygenRequirements(p.Gap, paymentParams)
 	cmds := []Command{}
 	roundStartMin := round * (p.RoundDurationMin + p.PauseMin)
 	cmds = append(cmds, withComment(fmt.Sprintf("Starting round %d, %d min since start", round, roundStartMin), discovery(lib.DiscoveryParams{
@@ -208,11 +209,20 @@ func (p *Params) Generate(round int) GeneratedRound {
 		sendersOutName = "group1"
 		cmds = append(cmds, sample(-1, "participant", []float64{p.SenderRatio}))
 	}
-	cmds = append(cmds, loadKeys(lib.KeyloaderParams{Dir: zkappsKeysDir}))
-	cmds = append(cmds, loadKeys(lib.KeyloaderParams{Dir: paymentsKeysDir}))
-	cmds = append(cmds, zkapps(-2, -3, sendersOutName, zkappParams))
-	cmds = append(cmds, payments(-2, -4, sendersOutName, paymentParams))
-	cmds = append(cmds, join(-1, "participant", -2, "participant"))
+	if onlyPayments {
+		cmds = append(cmds, loadKeys(lib.KeyloaderParams{Dir: paymentsKeysDir}))
+		cmds = append(cmds, payments(-1, -2, sendersOutName, paymentParams))
+	} else if onlyZkapps {
+		cmds = append(cmds, loadKeys(lib.KeyloaderParams{Dir: zkappsKeysDir}))
+		cmds = append(cmds, zkapps(-1, -2, sendersOutName, zkappParams))
+	} else {
+		cmds = append(cmds, loadKeys(lib.KeyloaderParams{Dir: zkappsKeysDir}))
+		cmds = append(cmds, loadKeys(lib.KeyloaderParams{Dir: paymentsKeysDir}))
+		cmds = append(cmds, zkapps(-2, -3, sendersOutName, zkappParams))
+		cmds = append(cmds, payments(-2, -4, sendersOutName, paymentParams))
+		cmds = append(cmds, join(-1, "participant", -2, "participant"))
+	}
+	sendersCmdId := len(cmds)
 	stopWaits := make([]int, p.StopsPerRound)
 	for i := 0; i < p.StopsPerRound; i++ {
 		stopWaits[i] = rand.Intn(60 * p.RoundDurationMin)
@@ -223,13 +233,17 @@ func (p *Params) Generate(round int) GeneratedRound {
 	}
 	stopRatio := sampleStopRatio(p.MinStopRatio, p.MaxStopRatio)
 	elapsed := 0
-	for i, waitSec := range stopWaits {
+	for _, waitSec := range stopWaits {
 		cmds = append(cmds, withComment(fmt.Sprintf("Running round %d, %d min %d sec since start, waiting for %d sec", round, roundStartMin+elapsed/60, elapsed%60, waitSec), wait(waitSec)))
 		cmds = append(cmds, discovery(lib.DiscoveryParams{
 			OffsetMin:          15,
 			OnlyBlockProducers: p.StopOnlyBps,
 		}))
-		cmds = append(cmds, except(-1, "participant", -3-i*6, "group"))
+		exceptRefName := "group"
+		if onlyPayments || onlyZkapps {
+			exceptRefName = "participant"
+		}
+		cmds = append(cmds, except(-1, "participant", sendersCmdId-len(cmds)-1, exceptRefName))
 		redeployRatio := p.RedeployRatio * stopRatio
 		restartRatio := (1 - p.RedeployRatio) * stopRatio
 		if redeployRatio > 1e-6 && restartRatio > 1e-6 {
@@ -250,14 +264,19 @@ func (p *Params) Generate(round int) GeneratedRound {
 			withComment(fmt.Sprintf("Waiting for remainder of round %d and pause, %d min %d sec since start", round, roundStartMin+elapsed/60, elapsed%60),
 				wait((p.RoundDurationMin+p.PauseMin)*60-elapsed)))
 	}
-	offset := (round * p.PrivkeysPerFundCmd * 2) % len(p.Privkeys)
+	fundCmdNum := 2
+	if onlyPayments || onlyZkapps {
+		fundCmdNum = 1
+	}
+	offset := (round * p.PrivkeysPerFundCmd * fundCmdNum) % len(p.Privkeys)
 	rem := p.Privkeys[offset:]
-	for len(rem) < p.PrivkeysPerFundCmd*2 {
+	for len(rem) < p.PrivkeysPerFundCmd*fundCmdNum {
 		rem = append(rem, p.Privkeys...)
 	}
-	return GeneratedRound{
-		Commands: cmds,
-		FundCommands: []Command{
+	fundCmds := []Command{}
+	if !onlyPayments {
+		zkappKeysNum, zkappAmount := lib.ZkappKeygenRequirements(zkappParams)
+		fundCmds = append(fundCmds,
 			fund(lib.FundParams{
 				PasswordEnv: p.PasswordEnv,
 				Privkeys:    rem[:p.PrivkeysPerFundCmd],
@@ -265,16 +284,29 @@ func (p *Params) Generate(round int) GeneratedRound {
 				Amount:      zkappAmount,
 				Fee:         1e9,
 				Num:         zkappKeysNum,
-			}),
+			}))
+	}
+	if !onlyZkapps {
+		paymentKeysNum, paymentAmount := lib.PaymentKeygenRequirements(p.Gap, paymentParams)
+		var privkeys []string
+		if onlyPayments {
+			privkeys = rem[:p.PrivkeysPerFundCmd]
+		} else {
+			privkeys = rem[p.PrivkeysPerFundCmd : p.PrivkeysPerFundCmd*2]
+		}
+		fundCmds = append(fundCmds,
 			fund(lib.FundParams{
 				PasswordEnv: p.PasswordEnv,
-				Privkeys:    rem[p.PrivkeysPerFundCmd : p.PrivkeysPerFundCmd*2],
+				Privkeys:    privkeys,
 				Prefix:      paymentsKeysDir + "/key-",
 				Amount:      paymentAmount,
 				Fee:         1e9,
 				Num:         paymentKeysNum,
-			}),
-		},
+			}))
+	}
+	return GeneratedRound{
+		Commands:     cmds,
+		FundCommands: fundCmds,
 	}
 }
 
@@ -298,6 +330,7 @@ func main() {
 	flag.BoolVar(&p.SendFromNonBpsOnly, "send-from-non-bps", false, "send only from non block producers")
 	flag.BoolVar(&p.StopOnlyBps, "stop-only-bps", false, "stop only block producers")
 	flag.BoolVar(&p.UseRestartScript, "use-restart-script", false, "use restart script insteadt of stop-daemon command")
+	flag.BoolVar(&p.MaxCost, "max-cost", false, "send max-cost zkapp commands")
 	flag.IntVar(&p.RoundDurationMin, "round-duration", 30, "duration of a round, minutes")
 	flag.IntVar(&p.PauseMin, "pause", 15, "duration of a pause between rounds, minutes")
 	flag.IntVar(&p.Rounds, "rounds", 4, "number of rounds to run experiment")
