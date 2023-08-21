@@ -39,16 +39,13 @@ let is_on_curve_bignum_point (curve : Curve_params.t)
  *     L and R are not O (the point at infinity)
  *
  *   External checks: (not counting inputs and output)
- *     Bound checks:          6
- *     Multi-range-checks:    3
- *     Compact-range-checks:  3
- *     Total range-checks:   12
+ *     Bound checks:         12
+ *     Compact-range-checks: 3
+ *     Range-checks:         72
  *
  *   Rows: (not counting inputs/outputs and constants)
- *     Group addition:     13
- *     Bound additions:    12
- *     Multi-range-checks: 48
- *     Total:              73
+ *     Group addition:  35
+ *     External checks: 135
  *
  *   Supported group axioms:
  *     Closure
@@ -201,12 +198,14 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
     (* s * s = s^2 *)
     Foreign_field.mul (module Circuit) external_checks slope slope curve.modulus
   in
+
   (* Bounds 1: Left input (slope) bound check below.
    *           Right input (slope) equal to left input (already checked)
-   *           Result (s^2) bound check already tracked by Foreign_field.mul.
+   *           Result (s^2) bound check already registered by Foreign_field.mul.
    *)
-  Foreign_field.(External_checks.append_bound_check external_checks @@
-    Element.Standard.of_limbs (slope0, slope1, slope2)) ;
+  Foreign_field.(
+    External_checks.add_bound_check external_checks
+    @@ Element.Standard.of_limbs (slope0, slope1, slope2)) ;
 
   (*
    * Constrain result x-coordinate computation: x = s^2 - Lx - Rx with length 2 chain
@@ -216,7 +215,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   let slope_squared_minus_x =
     Foreign_field.sub
       (module Circuit)
-      ~full:false slope_squared result_x curve.modulus
+      external_checks slope_squared result_x curve.modulus
   in
 
   (* Bounds 2: Left input (s^2) bound check covered by (Bounds 1).
@@ -228,7 +227,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   let expected_right_x =
     Foreign_field.sub
       (module Circuit)
-      ~full:false slope_squared_minus_x left_x curve.modulus
+      external_checks slope_squared_minus_x left_x curve.modulus
   in
 
   (* Bounds 3: Left input (sΔx) is chained (no bound check required).
@@ -247,13 +246,15 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   let right_delta =
     Foreign_field.sub
       (module Circuit)
-      ~full:false expected_right_x result_x curve.modulus
+      external_checks expected_right_x result_x curve.modulus
   in
+
   (* Bounds 4: Left input (Rx) is chained (no bound check required).
    *           Right input (x) is gadget output (checked by caller).
-   *           Addition chain result (right_delta) bound check added below.
+   *           Addition chain result (right_delta) bound checked below (multiplication input).
    *)
-  Foreign_field.External_checks.append_bound_check external_checks right_delta ;
+  Foreign_field.External_checks.add_bound_check external_checks
+    ~do_multi_range_check:false right_delta ;
 
   (* C5: RxΔ * s = RxΔs *)
   let right_delta_s =
@@ -274,12 +275,15 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* C6:  Rx - Lx = Δx  *)
   let delta_x =
-    Foreign_field.sub (module Circuit) ~full:false right_x left_x curve.modulus
+    Foreign_field.sub
+      (module Circuit)
+      external_checks right_x left_x curve.modulus
   in
   (* Bounds 6: Inputs (Rx and Lx) are gadget inputs (checked by caller).
-   *           Addition chain result (delta_x) bound check below.
+   *           Addition chain result (delta_x) bound check below (multiplication input).
    *)
-  Foreign_field.External_checks.append_bound_check external_checks delta_x ;
+  Foreign_field.External_checks.add_bound_check ~do_multi_range_check:false
+    external_checks delta_x ;
 
   (* C7: Δx * s = Δxs *)
   let delta_x_s =
@@ -301,7 +305,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   let expected_right_y =
     Foreign_field.add
       (module Circuit)
-      ~full:false delta_x_s left_y curve.modulus
+      external_checks delta_x_s left_y curve.modulus
   in
 
   (* Bounds 8: Left input (delta_x_s) check is tracked by (Bounds 7).
@@ -321,14 +325,14 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* C9: Ry + y = RxΔs *)
   let expected_right_delta_s =
-    Foreign_field.add ~full:false
+    Foreign_field.add
       (module Circuit)
-      expected_right_y result_y curve.modulus
+      external_checks expected_right_y result_y curve.modulus
   in
   (* Result row *)
   Foreign_field.result_row
     (module Circuit)
-    ~label:"Ec_group.add_expected_right_delta_s" expected_right_delta_s ;
+    ~label:"Ec_group.add_expected_right_delta_s" expected_right_delta_s None ;
   (* Bounds 9: Left input (Ry) check is chained (no check required).
    *           Right input (y) check value is gadget output (checked by caller).
    *           Addition chain result (expected_right_delta_s) check already covered by (Bounds 5).
@@ -338,7 +342,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
     (module Circuit)
     expected_right_delta_s right_delta_s ;
 
-  (* Return result point *)
+  (* Return result point of addition *)
   Affine.of_coordinates (result_x, result_y)
 
 (* Gadget for (partial) elliptic curve group doubling over foreign field
@@ -355,16 +359,13 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      P is not O (the point at infinity)
  *
  *   External checks: (not counting inputs and output)
- *     Bound checks:          8 (+1 when a != 0)
- *     Multi-range-checks:    4
- *     Compact-range-checks:  4
- *     Total range-checks:   16
+ *     Bound checks:         12 (+1 when a != 0)
+ *     Compact-range-checks: 4
+ *     Range-checks:         42 (+3 when a != 0)
  *
  *   Rows: (not counting inputs/outputs and constants)
- *     Group double:       16 (+2 when a != 0)
- *     Bound additions:    16
- *     Multi-range-checks: 64
- *     Total:              96
+ *     Group double:    36 (+2 when a != 0)
+ *     External checks: 123
  *
  *   Note: See group addition notes (above) about group properties supported by this implementation
  *)
@@ -466,8 +467,9 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Right input (slope) is equal to left input (no check required).
    *           Result (slope_squared) check already tracked by Foreign_field.mul.
    *)
-  Foreign_field.(External_checks.append_bound_check external_checks
-    Element.Standard.of_limbs (slope0, slope1, slope2)) ;
+  Foreign_field.(
+    External_checks.add_bound_check external_checks
+      (Element.Standard.of_limbs (slope0, slope1, slope2))) ;
 
   (* C2: Constrain result x-coordinate computation: x = s^2 - 2 * Px with length 2 chain
    *     with s^2 - x = 2 * Px
@@ -476,7 +478,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
     (* s^2 - x = 2Px *)
     Foreign_field.sub
       (module Circuit)
-      ~full:false slope_squared result_x curve.modulus
+      external_checks slope_squared result_x curve.modulus
   in
 
   (* Bounds 2: Left input (s^2) check covered by (Bounds 1).
@@ -488,7 +490,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
   let expected_point_x =
     Foreign_field.sub
       (module Circuit)
-      ~full:false point_x2 point_x curve.modulus
+      external_checks point_x2 point_x curve.modulus
   in
   (* Bounds 3: Left input (2Px) is chained (no check required).
    *           Right input (Px) is gadget input (checked by caller).
@@ -507,13 +509,14 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
   let delta_x =
     Foreign_field.sub
       (module Circuit)
-      ~full:false expected_point_x result_x curve.modulus
+      external_checks expected_point_x result_x curve.modulus
   in
   (* Bounds 4: Left input (Px) is chained (no check required).
    *           Right input (x) check value is gadget output (checked by caller).
-   *           Addition chain result (delta_x) bound check added below.
+   *           Addition chain result (delta_x) bound checked below (multiplication input).
    *)
-  Foreign_field.External_checks.append_bound_check external_checks delta_x ;
+  Foreign_field.External_checks.add_bound_check external_checks
+    ~do_multi_range_check:false delta_x ;
 
   (* C5: Δx * s = Δxs *)
   let delta_xs =
@@ -536,7 +539,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
   let expected_point_y =
     Foreign_field.sub
       (module Circuit)
-      ~full:false delta_xs result_y curve.modulus
+      external_checks delta_xs result_y curve.modulus
   in
   (* Bounds 6: Left input (delta_xs) checked by (Bound 5).
    *           Right input is gadget output (checked by caller).
@@ -549,13 +552,17 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* C7: Py + Py = 2Py *)
   let point_y2 =
-    Foreign_field.add (module Circuit) ~full:false point_y point_y curve.modulus
+    Foreign_field.add
+      (module Circuit)
+      external_checks point_y point_y curve.modulus
   in
 
   (* Bounds 7: Left input (Py) is gadget input (checked by caller).
    *           Right input (Py) is gadget input (checked by caller).
-   *           Addition result (2Py) chained (no check required).
+   *           Addition result (2Py) checked below (multiplication input)
    *)
+  Foreign_field.External_checks.add_bound_check external_checks
+    ~do_multi_range_check:false point_y2 ;
 
   (* C8: 2Py * s = 2Pys *)
   let point_y2s =
@@ -563,27 +570,24 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       external_checks point_y2 slope curve.modulus
   in
-  (* Bounds 8: Left input (point_y2) bound check added below.
+
+  (* Bounds 8: Left input (point_y2) already bound checked above.
    *           Right input (slope) already checked by (Bound 1).
    *           Result (2Pys) bound check already tracked by Foreign_field.mul.
-   *)
-  Foreign_field.External_checks.append_bound_check external_checks point_y2 ;
-
-  (*
-   * Constrain rest slope computation s = (3 * Px^2 + a)/(2 * Py)
    *)
 
   (* C9: 2Px + Px = 3Px *)
   let point_x3 =
     Foreign_field.add
       (module Circuit)
-      ~full:false point_x2 point_x curve.modulus
+      external_checks point_x2 point_x curve.modulus
   in
   (* Bounds 9: Left input (point_x2) bound check added below.
    *           Right input (Px) is gadget input (checked by caller).
    *           Result (3Px) is chained (no check required).
    *)
-  Foreign_field.External_checks.append_bound_check external_checks point_x2 ;
+  Foreign_field.External_checks.add_bound_check external_checks
+    ~do_multi_range_check:false point_x2 ;
 
   (* Check if the elliptic curve a parameter requires more constraints
    * to be added in order to add final a (e.g. 3Px^2 + a where a != 0).
@@ -603,7 +607,8 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
      *)
 
     (* Add point_x3 bound check (Bounds 101) *)
-    Foreign_field.External_checks.append_bound_check external_checks point_x3 ;
+    Foreign_field.External_checks.add_bound_check external_checks
+      ~do_multi_range_check:false point_x3 ;
 
     (* Copy point_x3_squared to point_y2s *)
     Foreign_field.Element.Standard.assert_equal
@@ -623,7 +628,8 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
      *)
 
     (* Add point_x3 bound check (Bounds 10b) *)
-    Foreign_field.External_checks.append_bound_check external_checks point_x3 ;
+    Foreign_field.External_checks.add_bound_check external_checks
+      ~do_multi_range_check:false point_x3 ;
 
     (* Add curve constant a and constrain rest slope computation
      *   with s = (3 * Px^2 + a)/(2 * Py)
@@ -633,7 +639,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
     let point_x3_squared_plus_a =
       Foreign_field.add
         (module Circuit)
-        ~full:false point_x3_squared curve.a curve.modulus
+        external_checks point_x3_squared curve.a curve.modulus
     in
     (* Bounds 11: Left input (point_x3_squared) already tracked by (Bounds 10b).
        *          Right input (curve.a) is public constant.
@@ -643,14 +649,15 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
     (* Result row *)
     Foreign_field.result_row
       (module Circuit)
-      ~label:"Ec_group.double_point_x3_squared_plus_a" point_x3_squared_plus_a ;
+      ~label:"Ec_group.double_point_x3_squared_plus_a" point_x3_squared_plus_a
+      None ;
 
     (* Copy point_x3_squared_plus_a to point_y2s *)
     Foreign_field.Element.Standard.assert_equal
       (module Circuit)
       point_x3_squared_plus_a point_y2s ) ;
 
-  (* Return result point *)
+  (* Return result point of doubling *)
   Affine.of_coordinates (result_x, result_y)
 
 (* Gadget for elliptic curve group negation
@@ -660,6 +667,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
  *       the negated result somewhere (e.g. in a Zero row or elsewhere).
  *)
 let negate (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (external_checks : f Foreign_field.External_checks.t)
     (curve : f Curve_params.InCircuit.t) (point : f Affine.t) : f Affine.t =
   let x, y = Affine.to_coordinates point in
   (* Zero constant foreign field elemtn *)
@@ -671,7 +679,7 @@ let negate (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* C1: Constrain computation of the negated point *)
   let neg_y =
     (* neg_y = 0 - y *)
-    Foreign_field.sub (module Circuit) ~full:false zero y curve.modulus
+    Foreign_field.sub (module Circuit) external_checks zero y curve.modulus
   in
 
   (* Bounds 1: Left input is public constant
@@ -750,19 +758,15 @@ let compute_ia_points ?(point : Affine.bignum_point option)
  *
  *   External checks: (not counting inputs and output)
  *     Bound checks:         3 (+1 when a != 0 and +1 when b != 0)
- *     Multi-range-checks:   3
  *     Compact-range-checks: 3
- *     Total range-checks:   9
+ *     Range-checks:         21 (+3 when a != 0 and +3 when b != 0)
  *
  *   Rows: (not counting inputs/outputs and constants)
- *     Curve check:         8 (+1 when a != 0 and +2 when b != 0)
- *     Bound additions:     6
- *     Multi-range-checks: 36
- *     Total:              50
+ *     Curve check: 20 (+1 when a != 0 and +2 when b != 0)
  *
  *   Constants:
- *     Curve constants:        10 (for 256-bit curve; one-time cost per circuit)
- *     Pre-computing doubles: 767 (for 256-bit curve; one-time cost per circuit)
+ *     Curve constants:        ~10 (for 256-bit curve; one-time cost per circuit)
+ *     Pre-computing doubles: ~767 (for 256-bit curve; one-time cost per circuit)
  *)
 let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t)
@@ -785,14 +789,15 @@ let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
       let x_squared_a =
         Foreign_field.add
           (module Circuit)
-          ~full:false x_squared curve.a curve.modulus
+          external_checks x_squared curve.a curve.modulus
       in
       (* Bounds 2: Left input already checked by (Bounds 1)
        *           Right input public parameter (no check necessary)
-       *           Result bound check below
+       *           Result bound check below (multiplication input)
        *)
       (* Add x_squared_a bound check *)
-      Foreign_field.External_checks.append_bound_check external_checks x_squared_a ;
+      Foreign_field.External_checks.add_bound_check ~do_multi_range_check:false
+        external_checks x_squared_a ;
       x_squared_a )
     else x_squared
   in
@@ -816,29 +821,35 @@ let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
       let x_cubed_ax_b =
         Foreign_field.add
           (module Circuit)
-          ~full:false x_cubed_ax curve.b curve.modulus
+          external_checks x_cubed_ax curve.b curve.modulus
       in
       (* Result row *)
       Foreign_field.result_row
         (module Circuit)
-        ~label:"Ec_group.is_on_curve_x_cubed_ax_b" x_cubed_ax_b ;
+        ~label:"Ec_group.is_on_curve_x_cubed_ax_b" x_cubed_ax_b None ;
 
       (* Bounds 4: Left input already checked by (Bounds 3)
        *           Right input public parameter (no check necessary)
-       *           Result bound check below
+       *           Result bound check below (for assert_equal)
        *)
 
       (* Add x_cubed_ax_b bound check *)
-      Foreign_field.External_checks.append_bound_check external_checks x_cubed_ax_b ;
+      Foreign_field.External_checks.add_bound_check ~do_multi_range_check:false
+        external_checks x_cubed_ax_b ;
 
       x_cubed_ax_b )
     else x_cubed_ax
   in
 
+  (* Safety check: make sure x_cubed_ax_b is canonical *)
+  Foreign_field.External_checks.add_canonical_check external_checks x_cubed_ax_b ;
+
   (* C5: y^2 = y * y *)
   let y_squared =
     Foreign_field.mul (module Circuit) external_checks y y curve.modulus
   in
+
+  (* No canonical check required for y_squared since it must be equal to x_cubed_ax_b *)
 
   (* Bounds 5: Left and right inputs are gadget input (checked by caller)
    *           Result bound check already tracked by Foreign_field.mul
@@ -862,12 +873,11 @@ let check_ia (type f) (module Circuit : Snark_intf.Run with type field = f)
   is_on_curve (module Circuit) external_checks curve ia.acc ;
 
   (* C2: Constrain computation of the negated initial accumulator point *)
-  let neg_init_acc = negate (module Circuit) curve ia.acc in
+  let neg_init_acc = negate (module Circuit) external_checks curve ia.acc in
   (* Result row *)
   Foreign_field.result_row
     (module Circuit)
-    ~label:"Ec_group.check_ia_neg_init_y"
-  @@ Affine.y neg_init_acc ;
+    ~label:"Ec_group.check_ia_neg_init_y" (Affine.y neg_init_acc) None ;
 
   (* Bounds 1: Input is public constant
    *           Result is part of input (checked by caller)
@@ -905,19 +915,17 @@ let check_ia (type f) (module Circuit : Snark_intf.Run with type field = f)
  *
  *   External checks: (per crumb, not counting inputs and output)
  *     Bound checks:         42 (+1 when a != 0)
- *     Multi-range-checks:   17
- *     Compact-range-checks: 17
- *     Total range-checks:   76
+ *     Canonical checks:     8
+ *     Compact-range-checks: 7
+ *     Range-checks:         192
  *
  *   Rows: (per crumb, not counting inputs/outputs and constants)
- *     Scalar multiplication:  ~84 (+2 when a != 0)
- *     Bound additions:         84
- *     Multi-range-checks:     308
- *     Total:                  476
+ *     Scalar multiplication: ~156 (+2 when a != 0)
+ *     External checks:       ~434
  *
  *   Constants:
- *     Curve constants:        10 (for 256-bit curve; one-time cost per circuit)
- *     Pre-computing doubles: 767 (for 256-bit curve; one-time cost per circuit)
+ *     Curve constants:        ~10 (for 256-bit curve; one-time cost per circuit)
+ *     Pre-computing doubles: ~767 (for 256-bit curve; one-time cost per circuit)
  *)
 let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t)
@@ -981,13 +989,21 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Add: sum = acc + base *)
         let sum = add (module Circuit) external_checks curve acc base in
         (* Bounds 1:
-         *   Left input is previous result, so already checked.
+         *   Left input is previous result (already checked).
          *   Right input is checked by previous doubling check.
          *   Initial acc and base are gadget inputs (checked by caller).
          *   Result bounds check below.
          *)
-        Foreign_field.External_checks.append_bound_check external_checks @@ Affine.x sum ;
-        Foreign_field.External_checks.append_bound_check external_checks @@ Affine.y sum ;
+        Foreign_field.External_checks.add_bound_check external_checks
+        @@ Affine.x sum ;
+        Foreign_field.External_checks.add_bound_check external_checks
+        @@ Affine.y sum ;
+
+        (* Safety checks *)
+        Foreign_field.External_checks.add_canonical_check external_checks
+        @@ Affine.x sum ;
+        Foreign_field.External_checks.add_canonical_check external_checks
+        @@ Affine.y sum ;
 
         (* Group double: double_base = base + base *)
         let double_base =
@@ -997,12 +1013,20 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
                 double (module Circuit) external_checks curve base
               in
               (* Bounds 2:
-               *   Input is previous result, so already checked.
+               *   Input is previous result (already checked).
                *   Initial base is gadget input (checked by caller).
                *   Result bounds check below.
                *)
-              Foreign_field.External_checks.append_bound_check external_checks @@ Affine.x double_base ;
-              Foreign_field.External_checks.append_bound_check external_checks @@ Affine.y double_base ;
+              Foreign_field.External_checks.add_bound_check external_checks
+              @@ Affine.x double_base ;
+              Foreign_field.External_checks.add_bound_check external_checks
+              @@ Affine.y double_base ;
+
+              (* Safety checks *)
+              Foreign_field.External_checks.add_canonical_check external_checks
+              @@ Affine.x double_base ;
+              Foreign_field.External_checks.add_canonical_check external_checks
+              @@ Affine.y double_base ;
               double_base
           | Some doubles ->
               (* When the base point is public (e.g. the secp256k1 generator) we can
@@ -1044,18 +1068,26 @@ let check_subgroup (type f)
    *           Right input is gadget input (checked by caller)
    *           Result bound check below
    *)
-  Foreign_field.External_checks.append_bound_check external_checks @@ Affine.x n_minus_one_point ;
-  Foreign_field.External_checks.append_bound_check external_checks @@ Affine.y n_minus_one_point ;
+  Foreign_field.External_checks.add_bound_check external_checks
+  @@ Affine.x n_minus_one_point ;
+  Foreign_field.External_checks.add_bound_check external_checks
+  @@ Affine.y n_minus_one_point ;
+  Foreign_field.External_checks.add_canonical_check external_checks
+  @@ Affine.x n_minus_one_point ;
+  Foreign_field.External_checks.add_canonical_check external_checks
+  @@ Affine.y n_minus_one_point ;
 
   (* C2: Compute -P *)
-  let minus_point = negate (module Circuit) curve point in
+  let minus_point = negate (module Circuit) external_checks curve point in
   (* Result row *)
-  Foreign_field.result_row (module Circuit) ~label:"minus_point_y"
-  @@ Affine.y minus_point ;
+  Foreign_field.result_row
+    (module Circuit)
+    ~label:"minus_point_y" (Affine.y minus_point) None ;
   (* Bounds 2: Input is gadget input (checked by caller)
    *           Result bound check below
    *)
-  Foreign_field.External_checks.append_bound_check external_checks @@ Affine.y minus_point ;
+  Foreign_field.External_checks.add_bound_check external_checks
+  @@ Affine.y minus_point ;
 
   (* C3: Assert (n - 1)P = -P *)
   Affine.assert_equal (module Circuit) n_minus_one_point minus_point
@@ -1117,11 +1149,9 @@ let%test_unit "Ec_group.add" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.bounds 6 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                3 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 3 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 36 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -1146,6 +1176,7 @@ let%test_unit "Ec_group.add" =
         (Bignum_bigint.of_int 0, Bignum_bigint.of_int 2)
       (* expected result *)
     in
+
     let _cs =
       test_add fake_curve5
         (Bignum_bigint.of_int 2, Bignum_bigint.of_int 3) (* left_input *)
@@ -1402,7 +1433,6 @@ let%test_unit "Ec_group.add" =
       test_add ~cs Secp256k1.params first_eth_tx_pubkey vitalik_eth_pubkey
         expected_result
     in
-
     () )
 
 let%test_unit "Ec_group.add_chained" =
@@ -1476,11 +1506,9 @@ let%test_unit "Ec_group.add_chained" =
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.bounds 12 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                6 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
             assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 6 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 72 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -1612,7 +1640,10 @@ let%test_unit "Ec_group.add_full" =
             let open Runner.Impl in
             (* Prepare test public inputs *)
             let curve =
-              Curve_params.to_circuit_constants (module Runner.Impl) curve
+              Curve_params.to_circuit_constants
+                ~use_precomputed_gen_doubles:false
+                (module Runner.Impl)
+                curve
             in
             let left_input =
               Affine.of_bignum_bigint_coordinates
@@ -1643,23 +1674,45 @@ let%test_unit "Ec_group.add_full" =
                 external_checks curve left_input right_input
             in
 
-            (* Add left_input to external checks *)
+            (* Check left_input *)
             Foreign_field.(
-              External_checks.append_bound_check external_checks @@ Affine.x left_input) ;
+              External_checks.add_bound_check external_checks
+              @@ Affine.x left_input) ;
             Foreign_field.(
-              External_checks.append_bound_check external_checks @@ Affine.y left_input) ;
+              External_checks.add_bound_check external_checks
+              @@ Affine.y left_input) ;
+            Foreign_field.(
+              External_checks.add_canonical_check external_checks
+              @@ Affine.x left_input) ;
+            Foreign_field.(
+              External_checks.add_canonical_check external_checks
+              @@ Affine.y left_input) ;
 
-            (* Add right_input to external checks *)
+            (* Check right_input *)
             Foreign_field.(
-              External_checks.append_bound_check external_checks @@ Affine.x right_input) ;
+              External_checks.add_bound_check external_checks
+              @@ Affine.x right_input) ;
             Foreign_field.(
-              External_checks.append_bound_check external_checks @@ Affine.y right_input) ;
+              External_checks.add_bound_check external_checks
+              @@ Affine.y right_input) ;
+            Foreign_field.(
+              External_checks.add_canonical_check external_checks
+              @@ Affine.x right_input) ;
+            Foreign_field.(
+              External_checks.add_canonical_check external_checks
+              @@ Affine.y right_input) ;
 
-            (* Add result to external checks *)
+            (* Check result *)
             Foreign_field.(
-              External_checks.append_bound_check external_checks @@ Affine.x result) ;
+              External_checks.add_bound_check external_checks @@ Affine.x result) ;
             Foreign_field.(
-              External_checks.append_bound_check external_checks @@ Affine.y result) ;
+              External_checks.add_bound_check external_checks @@ Affine.y result) ;
+            Foreign_field.(
+              External_checks.add_canonical_check external_checks
+              @@ Affine.x result) ;
+            Foreign_field.(
+              External_checks.add_canonical_check external_checks
+              @@ Affine.y result) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -1668,14 +1721,11 @@ let%test_unit "Ec_group.add_full" =
                     (module Runner.Impl)
                     result expected_result ) ) ;
 
-            (*
-             * Perform external checks
-             *)
+            (* Check for expected quantity of external checks *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 12) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 3) ;
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
-                3 ) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.canonicals 6) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 36) ;
+
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
               (module Runner.Impl)
@@ -1769,11 +1819,13 @@ let%test_unit "Ec_group.double" =
               assert (
                 Mina_stdlib.List.Length.equal unused_external_checks.bounds 9 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                4 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 4 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.ranges 42 )
+            else
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.ranges 45 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -1994,7 +2046,6 @@ let%test_unit "Ec_group.double" =
             )
           in
           test_double Secp256k1.params point wrong_result ) ) ;
-
     () )
 
 let%test_unit "Ec_group.double_chained" =
@@ -2046,11 +2097,13 @@ let%test_unit "Ec_group.double_chained" =
               assert (
                 Mina_stdlib.List.Length.equal unused_external_checks.bounds 18 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                8 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 8 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.ranges 84 )
+            else
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.ranges 90 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -2119,7 +2172,9 @@ let%test_unit "Ec_group.double_full" =
             let open Runner.Impl in
             (* Prepare test public inputs *)
             let curve =
-              Curve_params.to_circuit_constants (module Runner.Impl) curve
+              Curve_params.to_circuit_constants
+                (module Runner.Impl)
+                ~use_precomputed_gen_doubles:false curve
             in
             let point =
               Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
@@ -2141,17 +2196,31 @@ let%test_unit "Ec_group.double_full" =
               double (module Runner.Impl) external_checks curve point
             in
 
-            (* Add input point to external checks *)
+            (* Check input point *)
             Foreign_field.(
-              External_checks.append_bound_check external_checks @@ Affine.x point) ;
+              External_checks.add_bound_check external_checks @@ Affine.x point) ;
             Foreign_field.(
-              External_checks.append_bound_check external_checks @@ Affine.y point) ;
+              External_checks.add_bound_check external_checks @@ Affine.y point) ;
+            Foreign_field.(
+              External_checks.add_canonical_check external_checks
+              @@ Affine.x point) ;
+            Foreign_field.(
+              External_checks.add_canonical_check external_checks
+              @@ Affine.y point) ;
 
-            (* Add result to external checks *)
+            (* Bound check result point (already done when a = 0) *)
             Foreign_field.(
-              External_checks.append_bound_check external_checks @@ Affine.x result) ;
+              External_checks.add_bound_check external_checks @@ Affine.x result) ;
             Foreign_field.(
-              External_checks.append_bound_check external_checks @@ Affine.y result) ;
+              External_checks.add_bound_check external_checks @@ Affine.y result) ;
+
+            (* Canonical check result point *)
+            Foreign_field.(
+              External_checks.add_canonical_check external_checks
+              @@ Affine.x result) ;
+            Foreign_field.(
+              External_checks.add_canonical_check external_checks
+              @@ Affine.y result) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -2160,18 +2229,14 @@ let%test_unit "Ec_group.double_full" =
                     (module Runner.Impl)
                     result expected_result ) ) ;
 
-            (*
-             * Perform external checks
-             *)
-
-            (* Sanity checks *)
+            (* Check for expected quantity of external checks *)
             if Bignum_bigint.(curve.bignum.a = zero) then
               assert (Mina_stdlib.List.Length.equal external_checks.bounds 12)
             else assert (Mina_stdlib.List.Length.equal external_checks.bounds 13) ;
-            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 4) ;
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
-                4 ) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.canonicals 4) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (Mina_stdlib.List.Length.equal external_checks.ranges 42)
+            else assert (Mina_stdlib.List.Length.equal external_checks.ranges 45) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
@@ -2276,7 +2341,7 @@ let%test_unit "Ec_group.ops_mixed" =
             in
 
             (* S + S = D *)
-            let double =
+            let double_value =
               double (module Runner.Impl) unused_external_checks curve sum
             in
 
@@ -2288,18 +2353,20 @@ let%test_unit "Ec_group.ops_mixed" =
               assert (
                 Mina_stdlib.List.Length.equal unused_external_checks.bounds 15 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                7 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 7 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.canonicals 0 ) ;
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.ranges 78 )
+            else
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.ranges 81 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
                 assert (
                   Affine.equal_as_prover
                     (module Runner.Impl)
-                    double expected_result ) ) ;
+                    double_value expected_result ) ) ;
             () )
       in
 
@@ -2829,7 +2896,6 @@ let%test_unit "Ec_group.properties" =
         expected_commutative_result expected_associative_result
         expected_distributive_result
     in
-
     () )
 
 (*******************************)
@@ -2875,15 +2941,21 @@ let%test_unit "Ec_group.is_on_curve" =
               bound_checks_count := !bound_checks_count + 1 ;
             if not Bignum_bigint.(curve.bignum.b = zero) then
               bound_checks_count := !bound_checks_count + 1 ;
+
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.bounds
                 !bound_checks_count ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                3 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.canonicals 1 ) ;
+
+            let range_check_count = ref 18 in
+            if Bignum_bigint.(curve.bignum.a <> zero) then
+              range_check_count := !range_check_count + 3 ;
+            if Bignum_bigint.(curve.bignum.b <> zero) then
+              range_check_count := !range_check_count + 3 ;
             assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 3 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges
+                !range_check_count ) ;
             () )
       in
 
@@ -3006,20 +3078,26 @@ let%test_unit "Ec_group.check_ia" =
             check_ia (module Runner.Impl) unused_external_checks curve ia ;
 
             (* Check for expected quantity of external checks *)
-            let bounds_checks_count = ref 3 in
+            let bound_checks_count = ref 3 in
             if not Bignum_bigint.(curve.bignum.a = zero) then
-              bounds_checks_count := !bounds_checks_count + 1 ;
+              bound_checks_count := !bound_checks_count + 1 ;
             if not Bignum_bigint.(curve.bignum.b = zero) then
-              bounds_checks_count := !bounds_checks_count + 1 ;
+              bound_checks_count := !bound_checks_count + 1 ;
+
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.bounds
-                !bounds_checks_count ) ;
+                !bound_checks_count ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                3 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.canonicals 1 ) ;
+
+            let range_check_count = ref 21 in
+            if not Bignum_bigint.(curve.bignum.a = zero) then
+              range_check_count := !range_check_count + 3 ;
+            if not Bignum_bigint.(curve.bignum.b = zero) then
+              range_check_count := !range_check_count + 3 ;
             assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 3 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges
+                !range_check_count ) ;
             () )
       in
 
@@ -3347,7 +3425,7 @@ let%test_unit "Ec_group.scalar_mul" =
     in
     ()
 
-let%test_unit "Ec_group.scalar_mul_properties" =
+let%test_unit "Ec_group.scalar_mul_properties_addition" =
   if scalar_mul_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -3356,13 +3434,11 @@ let%test_unit "Ec_group.scalar_mul_properties" =
     in
 
     (* Test elliptic curve scalar multiplication properties *)
-    let test_scalar_mul_properties ?cs (curve : Curve_params.t)
+    let test_scalar_mul_properties_addition ?cs (curve : Curve_params.t)
         (a_scalar : Bignum_bigint.t) (b_scalar : Bignum_bigint.t)
         (point : Affine.bignum_point) (a_expected_result : Affine.bignum_point)
         (b_expected_result : Affine.bignum_point)
-        (a_plus_b_expected : Affine.bignum_point)
-        (a_times_b_expected : Affine.bignum_point)
-        (negation_expected : Affine.bignum_point) =
+        (a_plus_b_expected : Affine.bignum_point) =
       (* Generate and verify proof *)
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
@@ -3405,16 +3481,6 @@ let%test_unit "Ec_group.scalar_mul_properties" =
               Affine.of_bignum_bigint_coordinates
                 (module Runner.Impl)
                 a_plus_b_expected
-            in
-            let a_times_b_expected =
-              Affine.of_bignum_bigint_coordinates
-                (module Runner.Impl)
-                a_times_b_expected
-            in
-            let negation_expected =
-              Affine.of_bignum_bigint_coordinates
-                (module Runner.Impl)
-                negation_expected
             in
 
             (* Create external checks context for tracking extra constraints
@@ -3468,88 +3534,6 @@ let%test_unit "Ec_group.scalar_mul_properties" =
               (module Runner.Impl)
               a_result_plus_b_result a_plus_b_result ;
 
-            (*
-             * Check distributive property with multiplying scalars: [a]bP = [b]aP = [a*b]P
-             *)
-
-            (* [a]bP *)
-            let a_b_result =
-              scalar_mul
-                (module Runner.Impl)
-                unused_external_checks curve a_scalar_bits b_result
-            in
-
-            (* [b]aP *)
-            let b_a_result =
-              scalar_mul
-                (module Runner.Impl)
-                unused_external_checks curve b_scalar_bits a_result
-            in
-
-            (* Compute a*b as foreign field multiplication in scalar field *)
-            let ab_scalar_bits =
-              let ab_scalar =
-                Bignum_bigint.(a_scalar * b_scalar % curve.bignum.order)
-              in
-              Common.bignum_bigint_unpack_as_unchecked_vars
-                (module Runner.Impl)
-                ~remove_trailing:true ab_scalar
-            in
-
-            (* (a * b)P *)
-            let ab_result =
-              scalar_mul
-                (module Runner.Impl)
-                unused_external_checks curve ab_scalar_bits point
-            in
-
-            (* Assert [a]bP = [b]aP *)
-            Affine.assert_equal (module Runner.Impl) a_b_result b_a_result ;
-            (* Assert [b]aP = (a * b)P *)
-            Affine.assert_equal (module Runner.Impl) b_a_result ab_result ;
-            (* Assert (a * b)P = expected *)
-            Affine.assert_equal
-              (module Runner.Impl)
-              ab_result a_times_b_expected ;
-
-            (*
-             * Check scaling computes with negation: [-a]P = -(aP)
-             *)
-
-            (* Compute -a_scalar witness *)
-            let minus_a_scalar_bits =
-              let minus_a_scalar =
-                Bignum_bigint.(-a_scalar % curve.bignum.order)
-              in
-              Common.bignum_bigint_unpack_as_unchecked_vars
-                (module Runner.Impl)
-                ~remove_trailing:true minus_a_scalar
-            in
-
-            (* [-a]P *)
-            let minus_a_result =
-              scalar_mul
-                (module Runner.Impl)
-                unused_external_checks curve minus_a_scalar_bits point
-            in
-
-            (* -(aP) *)
-            let negated_a_result = negate (module Runner.Impl) curve a_result in
-            (* Result row: need to write negated y-coordinate to row in order to assert_equal on it *)
-            Foreign_field.result_row
-              (module Runner.Impl)
-              ~label:"negation_property_check"
-            @@ Affine.y negated_a_result ;
-
-            (* Assert [-a]P = -(aP) *)
-            Affine.assert_equal
-              (module Runner.Impl)
-              minus_a_result negated_a_result ;
-            (* Assert -(aP) = expected *)
-            Affine.assert_equal
-              (module Runner.Impl)
-              negated_a_result negation_expected ;
-
             () )
       in
 
@@ -3593,33 +3577,14 @@ let%test_unit "Ec_group.scalar_mul_properties" =
           "34561268318835956667566052477444512933985042899902969559255322703897774718063"
       )
     in
-    (* (a * b)G *)
-    let a_times_b_expected =
-      ( Bignum_bigint.of_string
-          "81456477659851325370442471400511783773782655276230587738882014172211964156628"
-      , Bignum_bigint.of_string
-          "95026373302104994624825470484745116441888023752189438912144935562310761663097"
-      )
-    in
-    (* [-a]G *)
-    let negation_expected =
-      ( Bignum_bigint.of_string
-          "17125835931983334217694156357722716412757965999176597307946554943053675538785"
-      , Bignum_bigint.of_string
-          "69404062321535470889404475960075629060049694591652257954514711877221175880002"
-      )
-    in
 
     assert (is_on_curve_bignum_point Secp256k1.params a_expected) ;
     assert (is_on_curve_bignum_point Secp256k1.params b_expected) ;
     assert (is_on_curve_bignum_point Secp256k1.params a_plus_b_expected) ;
-    assert (is_on_curve_bignum_point Secp256k1.params a_times_b_expected) ;
-    assert (is_on_curve_bignum_point Secp256k1.params negation_expected) ;
 
     let _cs =
-      test_scalar_mul_properties Secp256k1.params a_scalar b_scalar
+      test_scalar_mul_properties_addition Secp256k1.params a_scalar b_scalar
         Secp256k1.params.gen a_expected b_expected a_plus_b_expected
-        a_times_b_expected negation_expected
     in
 
     (* Tests with another curve point *)
@@ -3662,12 +3627,374 @@ let%test_unit "Ec_group.scalar_mul_properties" =
           "67252551234352942899384104854542424500400416990163373189382133933498016564076"
       )
     in
+
+    assert (is_on_curve_bignum_point Secp256k1.params point) ;
+    assert (is_on_curve_bignum_point Secp256k1.params a_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params b_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params a_plus_b_expected) ;
+
+    let _cs =
+      test_scalar_mul_properties_addition Secp256k1.params a_scalar b_scalar
+        point a_expected b_expected a_plus_b_expected
+    in
+    () )
+
+let%test_unit "Ec_group.scalar_mul_properties_multiplication" =
+  if scalar_mul_tests_enabled then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test elliptic curve scalar multiplication properties *)
+    let test_scalar_mul_properties_multiplication ?cs (curve : Curve_params.t)
+        (a_scalar : Bignum_bigint.t) (b_scalar : Bignum_bigint.t)
+        (point : Affine.bignum_point) (a_point : Affine.bignum_point)
+        (b_point : Affine.bignum_point)
+        (a_times_b_expected : Affine.bignum_point) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            (* Prepare test public inputs *)
+            let curve =
+              Curve_params.to_circuit_constants (module Runner.Impl) curve
+            in
+            let a_scalar_bits =
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true a_scalar
+            in
+            let b_scalar_bits =
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true b_scalar
+            in
+            let point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
+            in
+            let a_point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) a_point
+            in
+            let b_point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) b_point
+            in
+            let a_times_b_expected =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                a_times_b_expected
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* Skipping computation of aP and bP because it's too big for circuit without chunking enabled *)
+
+            (*
+             * Check distributive property with multiplying scalars: [a]bP = [b]aP = [a*b]P
+             *)
+
+            (* [a]bP *)
+            let a_b_result =
+              scalar_mul
+                (module Runner.Impl)
+                unused_external_checks curve a_scalar_bits b_point
+            in
+
+            (* [b]aP *)
+            let b_a_result =
+              scalar_mul
+                (module Runner.Impl)
+                unused_external_checks curve b_scalar_bits a_point
+            in
+
+            (* Compute a*b as foreign field multiplication in scalar field *)
+            let ab_scalar_bits =
+              let ab_scalar =
+                Bignum_bigint.(a_scalar * b_scalar % curve.bignum.order)
+              in
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true ab_scalar
+            in
+
+            (* (a * b)P *)
+            let ab_result =
+              scalar_mul
+                (module Runner.Impl)
+                unused_external_checks curve ab_scalar_bits point
+            in
+
+            (* Assert [a]bP = [b]aP *)
+            Affine.assert_equal (module Runner.Impl) a_b_result b_a_result ;
+            (* Assert [b]aP = (a * b)P *)
+            Affine.assert_equal (module Runner.Impl) b_a_result ab_result ;
+            (* Assert (a * b)P = expected *)
+            Affine.assert_equal
+              (module Runner.Impl)
+              ab_result a_times_b_expected ;
+            () )
+      in
+
+      cs
+    in
+
+    (*
+     * EC scalar multiplication properties tests
+     *)
+
+    (* Tests with generator *)
+    let a_scalar =
+      Bignum_bigint.of_string
+        "79401928295407367700174300280555320402843131478792245979539416476579739380993"
+    in
+    (* aG *)
+    let a_expected =
+      ( Bignum_bigint.of_string
+          "17125835931983334217694156357722716412757965999176597307946554943053675538785"
+      , Bignum_bigint.of_string
+          "46388026915780724534166509048612278793220290073988306084942872130687658791661"
+      )
+    in
+    let b_scalar =
+      Bignum_bigint.of_string
+        "89091288558408807474211262098870527285408764120538440460973310880924228023627"
+    in
+    (* bG *)
+    let b_expected =
+      ( Bignum_bigint.of_string
+          "79327061200655101960260174492040176163202074463842535225851740487556039447898"
+      , Bignum_bigint.of_string
+          "17719907321698144940791372349744661269763063699265755816142522447977929876765"
+      )
+    in
+    (* (a * b)G *)
+    let a_times_b_expected =
+      ( Bignum_bigint.of_string
+          "81456477659851325370442471400511783773782655276230587738882014172211964156628"
+      , Bignum_bigint.of_string
+          "95026373302104994624825470484745116441888023752189438912144935562310761663097"
+      )
+    in
+
+    assert (is_on_curve_bignum_point Secp256k1.params a_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params b_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params a_times_b_expected) ;
+
+    let _cs =
+      test_scalar_mul_properties_multiplication Secp256k1.params a_scalar
+        b_scalar Secp256k1.params.gen a_expected b_expected a_times_b_expected
+    in
+
+    (* Tests with another curve point *)
+    let point =
+      ( Bignum_bigint.of_string
+          "33774054739397672981116348681092907963399779523481500939771509974082662984990"
+      , Bignum_bigint.of_string
+          "60414776605185041994402340927179985824709402511452021592188768672640080416757"
+      )
+    in
+    let a_scalar =
+      Bignum_bigint.of_string
+        "101698197574283114939368343806106834988902354006673798485060078476846328099457"
+    in
+    (* aP *)
+    let a_expected =
+      ( Bignum_bigint.of_string
+          "75195284589272297831705973079897644085806639251981864022525558637369799002975"
+      , Bignum_bigint.of_string
+          "21318219854954928210493202207122232794689530644716510309784081397689563830643"
+      )
+    in
+    let b_scalar =
+      Bignum_bigint.of_string
+        "29906750163917842454712060592346612426879165698013462577595179415632189050569"
+    in
+    (* bP *)
+    let b_expected =
+      ( Bignum_bigint.of_string
+          "31338730031552911193929716320599408654845663804319033450328019997834721773857"
+      , Bignum_bigint.of_string
+          "19509931248131549366806268091016515808560677012657535095393179462073374184004"
+      )
+    in
     (* (a * b)P *)
     let a_times_b_expected =
       ( Bignum_bigint.of_string
           "104796198157638974641325627725056289938393733264860209068332598339943619687138"
       , Bignum_bigint.of_string
           "62474612839119693016992187953610680368302121786246432257338185158014628586401"
+      )
+    in
+
+    assert (is_on_curve_bignum_point Secp256k1.params point) ;
+    assert (is_on_curve_bignum_point Secp256k1.params a_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params b_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params a_times_b_expected) ;
+
+    let _cs =
+      test_scalar_mul_properties_multiplication Secp256k1.params a_scalar
+        b_scalar point a_expected b_expected a_times_b_expected
+    in
+    () )
+
+let%test_unit "Ec_group.scalar_mul_properties_negation" =
+  if scalar_mul_tests_enabled then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test elliptic curve scalar multiplication properties *)
+    let test_scalar_mul_properties_negation ?cs (curve : Curve_params.t)
+        (a_scalar : Bignum_bigint.t) (point : Affine.bignum_point)
+        (a_expected_result : Affine.bignum_point)
+        (negation_expected : Affine.bignum_point) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            (* Prepare test public inputs *)
+            let curve =
+              Curve_params.to_circuit_constants (module Runner.Impl) curve
+            in
+            let a_scalar_bits =
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true a_scalar
+            in
+            let point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
+            in
+            let a_expected_result =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                a_expected_result
+            in
+            let negation_expected =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                negation_expected
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* A = aP *)
+            let a_result =
+              scalar_mul
+                (module Runner.Impl)
+                unused_external_checks curve a_scalar_bits point
+            in
+
+            (* Assert aP = expected A *)
+            Affine.assert_equal (module Runner.Impl) a_result a_expected_result ;
+
+            (*
+             * Check scaling computes with negation: [-a]P = -(aP)
+             *)
+
+            (* Compute -a_scalar witness *)
+            let minus_a_scalar_bits =
+              let minus_a_scalar =
+                Bignum_bigint.(-a_scalar % curve.bignum.order)
+              in
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true minus_a_scalar
+            in
+
+            (* [-a]P *)
+            let minus_a_result =
+              scalar_mul
+                (module Runner.Impl)
+                unused_external_checks curve minus_a_scalar_bits point
+            in
+
+            (* -(aP) *)
+            let negated_a_result =
+              negate (module Runner.Impl) unused_external_checks curve a_result
+            in
+            (* Result row: need to write negated y-coordinate to row in order to assert_equal on it *)
+            Foreign_field.result_row
+              (module Runner.Impl)
+              ~label:"negation_property_check"
+              (Affine.y negated_a_result)
+              None ;
+
+            (* Assert [-a]P = -(aP) *)
+            Affine.assert_equal
+              (module Runner.Impl)
+              minus_a_result negated_a_result ;
+            (* Assert -(aP) = expected *)
+            Affine.assert_equal
+              (module Runner.Impl)
+              negated_a_result negation_expected ;
+
+            () )
+      in
+
+      cs
+    in
+
+    (*
+     * EC scalar multiplication properties tests
+     *)
+
+    (* Tests with generator *)
+    let a_scalar =
+      Bignum_bigint.of_string
+        "79401928295407367700174300280555320402843131478792245979539416476579739380993"
+    in
+    (* aG *)
+    let a_expected =
+      ( Bignum_bigint.of_string
+          "17125835931983334217694156357722716412757965999176597307946554943053675538785"
+      , Bignum_bigint.of_string
+          "46388026915780724534166509048612278793220290073988306084942872130687658791661"
+      )
+    in
+    (* [-a]G *)
+    let negation_expected =
+      ( Bignum_bigint.of_string
+          "17125835931983334217694156357722716412757965999176597307946554943053675538785"
+      , Bignum_bigint.of_string
+          "69404062321535470889404475960075629060049694591652257954514711877221175880002"
+      )
+    in
+
+    assert (is_on_curve_bignum_point Secp256k1.params a_expected) ;
+    assert (is_on_curve_bignum_point Secp256k1.params negation_expected) ;
+
+    let _cs =
+      test_scalar_mul_properties_negation Secp256k1.params a_scalar
+        Secp256k1.params.gen a_expected negation_expected
+    in
+
+    (* Tests with another curve point *)
+    let point =
+      ( Bignum_bigint.of_string
+          "33774054739397672981116348681092907963399779523481500939771509974082662984990"
+      , Bignum_bigint.of_string
+          "60414776605185041994402340927179985824709402511452021592188768672640080416757"
+      )
+    in
+    let a_scalar =
+      Bignum_bigint.of_string
+        "101698197574283114939368343806106834988902354006673798485060078476846328099457"
+    in
+    (* aP *)
+    let a_expected =
+      ( Bignum_bigint.of_string
+          "75195284589272297831705973079897644085806639251981864022525558637369799002975"
+      , Bignum_bigint.of_string
+          "21318219854954928210493202207122232794689530644716510309784081397689563830643"
       )
     in
     (* [-a]P *)
@@ -3681,15 +4008,11 @@ let%test_unit "Ec_group.scalar_mul_properties" =
 
     assert (is_on_curve_bignum_point Secp256k1.params point) ;
     assert (is_on_curve_bignum_point Secp256k1.params a_expected) ;
-    assert (is_on_curve_bignum_point Secp256k1.params b_expected) ;
-    assert (is_on_curve_bignum_point Secp256k1.params a_plus_b_expected) ;
-    assert (is_on_curve_bignum_point Secp256k1.params a_times_b_expected) ;
     assert (is_on_curve_bignum_point Secp256k1.params negation_expected) ;
 
     let _cs =
-      test_scalar_mul_properties Secp256k1.params a_scalar b_scalar point
-        a_expected b_expected a_plus_b_expected a_times_b_expected
-        negation_expected
+      test_scalar_mul_properties_negation Secp256k1.params a_scalar point
+        a_expected negation_expected
     in
     () )
 
@@ -3741,7 +4064,6 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
                 (module Runner.Impl)
                 unused_external_checks curve scalar_bits point
             in
-
             (* Check for expected quantity of external checks *)
             if Bignum_bigint.(curve.bignum.a = zero) then
               assert (
@@ -3750,11 +4072,9 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
               assert (
                 Mina_stdlib.List.Length.equal unused_external_checks.bounds 43 ) ;
             assert (
-              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
-                17 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.canonicals 8 ) ;
             assert (
-              Mina_stdlib.List.Length.equal
-                unused_external_checks.compact_multi_ranges 17 ) ;
+              Mina_stdlib.List.Length.equal unused_external_checks.ranges 192 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -3845,11 +4165,9 @@ let%test_unit "Ec_group.scalar_mul_tiny_full" =
             if Bignum_bigint.(curve.bignum.a = zero) then
               assert (Mina_stdlib.List.Length.equal external_checks.bounds 42)
             else assert (Mina_stdlib.List.Length.equal external_checks.bounds 43) ;
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.multi_ranges 17 ) ;
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
-                17 ) ;
+
+            assert (Mina_stdlib.List.Length.equal external_checks.canonicals 8) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.ranges 192) ;
 
             (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
             Foreign_field.constrain_external_checks
