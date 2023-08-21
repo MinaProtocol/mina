@@ -104,12 +104,12 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
         // FIXME: Is the flag computation correct ?
         // Should both xor fields be synced ?
         let feature_flags = FeatureFlags {
-            range_check0: false,
-            range_check1: false,
-            foreign_field_add: false,
-            foreign_field_mul: false,
-            rot: false,
-            xor: false,
+            range_check0: evals.range_check0_comm.is_some(),
+            range_check1: evals.range_check1_comm.is_some(),
+            foreign_field_add: evals.foreign_field_add_comm.is_some(),
+            foreign_field_mul: evals.foreign_field_mul_comm.is_some(),
+            rot: evals.rot_comm.is_some(),
+            xor: evals.xor_comm.is_some(),
             lookup_features: match &lookup_index {
                 None => LookupFeatures {
                     patterns: LookupPatterns {
