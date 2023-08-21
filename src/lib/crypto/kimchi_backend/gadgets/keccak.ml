@@ -254,7 +254,7 @@ let pad_101 (type f)
   (* Return the padded message *)
   message @ Array.to_list pad
 
-(* 
+(*
  * First algrithm in the compression step of Keccak for 64-bit words.
  * C[x] = A[x,0] xor A[x,1] xor A[x,2] xor A[x,3] xor A[x,4]
  * D[x] = C[x-1] xor ROT(C[x+1], 1)
@@ -309,7 +309,7 @@ let theta (type f)
  *     A[X,Y] = a[x,y]
  *   end for
  * end for
- * We use the first index of the state array as the x coordinate and the second index as the y coordinate. 
+ * We use the first index of the state array as the x coordinate and the second index as the y coordinate.
  *)
 let pi_rho (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -326,7 +326,7 @@ let pi_rho (type f)
   done ;
   state_b
 
-(* 
+(*
  * Fourth step of the compression function of Keccak for 64-bit words.
  * F[x,y] = B[x,y] xor ((not B[x+1,y]) and B[x+2,y])
  * It corresponds to the chi algorithm in the Keccak reference.
@@ -334,7 +334,7 @@ let pi_rho (type f)
  *   for x = 0 to 4 do
  *     A[x,y] = a[x,y] xor ((not a[x+1,y]) and a[x+2,y])
  *   end for
- * end for   
+ * end for
  *)
 let chi (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -476,7 +476,7 @@ let squeeze (type f)
   Array.to_list hashed
 
 (* Keccak sponge function for 1600 bits of state width
- * Need to split the message into blocks of 1088 bits. 
+ * Need to split the message into blocks of 1088 bits.
  *)
 let sponge (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -614,7 +614,7 @@ let ethereum (type f)
 
 (* Gagdet for pre-NIST SHA-3 function for output lengths 224/256/384/512.
  * Input and output endianness can be specified. Default is big endian.
- * Note that when calling with output length 256 this is equivalent to the ethereum function 
+ * Note that when calling with output length 256 this is equivalent to the ethereum function
  *)
 let pre_nist (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)

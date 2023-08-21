@@ -158,31 +158,24 @@ module External_checks : sig
   type 'field t =
     { mutable bounds : ('field Cvar.t standard_limbs * bool) list
     ; mutable canonicals : 'field Cvar.t standard_limbs list
-    ; mutable multi_ranges : 'field Cvar.t standard_limbs list
-    ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
-    ; mutable limb_ranges : 'field Cvar.t list
+    ; mutable ranges : 'field Cvar.t list
     }
 
   (** Create a new context *)
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
 
-  (** Track a bound check *)
-  val append_bound_check :
+  (** Register a bound check to be performed *)
+  val add_bound_check :
     'field t -> ?do_multi_range_check:bool -> 'field Element.Standard.t -> unit
 
-  (** Track a canonical check *)
-  val append_canonical_check : 'field t -> 'field Element.Standard.t -> unit
+  (** Register a canonical check to be performed *)
+  val add_canonical_check : 'field t -> 'field Element.Standard.t -> unit
 
-  (** Track a multi-range-check *)
-  val append_multi_range_check :
-    'field t -> 'field Cvar.t standard_limbs -> unit
+  (** Register a multi-range-check to be performed *)
+  val add_multi_range_check : 'field t -> 'field Cvar.t standard_limbs -> unit
 
-  (** Track a compact-multi-range-check *)
-  val append_compact_multi_range_check :
-    'field t -> 'field Cvar.t compact_limbs -> unit
-
-  (** Tracks a limb-range-check *)
-  val append_limb_check : 'field t -> 'field Cvar.t -> unit
+  (** Register a range-check to be performed *)
+  val add_range_check : 'field t -> 'field Cvar.t -> unit
 end
 
 (* Type of operation *)
@@ -197,8 +190,7 @@ type op_mode = Add | Sub
  *
  *    Outputs:
  *      Inserts generic gate to constrain computation of high bound x'2 = x2 + 2^88 - f2 - 1
- *      Adds x to external_checks.multi_ranges
- *      Adds x'2 to external_checks.limb_ranges
+ *      Adds x and x'2 to external_checks.ranges
  *      Returns computed high bound
  *)
 val check_bound :
@@ -211,7 +203,7 @@ val check_bound :
 (* bound *)
 
 (** Gadget to check the supplied value is a canonical foreign field element for the
- * supplied foreign field modulus
+ *  supplied foreign field modulus
  *
  *    This gadget checks in the circuit that a value is less than the foreign field modulus.
  *    Part of this involves computing a bound value that is both added to external_checks
@@ -333,6 +325,7 @@ val result_row :
  *
  *   Inputs:
  *     external_checks       := Context to track required external checks
+ *     bound_check_result    := Option to supress result bound check when not required
  *     left_input            := Multiplicand foreign field element
  *     right_input           := Multiplicand foreign field element
  *     foreign_field_modulus := Must be less than than max foreign field modulus
@@ -345,6 +338,7 @@ val result_row :
 val mul :
      (module Snark_intf.Run with type field = 'f)
   -> 'f External_checks.t (* external_checks *)
+  -> ?bound_check_result:bool
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
