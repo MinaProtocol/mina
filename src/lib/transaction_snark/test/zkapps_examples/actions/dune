@@ -26,6 +26,7 @@
   mina_state
   pickles
   pickles.backend
+  pickles_base
   pickles_types
   random_oracle_input
   random_oracle

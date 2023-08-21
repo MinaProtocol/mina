@@ -9,8 +9,8 @@ open Mina_transaction
 let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
   let keys_per_zkapp = 8 in
   let zkapps_per_block = 10 in
-  let pk_check_wait = Time.Span.of_sec 60. in
-  let pk_check_timeout = Time.Span.of_min 12. in
+  let pk_check_wait = Time.Span.of_sec 10. in
+  let pk_check_timeout = Time.Span.of_min 30. in
   let min_fee =
     Currency.Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee
   in
@@ -248,33 +248,19 @@ let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
       in
       let num_batch_pks = List.length batch_pks in
       Format.eprintf "Number of batch keys: %d@." num_batch_pks ;
-      (* check ledger at intervals for presence of all pks *)
-      let rec check_for_pks () =
-        let%bind res =
-          Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc None port
-        in
-        match res with
-        | Ok (Ok accounts) ->
-            Format.printf "Succesfully downloaded daemon ledger@." ;
-            let key_set =
-              Signature_lib.Public_key.Compressed.Hash_set.of_list
-                (List.map accounts ~f:(fun acct -> acct.public_key))
+      (* check for presence of all pks *)
+      let check_for_pks () =
+        Deferred.List.for_all batch_pks ~f:(fun pk ->
+            let account_id = Account_id.create pk Token_id.default in
+            let%map res =
+              Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_balance.rpc account_id
+                port
             in
-            let pk_count =
-              List.count batch_pks ~f:(fun pk -> Hash_set.mem key_set pk)
-            in
-            Format.eprintf "Number of batch keys in ledger: %d@." pk_count ;
-            Deferred.return (pk_count = num_batch_pks)
-        | Ok (Error err) ->
-            Format.eprintf "Error in getting daemon ledger: %s@."
-              (Error.to_string_hum err) ;
-            let%bind () = after (Time.Span.of_sec 10.) in
-            check_for_pks ()
-        | Error err ->
-            Format.eprintf "Error in getting daemon ledger: %s@."
-              (Error.to_string_hum err) ;
-            let%bind () = after (Time.Span.of_sec 10.) in
-            check_for_pks ()
+            match res with
+            | Ok (Ok (Some balance)) when Currency.Balance.(balance > zero) ->
+                true
+            | Ok (Ok (Some _)) | Ok (Ok None) | Ok (Error _) | Error _ ->
+                false )
       in
       let rec check_loop () =
         let%bind got_pks = check_for_pks () in

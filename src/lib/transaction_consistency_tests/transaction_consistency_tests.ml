@@ -76,7 +76,7 @@ let%test_module "transaction logic consistency" =
     module Sparse_txn_logic = Mina_transaction_logic.Make (Sparse_ledger.L)
 
     let sparse_ledger ledger t =
-      Or_error.try_with ~backtrace:true (fun () ->
+      Or_error.try_with ~here:[%here] ~backtrace:true (fun () ->
           Sparse_ledger.apply_transaction_exn ~constraint_constants
             ~txn_state_view ledger (Transaction.forget t) )
 
@@ -89,7 +89,7 @@ let%test_module "transaction logic consistency" =
       Or_error.map ~f:(const !ledger) target_ledger
 
     let transaction_snark ~source ~target transaction =
-      Or_error.try_with ~backtrace:true (fun () ->
+      Or_error.try_with ~here:[%here] ~backtrace:true (fun () ->
           Transaction_snark.check_transaction ~constraint_constants
             ~sok_message:
               { Sok_message.fee = Fee.zero

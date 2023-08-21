@@ -165,7 +165,7 @@ module Make (Engine : Intf.Engine.S) () :
             condition.description
           |> Malleable_error.soft_error ~value:()
 
-  (**************************************************************************************************)
+  (*************************************************************************************************)
   (* TODO: move into executive module *)
 
   type log_error = Node.t * Event_type.Log_error.t

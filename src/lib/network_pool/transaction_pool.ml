@@ -433,7 +433,7 @@ struct
           else true
 
     let diff_error_of_indexed_pool_error :
-        Indexed_pool.Command_error.t -> Diff_versioned.Diff_error.t = function
+        Command_error.t -> Diff_versioned.Diff_error.t = function
       | Invalid_nonce _ ->
           Invalid_nonce
       | Insufficient_funds _ ->
@@ -450,7 +450,7 @@ struct
           Expired
 
     let indexed_pool_error_metadata = function
-      | Indexed_pool.Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
+      | Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
           let nonce_json = Account.Nonce.to_yojson in
           [ ( "between"
             , `Assoc [ ("low", nonce_json low); ("hi", nonce_json hi) ] )
@@ -758,8 +758,7 @@ struct
       Mina_metrics.(
         Gauge.set Transaction_pool.pool_size
           (Float.of_int (Indexed_pool.size pool))) ;
-      t.pool <- pool ;
-      Deferred.unit
+      t.pool <- pool
 
     let create ~constraint_constants ~consensus_constants ~time_controller
         ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
@@ -992,8 +991,8 @@ struct
       let of_indexed_pool_error e =
         (diff_error_of_indexed_pool_error e, indexed_pool_error_metadata e)
 
-      let report_command_error ~logger ~is_sender_local tx
-          (e : Indexed_pool.Command_error.t) =
+      let report_command_error ~logger ~is_sender_local tx (e : Command_error.t)
+          =
         let diff_err, error_extra = of_indexed_pool_error e in
         if is_sender_local then
           [%str_log error]
@@ -1366,7 +1365,7 @@ struct
         in
         (decision, accepted, rejected)
 
-      let unsafe_apply' (t : pool) (diff : verified Envelope.Incoming.t) :
+      let unsafe_apply (t : pool) (diff : verified Envelope.Incoming.t) :
           ([ `Accept | `Reject ] * t * rejected, _) Result.t =
         match apply t diff with
         | Ok (decision, accepted, rejected) ->
@@ -1386,8 +1385,6 @@ struct
               , List.map ~f:(Tuple2.map_fst ~f:forget_cmd) rejected )
         | Error e ->
             Error (`Other e)
-
-      let unsafe_apply t diff = Deferred.return (unsafe_apply' t diff)
 
       type Structured_log_events.t +=
         | Transactions_received of { txns : t; sender : Envelope.Sender.t }
@@ -1760,7 +1757,7 @@ let%test_module _ =
       assert (List.is_sorted txns ~compare)
 
     let assert_pool_txs test txs =
-      Indexed_pool.For_tests.assert_invariants test.txn_pool.pool ;
+      Indexed_pool.For_tests.assert_pool_consistency test.txn_pool.pool ;
       assert_locally_generated test.txn_pool ;
       assert_fee_wu_ordering test.txn_pool ;
       assert_user_command_sets_equal
@@ -2024,14 +2021,14 @@ let%test_module _ =
                ~libp2p_port:8302 )
       in
       let tm0 = Time.now () in
-      let%bind verified =
+      let%map verified =
         Test.Resource_pool.Diff.verify test.txn_pool
           (Envelope.Incoming.wrap
              ~data:(List.map ~f:User_command.forget_check cs)
              ~sender )
         >>| Or_error.ok_exn
       in
-      let%map result =
+      let result =
         Test.Resource_pool.Diff.unsafe_apply test.txn_pool verified
       in
       let tm1 = Time.now () in
