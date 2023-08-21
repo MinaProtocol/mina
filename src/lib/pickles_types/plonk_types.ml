@@ -1246,27 +1246,34 @@ module Messages = struct
     end]
 
     type 'g t =
-      { sorted : 'g Lookup_sorted_vec.t; aggreg : 'g; runtime : 'g option }
+      { sorted : 'g Lookup_sorted_minus_1_vec.t
+      ; sorted_5th_column : 'g option
+      ; aggreg : 'g
+      ; runtime : 'g option
+      }
     [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
 
     module In_circuit = struct
       type ('g, 'bool) t =
-        { sorted : 'g Lookup_sorted_vec.t
+        { sorted : 'g Lookup_sorted_minus_1_vec.t
+        ; sorted_5th_column : ('g, 'bool) Opt.t
         ; aggreg : 'g
         ; runtime : ('g, 'bool) Opt.t
         }
       [@@deriving hlist]
     end
 
-    let dummy ~runtime_tables z =
+    let dummy ~lookups_per_row_4 ~runtime_tables z =
       { aggreg = z
-      ; sorted = Vector.init Lookup_sorted.n ~f:(fun _ -> z)
+      ; sorted = Vector.init Lookup_sorted_minus_1.n ~f:(fun _ -> z)
+      ; sorted_5th_column = Option.some_if lookups_per_row_4 z
       ; runtime = Option.some_if runtime_tables z
       }
 
-    let typ bool_typ e ~runtime_tables ~dummy =
+    let typ bool_typ e ~lookups_per_row_4 ~runtime_tables ~dummy =
       Snarky_backendless.Typ.of_hlistable
-        [ Vector.typ e Lookup_sorted.n
+        [ Vector.typ e Lookup_sorted_minus_1.n
+        ; Opt.typ bool_typ lookups_per_row_4 e ~dummy
         ; e
         ; Opt.typ bool_typ runtime_tables e ~dummy
         ]
@@ -1274,11 +1281,14 @@ module Messages = struct
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
     let opt_typ bool_typ ~(uses_lookup : Opt.Flag.t)
-        ~(runtime_tables : Opt.Flag.t) ~dummy:z elt =
+        ~(lookups_per_row_4 : Opt.Flag.t) ~(runtime_tables : Opt.Flag.t)
+        ~dummy:z elt =
       Opt.typ bool_typ uses_lookup
         ~dummy:
-          (dummy z ~runtime_tables:Opt.Flag.(not (equal runtime_tables No)))
-        (typ bool_typ ~runtime_tables ~dummy:z elt)
+          (dummy z
+             ~lookups_per_row_4:Opt.Flag.(not (equal lookups_per_row_4 No))
+             ~runtime_tables:Opt.Flag.(not (equal runtime_tables No)) )
+        (typ bool_typ ~lookups_per_row_4 ~runtime_tables ~dummy:z elt)
   end
 
   [%%versioned
@@ -1321,7 +1331,7 @@ module Messages = struct
       ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
       =
     let open Snarky_backendless.Typ in
-    let uses_lookup =
+    let uses_lookup, lookups_per_row_4 =
       let { Features.range_check0
           ; range_check1
           ; foreign_field_add = _ (* Doesn't use lookup *)
@@ -1333,8 +1343,11 @@ module Messages = struct
           } =
         feature_flags
       in
-      Array.reduce_exn ~f:Opt.Flag.( ||| )
-        [| range_check0; range_check1; foreign_field_mul; xor; rot; lookup |]
+      let lookups_per_row_4 =
+        Opt.Flag.(
+          range_check0 ||| range_check1 ||| foreign_field_mul ||| xor ||| rot)
+      in
+      (Opt.Flag.(lookups_per_row_4 ||| lookup), lookups_per_row_4)
     in
     let { Poly.w = w_lens; z; t } = commitment_lengths in
     let array ~length elt = padded_array_typ ~dummy ~length elt in
@@ -1345,8 +1358,8 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     let lookup =
-      Lookup.opt_typ Impl.Boolean.typ ~uses_lookup ~runtime_tables
-        ~dummy:[| dummy |]
+      Lookup.opt_typ Impl.Boolean.typ ~uses_lookup ~lookups_per_row_4
+        ~runtime_tables ~dummy:[| dummy |]
         (wo [ 1 ])
     in
     of_hlistable

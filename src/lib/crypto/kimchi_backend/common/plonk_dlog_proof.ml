@@ -349,8 +349,17 @@ module Make (Inputs : Inputs_intf) = struct
             Option.map t.commitments.lookup
               ~f:(fun l : _ Pickles_types.Plonk_types.Messages.Lookup.t ->
                 { sorted =
-                    Vector.init Pickles_types.Plonk_types.Lookup_sorted.n
+                    Vector.init
+                      Pickles_types.Plonk_types.Lookup_sorted_minus_1.n
                       ~f:(fun i -> (* TODO: Fixme *) wo l.sorted.(i))
+                ; sorted_5th_column =
+                    (* TODO: This is ugly and error-prone *)
+                    Option.try_with (fun () ->
+                        wo
+                          l.sorted.(Nat.to_int
+                                      Pickles_types.Plonk_types
+                                      .Lookup_sorted_minus_1
+                                      .n) )
                 ; aggreg = wo l.aggreg
                 ; runtime = Option.map ~f:wo l.runtime
                 } )
@@ -437,7 +446,10 @@ module Make (Inputs : Inputs_intf) = struct
         ; t_comm = pcwo t_comm
         ; lookup =
             Option.map lookup ~f:(fun t : _ Kimchi_types.lookup_commitments ->
-                { sorted = Array.map ~f:pcwo (Vector.to_array t.sorted)
+                { sorted =
+                    Array.map ~f:pcwo
+                      (Array.append (Vector.to_array t.sorted)
+                         (Option.to_array t.sorted_5th_column) )
                 ; aggreg = pcwo t.aggreg
                 ; runtime = Option.map ~f:pcwo t.runtime
                 } )

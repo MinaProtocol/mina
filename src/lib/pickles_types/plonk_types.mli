@@ -146,11 +146,16 @@ module Messages : sig
     end
 
     type 'g t =
-      { sorted : 'g Lookup_sorted_vec.t; aggreg : 'g; runtime : 'g option }
+      { sorted : 'g Lookup_sorted_minus_1_vec.t
+      ; sorted_5th_column : 'g option
+      ; aggreg : 'g
+      ; runtime : 'g option
+      }
 
     module In_circuit : sig
       type ('g, 'bool) t =
-        { sorted : 'g Lookup_sorted_vec.t
+        { sorted : 'g Lookup_sorted_minus_1_vec.t
+        ; sorted_5th_column : ('g, 'bool) Opt.t
         ; aggreg : 'g
         ; runtime : ('g, 'bool) Opt.t
         }
