@@ -1610,7 +1610,7 @@ let bytes_to_standard_element (type f)
    *
    *   Note: any size (up to 2^259-1) is supported using this kind of reduction
    *)
-  let one = Element.Standard.of_limbs (Field.zero, Field.zero, Field.one) in
+  let one = Element.Standard.one (module Circuit) in
   let output = mul (module Circuit) external_checks elem one fmod in
 
   (* C3: Range check z' < f *)
