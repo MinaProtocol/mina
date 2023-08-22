@@ -959,7 +959,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      Returns ther result
  *)
 let sub (type f) (module Circuit : Snark_intf.Run with type field = f)
-    ?(final = true) (external_checks : f External_checks.t)
+    ?(final = false) (external_checks : f External_checks.t)
     (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
   let final = match final with true -> true | false -> false in
@@ -1677,16 +1677,13 @@ let%test_unit "foreign_field arithmetics gadgets" =
 
             let external_checks = External_checks.create (module Runner.Impl) in
 
-            (* Create the gadget *)
+            (* Create the gadget with final result row *)
             let sum =
               add
                 (module Runner.Impl)
-                external_checks left_input right_input foreign_field_modulus
+                ~final:true external_checks left_input right_input
+                foreign_field_modulus
             in
-            (* Result row *)
-            result_row
-              (module Runner.Impl)
-              ~label:"foreign_field_add_test" sum None ;
 
             (* Check that the inputs were foreign field elements *)
             External_checks.add_bound_check external_checks left_input ;
