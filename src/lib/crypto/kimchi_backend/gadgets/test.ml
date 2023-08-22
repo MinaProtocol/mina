@@ -197,7 +197,7 @@ let%test_unit "keccak ecdsa converter" =
             let _elem =
               Foreign_field.bytes_to_standard_element
                 (module Runner.Impl)
-                ~endian external_checks bytestring secp256k1_modulus 256
+                ~endian external_checks bytestring secp256k1_modulus
             in
 
             constrain_external_checks
