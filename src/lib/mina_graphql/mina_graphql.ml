@@ -4736,10 +4736,9 @@ module Mutations = struct
               ~wait_span ~stop_signal ~stop_time ~uuid keypairs )
           else return ()
         in
-        let%bind accounts = Ledger.to_list ledger in
-        [%log debug] "The accounts were not in the best tip $ledger, try again"
-          ~metadata:
-            [ ("ledger", `List (List.map accounts ~f:Account.to_yojson)) ] ;
+        [%log debug]
+          "Some deployed zkApp accounts weren't found in the best tip ledger, \
+           trying again" ;
         let%bind () =
           Async.after
             (Time.Span.of_ms
