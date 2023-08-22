@@ -188,7 +188,8 @@ module Make
       ( Event_router.on event_router Event_type.Node_initialization
           ~f:(fun node () ->
             update ~f:(fun state ->
-                [%log debug]
+                [%log info]
+                  (* todo: downgrade to debug before landing *)
                   "Updating network state with initialization event of $node"
                   ~metadata:[ ("node", `String (Node.id node)) ] ;
                 let node_initialization' =
@@ -202,11 +203,11 @@ module Make
       ( Event_router.on event_router Event_type.Node_stopped ~f:(fun node () ->
             update ~f:(fun state ->
                 [%log info]
+                  (* todo: downgrade to debug before landing *)
                   "Updating network state with event of $node being stopped \
                    deliberately"
                   ~metadata:[ ("node", `String (Node.id node)) ] ;
 
-                (* todo: downgrade to debug before landing *)
                 let node_initialization' =
                   String.Map.set state.node_initialization ~key:(Node.id node)
                     ~data:false
@@ -261,8 +262,8 @@ module Make
                 [%log info]
                   "Lucy has lost contact with $node, without the node being \
                    deliberately stopped, meaning that the node crashed or was \
-                   somehow taken down.  Lucy will attempt to recover and\n\
-                  \                   restart this node."
+                   somehow taken down.  Lucy will attempt to recover and \
+                   restart this node."
                   ~metadata:[ ("node", `String (Node.id node)) ]
               in
               let (_ : [> `Continue ] Deferred.t) =
@@ -277,9 +278,13 @@ module Make
                       String.Map.set state.node_on ~key:(Node.id node)
                         ~data:true
                     in
+                    let best_tips_by_node' =
+                      String.Map.remove state.best_tips_by_node (Node.id node)
+                    in
                     { state with
                       node_initialization = node_initialization'
                     ; node_on = node_on'
+                    ; best_tips_by_node = best_tips_by_node'
                     } )
               in
               let%bind (_
