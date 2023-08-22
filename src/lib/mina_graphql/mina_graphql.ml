@@ -5629,7 +5629,7 @@ module Queries = struct
                        expensive proof generation step if we don't have one
                        available.
                     *)
-                    Proof.(!blockchain_dummy) )
+                    Lazy.force Proof.blockchain_dummy )
             }
         ; hash
         } )

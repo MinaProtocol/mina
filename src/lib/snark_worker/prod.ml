@@ -284,6 +284,6 @@ module Inputs = struct
           in
           Deferred.Or_error.return
           @@ ( Transaction_snark.create ~statement:{ stmt with sok_digest }
-                 ~proof:Proof.(!transaction_dummy)
+                 ~proof:(Lazy.force Proof.transaction_dummy)
              , Time.Span.zero )
 end
