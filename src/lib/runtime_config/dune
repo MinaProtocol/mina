@@ -8,18 +8,21 @@
    base.caml
    base
    base64
-   sexplib0
+   integers
    result
+   sexplib0
    ;; local libraries
    currency
    data_hash_lib
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_base
+   mina_base.import
    mina_numbers
    signature_lib
    ppx_dhall_type
    snark_params
    unsigned_extended
-   pasta
    pickles
    pickles.backend
    pickles_types
