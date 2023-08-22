@@ -959,7 +959,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      Returns ther result
  *)
 let sub (type f) (module Circuit : Snark_intf.Run with type field = f)
-    ?(final = true) (external_checks : f External_checks.t)
+    ?(final = false) (external_checks : f External_checks.t)
     (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
   let final = match final with true -> true | false -> false in
