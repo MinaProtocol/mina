@@ -3,11 +3,8 @@ open Pickles_types
 open Backend
 open Composition_types
 open Common
-open Lazy.Let_syntax
 
 let _wrap_domains = Common.wrap_domains
-
-let ( ! ) = Lazy.force
 
 let evals =
   lazy
@@ -26,7 +23,7 @@ let evals =
 
 let evals_combined =
   lazy
-    (Plonk_types.All_evals.map !evals ~f1:Fn.id
+    (Plonk_types.All_evals.map (Lazy.force evals) ~f1:Fn.id
        ~f2:(Array.reduce_exn ~f:Backend.Tock.Field.( + )) )
 
 module Ipa = struct
