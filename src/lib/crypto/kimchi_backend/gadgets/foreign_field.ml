@@ -1572,8 +1572,10 @@ let bytes_to_standard_element (type f)
    *)
   let zero = Element.Standard.of_limbs (Field.zero, Field.zero, Field.zero) in
   (* C4: Range check z' < f *)
-  (* Altogether this is a call to Foreign_field.add in default mode *)
-  let output = add (module Circuit) external_checks elem zero fmod in
+  (* Altogether this is a call to Foreign_field.add in final mode *)
+  let output =
+    add (module Circuit) ~final:true external_checks elem zero fmod
+  in
 
   (* return z' *)
   output
@@ -1623,16 +1625,13 @@ let%test_unit "foreign_field arithmetics gadgets" =
 
             let external_checks = External_checks.create (module Runner.Impl) in
 
-            (* Create the gadget *)
+            (* Create the gadget with final result row *)
             let sum =
               add
                 (module Runner.Impl)
-                external_checks left_input right_input foreign_field_modulus
+                ~final:true external_checks left_input right_input
+                foreign_field_modulus
             in
-            (* Result row *)
-            result_row
-              (module Runner.Impl)
-              ~label:"foreign_field_add_test" sum None ;
 
             (* Check that the inputs were foreign field elements *)
             External_checks.add_bound_check external_checks left_input ;
