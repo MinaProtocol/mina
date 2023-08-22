@@ -157,7 +157,7 @@ let%test_unit "custom gates integration" =
   ()
 
 let%test_unit "keccak ecdsa converter" =
-  if tests_enabled then (
+  ( if tests_enabled then
     let (* Import the gadget test runner *)
     open Kimchi_gadgets_test_runner in
     let open Foreign_field in
@@ -358,46 +358,45 @@ let%test_unit "keccak ecdsa converter" =
         ]
     in
 
-    (* NEGATIVE TESTS *)
-    (* Fails because input is larger than 2f *)
-    assert (
-      Common.is_error (fun () ->
-          test_converter
-            [ 0x01
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFF
-            ; 0xFD
-            ; 0xFF
-            ; 0xFF
-            ; 0xF8
-            ; 0x5E
-            ]
-            Keccak.Big ) ) ;
+    (* With FFMul reduction, it does not fail to convert inputs larger than 2f *)
+    let _cs =
+      test_converter
+        [ 0x01
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFF
+        ; 0xFD
+        ; 0xFF
+        ; 0xFF
+        ; 0xF8
+        ; 0x5E
+        ]
+        Keccak.Big
+    in
 
     () ) ;
   ()

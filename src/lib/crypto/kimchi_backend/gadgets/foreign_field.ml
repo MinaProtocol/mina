@@ -1577,9 +1577,8 @@ let standard_element_as_linear_combination_of_bytes (type f)
  * Output:
  * - representation of the bytestring as a foreign field element with standard limbs
  * Note:
- * For this helper to work as expected, the bytestring is assumed to have 
- * at most `fmod_bitlen` bits in length. If that was not the case, the 
- * constraints in the canonical check in the conversion would fail.
+ * If the input bitlength represents a value that is larger than the foreign modulus,
+ * then the converter can obtain image conflicts. 
  *)
 let bytes_to_standard_element (type f)
     (module Circuit : Snark_intf.Run with type field = f)
@@ -1600,30 +1599,21 @@ let bytes_to_standard_element (type f)
     standard_element_as_linear_combination_of_bytes (module Circuit) bytestring
   in
 
-  (* Check modulus_bit_length = # of bits you unpack
-   * This is partly implicit in the circuit given the number of byte outputs of Keccak:
-   * · input_bitlen < fmod_bitlen : OK
-   * · input_bitlen = fmod_bitlen : OK
-   * · input_bitlen > fmod_bitlen : CONSTRAIN
-   * If bit length of unpacked bits is at most fmod_bitlen,
-   * then elem will be at most twice the foreign modulus.
-   * and one single reduction with FFAdd will be enough.
-   *)
+  (* Check that input is in correct limb shape is implicit from linear combination of bytes *)
+  (* Meaning, no need to add a multi range check for elem *)
 
   (* C2: Reduce z modulo foreign_field_modulus
    *
-   *   Constrain z' = z + 0 modulo foreign_field_modulus using foreign field addition gate
+   *   Constrain z = z' mod foreign_field_modulus using foreign field multiplication gate
    *
-   *   Note: doing this once is sufficient because z cannot be larger than double the size due to bit length constraint
+   *   z * 1 = q * f + z' 
+   *
+   *   Note: any size (up to 2^259-1) is supported using this kind of reduction
    *)
-  let zero = Element.Standard.of_limbs (Field.zero, Field.zero, Field.zero) in
-  (* C3: Range check z' < f *)
-  (* Altogether this is a call to Foreign_field.add in final=true mode *)
-  (* with a canonical check for the output *)
-  let output =
-    add (module Circuit) ~final:true external_checks elem zero fmod
-  in
+  let one = Element.Standard.of_limbs (Field.zero, Field.zero, Field.one) in
+  let output = mul (module Circuit) external_checks elem one fmod in
 
+  (* C3: Range check z' < f *)
   (* Constrain the canonical value <f of the result *)
   let _bound = check_canonical (module Circuit) external_checks output fmod in
 
