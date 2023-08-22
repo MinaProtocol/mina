@@ -1567,41 +1567,6 @@ let standard_element_as_linear_combination_of_bytes (type f)
 
   Element.Standard.of_limbs limbs
 
-(* Helper to constrain that a foreign element given as Element.Standard has at most a given number of bits in length *)
-let bitlen_of_standard_element_is_at_most (type f)
-    (module Circuit : Snark_intf.Run with type field = f)
-    (external_checks : f External_checks.t) (element : f Element.Standard.t)
-    (target_bitlen : int) : unit =
-  let open Circuit in
-  let _elem0, _elem1, elem2 = Element.Standard.to_limbs element in
-
-  (* We want to check element < 2^target_bitlen
-   * · We express 2^target_bitlen as a constant standard field element: max0, max1, max2
-   * · Now we must check that the high limb of elem is less or equal than max_2
-   * · RangeCheck0 of result of : elem2 + 2^88 - max_2 < 2^88
-   *)
-
-  (* Create variable for 2^88 *)
-  let two_to_limb_f = two_to_limb_field (module Circuit) in
-  let two_to_limb_var = exists Field.typ ~compute:(fun () -> two_to_limb_f) in
-  Field.Assert.equal (Field.constant two_to_limb_f) two_to_limb_var ;
-
-  (* Obtain high limb of 2^fmod_bitlen *)
-  let max_bitlen =
-    Element.Standard.check_here_const_of_bignum_bigint
-      (module Circuit)
-      Bignum_bigint.(pow (of_int 2) (of_int target_bitlen))
-  in
-  let _max0, _max1, max2 = Element.Standard.to_limbs max_bitlen in
-
-  (* Compute high limb which must be < 2^88 *)
-  let high_limb = Field.(elem2 + two_to_limb_var - max2) in
-
-  (* Track check that result high limb is at most 88 bits *)
-  External_checks.add_range_check external_checks high_limb ;
-
-  ()
-
 (* Gadget to constrain conversion of bytes array (output of Keccak gadget)
  * into foreign field element with standard limbs (input of ECDSA gadget).
  * Inputs: 
@@ -1609,19 +1574,17 @@ let bitlen_of_standard_element_is_at_most (type f)
  * - external_checks: tracking of all external checks that need to be constrained
  * - bytestring: bytes list to be converted
  * - fmod: foreign field modulus of the target field
- * - fmod_bitlen: bit length of the foreign field modulus
  * Output:
  * - representation of the bytestring as a foreign field element with standard limbs
  * Note:
  * For this helper to work as expected, the bytestring is assumed to have 
- * at most `fmod_bitlen` bits in length.
- * If that was not the case, the constraints in the conversion will fail.
+ * at most `fmod_bitlen` bits in length. If that was not the case, the 
+ * constraints in the canonical check in the conversion would fail.
  *)
 let bytes_to_standard_element (type f)
     (module Circuit : Snark_intf.Run with type field = f)
     ~(endian : Keccak.endianness) (external_checks : f External_checks.t)
-    (bytestring : Circuit.Field.t list) (fmod : f standard_limbs)
-    (fmod_bitlen : int) =
+    (bytestring : Circuit.Field.t list) (fmod : f standard_limbs) =
   let open Circuit in
   assert (not (List.is_empty bytestring)) ;
   (* Make the input bytestring a little endian value *)
@@ -1637,28 +1600,24 @@ let bytes_to_standard_element (type f)
     standard_element_as_linear_combination_of_bytes (module Circuit) bytestring
   in
 
-  (* C2: Check modulus_bit_length = # of bits you unpack
+  (* Check modulus_bit_length = # of bits you unpack
    * This is partly implicit in the circuit given the number of byte outputs of Keccak:
    * · input_bitlen < fmod_bitlen : OK
    * · input_bitlen = fmod_bitlen : OK
    * · input_bitlen > fmod_bitlen : CONSTRAIN
-   * Use helper for that with target_bitlen = fmod_bitlen.
-   * If it is satisfied, then elem is at most twice the foreign modulus
+   * If bit length of unpacked bits is at most fmod_bitlen,
+   * then elem will be at most twice the foreign modulus.
+   * and one single reduction with FFAdd will be enough.
    *)
-  bitlen_of_standard_element_is_at_most
-    (module Circuit)
-    external_checks elem fmod_bitlen ;
 
-  (* Tracking that high limb of elem < 2^88 is implicit from the linear combination of bytes into limbs *)
-
-  (* C3: Reduce z modulo foreign_field_modulus
+  (* C2: Reduce z modulo foreign_field_modulus
    *
    *   Constrain z' = z + 0 modulo foreign_field_modulus using foreign field addition gate
    *
    *   Note: doing this once is sufficient because z cannot be larger than double the size due to bit length constraint
    *)
   let zero = Element.Standard.of_limbs (Field.zero, Field.zero, Field.zero) in
-  (* C4: Range check z' < f *)
+  (* C3: Range check z' < f *)
   (* Altogether this is a call to Foreign_field.add in final=true mode *)
   (* with a canonical check for the output *)
   let output =
