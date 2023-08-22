@@ -43,7 +43,6 @@ module Network_config = struct
     }
   [@@deriving to_yojson]
 
-  (* TODO: replace with t' *)
   type t =
     { debug_arg : bool
     ; genesis_keypairs :
@@ -57,22 +56,6 @@ module Network_config = struct
                  map )] )
     ; constants : Test_config.constants
     ; config : config
-    }
-  [@@deriving to_yojson]
-
-  (* TODO: remove *)
-  type t' =
-    { debug_arg : bool
-    ; genesis_keypairs :
-        (Network_keypair.t Core.String.Map.t
-        [@to_yojson
-          fun map ->
-            `Assoc
-              (Core.Map.fold_right ~init:[]
-                 ~f:(fun ~key:k ~data:v accum ->
-                   (k, Network_keypair.to_yojson v) :: accum )
-                 map )] )
-    ; constants : Test_config.constants
     }
   [@@deriving to_yojson]
 
@@ -211,10 +194,8 @@ module Network_config = struct
           Some
             { base =
                 Accounts
-                  (let tuplist = String.Map.data genesis_ledger_accounts in
-                   List.map tuplist ~f:(fun tup ->
-                       let acct, _ = tup in
-                       acct ) )
+                  ( String.Map.data genesis_ledger_accounts
+                  |> List.map ~f:(fun tup -> fst tup) )
             ; add_genesis_winner = None
             ; num_accounts = None
             ; balances = []
@@ -277,6 +258,7 @@ module Network_config = struct
       ; mina_archive_base_url ^ "zkapp_tables.sql"
       ]
     in
+    let before = Time.now () in
     let genesis_keypairs =
       String.Map.of_alist_exn
         (List.map (String.Map.to_alist genesis_ledger_accounts)
@@ -284,6 +266,9 @@ module Network_config = struct
              let kp_name, (_, (pk, sk)) = element in
              (kp_name, mk_net_keypair kp_name (pk, sk)) ) )
     in
+    [%log trace] "Genesis keypairs (%d): %s"
+      (String.Map.length genesis_keypairs)
+      Time.(abs_diff before @@ now () |> Span.to_string) ;
     let snark_coordinator_config =
       match snark_coordinator with
       | None ->
@@ -495,8 +480,7 @@ module Network_deployed = struct
           raise @@ Invalid_entry (Yojson.Safe.to_string t)
     in
     function
-    | (`Assoc [ ("network_id", `String network_id); ("nodes", `List nodes) ] :
-        Yojson.Safe.t ) ->
+    | `Assoc [ ("network_id", `String network_id); ("nodes", `List nodes) ] ->
         Ok (List.fold nodes ~init:Core.String.Map.empty ~f:(f network_id))
     | `Assoc [ ("network_id", `String _network_id) ] ->
         (* TODO: remove *)
