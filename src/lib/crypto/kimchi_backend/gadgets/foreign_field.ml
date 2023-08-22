@@ -1598,7 +1598,7 @@ let bitlen_of_standard_element_is_at_most (type f)
   let high_limb = Field.(elem2 + two_to_limb_var - max2) in
 
   (* Track check that result high limb is at most 88 bits *)
-  External_checks.append_limb_check external_checks high_limb ;
+  External_checks.add_range_check external_checks high_limb ;
 
   ()
 
