@@ -351,10 +351,20 @@ val mul :
   -> 'f Element.Standard.t
 (* remainder *)
 
-(** Gadget to constrain conversion of bytes list (e.g. output of Keccak gadget)
- *  into a foreign field element (e.g. input of ECDSA gadget).
- *
- *  Parameters: endianness of the bytes list
+(** Gadget to constrain conversion of bytes array (output of Keccak gadget)
+ * into foreign field element with standard limbs (input of ECDSA gadget).
+ * Inputs: 
+ * - endian: endianness of the bytes list
+ * - external_checks: tracking of all external checks that need to be constrained
+ * - bytestring: bytes list to be converted
+ * - fmod: foreign field modulus of the target field
+ * - fmod_bitlen: bit length of the foreign field modulus
+ * Output:
+ * - representation of the bytestring as a foreign field element with standard limbs
+ * Note:
+ * For this helper to work as expected, the bytestring is assumed to have 
+ * at most `fmod_bitlen` bits in length.
+ * If that was not the case, the constraints in the conversion will fail.
  *)
 val bytes_to_standard_element :
      (module Snark_intf.Run with type field = 'f)

@@ -1565,7 +1565,18 @@ let bitlen_of_standard_element_is_at_most (type f)
 
 (* Gadget to constrain conversion of bytes array (output of Keccak gadget)
  * into foreign field element with standard limbs (input of ECDSA gadget).
- * Include the endianness of the bytes list.
+ * Inputs: 
+ * - endian: endianness of the bytes list
+ * - external_checks: tracking of all external checks that need to be constrained
+ * - bytestring: bytes list to be converted
+ * - fmod: foreign field modulus of the target field
+ * - fmod_bitlen: bit length of the foreign field modulus
+ * Output:
+ * - representation of the bytestring as a foreign field element with standard limbs
+ * Note:
+ * For this helper to work as expected, the bytestring is assumed to have 
+ * at most `fmod_bitlen` bits in length.
+ * If that was not the case, the constraints in the conversion will fail.
  *)
 let bytes_to_standard_element (type f)
     (module Circuit : Snark_intf.Run with type field = f)
