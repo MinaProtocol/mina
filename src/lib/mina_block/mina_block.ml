@@ -25,7 +25,7 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
     let body = Staged_ledger_diff.Body.create Staged_ledger_diff.empty_diff in
     let header =
       Header.create ~protocol_state
-        ~protocol_state_proof:Proof.(!blockchain_dummy)
+        ~protocol_state_proof:(Lazy.force Proof.blockchain_dummy)
         ~delta_block_chain_proof:
           (Protocol_state.previous_state_hash protocol_state, [])
         ()

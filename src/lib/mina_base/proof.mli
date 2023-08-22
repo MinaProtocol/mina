@@ -6,8 +6,6 @@ val blockchain_dummy : t lazy_t
 
 val transaction_dummy : t lazy_t
 
-val ( ! ) : 'a lazy_t -> 'a
-
 [%%versioned:
 module Stable : sig
   [@@@no_toplevel_latest_type]

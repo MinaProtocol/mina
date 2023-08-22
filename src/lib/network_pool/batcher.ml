@@ -533,7 +533,7 @@ module Snark_pool = struct
           let message = Mina_base.Sok_message.create ~fee ~prover in
           ( One_or_two.map statements ~f:(fun statement ->
                 Ledger_proof.create ~statement ~sok_digest
-                  ~proof:Proof.(!transaction_dummy) )
+                  ~proof:(Lazy.force Proof.transaction_dummy) )
           , message )
         in
         Envelope.Incoming.gen data_gen

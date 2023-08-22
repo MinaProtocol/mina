@@ -361,7 +361,7 @@ module For_tests = struct
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
                       ~sok_digest:Sok_message.Digest.default
-                      ~proof:Proof.(!transaction_dummy) )
+                      ~proof:(Lazy.force Proof.transaction_dummy) )
             ; prover
             }
       in
@@ -459,7 +459,7 @@ module For_tests = struct
       let next_block =
         let header =
           Mina_block.Header.create ~protocol_state
-            ~protocol_state_proof:Proof.(!blockchain_dummy)
+            ~protocol_state_proof:(Lazy.force Proof.blockchain_dummy)
             ~delta_block_chain_proof:(previous_state_hashes.state_hash, [])
             ()
         in

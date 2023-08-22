@@ -6,8 +6,6 @@ let blockchain_dummy = lazy (Dummy_values.blockchain_proof ())
 
 let transaction_dummy = lazy (Dummy_values.transaction_proof ())
 
-let ( ! ) = Lazy.force
-
 [%%versioned
 module Stable = struct
   module V2 = struct
