@@ -319,46 +319,85 @@ let%test_unit "keccak ecdsa converter" =
         Keccak.Little
     in
 
+    (* This test now passes because 2^256 (the input) - f fits in f, even if it takes 257 bits *)
+    let _cs =
+      test_converter
+        [ 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x00
+        ; 0x01
+        ]
+    in
+
     (* NEGATIVE TESTS *)
-    (* Fails because input is larger than 256 bits *)
+    (* Fails because input is larger than 2f *)
     assert (
       Common.is_error (fun () ->
           test_converter
-            [ 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x00
-            ; 0x01
+            [ 0x01
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFF
+            ; 0xFD
+            ; 0xFF
+            ; 0xFF
+            ; 0xF8
+            ; 0x5E
             ]
-            Keccak.Little ) ) ;
+            Keccak.Big ) ) ;
 
     () ) ;
   ()
