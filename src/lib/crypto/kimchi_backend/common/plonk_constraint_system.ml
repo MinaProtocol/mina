@@ -308,6 +308,7 @@ module Plonk_constraint = struct
           }
       | AddFixedLookupTable of { id : int32; data : 'f array array }
       | AddRuntimeTableCfg of { id : int32; first_column : 'f array }
+      | RuntimeLookup of { table_id : 'v; idx : 'v; v : 'v }
       | Raw of
           { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
     [@@deriving sexp]
@@ -625,6 +626,8 @@ module Plonk_constraint = struct
           AddFixedLookupTable { id; data }
       | AddRuntimeTableCfg { id; first_column } ->
           AddRuntimeTableCfg { id; first_column }
+      | RuntimeLookup { table_id; idx; v } ->
+          RuntimeLookup { table_id = f table_id; idx = f idx; v = f v }
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
 
@@ -727,14 +730,13 @@ type ('f, 'rust_gates) t =
        The finalized tag contains the digest of the circuit.
     *)
     mutable gates : ('f, 'rust_gates) circuit
+        (* Witnesses values corresponding to each runtime lookups *)
+  ; mutable runtime_lookups : (V.t * (V.t * V.t)) list
         (* The user-provided lookup tables associated with this circuit. *)
   ; mutable fixed_lookup_tables : 'f fixed_lookup_tables
         (* The user-provided runtime table configurations associated with this
             circuit. *)
   ; mutable runtime_tables_cfg : 'f runtime_tables_cfg
-        (** The witness values corresponding to each lookup *)
-  ; mutable lookups : (Internal_var.t * (Internal_var.t * Internal_var.t)) list
-        (** The user-provided lookup tables associated with this circuit. *)
   ; (* The row to use the next time we add a constraint. *)
     mutable next_row : int
   ; (* The size of the public input (which fills the first rows of our constraint system. *)
@@ -929,34 +931,48 @@ end = struct
                 res.(col_idx).(row_idx) <- value ;
                 Hashtbl.set internal_values ~key:var ~data:value ) ) ;
 
-    (* Set up the runtime table structure. *)
-    let runtime_tables =
-      match sys.runtime_lookup_tables_cfg with
-      | Unfinalized_runtime_rev _ ->
+    let module MapRuntimeTable = struct
+      module T = struct
+        type t = int32 * Fp.t [@@deriving hash, sexp, compare]
+      end
+
+      include T
+      include Core_kernel.Hashable.Make (T)
+    end in
+    let map_runtime_tables = MapRuntimeTable.Table.create () in
+    let runtime_tables : Fp.t Kimchi_types.runtime_table array =
+      match sys.runtime_tables_cfg with
+      | Unfinalized_runtime_tables_cfg_rev _ ->
           failwith
             "Attempted to generate a witness for an unfinalized constraint \
              system"
-      | Compiled_runtime cfgs ->
-          Array.map cfgs
-            ~f:(fun
-                 { Kimchi_types.id; first_column }
-                 :
-                 _ Kimchi_types.runtime_table
-               -> { id; data = Array.map first_column ~f:(fun _ -> Fp.zero) } )
+      | Compiled_runtime_tables_cfg cfgs ->
+          Array.mapi cfgs ~f:(fun rt_idx { Kimchi_types.id; first_column } ->
+              let data =
+                Array.mapi first_column ~f:(fun i v ->
+                    ignore
+                    @@ MapRuntimeTable.Table.add map_runtime_tables ~key:(id, v)
+                         ~data:(i, rt_idx) ;
+                    (* default padding value for lookup *)
+                    Fp.zero )
+              in
+              let rt : Fp.t Kimchi_types.runtime_table = { id; data } in
+              rt )
     in
 
     (* Fill in the used entries of the runtime lookup tables. *)
-    List.iter sys.lookups ~f:(fun (id, (first, second)) ->
-        (* TODO: Update the entries in runtime_tables, filling in [second] in the
-           positions determined by [first].
-           This probably requires a map (id, first) => second_pos.
-        *)
-        let compute_value x = compute @@ find sys.internal_vars x in
-        let id = compute_value id in
-        let first = compute_value first in
-        let second = compute_value second in
-        ignore ((id, first, second) : _ * _ * _) ) ;
-
+    List.iter sys.runtime_lookups ~f:(fun (id, (idx, v)) ->
+        let compute_value x = compute ([ (Fp.one, x) ], None) in
+        let vid = compute_value id in
+        let vidx = compute_value idx in
+        let vv = compute_value v in
+        (* FIXME: we should have a int32 here. We are not sure the ID will be a
+           int32. We should enforce that *)
+        let id_int32 = Int32.of_string @@ Fp.to_string vid in
+        (* FIXME: make a better exception. Open an GH issue and link here *)
+        let i, rt_idx = Hashtbl.find_exn map_runtime_tables (id_int32, vidx) in
+        let rt = runtime_tables.(rt_idx) in
+        rt.data.(i) <- vv ) ;
     (* Return the witness. *)
     (res, runtime_tables)
 
@@ -977,6 +993,7 @@ end = struct
     ; prev_challenges = Set_once.create ()
     ; internal_vars = Internal_var.Table.create ()
     ; gates = Unfinalized_rev [] (* Gates.create () *)
+    ; runtime_lookups = []
     ; fixed_lookup_tables = Unfinalized_fixed_lookup_tables_rev []
     ; runtime_tables_cfg = Unfinalized_runtime_tables_cfg_rev []
     ; rows_rev = []
@@ -2206,6 +2223,19 @@ end = struct
             failwith
               "Trying to add a runtime table configuration  it has been \
                already finalized" )
+    | Plonk_constraint.T (RuntimeLookup { table_id; idx; v }) ->
+        (* FIXME: at the moment, we only do one runtime lookup per row, but
+                    we could do up to 3 within the same table.
+           TODO: open a GitHub issue and link here *)
+        (* Would be nice to have a nicer data structures than a list of tuples to
+           help the runtime table construction *)
+        let red_table_id = reduce_to_v table_id in
+        let red_idx = reduce_to_v idx in
+        let red_v = reduce_to_v v in
+        sys.runtime_lookups <-
+          (red_table_id, (red_idx, red_v)) :: sys.runtime_lookups ;
+        let vars_curr = [| Some red_table_id; Some red_idx; Some red_v |] in
+        add_row sys vars_curr Lookup [||]
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->
