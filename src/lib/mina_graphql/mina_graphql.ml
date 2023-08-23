@@ -5253,10 +5253,14 @@ module Mutations = struct
                               let staking_uuid = find_uuid "staking" in
                               let next_uuid = find_uuid "next" in
                               let rm_epoch_ledger uuid =
-                                let filename =
+                                let path =
                                   conf_dir ^/ sprintf "epoch_ledger%s" uuid
                                 in
-                                Sys.remove filename
+                                match%bind Sys.file_exists path with
+                                | `Yes ->
+                                    File_system.remove_dir path
+                                | `No | `Unknown ->
+                                    Deferred.unit
                               in
                               let%bind () = rm_epoch_ledger staking_uuid in
                               rm_epoch_ledger next_uuid
