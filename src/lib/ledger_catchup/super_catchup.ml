@@ -384,7 +384,7 @@ module Downloader = struct
           , Mina_block.blockchain_length t )
       end)
       (struct
-        type t = (State_hash.t * Length.t) option
+        type t = (State_hash.t * Length.t) option [@@deriving to_yojson]
       end)
 end
 
@@ -1078,7 +1078,8 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
                   `Some [] ) )
     in
     O1trace.thread "super_catchup_downloader" (fun () ->
-        Downloader.create ~stop ~trust_system ~preferred:[] ~max_batch_size:5
+        Downloader.create ~logger ~stop ~trust_system ~preferred:[]
+          ~max_batch_size:5
           ~get:(fun peer hs ->
             let sec =
               let sec_per_block =

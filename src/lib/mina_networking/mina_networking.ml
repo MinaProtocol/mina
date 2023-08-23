@@ -1728,7 +1728,7 @@ let glue_sync_ledger :
       Broadcast_pipe.create
         (Option.value_exn (Linear_pipe.peek query_reader) |> fst)
     in
-    Sl_downloader.create ~preferred ~max_batch_size:100
+    Sl_downloader.create ~logger:t.logger ~preferred ~max_batch_size:100
       ~peers:(fun () -> peers t)
       ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
       ~trust_system:t.trust_system
