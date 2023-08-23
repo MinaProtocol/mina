@@ -1584,7 +1584,6 @@ let bytes_to_standard_element (type f)
     (module Circuit : Snark_intf.Run with type field = f)
     ~(endian : Keccak.endianness) (external_checks : f External_checks.t)
     (bytestring : Circuit.Field.t list) (fmod : f standard_limbs) =
-  let open Circuit in
   assert (not (List.is_empty bytestring)) ;
   (* Make the input bytestring a little endian value *)
   let bytestring =

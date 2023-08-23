@@ -173,7 +173,7 @@ let%test_unit "keccak ecdsa converter" =
      * The circuit being created is the following:
      * - 
      *)
-    let test_converter ?cs bytestring endian =
+    let test_converter ?cs ?expected bytestring endian =
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
@@ -194,7 +194,7 @@ let%test_unit "keccak ecdsa converter" =
 
             let external_checks = External_checks.create (module Runner.Impl) in
 
-            let _elem =
+            let elem =
               Foreign_field.bytes_to_standard_element
                 (module Runner.Impl)
                 ~endian external_checks bytestring secp256k1_modulus
@@ -203,6 +203,14 @@ let%test_unit "keccak ecdsa converter" =
             constrain_external_checks
               (module Runner.Impl)
               external_checks secp256k1_modulus ;
+
+            ( if Option.is_some expected then
+              Foreign_field.Element.Standard.(
+                assert_equal
+                  (module Runner.Impl)
+                  elem
+                  ( of_bignum_bigint (module Runner.Impl)
+                  @@ Option.value_exn expected )) ) ;
             () )
       in
       cs
@@ -320,8 +328,10 @@ let%test_unit "keccak ecdsa converter" =
     in
 
     (* This test now passes because 2^256 (the input) - f fits in f, even if it takes 257 bits *)
+    (* Setting expected conversion to 2^256-f to make sure that it works as expected ("one" in FFMul correctly working)*)
     let _cs =
       test_converter
+        ~expected:(Bignum_bigint.of_int 4294968273)
         [ 0x00
         ; 0x00
         ; 0x00
