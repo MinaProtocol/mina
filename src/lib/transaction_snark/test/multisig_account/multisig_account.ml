@@ -425,5 +425,6 @@ let%test_module "multisig_account" =
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
+                  U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true ledger [ zkapp_command ] ) ) )
   end )

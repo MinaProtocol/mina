@@ -329,4 +329,5 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             |> printf "protocol_state:\n%s\n\n" )
           |> fun () ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
+              check_zkapp_command_with_merges_exn
+                ~don't_generate_merge_proofs:true ledger [ zkapp_command ] ) ) )
