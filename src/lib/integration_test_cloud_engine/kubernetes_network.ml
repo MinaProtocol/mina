@@ -37,12 +37,15 @@ module Node = struct
   type t =
     { app_id : string
     ; mutable pod_ids : string list
+          (* even though pod_ids is a list, there will only be 1 pod per node, except snark workers. *)
     ; pod_info : pod_info
     ; config : config
     ; event_writer : (t * Event_type.event) Pipe.Writer.t
     }
 
   let id { app_id; _ } = app_id
+
+  let infra_id { pod_ids; _ } = List.hd_exn pod_ids
 
   let refresh_pod_ids_of_node t =
     let%bind cwd = Unix.getcwd () in
