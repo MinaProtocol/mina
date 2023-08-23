@@ -11,8 +11,8 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
-	peer "github.com/libp2p/go-libp2p/core/peer"
-	peerstore "github.com/libp2p/go-libp2p/core/peerstore"
+	peer "github.com/libp2p/go-libp2p-core/peer"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 )
 
 type AddPeerReqT = ipc.Libp2pHelperInterface_AddPeer_Request
@@ -41,7 +41,7 @@ func (m AddPeerReq) handle(app *app, seqno uint64) *capnp.Message {
 	}
 
 	app.AddedPeers = append(app.AddedPeers, *info)
-	app.P2p.GatingState().TrustedPeers[info.ID] = struct{}{}
+	app.P2p.GatingState().TrustedPeers.Add(info.ID)
 
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
