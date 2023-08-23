@@ -315,6 +315,7 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 - Exit code `14` will be returned if any pods enter a failure state while waiting for all pods to be assigned to nodes.
 - Exit code `20` will be returned if any testnet nodes hard timed-out on initialization
 - Exit code `30` will be returned if any testnet node crashes for it's own organic reasons, unrelated to the Lucy framework and unrelated to infrastructure reasons.
+- Exit code `31` will be returned if any testnet node crashes because it took up too up too much memory and ran out.  This failure is unrelated to Lucy framework or to any infrastructure reasons.
 
 ![totally heterosexual and entirely becoming of good christian victorian woman behavior](https://user-images.githubusercontent.com/3465290/213062986-35ab48cc-d57f-4348-bda2-a8a504944cb5.png)
 |---|
