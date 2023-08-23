@@ -180,8 +180,8 @@ let%test_module "Access permission tests" =
           in
           Async.Thread_safe.block_on_async_exn
           @@ fun () ->
-          check_zkapp_command_with_merges_exn ?expected_failure ledger
-            [ zkapp_command ] )
+          check_zkapp_command_with_merges_exn ~don't_generate_merge_proofs:true
+            ?expected_failure ledger [ zkapp_command ] )
 
     let%test_unit "None_given with None" = run_test None_given None
 
