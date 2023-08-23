@@ -23,7 +23,7 @@ open Async
 open Mina_net2
 
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
+(* open Inline_test_quiet_logs *)
 
 type status = NotMet | Connected | Disconnected [@@deriving sexp]
 
@@ -75,7 +75,7 @@ let%test_module "all-ipc test" =
 
     let topic_c = "topic/c"
 
-    let bob_status =
+    let bob_status_text =
       "This is major Tom to ground control\nI'm stepping through the door"
 
     type messages =
@@ -119,25 +119,37 @@ let%test_module "all-ipc test" =
       ; y_peerid : string
       }
 
-    let rec iteratePcWhile label pc ls ~pred =
-      let checkDo (status, expectedPid) pid conn =
-        match (!status, conn, String.equal pid expectedPid) with
-        | NotMet, true, true ->
-            status := Connected ;
-            true
-        | NotMet, false, true ->
-            status := Disconnected ;
-            true
-        | Connected, true, true ->
-            true
-        | Disconnected, false, true ->
-            true
-        | Connected, false, true ->
-            status := Disconnected ;
-            true
-        | _, _, _ ->
-            false
+    let check_do (status, expectedPid) pid conn =
+      match (!status, conn) with
+      | _ when not (String.equal pid expectedPid) ->
+          false
+      | NotMet, true ->
+          status := Connected ;
+          true
+      | NotMet, false ->
+          status := Disconnected ;
+          true
+      | Connected, true ->
+          true
+      | Disconnected, false ->
+          true
+      | Connected, false ->
+          status := Disconnected ;
+          true
+      | Disconnected, true ->
+          false
+
+    let handle_read ls label (conn, pid) =
+      [%log info]
+        (if conn then "Connected $pid" else "Disconnected $pid")
+        ~metadata:[ ("pid", `String pid); ("label", `String label) ] ;
+      let allFine : bool =
+        List.fold ls ~init:false ~f:(fun b p -> b || check_do p pid conn)
       in
+      if not allFine then
+        raise (UnexpectedPeerConnectionStatus (label, conn, pid))
+
+    let rec iterate_while label pc ls ~pred =
       if pred () then Deferred.unit
       else
         Pipe.read pc
@@ -146,33 +158,26 @@ let%test_module "all-ipc test" =
         | `Eof ->
             raise (UnexpectedEof label)
         | `Ok (conn, pid) ->
-            [%log info]
-              (if conn then "Connected $pid" else "Disconnected $pid")
-              ~metadata:[ ("pid", `String pid); ("label", `String label) ] ;
-            let allFine : bool =
-              List.fold ls ~init:false ~f:(fun b p -> b || checkDo p pid conn)
-            in
-            if not allFine then
-              raise (UnexpectedPeerConnectionStatus (label, conn, pid)) ;
-            iteratePcWhile label pc ~pred ls
+            handle_read ls label (conn, pid) ;
+            iterate_while label pc ~pred ls
 
     let alice a ad (pc, _) msgs =
-      let bobStatus = ref NotMet in
-      let carolStatus = ref NotMet in
-      let yotaStatus = ref NotMet in
-      let pcLs =
-        [ (bobStatus, ad.b_peerid)
-        ; (carolStatus, ad.c_peerid)
-        ; (yotaStatus, ad.y_peerid)
+      let bob_status = ref NotMet in
+      let carol_status = ref NotMet in
+      let yota_status = ref NotMet in
+      let pc_ls =
+        [ (bob_status, ad.b_peerid)
+        ; (carol_status, ad.c_peerid)
+        ; (yota_status, ad.y_peerid)
         ]
       in
-      let pcIter pred = iteratePcWhile "alice" pc pcLs ~pred in
+      let iter_while pred = iterate_while "alice" pc pc_ls ~pred in
       (* Connect Alice to Bob *)
       let%bind () = add_peer a ad.b_addr ~is_seed:false >>| Or_error.ok_exn in
       (* Await connection from Bob to Alice to succeed *)
       let%bind () =
-        pcIter (fun () ->
-            match !bobStatus with
+        iter_while (fun () ->
+            match !bob_status with
             | NotMet ->
                 false
             | Connected ->
@@ -187,8 +192,8 @@ let%test_module "all-ipc test" =
       (* Await Carol to connect *)
       (* This is done mainly to test PeerConnected upcall *)
       let%bind () =
-        pcIter (fun () ->
-            match !carolStatus with
+        iter_while (fun () ->
+            match !carol_status with
             | NotMet ->
                 false
             | Connected ->
@@ -258,7 +263,7 @@ let%test_module "all-ipc test" =
       let%bind status_b =
         get_peer_node_status a ad.b_addr >>| Or_error.ok_exn
       in
-      assert (String.equal status_b bob_status) ;
+      assert (String.equal status_b bob_status_text) ;
 
       (* Open stream 2 to Carol *)
       (* By opening the stream Alice notifies Carol that both Alice and Bob
@@ -336,8 +341,8 @@ let%test_module "all-ipc test" =
       (* Wait for Carol to disconnect. This will deadlock Alice and Carol
          unless new gating config is put into effect and Carol becomes banned. *)
       let%bind () =
-        pcIter (fun () ->
-            match !carolStatus with
+        iter_while (fun () ->
+            match !carol_status with
             | Connected ->
                 false
             | Disconnected ->
@@ -349,8 +354,8 @@ let%test_module "all-ipc test" =
 
       (* Await Bob to terminate. This statement ensures that Alice doesn't finishes
          before Bob received all of the messages on topic "a" *)
-      pcIter (fun () ->
-          match !bobStatus with
+      iter_while (fun () ->
+          match !bob_status with
           | Disconnected ->
               true
           | Connected ->
@@ -360,10 +365,17 @@ let%test_module "all-ipc test" =
       |> or_timeout ~msg:"Alice: wait for Bob to disconnect"
 
     let bob b ad (pc, _) msgs =
-      let aliceStatus = ref NotMet in
-      let yotaStatus = ref NotMet in
-      let pcLs = [ (aliceStatus, ad.a_peerid); (yotaStatus, ad.y_peerid) ] in
-      let pcIter pred = iteratePcWhile "bob" pc pcLs ~pred in
+      let alice_status = ref NotMet in
+      let yota_status = ref NotMet in
+      let carol_status = ref Disconnected in
+      let pc_ls =
+        [ (alice_status, ad.a_peerid)
+        ; (carol_status, ad.c_peerid)
+        ; (yota_status, ad.y_peerid)
+        ]
+      in
+      let iterate_while pred = iterate_while "bob" pc pc_ls ~pred in
+      (* Setup stream handler *)
       (* Setup stream handler *)
       let streams_r, streams_w = Pipe.create () in
       let%bind () =
@@ -374,8 +386,8 @@ let%test_module "all-ipc test" =
       (* Await connection to succeed *)
       (* This is done mainly to test PeerConnected upcall *)
       let%bind () =
-        pcIter (fun () ->
-            match !aliceStatus with
+        iterate_while (fun () ->
+            match !alice_status with
             | NotMet ->
                 false
             | Connected ->
@@ -385,7 +397,7 @@ let%test_module "all-ipc test" =
         |> or_timeout ~msg:"Bob: Alice connected"
       in
       (* Set Bob's node status *)
-      let%bind () = set_node_status b bob_status >>| Or_error.ok_exn in
+      let%bind () = set_node_status b bob_status_text >>| Or_error.ok_exn in
       (* Subscribe to topic "a" *)
       let topic_a_received_1 = ref false in
       let topic_a_received_ivar = Ivar.create () in
@@ -446,16 +458,16 @@ let%test_module "all-ipc test" =
       Pubsub.unsubscribe b subA >>| Or_error.ok_exn
 
     let carol c ad (pc, _) msgs =
-      let aliceStatus = ref NotMet in
-      let bobStatus = ref NotMet in
-      let yotaStatus = ref NotMet in
-      let pcLs =
-        [ (aliceStatus, ad.a_peerid)
-        ; (bobStatus, ad.b_peerid)
-        ; (yotaStatus, ad.y_peerid)
+      let alice_status = ref NotMet in
+      let bob_status = ref Disconnected in
+      let yota_status = ref NotMet in
+      let pc_ls =
+        [ (alice_status, ad.a_peerid)
+        ; (bob_status, ad.b_peerid)
+        ; (yota_status, ad.y_peerid)
         ]
       in
-      let pcIter pred = iteratePcWhile "carol" pc pcLs ~pred in
+      let iterate_while pred = iterate_while "carol" pc pc_ls ~pred in
       (* Add stream handler *)
       let streams_r, streams_w = Pipe.create () in
       let%bind () =
@@ -466,8 +478,8 @@ let%test_module "all-ipc test" =
       (* Await connection to succeed *)
       (* This is being done mainly to test PeerConnected upcall. *)
       let%bind () =
-        pcIter (fun () ->
-            match !aliceStatus with
+        iterate_while (fun () ->
+            match !alice_status with
             | NotMet ->
                 false
             | Connected ->
@@ -492,8 +504,6 @@ let%test_module "all-ipc test" =
         Pubsub.publish_raw c ~topic:"topic/b" "not to be received"
       in
 
-      (match !bobStatus with Connected -> raise UnexpectedState | _ -> ()) ;
-
       (* Remove stream handler for the protocol, further stream
          connections will be rejected *)
       let%bind () = close_protocol c ~protocol in
@@ -515,8 +525,8 @@ let%test_module "all-ipc test" =
       (* Await disconnect *)
       (* This will hang until either Carol is banned by Alice
          or until Alice finishes *)
-      pcIter (fun () ->
-          match !aliceStatus with
+      iterate_while (fun () ->
+          match !alice_status with
           | Disconnected ->
               true
           | Connected ->
