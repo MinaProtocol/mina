@@ -17,7 +17,7 @@ let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \
   in
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchain ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"] "buildkite/scripts/zkapps-examples-unit-tests.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev",
+      commands = RunInToolchain.runInToolchain ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"] "buildkite/scripts/zkapps-examples-unit-tests.sh ${profile} && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev",
       label = "${profile} zkApps examples tests",
       key = command_key,
       target = cmd_target,
