@@ -10,24 +10,24 @@ import (
 	"sync"
 	"time"
 
-  "github.com/ipfs/boxo/bitswap"
-	bitnet "github.com/ipfs/boxo/bitswap/network"
+	"github.com/ipfs/go-bitswap"
+	bitnet "github.com/ipfs/go-bitswap/network"
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log/v2"
 	p2p "github.com/libp2p/go-libp2p"
 
-	"github.com/libp2p/go-libp2p/core/connmgr"
-	"github.com/libp2p/go-libp2p/core/control"
-	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/metrics"
-	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/libp2p/go-libp2p-core/connmgr"
+	"github.com/libp2p/go-libp2p-core/control"
+	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/metrics"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
+	protocol "github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/dual"
-	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoreds"
+	"github.com/libp2p/go-libp2p-peerstore/pstoreds"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	record "github.com/libp2p/go-libp2p-record"
 	p2pconfig "github.com/libp2p/go-libp2p/config"
@@ -285,15 +285,15 @@ type CodaGatingState struct {
 	KnownPrivateAddrFilters *ma.Filters
 	BannedAddrFilters       *ma.Filters
 	TrustedAddrFilters      *ma.Filters
-	BannedPeers             map[peer.ID]struct{}
-	TrustedPeers            map[peer.ID]struct{}
+	BannedPeers             *peer.Set
+	TrustedPeers            *peer.Set
 }
 
 type CodaGatingConfig struct {
 	BannedAddrFilters  *ma.Filters
 	TrustedAddrFilters *ma.Filters
-	BannedPeers        map[peer.ID]struct{}
-	TrustedPeers       map[peer.ID]struct{}
+	BannedPeers        *peer.Set
+	TrustedPeers       *peer.Set
 }
 
 // NewCodaGatingState returns a new CodaGatingState
@@ -312,12 +312,12 @@ func NewCodaGatingState(config *CodaGatingConfig, knownPrivateAddrFilters *ma.Fi
 
 	bannedPeers := config.BannedPeers
 	if bannedPeers == nil {
-		bannedPeers = make(map[peer.ID]struct{})
+		bannedPeers = peer.NewSet()
 	}
 
 	trustedPeers := config.TrustedPeers
 	if trustedPeers == nil {
-		trustedPeers = make(map[peer.ID]struct{})
+		trustedPeers = peer.NewSet()
 	}
 
 	return &CodaGatingState{
@@ -397,16 +397,14 @@ func (c connectionAllowance) isDeny() bool {
 }
 
 func (gs *CodaGatingState) checkPeerTrusted(p peer.ID) connectionAllowance {
-  _, isTrusted := gs.TrustedPeers[p]
-	if isTrusted {
+	if gs.TrustedPeers.Contains(p) {
 		return Accept
 	}
 	return Undecided
 }
 
 func (gs *CodaGatingState) checkPeerBanned(p peer.ID) connectionAllowance {
-  _, isBanned := gs.BannedPeers[p]
-	if isBanned {
+	if gs.BannedPeers.Contains(p) {
 		return DenyBannedPeer
 	}
 	return Undecided
