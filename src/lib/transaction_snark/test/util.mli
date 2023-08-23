@@ -54,7 +54,8 @@ type pass_number = Pass_1 | Pass_2
     Raises if either the snark generation or application fails
 *)
 val check_zkapp_command_with_merges_exn :
-     ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
+     ?don't_generate_merge_proofs:bool
+  -> ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
   -> ?ignore_outside_snark:bool
   -> ?global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> ?state_body:Transaction_protocol_state.Block_data.t
@@ -82,7 +83,8 @@ val gen_snapp_ledger :
   Base_quickcheck.Generator.t
 
 val test_snapp_update :
-     ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
+     ?don't_generate_merge_proofs:bool
+  -> ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?snapp_permissions:Permissions.t
   -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
@@ -156,7 +158,8 @@ val test_transaction_union :
   -> unit
 
 val test_zkapp_command :
-     ?expected_failure:Transaction_status.Failure.t * pass_number
+     ?don't_generate_merge_proofs:bool
+  -> ?expected_failure:Transaction_status.Failure.t * pass_number
   -> ?memo:Signed_command_memo.t
   -> ?fee:Currency.Fee.t
   -> fee_payer_pk:Account.key

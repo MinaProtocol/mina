@@ -46,7 +46,8 @@ module Make (Input : Input_intf) = struct
           ; preconditions = None
           }
         in
-        U.test_snapp_update test_spec ~init_ledger ~vk ~zkapp_prover
+        U.test_snapp_update ~don't_generate_merge_proofs:true test_spec
+          ~init_ledger ~vk ~zkapp_prover
           ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
   let%test_unit "update a snapp account with proof" =
@@ -71,7 +72,7 @@ module Make (Input : Input_intf) = struct
           ; preconditions = None
           }
         in
-        U.test_snapp_update
+        U.test_snapp_update ~don't_generate_merge_proofs:true
           ~snapp_permissions:
             (U.permissions_from_update snapp_update ~auth:Proof)
           test_spec ~init_ledger ~vk ~zkapp_prover
@@ -100,7 +101,7 @@ module Make (Input : Input_intf) = struct
           ; preconditions = None
           }
         in
-        U.test_snapp_update
+        U.test_snapp_update ~don't_generate_merge_proofs:true
           ~snapp_permissions:(U.permissions_from_update snapp_update ~auth:None)
           test_spec ~init_ledger ~vk ~zkapp_prover
           ~snapp_pk:(Public_key.compress new_kp.public_key) )
@@ -129,7 +130,7 @@ module Make (Input : Input_intf) = struct
           ; preconditions = None
           }
         in
-        U.test_snapp_update
+        U.test_snapp_update ~don't_generate_merge_proofs:true
           ~snapp_permissions:(U.permissions_from_update snapp_update ~auth:None)
           test_spec ~init_ledger ~vk ~zkapp_prover
           ~snapp_pk:(Public_key.compress new_kp.public_key) )
@@ -157,7 +158,7 @@ module Make (Input : Input_intf) = struct
           ; preconditions = None
           }
         in
-        U.test_snapp_update
+        U.test_snapp_update ~don't_generate_merge_proofs:true
           ~snapp_permissions:(U.permissions_from_update snapp_update ~auth:None)
           test_spec ~init_ledger ~vk ~zkapp_prover
           ~snapp_pk:(Public_key.compress new_kp.public_key) )
@@ -186,7 +187,7 @@ module Make (Input : Input_intf) = struct
           ; preconditions = None
           }
         in
-        U.test_snapp_update
+        U.test_snapp_update ~don't_generate_merge_proofs:true
           ~snapp_permissions:
             (U.permissions_from_update snapp_update ~auth:Either)
           test_spec ~init_ledger ~vk ~zkapp_prover
@@ -215,7 +216,7 @@ module Make (Input : Input_intf) = struct
           ; preconditions = None
           }
         in
-        U.test_snapp_update
+        U.test_snapp_update ~don't_generate_merge_proofs:true
           ~snapp_permissions:
             (U.permissions_from_update snapp_update ~auth:Either)
           test_spec ~init_ledger ~vk ~zkapp_prover
@@ -244,7 +245,8 @@ module Make (Input : Input_intf) = struct
           ; preconditions = None
           }
         in
-        U.test_snapp_update ~expected_failure:failure_expected
+        U.test_snapp_update ~don't_generate_merge_proofs:true
+          ~expected_failure:failure_expected
           ~snapp_permissions:
             (U.permissions_from_update snapp_update ~auth:Either)
           test_spec ~init_ledger ~vk ~zkapp_prover
@@ -283,7 +285,8 @@ module Make (Input : Input_intf) = struct
               ~vk ~ledger snapp_pk ;
             (*Ledger.apply_transaction should be successful if fee payer update
               is successful*)
-            U.test_snapp_update ~expected_failure:failure_expected
+            U.test_snapp_update ~don't_generate_merge_proofs:true
+              ~expected_failure:failure_expected
               ~snapp_permissions:
                 (U.permissions_from_update snapp_update ~auth:Proof)
               ~vk ~zkapp_prover test_spec ~init_ledger ~snapp_pk ) )
@@ -324,7 +327,8 @@ module Make (Input : Input_intf) = struct
               let account = get_account ledger zkapp_acc_id in
               assert (Option.is_none account.zkapp) ) ;
             let%map () =
-              U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ]
+              U.check_zkapp_command_with_merges_exn
+                ~don't_generate_merge_proofs:true ledger [ zkapp_command ]
             in
             let account = get_account ledger zkapp_acc_id in
             if is_non_zkapp_update then

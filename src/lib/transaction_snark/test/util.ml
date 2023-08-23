@@ -72,8 +72,9 @@ type pass_number = Pass_1 | Pass_2
 
 let pass_number_to_int = function Pass_1 -> 1 | Pass_2 -> 2
 
-let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
-    ?global_slot ?(state_body = genesis_state_body) ledger zkapp_commands =
+let check_zkapp_command_with_merges_exn ?(don't_generate_merge_proofs = false)
+    ?expected_failure ?ignore_outside_snark ?global_slot
+    ?(state_body = genesis_state_body) ledger zkapp_commands =
   let module T = (val Lazy.force snark_module) in
   let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
@@ -248,7 +249,17 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                                        Public_key.Compressed.gen )
                                 |> Sok_message.digest
                               in
-                              T.merge ~sok_digest prev curr )
+                              if don't_generate_merge_proofs then
+                                let%map statement =
+                                  Async.Deferred.return
+                                    (Transaction_snark.Statement.merge
+                                       (Transaction_snark.statement prev)
+                                       (Transaction_snark.statement curr) )
+                                in
+                                Transaction_snark.create
+                                  ~statement:{ statement with sok_digest }
+                                  ~proof:(Transaction_snark.proof prev)
+                              else T.merge ~sok_digest prev curr )
                     in
                     let p = Or_error.ok_exn p in
                     ( match statement_opt with
@@ -362,8 +373,8 @@ let gen_snapp_ledger =
   in
   (test_spec, kp)
 
-let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
-    ~zkapp_prover test_spec ~init_ledger ~snapp_pk =
+let test_snapp_update ?don't_generate_merge_proofs ?expected_failure ?state_body
+    ?snapp_permissions ~vk ~zkapp_prover test_spec ~init_ledger ~snapp_pk =
   let open Mina_transaction_logic.For_tests in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -377,8 +388,8 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
             Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
               ~constraint_constants test_spec
           in
-          check_zkapp_command_with_merges_exn ?expected_failure ?state_body
-            ledger [ zkapp_command ] ) )
+          check_zkapp_command_with_merges_exn ?don't_generate_merge_proofs
+            ?expected_failure ?state_body ledger [ zkapp_command ] ) )
 
 let permissions_from_update (update : Account_update.Update.t) ~auth =
   let default = Permissions.user_default in
@@ -658,7 +669,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   | Ok _ ->
       assert (not expect_snark_failure)
 
-let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
+let test_zkapp_command ?don't_generate_merge_proofs ?expected_failure
+    ?(memo = Signed_command_memo.empty)
     ?(fee = Currency.Fee.(of_nanomina_int_exn 100)) ~fee_payer_pk ~signers
     ~initialize_ledger ~finalize_ledger zkapp_command =
   let fee_payer : Account_update.Fee_payer.t =
@@ -680,6 +692,6 @@ let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       let aux = initialize_ledger ledger in
       Async.Thread_safe.block_on_async_exn (fun () ->
-          check_zkapp_command_with_merges_exn ?expected_failure ledger
-            [ zkapp_command ] ) ;
+          check_zkapp_command_with_merges_exn ?don't_generate_merge_proofs
+            ?expected_failure ledger [ zkapp_command ] ) ;
       finalize_ledger aux ledger )
