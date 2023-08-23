@@ -162,7 +162,7 @@ let%test_module "multisig_account" =
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               let spec = List.hd_exn specs in
-              let tag, _, (module P), Pickles.Provers.[ multisig_prover; _ ] =
+              let tag, _, (module P), Pickles.Provers.[ multisig_prover ] =
                 let multisig_rule : _ Pickles.Inductive_rule.t =
                   let multisig_main (tx_commitment : Zkapp_statement.Checked.t)
                       : unit Checked.t =
@@ -214,55 +214,15 @@ let%test_module "multisig_account" =
                   }
                 in
                 Pickles.compile () ~cache:Cache_dir.cache
-                  ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                   ~public_input:(Input Zkapp_statement.typ)
                   ~auxiliary_typ:Typ.unit
-                  ~branches:(module Nat.N2)
-                  ~max_proofs_verified:(module Nat.N2)
-                    (* You have to put 2 here... *)
+                  ~branches:(module Nat.N1)
+                  ~max_proofs_verified:(module Nat.N0)
                   ~name:"multisig"
                   ~constraint_constants:
                     (Genesis_constants.Constraint_constants.to_snark_keys_header
                        constraint_constants )
-                  ~choices:(fun ~self ->
-                    [ multisig_rule
-                    ; { identifier = "dummy"
-                      ; prevs = [ self; self ]
-                      ; main =
-                          (fun _ ->
-                            let s =
-                              Run.exists Field.typ ~compute:(fun () ->
-                                  Run.Field.Constant.zero )
-                            in
-                            let public_input =
-                              Run.exists Zkapp_statement.typ ~compute:(fun () ->
-                                  assert false )
-                            in
-                            let proof =
-                              Run.exists (Typ.Internal.ref ())
-                                ~compute:(fun () -> assert false)
-                            in
-                            Impl.run_checked
-                              (Transaction_snark.dummy_constraints ()) ;
-                            (* Unsatisfiable. *)
-                            Run.Field.(Assert.equal s (s + one)) ;
-                            { previous_proof_statements =
-                                [ { public_input
-                                  ; proof
-                                  ; proof_must_verify = Boolean.true_
-                                  }
-                                ; { public_input
-                                  ; proof
-                                  ; proof_must_verify = Boolean.true_
-                                  }
-                                ]
-                            ; public_output = ()
-                            ; auxiliary_output = ()
-                            } )
-                      ; feature_flags =
-                          Pickles_types.Plonk_types.Features.none_bool
-                      }
-                    ] )
+                  ~choices:(fun ~self:_ -> [ multisig_rule ])
               in
               let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
               let { Mina_transaction_logic.For_tests.Transaction_spec.fee
@@ -423,10 +383,11 @@ let%test_module "multisig_account" =
                 | _ ->
                     respond Unhandled
               in
-              let (), (), (pi : Pickles.Side_loaded.Proof.t) =
+              let (), (), (pi : _ Pickles.Proof.t) =
                 (fun () -> multisig_prover ~handler tx_statement)
                 |> Async.Thread_safe.block_on_async_exn
               in
+              let pi = Pickles.Side_loaded.Proof.of_proof pi in
               let fee_payer =
                 let txn_comm =
                   Zkapp_command.Transaction_commitment.create_complete
