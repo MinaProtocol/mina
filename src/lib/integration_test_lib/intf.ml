@@ -44,6 +44,8 @@ module Engine = struct
 
       val infra_id : t -> string
 
+      val check_OOM_failure : t -> bool Deferred.t
+
       val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t

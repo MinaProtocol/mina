@@ -47,6 +47,42 @@ module Node = struct
 
   let infra_id { pod_ids; _ } = List.hd_exn pod_ids
 
+  (* most container orchestration tools, kubernetes included, will have memory limits in place for the nodes. *)
+  let check_OOM_failure t =
+    let%bind cwd = Unix.getcwd () in
+    let open Deferred.Let_syntax in
+    let%bind pod_exit_codes_str =
+      (*example output: mina:1;user-agent:%!d(<nil>); *)
+      Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
+        ( base_kube_args t.config
+        @ [ "get"
+          ; "pod"
+          ; "-l"
+          ; "app=" ^ t.app_id
+          ; "-o gotemplate"
+          ; "'{{range .status.containerStatuses}}{{printf \"%s:%d;\" .name \
+             .lastState.terminated.exitCode}}{{end}}'"
+          ] )
+    in
+    let pod_exit_codes_list_unprocessed =
+      String.split pod_exit_codes_str ~on:';'
+    in
+    let pod_exit_codes =
+      List.map pod_exit_codes_list_unprocessed ~f:(fun s ->
+          let x = String.split s ~on:':' in
+          let exit_code = List.nth_exn x 1 |> int_of_string_opt in
+          exit_code )
+    in
+    Deferred.List.fold pod_exit_codes ~init:false ~f:(fun accum exit_code_opt ->
+        match exit_code_opt with
+        | None ->
+            return accum
+        | Some exit_code ->
+            (* kubernetes pod's exit code 139 means a SEGFAULT happened
+               https://komodor.com/learn/exit-codes-in-containers-and-kubernetes-the-complete-guide/
+            *)
+            if Int.equal exit_code 139 then return true else return accum )
+
   let refresh_pod_ids_of_node t =
     let%bind cwd = Unix.getcwd () in
     let open Deferred.Or_error.Let_syntax in
