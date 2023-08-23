@@ -12,7 +12,7 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \(cmd_target : Size) ->
+let buildTestCmd : Text -> Size -> Command.Type = \(profile : Text) -> \(cmd_target : Size) ->
   let command_key = "zkapps-examples-unit-test-${profile}"
   in
   Command.build
