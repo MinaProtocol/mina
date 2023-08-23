@@ -153,7 +153,8 @@ let%test_module "Zkapp payments tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
+                  U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true ledger [ zkapp_command ] ) ) )
 
     let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
@@ -169,7 +170,8 @@ let%test_module "Zkapp payments tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.check_zkapp_command_with_merges_exn ledger zkapp_commands ) ) )
+                  U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true ledger zkapp_commands ) ) )
 
     let%test_unit "multiple transfers from one account" =
       let open Mina_transaction_logic.For_tests in
@@ -222,7 +224,8 @@ let%test_module "Zkapp payments tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
+                  U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true ledger [ zkapp_command ] ) ) )
 
     let%test_unit "zkapps payments failed due to insufficient funds" =
       let open Mina_transaction_logic.For_tests in
@@ -286,6 +289,7 @@ let%test_module "Zkapp payments tests" =
                     Transaction_snark.For_tests.multiple_transfers test_spec
                   in
                   U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true
                     ~expected_failure:
                       (Transaction_status.Failure.Overflow, Pass_2)
                     ledger [ zkapp_command ] ) ) )
