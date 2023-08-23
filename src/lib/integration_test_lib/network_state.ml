@@ -287,14 +287,34 @@ module Make
                     ; best_tips_by_node = best_tips_by_node'
                     } )
               in
+              let pod_id_before_refresh = Node.infra_id node in
+              (* the pod_ids are refreshed in Node.start.  Node.infra_id references a mutable field *)
               let%bind (_
                          : ( unit Malleable_error.Result_accumulator.t
                            , Malleable_error.Hard_fail.t )
                            result ) =
                 Node.start ~fresh_state:false node
               in
+              let pod_id_after_refresh = Node.infra_id node in
 
-              Deferred.return `Continue )
+              (* if there was some kubernetes/infra failure that killed the pod for infra reasons, then the pod_id should be different.
+                  In case of infra failure, lucy just wants to recover and keep chugging along.
+                  But if the pod id before and after the refresh is the same, then that means the node wasn't killed for infra reasons, in fact it means that the actual mina daemon crashed.  Actual daemon crashes SHOULD make a whole lucy test fail, lucy will throw a hard error and terminate rather than recovering *)
+              if String.equal pod_id_after_refresh pod_id_before_refresh then
+                let%bind (_
+                           : ( unit Malleable_error.Result_accumulator.t
+                             , Malleable_error.Hard_fail.t )
+                             result ) =
+                  Malleable_error.or_hard_error ~exit_code:30
+                    (Or_error.errorf
+                       "The mina daemon of node %s has crashed, for reasons \
+                        unrelated to Lucy.  The test will now terminate."
+                       (Node.id node) )
+                in
+                Deferred.return `Continue
+                (* failwith
+                   "Aborting the test because a node went down unexpectedly." *)
+              else Deferred.return `Continue )
         : _ Event_router.event_subscription ) ;
     (* handle_breadcrumb_added *)
     ignore
