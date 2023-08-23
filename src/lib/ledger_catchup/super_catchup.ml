@@ -401,7 +401,7 @@ module Downloader = struct
           , Mina_block.blockchain_length t )
       end)
       (struct
-        type t = (State_hash.t * Length.t) option
+        type t = (State_hash.t * Length.t) option [@@deriving to_yojson]
       end)
 end
 
@@ -1117,7 +1117,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
               | None ->
                   `Some [] ) )
     in
-    Downloader.create ~stop ~trust_system ~preferred:[] ~max_batch_size:5
+    Downloader.create ~logger ~stop ~trust_system ~preferred:[]
+      ~max_batch_size:5
       ~get:(fun peer hs ->
         let sec =
           let sec_per_block =

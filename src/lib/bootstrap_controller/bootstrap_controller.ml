@@ -171,7 +171,8 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
             else
               start_sync_job_with_peer ~sender ~root_sync_ledger t best_tip root
         | Error e ->
-            return (received_bad_proof t sender e |> Fn.const `Ignored) )
+            don't_wait_for (received_bad_proof t sender e) ;
+            return `Ignored )
 
 let sync_ledger ({ context = (module Context); _ } as t) ~preferred
     ~root_sync_ledger ~transition_graph ~sync_ledger_reader ~genesis_constants =
@@ -241,6 +242,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       in
       let constraint_constants = precomputed_values.constraint_constants in
       let rec loop previous_cycles =
+        [%log debug] "Beginning bootstrap loop" ;
         let sync_ledger_pipe = "sync ledger pipe" in
         let sync_ledger_reader, sync_ledger_writer =
           create ~name:sync_ledger_pipe
@@ -290,29 +292,42 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
             temp_persistent_root_instance
         in
         let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
+          let root_sync_ledger =
+            Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
+          in
+          let preferred_peer =
+            Option.bind best_seen_transition ~f:(fun x ->
+                match Envelope.Incoming.sender x with
+                | Local ->
+                    None
+                | Remote r ->
+                    Some r )
+          in
+          [%log info]
+            "Started synchronizing root snarked ledger ($preferred_peer)"
+            ~metadata:
+              [ ("preferred_peer", [%to_yojson: Peer.t option] preferred_peer) ] ;
+          don't_wait_for
+            (sync_ledger t
+               ~preferred:(Option.to_list preferred_peer)
+               ~root_sync_ledger ~transition_graph ~sync_ledger_reader
+               ~genesis_constants ) ;
           time_deferred
-            (let root_sync_ledger =
-               Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
-             in
-             don't_wait_for
-               (sync_ledger t
-                  ~preferred:
-                    ( Option.to_list best_seen_transition
-                    |> List.filter_map ~f:(fun x ->
-                           match Envelope.Incoming.sender x with
-                           | Local ->
-                               None
-                           | Remote r ->
-                               Some r ) )
-                  ~root_sync_ledger ~transition_graph ~sync_ledger_reader
-                  ~genesis_constants ) ;
-             (* We ignore the resulting ledger returned here since it will always
-                * be the same as the ledger we started with because we are syncing
-                * a db ledger. *)
-             let%map _, data = Sync_ledger.Db.valid_tree root_sync_ledger in
+            (* We ignore the resulting ledger returned here since it will always
+               * be the same as the ledger we started with because we are syncing
+               * a db ledger. *)
+            (let%map _, data = Sync_ledger.Db.valid_tree root_sync_ledger in
              Sync_ledger.Db.destroy root_sync_ledger ;
              data )
         in
+        [%log info]
+          "Finished synchronizing root snarked ledger ($final_ledger_hash, \
+           $expected_staged_ledger_hash)"
+          ~metadata:
+            [ ("final_ledger_hash", Frozen_ledger_hash.to_yojson hash)
+            ; ( "expected_staged_ledger_hash"
+              , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
+            ] ;
         Mina_metrics.(
           Counter.inc Bootstrap.root_snarked_ledger_sync_ms
             Time.Span.(to_ms sync_ledger_time)) ;
@@ -322,6 +337,11 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         let%bind ( staged_ledger_data_download_time
                  , staged_ledger_construction_time
                  , staged_ledger_aux_result ) =
+          [%log info] "Downloading staged ledger data at block $hash from $peer"
+            ~metadata:
+              [ ("hash", Frozen_ledger_hash.to_yojson hash)
+              ; ("peer", `String sender.peer_id)
+              ] ;
           let%bind ( staged_ledger_data_download_time
                    , staged_ledger_data_download_result ) =
             time_deferred
@@ -331,12 +351,27 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           in
           match staged_ledger_data_download_result with
           | Error err ->
+              [%log error]
+                "Error downloading staged ledger data at block $hash from \
+                 $peer: $error"
+                ~metadata:
+                  [ ("hash", Frozen_ledger_hash.to_yojson hash)
+                  ; ("peer", `String sender.peer_id)
+                  ; ("error", `String (Error.to_string_hum err))
+                  ] ;
               Deferred.return (staged_ledger_data_download_time, None, Error err)
           | Ok
               ( scan_state
               , expected_merkle_root
               , pending_coinbases
               , protocol_states ) -> (
+              [%log info]
+                "Finished downloading staged ledger data at block $hash from \
+                 $peer"
+                ~metadata:
+                  [ ("hash", Frozen_ledger_hash.to_yojson hash)
+                  ; ("peer", `String sender.peer_id)
+                  ] ;
               let%map staged_ledger_construction_result =
                 O1trace.thread "construct_root_staged_ledger" (fun () ->
                     let open Deferred.Or_error.Let_syntax in
@@ -345,17 +380,17 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                         (Staged_ledger.Scan_state.hash scan_state)
                         expected_merkle_root pending_coinbases
                     in
-                    [%log debug]
+                    [%log info]
+                      "Checking validity of staged ledger data: expected \
+                       $expected_hash, computed $computed_hash"
                       ~metadata:
-                        [ ( "expected_staged_ledger_hash"
+                        [ ( "expected_hash"
                           , Staged_ledger_hash.to_yojson
                               expected_staged_ledger_hash )
-                        ; ( "received_staged_ledger_hash"
+                        ; ( "computed_hashed"
                           , Staged_ledger_hash.to_yojson
                               received_staged_ledger_hash )
-                        ]
-                      "Comparing $expected_staged_ledger_hash to \
-                       $received_staged_ledger_hash" ;
+                        ] ;
                     let%bind new_root =
                       t.current_root
                       |> Mina_block.Validation
@@ -411,41 +446,35 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                     (* Construct the staged ledger before constructing the transition
                      * frontier in order to verify the scan state we received.
                      * TODO: reorganize the code to avoid doing this twice (#3480) *)
-                    let open Deferred.Let_syntax in
-                    let%map staged_ledger_construction_time, construction_result
-                        =
-                      time_deferred
-                        (let open Deferred.Let_syntax in
-                        let temp_mask =
-                          Ledger.of_database temp_snarked_ledger
-                        in
-                        let%map result =
-                          Staged_ledger
-                          .of_scan_state_pending_coinbases_and_snarked_ledger
-                            ~logger
-                            ~snarked_local_state:
-                              Mina_block.(
-                                t.current_root |> Validation.block |> header
-                                |> Header.protocol_state
-                                |> Protocol_state.blockchain_state
-                                |> Blockchain_state.snarked_local_state)
-                            ~verifier ~constraint_constants ~scan_state
-                            ~snarked_ledger:temp_mask ~expected_merkle_root
-                            ~pending_coinbases ~get_state
-                        in
-                        ignore
-                          ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__
-                              temp_mask
-                            : Ledger.unattached_mask ) ;
-                        Result.map result
-                          ~f:
-                            (const
-                               ( scan_state
-                               , pending_coinbases
-                               , new_root
-                               , protocol_states ) ))
-                    in
-                    Ok (staged_ledger_construction_time, construction_result) )
+                    time_deferred
+                      (let open Deferred.Let_syntax in
+                      let temp_mask = Ledger.of_database temp_snarked_ledger in
+                      let%map result =
+                        Staged_ledger
+                        .of_scan_state_pending_coinbases_and_snarked_ledger
+                          ~logger
+                          ~snarked_local_state:
+                            Mina_block.(
+                              t.current_root |> Validation.block |> header
+                              |> Header.protocol_state
+                              |> Protocol_state.blockchain_state
+                              |> Blockchain_state.snarked_local_state)
+                          ~verifier ~constraint_constants ~scan_state
+                          ~snarked_ledger:temp_mask ~expected_merkle_root
+                          ~pending_coinbases ~get_state
+                      in
+                      ignore
+                        ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__
+                            temp_mask
+                          : Ledger.unattached_mask ) ;
+                      Result.map result
+                        ~f:
+                          (const
+                             ( scan_state
+                             , pending_coinbases
+                             , new_root
+                             , protocol_states ) ))
+                    |> Deferred.map ~f:Result.return )
               in
               match staged_ledger_construction_result with
               | Error err ->

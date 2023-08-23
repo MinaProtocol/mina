@@ -62,7 +62,7 @@ end) (Result : sig
 
   val key : t -> Key.t
 end) (Knowledge_context : sig
-  type t
+  type t [@@deriving to_yojson]
 end) : sig
   type t [@@deriving to_yojson]
 
@@ -80,7 +80,8 @@ end) : sig
   val cancel : t -> Key.t -> unit
 
   val create :
-       max_batch_size:int
+       logger:Logger.t
+    -> max_batch_size:int
     -> stop:unit Deferred.t
     -> trust_system:Trust_system.t
     -> get:(Peer.t -> Key.t list -> Result.t list Deferred.Or_error.t)
@@ -703,12 +704,25 @@ end = struct
         O1trace.sync_thread "refresh_downloader_peers" (fun () ->
             let peers' = Peer.Set.of_list peers in
             let new_peers = Set.diff peers' t.all_peers in
+            let removed_peers = Set.diff t.all_peers peers' in
             Useful_peers.update t.useful_peers
               (Refreshed_peers { all_peers = peers' }) ;
             if
               (not (Set.is_empty new_peers))
               && not (Strict_pipe.Writer.is_closed t.got_new_peers_w)
-            then Strict_pipe.Writer.write t.got_new_peers_w () ;
+            then (
+              [%log' debug t.logger] "Got new downloader peers: $new_peers"
+                ~metadata:
+                  [ ( "new_peers"
+                    , [%to_yojson: Peer.t list] (Set.to_list new_peers) )
+                  ] ;
+              Strict_pipe.Writer.write t.got_new_peers_w () ) ;
+            if not (Set.is_empty removed_peers) then
+              [%log' debug t.logger] "Removed downloader peers: $removed_peers"
+                ~metadata:
+                  [ ( "removed_peers"
+                    , [%to_yojson: Peer.t list] (Set.to_list removed_peers) )
+                  ] ;
             t.all_peers <- Peer.Set.of_list peers ) ;
         Deferred.unit )
     |> don't_wait_for
@@ -726,10 +740,11 @@ end = struct
         ; pending
         ; downloading
         ; max_batch_size = _
-        ; logger = _
+        ; logger
         ; trust_system = _
         ; stop = _
         } as t ) =
+    [%log debug] "Tearing down downloader instance" ;
     let rec clear_queue q =
       match Q.dequeue q with
       | None ->
@@ -758,6 +773,11 @@ end = struct
               ] ) )
         in
         let keys = List.map xs ~f:(fun x -> x.J.key) in
+        [%log' debug t.logger] "Initializing download of $keys from $peer"
+          ~metadata:
+            [ ("peer", Peer.to_yojson peer)
+            ; ("keys", [%to_yojson: Key.t list] keys)
+            ] ;
         let fail (e : Error.t) =
           let e = Error.to_string_hum e in
           [%log' debug t.logger]
@@ -794,6 +814,13 @@ end = struct
                   List.iter succ ~f:(Hash_set.remove all) ;
                   (succ, Hash_set.to_list all)
             in
+            [%log' debug t.logger]
+              "Downloaded data from $peer: $successes, $unsuccesses"
+              ~metadata:
+                [ ("peer", Peer.to_yojson peer)
+                ; ("successes", [%to_yojson: Key.t list] succs)
+                ; ("unsuccesses", [%to_yojson: Key.t list] unsuccs)
+                ] ;
             Useful_peers.update t.useful_peers
               (Download_finished (peer, `Successful succs, `Unsuccessful unsuccs)
               ) ) ;
@@ -810,6 +837,11 @@ end = struct
         List.iter xs ~f:(fun j -> Hashtbl.remove t.downloading j.key) ;
         match res with
         | `Stopped ->
+            [%log' debug t.logger] "Download of $keys from $peer stopped"
+              ~metadata:
+                [ ("peer", Peer.to_yojson peer)
+                ; ("keys", [%to_yojson: Key.t list] keys)
+                ] ;
             List.iter xs ~f:(kill_job t)
         | `Not_stopped r -> (
             match r with
@@ -880,8 +912,9 @@ end = struct
   let post_stall_retry_delay = Time.Span.of_min 1.
 
   let rec step t =
+    [%log' debug t.logger] "Downloader: executing fsm" ;
     if Q.length t.pending = 0 then (
-      [%log' debug t.logger] "Downloader: no jobs. waiting" ;
+      [%log' debug t.logger] "Downloader: no jobs; waiting" ;
       match%bind Strict_pipe.Reader.read t.flush_r with
       | `Eof ->
           [%log' debug t.logger] "Downloader: flush eof" ;
@@ -894,6 +927,7 @@ end = struct
           ~pending_jobs:(Q.to_list t.pending)
       with
       | `No_peers -> (
+          [%log' debug t.logger] "Downloader: no peers; waiting" ;
           match%bind Strict_pipe.Reader.read t.got_new_peers_r with
           | `Eof ->
               [%log' debug t.logger] "Downloader: new peers eof" ;
@@ -901,7 +935,7 @@ end = struct
           | `Ok () ->
               step t )
       | `Useful_but_busy -> (
-          [%log' debug t.logger] "Downloader: Waiting. All useful peers busy" ;
+          [%log' debug t.logger] "Downloader: all useful peers busy; waiting" ;
           let read p =
             Pipe.read_choice_single_consumer_exn
               (Strict_pipe.Reader.to_linear_pipe p).pipe [%here]
@@ -951,9 +985,11 @@ end = struct
   let mark_preferred t peer ~now =
     Useful_peers.Preferred_heap.add t.useful_peers.all_preferred (peer, now)
 
-  let create ~max_batch_size ~stop ~trust_system ~get ~knowledge_context
+  let create ~logger ~max_batch_size ~stop ~trust_system ~get ~knowledge_context
       ~knowledge ~peers ~preferred =
     let%map all_peers = peers () in
+    [%log debug] "Initializing downloader {TODO} ($all_peers)"
+      ~metadata:[ ("all_peers", [%to_yojson: Peer.t list] all_peers) ] ;
     let pipe ~name c =
       Strict_pipe.create ~warn_on_drop:false ~name
         (Buffered (`Capacity c, `Overflow (Drop_head ignore)))
@@ -972,7 +1008,7 @@ end = struct
       ; useful_peers = Useful_peers.create ~all_peers ~preferred
       ; get
       ; max_batch_size
-      ; logger = Logger.create ()
+      ; logger
       ; trust_system
       ; downloading = Key.Table.create ()
       ; stop
@@ -982,8 +1018,7 @@ end = struct
       let r, w = Broadcast_pipe.create [] in
       upon stop (fun () -> Broadcast_pipe.Writer.close w) ;
       Clock.every' ~stop (Time.Span.of_min 1.) (fun () ->
-          peers ()
-          >>= fun ps ->
+          let%bind ps = peers () in
           try Broadcast_pipe.Writer.write w ps
           with Broadcast_pipe.Already_closed _ -> Deferred.unit ) ;
       r
@@ -991,7 +1026,8 @@ end = struct
     let rec jobs_to_download stop =
       O1trace.thread "wait_for_jobs_to_download" (fun () ->
           if total_jobs t <> 0 then return `Ok
-          else
+          else (
+            [%log debug] "Waiting for download jobs" ;
             match%bind
               Deferred.choose
                 [ choice stop (Fn.const `Eof)
@@ -999,9 +1035,10 @@ end = struct
                 ]
             with
             | `Eof ->
+                [%log debug] "Stopped waiting for download jobs" ;
                 return `Finished
             | `Ok ->
-                jobs_to_download stop )
+                jobs_to_download stop ) )
     in
     let request_r, request_w =
       Strict_pipe.create ~name:"knowledge-requests" Strict_pipe.Synchronous
@@ -1013,8 +1050,10 @@ end = struct
           | `Finished ->
               Deferred.unit
           | `Ok ->
-              if not (Strict_pipe.Writer.is_closed request_w) then
-                Strict_pipe.Writer.write request_w peer
+              if not (Strict_pipe.Writer.is_closed request_w) then (
+                [%log debug] "Dispatching knowledge request to $peer"
+                  ~metadata:[ ("peer", Peer.to_yojson peer) ] ;
+                Strict_pipe.Writer.write request_w peer )
               else Deferred.unit )
     in
     let ps : unit Ivar.t Peer.Table.t = Peer.Table.create () in
@@ -1023,10 +1062,15 @@ end = struct
             let peers = Peer.Hash_set.of_list peers in
             Hashtbl.filteri_inplace ps ~f:(fun ~key:p ~data:finished ->
                 let keep = Hash_set.mem peers p in
-                if not keep then Ivar.fill_if_empty finished () ;
+                if not keep then (
+                  [%log debug] "Removing downloader peer: $peer"
+                    ~metadata:[ ("peer", Peer.to_yojson p) ] ;
+                  Ivar.fill_if_empty finished () ) ;
                 keep ) ;
             Hash_set.iter peers ~f:(fun p ->
                 if not (Hashtbl.mem ps p) then (
+                  [%log debug] "Adding downloader peer: $peer"
+                    ~metadata:[ ("peer", Peer.to_yojson p) ] ;
                   let finished = Ivar.create () in
                   refresh_knowledge (Ivar.read finished) p ;
                   Hashtbl.add_exn ps ~key:p ~data:finished ) ) ) ;
@@ -1036,10 +1080,19 @@ end = struct
       Throttle.create ~continue_on_error:true ~max_concurrent_jobs:8
     in
     let get_knowledge ctx peer =
-      Throttle.enqueue throttle (fun () -> knowledge ctx peer)
+      Throttle.enqueue throttle (fun () ->
+          [%log debug] "Requesting knowledge from $peer ($ctx)"
+            ~metadata:
+              [ ("peer", Peer.to_yojson peer)
+              ; ("ctx", Knowledge_context.to_yojson ctx)
+              ] ;
+          knowledge ctx peer )
     in
     O1trace.background_thread "refresh_downloader_knowledge" (fun () ->
-        Broadcast_pipe.Reader.iter knowledge_context ~f:(fun _ ->
+        Broadcast_pipe.Reader.iter knowledge_context ~f:(fun ctx ->
+            [%log debug]
+              "Received new knowledge context; refreshing peer knowledge ($ctx)"
+              ~metadata:[ ("ctx", Knowledge_context.to_yojson ctx) ] ;
             O1trace.sync_thread "refresh_downloader_knowledge" (fun () ->
                 Hashtbl.mapi_inplace ps ~f:(fun ~key:p ~data:finished ->
                     Ivar.fill_if_empty finished () ;
@@ -1050,8 +1103,16 @@ end = struct
     O1trace.background_thread "dispatch_downloader_requests" (fun () ->
         Strict_pipe.Reader.iter request_r ~f:(fun peer ->
             (* TODO: The pipe/clock logic is not quite right, but it is good enough. *)
-            if Deferred.is_determined stop then Deferred.unit
-            else
+            if Deferred.is_determined stop then (
+              [%log debug]
+                "Refusing to send knowledge request to $peer as downloader has \
+                 been stopped"
+                ~metadata:[ ("peer", Peer.to_yojson peer) ] ;
+              Deferred.unit )
+            else (
+              [%log debug]
+                "Awaiting capacity to send knowledge request to $peer"
+                ~metadata:[ ("peer", Peer.to_yojson peer) ] ;
               let%map () = Throttle.capacity_available throttle in
               don't_wait_for
                 (let ctx = Broadcast_pipe.Reader.peek knowledge_context in
@@ -1059,19 +1120,22 @@ end = struct
                  Useful_peers.update t.useful_peers
                    (Knowledge_request_starting peer) ;
                  let%map k = get_knowledge ctx peer in
+                 [%log debug] "Got knowledge from $peer: $knowledge"
+                   ~metadata:
+                     [ ("peer", Peer.to_yojson peer)
+                     ; ("knowlege", Claimed_knowledge.to_yojson Key.to_yojson k)
+                     ] ;
                  Useful_peers.update t.useful_peers
                    (Knowledge
                       { out_of_band = false
                       ; peer
                       ; claimed = k
                       ; active_jobs = active_jobs t
-                      } ) ) ) ) ;
+                      } ) ) ) ) ) ;
     O1trace.background_thread "execute_downlader_node_fstm" (fun () -> step t) ;
     upon stop (fun () -> tear_down t) ;
     every ~stop (Time.Span.of_sec 30.) (fun () ->
-        [%log' debug t.logger]
-          ~metadata:[ ("jobs", to_yojson t) ]
-          "Downloader jobs" ) ;
+        [%log debug] ~metadata:[ ("jobs", to_yojson t) ] "Downloader jobs" ) ;
     refresh_peers t peers ;
     t
 
@@ -1084,6 +1148,8 @@ end = struct
     | Some x, None | None, Some (_, x, _) ->
         x
     | None, None ->
+        [%log' debug t.logger] "Enqueueing download for knowledge at $key"
+          ~metadata:[ ("key", Key.to_yojson key) ] ;
         flush_soon t ;
         let e = { J.key; attempts; res = Ivar.create () } in
         enqueue_exn t e ; e
