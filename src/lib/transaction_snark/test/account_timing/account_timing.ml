@@ -1325,7 +1325,8 @@ let%test_module "account timing check" =
       @@ fun () ->
       Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
           Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn
-            ~global_slot:slot ledger [ zkapp_command ] )
+            ~don't_generate_merge_proofs:true ~global_slot:slot ledger
+            [ zkapp_command ] )
 
     let check_zkapp_failure expected_failure = function
       | Ok
