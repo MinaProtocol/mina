@@ -66,7 +66,8 @@ let%test_module "Valid_while precondition tests" =
                       ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
-                  U.check_zkapp_command_with_merges_exn ~global_slot ledger
+                  U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true ~global_slot ledger
                     [ zkapp_command ] ) ) )
 
     let%test_unit "invalid valid_while precondition" =
@@ -91,6 +92,7 @@ let%test_module "Valid_while precondition tests" =
                       (create_spec specs new_kp global_slot)
                   in
                   U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true
                     ~expected_failure:
                       (Valid_while_precondition_unsatisfied, U.Pass_2)
                     ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
@@ -391,6 +393,7 @@ let%test_module "Protocol state precondition tests" =
                     (module Mina_ledger.Ledger.Ledger_inner)
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true
                     ~expected_failure:
                       ( Transaction_status.Failure
                         .Protocol_state_precondition_unsatisfied
@@ -533,7 +536,8 @@ let%test_module "Account precondition tests" =
                     Transaction_snark.For_tests.update_states
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
-                  U.check_zkapp_command_with_merges_exn ~state_body ledger
+                  U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true ~state_body ledger
                     [ zkapp_command ] ) ) )
 
     let%test_unit "generated account precondition" =
@@ -595,7 +599,8 @@ let%test_module "Account precondition tests" =
                     Transaction_snark.For_tests.update_states
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
-                  U.check_zkapp_command_with_merges_exn ~state_body ledger
+                  U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true ~state_body ledger
                     [ zkapp_command ] ) ) )
 
     let mk_delegate_precondition pk : Account_update.Account_precondition.t =
@@ -687,7 +692,8 @@ let%test_module "Account precondition tests" =
                     in
                     Zkapp_command_builder.replace_authorizations ~keymap zkapp
                   in
-                  U.check_zkapp_command_with_merges_exn ~state_body ledger
+                  U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true ~state_body ledger
                     [ zkapp_command ] ) ) )
 
     let%test_unit "unsatisfied delegate precondition, custom token" =
@@ -760,6 +766,7 @@ let%test_module "Account precondition tests" =
                     replace_authorizations ~keymap zkapp_dummy_signatures
                   in
                   U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true
                     ~expected_failure:
                       (Account_delegate_precondition_unsatisfied, U.Pass_2)
                     ledger
@@ -827,6 +834,7 @@ let%test_module "Account precondition tests" =
                   Transaction_snark.For_tests.create_trivial_zkapp_account ~vk
                     ~ledger snapp_pk ;
                   U.check_zkapp_command_with_merges_exn
+                    ~don't_generate_merge_proofs:true
                     ~expected_failure:
                       ( Transaction_status.Failure
                         .Account_nonce_precondition_unsatisfied
