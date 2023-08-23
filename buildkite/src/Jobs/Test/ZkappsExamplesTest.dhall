@@ -43,7 +43,7 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = unitDirtyWhen,
         path = "Test",
-        name = "ZkappsExamplesUnitTest"
+        name = "ZkappsExamplesTest"
       },
     steps = [
       buildTestCmd "dev" Size.XLarge
