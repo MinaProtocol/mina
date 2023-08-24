@@ -967,7 +967,9 @@ end = struct
         let vidx = compute_value idx in
         let vv = compute_value v in
         (* FIXME: we should have a int32 here. We are not sure the ID will be a
-           int32. We should enforce that *)
+           int32. We should enforce that.
+           See https://github.com/MinaProtocol/mina/issues/13955
+        *)
         let id_int32 = Int32.of_string @@ Fp.to_string vid in
         (* FIXME: make a better exception. Open an GH issue and link here *)
         let i, rt_idx = Hashtbl.find_exn map_runtime_tables (id_int32, vidx) in
