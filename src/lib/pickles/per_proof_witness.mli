@@ -74,7 +74,7 @@ module Constant : sig
 
   type scalar_challenge = challenge Import.Scalar_challenge.t
 
-  type ('statement, 'max_proofs_verified, _) t =
+  type ('statement, 'max_proofs_verified) t =
     { app_state : 'statement
     ; wrap_proof : Wrap_proof.Constant.t
     ; proof_state :
@@ -105,8 +105,7 @@ module Constant : sig
     }
 
   module No_app_state : sig
-    type nonrec (_, 'max_proofs_verified, 'num_branches) t =
-      (unit, 'max_proofs_verified, 'num_branches) t
+    type nonrec (_, 'max_proofs_verified, _) t = (unit, 'max_proofs_verified) t
   end
 end
 
@@ -114,5 +113,4 @@ val typ :
      feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
   -> ('avar, 'aval) Impl.Typ.t
   -> 'n Pickles_types.Nat.t
-  -> 'm Pickles_types.Nat.t
-  -> (('avar, 'n, 'm) t, ('aval, 'n, 'm) Constant.t) Impl.Typ.t
+  -> (('avar, 'n, _) t, ('aval, 'n) Constant.t) Impl.Typ.t
