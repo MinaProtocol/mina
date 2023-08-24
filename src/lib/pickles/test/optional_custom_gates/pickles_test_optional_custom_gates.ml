@@ -314,3 +314,45 @@ module Foreign_field_mul = Make_test (struct
 
   let feature_flags2 = feature_flags
 end)
+
+(* Tests with 'Maybe' *)
+
+module Xor_maybe = Make_test (struct
+  let feature_flags1 = Plonk_types.Features.{ none_bool with xor = true }
+
+  let feature_flags2 = Plonk_types.Features.none_bool
+end)
+
+module Range_check0_maybe = Make_test (struct
+  let feature_flags1 =
+    Plonk_types.Features.{ none_bool with range_check0 = true }
+
+  let feature_flags2 = Plonk_types.Features.none_bool
+end)
+
+module Range_check1_maybe = Make_test (struct
+  let feature_flags1 =
+    Plonk_types.Features.{ none_bool with range_check1 = true }
+
+  let feature_flags2 = Plonk_types.Features.none_bool
+end)
+
+module Rot_maybe = Make_test (struct
+  let feature_flags1 = Plonk_types.Features.{ none_bool with rot = true }
+
+  let feature_flags2 = Plonk_types.Features.none_bool
+end)
+
+module Foreign_field_add_maybe = Make_test (struct
+  let feature_flags1 =
+    Plonk_types.Features.{ none_bool with foreign_field_add = true }
+
+  let feature_flags2 = Plonk_types.Features.none_bool
+end)
+
+module Foreign_field_mul_maybe = Make_test (struct
+  let feature_flags1 =
+    Plonk_types.Features.{ none_bool with foreign_field_mul = true }
+
+  let feature_flags2 = Plonk_types.Features.none_bool
+end)
