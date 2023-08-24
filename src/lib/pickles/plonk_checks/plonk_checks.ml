@@ -3,7 +3,7 @@ open Pickles_types
 open Pickles_base
 module Scalars = Scalars
 module Domain = Domain
-module Opt = Plonk_types.Opt
+module Opt = Opt
 
 type 'field vanishing_polynomial_domain =
   < vanishing_polynomial : 'field -> 'field >
@@ -116,7 +116,7 @@ let expand_feature_flags (type boolean)
 
 let lookup_tables_used feature_flags =
   let module Bool = struct
-    type t = Plonk_types.Opt.Flag.t
+    type t = Opt.Flag.t
 
     let (true_ : t) = Yes
 
@@ -397,7 +397,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; zeta_to_domain_size = env.zeta_to_n_minus_1 + F.one
         ; zeta_to_srs_length = pow2pow (module F) zeta env.srs_length_log2
         ; perm
-        ; joint_combiner = Plonk_types.Opt.of_option joint_combiner
+        ; joint_combiner = Opt.of_option joint_combiner
         ; feature_flags = actual_feature_flags
         }
 
@@ -420,7 +420,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; beta = plonk.beta
         ; gamma = plonk.gamma
         ; zeta = plonk.zeta
-        ; joint_combiner = Plonk_types.Opt.to_option_unsafe plonk.joint_combiner
+        ; joint_combiner = Opt.to_option_unsafe plonk.joint_combiner
         ; feature_flags = plonk.feature_flags
         }
         evals

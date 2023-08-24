@@ -14,7 +14,7 @@ module Basic : sig
         Backend.Tick.Inner_curve.Affine.t
         Pickles_types.Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
 end
 
@@ -35,7 +35,7 @@ module Side_loaded : sig
       { max_proofs_verified :
           (module Pickles_types.Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
-      ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
+      ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
       ; branches : 'n2 Pickles_types.Nat.t
       }
   end
@@ -58,7 +58,7 @@ module Compiled : sig
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; wrap_domains : Import.Domains.t
     ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
 
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
@@ -75,7 +75,7 @@ module Compiled : sig
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains : Import.Domains.t
     ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
 end
 
@@ -96,7 +96,7 @@ module For_step : sig
     ; step_domains :
         [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
         | `Side_loaded ]
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
 
   val of_side_loaded : ('a, 'b, 'c, 'd) Side_loaded.t -> ('a, 'b, 'c, 'd) t
@@ -126,8 +126,7 @@ val max_proofs_verified :
      ('a, 'b, 'n1, 'c) Tag.t
   -> (module Pickles_types.Nat.Add.Intf with type n = 'n1)
 
-val feature_flags :
-  _ Tag.t -> Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
+val feature_flags : _ Tag.t -> Opt.Flag.t Plonk_types.Features.Full.t
 
 val add_exn :
   ('var, 'value, 'c, 'd) Tag.t -> ('var, 'value, 'c, 'd) Compiled.t -> unit

@@ -132,10 +132,10 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                  , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                  , ( Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                    , Impls.Wrap.Boolean.var )
-                   Plonk_types.Opt.t
+                   Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                    , Impls.Wrap.Boolean.var )
-                   Pickles_types__Plonk_types.Opt.t
+                   Pickles_types__Opt.t
                  , Impls.Wrap.Boolean.var )
                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                  .In_circuit
@@ -417,8 +417,7 @@ struct
     let feature_flags =
       let rec go :
           type a b c d.
-             (a, b, c, d) H4.T(IR).t
-          -> Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t =
+          (a, b, c, d) H4.T(IR).t -> Opt.Flag.t Plonk_types.Features.Full.t =
        fun rules ->
         match rules with
         | [] ->
@@ -426,10 +425,10 @@ struct
         | [ r ] ->
             Plonk_types.Features.map r.feature_flags ~f:(function
               | true ->
-                  Plonk_types.Opt.Flag.Yes
+                  Opt.Flag.Yes
               | false ->
-                  Plonk_types.Opt.Flag.No )
-            |> Plonk_types.Features.to_full ~or_:Plonk_types.Opt.Flag.( ||| )
+                  Opt.Flag.No )
+            |> Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| )
         | r :: rules ->
             let feature_flags = go rules in
             Plonk_types.Features.Full.map2
@@ -437,7 +436,7 @@ struct
               feature_flags ~f:(fun enabled flag ->
                 match (enabled, flag) with
                 | true, Yes ->
-                    Plonk_types.Opt.Flag.Yes
+                    Opt.Flag.Yes
                 | false, No ->
                     No
                 | _, Maybe | true, No | false, Yes ->
@@ -866,8 +865,7 @@ module Side_loaded = struct
       ; public_input = typ
       ; branches = Verification_key.Max_branches.n
       ; feature_flags =
-          Plonk_types.Features.to_full ~or_:Plonk_types.Opt.Flag.( ||| )
-            feature_flags
+          Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
       }
 
   module Proof = struct
