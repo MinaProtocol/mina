@@ -242,7 +242,7 @@ module Db = struct
       module MT = Ledger
       include Base_ledger_inputs
 
-      let account_subtree_height = 3
+      let account_subtree_height = 6
     end
 
     module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
@@ -387,7 +387,7 @@ module Mask = struct
       module MT = Ledger
       include Base_ledger_inputs
 
-      let account_subtree_height = 3
+      let account_subtree_height = 6
     end
 
     module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
