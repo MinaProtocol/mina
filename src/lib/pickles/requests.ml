@@ -1,10 +1,8 @@
-open Core_kernel
 open Import
 open Types
 open Pickles_types
 open Hlist
 open Snarky_backendless.Request
-open Common
 open Backend
 
 module Wrap = struct
@@ -14,7 +12,6 @@ module Wrap = struct
     type max_local_max_proofs_verifieds
 
     open Impls.Wrap
-    open Wrap_main_inputs
     open Snarky_backendless.Request
 
     type _ t +=
@@ -145,7 +142,7 @@ module Step = struct
   end
 
   let create :
-      type proofs_verified local_signature local_branches statement return_value auxiliary_value prev_values prev_ret_values max_proofs_verified.
+      type proofs_verified local_signature local_branches statement return_value auxiliary_value prev_values max_proofs_verified.
          unit
       -> (module S
             with type local_signature = local_signature

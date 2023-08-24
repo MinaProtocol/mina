@@ -151,8 +151,7 @@ module Stable = struct
         let log2_size = Int.ceil_log2 d.constraints in
         let public =
           let (T (input, conv, _conv_inv)) =
-            Impls.Wrap.input
-              ~feature_flags:Plonk_types.Features.maybe ()
+            Impls.Wrap.input ~feature_flags:Plonk_types.Features.maybe ()
           in
           let (Typ typ) = input in
           typ.size_in_field_elements

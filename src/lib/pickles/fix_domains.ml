@@ -3,9 +3,9 @@ open Import
 
 let zk_rows = 3
 
-let rough_domains : Domains.t =
+let rough_domains =
   let d = Domain.Pow_2_roots_of_unity 20 in
-  { h = d }
+  { Domains.h = d }
 
 let domains (type field) ?(min_log2 = 0)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
@@ -13,7 +13,7 @@ let domains (type field) ?(min_log2 = 0)
     (Spec.ETyp.T (return_typ, _ret_conv, ret_conv_inv)) main =
   let main x () = ret_conv_inv (main (conv x)) in
 
-  let domains2 sys : Domains.t =
+  let domains2 sys =
     let open Domain in
     let public_input_size =
       Set_once.get_exn

@@ -101,13 +101,11 @@ module No_app_state = struct
 end
 
 module Constant = struct
-  open Kimchi_backend
-
   type challenge = Challenge.Constant.t
 
   type scalar_challenge = challenge Scalar_challenge.t
 
-  type ('statement, 'max_proofs_verified, _) t =
+  type ('statement, 'max_proofs_verified) t =
     { app_state : 'statement
     ; wrap_proof : Wrap_proof.Constant.t
     ; proof_state :
@@ -132,15 +130,13 @@ module Constant = struct
   [@@deriving hlist]
 
   module No_app_state = struct
-    type nonrec (_, 'max_proofs_verified, 'num_branches) t =
-      (unit, 'max_proofs_verified, 'num_branches) t
+    type nonrec (_, 'max_proofs_verified, _) t = (unit, 'max_proofs_verified) t
   end
 end
 
-let typ (type n avar aval m) ~feature_flags
+let typ (type n avar aval) ~feature_flags
     (statement : (avar, aval) Impls.Step.Typ.t) (max_proofs_verified : n Nat.t)
-    (branches : m Nat.t) :
-    ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
+    =
   let module Sc = Scalar_challenge in
   let open Impls.Step in
   let open Step_main_inputs in

@@ -45,7 +45,7 @@ module Create_account =
 {|
 mutation ($password: String!) @encoders(module: "Encoders"){
   createAccount(input: {password: $password}) {
-    public_key: publicKey
+    account: account { public_key : publicKey }
   }
 }
 |}]
@@ -55,7 +55,7 @@ module Create_hd_account =
 {|
 mutation ($hd_index: UInt32!) @encoders(module: "Encoders"){
   createHDAccount(input: {index: $hd_index}) {
-    public_key: publicKey
+    account : account { public_key: publicKey }
   }
 }
 |}]
@@ -65,7 +65,7 @@ module Unlock_account =
 {|
 mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
   unlockAccount(input: {password: $password, publicKey: $public_key }) {
-    public_key: publicKey
+    account: account { public_key: publicKey }
   }
 }
 |}]
@@ -112,7 +112,10 @@ query pendingSnarkWork {
         sign
         fee_magnitude: feeMagnitude
       }
-      supply_increase: supplyIncrease
+      supply_change: supplyChange {
+        sign
+        fee_magnitude: feeMagnitude
+      }
       work_id: workId
       }
     }
@@ -207,10 +210,10 @@ module Pooled_user_commands =
 query user_commands($public_key: PublicKey) @encoders(module: "Encoders"){
   pooledUserCommands(publicKey: $public_key) @bsRecord {
     id
-    isDelegation
+    kind
     nonce
-    from
-    to_: to
+    feePayer { public_key: publicKey }
+    receiver { public_key: publicKey }
     amount
     fee
     memo
