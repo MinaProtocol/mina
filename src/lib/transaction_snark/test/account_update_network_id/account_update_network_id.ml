@@ -10,8 +10,6 @@ let%test_module "Account update network id tests" =
 
     let%test_unit "zkapps failed to apply with a different network id" =
       let open Mina_transaction_logic.For_tests in
-      Backtrace.elide := false ;
-      Async.Scheduler.set_record_backtraces true ;
       Quickcheck.test ~trials:1 (Test_spec.mk_gen ~num_transactions:1 ())
         ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -49,5 +47,15 @@ let%test_module "Account update network id tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
+                  match%map
+                    Monitor.try_with (fun () ->
+                        U.check_zkapp_command_with_merges_exn ledger
+                          [ zkapp_command ] )
+                  with
+                  | Ok _ ->
+                      failwith
+                        "check_zkapp_command_with_merges_exn should cause \
+                         Constraint unsatisfied"
+                  | Error _ ->
+                      () ) ) )
   end )

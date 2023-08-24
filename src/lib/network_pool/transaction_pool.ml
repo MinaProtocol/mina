@@ -2951,6 +2951,11 @@ let%test_module _ =
           in
           return () )
 
+    (* This test uses dummy verifiers, that's why it's not rejecting the problematic zkapp command
+       But this test is still useful, since it exercises the parts that doesn't requires a pickles instance
+       Combining together with the test that uses pickles directly, these 2 tests would make sure that
+       the problematic zkapp command would fail exactly for the invalid proof
+    *)
     let%test "account update with a different network id that uses proof \
               authorization would pass verification under dummy verifier" =
       Thread_safe.block_on_async_exn (fun () ->

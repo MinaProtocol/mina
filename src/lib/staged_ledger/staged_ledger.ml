@@ -4418,7 +4418,13 @@ let%test_module "staged ledger tests" =
                   | _ ->
                       failwith "expecting zkapp_command transaction" ) ) )
 
-    let%test_unit "Invalid account_update_hash" =
+    (* This test uses dummy verifiers, that's why it's not rejecting the problematic zkapp command
+       But this test is still useful, since it exercises the parts that doesn't requires a pickles instance
+       Combining together with the test that uses pickles directly, these 2 tests would make sure that
+       the problematic zkapp command would fail exactly for the invalid proof
+    *)
+    let%test_unit "Invalid account_update_hash would not be rejected by dummy \
+                   verifier" =
       let open Transaction_snark.For_tests in
       Quickcheck.test ~trials:1 gen_spec_keypair_and_global_slot
         ~f:(fun ({ init_ledger; specs }, zkapp_account_keypair, global_slot) ->
@@ -4506,25 +4512,7 @@ let%test_module "staged ledger tests" =
                           ~supercharge_coinbase:false
                       with
                       | Ok _ ->
-                          assert false
+                          ()
                       | Error e ->
-                          failwith (Staged_ledger_error.to_string e) )
-                  (*
-                  let%bind _proof, diff =
-                    create_and_apply sl ~global_slot ~state_and_body_hash
-                      ~protocol_state_view:current_state_view
-                      (Sequence.singleton
-                         (User_command.Zkapp_command invalid_zkapp_command) )
-                      stmt_to_work_one_prover
-                  in
-                  let command =
-                    Staged_ledger_diff.commands diff |> List.hd_exn
-                  in
-                  match command.status with
-                  | Failed failure_tbl ->
-                      failwith
-                        ( Transaction_status.Failure.Collection.to_yojson
-                            failure_tbl
-                        |> Yojson.Safe.to_string )
-                  | Applied -> *) ) ) )
+                          failwith (Staged_ledger_error.to_string e) ) ) ) )
   end )
