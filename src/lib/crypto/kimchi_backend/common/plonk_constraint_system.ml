@@ -2224,9 +2224,9 @@ end = struct
               "Trying to add a runtime table configuration  it has been \
                already finalized" )
     | Plonk_constraint.T (RuntimeLookup { table_id; idx; v }) ->
-        (* FIXME: at the moment, we only do one runtime lookup per row, but
-                    we could do up to 3 within the same table.
-           TODO: open a GitHub issue and link here *)
+        (* FIXME: at the moment, we only do one runtime lookup per row, but we
+                    could do up to 3 within the same table_id. See
+                    https://github.com/MinaProtocol/mina/issues/13952 *)
         (* Would be nice to have a nicer data structures than a list of tuples to
            help the runtime table construction *)
         let red_table_id = reduce_to_v table_id in
