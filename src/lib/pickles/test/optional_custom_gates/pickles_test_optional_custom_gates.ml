@@ -184,15 +184,25 @@ let main_foreign_field_mul () =
     (Raw { kind = Zero; values = [| fresh_int 0 |]; coeffs = [||] })
 
 module Make_test (Inputs : sig
-  val feature_flags : bool Plonk_types.Features.t
+  val feature_flags1 : bool Plonk_types.Features.t
+
+  val feature_flags2 : bool Plonk_types.Features.t
 end) =
 struct
   open Inputs
 
-  let _tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
+  let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
+    if feature_flags.rot then main_rot () ;
+    if feature_flags.xor then main_xor () ;
+    if feature_flags.range_check0 then main_range_check0 () ;
+    if feature_flags.range_check1 then main_range_check1 () ;
+    if feature_flags.foreign_field_add then main_foreign_field_add () ;
+    if feature_flags.foreign_field_mul then main_foreign_field_mul ()
+
+  let _tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
-      ~branches:(module Nat.N1)
+      ~branches:(module Nat.N2)
       ~max_proofs_verified:(module Nat.N0)
       ~name:"optional_custom_gates"
       ~constraint_constants:
@@ -209,62 +219,98 @@ struct
         ; fork = None
         }
       ~choices:(fun ~self:_ ->
-        [ { identifier = "main"
+        [ { identifier = "main1"
           ; prevs = []
           ; main =
               (fun _ ->
-                if feature_flags.rot then main_rot () ;
-                if feature_flags.xor then main_xor () ;
-                if feature_flags.range_check0 then main_range_check0 () ;
-                if feature_flags.range_check1 then main_range_check1 () ;
-                if feature_flags.foreign_field_add then
-                  main_foreign_field_add () ;
-                if feature_flags.foreign_field_mul then
-                  main_foreign_field_mul () ;
+                main_body ~feature_flags:feature_flags1 () ;
                 { previous_proof_statements = []
                 ; public_output = ()
                 ; auxiliary_output = ()
                 } )
-          ; feature_flags
+          ; feature_flags = feature_flags1
+          }
+        ; { identifier = "main2"
+          ; prevs = []
+          ; main =
+              (fun _ ->
+                main_body ~feature_flags:feature_flags2 () ;
+                { previous_proof_statements = []
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
+          ; feature_flags = feature_flags2
           }
         ] )
       ()
 
   module Proof = (val proof)
 
-  let public_input, (), proof =
-    Async.Thread_safe.block_on_async_exn (fun () -> prove ())
+  let public_input1, (), proof1 =
+    Async.Thread_safe.block_on_async_exn (fun () -> prove1 ())
 
   let () =
     Or_error.ok_exn
       (Async.Thread_safe.block_on_async_exn (fun () ->
-           Proof.verify [ (public_input, proof) ] ) )
+           Proof.verify [ (public_input1, proof1) ] ) )
+
+  let public_input2, (), proof2 =
+    Async.Thread_safe.block_on_async_exn (fun () -> prove2 ())
+
+  let () =
+    Or_error.ok_exn
+      (Async.Thread_safe.block_on_async_exn (fun () ->
+           Proof.verify [ (public_input2, proof2) ] ) )
 end
 
 module Xor = Make_test (struct
   let feature_flags = Plonk_types.Features.{ none_bool with xor = true }
+
+  let feature_flags1 = feature_flags
+
+  let feature_flags2 = feature_flags
 end)
 
 module Range_check0 = Make_test (struct
   let feature_flags =
     Plonk_types.Features.{ none_bool with range_check0 = true }
+
+  let feature_flags1 = feature_flags
+
+  let feature_flags2 = feature_flags
 end)
 
 module Range_check1 = Make_test (struct
   let feature_flags =
     Plonk_types.Features.{ none_bool with range_check1 = true }
+
+  let feature_flags1 = feature_flags
+
+  let feature_flags2 = feature_flags
 end)
 
 module Rot = Make_test (struct
   let feature_flags = Plonk_types.Features.{ none_bool with rot = true }
+
+  let feature_flags1 = feature_flags
+
+  let feature_flags2 = feature_flags
 end)
 
 module Foreign_field_add = Make_test (struct
   let feature_flags =
     Plonk_types.Features.{ none_bool with foreign_field_add = true }
+
+  let feature_flags1 = feature_flags
+
+  let feature_flags2 = feature_flags
 end)
 
 module Foreign_field_mul = Make_test (struct
   let feature_flags =
     Plonk_types.Features.{ none_bool with foreign_field_mul = true }
+
+  let feature_flags1 = feature_flags
+
+  let feature_flags2 = feature_flags
 end)
