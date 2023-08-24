@@ -1,5 +1,3 @@
-open Pickles_types
-
 module Wrap_impl :
     module type of Snarky_backendless.Snark.Run.Make (Backend.Tock)
 
@@ -39,7 +37,6 @@ module Step : sig
   val input :
        proofs_verified:'a Pickles_types.Nat.t
     -> wrap_rounds:'b Pickles_types.Nat.t
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
     -> ( ( ( ( Impl.Field.t
              , Impl.Field.t Composition_types.Scalar_challenge.t
              , Other_field.t Pickles_types.Shifted_value.Type2.t

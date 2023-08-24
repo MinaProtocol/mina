@@ -209,7 +209,7 @@ struct
     in
     let map2 ~f_bool ~f =
       Plonk_verification_key_evals.Step.map2 ~f ~f_opt:(fun x y ->
-          match (x, y) with
+          match[@warning "-4"] (x, y) with
           | Plonk_types.Opt.None, Plonk_types.Opt.None ->
               Plonk_types.Opt.None
           | Plonk_types.Opt.Some x, Plonk_types.Opt.Some y ->
@@ -544,15 +544,17 @@ struct
       ; gamma = gamma_0
       ; zeta = zeta_0
       ; joint_combiner = joint_combiner_0
+      ; feature_flags = _
       }
       { Plonk.Minimal.In_circuit.alpha = alpha_1
       ; beta = beta_1
       ; gamma = gamma_1
       ; zeta = zeta_1
       ; joint_combiner = joint_combiner_1
+      ; feature_flags = _
       } =
     with_label __LOC__ (fun () ->
-        match (joint_combiner_0, joint_combiner_1) with
+        match[@warning "-4"] (joint_combiner_0, joint_combiner_1) with
         | None, None ->
             ()
         | Maybe (b0, j0), Maybe (b1, j1) ->
@@ -600,6 +602,19 @@ struct
         ; mul_comm
         ; emul_comm
         ; endomul_scalar_comm
+        ; range_check0_comm
+        ; range_check1_comm
+        ; foreign_field_mul_comm
+        ; foreign_field_add_comm
+        ; xor_comm
+        ; rot_comm
+        ; lookup_table_comm
+        ; lookup_table_ids
+        ; runtime_tables_selector
+        ; lookup_selector_xor
+        ; lookup_selector_lookup
+        ; lookup_selector_range_check
+        ; lookup_selector_ffmul
         } =
       m
     in
@@ -615,20 +630,20 @@ struct
         ; endomul_scalar_comm
         ] )
       ~f:(fun x -> Plonk_types.Opt.Some (g x))
-    @ [ g_opt m.range_check0_comm
-      ; g_opt m.range_check1_comm
-      ; g_opt m.foreign_field_mul_comm
-      ; g_opt m.foreign_field_add_comm
-      ; g_opt m.xor_comm
-      ; g_opt m.rot_comm
+    @ [ g_opt range_check0_comm
+      ; g_opt range_check1_comm
+      ; g_opt foreign_field_mul_comm
+      ; g_opt foreign_field_add_comm
+      ; g_opt xor_comm
+      ; g_opt rot_comm
       ]
-    @ List.map ~f:g_opt (Vector.to_list m.lookup_table_comm)
-    @ [ g_opt m.lookup_table_ids
-      ; g_opt m.runtime_tables_selector
-      ; g_opt m.lookup_selector_xor
-      ; g_opt m.lookup_selector_lookup
-      ; g_opt m.lookup_selector_range_check
-      ; g_opt m.lookup_selector_ffmul
+    @ List.map ~f:g_opt (Vector.to_list lookup_table_comm)
+    @ [ g_opt lookup_table_ids
+      ; g_opt runtime_tables_selector
+      ; g_opt lookup_selector_xor
+      ; g_opt lookup_selector_lookup
+      ; g_opt lookup_selector_range_check
+      ; g_opt lookup_selector_ffmul
       ]
 
   (** Simulate an [Opt_sponge.t] locally in a block, but without running the
@@ -795,7 +810,7 @@ struct
           match messages.lookup with
           | None ->
               Types.Opt.None
-          | Maybe (b, l) ->
+          | Maybe (_b, _l) ->
               failwith "TODO"
           | Some l -> (
               let absorb_sorted_first_part () =
@@ -814,7 +829,9 @@ struct
                     let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
                     absorb sponge Without_degree_bound z
               in
-              match (m.lookup_table_comm, m.runtime_tables_selector) with
+              match[@warning "-4"]
+                (m.lookup_table_comm, m.runtime_tables_selector)
+              with
               | _ :: Some _ :: _, _ | _, Some _ ->
                   let joint_combiner = sample_scalar () in
                   absorb_sorted_first_part () ;
@@ -828,11 +845,11 @@ struct
                   failwith "TODO" )
         in
         let lookup_table_comm =
-          match (messages.lookup, joint_combiner) with
+          match[@warning "-4"] (messages.lookup, joint_combiner) with
           | Types.Opt.None, Types.Opt.None ->
               Types.Opt.None
-          | ( Types.Opt.Maybe (b_l, l)
-            , Types.Opt.Maybe (b_joint_combiner, joint_combiner) ) ->
+          | ( Types.Opt.Maybe (_b_l, _l)
+            , Types.Opt.Maybe (_b_joint_combiner, _joint_combiner) ) ->
               failwith "TODO"
           | Types.Opt.Some l, Types.Opt.Some joint_combiner ->
               let (first_column :: second_column :: rest) =
@@ -1042,8 +1059,12 @@ struct
         in
         let ft_comm =
           with_label __LOC__ (fun () ->
-              Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast
-                ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
+              Common.ft_comm
+                ~add:(Ops.add_fast ?check_finite:None)
+                ~scale:scale_fast ~negate:Inner_curve.negate
+                ~endoscale:
+                  (Scalar_challenge.endo
+                     ~num_bits:Other_field.Packed.Constant.size_in_bits )
                 ~verification_key:
                   (Plonk_verification_key_evals.Step.forget_optional_commitments
                      m )

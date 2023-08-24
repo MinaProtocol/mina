@@ -40,7 +40,6 @@ val assert_n_bits :
 
 val finalize_other_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
   -> step_domains:
        [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
        | `Side_loaded ]
