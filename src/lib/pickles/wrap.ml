@@ -442,7 +442,6 @@ let%test_module "gate finalization" =
             (* Call finalisation with all of the required details *)
             Step_verifier.finalize_other_proof
               (module Nat.N0)
-              ~feature_flags
               ~step_domains:
                 (`Known
                   [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ]
@@ -759,7 +758,7 @@ let wrap
 
   let public_input =
     tick_public_input_of_statement ~max_proofs_verified
-      prev_statement_with_hashes ~feature_flags
+      prev_statement_with_hashes
   in
   let prev_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges

@@ -23,6 +23,6 @@ let domains (type field) ?(min_log2 = 0)
     let rows =
       zk_rows + public_input_size + Impl.R1CS_constraint_system.get_rows_len sys
     in
-    { h = Pow_2_roots_of_unity Int.(max min_log2 (ceil_log2 rows)) }
+    { Domains.h = Pow_2_roots_of_unity Int.(max min_log2 (ceil_log2 rows)) }
   in
   domains2 (Impl.constraint_system ~input_typ:typ ~return_typ main)
