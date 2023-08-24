@@ -971,7 +971,8 @@ end = struct
            See https://github.com/MinaProtocol/mina/issues/13955
         *)
         let id_int32 = Int32.of_string @@ Fp.to_string vid in
-        (* FIXME: make a better exception. Open an GH issue and link here *)
+        (* FIXME: make a better exception. See
+           https://github.com/MinaProtocol/mina/issues/13954 *)
         let i, rt_idx = Hashtbl.find_exn map_runtime_tables (id_int32, vidx) in
         let rt = runtime_tables.(rt_idx) in
         rt.data.(i) <- vv ) ;
