@@ -3,8 +3,8 @@
 (** {1 Type} *)
 
 type ('a, 'bool) t =
-  | Some of 'a
-  | None
+  | Just of 'a
+  | Nothing
   | Maybe of 'bool * 'a
       (** Representation of a value that can either be [None] or [Some]
                             depending on the actual value of its first parameter. *)
@@ -12,9 +12,9 @@ type ('a, 'bool) t =
 
 (** {1 Constructors} *)
 
-val some : 'a -> ('a, 'bool) t
+val just : 'a -> ('a, 'bool) t
 
-val none : ('a, 'bool) t
+val nothing : ('a, 'bool) t
 
 val maybe : 'bool -> 'a -> ('a, 'bool) t
 
@@ -30,12 +30,12 @@ val map : ('a, 'bool) t -> f:('a -> 'b) -> ('b, 'bool) t
   **)
 val value_exn : ('a, 'bool) t -> 'a
 
-(** [to_option_unsafe opt] is [Some v] when [opt] if [Some v] or [Maybe (_, v)],
+(** [to_option_unsafe opt] is [Some v] when [opt] if [Just v] or [Maybe (_, v)],
     [None] otherwise *)
 val to_option_unsafe : ('a, 'bool) t -> 'a option
 
-(** [to_option bool_opt] maps {!const:Some} and {!const:None} to their
-    identically named constructors in {!type:Option.t}.
+(** [to_option bool_opt] maps {!const:Just}, resp. {!const:Nothing}, to
+    {!const:Option.Some}, resp. {!const:Option.None}.
     
     The difference with {!val:to_option_unsafe} lies in the treatment of
     {!const:Maybe}, where [Maybe(false, x)] maps to {!val:Option.None} and
@@ -46,20 +46,20 @@ val to_option : ('a, bool) t -> 'a option
 (** [of_option o] is a straightforward injection of a regular {!type:Option.t}
     value [o] into type {!type:t}.
 
-    {!const:Option.Some} maps to {!const:Some} and {!const:Option.None} to
-    {!const:None}.
+    {!const:Option.Some} maps to {!const:Just} and {!const:Option.None} to
+    {!const:Nothing}.
 *)
 val of_option : 'a option -> ('a, 'bool) t
 
-(** [lift ?on_maybe ~none f] lifts the application of function [f] to a value
+(** [lift ?on_maybe ~nothing f] lifts the application of function [f] to a value
     of type !{type:('a, 'bool) t} as follows:
-    - [Some v]: apply [f] to contained value [v]
-    - [None]: return the value specified by [none]
+    - [Just v]: apply [f] to contained value [v]
+    - [Nothing]: return the value specified by [nothing]
     - [Maybe (b, v)]: defaults to the case [Some v] when [on_maybe] is
       unspecified, otherwise apply [on_maybe b v]
 *)
 val lift :
-  ?on_maybe:('a -> 'b -> 'c) -> none:'c -> ('b -> 'c) -> ('b, 'a) t -> 'c
+  ?on_maybe:('a -> 'b -> 'c) -> nothing:'c -> ('b -> 'c) -> ('b, 'a) t -> 'c
 
 module Flag : sig
   type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]

@@ -215,11 +215,11 @@ struct
                  when none of the optional gates are used, otherwise we will
                  change the serialization of the protocol circuits.
               *)
-              | Opt.None ->
+              | Opt.Nothing ->
                   ([], [], [ b ])
               | Opt.Maybe (b_x, x) ->
                   ([], [ (b, b_x, x) ], [])
-              | Opt.Some x ->
+              | Opt.Just x ->
                   ([ (b, x) ], [], []) ) )
       |> Vector.reduce_exn
            ~f:
@@ -231,7 +231,7 @@ struct
                (* We only have `None`s, so we can emit exactly `None` without
                   further computation.
                *)
-               Opt.None
+               Opt.Nothing
            | somes, [], [] ->
                (* Special case: we don't need to compute the 'maybe' bool
                   because we know statically that all entries are `Some`.
@@ -242,7 +242,7 @@ struct
                         Double.map g ~f:(( * ) (b :> t)) )
                  |> List.reduce_exn ~f:(Double.map2 ~f:( + ))
                in
-               Opt.Some sum
+               Opt.just sum
            | somes, maybes, nones ->
                let is_none =
                  List.reduce nones
@@ -462,22 +462,22 @@ struct
               { Curve_opt.non_zero; point }
             in
             match p with
-            | Opt.None ->
+            | Opt.Nothing ->
                 acc
             | Opt.Maybe (keep, p) ->
                 point keep p
-            | Opt.Some p ->
+            | Opt.Just p ->
                 point Boolean.true_ p )
           ~xi
           ~init:(function
-            | Opt.None ->
+            | Opt.Nothing ->
                 None
             | Opt.Maybe (keep, p) ->
                 Some
                   { non_zero = Boolean.(keep &&& Point.finite p)
                   ; point = Point.underlying p
                   }
-            | Opt.Some p ->
+            | Opt.Just p ->
                 Some
                   { non_zero = Boolean.(true_ &&& Point.finite p)
                   ; point = Point.underlying p
@@ -598,8 +598,8 @@ struct
       ; feature_flags = _
       } =
     with_label __LOC__ (fun () ->
-        match (joint_combiner_0, joint_combiner_1) with
-        | None, None ->
+        match[@warning "-4"] (joint_combiner_0, joint_combiner_1) with
+        | Nothing, Nothing ->
             ()
         | Maybe (b0, j0), Maybe (b1, j1) ->
             Boolean.Assert.(b0 = b1) ;
@@ -607,13 +607,13 @@ struct
             Array.iter2_exn ~f:Field.Assert.equal
               (fst @@ var_to_fields j0)
               (fst @@ var_to_fields j1)
-        | Some j0, Some j1 ->
+        | Just j0, Just j1 ->
             let (Typ { var_to_fields; _ }) = Scalar_challenge.typ in
             Array.iter2_exn ~f:Field.Assert.equal
               (fst @@ var_to_fields j0)
               (fst @@ var_to_fields j1)
-        | ( ((Pickles_types.Opt.Some _ | Maybe _ | None) as j0)
-          , ((Pickles_types.Opt.Some _ | Maybe _ | None) as j1) ) ->
+        | ( ((Pickles_types.Opt.Just _ | Maybe _ | Nothing) as j0)
+          , ((Pickles_types.Opt.Just _ | Maybe _ | Nothing) as j1) ) ->
             let sexp_of t =
               Sexp.to_string
               @@ Types.Opt.sexp_of_t
@@ -675,7 +675,7 @@ struct
         ; emul_comm
         ; endomul_scalar_comm
         ] )
-      ~f:(fun x -> Opt.Some (g x))
+      ~f:(fun x -> Opt.just (g x))
     @ [ g_opt range_check0_comm
       ; g_opt range_check1_comm
       ; g_opt foreign_field_mul_comm
@@ -700,8 +700,8 @@ struct
       final state when using the sponge.
   *)
   let simulate_optional_sponge_with_alignment (sponge : Sponge.t) ~f = function
-    | Pickles_types.Opt.None ->
-        Pickles_types.Opt.None
+    | Pickles_types.Opt.Nothing ->
+        Pickles_types.Opt.Nothing
     | Pickles_types.Opt.Maybe (b, x) ->
         (* Cache the sponge state before *)
         let sponge_state_before = sponge.sponge_state in
@@ -724,8 +724,8 @@ struct
         in
         sponge.state <- state ;
         Pickles_types.Opt.Maybe (b, res)
-    | Pickles_types.Opt.Some x ->
-        Pickles_types.Opt.Some (f sponge x)
+    | Pickles_types.Opt.Just x ->
+        Pickles_types.Opt.Just (f sponge x)
 
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
@@ -867,25 +867,25 @@ struct
             in
             let absorb_sorted_5 () =
               match l.sorted_5th_column with
-              | None ->
+              | Nothing ->
                   ()
               | Maybe (b, z) ->
                   let z = Array.map z ~f:(fun z -> (b, z)) in
                   absorb sponge Without_degree_bound z
-              | Some z ->
+              | Just z ->
                   let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
                   absorb sponge Without_degree_bound z
             in
             match[@warning "-4"]
               (m.lookup_table_comm, m.runtime_tables_selector)
             with
-            | _ :: Some _ :: _, _ | _, Some _ ->
+            | _ :: Just _ :: _, _ | _, Just _ ->
                 let joint_combiner = sample_scalar () in
                 absorb_sorted_1 sponge ;
                 absorb_sorted_2_to_4 () ;
                 absorb_sorted_5 () ;
                 joint_combiner
-            | _ :: None :: _, None ->
+            | _ :: Nothing :: _, Nothing ->
                 absorb_sorted_1 sponge ;
                 absorb_sorted_2_to_4 () ;
                 absorb_sorted_5 () ;
@@ -925,8 +925,8 @@ struct
                 }
           in
           match messages.lookup with
-          | None ->
-              Types.Opt.None
+          | Nothing ->
+              Types.Opt.Nothing
           | Maybe (b, l) ->
               Opt.consume_all_pending sponge ;
               let sponge2 = Opt.copy sponge in
@@ -939,9 +939,9 @@ struct
               *)
               sponge.needs_final_permute_if_empty <- false ;
               Types.Opt.Maybe (b, joint_combiner)
-          | Some l ->
+          | Just l ->
               Opt.consume_all_pending sponge ;
-              Types.Opt.Some (compute_joint_combiner l)
+              Types.Opt.just (compute_joint_combiner l)
         in
         let lookup_table_comm =
           let compute_lookup_table_comm (l : _ Messages.Lookup.In_circuit.t)
@@ -953,7 +953,7 @@ struct
             in
             let second_column_with_runtime =
               match (second_column, l.runtime) with
-              | Types.Opt.None, comm | comm, Types.Opt.None ->
+              | Types.Opt.Nothing, comm | comm, Types.Opt.Nothing ->
                   comm
               | ( Types.Opt.Maybe (has_second_column, second_column)
                 , Types.Opt.Maybe (has_runtime, runtime) ) ->
@@ -973,9 +973,9 @@ struct
                           ~then_:second_with_runtime ~else_:runtime )
                   in
                   let b = Boolean.(has_second_column ||| has_runtime) in
-                  Types.Opt.Maybe (b, res)
+                  Types.Opt.maybe b res
               | ( Types.Opt.Maybe (has_second_column, second_column)
-                , Types.Opt.Some runtime ) ->
+                , Types.Opt.Just runtime ) ->
                   let res =
                     let sum =
                       Array.map2_exn ~f:Inner_curve.( + ) second_column runtime
@@ -984,8 +984,8 @@ struct
                         Inner_curve.if_ has_second_column ~then_:sum
                           ~else_:runtime )
                   in
-                  Types.Opt.Some res
-              | ( Types.Opt.Some second_column
+                  Types.Opt.just res
+              | ( Types.Opt.Just second_column
                 , Types.Opt.Maybe (has_runtime, runtime) ) ->
                   let res =
                     let sum =
@@ -996,9 +996,9 @@ struct
                         Inner_curve.if_ has_runtime ~then_:sum
                           ~else_:second_column )
                   in
-                  Types.Opt.Some res
-              | Types.Opt.Some second_column, Types.Opt.Some runtime ->
-                  Types.Opt.Some
+                  Types.Opt.just res
+              | Types.Opt.Just second_column, Types.Opt.Just runtime ->
+                  Types.Opt.just
                     (Array.map2_exn ~f:Inner_curve.( + ) second_column runtime)
             in
             let rest_rev =
@@ -1009,12 +1009,12 @@ struct
             in
             Vector.fold ~init:table_ids rest_rev ~f:(fun acc comm ->
                 match acc with
-                | Types.Opt.None ->
+                | Types.Opt.Nothing ->
                     comm
                 | Types.Opt.Maybe (has_acc, acc) -> (
                     match comm with
-                    | Types.Opt.None ->
-                        Types.Opt.Maybe (has_acc, acc)
+                    | Types.Opt.Nothing ->
+                        Types.Opt.maybe has_acc acc
                     | Types.Opt.Maybe (has_comm, comm) ->
                         let scaled_acc =
                           Array.map acc ~f:(fun acc ->
@@ -1034,8 +1034,8 @@ struct
                                 ~else_:acc )
                         in
                         let b = Boolean.(has_acc ||| has_comm) in
-                        Types.Opt.Maybe (b, res)
-                    | Types.Opt.Some comm ->
+                        Types.Opt.maybe b res
+                    | Types.Opt.Just comm ->
                         let scaled_acc =
                           Array.map acc ~f:(fun acc ->
                               Scalar_challenge.endo acc joint_combiner )
@@ -1047,11 +1047,11 @@ struct
                           Array.map2_exn sum comm ~f:(fun sum comm ->
                               Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
                         in
-                        Types.Opt.Some res )
-                | Types.Opt.Some acc -> (
+                        Types.Opt.just res )
+                | Types.Opt.Just acc -> (
                     match comm with
-                    | Types.Opt.None ->
-                        Types.Opt.Some acc
+                    | Types.Opt.Nothing ->
+                        Types.Opt.just acc
                     | Types.Opt.Maybe (has_comm, comm) ->
                         let scaled_acc =
                           Array.map acc ~f:(fun acc ->
@@ -1064,34 +1064,34 @@ struct
                           Array.map2_exn sum acc ~f:(fun sum acc ->
                               Inner_curve.if_ has_comm ~then_:sum ~else_:acc )
                         in
-                        Types.Opt.Some res
-                    | Types.Opt.Some comm ->
+                        Types.Opt.just res
+                    | Types.Opt.Just comm ->
                         let scaled_acc =
                           Array.map acc ~f:(fun acc ->
                               Scalar_challenge.endo acc joint_combiner )
                         in
-                        Types.Opt.Some
+                        Types.Opt.Just
                           (Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm)
                     ) )
           in
           match (messages.lookup, joint_combiner) with
-          | Types.Opt.None, Types.Opt.None ->
-              Types.Opt.None
+          | Types.Opt.Nothing, Types.Opt.Nothing ->
+              Types.Opt.Nothing
           | ( Types.Opt.Maybe (b_l, l)
             , Types.Opt.Maybe (_b_joint_combiner, joint_combiner) ) -> (
               (* NB: b_l = _b_joint_combiner by construction *)
               match compute_lookup_table_comm l joint_combiner with
-              | Types.Opt.None ->
-                  Types.Opt.None
+              | Types.Opt.Nothing ->
+                  Types.Opt.Nothing
               | Types.Opt.Maybe (b_lookup_table_comm, lookup_table_comm) ->
                   Types.Opt.Maybe
                     (Boolean.(b_l &&& b_lookup_table_comm), lookup_table_comm)
-              | Types.Opt.Some lookup_table_comm ->
+              | Types.Opt.Just lookup_table_comm ->
                   Types.Opt.Maybe (b_l, lookup_table_comm) )
-          | Types.Opt.Some l, Types.Opt.Some joint_combiner ->
+          | Types.Opt.Just l, Types.Opt.Just joint_combiner ->
               compute_lookup_table_comm l joint_combiner
-          | ( (Types.Opt.None | Maybe _ | Some _)
-            , (Types.Opt.None | Maybe _ | Some _) ) ->
+          | ( (Types.Opt.Nothing | Maybe _ | Just _)
+            , (Types.Opt.Nothing | Maybe _ | Just _) ) ->
               assert false
         in
         let lookup_sorted =
@@ -1100,26 +1100,26 @@ struct
           in
           Vector.init Plonk_types.Lookup_sorted.n ~f:(fun i ->
               match messages.lookup with
-              | Types.Opt.None ->
-                  Types.Opt.None
+              | Types.Opt.Nothing ->
+                  Types.Opt.Nothing
               | Types.Opt.Maybe (b, l) ->
                   if i = lookup_sorted_minus_1 then l.sorted_5th_column
                   else
                     Types.Opt.Maybe (b, Option.value_exn (Vector.nth l.sorted i))
-              | Types.Opt.Some l ->
+              | Types.Opt.Just l ->
                   if i = lookup_sorted_minus_1 then l.sorted_5th_column
-                  else Types.Opt.Some (Option.value_exn (Vector.nth l.sorted i)) )
+                  else Types.Opt.Just (Option.value_exn (Vector.nth l.sorted i)) )
         in
         let beta = sample () in
         let gamma = sample () in
         let () =
           match messages.lookup with
-          | None ->
+          | Nothing ->
               ()
           | Maybe (b, l) ->
               let aggreg = Array.map l.aggreg ~f:(fun z -> (b, z)) in
               absorb sponge Without_degree_bound aggreg
-          | Some l ->
+          | Just l ->
               let aggreg =
                 Array.map l.aggreg ~f:(fun z -> (Boolean.true_, z))
               in
@@ -1238,7 +1238,7 @@ struct
                             (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
                             len_1_add )
                          len_2_add )
-                 |> Vector.map ~f:(Array.map ~f:Pickles_types.Opt.some)
+                 |> Vector.map ~f:(Array.map ~f:Pickles_types.Opt.just)
                  |> append_chain len_6_add
                       ( [ m.range_check0_comm
                         ; m.range_check1_comm
@@ -1422,9 +1422,9 @@ struct
       List.iter xs ~f:(fun opt ->
           let absorb = Array.iter ~f:(fun x -> Sponge.absorb sponge x) in
           match opt with
-          | None ->
+          | Nothing ->
               ()
-          | Some (x1, x2) ->
+          | Just (x1, x2) ->
               absorb x1 ; absorb x2
           | Maybe (b, (x1, x2)) ->
               (* Cache the sponge state before *)
@@ -1525,15 +1525,15 @@ struct
               let a =
                 Evals.In_circuit.to_list e
                 |> List.map ~f:(function
-                     | None ->
+                     | Nothing ->
                          [||]
-                     | Some a ->
-                         Array.map a ~f:Pickles_types.Opt.some
+                     | Just a ->
+                         Array.map a ~f:Pickles_types.Opt.just
                      | Maybe (b, a) ->
                          Array.map a ~f:(Pickles_types.Opt.maybe b) )
               in
               let sg_evals =
-                Vector.map sg_evals ~f:(fun x -> [| Pickles_types.Opt.Some x |])
+                Vector.map sg_evals ~f:(fun x -> [| Pickles_types.Opt.just x |])
                 |> Vector.to_list
                 (* TODO: This was the code before the wrap hack was put in
                    match actual_proofs_verified with
@@ -1550,7 +1550,10 @@ struct
                                [| Field.((b :> t) * f pt) |] ) ) *)
               in
               let v =
-                List.append sg_evals ([| Some x_hat |] :: [| Some ft |] :: a)
+                List.append sg_evals
+                  ( [| Pickles_types.Opt.just x_hat |]
+                  :: [| Pickles_types.Opt.just ft |]
+                  :: a )
               in
               Common.combined_evaluation (module Impl) ~xi v
             in
@@ -1591,7 +1594,7 @@ struct
             (module Impl)
             ~env ~shift:shift2
             (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-             .to_wrap ~opt_none:Pickles_types.Opt.None ~false_:Boolean.false_
+             .to_wrap ~opt_none:Pickles_types.Opt.nothing ~false_:Boolean.false_
                plonk )
             combined_evals )
     in
