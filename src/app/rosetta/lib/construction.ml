@@ -279,20 +279,23 @@ module Metadata = struct
 
   let suggest_fee (type a) (module F : Field_like with type t = a) fees =
     let len = Array.length fees in
-    let med = fees.(len / 2) in
-    let iqr =
-      let threeq = fees.(3 * len / 4) in
-      let oneq = fees.(len / 4) in
-      F.(threeq - oneq)
-    in
-    let open F in
-    med + (iqr / of_int 2)
+    if len > 0 then
+      let med = fees.(len / 2) in
+      let iqr =
+        let threeq = fees.(3 * len / 4) in
+        let oneq = fees.(len / 4) in
+        F.(threeq - oneq)
+      in
+      let open F in
+      Some (med + (iqr / of_int 2))
+    else
+      None
 
   let%test_unit "suggest_fee is reasonable" =
     let sugg =
       suggest_fee (module Int) [| 100; 200; 300; 400; 500; 600; 700; 800 |]
     in
-    [%test_eq: int] sugg 700
+    [%test_eq: int option] sugg (Some 700)
 
   module Impl (M : Monad_fail.S) = struct
     let handle ~graphql_uri ~(env : 'gql Env.T(M).t)
@@ -330,9 +333,16 @@ module Metadata = struct
           account.nonce
         |> Option.value ~default:Unsigned.UInt32.zero
       in
+      (* minimum fee : Pull this from the compile constants *)
+      let minimum_fee_as_amount =
+        Amount_of.mina @@
+          Mina_currency.Fee.to_uint64
+            Mina_compile_config.minimum_user_command_fee
+      in
       (* suggested fee *)
-      (* Take the median of all the fees in blocks and add a bit extra using
-       * the interquartile range *)
+      (* Take the median of all the fees in blocks and add a half of the
+       * interquartile range. This will obviously fail if there have been
+       * no transactions so far, in which case return the minimum fee. *)
       let%map suggested_fee =
         let%map fees =
           match res.bestChain with
@@ -348,7 +358,9 @@ module Metadata = struct
           | None ->
               M.fail (Errors.create `Chain_info_missing)
         in
-        Amount_of.mina
+        Option.value_map
+          ~f:Amount_of.mina
+          ~default:minimum_fee_as_amount
           (suggest_fee
              ( module struct
                include Unsigned_extended.UInt64
@@ -356,14 +368,10 @@ module Metadata = struct
              end )
              fees)
       in
-      (* minimum fee : Pull this from the compile constants *)
       let amount_metadata =
         `Assoc
           [ ( "minimum_fee"
-            , Amount.to_yojson
-                (Amount_of.mina
-                   (Mina_currency.Fee.to_uint64
-                      Mina_compile_config.minimum_user_command_fee)) )
+            , Amount.to_yojson minimum_fee_as_amount )
           ]
       in
       let receiver_exists =
