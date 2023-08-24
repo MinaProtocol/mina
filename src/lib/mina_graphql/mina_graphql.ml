@@ -4854,8 +4854,8 @@ module Mutations = struct
                           let unused_pks =
                             List.map unused_keypairs
                               ~f:(fun { public_key; _ } ->
-                                (Public_key.compress public_key, ()) )
-                            |> Public_key.Compressed.Table.of_alist_exn
+                                Public_key.compress public_key )
+                            |> Public_key.Compressed.Hash_set.of_list
                           in
                           let `VK vk, `Prover prover =
                             Transaction_snark.For_tests.create_trivial_snapp

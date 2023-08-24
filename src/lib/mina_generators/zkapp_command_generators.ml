@@ -708,16 +708,17 @@ let gen_account_update_body_components (type a b c d) ?global_slot
       | Some available_pks ->
           let available_pk =
             match
-              Signature_lib.Public_key.Compressed.Table.choose available_pks
+              Hash_set.fold_until ~init:None
+                ~f:(fun _ x -> Stop (Some x))
+                ~finish:ident available_pks
             with
             | None ->
                 failwith "gen_account_update_body: no available public keys"
-            | Some (pk, ()) ->
+            | Some pk ->
                 pk
           in
           (* available public key no longer available *)
-          Signature_lib.Public_key.Compressed.Table.remove available_pks
-            available_pk ;
+          Hash_set.remove available_pks available_pk ;
           let account_id =
             match token_id with
             | Some custom_token_id ->
@@ -1184,13 +1185,11 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
         let ledger_pk_set =
           Signature_lib.Public_key.Compressed.Set.of_list ledger_pk_list
         in
-        let tbl = Signature_lib.Public_key.Compressed.Table.create () in
+        let tbl = Signature_lib.Public_key.Compressed.Hash_set.create () in
         Signature_lib.Public_key.Compressed.Map.iter_keys keymap ~f:(fun pk ->
             if
               not (Signature_lib.Public_key.Compressed.Set.mem ledger_pk_set pk)
-            then
-              Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk
-                ~data:() ) ;
+            then Hash_set.strict_add_exn tbl pk ) ;
         tbl
   in
   (* account ids seen, to generate receipt chain hash precondition only if

@@ -66,7 +66,7 @@ val gen_zkapp_command_from :
   -> ledger:Mina_ledger.Ledger.t
   -> ?protocol_state_view:Zkapp_precondition.Protocol_state.View.t
   -> ?vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
-  -> ?available_public_keys:unit Signature_lib.Public_key.Compressed.Table.t
+  -> ?available_public_keys:Signature_lib.Public_key.Compressed.Hash_set.t
   -> unit
   -> Zkapp_command.t Quickcheck.Generator.t
 
