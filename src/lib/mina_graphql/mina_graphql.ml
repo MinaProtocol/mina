@@ -4736,10 +4736,9 @@ module Mutations = struct
               ~wait_span ~stop_signal ~stop_time ~uuid keypairs )
           else return ()
         in
-        let%bind accounts = Ledger.to_list ledger in
-        [%log debug] "The accounts were not in the best tip $ledger, try again"
-          ~metadata:
-            [ ("ledger", `List (List.map accounts ~f:Account.to_yojson)) ] ;
+        [%log debug]
+          "Some deployed zkApp accounts weren't found in the best tip ledger, \
+           trying again" ;
         let%bind () =
           Async.after
             (Time.Span.of_ms
@@ -4852,6 +4851,12 @@ module Mutations = struct
                                 (Public_key.compress public_key, private_key) )
                             |> Public_key.Compressed.Map.of_alist_exn
                           in
+                          let unused_pks =
+                            List.map unused_keypairs
+                              ~f:(fun { public_key; _ } ->
+                                Public_key.compress public_key )
+                            |> Public_key.Compressed.Hash_set.of_list
+                          in
                           let `VK vk, `Prover prover =
                             Transaction_snark.For_tests.create_trivial_snapp
                               ~constraint_constants ()
@@ -4960,7 +4965,8 @@ module Mutations = struct
                                             ~fee_payer_keypair:fee_payer ~keymap
                                             ~account_state_tbl
                                             ~generate_new_accounts ~ledger ~vk
-                                            () )
+                                            ~available_public_keys:unused_pks ()
+                                        )
                                         ~size:1
                                         ~random:
                                           (Splittable_random.State.create
@@ -6029,6 +6035,83 @@ module Queries = struct
         Mina_lib.runtime_config mina
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
 
+  let fork_config =
+    let rec map_results ~f = function
+      | [] ->
+          Result.return []
+      | r :: rs ->
+          let open Result.Let_syntax in
+          let%bind r' = f r in
+          let%map rs = map_results ~f rs in
+          r' :: rs
+    in
+    field "fork_config"
+      ~doc:
+        "The runtime configuration for a blockchain fork intended to be a \
+         continuation of the current one."
+      ~typ:(non_null Types.json)
+      ~args:Arg.[]
+      ~resolve:(fun { ctx = mina; _ } () ->
+        match Mina_lib.best_tip mina with
+        | `Bootstrapping ->
+            `Assoc [ ("error", `String "Daemon is bootstrapping") ]
+        | `Active best_tip -> (
+            let block = Transition_frontier.Breadcrumb.(block best_tip) in
+            let global_slot =
+              Mina_block.blockchain_length block |> Unsigned.UInt32.to_int
+            in
+            let accounts_or_error =
+              Transition_frontier.Breadcrumb.staged_ledger best_tip
+              |> Staged_ledger.ledger
+              |> Ledger.foldi ~init:[] ~f:(fun _ accum act -> act :: accum)
+              |> map_results
+                   ~f:Runtime_config.Json_layout.Accounts.Single.of_account
+            in
+            let protocol_state =
+              Transition_frontier.Breadcrumb.protocol_state best_tip
+            in
+            match accounts_or_error with
+            | Error e ->
+                `Assoc [ ("error", `String e) ]
+            | Ok accounts ->
+                let runtime_config = Mina_lib.runtime_config mina in
+                let ledger = Option.value_exn runtime_config.ledger in
+                let previous_length =
+                  let open Option.Let_syntax in
+                  let%bind proof = runtime_config.proof in
+                  let%map fork = proof.fork in
+                  fork.previous_length + global_slot
+                in
+                let fork =
+                  Runtime_config.Fork_config.
+                    { previous_state_hash =
+                        State_hash.to_base58_check
+                          protocol_state.previous_state_hash
+                    ; previous_length =
+                        Option.value ~default:global_slot previous_length
+                    ; previous_global_slot = global_slot
+                    }
+                in
+                let update =
+                  Runtime_config.make
+                  (* add_genesis_winner must be set to false, because this
+                     config effectively creates a continuation of the current
+                     blockchain state and therefore the genesis ledger already
+                     contains the winner of the previous block. No need to
+                     artificially add it. In fact, it wouldn't work at all,
+                     because the new node would try to create this account at
+                     startup, even though it already exists, leading to an error.*)
+                    ~ledger:
+                      { ledger with
+                        base = Accounts accounts
+                      ; add_genesis_winner = Some false
+                      }
+                    ~proof:(Runtime_config.Proof_keys.make ~fork ())
+                    ()
+                in
+                let new_config = Runtime_config.combine runtime_config update in
+                Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic ) )
+
   let thread_graph =
     field "threadGraph"
       ~doc:
@@ -6143,6 +6226,7 @@ module Queries = struct
     ; evaluate_vrf
     ; check_vrf
     ; runtime_config
+    ; fork_config
     ; thread_graph
     ; blockchain_verification_key
     ]
