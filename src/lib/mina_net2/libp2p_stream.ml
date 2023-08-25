@@ -40,6 +40,7 @@ let data_received { incoming_w; _ } data =
   don't_wait_for (Pipe.write_if_open incoming_w data)
 
 let reset ~helper { id; _ } =
+  Libp2p_helper.log_rpc_request helper "ResetStream" ;
   (* NOTE: do not close the pipes here. Reset_stream should end up
       notifying us that streamReadComplete. We can reset the stream (telling
       the remote peer to stop writing) and still be sending data ourselves. *)
@@ -142,6 +143,8 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
   in
   let send_outgoing_messages_task =
     Pipe.iter outgoing_r ~f:(fun msg ->
+        Libp2p_helper.log_rpc_request helper "SendStream"
+          ~metadata:[ ("len", `Int (String.length msg)) ] ;
         match%map
           Libp2p_helper.do_rpc helper
             (module Libp2p_ipc.Rpcs.SendStream)
@@ -182,6 +185,7 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
    We will always have already had the full peer record by now... *)
 let open_ ~logger ~helper ~protocol ~peer_id ~release_stream =
   let open Deferred.Or_error.Let_syntax in
+  Libp2p_helper.log_rpc_request helper "OpenStream" ;
   let%map response =
     Libp2p_helper.do_rpc helper
       (module Libp2p_ipc.Rpcs.OpenStream)

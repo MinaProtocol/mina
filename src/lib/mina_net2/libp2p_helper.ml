@@ -127,6 +127,12 @@ type t =
       Libp2p_ipc.Sequence_number.Table.t
   }
 
+let log_rpc_request ?metadata t =
+  [%log' debug t.logger] "Sending IPC RPC request %s" ?metadata
+
+let log_push ?metadata t =
+  [%log' debug t.logger] "Sending IPC push message %s" ?metadata
+
 let handle_libp2p_helper_termination t ~pids ~killed result =
   Hashtbl.iter t.outstanding_requests ~f:(fun iv ->
       Ivar.fill_if_empty iv
@@ -332,20 +338,24 @@ let send_push ~msg t =
     Libp2p_ipc.push_message_to_outgoing_message msg
     |> Libp2p_ipc.write_outgoing_message (Child_processes.stdin t.process)
 
-let send_validation ~validation_id ~validation_result =
+let send_validation ~validation_id ~validation_result t =
+  log_push t "Validation" ;
   send_push
     ~msg:
       (Libp2p_ipc.create_validation_push_message ~validation_id
          ~validation_result )
+    t
 
-let send_add_resource ~tag ~body =
+let send_add_resource ~tag ~body t =
+  log_push t "Add_resource" ;
   let open Staged_ledger_diff in
   let tag = Body.Tag.to_enum tag in
   let data = Body.to_binio_bigstring body |> Bigstring.to_string in
-  send_push ~msg:(Libp2p_ipc.create_add_resource_push_message ~tag ~data)
+  send_push ~msg:(Libp2p_ipc.create_add_resource_push_message ~tag ~data) t
 
-let send_heartbeat ~peer_id =
-  send_push ~msg:(Libp2p_ipc.create_heartbeat_peer_push_message ~peer_id)
+let send_heartbeat ~peer_id t =
+  log_push t "Heartbeat" ;
+  send_push ~msg:(Libp2p_ipc.create_heartbeat_peer_push_message ~peer_id) t
 
 let test_with_libp2p_helper ?(logger = Logger.null ())
     ?(handle_push_message = fun _ -> assert false) f =

@@ -156,6 +156,8 @@ module Pubsub = struct
 end
 
 let set_node_status t data =
+  Libp2p_helper.log_rpc_request t.helper "SetNodeStatus"
+    ~metadata:[ ("len", `Int (String.length data)) ] ;
   Libp2p_helper.do_rpc t.helper
     (module Libp2p_ipc.Rpcs.SetNodeStatus)
     (Libp2p_ipc.Rpcs.SetNodeStatus.create_request ~data)
@@ -164,6 +166,7 @@ let set_node_status t data =
 let get_peer_node_status t peer =
   let open Deferred.Or_error.Let_syntax in
   let peer_multiaddr = Multiaddr.to_libp2p_ipc peer in
+  Libp2p_helper.log_rpc_request t.helper "GetPeerNodeStatus" ;
   let%map response =
     Libp2p_helper.do_rpc t.helper
       (module Libp2p_ipc.Rpcs.GetPeerNodeStatus)
@@ -173,6 +176,7 @@ let get_peer_node_status t peer =
   result_get response
 
 let list_peers t =
+  Libp2p_helper.log_rpc_request t.helper "ListPeers" ;
   match%map
     Libp2p_helper.do_rpc t.helper
       (module Libp2p_ipc.Rpcs.ListPeers)
@@ -192,6 +196,7 @@ let list_peers t =
       []
 
 let bandwidth_info t =
+  Libp2p_helper.log_rpc_request t.helper "BandwidthInfo" ;
   Deferred.Or_error.map ~f:(fun response ->
       let open Libp2p_ipc.Reader.Libp2pHelperInterface.BandwidthInfo.Response in
       let input_bandwidth = input_bandwidth_get response
@@ -225,6 +230,7 @@ let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
       ~gating_config:(gating_config_to_helper_format initial_gating_config)
       ~topic_config ()
   in
+  Libp2p_helper.log_rpc_request t.helper "Configure" ;
   let%map _ =
     Libp2p_helper.do_rpc t.helper
       (module Libp2p_ipc.Rpcs.Configure)
@@ -237,6 +243,7 @@ let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
 let peers t = list_peers t
 
 let listen_on t iface =
+  Libp2p_helper.log_rpc_request t.helper "Listen" ;
   let open Deferred.Or_error.Let_syntax in
   let%map response =
     Libp2p_helper.do_rpc t.helper
@@ -249,6 +256,7 @@ let listen_on t iface =
 
 let listening_addrs t =
   let open Deferred.Or_error.Let_syntax in
+  Libp2p_helper.log_rpc_request t.helper "GetListeningAddrs" ;
   let%map response =
     Libp2p_helper.do_rpc t.helper
       (module Libp2p_ipc.Rpcs.GetListeningAddrs)
@@ -264,15 +272,17 @@ let open_protocol t ~on_handler_error ~protocol f =
   in
   if Hashtbl.mem t.protocol_handlers protocol then
     Deferred.Or_error.errorf "already handling protocol %s" protocol
-  else
+  else (
+    Libp2p_helper.log_rpc_request t.helper "AddStreamHandler" ;
     let%map _ =
       Libp2p_helper.do_rpc t.helper
         (module Libp2p_ipc.Rpcs.AddStreamHandler)
         (Libp2p_ipc.Rpcs.AddStreamHandler.create_request ~protocol)
     in
-    Hashtbl.add_exn t.protocol_handlers ~key:protocol ~data:protocol_handler
+    Hashtbl.add_exn t.protocol_handlers ~key:protocol ~data:protocol_handler )
 
 let close_protocol ?(reset_existing_streams = false) t ~protocol =
+  Libp2p_helper.log_rpc_request t.helper "RemoveStreamHandler" ;
   let%map result =
     Libp2p_helper.do_rpc t.helper
       (module Libp2p_ipc.Rpcs.RemoveStreamHandler)
@@ -322,6 +332,7 @@ let open_stream t ~protocol ~peer =
 let reset_stream t = Libp2p_stream.reset ~helper:t.helper
 
 let add_peer t maddr ~is_seed =
+  Libp2p_helper.log_rpc_request t.helper "AddPeer" ;
   Libp2p_ipc.Rpcs.AddPeer.create_request
     ~multiaddr:(Multiaddr.to_libp2p_ipc maddr)
     ~is_seed
@@ -329,11 +340,13 @@ let add_peer t maddr ~is_seed =
   |> Deferred.Or_error.ignore_m
 
 let begin_advertising t =
+  Libp2p_helper.log_rpc_request t.helper "BeginAdvertising" ;
   Libp2p_ipc.Rpcs.BeginAdvertising.create_request ()
   |> Libp2p_helper.do_rpc t.helper (module Libp2p_ipc.Rpcs.BeginAdvertising)
   |> Deferred.Or_error.ignore_m
 
 let set_connection_gating_config t ?clean_added_peers config =
+  Libp2p_helper.log_rpc_request t.helper "SetGatingConfig" ;
   match%map
     Libp2p_helper.do_rpc t.helper
       (module Libp2p_ipc.Rpcs.SetGatingConfig)
@@ -462,6 +475,8 @@ let handle_push_message t push_message =
                           ph.closed <- true ;
                           don't_wait_for
                             (let%map result =
+                               Libp2p_helper.log_rpc_request t.helper
+                                 "RemoveStreamHandler" ;
                                Libp2p_helper.do_rpc t.helper
                                  (module Libp2p_ipc.Rpcs.RemoveStreamHandler)
                                  (Libp2p_ipc.Rpcs.RemoveStreamHandler

@@ -49,3 +49,6 @@ val test_with_libp2p_helper :
         -> unit Deferred.t )
   -> (string -> t -> 'a Deferred.t)
   -> 'a
+
+val log_rpc_request :
+  ?metadata:(string * Yojson.Safe.t) List.t -> t -> string -> unit

@@ -24,6 +24,8 @@ let topic { topic; _ } = topic
 let subscribe ~helper ~topic ~encode ~decode ~on_decode_failure ~validator =
   let open Deferred.Or_error.Let_syntax in
   let subscription_id = Id.create () in
+  Libp2p_helper.log_rpc_request helper "Subscribe"
+    ~metadata:[ ("topic", `String topic) ] ;
   let%map _ =
     Libp2p_helper.do_rpc helper
       (module Libp2p_ipc.Rpcs.Subscribe)
@@ -40,6 +42,7 @@ let subscribe ~helper ~topic ~encode ~decode ~on_decode_failure ~validator =
 
 let unsubscribe ~helper sub =
   let open Deferred.Or_error.Let_syntax in
+  Libp2p_helper.log_rpc_request helper "Unsubscribe" ;
   if not sub.closed then
     let%map _ =
       Libp2p_helper.do_rpc helper
@@ -84,6 +87,8 @@ let handle_and_validate sub ~validation_expiration ~(sender : Peer.t)
       return (`Decoding_error e)
 
 let publish_raw ~logger ~helper ~topic data =
+  Libp2p_helper.log_rpc_request helper "Publish"
+    ~metadata:[ ("topic", `String topic); ("len", `Int (String.length data)) ] ;
   match%map
     Libp2p_helper.do_rpc helper
       (module Libp2p_ipc.Rpcs.Publish)
