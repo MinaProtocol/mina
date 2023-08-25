@@ -504,7 +504,7 @@ let setup_daemon logger =
             Daemon.daemonize ~allow_threads_to_have_been_created:true
               ~redirect_stdout:`Dev_null ?cd:working_dir
               ~redirect_stderr:`Dev_null () )
-          else ignore (Option.map working_dir ~f:Caml.Sys.chdir)
+          else Option.iter working_dir ~f:Caml.Sys.chdir
         in
         Stdout_log.setup log_json log_level ;
         (* 512MB logrotate max size = 1GB max filesystem usage *)
@@ -1011,7 +1011,7 @@ let setup_daemon logger =
                 | Sexp.List sexps ->
                     `List (List.map ~f:Error_json.sexp_record_to_yojson sexps)
                 | Sexp.Atom _ ->
-                    failwith "Expeted a sexp list" )
+                    failwith "Expected a sexp list" )
           in
           let o1trace context =
             Execution_context.find_local context O1trace.local_storage_id
