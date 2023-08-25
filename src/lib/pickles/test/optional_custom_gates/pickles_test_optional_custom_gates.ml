@@ -183,7 +183,14 @@ let main_foreign_field_mul () =
   add_plonk_constraint
     (Raw { kind = Zero; values = [| fresh_int 0 |]; coeffs = [||] })
 
+let add_tests, get_tests =
+  let tests = ref [] in
+  ( (fun name testcases -> tests := (name, testcases) :: !tests)
+  , fun () -> List.rev !tests )
+
 module Make_test (Inputs : sig
+  val name : string
+
   val feature_flags1 : bool Plonk_types.Features.t
 
   val feature_flags2 : bool Plonk_types.Features.t
@@ -246,24 +253,33 @@ struct
 
   module Proof = (val proof)
 
-  let public_input1, (), proof1 =
-    Async.Thread_safe.block_on_async_exn (fun () -> prove1 ())
-
-  let () =
+  let test_prove1 () =
+    let public_input1, (), proof1 =
+      Async.Thread_safe.block_on_async_exn (fun () -> prove1 ())
+    in
     Or_error.ok_exn
       (Async.Thread_safe.block_on_async_exn (fun () ->
            Proof.verify [ (public_input1, proof1) ] ) )
 
-  let public_input2, (), proof2 =
-    Async.Thread_safe.block_on_async_exn (fun () -> prove2 ())
-
-  let () =
+  let test_prove2 () =
+    let public_input2, (), proof2 =
+      Async.Thread_safe.block_on_async_exn (fun () -> prove2 ())
+    in
     Or_error.ok_exn
       (Async.Thread_safe.block_on_async_exn (fun () ->
            Proof.verify [ (public_input2, proof2) ] ) )
+
+  let () =
+    let open Alcotest in
+    add_tests name
+      [ test_case "prove 1" `Quick test_prove1
+      ; test_case "prove 2" `Quick test_prove2
+      ]
 end
 
 module Xor = Make_test (struct
+  let name = "xor"
+
   let feature_flags = Plonk_types.Features.{ none_bool with xor = true }
 
   let feature_flags1 = feature_flags
@@ -272,6 +288,8 @@ module Xor = Make_test (struct
 end)
 
 module Range_check0 = Make_test (struct
+  let name = "range check 0"
+
   let feature_flags =
     Plonk_types.Features.{ none_bool with range_check0 = true }
 
@@ -281,6 +299,8 @@ module Range_check0 = Make_test (struct
 end)
 
 module Range_check1 = Make_test (struct
+  let name = "range check 1"
+
   let feature_flags =
     Plonk_types.Features.{ none_bool with range_check1 = true }
 
@@ -290,6 +310,8 @@ module Range_check1 = Make_test (struct
 end)
 
 module Rot = Make_test (struct
+  let name = "rot"
+
   let feature_flags = Plonk_types.Features.{ none_bool with rot = true }
 
   let feature_flags1 = feature_flags
@@ -298,6 +320,8 @@ module Rot = Make_test (struct
 end)
 
 module Foreign_field_add = Make_test (struct
+  let name = "foreign field addition"
+
   let feature_flags =
     Plonk_types.Features.{ none_bool with foreign_field_add = true }
 
@@ -307,6 +331,8 @@ module Foreign_field_add = Make_test (struct
 end)
 
 module Foreign_field_mul = Make_test (struct
+  let name = "foreign field multiplication"
+
   let feature_flags =
     Plonk_types.Features.{ none_bool with foreign_field_mul = true }
 
@@ -317,13 +343,19 @@ end)
 
 (* Tests with 'Maybe' *)
 
+let maybe_name name = Printf.sprintf "%s (maybe)" name
+
 module Xor_maybe = Make_test (struct
+  let name = maybe_name "xor"
+
   let feature_flags1 = Plonk_types.Features.{ none_bool with xor = true }
 
   let feature_flags2 = Plonk_types.Features.none_bool
 end)
 
 module Range_check0_maybe = Make_test (struct
+  let name = maybe_name "range_check 0"
+
   let feature_flags1 =
     Plonk_types.Features.{ none_bool with range_check0 = true }
 
@@ -331,6 +363,8 @@ module Range_check0_maybe = Make_test (struct
 end)
 
 module Range_check1_maybe = Make_test (struct
+  let name = maybe_name "range check 1"
+
   let feature_flags1 =
     Plonk_types.Features.{ none_bool with range_check1 = true }
 
@@ -338,12 +372,16 @@ module Range_check1_maybe = Make_test (struct
 end)
 
 module Rot_maybe = Make_test (struct
+  let name = maybe_name "rot"
+
   let feature_flags1 = Plonk_types.Features.{ none_bool with rot = true }
 
   let feature_flags2 = Plonk_types.Features.none_bool
 end)
 
 module Foreign_field_add_maybe = Make_test (struct
+  let name = maybe_name "foreign field addition"
+
   let feature_flags1 =
     Plonk_types.Features.{ none_bool with foreign_field_add = true }
 
@@ -351,8 +389,12 @@ module Foreign_field_add_maybe = Make_test (struct
 end)
 
 module Foreign_field_mul_maybe = Make_test (struct
+  let name = maybe_name "foreign field multiplication"
+
   let feature_flags1 =
     Plonk_types.Features.{ none_bool with foreign_field_mul = true }
 
   let feature_flags2 = Plonk_types.Features.none_bool
 end)
+
+let () = Alcotest.run "Custom gates" (get_tests ())
