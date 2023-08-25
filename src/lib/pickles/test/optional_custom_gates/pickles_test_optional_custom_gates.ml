@@ -278,7 +278,11 @@ let register_test name feature_flags1 feature_flags2 =
 
 let register_feature_test (name, specific_feature_flags) =
   (* Tests activating "on" logic*)
-  register_test name specific_feature_flags specific_feature_flags
+  register_test name specific_feature_flags specific_feature_flags ;
+  (* Tests activating "maybe on" logic *)
+  register_test
+    (Printf.sprintf "%s (maybe)" name)
+    specific_feature_flags Plonk_types.Features.none_bool
 
 let () =
   let configurations =
