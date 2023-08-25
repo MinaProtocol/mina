@@ -4419,9 +4419,9 @@ let%test_module "staged ledger tests" =
                       failwith "expecting zkapp_command transaction" ) ) )
 
     (* This test uses dummy verifiers, that's why it's not rejecting the problematic zkapp command
-       But this test is still useful, since it exercises the parts that doesn't requires a pickles instance
-       Combining together with the test that uses pickles directly, these 2 tests would make sure that
-       the problematic zkapp command would fail exactly for the invalid proof
+       But this test is still useful, since it exercises the parts that doesn't requires a pickles
+       instance. Currently we only have the test with dummy verifier. The test that uses a full
+       verifier is still under working.
     *)
     let%test_unit "Invalid account_update_hash would not be rejected by dummy \
                    verifier" =
