@@ -4585,7 +4585,7 @@ module Make_str (A : Wire_types.Concrete) = struct
        with proof authorization. This is mainly for cross-network replay tests. We
        want to test the condition that when a proof is generated in one network
        and being rejected by another network.
-     *)
+    *)
     module Single_account_update_spec = struct
       type t =
         { fee : Currency.Fee.t
