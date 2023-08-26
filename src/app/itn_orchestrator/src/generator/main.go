@@ -49,6 +49,7 @@ type Params struct {
 	Privkeys                                                                               []string
 	PaymentReceiver                                                                        itn_json_types.MinaPublicKey
 	PrivkeysPerFundCmd                                                                     int
+	GenerateFundKeys                                                                       int
 }
 
 type Command struct {
@@ -59,7 +60,7 @@ type Command struct {
 
 type GeneratedRound struct {
 	Commands     []Command
-	FundCommands []Command
+	FundCommands []lib.FundParams
 }
 
 func fund(p lib.FundParams) Command {
@@ -264,45 +265,29 @@ func (p *Params) Generate(round int) GeneratedRound {
 			withComment(fmt.Sprintf("Waiting for remainder of round %d and pause, %d min %d sec since start", round, roundStartMin+elapsed/60, elapsed%60),
 				wait((p.RoundDurationMin+p.PauseMin)*60-elapsed)))
 	}
-	fundCmdNum := 2
-	if onlyPayments || onlyZkapps {
-		fundCmdNum = 1
-	}
-	offset := (round * p.PrivkeysPerFundCmd * fundCmdNum) % len(p.Privkeys)
-	rem := p.Privkeys[offset:]
-	for len(rem) < p.PrivkeysPerFundCmd*fundCmdNum {
-		rem = append(rem, p.Privkeys...)
-	}
-	fundCmds := []Command{}
+	fundCmds := []lib.FundParams{}
 	if !onlyPayments {
 		zkappKeysNum, zkappAmount := lib.ZkappKeygenRequirements(zkappParams)
 		fundCmds = append(fundCmds,
-			fund(lib.FundParams{
+			lib.FundParams{
 				PasswordEnv: p.PasswordEnv,
-				Privkeys:    rem[:p.PrivkeysPerFundCmd],
 				Prefix:      zkappsKeysDir + "/key",
 				Amount:      zkappAmount,
 				Fee:         1e9,
 				Num:         zkappKeysNum,
-			}))
+			})
 	}
 	if !onlyZkapps {
 		paymentKeysNum, paymentAmount := lib.PaymentKeygenRequirements(p.Gap, paymentParams)
-		var privkeys []string
-		if onlyPayments {
-			privkeys = rem[:p.PrivkeysPerFundCmd]
-		} else {
-			privkeys = rem[p.PrivkeysPerFundCmd : p.PrivkeysPerFundCmd*2]
-		}
 		fundCmds = append(fundCmds,
-			fund(lib.FundParams{
+			lib.FundParams{
 				PasswordEnv: p.PasswordEnv,
-				Privkeys:    privkeys,
-				Prefix:      paymentsKeysDir + "/key-",
-				Amount:      paymentAmount,
-				Fee:         1e9,
-				Num:         paymentKeysNum,
-			}))
+				// Privkeys:    privkeys,
+				Prefix: paymentsKeysDir + "/key",
+				Amount: paymentAmount,
+				Fee:    1e9,
+				Num:    paymentKeysNum,
+			})
 	}
 	return GeneratedRound{
 		Commands:     cmds,
@@ -347,14 +332,19 @@ func main() {
 	flag.StringVar((*string)(&p.PaymentReceiver), "payment-receiver", "", "Mina PK receiving payments")
 	flag.StringVar(&p.ExperimentName, "experiment-name", "exp-0", "Name of experiment")
 	flag.IntVar(&p.PrivkeysPerFundCmd, "privkeys-per-fund", 1, "Number of private keys to use per fund command")
+	flag.IntVar(&p.GenerateFundKeys, "generate-privkeys", 0, "Number of funding keys to generate from the private key")
 	flag.Parse()
 	p.Privkeys = flag.Args()
 	if len(p.Privkeys) == 0 {
 		fmt.Fprintln(os.Stderr, "Specify funding private key files after all flags (separated by spaces)")
 		os.Exit(4)
 	}
-	if len(p.Privkeys) < p.PrivkeysPerFundCmd {
-		fmt.Fprintln(os.Stderr, "Number of private keys is less than --privkeys-per-fund")
+	if p.GenerateFundKeys > 0 && len(p.Privkeys) > 1 {
+		fmt.Fprintln(os.Stderr, "When option -generate-funding-keys is used, only a single private key should be provided")
+		os.Exit(4)
+	}
+	if (p.GenerateFundKeys > 0 && p.GenerateFundKeys < p.PrivkeysPerFundCmd) || (p.GenerateFundKeys == 0 && len(p.Privkeys) < p.PrivkeysPerFundCmd) {
+		fmt.Fprintln(os.Stderr, "Number of private keys is less than -privkeys-per-fund")
 		os.Exit(4)
 	}
 	switch mode {
@@ -393,12 +383,51 @@ func main() {
 		}
 	}
 	cmds := []Command{}
+	fundCmds := []lib.FundParams{}
 	for r := 0; r < p.Rounds; r++ {
 		round := p.Generate(r)
 		cmds = append(cmds, round.Commands...)
-		for _, cmd := range round.FundCommands {
-			writeCommand(cmd)
+		fundCmds = append(fundCmds, round.FundCommands...)
+	}
+	privkeys := p.Privkeys
+	if p.GenerateFundKeys > 0 {
+		fundKeysDir := fmt.Sprintf("%s/funding", p.FundKeyPrefix)
+		privkeys = make([]string, p.GenerateFundKeys)
+		privkeyAmounts := make([]uint64, p.GenerateFundKeys)
+		for i := range privkeys {
+			privkeys[i] = fmt.Sprintf("%s/key-0-%d", fundKeysDir, i)
 		}
+		for i, f := range fundCmds {
+			i_ := (i * p.PrivkeysPerFundCmd) % p.GenerateFundKeys
+			itemsPerFundKey := f.Num/p.PrivkeysPerFundCmd + 1
+			perGeneratedKey := f.Amount / uint64(f.Num) * uint64(itemsPerFundKey)
+			for j := i_; j < (i_ + p.PrivkeysPerFundCmd); j++ {
+				j_ := j % p.GenerateFundKeys
+				privkeyAmounts[j_] += perGeneratedKey
+			}
+		}
+		perKeyAmount := privkeyAmounts[0]
+		for _, a := range privkeyAmounts[1:] {
+			if perKeyAmount < a {
+				perKeyAmount = a
+			}
+		}
+		// Generate funding keys
+		writeCommand(fund(lib.FundParams{
+			PasswordEnv: p.PasswordEnv,
+			Privkeys:    p.Privkeys,
+			Prefix:      fundKeysDir + "/key",
+			Amount:      perKeyAmount*uint64(p.GenerateFundKeys)*3/2 + 2e9,
+			Fee:         1e9,
+			Num:         p.GenerateFundKeys,
+		}))
+		writeCommand(wait(1))
+	}
+	privkeysExt := append(privkeys, privkeys...)
+	for i, cmd := range fundCmds {
+		i_ := (i * p.PrivkeysPerFundCmd) % len(privkeys)
+		cmd.Privkeys = privkeysExt[i_:(i_ + p.PrivkeysPerFundCmd)]
+		writeCommand(fund(cmd))
 	}
 	for _, cmd := range cmds {
 		writeCommand(cmd)
