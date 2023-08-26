@@ -2,6 +2,15 @@ open Core_kernel
 open Pickles_types
 open Pickles.Impls.Step
 
+(** Testing 
+    -------
+
+    Component: Pickles
+    Subject: Testing the integration of custom gates
+    Invocation: dune exec \ 
+    src/lib/pickles/test/optional_custom_gates/pickles_test_optional_custom_gates.exe 
+*)
+
 let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 
 let () = Pickles.Backend.Tock.Keypair.set_urs_info []
