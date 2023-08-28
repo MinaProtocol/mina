@@ -294,13 +294,19 @@ module Make_str (A : Wire_types.Concrete) = struct
                 File_system.rmrf location
 
           let ledger_subset keys ledger =
+            let open Mina_ledger in
             match ledger with
             | Genesis_epoch_ledger ledger ->
-                Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger keys
-            | Ledger_db ledger ->
-                Mina_ledger.(
-                  Sparse_ledger.of_any_ledger
-                  @@ Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+                Sparse_ledger.of_ledger_subset_exn ledger keys
+            | Ledger_db db_ledger ->
+                let ledger = Ledger.of_database db_ledger in
+                let subset_ledger =
+                  Sparse_ledger.of_ledger_subset_exn ledger keys
+                in
+                ignore
+                  ( Ledger.unregister_mask_exn ~loc:__LOC__ ledger
+                    : Ledger.unattached_mask ) ;
+                subset_ledger
         end
 
         type t =
@@ -3378,6 +3384,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
 
       let genesis_winner = Vrf.Precomputed.genesis_winner
+
+      let genesis_winner_account =
+        Mina_base.Account.create
+          (Mina_base.Account_id.create (fst genesis_winner)
+             Mina_base.Token_id.default )
+          (Currency.Balance.of_nanomina_int_exn 1000)
 
       let check_block_data ~constants ~logger (block_data : Block_data.t)
           global_slot =
