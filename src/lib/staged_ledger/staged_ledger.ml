@@ -4504,10 +4504,17 @@ let%test_module "staged ledger tests" =
                           (Staged_ledger_diff.With_valid_signatures_and_proofs
                            .commands diff )
                         = 1 ) ;
+                      let%bind verifier_full =
+                        Verifier.create ~logger ~proof_level:Full
+                          ~constraint_constants ~conf_dir:None
+                          ~pids:
+                            (Child_processes.Termination.create_pid_table ())
+                          ()
+                      in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl
                           (Staged_ledger_diff.forget diff)
-                          ~logger ~verifier ~current_state_view
+                          ~logger ~verifier:verifier_full ~current_state_view
                           ~state_and_body_hash ~coinbase_receiver
                           ~supercharge_coinbase:false
                       with

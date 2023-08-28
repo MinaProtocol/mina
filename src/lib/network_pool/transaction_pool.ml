@@ -1779,7 +1779,7 @@ let%test_module _ =
                 User_command.forget_check )
            txs )
 
-    let setup_test ?permissions () =
+    let setup_test ?(verifier = verifier) ?permissions () =
       let frontier, best_tip_diff_w =
         Mock_transition_frontier.create ?permissions ()
       in
@@ -2959,8 +2959,14 @@ let%test_module _ =
     let%test "account update with a different network id that uses proof \
               authorization would pass verification under dummy verifier" =
       Thread_safe.block_on_async_exn (fun () ->
+          let%bind verifier_full =
+            Verifier.create ~logger ~proof_level:Full ~constraint_constants
+              ~conf_dir:None
+              ~pids:(Child_processes.Termination.create_pid_table ())
+              ()
+          in
           let%bind test =
-            setup_test
+            setup_test ~verifier:verifier_full
               ~permissions:
                 { Permissions.user_default with set_zkapp_uri = Proof }
               ()
