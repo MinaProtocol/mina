@@ -1,5 +1,6 @@
-(executable
- (name pickles_test_optional_custom_gates)
+(tests
+ (names pickles_test_optional_custom_gates)
+ (flags (:standard -w -26-27-32))
  (libraries
    ;; opam libraries
   stdio

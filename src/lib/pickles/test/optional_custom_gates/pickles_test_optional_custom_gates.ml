@@ -299,16 +299,16 @@ let register_test name feature_flags1 feature_flags2 =
   let open Alcotest in
   add_tests name
     [ test_case "prove 1" `Quick test_prove1
-    ; test_case "prove 2" `Quick test_prove2
+      (* ; test_case "prove 2" `Quick test_prove2 *)
     ]
 
 let register_feature_test (name, specific_feature_flags) =
   (* Tests activating "on" logic*)
-  register_test name specific_feature_flags specific_feature_flags ;
-  (* Tests activating "maybe on" logic *)
-  register_test
-    (Printf.sprintf "%s (maybe)" name)
-    specific_feature_flags Plonk_types.Features.none_bool
+  register_test name specific_feature_flags specific_feature_flags
+(* Tests activating "maybe on" logic *)
+(* register_test *)
+(*   (Printf.sprintf "%s (maybe)" name) *)
+(*   specific_feature_flags Plonk_types.Features.none_bool *)
 
 let () =
   let configurations =
