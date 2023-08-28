@@ -18,6 +18,7 @@ jobs:
     - uses: cachix/install-nix-action@v22
       with:
         github_access_token: ${{ secrets.GITHUB_TOKEN }}
+    - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: nix/pin.sh 
     - run: nix build mina
       env:
