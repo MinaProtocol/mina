@@ -70,7 +70,7 @@ func scheduleZkappCommandsDo(config Config, params ZkappCommandParams, nodeAddre
 	if err == nil {
 		config.Log.Infof("scheduled zkapp batch %d with tps %f for %s: %s", batchIx, tps, nodeAddress, handle)
 	}
-	return handle, nil
+	return handle, err
 }
 
 func zkappParams(params ZkappCommandParams, tps float64) (zkappsToDeploy int, accountQueueSize int) {
