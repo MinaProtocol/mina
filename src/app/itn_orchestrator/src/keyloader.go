@@ -7,7 +7,6 @@ import (
 	"io"
 	"itn_json_types"
 	"os"
-	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
 	logging "github.com/ipfs/go-log/v2"
@@ -102,10 +101,6 @@ func DecodePrivateKey(bs []byte, password []byte) ([]byte, error) {
 }
 
 func LoadPrivateKeyFiles(log logging.StandardLogger, params KeyloaderParams, output func(itn_json_types.MinaPrivateKey)) error {
-	entries, err := os.ReadDir(params.Dir)
-	if err != nil {
-		return err
-	}
 	var password []byte
 	if params.PasswordEnv != "" {
 		pass, has := os.LookupEnv(params.PasswordEnv)
@@ -113,20 +108,18 @@ func LoadPrivateKeyFiles(log logging.StandardLogger, params KeyloaderParams, out
 			password = []byte(pass)
 		}
 	}
-	i := 0
-	for _, e := range entries {
-		fname := e.Name()
-		if strings.HasSuffix(fname, ".pub") {
-			continue
-		}
-		sk, err := LoadPrivateKey(params.Dir+string(os.PathSeparator)+fname, password)
+	keyfiles, err := listKeyfiles(params.Dir)
+	if err != nil {
+		return err
+	}
+	for i, keyfile := range keyfiles {
+		sk, err := LoadPrivateKey(keyfile, password)
 		if err != nil {
 			return err
 		}
 		sender := base58.CheckEncode(sk, '\x5A')
 		output(itn_json_types.MinaPrivateKey(sender))
-		i++
-		if params.Limit > 0 && i >= params.Limit {
+		if params.Limit > 0 && i+1 >= params.Limit {
 			break
 		}
 	}
