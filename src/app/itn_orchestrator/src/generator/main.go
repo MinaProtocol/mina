@@ -43,17 +43,18 @@ func sampleStopRatio(minRatio, maxRatio float64) float64 {
 }
 
 type Params struct {
-	BaseTps, StressTps, SenderRatio, ZkappRatio, RedeployRatio, MinStopRatio, MaxStopRatio float64
-	RoundDurationMin, PauseMin, Rounds, StopsPerRound, Gap                                 int
-	SendFromNonBpsOnly, StopOnlyBps, UseRestartScript, MaxCost                             bool
-	ExperimentName, PasswordEnv, FundKeyPrefix                                             string
-	Privkeys                                                                               []string
-	PaymentReceiver                                                                        itn_json_types.MinaPublicKey
-	PrivkeysPerFundCmd                                                                     int
-	GenerateFundKeys                                                                       int
-	RotationKeys, RotationServers                                                          []string
-	RotationPermutation                                                                    bool
-	RotationRatio                                                                          float64
+	BaseTps, StressTps, SenderRatio, ZkappRatio, NewAccountRatio float64
+	RedeployRatio, MinStopRatio, MaxStopRatio                    float64
+	RoundDurationMin, PauseMin, Rounds, StopsPerRound, Gap       int
+	SendFromNonBpsOnly, StopOnlyBps, UseRestartScript, MaxCost   bool
+	ExperimentName, PasswordEnv, FundKeyPrefix                   string
+	Privkeys                                                     []string
+	PaymentReceiver                                              itn_json_types.MinaPublicKey
+	PrivkeysPerFundCmd                                           int
+	GenerateFundKeys                                             int
+	RotationKeys, RotationServers                                []string
+	RotationPermutation                                          bool
+	RotationRatio                                                float64
 }
 
 type Command struct {
@@ -184,6 +185,7 @@ func (p *Params) Generate(round int) GeneratedRound {
 	onlyZkapps := math.Abs(1-p.ZkappRatio) < 1e-3
 	onlyPayments := p.ZkappRatio < 1e-3
 	zkappTps := tps * p.ZkappRatio
+	newAccounts := int(zkappTps * float64(p.RoundDurationMin*60-p.Gap*4) * p.NewAccountRatio)
 	zkappParams := lib.ZkappSubParams{
 		ExperimentName:    experimentName,
 		Tps:               zkappTps,
@@ -196,6 +198,7 @@ func (p *Params) Generate(round int) GeneratedRound {
 		MaxFee:            4e9,
 		DeploymentFee:     2e9,
 		MaxCost:           p.MaxCost,
+		NewAccounts:       newAccounts,
 	}
 	paymentParams := lib.PaymentSubParams{
 		ExperimentName: experimentName,
@@ -340,6 +343,7 @@ func main() {
 	flag.Float64Var(&p.SenderRatio, "sender-ratio", 0.5, "float in range [0..1], max proportion of nodes selected for transaction sending")
 	flag.Float64Var(&p.ZkappRatio, "zkapp-ratio", 0.5, "float in range [0..1], ratio of zkapp transactions of all transactions generated")
 	flag.Float64Var(&p.RedeployRatio, "redeploy-ratio", 0.1, "float in range [0..1], ratio of redeploys of all node stops")
+	flag.Float64Var(&p.NewAccountRatio, "new-account-ratio", 0, "float in range [0..1], ratio of new accounts, in relation to expected number of zkapp txs")
 	flag.BoolVar(&p.SendFromNonBpsOnly, "send-from-non-bps", false, "send only from non block producers")
 	flag.BoolVar(&p.StopOnlyBps, "stop-only-bps", false, "stop only block producers")
 	flag.BoolVar(&p.UseRestartScript, "use-restart-script", false, "use restart script insteadt of stop-daemon command")
@@ -349,11 +353,6 @@ func main() {
 	flag.IntVar(&p.Rounds, "rounds", 4, "number of rounds to run experiment")
 	flag.IntVar(&p.StopsPerRound, "round-stops", 2, "number of stops to perform within round")
 	flag.IntVar(&p.Gap, "gap", 180, "gap between related transactions, seconds")
-	checkRatio(p.SenderRatio, "wrong sender ratio")
-	checkRatio(p.ZkappRatio, "wrong zkapp ratio")
-	checkRatio(p.MinStopRatio, "wrong min stop ratio")
-	checkRatio(p.MaxStopRatio, "wrong max stop ratio")
-	checkRatio(p.RedeployRatio, "wrong redeploy ratio")
 	flag.StringVar(&mode, "mode", "default", "mode of generation")
 	flag.StringVar(&p.FundKeyPrefix, "fund-keys-dir", "./fund-keys", "Dir for generated fund key prefixes")
 	flag.StringVar(&p.PasswordEnv, "password-env", "", "Name of environment variable to read privkey password from")
@@ -366,6 +365,20 @@ func main() {
 	flag.Float64Var(&p.RotationRatio, "rotate-ratio", 0.3, "Ratio of balance to rotate")
 	flag.BoolVar(&p.RotationPermutation, "rotate-permutation", false, "Whether to generate only permutation mappings for rotation")
 	flag.Parse()
+	checkRatio(p.SenderRatio, "wrong sender ratio")
+	checkRatio(p.ZkappRatio, "wrong zkapp ratio")
+	checkRatio(p.MinStopRatio, "wrong min stop ratio")
+	checkRatio(p.MaxStopRatio, "wrong max stop ratio")
+	checkRatio(p.RedeployRatio, "wrong redeploy ratio")
+	if p.RoundDurationMin*60 < p.Gap*4 {
+		fmt.Fprintln(os.Stderr, "increase round duration: roundDurationMin*60 should be more than gap*4")
+		os.Exit(9)
+	}
+	if p.NewAccountRatio < 0 {
+		fmt.Fprintln(os.Stderr, "wrong new account ratio")
+		os.Exit(2)
+	}
+	checkRatio(p.RotationRatio, "wrong rotation ratio")
 	p.Privkeys = flag.Args()
 	if len(p.Privkeys) == 0 {
 		fmt.Fprintln(os.Stderr, "Specify funding private key files after all flags (separated by spaces)")
@@ -385,7 +398,7 @@ func main() {
 	if rotateServers != "" {
 		p.RotationServers = strings.Split(rotateServers, ",")
 	}
-	if len(p.RotationServers) != len(p.RotationKeys) || p.RotationRatio <= 0 || p.RotationRatio > 1 {
+	if len(p.RotationServers) != len(p.RotationKeys) {
 		fmt.Fprintln(os.Stderr, "wrong rotation configuration")
 		os.Exit(5)
 	}
