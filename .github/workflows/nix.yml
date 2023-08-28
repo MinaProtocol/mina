@@ -2,6 +2,12 @@ name: "Build nix"
 on:
   pull_request:
   push:
+    branches:
+      - develop
+      - compatible
+      - berkeley
+      - releases/**
+      - main
 jobs:
   tests:
     runs-on: ubuntu-latest
