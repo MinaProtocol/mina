@@ -59,12 +59,13 @@ func scheduleZkappCommandsDo(config Config, params ZkappCommandParams, nodeAddre
 		NoPrecondition:    params.NoPrecondition,
 		MinBalanceChange:  params.MinBalanceChange,
 		MaxBalanceChange:  params.MaxBalanceChange,
-		InitBalance:       1e10 * uint64(params.NewAccounts+1),
-		MinFee:            params.MinFee,
-		MaxFee:            params.MaxFee,
-		DeploymentFee:     params.DeploymentFee,
-		AccountQueueSize:  accountQueueSize,
-		MaxCost:           params.MaxCost,
+		// TODO hardcoded in generator, TODO update
+		InitBalance:      1e10 * uint64(params.NewAccounts+1),
+		MinFee:           params.MinFee,
+		MaxFee:           params.MaxFee,
+		DeploymentFee:    params.DeploymentFee,
+		AccountQueueSize: accountQueueSize,
+		MaxCost:          params.MaxCost,
 	}
 	handle, err := ScheduleZkappCommands(config, nodeAddress, paymentInput)
 	if err == nil {
