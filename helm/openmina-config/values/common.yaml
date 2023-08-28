@@ -116,7 +116,7 @@ internalTrace:
   image: openmina/mina-internal-trace-consumer:fec6545
 
 aggregator:
-  image: openmina/mina-aggregator:a461b7e3
+  image: openmina/mina-aggregator:18495f3c
   ciRepo: MinaProtocol/mina
   ciApiUrl: https://ci.o1.openmina.com/api
 
