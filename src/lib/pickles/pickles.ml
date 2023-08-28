@@ -1737,7 +1737,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               Backend.Tock.Proof.create_async
                                 ~primary:public_inputs
                                 ~auxiliary:auxiliary_inputs pk
-                                ~runtime_tables:[||]
                                 ~message:
                                   ( Vector.map2
                                       (Vector.extend_front_exn
