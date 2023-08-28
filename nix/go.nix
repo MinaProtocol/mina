@@ -31,7 +31,7 @@ final: prev: {
   };
 
   # Jobs/Test/Libp2pUnitTest
-  libp2p_helper = final.buildGo119Module {
+  libp2p_helper = final.buildGo118Module {
     pname = "libp2p_helper";
     version = "0.1";
     src = ../src/app/libp2p_helper/src;
