@@ -623,6 +623,8 @@ module Plonk_constraint = struct
             ; (* Coefficients *) two_to_rot
             }
       | AddFixedLookupTable { id; data } ->
+          (* TODO: see a possible better API -
+             https://github.com/MinaProtocol/mina/issues/13984 *)
           AddFixedLookupTable { id; data }
       | AddRuntimeTableCfg { id; first_column } ->
           AddRuntimeTableCfg { id; first_column }
