@@ -61,6 +61,7 @@
 (package (name graphql_wrapper))
 (package (name hash_prefixes))
 (package (name hash_prefix_states))
+(package (name hash_prefix_create))
 (package (name heap_usage))
 (package (name hex))
 (package (name immutable_array))

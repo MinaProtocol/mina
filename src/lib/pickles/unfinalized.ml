@@ -69,7 +69,8 @@ module Constant = struct
          }
        in
        let evals =
-         Plonk_types.Evals.to_in_circuit Dummy.evals_combined.evals.evals
+         Plonk_types.Evals.to_in_circuit
+           (Lazy.force Dummy.evals_combined).evals.evals
        in
        let env =
          let module Env_bool = struct
