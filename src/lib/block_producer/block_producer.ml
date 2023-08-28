@@ -716,10 +716,11 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     let proof = Blockchain_snark.Blockchain.proof block in
                     Interruptible.lift (Deferred.return proof)
                       (Deferred.never ())
-                | Error _ ->
+                | Error err ->
                     [%log error]
                       "Aborting block production: cannot generate a genesis \
-                       proof" ;
+                       proof"
+                      ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
                     Interruptible.lift (Deferred.never ()) (Deferred.return ())
                 )
               else

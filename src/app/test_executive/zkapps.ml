@@ -244,7 +244,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                       , zkapp_command_insufficient_funds
                       , zkapp_command_insufficient_replace_fee
                       , zkapp_command_insufficient_fee
-                      , zkapp_command_single_account_update ) =
+                      , zkapp_command_cross_network_replay ) =
       let amount = Currency.Amount.zero in
       let nonce = Account.Nonce.of_int 1 in
       let memo =
@@ -340,7 +340,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           spec_insufficient_fee
       in
 
-      let%map.Deferred zkapp_command_single_account_update =
+      let%map.Deferred zkapp_command_cross_network_replay =
         let spec : Transaction_snark.For_tests.Single_account_update_spec.t =
           { fee
           ; fee_payer = (fish2_kp, nonce)
@@ -362,7 +362,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       , zkapp_command_insufficient_funds
       , zkapp_command_insufficient_replace_fee
       , zkapp_command_insufficient_fee
-      , zkapp_command_single_account_update )
+      , zkapp_command_cross_network_replay )
     in
     let zkapp_command_invalid_signature =
       let p = zkapp_command_update_all in
@@ -756,7 +756,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a zkapp with a different chain id"
         (send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri node)
-           zkapp_command_single_account_update "Verification_failed" )
+           zkapp_command_cross_network_replay "Verification_failed" )
     in
     let%bind () =
       section_hard "Send a zkapp with an insufficient fee"
