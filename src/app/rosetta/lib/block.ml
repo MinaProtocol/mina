@@ -965,10 +965,8 @@ module Sql = struct
            ON zc.id = bzc.zkapp_command_id
          INNER JOIN zkapp_fee_payer_body zfpb
            ON zc.zkapp_fee_payer_body_id = zfpb.id
-         INNER JOIN account_identifiers ai_fee_payer
-           ON ai_fee_payer.id = zfpb.account_identifier_id
          INNER JOIN public_keys pk_fee_payer
-           ON ai_fee_payer.public_key_id = pk_fee_payer.id
+           ON zfpb.public_key_id = pk_fee_payer.id
          WHERE bzc.block_id = ?
       |}
 
