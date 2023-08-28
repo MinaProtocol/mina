@@ -24,7 +24,7 @@ in Pipeline.build Pipeline.Config::{
     ],
     path = "Test",
     name = "TestnetIntegrationTestsLong",
-
+    mode = PipelineMode.Type.Stable
   },
   steps = [
     TestExecutive.execute "hard-fork" dependsOn
