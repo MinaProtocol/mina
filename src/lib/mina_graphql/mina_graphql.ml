@@ -4736,10 +4736,9 @@ module Mutations = struct
               ~wait_span ~stop_signal ~stop_time ~uuid keypairs )
           else return ()
         in
-        let%bind accounts = Ledger.to_list ledger in
-        [%log debug] "The accounts were not in the best tip $ledger, try again"
-          ~metadata:
-            [ ("ledger", `List (List.map accounts ~f:Account.to_yojson)) ] ;
+        [%log debug]
+          "Some deployed zkApp accounts weren't found in the best tip ledger, \
+           trying again" ;
         let%bind () =
           Async.after
             (Time.Span.of_ms
@@ -4852,6 +4851,12 @@ module Mutations = struct
                                 (Public_key.compress public_key, private_key) )
                             |> Public_key.Compressed.Map.of_alist_exn
                           in
+                          let unused_pks =
+                            List.map unused_keypairs
+                              ~f:(fun { public_key; _ } ->
+                                Public_key.compress public_key )
+                            |> Public_key.Compressed.Hash_set.of_list
+                          in
                           let `VK vk, `Prover prover =
                             Transaction_snark.For_tests.create_trivial_snapp
                               ~constraint_constants ()
@@ -4960,7 +4965,8 @@ module Mutations = struct
                                             ~fee_payer_keypair:fee_payer ~keymap
                                             ~account_state_tbl
                                             ~generate_new_accounts ~ledger ~vk
-                                            () )
+                                            ~available_public_keys:unused_pks ()
+                                        )
                                         ~size:1
                                         ~random:
                                           (Splittable_random.State.create
