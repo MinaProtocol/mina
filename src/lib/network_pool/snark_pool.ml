@@ -103,6 +103,7 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
+    -> slot_tx_end:Mina_numbers.Account_nonce.t option
     -> frontier_broadcast_pipe:
          transition_frontier option Broadcast_pipe.Reader.t
     -> log_gossip_heard:bool
@@ -381,7 +382,7 @@ struct
         in
         Deferred.don't_wait_for tf_deferred
 
-      let create ~constraint_constants ~consensus_constants:_ ~time_controller:_
+      let create ~constraint_constants ~consensus_constants:_ ~time_controller:_ ~slot_tx_end:_
           ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
         let t =
           { snark_tables =
@@ -645,7 +646,7 @@ struct
   let loaded = ref false
 
   let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~frontier_broadcast_pipe ~log_gossip_heard
+      ~time_controller ~slot_tx_end ~frontier_broadcast_pipe ~log_gossip_heard
       ~on_remote_push =
     if !loaded then
       failwith
@@ -674,7 +675,7 @@ struct
           res
       | Error _e ->
           create ~config ~logger ~constraint_constants ~consensus_constants
-            ~time_controller ~frontier_broadcast_pipe ~log_gossip_heard
+            ~time_controller ~slot_tx_end ~frontier_broadcast_pipe ~log_gossip_heard
             ~on_remote_push
     in
     store_periodically (resource_pool pool) ;
@@ -749,6 +750,8 @@ let%test_module "random set test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let slot_tx_end = None
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -798,7 +801,7 @@ let%test_module "random set test" =
       let open Deferred.Let_syntax in
       let mock_pool, _r_sink, _l_sink =
         Mock_snark_pool.create ~config ~logger ~constraint_constants
-          ~consensus_constants ~time_controller
+          ~consensus_constants ~time_controller ~slot_tx_end
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
         (* |>  *)
@@ -975,7 +978,7 @@ let%test_module "random set test" =
           in
           let network_pool, _, _ =
             Mock_snark_pool.create ~config ~constraint_constants
-              ~consensus_constants ~time_controller ~logger
+              ~consensus_constants ~time_controller ~slot_tx_end ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
@@ -1046,7 +1049,7 @@ let%test_module "random set test" =
             in
             let network_pool, remote_sink, local_sink =
               Mock_snark_pool.create ~logger ~config ~constraint_constants
-                ~consensus_constants ~time_controller
+                ~consensus_constants ~time_controller ~slot_tx_end
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
             in
@@ -1130,7 +1133,7 @@ let%test_module "random set test" =
           let open Deferred.Let_syntax in
           let network_pool, _, _ =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
-              ~constraint_constants ~consensus_constants ~time_controller
+              ~constraint_constants ~consensus_constants ~time_controller ~slot_tx_end
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in

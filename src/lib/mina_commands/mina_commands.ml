@@ -69,8 +69,7 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
   (* hack to get types to work out *)
   let%map () = return () in
   let slot =
-    Account_nonce.to_int
-    @@ Consensus.Data.Consensus_time.to_global_slot
+    Consensus.Data.Consensus_time.to_global_slot
          (Consensus.Data.Consensus_time.of_time_exn
             ~constants:
               (Mina_lib.config t).precomputed_values.consensus_constants
@@ -78,10 +77,10 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
   in
   let open Deferred.Let_syntax in
   match (Mina_lib.config t).slot_tx_end with
-  | Some slot_tx_end when slot >= slot_tx_end ->
+  | Some slot_tx_end when Account_nonce.(slot >= slot_tx_end) ->
       [%log' warn (Mina_lib.top_level_logger t)]
         "can't produce transaction in slot $slot, tx production ends at $end"
-        ~metadata:[ ("slot", `Int slot); ("end", `Int slot_tx_end) ] ;
+        ~metadata:[ ("slot", `Int (Account_nonce.to_int slot)); ("end", `Int (Account_nonce.to_int slot_tx_end)) ] ;
       Deferred.return (Error (Error.of_string "tx production has ended"))
   | Some _ | None -> (
       let%map result = Mina_lib.add_transactions t [ user_command_input ] in
@@ -124,18 +123,17 @@ let setup_and_submit_user_commands t user_command_list =
   let open Participating_state.Let_syntax in
   let%map _is_active = Mina_lib.active_or_bootstrapping t in
   let slot =
-    Account_nonce.to_int
-    @@ Consensus.Data.Consensus_time.to_global_slot
+    Consensus.Data.Consensus_time.to_global_slot
          (Consensus.Data.Consensus_time.of_time_exn
             ~constants:
               (Mina_lib.config t).precomputed_values.consensus_constants
             (Block_time.now (Mina_lib.config t).time_controller) )
   in
   match (Mina_lib.config t).slot_tx_end with
-  | Some slot_tx_end when slot >= slot_tx_end ->
+  | Some slot_tx_end when Account_nonce.(slot >= slot_tx_end) ->
       [%log' warn (Mina_lib.top_level_logger t)]
         "can't produce transactions in slot $slot, tx production ends at $end"
-        ~metadata:[ ("slot", `Int slot); ("end", `Int slot_tx_end) ] ;
+        ~metadata:[ ("slot", `Int (Account_nonce.to_int slot)); ("end", `Int (Account_nonce.to_int slot_tx_end)) ] ;
       Deferred.return (Error (Error.of_string "tx production has ended"))
   | Some _ | None ->
       [%log' warn (Mina_lib.top_level_logger t)]

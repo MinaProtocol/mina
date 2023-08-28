@@ -59,6 +59,6 @@ type t =
   ; uptime_url : Uri.t option [@default None]
   ; uptime_submitter_keypair : Keypair.t option [@default None]
   ; stop_time : int
-  ; slot_tx_end : int option [@default None]
+  ; slot_tx_end : Mina_numbers.Account_nonce.t option [@default None]
   }
 [@@deriving make]

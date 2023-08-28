@@ -47,6 +47,7 @@ type t =
   ; constraint_constants : Genesis_constants.Constraint_constants.t
   ; consensus_constants : Consensus.Constants.t
   ; time_controller : Block_time.Controller.t
+  ; slot_tx_end : Account_nonce.t option
   }
 [@@deriving sexp_of, equal, compare]
 
@@ -72,6 +73,7 @@ module Command_error = struct
         * [ `Current_global_slot of Mina_numbers.Global_slot.t ]
     | Unwanted_fee_token of Token_id.t
     | Invalid_transaction
+    | After_slot_tx_end
   [@@deriving sexp_of, to_yojson]
 end
 
@@ -298,7 +300,8 @@ module For_tests = struct
     [%test_eq: int] (Map.length all_by_hash) size
 end
 
-let empty ~constraint_constants ~consensus_constants ~time_controller : t =
+let empty ~constraint_constants ~consensus_constants ~time_controller
+    ~slot_tx_end : t =
   { applicable_by_fee = Currency.Fee.Map.empty
   ; all_by_sender = Account_id.Map.empty
   ; all_by_fee = Currency.Fee.Map.empty
@@ -308,6 +311,7 @@ let empty ~constraint_constants ~consensus_constants ~time_controller : t =
   ; constraint_constants
   ; consensus_constants
   ; time_controller
+  ; slot_tx_end
   }
 
 let size : t -> int = fun t -> t.size
@@ -350,6 +354,8 @@ let current_global_slot t =
       Mina_numbers.Global_slot.(add previous_global_slot current_slot)
   | None ->
       current_slot
+
+let slot_tx_end t = t.slot_tx_end
 
 let check_expiry t (cmd : User_command.t) =
   let current_global_slot = current_global_slot t in
@@ -505,6 +511,16 @@ let drop_until_sufficient_balance :
         (Sequence.append dropped_so_far @@ Sequence.singleton liat)
   in
   go queue currency_reserved Sequence.empty
+
+let drop_all t =
+  { t with
+    applicable_by_fee = Currency.Fee.Map.empty
+  ; all_by_sender = Account_id.Map.empty
+  ; all_by_fee = Currency.Fee.Map.empty
+  ; all_by_hash = Transaction_hash.Map.empty
+  ; transactions_with_expiration = Global_slot.Map.empty
+  ; size = 0
+  }
 
 (* Iterate over all commands in the pool, removing them if they require too much
    currency or have too low of a nonce.
@@ -725,249 +741,278 @@ let rec add_from_gossip_exn :
          * Transaction_hash.User_command_with_valid_signature.t Sequence.t
        , Command_error.t )
        Result.t =
- fun ({ constraint_constants; consensus_constants; time_controller; _ } as t)
-     ~verify cmd0 current_nonce balance ->
+ fun ( { constraint_constants
+       ; consensus_constants
+       ; time_controller
+       ; slot_tx_end
+       ; _
+       } as t ) ~verify cmd0 current_nonce balance ->
   let open Command_error in
   let open Result.Let_syntax in
-  let unchecked_cmd =
-    match cmd0 with
-    | `Unchecked x ->
-        x
-    | `Checked x ->
-        Transaction_hash.User_command.of_checked x
+  let slot =
+    Consensus.Data.Consensus_time.to_global_slot
+      (Consensus.Data.Consensus_time.of_time_exn ~constants:consensus_constants
+         (Block_time.now time_controller) )
   in
-  let unchecked = Transaction_hash.User_command.data unchecked_cmd in
-  let verified () =
-    match cmd0 with
-    | `Checked x ->
-        Ok x
-    | `Unchecked _ ->
-        let%map x =
-          Result.of_option (verify unchecked) ~error:Invalid_transaction
-        in
-        Transaction_hash.(
-          User_command_with_valid_signature.make x
-            (User_command.hash unchecked_cmd))
-  in
-  let fee = User_command.fee_exn unchecked in
-  let fee_payer = User_command.fee_payer unchecked in
-  let nonce = User_command.nonce_exn unchecked in
-  (* Result errors indicate problems with the command, while assert failures
-     indicate bugs in Coda. *)
-  let%bind () = check_expiry t unchecked in
-  let%bind consumed = currency_consumed' ~constraint_constants unchecked in
-  let%bind () =
-    if User_command.check_tokens unchecked then return () else Error Bad_token
-  in
-  let%bind () =
-    (* TODO: Proper exchange rate mechanism. *)
-    let fee_token = User_command.fee_token unchecked in
-    if Token_id.(equal default) fee_token then return ()
-    else Error (Unwanted_fee_token fee_token)
-  in
-  (* C4 *)
-  match Map.find t.all_by_sender fee_payer with
-  | None ->
-      (* nothing queued for this sender *)
+  match slot_tx_end with
+  | Some slot_tx_end' when Account_nonce.(slot >= slot_tx_end') ->
+      Error After_slot_tx_end
+  | Some _ | None -> (
+      let unchecked_cmd =
+        match cmd0 with
+        | `Unchecked x ->
+            x
+        | `Checked x ->
+            Transaction_hash.User_command.of_checked x
+      in
+      let unchecked = Transaction_hash.User_command.data unchecked_cmd in
+      let verified () =
+        match cmd0 with
+        | `Checked x ->
+            Ok x
+        | `Unchecked _ ->
+            let%map x =
+              Result.of_option (verify unchecked) ~error:Invalid_transaction
+            in
+            Transaction_hash.(
+              User_command_with_valid_signature.make x
+                (User_command.hash unchecked_cmd))
+      in
+      let fee = User_command.fee_exn unchecked in
+      let fee_payer = User_command.fee_payer unchecked in
+      let nonce = User_command.nonce_exn unchecked in
+      (* Result errors indicate problems with the command, while assert failures
+         indicate bugs in Coda. *)
+      let%bind () = check_expiry t unchecked in
+      let%bind consumed = currency_consumed' ~constraint_constants unchecked in
       let%bind () =
-        Result.ok_if_true
-          (Account_nonce.equal current_nonce nonce)
-          ~error:(Invalid_nonce (`Expected current_nonce, nonce))
-        (* C1/1a *)
+        if User_command.check_tokens unchecked then return ()
+        else Error Bad_token
       in
       let%bind () =
-        Result.ok_if_true
-          Currency.Amount.(consumed <= balance)
-          ~error:(Insufficient_funds (`Balance balance, consumed))
-        (* C2 *)
+        (* TODO: Proper exchange rate mechanism. *)
+        let fee_token = User_command.fee_token unchecked in
+        if Token_id.(equal default) fee_token then return ()
+        else Error (Unwanted_fee_token fee_token)
       in
-      let%map cmd = verified () in
-      ( cmd
-      , { applicable_by_fee =
-            Map_set.insert
-              (module Transaction_hash.User_command_with_valid_signature)
-              t.applicable_by_fee fee cmd
-        ; all_by_sender =
-            Map.set t.all_by_sender ~key:fee_payer
-              ~data:(F_sequence.singleton cmd, consumed)
-        ; all_by_fee =
-            Map_set.insert
-              (module Transaction_hash.User_command_with_valid_signature)
-              t.all_by_fee fee cmd
-        ; all_by_hash =
-            Map.set t.all_by_hash
-              ~key:(Transaction_hash.User_command_with_valid_signature.hash cmd)
-              ~data:cmd
-        ; transactions_with_expiration =
-            add_to_expiration t.transactions_with_expiration cmd
-        ; size = t.size + 1
-        ; constraint_constants
-        ; consensus_constants
-        ; time_controller
-        }
-      , Sequence.empty )
-  | Some (queued_cmds, reserved_currency) ->
-      (* commands queued for this sender *)
-      assert (not @@ F_sequence.is_empty queued_cmds) ;
-      let last_queued_nonce =
-        F_sequence.last_exn queued_cmds
-        |> Transaction_hash.User_command_with_valid_signature.command
-        |> User_command.nonce_exn
-      in
-      if Account_nonce.equal (Account_nonce.succ last_queued_nonce) nonce then
-        (* this command goes on the end *)
-        let%bind reserved_currency' =
-          Currency.Amount.(consumed + reserved_currency)
-          |> Result.of_option ~error:Overflow
-          (* C4 *)
-        in
-        let%bind () =
-          Result.ok_if_true
-            Currency.Amount.(balance >= reserved_currency')
-            ~error:(Insufficient_funds (`Balance balance, reserved_currency'))
-          (* C2 *)
-        in
-        let%map cmd = verified () in
-        ( cmd
-        , { t with
-            all_by_sender =
-              Map.set t.all_by_sender ~key:fee_payer
-                ~data:(F_sequence.snoc queued_cmds cmd, reserved_currency')
-          ; all_by_fee =
-              Map_set.insert
-                (module Transaction_hash.User_command_with_valid_signature)
-                t.all_by_fee fee cmd
-          ; all_by_hash =
-              Map.set t.all_by_hash
-                ~key:
-                  (Transaction_hash.User_command_with_valid_signature.hash cmd)
-                ~data:cmd
-          ; transactions_with_expiration =
-              add_to_expiration t.transactions_with_expiration cmd
-          ; size = t.size + 1
-          }
-        , Sequence.empty )
-      else
-        (* we're replacing a command *)
-        let first_queued_nonce =
-          F_sequence.head_exn queued_cmds
-          |> Transaction_hash.User_command_with_valid_signature.command
-          |> User_command.nonce_exn
-        in
-        assert (Account_nonce.equal first_queued_nonce current_nonce) ;
-        let%bind () =
-          Result.ok_if_true
-            (Account_nonce.between ~low:first_queued_nonce
-               ~high:last_queued_nonce nonce )
-            ~error:
-              (Invalid_nonce
-                 (`Between (first_queued_nonce, last_queued_nonce), nonce) )
-          (* C1/C1b *)
-        in
-        assert (
-          F_sequence.length queued_cmds
-          = Account_nonce.to_int last_queued_nonce
-            - Account_nonce.to_int first_queued_nonce
-            + 1 ) ;
-        let _keep_queue, drop_queue =
-          F_sequence.split_at queued_cmds
-            ( Account_nonce.to_int nonce
-            - Account_nonce.to_int first_queued_nonce )
-        in
-        let to_drop =
-          F_sequence.head_exn drop_queue
-          |> Transaction_hash.User_command_with_valid_signature.command
-        in
-        assert (Account_nonce.equal (User_command.nonce_exn to_drop) nonce) ;
-        (* We check the fee increase twice because we need to be sure the
-           subtraction is safe. *)
-        let%bind () =
-          let replace_fee = User_command.fee_exn to_drop in
-          Result.ok_if_true
-            Currency.Fee.(fee >= replace_fee)
-            ~error:(Insufficient_replace_fee (`Replace_fee replace_fee, fee))
-          (* C3 *)
-        in
-        let dropped, t' =
-          remove_with_dependents_exn t @@ F_sequence.head_exn drop_queue
-        in
-        (* check remove_exn dropped the right things *)
-        [%test_eq:
-          Transaction_hash.User_command_with_valid_signature.t Sequence.t]
-          dropped
-          (F_sequence.to_seq drop_queue) ;
-        let%bind cmd = verified () in
-        (* Add the new transaction *)
-        let%bind cmd, t'', _ =
-          match
-            add_from_gossip_exn t' ~verify (`Checked cmd) current_nonce balance
-          with
-          | Ok (v, t'', dropped') ->
-              (* We've already removed them, so this should always be empty. *)
-              assert (Sequence.is_empty dropped') ;
-              Result.Ok (v, t'', dropped)
-          | Error err ->
-              Error err
-        in
-        let drop_head, drop_tail = Option.value_exn (Sequence.next dropped) in
-        let increment =
-          Option.value_exn Currency.Fee.(fee - User_command.fee_exn to_drop)
-        in
-        (* Re-add all of the transactions we dropped until there are none left,
-           or until the fees from dropped transactions exceed the fee increase
-           over the first transaction.
-        *)
-        let%bind t'', increment, dropped' =
-          let rec go t' increment dropped dropped' current_nonce =
-            match (Sequence.next dropped, dropped') with
-            | None, Some dropped' ->
-                Ok (t', increment, dropped')
-            | None, None ->
-                Ok (t', increment, Sequence.empty)
-            | Some (cmd, dropped), Some _ -> (
-                let cmd_unchecked =
-                  Transaction_hash.User_command_with_valid_signature.command cmd
-                in
-                let replace_fee = User_command.fee_exn cmd_unchecked in
-                match Currency.Fee.(increment - replace_fee) with
-                | Some increment ->
-                    go t' increment dropped dropped' current_nonce
-                | None ->
-                    Error
-                      (Insufficient_replace_fee
-                         (`Replace_fee replace_fee, increment) ) )
-            | Some (cmd, dropped'), None -> (
-                let current_nonce = Account_nonce.succ current_nonce in
-                match
-                  add_from_gossip_exn t' ~verify (`Checked cmd) current_nonce
-                    balance
-                with
-                | Ok (_v, t', dropped_) ->
-                    assert (Sequence.is_empty dropped_) ;
-                    go t' increment dropped' None current_nonce
-                | Error _err ->
-                    (* Re-evaluate with the same [dropped] to calculate the new
-                       fee increment.
-                    *)
-                    go t' increment dropped (Some dropped') current_nonce )
+      (* C4 *)
+      match Map.find t.all_by_sender fee_payer with
+      | None ->
+          (* nothing queued for this sender *)
+          let%bind () =
+            Result.ok_if_true
+              (Account_nonce.equal current_nonce nonce)
+              ~error:(Invalid_nonce (`Expected current_nonce, nonce))
+            (* C1/1a *)
           in
-          go t'' increment drop_tail None current_nonce
-        in
-        let%map () =
-          Result.ok_if_true
-            Currency.Fee.(increment >= replace_fee)
-            ~error:
-              (Insufficient_replace_fee (`Replace_fee replace_fee, increment))
-          (* C3 *)
-        in
-        (cmd, t'', Sequence.(append (return drop_head) dropped'))
+          let%bind () =
+            Result.ok_if_true
+              Currency.Amount.(consumed <= balance)
+              ~error:(Insufficient_funds (`Balance balance, consumed))
+            (* C2 *)
+          in
+          let%map cmd = verified () in
+          ( cmd
+          , { applicable_by_fee =
+                Map_set.insert
+                  (module Transaction_hash.User_command_with_valid_signature)
+                  t.applicable_by_fee fee cmd
+            ; all_by_sender =
+                Map.set t.all_by_sender ~key:fee_payer
+                  ~data:(F_sequence.singleton cmd, consumed)
+            ; all_by_fee =
+                Map_set.insert
+                  (module Transaction_hash.User_command_with_valid_signature)
+                  t.all_by_fee fee cmd
+            ; all_by_hash =
+                Map.set t.all_by_hash
+                  ~key:
+                    (Transaction_hash.User_command_with_valid_signature.hash cmd)
+                  ~data:cmd
+            ; transactions_with_expiration =
+                add_to_expiration t.transactions_with_expiration cmd
+            ; size = t.size + 1
+            ; constraint_constants
+            ; consensus_constants
+            ; time_controller
+            ; slot_tx_end
+            }
+          , Sequence.empty )
+      | Some (queued_cmds, reserved_currency) ->
+          (* commands queued for this sender *)
+          assert (not @@ F_sequence.is_empty queued_cmds) ;
+          let last_queued_nonce =
+            F_sequence.last_exn queued_cmds
+            |> Transaction_hash.User_command_with_valid_signature.command
+            |> User_command.nonce_exn
+          in
+          if Account_nonce.equal (Account_nonce.succ last_queued_nonce) nonce
+          then
+            (* this command goes on the end *)
+            let%bind reserved_currency' =
+              Currency.Amount.(consumed + reserved_currency)
+              |> Result.of_option ~error:Overflow
+              (* C4 *)
+            in
+            let%bind () =
+              Result.ok_if_true
+                Currency.Amount.(balance >= reserved_currency')
+                ~error:
+                  (Insufficient_funds (`Balance balance, reserved_currency'))
+              (* C2 *)
+            in
+            let%map cmd = verified () in
+            ( cmd
+            , { t with
+                all_by_sender =
+                  Map.set t.all_by_sender ~key:fee_payer
+                    ~data:(F_sequence.snoc queued_cmds cmd, reserved_currency')
+              ; all_by_fee =
+                  Map_set.insert
+                    (module Transaction_hash.User_command_with_valid_signature)
+                    t.all_by_fee fee cmd
+              ; all_by_hash =
+                  Map.set t.all_by_hash
+                    ~key:
+                      (Transaction_hash.User_command_with_valid_signature.hash
+                         cmd )
+                    ~data:cmd
+              ; transactions_with_expiration =
+                  add_to_expiration t.transactions_with_expiration cmd
+              ; size = t.size + 1
+              }
+            , Sequence.empty )
+          else
+            (* we're replacing a command *)
+            let first_queued_nonce =
+              F_sequence.head_exn queued_cmds
+              |> Transaction_hash.User_command_with_valid_signature.command
+              |> User_command.nonce_exn
+            in
+            assert (Account_nonce.equal first_queued_nonce current_nonce) ;
+            let%bind () =
+              Result.ok_if_true
+                (Account_nonce.between ~low:first_queued_nonce
+                   ~high:last_queued_nonce nonce )
+                ~error:
+                  (Invalid_nonce
+                     (`Between (first_queued_nonce, last_queued_nonce), nonce)
+                  )
+              (* C1/C1b *)
+            in
+            assert (
+              F_sequence.length queued_cmds
+              = Account_nonce.to_int last_queued_nonce
+                - Account_nonce.to_int first_queued_nonce
+                + 1 ) ;
+            let _keep_queue, drop_queue =
+              F_sequence.split_at queued_cmds
+                ( Account_nonce.to_int nonce
+                - Account_nonce.to_int first_queued_nonce )
+            in
+            let to_drop =
+              F_sequence.head_exn drop_queue
+              |> Transaction_hash.User_command_with_valid_signature.command
+            in
+            assert (Account_nonce.equal (User_command.nonce_exn to_drop) nonce) ;
+            (* We check the fee increase twice because we need to be sure the
+               subtraction is safe. *)
+            let%bind () =
+              let replace_fee = User_command.fee_exn to_drop in
+              Result.ok_if_true
+                Currency.Fee.(fee >= replace_fee)
+                ~error:(Insufficient_replace_fee (`Replace_fee replace_fee, fee))
+              (* C3 *)
+            in
+            let dropped, t' =
+              remove_with_dependents_exn t @@ F_sequence.head_exn drop_queue
+            in
+            (* check remove_exn dropped the right things *)
+            [%test_eq:
+              Transaction_hash.User_command_with_valid_signature.t Sequence.t]
+              dropped
+              (F_sequence.to_seq drop_queue) ;
+            let%bind cmd = verified () in
+            (* Add the new transaction *)
+            let%bind cmd, t'', _ =
+              match
+                add_from_gossip_exn t' ~verify (`Checked cmd) current_nonce
+                  balance
+              with
+              | Ok (v, t'', dropped') ->
+                  (* We've already removed them, so this should always be empty. *)
+                  assert (Sequence.is_empty dropped') ;
+                  Result.Ok (v, t'', dropped)
+              | Error err ->
+                  Error err
+            in
+            let drop_head, drop_tail =
+              Option.value_exn (Sequence.next dropped)
+            in
+            let increment =
+              Option.value_exn Currency.Fee.(fee - User_command.fee_exn to_drop)
+            in
+            (* Re-add all of the transactions we dropped until there are none left,
+               or until the fees from dropped transactions exceed the fee increase
+               over the first transaction.
+            *)
+            let%bind t'', increment, dropped' =
+              let rec go t' increment dropped dropped' current_nonce =
+                match (Sequence.next dropped, dropped') with
+                | None, Some dropped' ->
+                    Ok (t', increment, dropped')
+                | None, None ->
+                    Ok (t', increment, Sequence.empty)
+                | Some (cmd, dropped), Some _ -> (
+                    let cmd_unchecked =
+                      Transaction_hash.User_command_with_valid_signature.command
+                        cmd
+                    in
+                    let replace_fee = User_command.fee_exn cmd_unchecked in
+                    match Currency.Fee.(increment - replace_fee) with
+                    | Some increment ->
+                        go t' increment dropped dropped' current_nonce
+                    | None ->
+                        Error
+                          (Insufficient_replace_fee
+                             (`Replace_fee replace_fee, increment) ) )
+                | Some (cmd, dropped'), None -> (
+                    let current_nonce = Account_nonce.succ current_nonce in
+                    match
+                      add_from_gossip_exn t' ~verify (`Checked cmd)
+                        current_nonce balance
+                    with
+                    | Ok (_v, t', dropped_) ->
+                        assert (Sequence.is_empty dropped_) ;
+                        go t' increment dropped' None current_nonce
+                    | Error _err ->
+                        (* Re-evaluate with the same [dropped] to calculate the new
+                           fee increment.
+                        *)
+                        go t' increment dropped (Some dropped') current_nonce )
+              in
+              go t'' increment drop_tail None current_nonce
+            in
+            let%map () =
+              Result.ok_if_true
+                Currency.Fee.(increment >= replace_fee)
+                ~error:
+                  (Insufficient_replace_fee (`Replace_fee replace_fee, increment)
+                  )
+              (* C3 *)
+            in
+            (cmd, t'', Sequence.(append (return drop_head) dropped')) )
 
 let add_from_backtrack :
        t
     -> Transaction_hash.User_command_with_valid_signature.t
     -> (t, Command_error.t) Result.t =
- fun ({ constraint_constants; consensus_constants; time_controller; _ } as t)
-     cmd ->
+ fun ( { constraint_constants
+       ; consensus_constants
+       ; time_controller
+       ; slot_tx_end
+       ; _
+       } as t ) cmd ->
   let open Result.Let_syntax in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
@@ -1004,6 +1049,7 @@ let add_from_backtrack :
       ; constraint_constants
       ; consensus_constants
       ; time_controller
+      ; slot_tx_end
       }
   | Some (queue, currency_reserved) ->
       let first_queued = F_sequence.head_exn queue in
@@ -1047,6 +1093,7 @@ let add_from_backtrack :
       ; constraint_constants
       ; consensus_constants
       ; time_controller
+      ; slot_tx_end
       }
 
 (* Only show stdout for failed inline tests. *)
@@ -1075,8 +1122,11 @@ let%test_module _ =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let slot_tx_end = None
+
     let empty =
       empty ~constraint_constants ~consensus_constants ~time_controller
+        ~slot_tx_end
 
     let%test_unit "empty invariants" = assert_invariants empty
 
@@ -1217,7 +1267,11 @@ let%test_module _ =
                       !"Expired user command. Current global slot is \
                         %{sexp:Mina_numbers.Global_slot.t} but user command is \
                         only valid until %{sexp:Mina_numbers.Global_slot.t}"
-                      current_global_slot valid_until () )
+                      current_global_slot valid_until ()
+                | Error After_slot_tx_end ->
+                    failwith
+                      "Transaction was submitted after th slot defined to stop \
+                       accepting transactions" )
           in
           go cmds )
 

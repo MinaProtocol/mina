@@ -76,6 +76,8 @@ let%test_module "transaction_status" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let slot_tx_end = None
+
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let proof_level = precomputed_values.proof_level
@@ -120,7 +122,7 @@ let%test_module "transaction_status" =
         Transaction_pool.create ~config
           ~constraint_constants:precomputed_values.constraint_constants
           ~consensus_constants:precomputed_values.consensus_constants
-          ~time_controller ~logger ~frontier_broadcast_pipe
+          ~time_controller ~slot_tx_end ~logger ~frontier_broadcast_pipe
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
       in
       don't_wait_for

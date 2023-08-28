@@ -6,6 +6,7 @@ open Pipe_lib
 open Strict_pipe
 open Signature_lib
 open Network_peer
+open Mina_numbers
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
@@ -894,17 +895,16 @@ let get_current_nonce t aid =
 
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let slot =
-    Mina_numbers.Account_nonce.to_int
-    @@ Consensus.Data.Consensus_time.to_global_slot
+    Consensus.Data.Consensus_time.to_global_slot
          (Consensus.Data.Consensus_time.of_time_exn
             ~constants:(config t).precomputed_values.consensus_constants
             (Block_time.now (config t).time_controller) )
   in
   match (config t).slot_tx_end with
-  | Some slot_tx_end when slot >= slot_tx_end ->
+  | Some slot_tx_end when Account_nonce.(slot >= slot_tx_end) ->
       [%log' warn (top_level_logger t)]
         "can't add transactions at slot $slot, tx production ends at $end"
-        ~metadata:[ ("slot", `Int slot); ("end", `Int slot_tx_end) ] ;
+        ~metadata:[ ("slot", `Int (Account_nonce.to_int slot)); ("end", `Int (Account_nonce.to_int slot_tx_end)) ] ;
       Deferred.return (Error (Error.of_string "tx production has ended"))
   | Some _ | None ->
       let result_ivar = Ivar.create () in
@@ -915,17 +915,16 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
 
 let add_full_transactions t user_command =
   let slot =
-    Mina_numbers.Account_nonce.to_int
-    @@ Consensus.Data.Consensus_time.to_global_slot
+    Consensus.Data.Consensus_time.to_global_slot
          (Consensus.Data.Consensus_time.of_time_exn
             ~constants:(config t).precomputed_values.consensus_constants
             (Block_time.now (config t).time_controller) )
   in
   match (config t).slot_tx_end with
-  | Some slot_tx_end when slot >= slot_tx_end ->
+  | Some slot_tx_end when Account_nonce.(slot >= slot_tx_end) ->
       [%log' warn (top_level_logger t)]
         "can't add transactions at slot $slot, tx production ends at $end"
-        ~metadata:[ ("slot", `Int slot); ("end", `Int slot_tx_end) ] ;
+        ~metadata:[ ("slot", `Int (Account_nonce.to_int slot)); ("end", `Int (Account_nonce.to_int slot_tx_end)) ] ;
       Deferred.return (Error (Error.of_string "tx production has ended"))
   | Some _ | None ->
       let result_ivar = Ivar.create () in
@@ -1618,7 +1617,7 @@ let create ?wallets (config : Config.t) =
             (* make transaction pool return writer for local and incoming diffs *)
             Network_pool.Transaction_pool.create ~config:txn_pool_config
               ~constraint_constants ~consensus_constants
-              ~time_controller:config.time_controller ~logger:config.logger
+              ~time_controller:config.time_controller ~slot_tx_end:config.slot_tx_end ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~on_remote_push:notify_online
               ~log_gossip_heard:
@@ -1632,7 +1631,7 @@ let create ?wallets (config : Config.t) =
           let%bind snark_pool, snark_remote_sink, snark_local_sink =
             Network_pool.Snark_pool.load ~config:snark_pool_config
               ~constraint_constants ~consensus_constants
-              ~time_controller:config.time_controller ~logger:config.logger
+              ~time_controller:config.time_controller ~slot_tx_end:config.slot_tx_end ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~on_remote_push:notify_online
               ~log_gossip_heard:

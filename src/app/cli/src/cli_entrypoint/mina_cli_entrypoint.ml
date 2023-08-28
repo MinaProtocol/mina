@@ -1277,6 +1277,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   "Cannot provide both uptime submitter public key and uptime \
                    submitter keyfile"
           in
+          let slot_tx_end = Option.map ~f:Mina_numbers.Account_nonce.of_int slot_tx_end in
           let start_time = Time.now () in
           let%map coda =
             Mina_lib.create ~wallets

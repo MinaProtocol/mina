@@ -79,6 +79,7 @@ module Diff_versioned = struct
           | Unwanted_fee_token
           | Expired
           | Overloaded
+          | After_slot_tx_end
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
@@ -101,6 +102,7 @@ module Diff_versioned = struct
       | Unwanted_fee_token
       | Expired
       | Overloaded
+      | After_slot_tx_end
     [@@deriving sexp, yojson]
 
     let to_string_hum = function
@@ -133,6 +135,9 @@ module Diff_versioned = struct
           "This transaction has expired"
       | Overloaded ->
           "The diff containing this transaction was too large"
+      | After_slot_tx_end ->
+          "This transaction was submitted after the slot defined to stop \
+           accepting transactions"
   end
 
   module Rejected = struct
@@ -393,6 +398,8 @@ struct
             ; ( "current_global_slot"
               , Mina_numbers.Global_slot.to_yojson current_global_slot )
             ] )
+      | After_slot_tx_end ->
+          ("after_slot_tx_end", [])
 
     let balance_of_account ~global_slot (account : Account.t) =
       match account.timing with
@@ -688,6 +695,24 @@ struct
           ignore
             ( Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
               : (Time.t * [ `Batch of int ]) option ) ) ;
+      let pool =
+        match Indexed_pool.slot_tx_end t.pool with
+        | Some slot_tx_end
+          when Mina_numbers.Account_nonce.(global_slot >= slot_tx_end) ->
+            (* discard all transactions *)
+            [%log' debug t.logger]
+              "Discarding all transactions because the current global slot \
+               $slot is past slot_tx_end $slot_tx_end"
+              ~metadata:
+                [ ("slot", Mina_numbers.Global_slot.to_yojson global_slot)
+                ; ("slot_tx_end", Mina_numbers.Global_slot.to_yojson slot_tx_end)
+                ] ;
+            Hashtbl.clear t.locally_generated_uncommitted ;
+            Hashtbl.clear t.locally_generated_committed ;
+            Indexed_pool.drop_all t.pool
+        | None | Some _ ->
+            pool
+      in
       Mina_metrics.(
         Gauge.set Transaction_pool.pool_size
           (Float.of_int (Indexed_pool.size pool))) ;
@@ -695,11 +720,11 @@ struct
       Deferred.unit
 
     let create ~constraint_constants ~consensus_constants ~time_controller
-        ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+        ~slot_tx_end ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
       let t =
         { pool =
             Indexed_pool.empty ~constraint_constants ~consensus_constants
-              ~time_controller
+              ~time_controller ~slot_tx_end
         ; locally_generated_uncommitted =
             Hashtbl.create
               ( module Transaction_hash.User_command_with_valid_signature.Stable
@@ -850,6 +875,7 @@ struct
           | Unwanted_fee_token
           | Expired
           | Overloaded
+          | After_slot_tx_end
         [@@deriving sexp, yojson]
 
         let to_string_hum = Diff_versioned.Diff_error.to_string_hum
@@ -1123,6 +1149,8 @@ struct
                                     , Mina_numbers.Global_slot.to_yojson
                                         current_global_slot )
                                   ] )
+                            | After_slot_tx_end ->
+                                (After_slot_tx_end, [])
                           in
                           let yojson_fail_reason =
                             Fn.compose
@@ -1144,7 +1172,9 @@ struct
                                 | Unwanted_fee_token _ ->
                                     "unwanted fee token"
                                 | Expired _ ->
-                                    "expired" )
+                                    "expired"
+                                | After_slot_tx_end ->
+                                    "after slot tx end" )
                           in
                           match add_res with
                           | Ok (verified, pool', dropped) ->
@@ -1484,6 +1514,8 @@ let%test_module _ =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let slot_tx_end = None
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -1573,7 +1605,7 @@ let%test_module _ =
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
-          ~time_controller ~frontier_broadcast_pipe:tf_pipe_r
+          ~time_controller ~slot_tx_end ~frontier_broadcast_pipe:tf_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
       in
       let pool = Test.resource_pool pool_ in
@@ -2025,7 +2057,7 @@ let%test_module _ =
           in
           let pool_, _, _ =
             Test.create ~config ~logger ~constraint_constants
-              ~consensus_constants ~time_controller
+              ~consensus_constants ~time_controller ~slot_tx_end
               ~frontier_broadcast_pipe:frontier_pipe_r ~log_gossip_heard:false
               ~on_remote_push:(Fn.const Deferred.unit)
           in
