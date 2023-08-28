@@ -2006,14 +2006,6 @@ module Payload = struct
             ~resolve:(fun (_ : Mina_lib.t resolve_info) -> Fn.id)
         ] )
 
-  let add_payment_receipt =
-    obj "AddPaymentReceiptPayload" ~fields:(fun _ ->
-        [ field "payment"
-            ~typ:(non_null User_command.user_command)
-            ~args:Arg.[]
-            ~resolve:(fun _ -> Fn.id)
-        ] )
-
   let set_coinbase_receiver =
     obj "SetCoinbaseReceiverPayload" ~fields:(fun _ ->
         [ field "lastCoinbaseReceiver"
@@ -2828,26 +2820,6 @@ module Input = struct
                    "Public key you wish to start snark-working on; null to \
                     stop doing any snark work. %s"
                    Cli_lib.Default.receiver_key_warning )
-          ]
-  end
-
-  module AddPaymentReceiptInput = struct
-    type input = { payment : string; added_time : string }
-
-    let arg_typ =
-      obj "AddPaymentReceiptInput"
-        ~coerce:(fun payment added_time -> { payment; added_time })
-        ~split:(fun f (t : input) -> f t.payment t.added_time)
-        ~fields:
-          [ arg "payment"
-              ~doc:(Doc.bin_prot "Serialized payment")
-              ~typ:(non_null string)
-          ; (* TODO: create a formal method for verifying that the provided added_time is correct  *)
-            arg "added_time" ~typ:(non_null string)
-              ~doc:
-                (Doc.date
-                   "Time that a payment gets added to another clients \
-                    transaction database" )
           ]
   end
 

@@ -281,7 +281,7 @@ let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
           @@ fun () ->
           match%map Zkapps.send_zkapp_command mina zkapp_command with
           | Ok _ ->
-              [%log info] "Send out zkApp $command"
+              [%log info] "Sent out zkApp $command"
                 ~metadata:[ ("command", Zkapp_command.to_yojson zkapp_command) ]
           | Error e ->
               [%log info] "Failed to send out zkApp $command, see $error"
