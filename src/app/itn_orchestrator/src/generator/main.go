@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"sort"
+	"strings"
 
 	lib "itn_orchestrator"
 )
@@ -50,6 +51,9 @@ type Params struct {
 	PaymentReceiver                                                                        itn_json_types.MinaPublicKey
 	PrivkeysPerFundCmd                                                                     int
 	GenerateFundKeys                                                                       int
+	RotationKeys, RotationServers                                                          []string
+	RotationPermutation                                                                    bool
+	RotationRatio                                                                          float64
 }
 
 type Command struct {
@@ -65,6 +69,10 @@ type GeneratedRound struct {
 
 func fund(p lib.FundParams) Command {
 	return Command{Action: lib.FundAction{}.Name(), Params: p}
+}
+
+func rotate(p lib.RotateParams) Command {
+	return Command{Action: lib.RotateAction{}.Name(), Params: p}
 }
 
 func loadKeys(p lib.KeyloaderParams) Command {
@@ -201,6 +209,25 @@ func (p *Params) Generate(round int) GeneratedRound {
 	}
 	cmds := []Command{}
 	roundStartMin := round * (p.RoundDurationMin + p.PauseMin)
+	if len(p.RotationKeys) > 0 {
+		var mapping []int
+		nKeys := len(p.RotationKeys)
+		if p.RotationPermutation {
+			mapping = rand.Perm(nKeys)
+		} else {
+			mapping = make([]int, nKeys)
+			for i := range mapping {
+				mapping[i] = rand.Intn(len(p.RotationKeys))
+			}
+		}
+		cmds = append(cmds, rotate(lib.RotateParams{
+			Pubkeys:     p.RotationKeys,
+			RestServers: p.RotationServers,
+			Mapping:     mapping,
+			Ratio:       p.RotationRatio,
+			PasswordEnv: p.PasswordEnv,
+		}))
+	}
 	cmds = append(cmds, withComment(fmt.Sprintf("Starting round %d, %d min since start", round, roundStartMin), discovery(lib.DiscoveryParams{
 		OffsetMin:        15,
 		NoBlockProducers: p.SendFromNonBpsOnly,
@@ -303,6 +330,7 @@ func checkRatio(ratio float64, msg string) {
 }
 
 func main() {
+	var rotateKeys, rotateServers string
 	var mode string
 	var p Params
 	flag.Float64Var(&p.BaseTps, "base-tps", 0.3, "Base tps rate for the whole network")
@@ -333,6 +361,10 @@ func main() {
 	flag.StringVar(&p.ExperimentName, "experiment-name", "exp-0", "Name of experiment")
 	flag.IntVar(&p.PrivkeysPerFundCmd, "privkeys-per-fund", 1, "Number of private keys to use per fund command")
 	flag.IntVar(&p.GenerateFundKeys, "generate-privkeys", 0, "Number of funding keys to generate from the private key")
+	flag.StringVar(&rotateKeys, "rotate-keys", "", "Comma-separated list of public keys to rotate")
+	flag.StringVar(&rotateServers, "rotate-servers", "", "Comma-separated list of servers for rotation")
+	flag.Float64Var(&p.RotationRatio, "rotate-ratio", 0.3, "Ratio of balance to rotate")
+	flag.BoolVar(&p.RotationPermutation, "rotate-permutation", false, "Whether to generate only permutation mappings for rotation")
 	flag.Parse()
 	p.Privkeys = flag.Args()
 	if len(p.Privkeys) == 0 {
@@ -346,6 +378,16 @@ func main() {
 	if (p.GenerateFundKeys > 0 && p.GenerateFundKeys < p.PrivkeysPerFundCmd) || (p.GenerateFundKeys == 0 && len(p.Privkeys) < p.PrivkeysPerFundCmd) {
 		fmt.Fprintln(os.Stderr, "Number of private keys is less than -privkeys-per-fund")
 		os.Exit(4)
+	}
+	if rotateKeys != "" {
+		p.RotationKeys = strings.Split(rotateKeys, ",")
+	}
+	if rotateServers != "" {
+		p.RotationServers = strings.Split(rotateServers, ",")
+	}
+	if len(p.RotationServers) != len(p.RotationKeys) || p.RotationRatio <= 0 || p.RotationRatio > 1 {
+		fmt.Fprintln(os.Stderr, "wrong rotation configuration")
+		os.Exit(5)
 	}
 	switch mode {
 	case "stop-ratio-distribution":
