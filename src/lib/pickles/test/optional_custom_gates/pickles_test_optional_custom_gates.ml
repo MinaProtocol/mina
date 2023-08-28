@@ -217,6 +217,52 @@ let main_fixed_lookup_tables_simple () =
        ; (* v3 *) w6 = fresh_int 2
        } )
 
+(* FIXME: This test seems to fail on random values. It is not added at the
+   moment, and therefore prefixed with _.
+   TODO: open a GitHub issue and link here
+*)
+let _main_fixed_lookup_tables_randomized () =
+  let nb_lookups = 1 + Random.int 30 in
+  let nb_tables = 1 + Random.int 100 in
+  let lookup_tables =
+    Array.init nb_tables ~f:(fun table_id ->
+        let n_indexes = 1 + Random.int 20 in
+        let n_indexes = 4 in
+        let indexes = Array.init n_indexes ~f:Field.Constant.of_int in
+        let values =
+          Array.init n_indexes ~f:(fun i ->
+              Field.Constant.of_int (Random.int 100) )
+        in
+        add_plonk_constraint
+          (AddFixedLookupTable
+             { id = Int.to_int32_exn table_id; data = [| indexes; values |] } ) ;
+        [| indexes; values |] )
+  in
+  ignore
+  @@ Array.init nb_lookups ~f:(fun i ->
+         let table_id = 0 in
+         let pickled_lt_data = lookup_tables.(table_id).(1) in
+         let table_size = Array.length pickled_lt_data in
+         let i1 = Random.int table_size in
+         let v1 = pickled_lt_data.(i1) in
+         let vv1 = exists Field.typ ~compute:(fun () -> v1) in
+         let i2 = Random.int table_size in
+         let v2 = pickled_lt_data.(i2) in
+         let vv2 = exists Field.typ ~compute:(fun () -> v2) in
+         let i3 = Random.int table_size in
+         let v3 = pickled_lt_data.(i3) in
+         let vv3 = exists Field.typ ~compute:(fun () -> v3) in
+         add_plonk_constraint
+           (Lookup
+              { w0 = fresh_int table_id
+              ; w1 = fresh_int i1
+              ; w2 = vv1
+              ; w3 = fresh_int i2
+              ; w4 = vv2
+              ; w5 = fresh_int i3
+              ; w6 = vv3
+              } ) )
+
 let add_tests, get_tests =
   let tests = ref [] in
   ( (fun name testcases -> tests := (name, testcases) :: !tests)
