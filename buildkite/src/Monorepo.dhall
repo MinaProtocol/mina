@@ -43,7 +43,7 @@ let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
       fi
     ''
   }
-  in Cmd.quietly (merge pipelineHandlers pipelineType)
+  in Cmd.quietly (merge pipelineHandlers requestedPipeline)
 
 let prefixCommands = [
   Cmd.run "git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt", -- Tell git where to find certs for https connections
