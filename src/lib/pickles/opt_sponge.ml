@@ -228,6 +228,29 @@ struct
         t.sponge_state <- Squeezed 1 ;
         t.state.(0)
 
+  let consume_all_pending (t : t) =
+    match t.sponge_state with
+    | Squeezed _ ->
+        failwith "Nothing pending"
+    | Absorbing { next_index; xs } ->
+        let input = Array.of_list_rev xs in
+        assert (Array.length t.state = m) ;
+        let n = Array.length input in
+        let num_pairs = n / 2 in
+        let remaining = n - (2 * num_pairs) in
+        let pairs =
+          Array.init num_pairs ~f:(fun i ->
+              (input.(2 * i), input.((2 * i) + 1)) )
+        in
+        let pos =
+          consume_pairs ~params:t.params ~state:t.state ~pos:next_index pairs
+        in
+        (* TODO: We should propagate the emptiness state of the pairs,
+           otherwise this will break in some edge cases.
+        *)
+        let xs = if remaining = 1 then [ input.(n - 1) ] else [] in
+        t.sponge_state <- Absorbing { next_index = pos; xs }
+
   let%test_module "opt_sponge" =
     ( module struct
       module S = Sponge.Make_sponge (P)

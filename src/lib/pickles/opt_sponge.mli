@@ -25,4 +25,6 @@ module Make
     t -> Impl.Field.t Snarky_backendless.Boolean.t * Impl.Field.t -> unit
 
   val squeeze : t -> Impl.Field.t
+
+  val consume_all_pending : t -> unit
 end
