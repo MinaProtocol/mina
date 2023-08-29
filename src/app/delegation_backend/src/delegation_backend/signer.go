@@ -2,9 +2,9 @@ package delegation_backend
 
 // TODO think of getting rid of -L flags with relative paths
 
-// #cgo LDFLAGS: -L../result
+// #cgo LDFLAGS: -L ../../result
 // #cgo LDFLAGS: -lmina_signer -lm
-// #cgo CFLAGS: -w -I ../result/headers
+// #cgo CFLAGS: -w -I ../../result/headers
 // #include "crypto.h"
 import "C"
 import "unsafe"
