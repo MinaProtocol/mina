@@ -2951,13 +2951,8 @@ let%test_module _ =
           in
           return () )
 
-    (* This test uses dummy verifiers, that's why it's not rejecting the problematic zkapp command
-       But this test is still useful, since it exercises the parts that doesn't requires a pickles instance
-       Combining together with the test that uses pickles directly, these 2 tests would make sure that
-       the problematic zkapp command would fail exactly for the invalid proof
-    *)
     let%test "account update with a different network id that uses proof \
-              authorization would pass verification under dummy verifier" =
+              authorization would be rejected" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind verifier_full =
             Verifier.create ~logger ~proof_level:Full ~constraint_constants
@@ -2988,53 +2983,8 @@ let%test_module _ =
                  ~sender:Envelope.Sender.Local )
           with
           | Error e ->
-              failwith (Error.to_string_hum e)
+              String.is_substring (Error.to_string_hum e)
+                ~substring:"Invalid_proof"
           | Ok _ ->
-              true )
-
-    let%test "account update with a different network id that uses proof \
-              authorization would fail verification under pickles" =
-      Thread_safe.block_on_async_exn (fun () ->
-          let%bind test =
-            setup_test
-              ~permissions:
-                { Permissions.user_default with set_zkapp_uri = Proof }
-              ()
-          in
-          let%bind zkapp_command =
-            mk_single_account_update
-              ~chain:Mina_signature_kind.(Other_network "invalid")
-              ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
-              ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
-          in
-          let Zkapp_command.Verifiable.{ account_updates; _ } = zkapp_command in
-          let zkapp_command_with_hashes_list =
-            account_updates |> Zkapp_statement.zkapp_statements_of_forest'
-            |> Zkapp_command.Call_forest.With_hashes_and_data
-               .to_zkapp_command_with_hashes_list
-          in
-          let to_verify =
-            List.map zkapp_command_with_hashes_list
-              ~f:(fun ((p, (vk_opt, _stmt)), _) ->
-                match p.authorization with
-                | Proof pi ->
-                    let vk = Option.value_exn vk_opt in
-                    let stmt =
-                      Zkapp_statement.Poly.
-                        { account_update =
-                            ( Zkapp_command.Digest.Account_update.create p
-                              :> Zkapp_command.Transaction_commitment.t )
-                        ; calls =
-                            ( Zkapp_command.Call_forest.hash []
-                              :> Zkapp_command.Transaction_commitment.t )
-                        }
-                    in
-                    (vk.data, stmt, pi)
-                | _ ->
-                    failwith "mk_single_account_update doesn't have proof auth" )
-          in
-          let%map result =
-            Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
-          in
-          Or_error.is_error result )
+              false )
   end )

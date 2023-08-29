@@ -4418,13 +4418,7 @@ let%test_module "staged ledger tests" =
                   | _ ->
                       failwith "expecting zkapp_command transaction" ) ) )
 
-    (* This test uses dummy verifiers, that's why it's not rejecting the problematic zkapp command
-       But this test is still useful, since it exercises the parts that doesn't requires a pickles
-       instance. Currently we only have the test with dummy verifier. The test that uses a full
-       verifier is still under working.
-    *)
-    let%test_unit "Invalid account_update_hash would not be rejected by dummy \
-                   verifier" =
+    let%test_unit "Invalid account_update_hash would be rejected" =
       let open Transaction_snark.For_tests in
       Quickcheck.test ~trials:1 gen_spec_keypair_and_global_slot
         ~f:(fun ({ init_ledger; specs }, zkapp_account_keypair, global_slot) ->
@@ -4519,7 +4513,15 @@ let%test_module "staged ledger tests" =
                           ~supercharge_coinbase:false
                       with
                       | Ok _ ->
-                          ()
+                          failwith "invalid block should be rejected"
                       | Error e ->
-                          failwith (Staged_ledger_error.to_string e) ) ) ) )
+                          if
+                            String.is_substring
+                              (Staged_ledger_error.to_string e)
+                              ~substring:"batch verification failed"
+                          then ()
+                          else
+                            failwith
+                              "block should be rejected because batch \
+                               verification failed" ) ) ) )
   end )
