@@ -217,6 +217,49 @@ let main_fixed_lookup_tables_simple () =
        ; (* v3 *) w6 = fresh_int 2
        } )
 
+let main_fixed_lookup_tables_values_not_sorted () =
+  add_plonk_constraint
+    (AddFixedLookupTable
+       { id = 0l
+       ; data =
+           (* It is an indexed table containing the values [0, 1, 2, 3] *)
+           [| [| Field.Constant.of_int 0
+               ; Field.Constant.of_int 1
+               ; Field.Constant.of_int 2
+               ; Field.Constant.of_int 3
+              |]
+            ; [| Field.Constant.of_int 87
+               ; Field.Constant.of_int 84
+               ; Field.Constant.of_int 83
+               ; Field.Constant.of_int 5
+              |]
+           |]
+       } ) ;
+  add_plonk_constraint
+    (Lookup
+       { (* table id *)
+         w0 = fresh_int 0
+       ; (* idx1 *) w1 = fresh_int 0
+       ; (* v1 *) w2 = fresh_int 87
+       ; (* idx2 *) w3 = fresh_int 3
+       ; (* v2 *) w4 = fresh_int 5
+       ; (* idx3 *) w5 = fresh_int 1
+       ; (* v3 *) w6 = fresh_int 84
+       } ) ;
+
+  (* Same index and values in the same constraint *)
+  add_plonk_constraint
+    (Lookup
+       { (* table id *)
+         w0 = fresh_int 0
+       ; (* idx1 *) w1 = fresh_int 0
+       ; (* v1 *) w2 = fresh_int 87
+       ; (* idx2 *) w3 = fresh_int 0
+       ; (* v2 *) w4 = fresh_int 87
+       ; (* idx3 *) w5 = fresh_int 0
+       ; (* v3 *) w6 = fresh_int 87
+       } )
+
 (* FIXME: This test seems to fail on random values. It is not added at the
    moment, and therefore prefixed with _.
    TODO: open a GitHub issue and link here
@@ -288,7 +331,9 @@ let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
   if feature_flags.range_check1 then main_range_check1 () ;
   if feature_flags.foreign_field_add then main_foreign_field_add () ;
   if feature_flags.foreign_field_mul then main_foreign_field_mul () ;
-  if feature_flags.lookup then main_fixed_lookup_tables_simple ()
+  if feature_flags.lookup then (
+    main_fixed_lookup_tables_simple () ;
+    main_fixed_lookup_tables_values_not_sorted () )
 
 let register_test name feature_flags1 feature_flags2 =
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
