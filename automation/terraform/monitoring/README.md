@@ -22,7 +22,7 @@
 
 Developing alert expressions consists of using Prometheus's domain-specific [query language](https://prometheus.io/docs/prometheus/latest/querying/basics/) ([examples](https://prometheus.io/docs/prometheus/latest/querying/examples/)) coupled with its alert rules specification [format](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) for devising metric and alerting conditions/rules.
 
-To enable variability when defining these rules, each rule set or group is implemented using *terraform*'s [template_file](https://registry.terraform.io/providers/hashicorp/template/latest/docs/data-sources/file) and `(${ ... })` templating mechanisms for including variable substition where appropriate (**note:** variable substitutions are *optional* and provided as defaults - alert rules can be defined completely according to a custom specification).
+To enable variability when defining these rules, each rule set or group is implemented using *terraform*'s [template_file](https://registry.terraform.io/providers/hashicorp/template/latest/docs/data-sources/file) and `(${ ... })` templating mechanisms for including variable substitution where appropriate (**note:** variable substitutions are *optional* and provided as defaults - alert rules can be defined completely according to a custom specification).
 
 A standard set of such testnet alert rules based on templates is defined [here](https://github.com/MinaProtocol/mina/blob/develop/automation/terraform/modules/testnet-alerts/templates/testnet-alert-rules.yml.tpl#L6) and should be edited when adding rules to be applied to all testnets.
 
@@ -46,7 +46,9 @@ Executed by CI's *Lint/TestnetAlerts* [job](https://github.com/MinaProtocol/mina
 
 ###### manual steps
 
-    `terraform apply -target module.o1testnet_alerts.null_resource.alert_rules_lint` 
+```
+    terraform apply -target module.o1testnet_alerts.null_resource.alert_rules_lint
+``` 
 
 ##### Check alerts against recommended [best practices](https://prometheus.io/docs/practices/rules/)
 
@@ -56,7 +58,9 @@ Executed by CI's *Lint/TestnetAlerts* [job](https://github.com/MinaProtocol/mina
 
 ###### manual steps
 
-    `terraform apply -target module.o1testnet_alerts.null_resource.alert_rules_check`
+```
+    terraform apply -target module.o1testnet_alerts.null_resource.alert_rules_check
+```
 
 #### Deployment
 
@@ -68,15 +72,26 @@ Executed by CI's *Release/TestnetAlerts* [job](https://github.com/MinaProtocol/m
 
 ###### manual steps
 
-    `terraform apply -target module.o1testnet_alerts.docker_container.sync_alert_rules`
+```
+    terraform apply -target module.o1testnet_alerts.docker_container.sync_alert_rules
+```
 
 **Note:** operation will sync provisioned alerts with exact match of alert file state (e.g. alerts removed from the alert file will be unprovisioned on Grafanacloud)
+
+**Warning:** Unfortunately terraform silences errors which cortextool is producing, for example when syncing rules. In order to debug sync rules process:
+- Obtain secrets (id,address,key) from aws secret manager 
+- Run above terraform command once again
+- Run below command in automation/terraform/monitoring folder: 
+
+```
+    ~/.local/bin/cortextool rules sync --rule-files alert_rules.yml --id ... --address ... --key ... 
+```
 
 ## Alert Status
 
 #### GrafanaCloud Config
 
-To view the current testnet alerting rules config or verify that changes were applied correctly following a deployment, visit this Grafanacloud rules config [site](https://o1testnet.grafana.net/a/grafana-alerting-ui-app/?tab=rules&rulessource=grafanacloud-o1testnet-prom).
+To view the current testnet alerting rules config or verify that changes were applied correctly following a deployment, visit this Grafanacloud rules config [site](https://o1testnet.grafana.net/alerting/list?search=datasource:grafanacloud-o1testnet-prom).
 
 **Note:** ensure the datasource is set to `grafanacloud-o1testnet-prom` to access the appropriate ruleset. 
 
@@ -148,7 +163,11 @@ To view the current alerting receiver configuration or verify changes following 
 
 ##### Steps
 
-    `terraform apply -target module.o1testnet_alerts.docker_container.update_alert_receivers` from the [automation monitoring](https://github.com/MinaProtocol/mina/tree/develop/automation/terraform/monitoring) directory.
+```
+    terraform apply -target module.o1testnet_alerts.docker_container.update_alert_receivers
+``` 
+
+from the [automation monitoring](https://github.com/MinaProtocol/mina/tree/develop/automation/terraform/monitoring) directory.
 
 #### View Alert Metrics
 
