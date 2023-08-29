@@ -217,6 +217,20 @@ let main_fixed_lookup_tables_simple () =
        ; (* v3 *) w6 = fresh_int 2
        } )
 
+let main_runtime_lookup_tables_simple () =
+  let n = 10 in
+  let table_id = 0 in
+  let first_column = Array.init n ~f:(fun i -> Field.Constant.of_int i) in
+  add_plonk_constraint
+    (AddRuntimeTableCfg { id = Int32.of_int_exn table_id; first_column }) ;
+  add_plonk_constraint
+    (RuntimeLookup
+       { (* table id *)
+         table_id = fresh_int table_id
+       ; idx = fresh_int 1
+       ; v = fresh_int 42
+       } )
+
 let main_fixed_lookup_tables_values_not_sorted () =
   add_plonk_constraint
     (AddFixedLookupTable
@@ -386,7 +400,8 @@ let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
   if feature_flags.foreign_field_mul then main_foreign_field_mul () ;
   if feature_flags.lookup then (
     main_fixed_lookup_tables_simple () ;
-    main_fixed_lookup_tables_values_not_sorted () )
+    main_fixed_lookup_tables_values_not_sorted () ) ;
+  if feature_flags.runtime_tables then main_runtime_lookup_tables_simple ()
 
 let register_test name feature_flags1 feature_flags2 =
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
@@ -470,6 +485,9 @@ let () =
       , Plonk_types.Features.{ none_bool with lookup = true } )
     ; ( "Fixed lookup tables and XOR "
       , Plonk_types.Features.{ none_bool with lookup = true; xor = true } )
+      ( "Runtime lookup tables"
+      , Plonk_types.Features.
+          { none_bool with runtime_tables = true; lookup = true } )
     ]
   in
   List.iter ~f:register_feature_test configurations ;
