@@ -82,6 +82,8 @@ module Features : sig
       ; lookup_pattern_range_check : 'bool
       }
     [@@deriving sexp, compare, yojson, hash, equal, hlist]
+
+    val get_feature_flag : 'bool t -> Kimchi_types.feature_flag -> 'bool option
   end
 
   [%%versioned:

@@ -220,45 +220,7 @@ let lookup_tables_used feature_flags =
 let get_feature_flag (feature_flags : _ all_feature_flags)
     (feature : Kimchi_types.feature_flag) =
   let lazy_flag =
-    match feature with
-    | RangeCheck0 ->
-        Some feature_flags.range_check0
-    | RangeCheck1 ->
-        Some feature_flags.range_check1
-    | ForeignFieldAdd ->
-        Some feature_flags.foreign_field_add
-    | ForeignFieldMul ->
-        Some feature_flags.foreign_field_mul
-    | Xor ->
-        Some feature_flags.xor
-    | Rot ->
-        Some feature_flags.rot
-    | LookupTables ->
-        Some feature_flags.uses_lookups
-    | RuntimeLookupTables ->
-        Some feature_flags.runtime_tables
-    | TableWidth 3 ->
-        Some feature_flags.table_width_3
-    | TableWidth 2 ->
-        Some feature_flags.table_width_at_least_2
-    | TableWidth i when i <= 1 ->
-        Some feature_flags.table_width_at_least_1
-    | TableWidth _ ->
-        None
-    | LookupsPerRow 4 ->
-        Some feature_flags.lookups_per_row_4
-    | LookupsPerRow i when i <= 3 ->
-        Some feature_flags.lookups_per_row_3
-    | LookupsPerRow _ ->
-        None
-    | LookupPattern Lookup ->
-        Some feature_flags.lookup
-    | LookupPattern Xor ->
-        Some feature_flags.lookup_pattern_xor
-    | LookupPattern RangeCheck ->
-        Some feature_flags.lookup_pattern_range_check
-    | LookupPattern ForeignFieldMul ->
-        Some feature_flags.foreign_field_mul
+    Plonk_types.Features.Full.get_feature_flag feature_flags feature
   in
   Option.map ~f:Lazy.force lazy_flag
 
