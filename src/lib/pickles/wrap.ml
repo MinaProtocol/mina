@@ -375,6 +375,11 @@ let%test_module "gate finalization" =
           ~step_vk:vk ~public_input ~proof ~actual_proofs_verified:Nat.N0.n
       in
 
+      let full_features =
+        Plonk_types.Features.to_full ~or_:Plonk_types.Opt.Flag.( ||| )
+          feature_flags
+      in
+
       (* Define Typ.t for Deferred_values.t -- A Type.t defines how to convert a value of some type
                                               in OCaml into a var in circuit/Snarky.
 
@@ -386,7 +391,7 @@ let%test_module "gate finalization" =
         let open Step_verifier in
         Wrap.Proof_state.Deferred_values.In_circuit.typ
           (module Impls.Step)
-          ~feature_flags ~challenge:Challenge.typ
+          ~feature_flags:full_features ~challenge:Challenge.typ
           ~scalar_challenge:Challenge.typ
           ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
           ~dummy_scalar_challenge:
@@ -414,7 +419,7 @@ let%test_module "gate finalization" =
          for use in the circuit *)
       and evals =
         constant
-          (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
+          (Plonk_types.All_evals.typ (module Impls.Step) full_features)
           { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
           ; ft_eval1 = proof.openings.ft_eval1
           }

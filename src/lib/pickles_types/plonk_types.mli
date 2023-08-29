@@ -88,6 +88,12 @@ module Features : sig
     val map : 'a t -> f:('a -> 'b) -> 'b t
 
     val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
+
+    val none : Opt.Flag.t t
+
+    val maybe : Opt.Flag.t t
+
+    val none_bool : bool t
   end
 
   [%%versioned:
@@ -236,7 +242,7 @@ module Messages : sig
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
     -> ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> Opt.Flag.t Features.t
+    -> Opt.Flag.t Features.Full.t
     -> dummy:'b
     -> commitment_lengths:((int, 'n) Vector.vec, int, int) Poly.t
     -> bool:('c, bool, 'f) Snarky_backendless.Typ.t
@@ -442,7 +448,7 @@ module All_evals : sig
 
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> Opt.Flag.t Features.t
+    -> Opt.Flag.t Features.Full.t
     -> ( ( 'f Snarky_backendless.Cvar.t
          , 'f Snarky_backendless.Cvar.t array
          , 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
