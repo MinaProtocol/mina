@@ -174,10 +174,9 @@ module Make
     ignore
       ( Event_router.on event_router Event_type.Node_started ~f:(fun node () ->
             update ~f:(fun state ->
-                [%log info]
+                [%log debug]
                   "Updating network state with event of $node being started"
                   ~metadata:[ ("node", `String (Node.id node)) ] ;
-                (* todo: downgrade to debug before landing *)
                 let node_on' =
                   String.Map.set state.node_on ~key:(Node.id node) ~data:true
                 in
@@ -188,8 +187,7 @@ module Make
       ( Event_router.on event_router Event_type.Node_initialization
           ~f:(fun node () ->
             update ~f:(fun state ->
-                [%log info]
-                  (* todo: downgrade to debug before landing *)
+                [%log debug]
                   "Updating network state with initialization event of $node"
                   ~metadata:[ ("node", `String (Node.id node)) ] ;
                 let node_initialization' =
@@ -202,8 +200,7 @@ module Make
     ignore
       ( Event_router.on event_router Event_type.Node_stopped ~f:(fun node () ->
             update ~f:(fun state ->
-                [%log info]
-                  (* todo: downgrade to debug before landing *)
+                [%log debug]
                   "Updating network state with event of $node being stopped \
                    deliberately"
                   ~metadata:[ ("node", `String (Node.id node)) ] ;
@@ -227,9 +224,7 @@ module Make
     (* handle_node_down *)
     ignore
       ( Event_router.on event_router Event_type.Node_down ~f:(fun node () ->
-            [%log info]
-              (* TODO remove this log line before landing *)
-              "received Node_down event from $node"
+            [%log debug] "received Node_down event from $node"
               ~metadata:[ ("node", `String (Node.id node)) ] ;
 
             let state = Broadcast_pipe.Reader.peek reader in
@@ -237,8 +232,7 @@ module Make
               not (String.Map.find_exn state.node_initialization (Node.id node))
             then
               let () =
-                [%log info]
-                  (* TODO change this back to debug before landing *)
+                [%log debug]
                   "Lucy cannot contact $node, but all is well because this \
                    node was stopped deliberately or just hasn't initialized \
                    yet"
@@ -246,89 +240,87 @@ module Make
               in
               update ~f:(fun state -> state)
             else
-              (*
-                 let () =
-                   [%log fatal]
-                     "Lucy has lost contact with $node, without the node being \
-                      deliberately stopped.  Aborting the test because a node \
-                      went down unexpectedly."
-                     ~metadata:[ ("node", `String (Node.id node)) ]
-                 in
-
-                 failwith
-                    "Aborting the test because a node went down unexpectedly."
-              *)
               let () =
-                [%log info]
+                [%log fatal]
                   "Lucy has lost contact with $node, without the node being \
-                   deliberately stopped, meaning that the node crashed or was \
-                   somehow taken down.  Lucy will attempt to recover and \
-                   restart this node."
+                   deliberately stopped.  Aborting the test because a node \
+                   went down unexpectedly."
                   ~metadata:[ ("node", `String (Node.id node)) ]
               in
-              let (_ : [> `Continue ] Deferred.t) =
-                update ~f:(fun state ->
-                    let node_initialization' =
-                      (* we're about to restart the node, which means it will soon be in a not-initialized state and will need to go through initialization, thus we need to set the node's initialization state to false *)
-                      String.Map.set state.node_initialization
-                        ~key:(Node.id node) ~data:false
-                    in
-                    let node_on' =
-                      (* it should already be "on" but setting here just to be sure *)
-                      String.Map.set state.node_on ~key:(Node.id node)
-                        ~data:true
-                    in
-                    let best_tips_by_node' =
-                      String.Map.remove state.best_tips_by_node (Node.id node)
-                    in
-                    { state with
-                      node_initialization = node_initialization'
-                    ; node_on = node_on'
-                    ; best_tips_by_node = best_tips_by_node'
-                    } )
-              in
-              let infra_id_before_refresh = Node.infra_id node in
-              (* the pod_ids are refreshed in Node.start.  Node.infra_id references a mutable field *)
-              let%bind (_
-                         : ( unit Malleable_error.Result_accumulator.t
-                           , Malleable_error.Hard_fail.t )
-                           result ) =
-                Node.start ~fresh_state:false node
-              in
-              let infra_id_after_refresh = Node.infra_id node in
 
-              (* if there was some kubernetes/infra failure that killed the pod for infra reasons, then the infra_id should be different.
-                  In case of infra failure, lucy just wants to recover and keep chugging along.
-                  But if the infra_id before and after the refresh is the same, then that means the node wasn't killed for infra reasons, in fact it means that the actual mina daemon crashed.  Actual daemon crashes SHOULD make a whole lucy test fail, lucy will throw a hard error and terminate rather than recovering *)
-              if String.equal infra_id_after_refresh infra_id_before_refresh
-              then
-                let%bind (_
-                           : ( unit Malleable_error.Result_accumulator.t
-                             , Malleable_error.Hard_fail.t )
-                             result ) =
-                  Malleable_error.or_hard_error ~exit_code:30
-                    (Or_error.errorf
-                       "The mina daemon of node %s has crashed.  The test will \
-                        deliberately not recover and will now terminate."
-                       (Node.id node) )
-                in
-                Deferred.return `Continue
-              else
-                let%bind has_oom = Node.check_OOM_failure node in
-                if has_oom then
-                  let%bind (_
-                             : ( unit Malleable_error.Result_accumulator.t
-                               , Malleable_error.Hard_fail.t )
-                               result ) =
-                    Malleable_error.or_hard_error ~exit_code:31
-                      (Or_error.errorf
-                         "The mina daemon of node %s has crashed because the \
-                          daemon ran out of memory.  The test will \
-                          deliberately not recover and will now terminate."
-                         (Node.id node) )
-                  in
-                  Deferred.return `Continue
-                else Deferred.return `Continue )
+              failwith
+                "Aborting the test because a node went down unexpectedly."
+            (* let () =
+                 [%log info]
+                   "Lucy has lost contact with $node, without the node being \
+                    deliberately stopped, meaning that the node crashed or was \
+                    somehow taken down.  Lucy will attempt to recover and \
+                    restart this node."
+                   ~metadata:[ ("node", `String (Node.id node)) ]
+               in
+               let (_ : [> `Continue ] Deferred.t) =
+                 update ~f:(fun state ->
+                     let node_initialization' =
+                       (* we're about to restart the node, which means it will soon be in a not-initialized state and will need to go through initialization, thus we need to set the node's initialization state to false *)
+                       String.Map.set state.node_initialization
+                         ~key:(Node.id node) ~data:false
+                     in
+                     let node_on' =
+                       (* it should already be "on" but setting here just to be sure *)
+                       String.Map.set state.node_on ~key:(Node.id node)
+                         ~data:true
+                     in
+                     let best_tips_by_node' =
+                       String.Map.remove state.best_tips_by_node (Node.id node)
+                     in
+                     { state with
+                       node_initialization = node_initialization'
+                     ; node_on = node_on'
+                     ; best_tips_by_node = best_tips_by_node'
+                     } )
+               in
+               let infra_id_before_refresh = Node.infra_id node in
+               (* the pod_ids are refreshed in Node.start.  Node.infra_id references a mutable field *)
+               let%bind (_
+                          : ( unit Malleable_error.Result_accumulator.t
+                            , Malleable_error.Hard_fail.t )
+                            result ) =
+                 Node.start ~fresh_state:false node
+               in
+               let infra_id_after_refresh = Node.infra_id node in
+
+               (* if there was some kubernetes/infra failure that killed the pod for infra reasons, then the infra_id should be different.
+                   In case of infra failure, lucy just wants to recover and keep chugging along.
+                   But if the infra_id before and after the refresh is the same, then that means the node wasn't killed for infra reasons, in fact it means that the actual mina daemon crashed.  Actual daemon crashes SHOULD make a whole lucy test fail, lucy will throw a hard error and terminate rather than recovering *)
+               if String.equal infra_id_after_refresh infra_id_before_refresh
+               then
+                 let%bind (_
+                            : ( unit Malleable_error.Result_accumulator.t
+                              , Malleable_error.Hard_fail.t )
+                              result ) =
+                   Malleable_error.or_hard_error ~exit_code:30
+                     (Or_error.errorf
+                        "The mina daemon of node %s has crashed.  The test will \
+                         deliberately not recover and will now terminate."
+                        (Node.id node) )
+                 in
+                 Deferred.return `Continue
+               else
+                 let%bind has_oom = Node.check_OOM_failure node in
+                 if has_oom then
+                   let%bind (_
+                              : ( unit Malleable_error.Result_accumulator.t
+                                , Malleable_error.Hard_fail.t )
+                                result ) =
+                     Malleable_error.or_hard_error ~exit_code:31
+                       (Or_error.errorf
+                          "The mina daemon of node %s has crashed because the \
+                           daemon ran out of memory.  The test will \
+                           deliberately not recover and will now terminate."
+                          (Node.id node) )
+                   in
+                   Deferred.return `Continue
+                 else Deferred.return `Continue *) )
         : _ Event_router.event_subscription ) ;
     (* handle_breadcrumb_added *)
     ignore
