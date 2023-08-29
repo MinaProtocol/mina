@@ -105,7 +105,7 @@ let evals_of_split_evals field ~zeta ~zetaw (es : _ Plonk_types.Evals.t) ~rounds
 open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
 
 type 'bool all_feature_flags =
-  { lookup_tables : 'bool Lazy.t
+  { uses_lookups : 'bool Lazy.t
   ; table_width_at_least_1 : 'bool Lazy.t
   ; table_width_at_least_2 : 'bool Lazy.t
   ; table_width_3 : 'bool Lazy.t
@@ -167,7 +167,7 @@ let expand_feature_flags (type boolean)
     (* Lookup has max_lookups_per_row = 3 *)
     lazy (B.( ||| ) (Lazy.force lookups_per_row_4) lookup)
   in
-  { lookup_tables = lookups_per_row_3
+  { uses_lookups = lookups_per_row_3
   ; table_width_at_least_1
   ; table_width_at_least_2
   ; table_width_3
@@ -207,7 +207,7 @@ let lookup_tables_used feature_flags =
     let any = List.fold_left ~f:( ||| ) ~init:false_
   end in
   let all_feature_flags = expand_feature_flags (module Bool) feature_flags in
-  Lazy.force all_feature_flags.lookup_tables
+  Lazy.force all_feature_flags.uses_lookups
 
 let get_feature_flag (feature_flags : _ all_feature_flags)
     (feature : Kimchi_types.feature_flag) =
@@ -225,7 +225,7 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
   | Rot ->
       Some feature_flags.features.rot
   | LookupTables ->
-      Some (Lazy.force feature_flags.lookup_tables)
+      Some (Lazy.force feature_flags.uses_lookups)
   | RuntimeLookupTables ->
       Some feature_flags.features.runtime_tables
   | TableWidth 3 ->
