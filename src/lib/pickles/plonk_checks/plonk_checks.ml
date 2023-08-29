@@ -113,7 +113,7 @@ type 'bool all_feature_flags =
   ; lookups_per_row_4 : 'bool Lazy.t
   ; lookup_pattern_xor : 'bool Lazy.t
   ; lookup_pattern_range_check : 'bool Lazy.t
-  ; features : 'bool Plonk_types.Features.t
+  ; features : 'bool Lazy.t Plonk_types.Features.t
   }
 
 let expand_feature_flags (type boolean)
@@ -175,7 +175,7 @@ let expand_feature_flags (type boolean)
   ; lookups_per_row_4
   ; lookup_pattern_xor
   ; lookup_pattern_range_check
-  ; features
+  ; features = Plonk_types.Features.map ~f:(fun x -> lazy x) features
   }
 
 let lookup_tables_used feature_flags =
@@ -211,45 +211,48 @@ let lookup_tables_used feature_flags =
 
 let get_feature_flag (feature_flags : _ all_feature_flags)
     (feature : Kimchi_types.feature_flag) =
-  match feature with
-  | RangeCheck0 ->
-      Some feature_flags.features.range_check0
-  | RangeCheck1 ->
-      Some feature_flags.features.range_check1
-  | ForeignFieldAdd ->
-      Some feature_flags.features.foreign_field_add
-  | ForeignFieldMul ->
-      Some feature_flags.features.foreign_field_mul
-  | Xor ->
-      Some feature_flags.features.xor
-  | Rot ->
-      Some feature_flags.features.rot
-  | LookupTables ->
-      Some (Lazy.force feature_flags.uses_lookups)
-  | RuntimeLookupTables ->
-      Some feature_flags.features.runtime_tables
-  | TableWidth 3 ->
-      Some (Lazy.force feature_flags.table_width_3)
-  | TableWidth 2 ->
-      Some (Lazy.force feature_flags.table_width_at_least_2)
-  | TableWidth i when i <= 1 ->
-      Some (Lazy.force feature_flags.table_width_at_least_1)
-  | TableWidth _ ->
-      None
-  | LookupsPerRow 4 ->
-      Some (Lazy.force feature_flags.lookups_per_row_4)
-  | LookupsPerRow i when i <= 3 ->
-      Some (Lazy.force feature_flags.lookups_per_row_3)
-  | LookupsPerRow _ ->
-      None
-  | LookupPattern Lookup ->
-      Some feature_flags.features.lookup
-  | LookupPattern Xor ->
-      Some (Lazy.force feature_flags.lookup_pattern_xor)
-  | LookupPattern RangeCheck ->
-      Some (Lazy.force feature_flags.lookup_pattern_range_check)
-  | LookupPattern ForeignFieldMul ->
-      Some feature_flags.features.foreign_field_mul
+  let lazy_flag =
+    match feature with
+    | RangeCheck0 ->
+        Some feature_flags.features.range_check0
+    | RangeCheck1 ->
+        Some feature_flags.features.range_check1
+    | ForeignFieldAdd ->
+        Some feature_flags.features.foreign_field_add
+    | ForeignFieldMul ->
+        Some feature_flags.features.foreign_field_mul
+    | Xor ->
+        Some feature_flags.features.xor
+    | Rot ->
+        Some feature_flags.features.rot
+    | LookupTables ->
+        Some feature_flags.uses_lookups
+    | RuntimeLookupTables ->
+        Some feature_flags.features.runtime_tables
+    | TableWidth 3 ->
+        Some feature_flags.table_width_3
+    | TableWidth 2 ->
+        Some feature_flags.table_width_at_least_2
+    | TableWidth i when i <= 1 ->
+        Some feature_flags.table_width_at_least_1
+    | TableWidth _ ->
+        None
+    | LookupsPerRow 4 ->
+        Some feature_flags.lookups_per_row_4
+    | LookupsPerRow i when i <= 3 ->
+        Some feature_flags.lookups_per_row_3
+    | LookupsPerRow _ ->
+        None
+    | LookupPattern Lookup ->
+        Some feature_flags.features.lookup
+    | LookupPattern Xor ->
+        Some feature_flags.lookup_pattern_xor
+    | LookupPattern RangeCheck ->
+        Some feature_flags.lookup_pattern_range_check
+    | LookupPattern ForeignFieldMul ->
+        Some feature_flags.features.foreign_field_mul
+  in
+  Option.map ~f:Lazy.force lazy_flag
 
 let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     (module F : Field_with_if_intf with type t = t and type bool = boolean)
