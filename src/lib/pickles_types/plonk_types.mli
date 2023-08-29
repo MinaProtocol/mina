@@ -84,6 +84,10 @@ module Features : sig
     [@@deriving sexp, compare, yojson, hash, equal, hlist]
 
     val get_feature_flag : 'bool t -> Kimchi_types.feature_flag -> 'bool option
+
+    val map : 'a t -> f:('a -> 'b) -> 'b t
+
+    val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
   end
 
   [%%versioned:

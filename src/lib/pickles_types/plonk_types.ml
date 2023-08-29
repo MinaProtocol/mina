@@ -253,6 +253,64 @@ module Features = struct
           Some feature_flags.lookup_pattern_range_check
       | LookupPattern ForeignFieldMul ->
           Some feature_flags.foreign_field_mul
+
+    let map
+        { range_check0
+        ; range_check1
+        ; foreign_field_add
+        ; foreign_field_mul
+        ; rot
+        ; xor
+        ; lookup
+        ; runtime_tables
+        ; uses_lookups
+        ; table_width_at_least_1
+        ; table_width_at_least_2
+        ; table_width_3
+        ; lookups_per_row_3
+        ; lookups_per_row_4
+        ; lookup_pattern_xor
+        ; lookup_pattern_range_check
+        } ~f =
+      { range_check0 = f range_check0
+      ; range_check1 = f range_check1
+      ; foreign_field_add = f foreign_field_add
+      ; foreign_field_mul = f foreign_field_mul
+      ; xor = f xor
+      ; rot = f rot
+      ; lookup = f lookup
+      ; runtime_tables = f runtime_tables
+      ; uses_lookups = f uses_lookups
+      ; table_width_at_least_1 = f table_width_at_least_1
+      ; table_width_at_least_2 = f table_width_at_least_2
+      ; table_width_3 = f table_width_3
+      ; lookups_per_row_3 = f lookups_per_row_3
+      ; lookups_per_row_4 = f lookups_per_row_4
+      ; lookup_pattern_xor = f lookup_pattern_xor
+      ; lookup_pattern_range_check = f lookup_pattern_range_check
+      }
+
+    let map2 x1 x2 ~f =
+      { range_check0 = f x1.range_check0 x2.range_check0
+      ; range_check1 = f x1.range_check1 x2.range_check1
+      ; foreign_field_add = f x1.foreign_field_add x2.foreign_field_add
+      ; foreign_field_mul = f x1.foreign_field_mul x2.foreign_field_mul
+      ; xor = f x1.xor x2.xor
+      ; rot = f x1.rot x2.rot
+      ; lookup = f x1.lookup x2.lookup
+      ; runtime_tables = f x1.runtime_tables x2.runtime_tables
+      ; uses_lookups = f x1.uses_lookups x2.uses_lookups
+      ; table_width_at_least_1 =
+          f x1.table_width_at_least_1 x2.table_width_at_least_1
+      ; table_width_at_least_2 =
+          f x1.table_width_at_least_2 x2.table_width_at_least_2
+      ; table_width_3 = f x1.table_width_3 x2.table_width_3
+      ; lookups_per_row_3 = f x1.lookups_per_row_3 x2.lookups_per_row_3
+      ; lookups_per_row_4 = f x1.lookups_per_row_4 x2.lookups_per_row_4
+      ; lookup_pattern_xor = f x1.lookup_pattern_xor x2.lookup_pattern_xor
+      ; lookup_pattern_range_check =
+          f x1.lookup_pattern_range_check x2.lookup_pattern_range_check
+      }
   end
 
   [%%versioned
