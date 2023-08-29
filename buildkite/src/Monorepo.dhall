@@ -23,21 +23,24 @@ let jobs : List JobSpec.Type =
 let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
   let dirtyWhen = SelectFiles.compile job.dirtyWhen
   let trigger = triggerCommand "src/Jobs/${job.path}/${job.name}.dhall"
-  let pipelineType : PipelineMode.Type = env:BUILDKITE_PIPELINE_MODE ? job.mode
-  let pipelineTypeString = PipelineMode.capitalName pipelineType
+  let requestedPipeline : PipelineMode.Type = env:BUILDKITE_PIPELINE_MODE ? PipelineMode.Type.PullRequest
+  let requestedPipelineName = PipelineMode.capitalName requestedPipeline
+  let jobPipelineName = PipelineMode.capitalName job.mode
   let pipelineHandlers = {
     PullRequest = ''
-      if [[ "${pipelineTypeString}" != "PullRequest" ]]; then  
-        echo "Skipping ${job.name} because this is a CI buildkite run, not stable"
-      elif (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
-        echo "Triggering ${job.name} for reason:"
-        cat _computed_diff.txt | egrep '${dirtyWhen}'
-        ${Cmd.format trigger}
+      if [ "${jobPipelineName}" == "${requestedPipelineName}" ]; then
+        if (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
+          echo "Triggering ${job.name} for reason:"
+          cat _computed_diff.txt | egrep '${dirtyWhen}'
+          ${Cmd.format trigger}
+        fi 
       fi
     '',
     Stable = ''
-      echo "Triggering ${job.name} because this is a stable buildkite run"
-      ${Cmd.format trigger}
+      if [ "${jobPipelineName}" == "${requestedPipelineName}" ]; then
+        echo "Triggering ${job.name} because this is a stable buildkite run"
+        ${Cmd.format trigger}
+      fi
     ''
   }
   in Cmd.quietly (merge pipelineHandlers pipelineType)
