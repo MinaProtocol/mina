@@ -1358,7 +1358,7 @@ module AccountObj = struct
                ~resolve:(fun { ctx = mina; _ } { index; _ } ->
                  let open Option.Let_syntax in
                  let%bind ledger, _breadcrumb =
-                   Misc.get_ledger_and_breadcrumb mina
+                   Utils.get_ledger_and_breadcrumb mina
                  in
                  let%bind index = index in
                  Option.try_with (fun () ->
@@ -2067,7 +2067,7 @@ end
 
 module Arguments = struct
   let ip_address ~name ip_addr =
-    Misc.result_of_exn Unix.Inet_addr.of_string ip_addr
+    Utils.result_of_exn Unix.Inet_addr.of_string ip_addr
       ~error:(sprintf !"%s is not valid." name)
 end
 
@@ -2276,7 +2276,7 @@ module Input = struct
     let arg_typ =
       scalar "SendTestZkappInput" ~doc:"zkApp command for a test zkApp"
         ~coerce:(fun json ->
-          let json = Misc.to_yojson json in
+          let json = Utils.to_yojson json in
           Result.try_with (fun () -> Mina_base.Zkapp_command.of_json json)
           |> Result.map_error ~f:(fun ex -> Exn.to_string ex) )
         ~to_json:(fun (x : input) ->
@@ -2289,7 +2289,7 @@ module Input = struct
     let arg_typ =
       scalar "PrecomputedBlock" ~doc:"Block encoded in precomputed block format"
         ~coerce:(fun json ->
-          let json = Misc.to_yojson json in
+          let json = Utils.to_yojson json in
           Mina_block.Precomputed.of_yojson json )
         ~to_json:(fun (x : input) ->
           Yojson.Safe.to_basic (Mina_block.Precomputed.to_yojson x) )
@@ -2301,7 +2301,7 @@ module Input = struct
     let arg_typ =
       scalar "ExtensionalBlock" ~doc:"Block encoded in extensional block format"
         ~coerce:(fun json ->
-          let json = Misc.to_yojson json in
+          let json = Utils.to_yojson json in
           Archive_lib.Extensional.Block.of_yojson json )
         ~to_json:(fun (x : input) ->
           Yojson.Safe.to_basic @@ Archive_lib.Extensional.Block.to_yojson x )
@@ -2676,7 +2676,7 @@ module Input = struct
       Schema.Arg.scalar "RosettaTransaction"
         ~doc:"A transaction encoded in the Rosetta format"
         ~coerce:(fun graphql_json ->
-          Rosetta_lib.Transaction.to_mina_signed (Misc.to_yojson graphql_json)
+          Rosetta_lib.Transaction.to_mina_signed (Utils.to_yojson graphql_json)
           |> Result.map_error ~f:Error.to_string_hum )
         ~to_json:(Fn.id : input -> input)
   end

@@ -9,7 +9,7 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
   O1trace.thread "itn_deploy_zkapps"
   @@ fun () ->
   let fee_payer_accounts =
-    Array.map fee_payer_array ~f:(fun key -> Misc.account_of_kp key ledger)
+    Array.map fee_payer_array ~f:(fun key -> Utils.account_of_kp key ledger)
   in
   let fee_payer_nonces =
     Array.map fee_payer_accounts ~f:(fun account -> ref account.nonce)
@@ -91,7 +91,7 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
 let is_zkapp_deployed kp ledger =
   match
     Option.try_with (fun () ->
-        let account = Misc.account_of_kp kp ledger in
+        let account = Utils.account_of_kp kp ledger in
         Option.is_some account.zkapp )
   with
   | Some true ->
@@ -139,7 +139,7 @@ let rec wait_until_zkapps_deployed ?(deployed = false) ~scheduler_tbl ~mina
            (Float.of_int constraint_constants.block_window_duration_ms) )
     in
     let ledger =
-      Misc.get_ledger_and_breadcrumb mina
+      Utils.get_ledger_and_breadcrumb mina
       |> Option.value_map ~default:ledger ~f:(fun (new_ledger, _) ->
              new_ledger )
     in
@@ -204,7 +204,7 @@ let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
     let zkapp_dummy_opt_res =
       O1trace.sync_thread "itn_generate_dummy_zkapp"
       @@ fun () ->
-      match Misc.get_ledger_and_breadcrumb mina with
+      match Utils.get_ledger_and_breadcrumb mina with
       | None ->
           [%log info]
             "Failed to fetch the best tip ledger, skip this round, we will try \
