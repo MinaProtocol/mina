@@ -2,7 +2,7 @@ apiVersion: v2
 name: plain-node
 description: A Helm chart for Mina Protocol's plain nodes
 type: application
-version: 1.0.5
+version: 1.0.6
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |

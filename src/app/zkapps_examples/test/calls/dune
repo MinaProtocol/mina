@@ -1,0 +1,48 @@
+(library
+ (name calls)
+ (libraries
+   ;; opam libraries
+   async
+   async_kernel
+   async_unix
+   base
+   core
+   core_kernel
+   ppx_inline_test.config
+   yojson
+   ;; local libraries
+   cache_dir
+   currency
+   data_hash_lib
+   genesis_constants
+   pasta_bindings
+   kimchi_backend
+   kimchi_pasta
+   kimchi_backend.pasta.basic
+   merkle_ledger
+   mina_base
+   mina_base.import
+   mina_ledger
+   mina_numbers
+   mina_state
+   mina_transaction_logic
+   pickles
+   pickles.backend
+   pickles_types
+   random_oracle_input
+   random_oracle
+   sgn
+   signature_lib
+   snark_params
+   snarky.backendless
+   transaction_protocol_state
+   transaction_snark
+   transaction_snark_tests
+   with_hash
+   zkapps_calls
+   zkapps_examples
+   )
+  (inline_tests)
+  (preprocess
+    (pps ppx_snarky ppx_version ppx_jane))
+  (instrumentation (backend bisect_ppx)))

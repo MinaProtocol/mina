@@ -54,27 +54,21 @@ module Json_layout = struct
       module Timed = struct
         type t =
           { initial_minimum_balance : Currency.Balance.t
-          ; cliff_time : Mina_numbers.Global_slot.t
+          ; cliff_time : Mina_numbers.Global_slot_since_genesis.t
           ; cliff_amount : Currency.Amount.t
-          ; vesting_period : Mina_numbers.Global_slot.t
+          ; vesting_period : Mina_numbers.Global_slot_span.t
           ; vesting_increment : Currency.Amount.t
           }
-        [@@deriving yojson, dhall_type, sexp]
+        [@@deriving yojson, fields, dhall_type, sexp]
 
-        let fields =
-          [| "initial_minimum_balance"
-           ; "cliff_time"
-           ; "cliff_amount"
-           ; "vesting_period"
-           ; "vesting_increment"
-          |]
+        let fields = Fields.names |> Array.of_list
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
 
       module Permissions = struct
         module Auth_required = struct
-          type t = None | Either | Proof | Signature | Both | Impossible
+          type t = None | Either | Proof | Signature | Impossible
           [@@deriving dhall_type, sexp, bin_io_unversioned]
 
           let to_yojson = function
@@ -86,8 +80,6 @@ module Json_layout = struct
                 `String "proof"
             | Signature ->
                 `String "signature"
-            | Both ->
-                `String "both"
             | Impossible ->
                 `String "impossible"
 
@@ -102,8 +94,6 @@ module Json_layout = struct
                     Ok Proof
                 | "signature" ->
                     Ok Signature
-                | "both" ->
-                    Ok Both
                 | "impossible" ->
                     Ok Impossible
                 | _ ->
@@ -121,51 +111,33 @@ module Json_layout = struct
                 Proof
             | Signature ->
                 Signature
-            | Both ->
-                Both
             | Impossible ->
                 Impossible
         end
 
         type t =
-          { stake : bool [@default false]
-          ; edit_state : Auth_required.t [@default None]
+          { edit_state : Auth_required.t [@default None]
           ; send : Auth_required.t [@default None]
           ; receive : Auth_required.t [@default None]
+          ; access : Auth_required.t [@default None]
           ; set_delegate : Auth_required.t [@default None]
           ; set_permissions : Auth_required.t [@default None]
           ; set_verification_key : Auth_required.t [@default None]
+          ; set_zkapp_uri : Auth_required.t [@default None]
+          ; edit_action_state : Auth_required.t [@default None]
+          ; set_token_symbol : Auth_required.t [@default None]
+          ; increment_nonce : Auth_required.t [@default None]
+          ; set_voting_for : Auth_required.t [@default None]
+          ; set_timing : Auth_required.t [@default None]
           }
-        [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
+        [@@deriving yojson, fields, dhall_type, sexp, bin_io_unversioned]
 
-        let fields =
-          [| "stake"
-           ; "edit_state"
-           ; "send"
-           ; "receive"
-           ; "set_delegate"
-           ; "set_permissions"
-           ; "set_verification_key"
-          |]
+        let fields = Fields.names |> Array.of_list
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
 
-      module Token_permissions = struct
-        type t =
-          { token_owned : bool [@default false]
-          ; account_disabled : bool [@default false]
-          ; disable_new_accounts : bool [@default false]
-          }
-        [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
-
-        let fields =
-          [| "token_owned"; "account_disabled"; "disable_new_accounts" |]
-
-        let of_yojson json = of_yojson_generic ~fields of_yojson json
-      end
-
-      module Snapp_account = struct
+      module Zkapp_account = struct
         module Field = struct
           type t = Snark_params.Tick.Field.t
           [@@deriving sexp, bin_io_unversioned]
@@ -179,145 +151,176 @@ module Json_layout = struct
             | `String s ->
                 Ok (Snark_params.Tick.Field.of_string s)
             | _ ->
-                Error "Invalid Field.t runtime config Snapp_account.state"
+                Error
+                  "Invalid JSON in runtime config Zkapp_account.state, \
+                   expected string"
         end
 
-        type t = { state : Field.t list; verification_key : string option }
-        [@@deriving sexp, dhall_type, yojson, bin_io_unversioned]
+        module Verification_key = struct
+          type t = Pickles.Side_loaded.Verification_key.Stable.Latest.t
+          [@@deriving sexp, bin_io_unversioned]
 
-        let fields = [| "state"; "verification_key" |]
+          (* can't be automatically derived *)
+          let dhall_type = Ppx_dhall_type.Dhall_type.Text
+
+          let to_yojson t =
+            `String (Pickles.Side_loaded.Verification_key.to_base64 t)
+
+          let of_yojson = function
+            | `String s ->
+                let vk_or_err =
+                  Pickles.Side_loaded.Verification_key.of_base64 s
+                in
+                Result.map_error vk_or_err ~f:Error.to_string_hum
+            | _ ->
+                Error
+                  "Invalid JSON in runtime config \
+                   Zkapp_account.verification_key, expected string"
+        end
+
+        module Zkapp_version = struct
+          type t = Mina_numbers.Zkapp_version.Stable.Latest.t
+          [@@deriving bin_io_unversioned]
+
+          include (
+            Mina_numbers.Zkapp_version :
+              module type of Mina_numbers.Zkapp_version with type t := t )
+        end
+
+        type t =
+          { app_state : Field.t list
+          ; verification_key : Verification_key.t option [@default None]
+          ; zkapp_version : Zkapp_version.t
+          ; action_state : Field.t list
+          ; last_action_slot : int
+          ; proved_state : bool
+          ; zkapp_uri : string
+          }
+        [@@deriving sexp, fields, dhall_type, yojson, bin_io_unversioned]
+
+        let fields = Fields.names |> Array.of_list
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
 
       type t =
-        { pk : string option [@default None]
+        { pk : string
         ; sk : string option [@default None]
         ; balance : Currency.Balance.t
         ; delegate : string option [@default None]
         ; timing : Timed.t option [@default None]
-        ; token : Unsigned_extended.UInt64.t option [@default None]
-        ; token_permissions : Token_permissions.t option [@default None]
+        ; token : string option [@default None]
         ; nonce : Mina_numbers.Account_nonce.t
               [@default Mina_numbers.Account_nonce.zero]
         ; receipt_chain_hash : string option [@default None]
         ; voting_for : string option [@default None]
-        ; snapp : Snapp_account.t option [@default None]
+        ; zkapp : Zkapp_account.t option [@default None]
         ; permissions : Permissions.t option [@default None]
+        ; token_symbol : string option [@default None]
         }
-      [@@deriving sexp, yojson, dhall_type]
+      [@@deriving sexp, fields, yojson, dhall_type]
 
-      let fields =
-        [| "pk"
-         ; "sk"
-         ; "balance"
-         ; "delegate"
-         ; "timing"
-         ; "token"
-         ; "token_permissions"
-         ; "nonce"
-         ; "receipt_chain_hash"
-         ; "voting_for"
-         ; "snapp"
-         ; "permissions"
-        |]
+      let fields = Fields.names |> Array.of_list
 
       let of_yojson json = of_yojson_generic ~fields of_yojson json
 
       let default : t =
-        { pk = None
+        { pk = Signature_lib.Public_key.Compressed.(to_base58_check empty)
         ; sk = None
         ; balance = Currency.Balance.zero
         ; delegate = None
         ; timing = None
         ; token = None
-        ; token_permissions = None
         ; nonce = Mina_numbers.Account_nonce.zero
         ; receipt_chain_hash = None
         ; voting_for = None
-        ; snapp = None
+        ; zkapp = None
         ; permissions = None
+        ; token_symbol = None
         }
 
       let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
         let open Result.Let_syntax in
         let open Signature_lib in
-        let%map snapp =
-          match a.snapp with
-          | None ->
-              return None
-          | Some snapp ->
-              let state = Mina_base.Snapp_state.V.to_list snapp.app_state in
-              let%map verification_key =
-                match snapp.verification_key with
-                | None ->
-                    return None
-                | Some vk ->
-                    Binable.to_string
-                      (module Pickles.Side_loaded.Verification_key.Stable.Latest)
-                      vk.With_hash.data
-                    |> Base64.encode ~alphabet:Base64.uri_safe_alphabet
-                    |> Result.map ~f:Option.return
-                    |> Result.map_error ~f:(fun (`Msg m) -> m)
-              in
-              Some Snapp_account.{ state; verification_key }
-        in
-        { pk = Some (Public_key.Compressed.to_base58_check a.public_key)
-        ; sk = None
-        ; balance = a.balance
-        ; delegate =
-            Option.map a.delegate ~f:(fun pk ->
-                Public_key.Compressed.to_base58_check pk )
-        ; timing =
-            ( match a.timing with
-            | Untimed ->
-                None
-            | Timed t ->
-                let open Timed in
-                Some
-                  { initial_minimum_balance = t.initial_minimum_balance
-                  ; cliff_time = t.cliff_time
-                  ; cliff_amount = t.cliff_amount
-                  ; vesting_period = t.vesting_period
-                  ; vesting_increment = t.vesting_increment
+        return
+          { pk = Public_key.Compressed.to_base58_check a.public_key
+          ; sk = None
+          ; balance = a.balance
+          ; delegate =
+              Option.map a.delegate ~f:(fun pk ->
+                  Public_key.Compressed.to_base58_check pk )
+          ; timing =
+              ( match a.timing with
+              | Untimed ->
+                  None
+              | Timed t ->
+                  let open Timed in
+                  Some
+                    { initial_minimum_balance = t.initial_minimum_balance
+                    ; cliff_time = t.cliff_time
+                    ; cliff_amount = t.cliff_amount
+                    ; vesting_period = t.vesting_period
+                    ; vesting_increment = t.vesting_increment
+                    } )
+          ; token = Some (Mina_base.Token_id.to_string a.token_id)
+          ; token_symbol = Some a.token_symbol
+          ; zkapp =
+              Option.map a.zkapp ~f:(fun zkapp ->
+                  let open Zkapp_account in
+                  { app_state = Mina_base.Zkapp_state.V.to_list zkapp.app_state
+                  ; verification_key =
+                      Option.map zkapp.verification_key ~f:With_hash.data
+                  ; zkapp_version = zkapp.zkapp_version
+                  ; action_state =
+                      Pickles_types.Vector.Vector_5.to_list zkapp.action_state
+                  ; last_action_slot =
+                      Unsigned.UInt32.to_int
+                      @@ Mina_numbers.Global_slot_since_genesis.to_uint32
+                           zkapp.last_action_slot
+                  ; proved_state = zkapp.proved_state
+                  ; zkapp_uri = zkapp.zkapp_uri
                   } )
-        ; token = Some (Mina_base.Token_id.to_uint64 a.token_id)
-        ; token_permissions =
-            Some
-              ( match a.token_permissions with
-              | Token_owned { disable_new_accounts } ->
-                  { token_owned = true
-                  ; account_disabled = false
-                  ; disable_new_accounts
+          ; nonce = a.nonce
+          ; receipt_chain_hash =
+              Some
+                (Mina_base.Receipt.Chain_hash.to_base58_check
+                   a.receipt_chain_hash )
+          ; voting_for =
+              Some (Mina_base.State_hash.to_base58_check a.voting_for)
+          ; permissions =
+              Some
+                Permissions.
+                  { edit_state =
+                      Auth_required.of_account_perm a.permissions.edit_state
+                  ; send = Auth_required.of_account_perm a.permissions.send
+                  ; receive =
+                      Auth_required.of_account_perm a.permissions.receive
+                  ; set_delegate =
+                      Auth_required.of_account_perm a.permissions.set_delegate
+                  ; set_permissions =
+                      Auth_required.of_account_perm
+                        a.permissions.set_permissions
+                  ; set_verification_key =
+                      Auth_required.of_account_perm
+                        a.permissions.set_verification_key
+                  ; set_token_symbol =
+                      Auth_required.of_account_perm
+                        a.permissions.set_token_symbol
+                  ; access = Auth_required.of_account_perm a.permissions.access
+                  ; edit_action_state =
+                      Auth_required.of_account_perm
+                        a.permissions.edit_action_state
+                  ; set_zkapp_uri =
+                      Auth_required.of_account_perm a.permissions.set_zkapp_uri
+                  ; increment_nonce =
+                      Auth_required.of_account_perm
+                        a.permissions.increment_nonce
+                  ; set_timing =
+                      Auth_required.of_account_perm a.permissions.set_timing
+                  ; set_voting_for =
+                      Auth_required.of_account_perm a.permissions.set_voting_for
                   }
-              | Not_owned { account_disabled } ->
-                  { token_owned = false
-                  ; account_disabled
-                  ; disable_new_accounts = false
-                  } )
-        ; nonce = a.nonce
-        ; receipt_chain_hash =
-            Some
-              (Mina_base.Receipt.Chain_hash.to_base58_check a.receipt_chain_hash)
-        ; voting_for = Some (Mina_base.State_hash.to_base58_check a.voting_for)
-        ; snapp
-        ; permissions =
-            Some
-              Permissions.
-                { stake = a.permissions.stake
-                ; edit_state =
-                    Auth_required.of_account_perm a.permissions.edit_state
-                ; send = Auth_required.of_account_perm a.permissions.send
-                ; receive = Auth_required.of_account_perm a.permissions.receive
-                ; set_delegate =
-                    Auth_required.of_account_perm a.permissions.set_delegate
-                ; set_permissions =
-                    Auth_required.of_account_perm a.permissions.set_permissions
-                ; set_verification_key =
-                    Auth_required.of_account_perm
-                      a.permissions.set_verification_key
-                }
-        }
+          }
     end
 
     type t = Single.t list [@@deriving yojson, dhall_type]
@@ -337,16 +340,9 @@ module Json_layout = struct
       ; name : string option [@default None]
       ; add_genesis_winner : bool option [@default None]
       }
-    [@@deriving yojson, dhall_type]
+    [@@deriving yojson, fields, dhall_type]
 
-    let fields =
-      [| "accounts"
-       ; "num_accounts"
-       ; "balances"
-       ; "hash"
-       ; "name"
-       ; "add_genesis_winner"
-      |]
+    let fields = Fields.names |> Array.of_list
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -360,6 +356,9 @@ module Json_layout = struct
         }
       [@@deriving yojson, dhall_type]
 
+      (* we don't deriving the field names here, because the first one differs from the
+         field in the record type
+      *)
       let fields = [| "2_to_the"; "txns_per_second_x10" |]
 
       let alternates = [| ("two_to_the", "2_to_the"); ("log_2", "2_to_the") |]
@@ -383,19 +382,9 @@ module Json_layout = struct
       ; account_creation_fee : Currency.Fee.t option [@default None]
       ; fork : Fork_config.t option [@default None]
       }
-    [@@deriving yojson, dhall_type]
+    [@@deriving yojson, fields, dhall_type]
 
-    let fields =
-      [| "level"
-       ; "sub_windows_per_window"
-       ; "ledger_depth"
-       ; "work_delay"
-       ; "block_window_duration_ms"
-       ; "transaction_capacity"
-       ; "coinbase_amount"
-       ; "supercharged_coinbase_factor"
-       ; "account_creation_fee"
-      |]
+    let fields = Fields.names |> Array.of_list
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -408,16 +397,9 @@ module Json_layout = struct
       ; slots_per_sub_window : int option [@default None]
       ; genesis_state_timestamp : string option [@default None]
       }
-    [@@deriving yojson, dhall_type]
+    [@@deriving yojson, fields, dhall_type]
 
-    let fields =
-      [| "k"
-       ; "delta"
-       ; "slots_per_epoch"
-       ; "slots_per_sub_window"
-       ; "sub_window_per_window"
-       ; "genesis_state_timestamp"
-      |]
+    let fields = Fields.names |> Array.of_list
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -426,10 +408,16 @@ module Json_layout = struct
     type t =
       { txpool_max_size : int option [@default None]
       ; peer_list_url : string option [@default None]
+      ; zkapp_proof_update_cost : float option [@default None]
+      ; zkapp_signed_single_update_cost : float option [@default None]
+      ; zkapp_signed_pair_update_cost : float option [@default None]
+      ; zkapp_transaction_cost_limit : float option [@default None]
+      ; max_event_elements : int option [@default None]
+      ; max_action_elements : int option [@default None]
       }
-    [@@deriving yojson, dhall_type]
+    [@@deriving yojson, fields, dhall_type]
 
-    let fields = [| "txpool_max_size"; "peer_list_url" |]
+    let fields = Fields.names |> Array.of_list
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -437,9 +425,9 @@ module Json_layout = struct
   module Epoch_data = struct
     module Data = struct
       type t = { accounts : Accounts.t; seed : string }
-      [@@deriving yojson, dhall_type]
+      [@@deriving yojson, fields, dhall_type]
 
-      let fields = [| "accounts"; "seed" |]
+      let fields = Fields.names |> Array.of_list
 
       let of_yojson json = of_yojson_generic ~fields of_yojson json
     end
@@ -448,9 +436,9 @@ module Json_layout = struct
       { staking : Data.t
       ; next : (Data.t option[@default None]) (*If None then next = staking*)
       }
-    [@@deriving yojson, dhall_type]
+    [@@deriving yojson, fields, dhall_type]
 
-    let fields = [| "staking"; "next" |]
+    let fields = Fields.names |> Array.of_list
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -462,9 +450,9 @@ module Json_layout = struct
     ; ledger : Ledger.t option [@default None]
     ; epoch_data : Epoch_data.t option [@default None]
     }
-  [@@deriving yojson, dhall_type]
+  [@@deriving yojson, fields, dhall_type]
 
-  let fields = [| "daemon"; "ledger"; "genesis"; "proof"; "epoch_data" |]
+  let fields = Fields.names |> Array.of_list
 
   let of_yojson json = of_yojson_generic ~fields of_yojson json
 end
@@ -511,33 +499,35 @@ module Accounts = struct
     module Timed = struct
       type t = Json_layout.Accounts.Single.Timed.t =
         { initial_minimum_balance : Currency.Balance.Stable.Latest.t
-        ; cliff_time : Mina_numbers.Global_slot.Stable.Latest.t
+        ; cliff_time : Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
         ; cliff_amount : Currency.Amount.Stable.Latest.t
-        ; vesting_period : Mina_numbers.Global_slot.Stable.Latest.t
+        ; vesting_period : Mina_numbers.Global_slot_span.Stable.Latest.t
         ; vesting_increment : Currency.Amount.Stable.Latest.t
         }
       [@@deriving bin_io_unversioned, sexp]
     end
 
     module Permissions = Json_layout.Accounts.Single.Permissions
-    module Token_permissions = Json_layout.Accounts.Single.Token_permissions
-    module Snapp_account = Json_layout.Accounts.Single.Snapp_account
+    module Zkapp_account = Json_layout.Accounts.Single.Zkapp_account
 
     type t = Json_layout.Accounts.Single.t =
-      { pk : string option
+      { pk : string
       ; sk : string option
       ; balance : Currency.Balance.Stable.Latest.t
       ; delegate : string option
       ; timing : Timed.t option
-      ; token : Unsigned_extended.UInt64.Stable.Latest.t option
-      ; token_permissions : Token_permissions.t option
+      ; token : string option
       ; nonce : Mina_numbers.Account_nonce.Stable.Latest.t
       ; receipt_chain_hash : string option
       ; voting_for : string option
-      ; snapp : Snapp_account.t option
+      ; zkapp : Zkapp_account.t option
       ; permissions : Permissions.t option
+      ; token_symbol : string option
       }
     [@@deriving bin_io_unversioned, sexp]
+
+    let of_account : Mina_base.Account.t -> (t, string) Result.t =
+      Json_layout.Accounts.Single.of_account
 
     let to_json_layout : t -> Json_layout.Accounts.Single.t = Fn.id
 
@@ -553,18 +543,18 @@ module Accounts = struct
   end
 
   type single = Single.t =
-    { pk : string option
+    { pk : string
     ; sk : string option
     ; balance : Currency.Balance.t
     ; delegate : string option
     ; timing : Single.Timed.t option
-    ; token : Unsigned_extended.UInt64.t option
-    ; token_permissions : Single.Token_permissions.t option
+    ; token : string option
     ; nonce : Mina_numbers.Account_nonce.t
     ; receipt_chain_hash : string option
     ; voting_for : string option
-    ; snapp : Single.Snapp_account.t option
+    ; zkapp : Single.Zkapp_account.t option
     ; permissions : Single.Permissions.t option
+    ; token_symbol : string option
     }
 
   type t = Single.t list [@@deriving bin_io_unversioned]
@@ -739,6 +729,8 @@ module Proof_keys = struct
         (Json_layout.Proof_keys.Transaction_capacity.of_yojson json)
 
     let small : t = Log_2 2
+
+    let medium : t = Log_2 3
   end
 
   type t =
@@ -887,7 +879,15 @@ end
 
 module Daemon = struct
   type t = Json_layout.Daemon.t =
-    { txpool_max_size : int option; peer_list_url : string option }
+    { txpool_max_size : int option
+    ; peer_list_url : string option
+    ; zkapp_proof_update_cost : float option [@default None]
+    ; zkapp_signed_single_update_cost : float option [@default None]
+    ; zkapp_signed_pair_update_cost : float option [@default None]
+    ; zkapp_transaction_cost_limit : float option [@default None]
+    ; max_event_elements : int option [@default None]
+    ; max_action_elements : int option [@default None]
+    }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout : t -> Json_layout.Daemon.t = Fn.id
@@ -904,6 +904,22 @@ module Daemon = struct
     { txpool_max_size =
         opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
     ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
+    ; zkapp_proof_update_cost =
+        opt_fallthrough ~default:t1.zkapp_proof_update_cost
+          t2.zkapp_proof_update_cost
+    ; zkapp_signed_single_update_cost =
+        opt_fallthrough ~default:t1.zkapp_signed_single_update_cost
+          t2.zkapp_signed_single_update_cost
+    ; zkapp_signed_pair_update_cost =
+        opt_fallthrough ~default:t1.zkapp_signed_pair_update_cost
+          t2.zkapp_signed_pair_update_cost
+    ; zkapp_transaction_cost_limit =
+        opt_fallthrough ~default:t1.zkapp_transaction_cost_limit
+          t2.zkapp_transaction_cost_limit
+    ; max_event_elements =
+        opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
+    ; max_action_elements =
+        opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
     }
 end
 

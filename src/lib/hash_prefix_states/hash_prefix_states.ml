@@ -3,9 +3,13 @@ open Hash_prefixes
 
 let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
 
-let receipt_chain_user_command = salt receipt_chain_user_command
+let salt_legacy (s : Hash_prefixes.t) = Random_oracle.Legacy.salt (s :> string)
 
-let receipt_chain_snapp = salt receipt_chain_snapp
+let receipt_chain_signed_command = salt_legacy receipt_chain_user_command
+
+let receipt_chain_zkapp_command = salt receipt_chain_user_command
+
+let receipt_chain_zkapp = salt receipt_chain_zkapp
 
 let coinbase = salt coinbase
 
@@ -56,12 +60,32 @@ let signature_for_mainnet = salt signature_mainnet
 
 let signature_for_testnet = salt signature_testnet
 
-let signature =
-  match Mina_signature_kind.t with
+let signature_for_other chain_name = salt @@ signature_other chain_name
+
+let signature ?(signature_kind = Mina_signature_kind.t) =
+  match signature_kind with
   | Mainnet ->
       signature_for_mainnet
   | Testnet ->
       signature_for_testnet
+  | Other_network chain_name ->
+      signature_for_other chain_name
+
+let signature_for_mainnet_legacy = salt_legacy signature_mainnet
+
+let signature_for_testnet_legacy = salt_legacy signature_testnet
+
+let signature_for_other_legacy chain_name =
+  salt_legacy @@ signature_other chain_name
+
+let signature_legacy ?(signature_kind = Mina_signature_kind.t) =
+  match signature_kind with
+  | Mainnet ->
+      signature_for_mainnet_legacy
+  | Testnet ->
+      signature_for_testnet_legacy
+  | Other_network chain_name ->
+      signature_for_other_legacy chain_name
 
 let vrf_output = salt vrf_output
 
@@ -75,14 +99,39 @@ let account = salt account
 
 let side_loaded_vk = salt side_loaded_vk
 
-let snapp_account = salt snapp_account
+let zkapp_account = salt zkapp_account
 
-let snapp_payload = salt snapp_payload
+let zkapp_payload = salt zkapp_payload
 
-let snapp_body = salt snapp_body
+let zkapp_body ?(chain = Mina_signature_kind.t) = salt @@ zkapp_body ~chain
 
-let snapp_predicate = salt snapp_predicate
+let zkapp_precondition = salt zkapp_precondition
 
-let snapp_predicate_account = salt snapp_predicate_account
+let zkapp_precondition_account = salt zkapp_precondition_account
 
-let snapp_predicate_protocol_state = salt snapp_predicate_protocol_state
+let zkapp_precondition_protocol_state = salt zkapp_precondition_protocol_state
+
+let account_update_account_precondition =
+  salt account_update_account_precondition
+
+let account_update_cons = salt account_update_cons
+
+let account_update_node = salt account_update_node
+
+let account_update_stack_frame = salt account_update_stack_frame
+
+let account_update_stack_frame_cons = salt account_update_stack_frame_cons
+
+let zkapp_uri = salt zkapp_uri
+
+let zkapp_event = salt zkapp_event
+
+let zkapp_events = salt zkapp_events
+
+let zkapp_actions = salt zkapp_actions
+
+let zkapp_memo = salt zkapp_memo
+
+let zkapp_test = salt zkapp_test
+
+let derive_token_id = salt derive_token_id

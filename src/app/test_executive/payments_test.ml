@@ -25,11 +25,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~vesting_increment : Mina_base.Account_timing.t =
       let open Currency in
       Timed
-        { initial_minimum_balance = Balance.of_int min_balance
-        ; cliff_time = Mina_numbers.Global_slot.of_int cliff_time
-        ; cliff_amount = Amount.of_int cliff_amount
-        ; vesting_period = Mina_numbers.Global_slot.of_int vesting_period
-        ; vesting_increment = Amount.of_int vesting_increment
+        { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
+        ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
+        ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
+        ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
+        ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
         }
     in
     { default with
@@ -107,8 +107,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (* hardcoded values of the balances of fish1 (receiver) and fish2 (sender), update here if they change in the config *)
     (* TODO undo the harcoding, don't be lazy and just make the graphql commands to fetch the balances *)
-    let receiver_original_balance = Currency.Amount.of_formatted_string "100" in
-    let sender_original_balance = Currency.Amount.of_formatted_string "100" in
+    let receiver_original_balance = Currency.Amount.of_mina_string_exn "100" in
+    let sender_original_balance = Currency.Amount.of_mina_string_exn "100" in
     let sender = fish2.keypair in
     let receiver = fish1.keypair in
     [%log info] "extra genesis keypairs: %s"
@@ -138,31 +138,29 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let receiver_pub_key =
       receiver.public_key |> Signature_lib.Public_key.compress
     in
+    let receiver_account_id =
+      Account_id.create receiver_pub_key Token_id.default
+    in
     let sender_pub_key =
       sender.public_key |> Signature_lib.Public_key.compress
     in
+    let sender_account_id = Account_id.create sender_pub_key Token_id.default in
     let%bind { nonce = sender_current_nonce; _ } =
       Integration_test_lib.Graphql_requests.must_get_account_data ~logger
         (Network.Node.get_ingress_uri untimed_node_b)
-        ~public_key:sender_pub_key
+        ~account_id:sender_account_id
     in
-    let amount = Currency.Amount.of_formatted_string "10" in
-    let fee = Currency.Fee.of_formatted_string "1" in
+    let amount = Currency.Amount.of_mina_string_exn "10" in
+    let fee = Currency.Fee.of_mina_string_exn "1" in
     let memo = "" in
-    let token = Token_id.default in
-    let valid_until = Mina_numbers.Global_slot.max_value in
+    let valid_until = Mina_numbers.Global_slot_since_genesis.max_value in
     let payload =
       let payment_payload =
-        { Payment_payload.Poly.receiver_pk = receiver_pub_key
-        ; source_pk = sender_pub_key
-        ; token_id = token
-        ; amount
-        }
+        { Payment_payload.Poly.receiver_pk = receiver_pub_key; amount }
       in
       let body = Signed_command_payload.Body.Payment payment_payload in
       let common =
         { Signed_command_payload.Common.Poly.fee
-        ; fee_token = Signed_command_payload.Body.token body
         ; fee_payer_pk = sender_pub_key
         ; nonce = sender_current_nonce
         ; valid_until
@@ -182,11 +180,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Integration_test_lib.Graphql_requests.must_send_payment_with_raw_sig
              (Network.Node.get_ingress_uri untimed_node_b)
              ~logger
-             ~sender_pub_key:(Signed_command_payload.source_pk payload)
+             ~sender_pub_key:(Signed_command_payload.fee_payer_pk payload)
              ~receiver_pub_key:(Signed_command_payload.receiver_pk payload)
              ~amount ~fee
              ~nonce:(Signed_command_payload.nonce payload)
-             ~memo ~token ~valid_until ~raw_signature
+             ~memo ~valid_until ~raw_signature
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
@@ -199,12 +197,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind { total_balance = receiver_balance; _ } =
            Integration_test_lib.Graphql_requests.must_get_account_data ~logger
              (Network.Node.get_ingress_uri untimed_node_b)
-             ~public_key:receiver_pub_key
+             ~account_id:receiver_account_id
          in
          let%bind { total_balance = sender_balance; _ } =
            Integration_test_lib.Graphql_requests.must_get_account_data ~logger
              (Network.Node.get_ingress_uri untimed_node_b)
-             ~public_key:sender_pub_key
+             ~account_id:sender_account_id
          in
          (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
          let receiver_expected =
@@ -220,16 +218,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          (* [%log info] "coinbase_amount: %s"
             (Currency.Amount.to_formatted_string coinbase_reward) ; *)
-         [%log info] "txn_amount: %s"
-           (Currency.Amount.to_formatted_string amount) ;
+         [%log info] "txn_amount: %s" (Currency.Amount.to_mina_string amount) ;
          [%log info] "receiver_expected: %s"
-           (Currency.Amount.to_formatted_string receiver_expected) ;
+           (Currency.Amount.to_mina_string receiver_expected) ;
          [%log info] "receiver_balance: %s"
-           (Currency.Balance.to_formatted_string receiver_balance) ;
+           (Currency.Balance.to_mina_string receiver_balance) ;
          [%log info] "sender_expected: %s"
-           (Currency.Amount.to_formatted_string sender_expected) ;
+           (Currency.Amount.to_mina_string sender_expected) ;
          [%log info] "sender_balance: %s"
-           (Currency.Balance.to_formatted_string sender_balance) ;
+           (Currency.Balance.to_mina_string sender_balance) ;
          if
            (* node_a is the receiver *)
            (* node_a_balance >= 400_000_000_000_000 + txn_amount *)
@@ -250,11 +247,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Error with account balances.  receiver balance is %d and should \
               be %d, sender balance is %d and should be %d.  and txn_amount is \
               %d"
-             (Currency.Balance.to_int receiver_balance)
-             (Currency.Amount.to_int receiver_expected)
-             (Currency.Balance.to_int sender_balance)
-             (Currency.Amount.to_int sender_expected)
-             (Currency.Amount.to_int amount) )
+             (Currency.Balance.to_nanomina_int receiver_balance)
+             (Currency.Amount.to_nanomina_int receiver_expected)
+             (Currency.Balance.to_nanomina_int sender_balance)
+             (Currency.Amount.to_nanomina_int sender_expected)
+             (Currency.Amount.to_nanomina_int amount) )
     in
     let%bind () =
       section
@@ -265,11 +262,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Integration_test_lib.Graphql_requests.send_payment_with_raw_sig
             (Network.Node.get_ingress_uri untimed_node_b)
             ~logger
-            ~sender_pub_key:(Signed_command_payload.source_pk payload)
+            ~sender_pub_key:(Signed_command_payload.fee_payer_pk payload)
             ~receiver_pub_key:(Signed_command_payload.receiver_pk payload)
             ~amount ~fee
             ~nonce:(Signed_command_payload.nonce payload)
-            ~memo ~token ~valid_until ~raw_signature
+            ~memo ~valid_until ~raw_signature
         with
         | Ok { nonce; _ } ->
             Malleable_error.soft_error_format ~value:()
@@ -304,13 +301,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Integration_test_lib.Graphql_requests.send_payment_with_raw_sig
             (Network.Node.get_ingress_uri untimed_node_a)
             ~logger
-            ~sender_pub_key:(Signed_command_payload.source_pk payload)
+            ~sender_pub_key:(Signed_command_payload.fee_payer_pk payload)
             ~receiver_pub_key:(Signed_command_payload.receiver_pk payload)
             ~amount ~fee
             ~nonce:
               (Mina_numbers.Account_nonce.succ
                  (Signed_command_payload.nonce payload) )
-            ~memo ~token ~valid_until ~raw_signature
+            ~memo ~valid_until ~raw_signature
         with
         | Ok { nonce = returned_nonce; _ } ->
             Malleable_error.soft_error_format ~value:()
@@ -337,7 +334,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "send a single payment from timed account using available liquid"
-        (let amount = Currency.Amount.of_int 1_000_000_000_000 in
+        (let amount = Currency.Amount.of_mina_int_exn 1_000 in
          let receiver = untimed_node_a in
          let%bind receiver_pub_key = pub_key_of_node receiver in
          let sender = timed_node_c in
@@ -354,7 +351,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "unable to send payment from timed account using illiquid tokens"
-        (let amount = Currency.Amount.of_int 25_000_000_000_000 in
+        (let amount = Currency.Amount.of_mina_int_exn 25_000 in
          let receiver = untimed_node_b in
          let%bind receiver_pub_key = pub_key_of_node receiver in
          let sender = timed_node_c in
@@ -362,14 +359,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind { total_balance = timed_node_c_total; _ } =
            Integration_test_lib.Graphql_requests.must_get_account_data ~logger
              (Network.Node.get_ingress_uri timed_node_c)
-             ~public_key:sender_pub_key
+             ~account_id:sender_account_id
          in
          [%log info] "timed_node_c total balance: %s"
-           (Currency.Balance.to_formatted_string timed_node_c_total) ;
+           (Currency.Balance.to_mina_string timed_node_c_total) ;
          [%log info]
            "Attempting to send txn from timed_node_c to untimed_node_a for \
             amount of %s"
-           (Currency.Amount.to_formatted_string amount) ;
+           (Currency.Amount.to_mina_string amount) ;
          (* TODO: refactor this using new [expect] dsl when it's available *)
          let open Deferred.Let_syntax in
          match%bind
@@ -427,6 +424,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.ledger_proofs_emitted_since_genesis
               ~test_config:config ~num_proofs:1 ) )
     in
+    let get_account_id pubk =
+      Account_id.create
+        (pubk |> Signature_lib.Public_key.compress)
+        Token_id.default
+    in
     let%bind () =
       section_hard
         "check account balances.  snark-node-key1 should be greater than or \
@@ -434,19 +436,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind { total_balance = key_1_balance_actual; _ } =
            Integration_test_lib.Graphql_requests.must_get_account_data ~logger
              (Network.Node.get_ingress_uri untimed_node_b)
-             ~public_key:
-               ( snark_node_key1.keypair.public_key
-               |> Signature_lib.Public_key.compress )
+             ~account_id:(get_account_id snark_node_key1.keypair.public_key)
          in
          let%bind { total_balance = key_2_balance_actual; _ } =
            Integration_test_lib.Graphql_requests.must_get_account_data ~logger
              (Network.Node.get_ingress_uri untimed_node_a)
-             ~public_key:
-               ( snark_node_key2.keypair.public_key
-               |> Signature_lib.Public_key.compress )
+             ~account_id:(get_account_id snark_node_key2.keypair.public_key)
          in
          let key_1_balance_expected =
-           Currency.Amount.of_formatted_string config.snark_worker_fee
+           Currency.Amount.of_mina_string_exn config.snark_worker_fee
          in
          if
            Currency.Amount.( >= )
@@ -458,8 +456,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
               snark-worker-fee: %s"
-             (Currency.Balance.to_formatted_string key_1_balance_actual)
-             (Currency.Balance.to_formatted_string key_2_balance_actual)
+             (Currency.Balance.to_mina_string key_1_balance_actual)
+             (Currency.Balance.to_mina_string key_2_balance_actual)
              config.snark_worker_fee ;
 
            Malleable_error.return () )
@@ -469,8 +467,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
               snark-worker-fee: %s"
-             (Currency.Balance.to_formatted_string key_1_balance_actual)
-             (Currency.Balance.to_formatted_string key_2_balance_actual)
+             (Currency.Balance.to_mina_string key_1_balance_actual)
+             (Currency.Balance.to_mina_string key_2_balance_actual)
              config.snark_worker_fee )
     in
     let%bind () =
@@ -482,12 +480,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ( snark_node_key2.keypair.public_key
              |> Signature_lib.Public_key.compress ) )
     in
-    let new_snark_work_fee = Currency.Amount.of_formatted_string "0.0001" in
+    let new_snark_work_fee = Currency.Amount.of_mina_string_exn "0.0001" in
     let%bind () =
       section_hard "change snark work fee from 0.0002 to 0.0001"
         (Integration_test_lib.Graphql_requests.must_set_snark_work_fee ~logger
            (Network.Node.get_ingress_uri snark_coordinator)
-           ~new_snark_work_fee:(Currency.Amount.to_int new_snark_work_fee) )
+           ~new_snark_work_fee:
+             (Currency.Amount.to_nanomina_int new_snark_work_fee) )
     in
     let%bind () =
       section_hard
@@ -512,16 +511,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind { total_balance = key_1_balance_actual; _ } =
            Integration_test_lib.Graphql_requests.must_get_account_data ~logger
              (Network.Node.get_ingress_uri untimed_node_b)
-             ~public_key:
-               ( snark_node_key1.keypair.public_key
-               |> Signature_lib.Public_key.compress )
+             ~account_id:(get_account_id snark_node_key1.keypair.public_key)
          in
          let%bind { total_balance = key_2_balance_actual; _ } =
            Integration_test_lib.Graphql_requests.must_get_account_data ~logger
              (Network.Node.get_ingress_uri untimed_node_a)
-             ~public_key:
-               ( snark_node_key2.keypair.public_key
-               |> Signature_lib.Public_key.compress )
+             ~account_id:(get_account_id snark_node_key2.keypair.public_key)
          in
          if
            Currency.Amount.( >= )
@@ -532,10 +527,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "balance check successful.  \n\
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
-              new-snark-worker-fee: %s"
-             (Currency.Balance.to_formatted_string key_1_balance_actual)
-             (Currency.Balance.to_formatted_string key_2_balance_actual)
-             (Currency.Amount.to_formatted_string new_snark_work_fee) ;
+              new-snark-work-fee: %s"
+             (Currency.Balance.to_mina_string key_1_balance_actual)
+             (Currency.Balance.to_mina_string key_2_balance_actual)
+             (Currency.Amount.to_mina_string new_snark_work_fee) ;
 
            Malleable_error.return () )
          else
@@ -543,10 +538,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Error with balance of snark-node-key2.  \n\
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
-              new-snark-worker-fee: %s"
-             (Currency.Balance.to_formatted_string key_1_balance_actual)
-             (Currency.Balance.to_formatted_string key_2_balance_actual)
-             (Currency.Amount.to_formatted_string new_snark_work_fee) )
+              new-snark-work-fee: %s"
+             (Currency.Balance.to_mina_string key_1_balance_actual)
+             (Currency.Balance.to_mina_string key_2_balance_actual)
+             (Currency.Amount.to_mina_string new_snark_work_fee) )
     in
     section_hard "running replayer"
       (let%bind logs =

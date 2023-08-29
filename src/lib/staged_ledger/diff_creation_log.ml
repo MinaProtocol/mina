@@ -58,7 +58,7 @@ module Summary = struct
 
   let init_resources
       ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
-      ~(commands : User_command.Valid.t With_status.t Sequence.t)
+      ~(commands : User_command.Valid.t Sequence.t)
       ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
     let completed_work =
       ( Sequence.length completed_work
@@ -71,13 +71,13 @@ module Summary = struct
       , Sequence.sum
           (module Fee_Summable)
           commands
-          ~f:(fun cmd -> User_command.fee_exn (cmd.data :> User_command.t)) )
+          ~f:(fun cmd -> User_command.fee (User_command.forget_check cmd)) )
     in
     let coinbase_work_fees = coinbase_fees coinbase in
     { completed_work; commands; coinbase_work_fees }
 
   let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
-      ~(commands : User_command.Valid.t With_status.t Sequence.t)
+      ~(commands : User_command.Valid.t Sequence.t)
       ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t)
       ~partition ~available_slots ~required_work_count =
     let start_resources = init_resources ~completed_work ~commands ~coinbase in
@@ -101,7 +101,7 @@ module Summary = struct
     }
 
   let end_log t ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
-      ~(commands : User_command.Valid.t With_status.t Sequence.t)
+      ~(commands : User_command.Valid.t Sequence.t)
       ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
     end_resources.set (init_resources ~completed_work ~commands ~coinbase) t
 
@@ -147,7 +147,7 @@ module Detail = struct
   type t = line list [@@deriving sexp, to_yojson]
 
   let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
-      ~(commands : User_command.Valid.t With_status.t Sequence.t)
+      ~(commands : User_command.Valid.t Sequence.t)
       ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
     let init = Summary.init_resources ~completed_work ~commands ~coinbase in
     [ { reason = `Init
@@ -166,7 +166,7 @@ module Detail = struct
             reason = why
           ; commands =
               ( fst x.commands - 1
-              , Currency.Fee.sub (snd x.commands) (User_command.fee_exn command)
+              , Currency.Fee.sub (snd x.commands) (User_command.fee command)
                 |> Option.value_exn )
           }
         in
@@ -207,7 +207,7 @@ type summary_list = Summary.t list [@@deriving sexp, to_yojson]
 type detail_list = Detail.t list [@@deriving sexp, to_yojson]
 
 let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
-    ~(commands : User_command.Valid.t With_status.t Sequence.t)
+    ~(commands : User_command.Valid.t Sequence.t)
     ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t)
     ~partition ~available_slots ~required_work_count =
   let summary =
@@ -228,7 +228,7 @@ let discard_completed_work why completed_work t =
   (summary, detailed)
 
 let end_log ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
-    ~(commands : User_command.Valid.t With_status.t Sequence.t)
+    ~(commands : User_command.Valid.t Sequence.t)
     ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) t =
   let summary = Summary.end_log (fst t) ~completed_work ~commands ~coinbase in
   let detailed = Detail.end_log coinbase (snd t) in

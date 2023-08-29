@@ -2,6 +2,10 @@
  (name mina_compile_config)
  (public_name mina_compile_config_nonconsensus)
  (libraries currency_nonconsensus)
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_base ppx_optcomp)))
