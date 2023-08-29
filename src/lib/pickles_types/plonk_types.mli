@@ -63,7 +63,7 @@ end
 
 module Features : sig
   module Full : sig
-    type 'bool t =
+    type 'bool t = private
       { range_check0 : 'bool
       ; range_check1 : 'bool
       ; foreign_field_add : 'bool
