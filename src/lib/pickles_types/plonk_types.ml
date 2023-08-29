@@ -191,6 +191,28 @@ module Opt = struct
 end
 
 module Features = struct
+  module Full = struct
+    type 'bool t =
+      { range_check0 : 'bool
+      ; range_check1 : 'bool
+      ; foreign_field_add : 'bool
+      ; foreign_field_mul : 'bool
+      ; xor : 'bool
+      ; rot : 'bool
+      ; lookup : 'bool
+      ; runtime_tables : 'bool
+      ; uses_lookups : 'bool
+      ; table_width_at_least_1 : 'bool
+      ; table_width_at_least_2 : 'bool
+      ; table_width_3 : 'bool
+      ; lookups_per_row_3 : 'bool
+      ; lookups_per_row_4 : 'bool
+      ; lookup_pattern_xor : 'bool
+      ; lookup_pattern_range_check : 'bool
+      }
+    [@@deriving sexp, compare, yojson, hash, equal, hlist]
+  end
+
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -207,6 +229,35 @@ module Features = struct
       [@@deriving sexp, compare, yojson, hash, equal, hlist]
     end
   end]
+
+  let of_full
+      ({ range_check0
+       ; range_check1
+       ; foreign_field_add
+       ; foreign_field_mul
+       ; xor
+       ; rot
+       ; lookup
+       ; runtime_tables
+       ; uses_lookups = _
+       ; table_width_at_least_1 = _
+       ; table_width_at_least_2 = _
+       ; table_width_3 = _
+       ; lookups_per_row_3 = _
+       ; lookups_per_row_4 = _
+       ; lookup_pattern_xor = _
+       ; lookup_pattern_range_check = _
+       } :
+        'bool Full.t ) =
+    { range_check0
+    ; range_check1
+    ; foreign_field_add
+    ; foreign_field_mul
+    ; xor
+    ; rot
+    ; lookup
+    ; runtime_tables
+    }
 
   type options = Opt.Flag.t t
 

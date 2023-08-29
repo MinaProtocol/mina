@@ -62,6 +62,28 @@ module Opt : sig
 end
 
 module Features : sig
+  module Full : sig
+    type 'bool t =
+      { range_check0 : 'bool
+      ; range_check1 : 'bool
+      ; foreign_field_add : 'bool
+      ; foreign_field_mul : 'bool
+      ; xor : 'bool
+      ; rot : 'bool
+      ; lookup : 'bool
+      ; runtime_tables : 'bool
+      ; uses_lookups : 'bool
+      ; table_width_at_least_1 : 'bool
+      ; table_width_at_least_2 : 'bool
+      ; table_width_3 : 'bool
+      ; lookups_per_row_3 : 'bool
+      ; lookups_per_row_4 : 'bool
+      ; lookup_pattern_xor : 'bool
+      ; lookup_pattern_range_check : 'bool
+      }
+    [@@deriving sexp, compare, yojson, hash, equal, hlist]
+  end
+
   [%%versioned:
   module Stable : sig
     module V1 : sig
@@ -78,6 +100,8 @@ module Features : sig
       [@@deriving sexp, compare, yojson, hash, equal, hlist]
     end
   end]
+
+  val of_full : 'a Full.t -> 'a t
 
   (** {2 Type aliases} *)
 
