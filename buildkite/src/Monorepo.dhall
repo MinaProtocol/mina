@@ -23,8 +23,7 @@ let jobs : List JobSpec.Type =
 let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
   let dirtyWhen = SelectFiles.compile job.dirtyWhen
   let trigger = triggerCommand "src/Jobs/${job.path}/${job.name}.dhall"
-  let requestedPipeline : PipelineMode.Type = env:BUILDKITE_PIPELINE_MODE ? PipelineMode.Type.PullRequest
-  let requestedPipelineName = PipelineMode.capitalName requestedPipeline
+  let requestedPipelineName : Text = env:BUILDKITE_PIPELINE_MODE as Text? "PullRequest"
   let jobPipelineName = PipelineMode.capitalName job.mode
   let pipelineHandlers = {
     PullRequest = ''
@@ -37,13 +36,11 @@ let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
       fi
     '',
     Stable = ''
-      if [ "${jobPipelineName}" == "${requestedPipelineName}" ]; then
-        echo "Triggering ${job.name} because this is a stable buildkite run"
-        ${Cmd.format trigger}
-      fi
+      echo "Triggering ${job.name} because this is a stable buildkite run"
+      ${Cmd.format trigger}
     ''
   }
-  in Cmd.quietly (merge pipelineHandlers requestedPipeline)
+  in Cmd.quietly (merge pipelineHandlers requestedPipelineName)
 
 let prefixCommands = [
   Cmd.run "git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt", -- Tell git where to find certs for https connections
