@@ -102,7 +102,7 @@ module Wrap : sig
 
               Then, we expose them so the next guy (who can do scalar
               arithmetic) can check that they were computed correctly from the
-              evaluations in the proof and the challenges.  
+              evaluations in the proof and the challenges.
            *)
           type ( 'challenge
                , 'scalar_challenge
@@ -253,19 +253,6 @@ module Wrap : sig
         ; branch_data : 'branch_data
         }
       [@@deriving sexp, compare, yojson, hlist, hash, equal]
-
-      type ( 'plonk
-           , 'scalar_challenge
-           , 'fp
-           , 'bulletproof_challenges
-           , 'branch_data )
-           w :=
-        ( 'plonk
-        , 'scalar_challenge
-        , 'fp
-        , 'bulletproof_challenges
-        , 'branch_data )
-        t
 
       val map_challenges :
            ('a, 'b, 'fp, 'c, 'd) t
@@ -937,6 +924,7 @@ module Wrap : sig
       type 'a vec8 :=
         ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
         Hlist.HlistId.t
+      [@@warning "-34"]
 
       type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp_opt, 'bool) flat_repr :=
         ( ('a, Nat.N5.n) Vector.t
@@ -1290,10 +1278,6 @@ module Step : sig
           t_
         [@@deriving sexp, compare, yojson]
 
-        type 'a vec8 :=
-          ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
-          Hlist.HlistId.t
-
         type ( 'field
              , 'digest
              , 'challenge
@@ -1429,10 +1413,6 @@ module Step : sig
          , 'c )
          Spec.T.t
 
-    type 'a vec8 :=
-      ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit)))))))))
-      Hlist.HlistId.t
-
     val typ :
          'f Spec.impl
       -> ( Limb_vector.Challenge.Constant.t
@@ -1493,10 +1473,6 @@ module Step : sig
       ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
       }
     [@@deriving sexp, compare, yojson]
-
-    type 'a vec8 :=
-      ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
-      Hlist.HlistId.t
 
     val to_data :
          ( ( ( 'a

@@ -94,18 +94,29 @@ module type Inputs_intf = sig
 
     val create :
          Index.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.t array
-      -> Curve.Affine.Backend.t array
+      -> primary:Scalar_field.Vector.t
+      -> auxiliary:Scalar_field.Vector.t
+      -> runtime_tables:Scalar_field.t Kimchi_types.runtime_table array
+      -> prev_chals:Scalar_field.t array
+      -> prev_comms:Curve.Affine.Backend.t array
       -> t
 
     val create_async :
          Index.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.t array
-      -> Curve.Affine.Backend.t array
+      -> primary:Scalar_field.Vector.t
+      -> auxiliary:Scalar_field.Vector.t
+      -> runtime_tables:Scalar_field.t Kimchi_types.runtime_table array
+      -> prev_chals:Scalar_field.t array
+      -> prev_comms:Curve.Affine.Backend.t array
+      -> t Promise.t
+
+    val create_and_verify_async :
+         Index.t
+      -> primary:Scalar_field.Vector.t
+      -> auxiliary:Scalar_field.Vector.t
+      -> runtime_tables:Scalar_field.t Kimchi_types.runtime_table array
+      -> prev_chals:Scalar_field.t array
+      -> prev_comms:Curve.Affine.Backend.t array
       -> t Promise.t
 
     val verify : Verifier_index.t -> t -> bool
@@ -247,7 +258,8 @@ module Make (Inputs : Inputs_intf) = struct
     Array.iter arr ~f:(fun fe -> Fq.Vector.emplace_back vec fe) ;
     vec
 
-  (** Note that this function will panic if any of the points are points at infinity *)
+  (** Note that this function will panic if any of the points are points at
+      infinity *)
   let opening_proof_of_backend_exn (t : Opening_proof_backend.t) =
     let g (x : G.Affine.Backend.t) : G.Affine.t =
       G.Affine.of_backend x |> Pickles_types.Or_infinity.finite_exn
@@ -478,7 +490,7 @@ module Make (Inputs : Inputs_intf) = struct
   let to_backend chal_polys primary_input t =
     to_backend' chal_polys (List.to_array primary_input) t
 
-  let create ?message pk ~primary ~auxiliary =
+  let create ?message pk ~primary ~auxiliary ~runtime_tables =
     let chal_polys =
       match (message : message option) with Some s -> s | None -> []
     in
@@ -492,10 +504,13 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment) )
     in
-    let res = Backend.create pk primary auxiliary challenges commitments in
+    let res =
+      Backend.create pk ~primary ~auxiliary ~runtime_tables
+        ~prev_chals:challenges ~prev_comms:commitments
+    in
     of_backend res
 
-  let create_async ?message pk ~primary ~auxiliary =
+  let create_async ?message pk ~primary ~auxiliary ~runtime_tables =
     let chal_polys =
       match (message : message option) with Some s -> s | None -> []
     in
@@ -510,7 +525,28 @@ module Make (Inputs : Inputs_intf) = struct
           G.Affine.to_backend (Finite commitment) )
     in
     let%map.Promise res =
-      Backend.create_async pk primary auxiliary challenges commitments
+      Backend.create_async pk ~primary ~auxiliary ~runtime_tables
+        ~prev_chals:challenges ~prev_comms:commitments
+    in
+    of_backend res
+
+  let create_and_verify_async ?message pk ~primary ~auxiliary ~runtime_tables =
+    let chal_polys =
+      match (message : message option) with Some s -> s | None -> []
+    in
+    let challenges =
+      List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
+          challenges )
+      |> Array.concat
+    in
+    let commitments =
+      Array.of_list_map chal_polys
+        ~f:(fun { Challenge_polynomial.commitment; _ } ->
+          G.Affine.to_backend (Finite commitment) )
+    in
+    let%map.Promise res =
+      Backend.create_and_verify_async pk ~primary ~auxiliary ~runtime_tables
+        ~prev_chals:challenges ~prev_comms:commitments
     in
     of_backend res
 

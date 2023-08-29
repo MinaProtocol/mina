@@ -7,16 +7,26 @@
    bin_prot.shape
    base.caml
    base
-   sexplib0
+   base64
+   integers
    result
+   sexplib0
    ;; local libraries
    currency
+   data_hash_lib
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   mina_base
+   mina_base.import
    mina_numbers
    signature_lib
    ppx_dhall_type
    snark_params
    unsigned_extended
    pickles
+   pickles.backend
+   pickles_types
+   with_hash
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson

@@ -17,7 +17,7 @@ let block_cipher _params (s : Field.t array) =
 
 let%test_unit "check rust implementation of block-cipher" =
   let params' : Field.t Sponge.Params.t =
-    Sponge.Params.(map pasta_p_kimchi ~f:Field.of_string)
+    Kimchi_pasta_basic.poseidon_params_fp
   in
   let open Pickles.Impls.Step in
   let module T = Internal_Basic in
