@@ -200,7 +200,7 @@ struct
     let open Tuple_lib in
     let to_maybe = function
       | Plonk_types.Opt.None ->
-          (Boolean.false_, (Field.zero, Field.zero))
+          (Boolean.false_, Inner_curve.one)
       | Plonk_types.Opt.Maybe (b, x) ->
           (b, x)
       | Plonk_types.Opt.Some x ->
