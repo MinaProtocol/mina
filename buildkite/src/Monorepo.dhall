@@ -27,20 +27,27 @@ let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
   let jobPipelineName = PipelineMode.capitalName job.mode
   let pipelineHandlers = {
     PullRequest = ''
-      if [ "${jobPipelineName}" == "${requestedPipelineName}" ]; then
+      if [ "${requestedPipelineName}" == "PullRequest" ]; then
         if (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
           echo "Triggering ${job.name} for reason:"
           cat _computed_diff.txt | egrep '${dirtyWhen}'
           ${Cmd.format trigger}
         fi
+      else 
+        echo "Triggering ${job.name} because this is a stable buildkite run"
+        ${Cmd.format trigger}
       fi
     '',
     Stable = ''
-      echo "Triggering ${job.name} because this is a stable buildkite run"
-      ${Cmd.format trigger}
+      if [ "${requestedPipelineName}" == "PullRequest" ]; then
+        echo "Skipping ${job.name} because this is a PR buildkite run"
+      else 
+        echo "Triggering ${job.name} because this is a stable buildkite run"
+        ${Cmd.format trigger}
+      fi
     ''
   }
-  in Cmd.quietly (merge pipelineHandlers requestedPipelineName)
+  in Cmd.quietly (merge pipelineHandlers job.mode)
 
 let prefixCommands = [
   Cmd.run "git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt", -- Tell git where to find certs for https connections
