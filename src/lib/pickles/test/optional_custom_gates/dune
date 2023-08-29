@@ -56,4 +56,10 @@
    internal_tracing.context_logger
    ppx_version.runtime
    error_json
-))
+ )
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_version
+)))
