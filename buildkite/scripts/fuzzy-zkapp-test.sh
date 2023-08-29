@@ -12,20 +12,17 @@ path=$2
 timeout=$3
 individual_test_timeout=$4
 
-if [ "$NIGHTLY" = true ]
-then
-  source ~/.profile
+source ~/.profile
 
-  echo "--- Make build"
-  export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go
+echo "--- Make build"
+export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go
 
-  # Note: By attempting a re-run on failure here, we can avoid rebuilding and
-  # skip running all of the tests that have already succeeded, since dune will
-  # only retry those tests that failed.
-  echo "--- Run fuzzy zkapp tests"
+# Note: By attempting a re-run on failure here, we can avoid rebuilding and
+# skip running all of the tests that have already succeeded, since dune will
+# only retry those tests that failed.
+echo "--- Run fuzzy zkapp tests"
+time dune exec "${path}" --profile="${profile}" -j16 -- --timeout "${timeout}" --individual-test-timeout "${individual_test_timeout}" --seed "${RANDOM}" || \
+(./scripts/link-coredumps.sh && \
+  echo "--- Retrying failed unit tests" && \
   time dune exec "${path}" --profile="${profile}" -j16 -- --timeout "${timeout}" --individual-test-timeout "${individual_test_timeout}" --seed "${RANDOM}" || \
-  (./scripts/link-coredumps.sh && \
-   echo "--- Retrying failed unit tests" && \
-   time dune exec "${path}" --profile="${profile}" -j16 -- --timeout "${timeout}" --individual-test-timeout "${individual_test_timeout}" --seed "${RANDOM}" || \
-   (./scripts/link-coredumps.sh && false))
-fi
+  (./scripts/link-coredumps.sh && false))
