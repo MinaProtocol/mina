@@ -103,6 +103,8 @@ module Features : sig
     end
   end]
 
+  val to_full : or_:('bool -> 'bool -> 'bool) -> 'bool t -> 'bool Full.t
+
   val of_full : 'a Full.t -> 'a t
 
   (** {2 Type aliases} *)
