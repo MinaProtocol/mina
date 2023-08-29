@@ -114,73 +114,73 @@ struct
         state.(i) <- Field.if_ permute ~then_:permuted.(i) ~else_:state.(i)
       done
     in
-    let pairs = n / 2 in
-    let remaining = n - (2 * pairs) in
-    for i = 0 to pairs - 1 do
-      (* Semantically, we want to do this.
-         match b, b' with
-         | 1, 1 ->
-          if p = 0
-          then state := perm {state with .0 += x, .1 += y }
-          else state := {perm {state with .1 += x} with .0 += y}
-         | 1, 0 ->
-          if p = 0
-          then state := {state with .0 += x}
-          else state := perm {state with .1 += x}
-         | 0, 1 ->
-          if p = 0
-          then state := {state with .0 += y }
-          else state := perm {state with .1 += y}
-         | 0, 0 ->
-          state
-      *)
-      let b, x = input.(2 * i) in
-      let b', y = input.((2 * i) + 1) in
-      let p = !pos in
-      let p' = Boolean.( lxor ) p b in
-      pos := Boolean.( lxor ) p' b' ;
-      let y = Field.(y * (b' :> t)) in
-      let add_in_y_after_perm =
-        (* post
-           add in
-           (1, 1, 1)
-
-           do not add in
-           (1, 1, 0)
-           (0, 1, 0)
-           (0, 1, 1)
-
-           (1, 0, 0)
-           (1, 0, 1)
-           (0, 0, 0)
-           (0, 0, 1)
+    let num_pairs = n / 2 in
+    let remaining = n - (2 * num_pairs) in
+    let pairs =
+      Array.init num_pairs ~f:(fun i -> (input.(2 * i), input.((2 * i) + 1)))
+    in
+    Array.iter pairs ~f:(fun ((b, x), (b', y)) ->
+        (* Semantically, we want to do this.
+           match b, b' with
+           | 1, 1 ->
+            if p = 0
+            then state := perm {state with .0 += x, .1 += y }
+            else state := {perm {state with .1 += x} with .0 += y}
+           | 1, 0 ->
+            if p = 0
+            then state := {state with .0 += x}
+            else state := perm {state with .1 += x}
+           | 0, 1 ->
+            if p = 0
+            then state := {state with .0 += y }
+            else state := perm {state with .1 += y}
+           | 0, 0 ->
+            state
         *)
-        (* Only one case where we add in y after the permutation is applied *)
-        Boolean.all [ b; b'; p ]
-      in
-      let add_in_y_before_perm = Boolean.not add_in_y_after_perm in
-      add_in state p Field.(x * (b :> t)) ;
-      add_in state p' Field.(y * (add_in_y_before_perm :> t)) ;
-      let permute =
-        (* (b, b', p)
-            true:
-            (0, 1, 1)
-            (1, 0, 1)
-            (1, 1, 0)
-            (1, 1, 1)
+        let p = !pos in
+        let p' = Boolean.( lxor ) p b in
+        pos := Boolean.( lxor ) p' b' ;
+        let y = Field.(y * (b' :> t)) in
+        let add_in_y_after_perm =
+          (* post
+             add in
+             (1, 1, 1)
 
-           false:
-            (0, 0, 0)
-            (0, 0, 1)
-            (0, 1, 0)
-            (1, 0, 0)
-        *)
-        (* (b && b') || (p && (b || b')) *)
-        Boolean.(any [ all [ b; b' ]; all [ p; b ||| b' ] ])
-      in
-      cond_permute permute ;
-      add_in state p' Field.(y * (add_in_y_after_perm :> t))
-    done ;
+             do not add in
+             (1, 1, 0)
+             (0, 1, 0)
+             (0, 1, 1)
+
+             (1, 0, 0)
+             (1, 0, 1)
+             (0, 0, 0)
+             (0, 0, 1)
+          *)
+          (* Only one case where we add in y after the permutation is applied *)
+          Boolean.all [ b; b'; p ]
+        in
+        let add_in_y_before_perm = Boolean.not add_in_y_after_perm in
+        add_in state p Field.(x * (b :> t)) ;
+        add_in state p' Field.(y * (add_in_y_before_perm :> t)) ;
+        let permute =
+          (* (b, b', p)
+              true:
+              (0, 1, 1)
+              (1, 0, 1)
+              (1, 1, 0)
+              (1, 1, 1)
+
+             false:
+              (0, 0, 0)
+              (0, 0, 1)
+              (0, 1, 0)
+              (1, 0, 0)
+          *)
+          (* (b && b') || (p && (b || b')) *)
+          Boolean.(any [ all [ b; b' ]; all [ p; b ||| b' ] ])
+        in
+        cond_permute permute ;
+        add_in state p' Field.(y * (add_in_y_after_perm :> t)) ) ;
     let empty_imput =
       Boolean.not (Boolean.Array.any (Array.map input ~f:fst))
     in
