@@ -33,7 +33,7 @@ let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
           echo "Triggering ${job.name} for reason:"
           cat _computed_diff.txt | egrep '${dirtyWhen}'
           ${Cmd.format trigger}
-        fi 
+        fi
       fi
     '',
     Stable = ''
