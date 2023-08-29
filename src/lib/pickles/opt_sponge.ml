@@ -104,15 +104,15 @@ struct
         assert_r1cs x (i_equals_j :> Field.t) Field.(a_j' - a.(j)) ;
         a.(j) <- a_j' )
 
+  let cond_permute ~params ~permute state =
+    let permuted = P.block_cipher params (Array.copy state) in
+    for i = 0 to m - 1 do
+      state.(i) <- Field.if_ permute ~then_:permuted.(i) ~else_:state.(i)
+    done
+
   let consume ~needs_final_permute_if_empty ~params ~start_pos input state =
     assert (Array.length state = m) ;
     let n = Array.length input in
-    let cond_permute permute =
-      let permuted = P.block_cipher params (Array.copy state) in
-      for i = 0 to m - 1 do
-        state.(i) <- Field.if_ permute ~then_:permuted.(i) ~else_:state.(i)
-      done
-    in
     let num_pairs = n / 2 in
     let remaining = n - (2 * num_pairs) in
     let pairs =
@@ -178,7 +178,7 @@ struct
             (* (b && b') || (p && (b || b')) *)
             Boolean.(any [ all [ b; b' ]; all [ p; b ||| b' ] ])
           in
-          cond_permute permute ;
+          cond_permute ~params ~permute state ;
           add_in state p' Field.(y * (add_in_y_after_perm :> t)) ;
           pos_after )
     in
@@ -201,7 +201,7 @@ struct
       | _ ->
           assert false
     in
-    cond_permute should_permute
+    cond_permute ~params ~permute:should_permute state
 
   let absorb (t : t) x =
     match t.sponge_state with
