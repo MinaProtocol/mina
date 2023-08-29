@@ -1014,7 +1014,7 @@ module Evals = struct
           ; xor
           ; rot
           ; lookup
-          ; runtime_tables = _ (* Fixme *)
+          ; runtime_tables = _
           } =
         feature_flags
       in

@@ -363,7 +363,7 @@ module Make (Inputs : Inputs_intf) = struct
                 { sorted =
                     Vector.init
                       Pickles_types.Plonk_types.Lookup_sorted_minus_1.n
-                      ~f:(fun i -> (* TODO: Fixme *) wo l.sorted.(i))
+                      ~f:(fun i -> wo l.sorted.(i))
                 ; sorted_5th_column =
                     (* TODO: This is ugly and error-prone *)
                     Option.try_with (fun () ->
