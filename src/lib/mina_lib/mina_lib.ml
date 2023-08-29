@@ -1388,7 +1388,7 @@ let start t =
         Node_status_service.start ~logger:t.config.logger ~node_status_url
           ~network:t.components.net
           ~transition_frontier:t.components.transition_frontier
-          ~sync_status:t.sync_status
+          ~sync_status:t.sync_status ~chain_id:t.config.chain_id
           ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
           ~start_time:t.config.start_time
           ~slot_duration:

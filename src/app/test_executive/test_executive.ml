@@ -67,6 +67,7 @@ let tests : test list =
     , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
   ; ("snarkyjs", (module Snarkyjs.Make : Intf.Test.Functor_intf))
   ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
+  ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
