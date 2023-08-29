@@ -1267,17 +1267,24 @@ module Evals = struct
 
   let typ (type f a_var a)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      ~dummy e ({ uses_lookups; _ } as feature_flags : _ Features.Full.t) :
+      ~dummy e
+      ({ uses_lookups; lookups_per_row_3; lookups_per_row_4; _ } as
+       feature_flags :
+        _ Features.Full.t ) :
       ((a_var, Impl.Boolean.var) In_circuit.t, a t, f) Snarky_backendless.Typ.t
       =
     let open Impl in
     let opt flag = Opt.typ Impl.Boolean.typ flag e ~dummy in
     let lookup_sorted =
-      match uses_lookups with
-      | Opt.Flag.No ->
-          Opt.Flag.No
-      | Yes | Maybe ->
-          Opt.Flag.Maybe
+      let lookups_per_row_3 = opt lookups_per_row_3 in
+      let lookups_per_row_4 = opt lookups_per_row_4 in
+      Vector.typ'
+        [ lookups_per_row_3
+        ; lookups_per_row_3
+        ; lookups_per_row_3
+        ; lookups_per_row_3
+        ; lookups_per_row_4
+        ]
     in
     Typ.of_hlistable
       [ Vector.typ e Columns.n
@@ -1298,16 +1305,12 @@ module Evals = struct
       ; opt feature_flags.rot
       ; opt uses_lookups
       ; opt uses_lookups
-      ; Vector.typ (opt lookup_sorted) Nat.N5.n (* TODO: Fixme *)
+      ; lookup_sorted
       ; opt feature_flags.runtime_tables
       ; opt feature_flags.runtime_tables
-      ; opt feature_flags.xor
+      ; opt feature_flags.lookup_pattern_xor
       ; opt feature_flags.lookup
-      ; opt
-          Opt.Flag.(
-            feature_flags.range_check0 ||| feature_flags.range_check1
-            ||| feature_flags.rot)
-        (* TODO: This logic does not belong here. *)
+      ; opt feature_flags.lookup_pattern_range_check
       ; opt feature_flags.foreign_field_mul
       ]
       ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
