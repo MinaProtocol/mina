@@ -511,7 +511,7 @@ module Mutations = struct
       Option.map ~f:Mina_numbers.Global_slot_since_genesis.of_uint32 valid_until
     in
     let%bind fee =
-      Misc.result_of_exn Currency.Fee.of_uint64 fee
+      Utils.result_of_exn Currency.Fee.of_uint64 fee
         ~error:(sprintf "Invalid `fee` provided.")
     in
     let%bind () =
@@ -528,7 +528,7 @@ module Mutations = struct
     let%map memo =
       Option.value_map memo ~default:(Ok Signed_command_memo.empty)
         ~f:(fun memo ->
-          Misc.result_of_exn Signed_command_memo.create_from_string_exn memo
+          Utils.result_of_exn Signed_command_memo.create_from_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
     User_command_input.create ~signer ~fee ~fee_payer_pk ?nonce:nonce_opt
@@ -828,7 +828,7 @@ module Mutations = struct
       ~resolve:(fun { ctx = mina; _ } () raw_fee ->
         let open Result.Let_syntax in
         let%map fee =
-          Misc.result_of_exn Currency.Fee.of_uint64 raw_fee
+          Utils.result_of_exn Currency.Fee.of_uint64 raw_fee
             ~error:"Invalid snark work `fee` provided."
         in
         let last_fee = Mina_lib.snark_work_fee mina in
@@ -1044,7 +1044,7 @@ module Mutations = struct
           in
           let%bind.Result ledger, _tip =
             Result.of_option ~error:"Could not get best tip ledger"
-              (Misc.get_ledger_and_breadcrumb mina)
+              (Utils.get_ledger_and_breadcrumb mina)
           in
           let nonce_opts =
             Array.map sources ~f:(fun source ->
@@ -1232,7 +1232,7 @@ module Mutations = struct
                     "Unexpected duplicate scheduled zkApp commands handle"
             in
             let%bind.Result ledger =
-              match Misc.get_ledger_and_breadcrumb mina with
+              match Utils.get_ledger_and_breadcrumb mina with
               | None ->
                   Error "Could not get best tip ledger"
               | Some (ledger, _best_tip) ->
@@ -1275,7 +1275,7 @@ module Mutations = struct
             let%bind.Result _ =
               Result.try_with (fun () ->
                   Array.map fee_payer_array ~f:(fun fee_payer_keypair ->
-                      Misc.account_of_kp fee_payer_keypair ledger ) )
+                      Utils.account_of_kp fee_payer_keypair ledger ) )
               |> Result.map_error ~f:(const "fee payer not in the ledger")
             in
             let keymap =
@@ -1306,7 +1306,7 @@ module Mutations = struct
                     let account_state_tbl =
                       let get_account ids role =
                         List.map ids ~f:(fun id ->
-                            (id, (Misc.account_of_id id ledger, role)) )
+                            (id, (Utils.account_of_id id ledger, role)) )
                       in
                       Account_id.Table.of_alist_exn
                         ( get_account fee_payer_ids `Fee_payer
@@ -1855,7 +1855,7 @@ module Queries = struct
               ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
           ]
       ~resolve:(fun { ctx = mina; _ } () pk token ->
-        Option.bind (Misc.get_ledger_and_breadcrumb mina)
+        Option.bind (Utils.get_ledger_and_breadcrumb mina)
           ~f:(fun (ledger, breadcrumb) ->
             let open Option.Let_syntax in
             let%bind location =
@@ -1874,7 +1874,7 @@ module Queries = struct
               ~typ:(non_null Types.Input.PublicKey.arg_typ)
           ]
       ~resolve:(fun { ctx = mina; _ } () pk ->
-        match Misc.get_ledger_and_breadcrumb mina with
+        match Utils.get_ledger_and_breadcrumb mina with
         | Some (ledger, breadcrumb) ->
             let tokens = Ledger.tokens ledger pk |> Set.to_list in
             List.filter_map tokens ~f:(fun token ->
@@ -1898,7 +1898,7 @@ module Queries = struct
               ~typ:(non_null Types.Input.TokenId.arg_typ)
           ]
       ~resolve:(fun { ctx = mina; _ } () token_id ->
-        match Misc.get_ledger_and_breadcrumb mina with
+        match Utils.get_ledger_and_breadcrumb mina with
         | Some (ledger, breadcrumb) ->
             let%map.Deferred accounts = Ledger.accounts ledger in
             Ok
