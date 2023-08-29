@@ -843,6 +843,17 @@ end = struct
   open Core_kernel
   open Pickles_types
 
+  (* Use by compute_witness to build the runtime tables from the RuntimeLookup
+     constraint *)
+  module MapRuntimeTable = struct
+    module T = struct
+      type t = int32 * Fp.t [@@deriving hash, sexp, compare]
+    end
+
+    include T
+    include Core_kernel.Hashable.Make (T)
+  end
+
   type nonrec t = (Fp.t, Gates.t) t
 
   (** Converts the set of permutations (equivalence_classes) to
@@ -931,14 +942,6 @@ end = struct
                 res.(col_idx).(row_idx) <- value ;
                 Hashtbl.set internal_values ~key:var ~data:value ) ) ;
 
-    let module MapRuntimeTable = struct
-      module T = struct
-        type t = int32 * Fp.t [@@deriving hash, sexp, compare]
-      end
-
-      include T
-      include Core_kernel.Hashable.Make (T)
-    end in
     let map_runtime_tables = MapRuntimeTable.Table.create () in
     let runtime_tables : Fp.t Kimchi_types.runtime_table array =
       match sys.runtime_tables_cfg with
@@ -973,7 +976,9 @@ end = struct
         let id_int32 = Int32.of_string @@ Fp.to_string vid in
         (* FIXME: make a better exception. See
            https://github.com/MinaProtocol/mina/issues/13954 *)
-        let i, rt_idx = Hashtbl.find_exn map_runtime_tables (id_int32, vidx) in
+        let i, rt_idx =
+          MapRuntimeTable.Table.find_exn map_runtime_tables (id_int32, vidx)
+        in
         let rt = runtime_tables.(rt_idx) in
         rt.data.(i) <- vv ) ;
     (* Return the witness. *)
