@@ -162,11 +162,14 @@ let%test_module "coda network tests" =
       let () = Core.Backtrace.elide := false in
       let test_def () =
         let open Deferred.Let_syntax in
-        let%bind b, c, shutdown = setup_two_nodes "test_stream" in
-        let%bind b_peerid = me b >>| Keypair.to_peer_id in
+        let%bind bob, carol, shutdown = setup_two_nodes "test_stream" in
+        let%bind bob_peerid = me bob >>| Keypair.to_peer_id in
+        (* Ivar that gets resolved once Bob received a stream, fully read
+           its contents, send the contents back on the same stream and
+           closed the stream *)
         let handler_finished = Ivar.create () in
         let%bind () =
-          open_protocol b ~on_handler_error:`Raise ~protocol:"echo"
+          open_protocol bob ~on_handler_error:`Raise ~protocol:"echo"
             (fun stream ->
               let r, w = Libp2p_stream.pipes stream in
               let%map () = Pipe.transfer r w ~f:Fn.id in
@@ -174,28 +177,49 @@ let%test_module "coda network tests" =
               Ivar.fill_if_empty handler_finished () )
           |> Deferred.Or_error.ok_exn
         in
+        (* Open a stream from Carol to Bob *)
         let%bind stream =
-          open_stream c ~protocol:"echo" ~peer:b_peerid >>| Or_error.ok_exn
+          open_stream carol ~protocol:"echo" ~peer:bob_peerid
+          >>| Or_error.ok_exn
         in
         let r, w = Libp2p_stream.pipes stream in
         let testmsg =
-          String.of_char_list
-          @@ Quickcheck.random_value
-               (Quickcheck.Generator.list_with_length 1_000_000
-                  Quickcheck.Generator.char_print )
+          String.of_char_list @@ Sequence.to_list
+          @@ Sequence.take
+               (Quickcheck.random_sequence Quickcheck.Generator.char_print)
+               40_000_000
         in
-        let testmsg = String.concat (List.init 170 ~f:(const testmsg)) in
-        Pipe.write_without_pushback w testmsg ;
+        (* Send test message from Carol to Bob and close the Carol's writing
+            edge of the stream *)
+        let%bind () = Pipe.write w testmsg in
         Pipe.close w ;
-        (* HACK: let our messages send before we reset.
-           It would be more principled to add synchronization. *)
-        let%bind () = after (Time.Span.of_sec 120.) in
-        let%bind () = reset_stream c stream >>| Or_error.ok_exn in
-        let%bind msg = Pipe.read_all r in
-        let msg = Queue.to_list msg |> String.concat in
-        assert (String.equal msg testmsg) ;
+        let handle_read tmsg = function
+          | `Ok chunks ->
+              let s =
+                String.chop_prefix_exn tmsg
+                  ~prefix:(Queue.to_list chunks |> String.concat)
+              in
+              if String.is_empty s then `Finished () else `Repeat s
+          | `Eof ->
+              failwith "didn't read the whole messages sent"
+        in
+        let%bind () =
+          let open Deferred in
+          choose
+            [ choice
+                (repeat_until_finished testmsg (fun tmsg ->
+                     map (Pipe.read' r) ~f:(handle_read tmsg) ) )
+                Fn.id
+            ; choice
+                (after @@ Time.Span.of_sec 200.)
+                (fun _ -> failwith "timeout")
+            ]
+        in
+        (* We reset stream to make `Pipe.transfer` on Bob's side to finish *)
+        let%bind () = reset_stream carol stream >>| Or_error.ok_exn in
+        (* Ensure Bob's stream handler gracefully finished *)
         let%bind () = Ivar.read handler_finished in
-        let%bind () = close_protocol b ~protocol:"echo" in
+        let%bind () = close_protocol bob ~protocol:"echo" in
         shutdown ()
       in
       Async.Thread_safe.block_on_async_exn test_def

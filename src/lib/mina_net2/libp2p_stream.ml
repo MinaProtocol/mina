@@ -126,18 +126,15 @@ let stream_closed ~logger ~who_closed t =
         ] ;
   `Stream_should_be_released (equal_state FullyOpen t.state)
 
-let max_message_size = 16777216 (* 16 MiB *)
+let max_chunk_size = 16777216 (* 16 MiB *)
 
 let split_string ~every b =
   let blen = String.length b in
-  let rec isplit sofar pos =
-    if blen - pos > every then
-      let chunk = String.sub b ~pos ~len:every in
-      isplit (chunk :: sofar) @@ (pos + every)
-    else if blen - pos = 0 then sofar
-    else String.sub ~pos ~len:(blen - pos) b :: sofar
-  in
-  List.rev (isplit [] 0)
+  let num_chunks = (blen + every - 1) / every in
+  List.init num_chunks ~f:(fun i ->
+      let pos = i * every in
+      let len = if i + 1 = num_chunks then blen - pos else every in
+      String.sub ~pos ~len b )
 
 let%test_unit "split_string" =
   let gen =
@@ -176,10 +173,10 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
   in
   let send_outgoing_messages_task =
     Pipe.iter outgoing_r ~f:(fun msg ->
-        let parts = split_string msg ~every:max_message_size in
+        let parts = split_string msg ~every:max_chunk_size in
         match%map
           Deferred.Or_error.List.iter parts ~f:(fun data ->
-              Deferred.Or_error.map ~f:(const ())
+              Deferred.Or_error.ignore_m
               @@ Libp2p_helper.do_rpc helper
                    (module Libp2p_ipc.Rpcs.SendStream)
                    (Libp2p_ipc.Rpcs.SendStream.create_request ~stream_id ~data) )
