@@ -53,6 +53,9 @@ module type Full = sig
       built-in XOR and RangeCheck tables *)
   val get_concatenated_fixed_lookup_table_size : t -> int
 
+  (** Return the size of all the runtime lookup tables concatenated *)
+  val get_concatenated_runtime_lookup_table_size : t -> int
+
   val digest : t -> Md5.t
 
   val to_json : t -> string

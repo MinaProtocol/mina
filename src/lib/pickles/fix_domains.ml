@@ -31,10 +31,7 @@ let domains (type field) ?feature_flags
               ; xor
               ; rot
               ; lookup
-              ; runtime_tables =
-                  _
-                  (* TODO: add the length of the runtime table configuration. Should
-                     look like the one for the fixed lookup tables *)
+              ; runtime_tables
               } =
             feature_flags
           in
@@ -45,13 +42,17 @@ let domains (type field) ?feature_flags
             let xor_table_used = xor in
             (if range_check_table_used then Int.pow 2 12 else 0)
             + (if xor_table_used then Int.pow 2 8 else 0)
+            + ( if lookup then
+                Impl.R1CS_constraint_system
+                .get_concatenated_fixed_lookup_table_size sys
+              else 0 )
             +
-            (* TODO: add runtime table cfg *)
-            if lookup then
+            if runtime_tables then
               Impl.R1CS_constraint_system
-              .get_concatenated_fixed_lookup_table_size sys
+              .get_concatenated_runtime_lookup_table_size sys
             else 0
           in
+
           Int.ceil_log2 (combined_lookup_table_length + zk_rows + 1)
     in
     let public_input_size =

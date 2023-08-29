@@ -782,6 +782,18 @@ let get_concatenated_fixed_lookup_table_size sys =
       in
       Array.fold_left (fun acc flt -> acc + get_table_size flt) 0 flts
 
+let get_concatenated_runtime_lookup_table_size sys =
+  match sys.runtime_tables_cfg with
+  | Unfinalized_runtime_tables_cfg_rev _ ->
+      failwith
+        "Cannot get the runtime table configurations before finalizing the \
+         constraint system"
+  | Compiled_runtime_tables_cfg rt_cfgs ->
+      Array.fold_left
+        (fun acc (rt_cfg : _ Kimchi_types.runtime_table_cfg) ->
+          acc + Array.length rt_cfg.first_column )
+        0 rt_cfgs
+
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
 
 (* TODO: glossary of terms in this file (terms, reducing, feeding) + module doc *)
@@ -822,6 +834,8 @@ module Make
   val next_row : t -> int
 
   val get_concatenated_fixed_lookup_table_size : t -> int
+
+  val get_concatenated_runtime_lookup_table_size : t -> int
 
   val add_constraint :
        ?label:string
@@ -996,6 +1010,9 @@ end = struct
 
   let get_concatenated_fixed_lookup_table_size (sys : t) =
     get_concatenated_fixed_lookup_table_size sys
+
+  let get_concatenated_runtime_lookup_table_size (sys : t) =
+    get_concatenated_runtime_lookup_table_size sys
 
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
