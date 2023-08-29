@@ -420,9 +420,11 @@ module Evals = struct
       } =
     let enable_if x flag = Bool.(Option.is_some x = flag) in
     let range_check_lookup = f.range_check0 || f.range_check1 || f.rot in
-    let lookups_per_row_4 = f.xor || range_check_lookup in
+    let lookups_per_row_4 =
+      f.xor || range_check_lookup || f.foreign_field_mul
+    in
     let lookups_per_row_3 = lookups_per_row_4 || f.lookup in
-    let lookups_per_row_2 = lookups_per_row_3 || f.foreign_field_mul in
+    let lookups_per_row_2 = lookups_per_row_3 in
     Array.reduce_exn ~f:( && )
       [| enable_if range_check0_selector f.range_check0
        ; enable_if range_check1_selector f.range_check1
