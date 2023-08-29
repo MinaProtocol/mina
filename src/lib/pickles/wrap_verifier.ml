@@ -198,6 +198,14 @@ struct
       -> (Inner_curve.t, (Inner_curve.t, Boolean.var) Plonk_types.Opt.t) index'
       =
     let open Tuple_lib in
+    let to_maybe = function
+      | Plonk_types.Opt.None ->
+          (Boolean.false_, (Field.zero, Field.zero))
+      | Plonk_types.Opt.Maybe (b, x) ->
+          (b, x)
+      | Plonk_types.Opt.Some x ->
+          (Boolean.true_, x)
+    in
     let map ~f_bool ~f =
       Plonk_verification_key_evals.Step.map ~f ~f_opt:(function
         | Plonk_types.Opt.None ->
@@ -216,17 +224,10 @@ struct
               Plonk_types.Opt.Some (f x y)
           | ( (Plonk_types.Opt.Some _ | Maybe _ | None)
             , (Plonk_types.Opt.Some _ | Maybe _ | None) ) ->
-              let to_maybe = function
-                | Plonk_types.Opt.None ->
-                    (Boolean.false_, (Field.zero, Field.zero))
-                | Plonk_types.Opt.Maybe (b, x) ->
-                    (b, x)
-                | Plonk_types.Opt.Some x ->
-                    (Boolean.true_, x)
-              in
               let b1, x1 = to_maybe x in
               let b2, x2 = to_maybe y in
-              Plonk_types.Opt.Maybe (f_bool b1 b2, f x1 x2) )
+              let b = f_bool b1 b2 in
+              Plonk_types.Opt.Maybe (b, f x1 x2) )
     in
     fun bs keys ->
       let open Field in
@@ -234,7 +235,12 @@ struct
         (bs :> (Boolean.var, n) Vector.t)
         keys
         ~f:(fun b key ->
-          map key
+          map
+            (Plonk_verification_key_evals.Step.map ~f:Fn.id
+               ~f_opt:(fun x ->
+                 let b, x = to_maybe x in
+                 Plonk_types.Opt.Maybe (b, x) )
+               key )
             ~f:(fun g -> Double.map g ~f:(( * ) (b :> t)))
             ~f_bool:(fun b_inner -> Boolean.(b &&& b_inner)) )
       |> Vector.reduce_exn
