@@ -49,6 +49,10 @@ module type Full = sig
        * fp Kimchi_types.lookup_table array
        * fp Kimchi_types.runtime_table_cfg array
 
+  (** Return the size of all the fixed lookup tables concatenated, without the
+      built-in XOR and RangeCheck tables *)
+  val get_concatenated_fixed_lookup_table_size : t -> int
+
   val digest : t -> Md5.t
 
   val to_json : t -> string

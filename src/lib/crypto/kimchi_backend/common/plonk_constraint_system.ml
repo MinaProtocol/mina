@@ -769,6 +769,19 @@ let get_prev_challenges sys = sys.prev_challenges
 let set_prev_challenges sys challenges =
   Core_kernel.Set_once.set_exn sys.prev_challenges [%here] challenges
 
+let get_concatenated_fixed_lookup_table_size sys =
+  match sys.fixed_lookup_tables with
+  | Unfinalized_fixed_lookup_tables_rev _ ->
+      failwith
+        "Cannot get the fixed lookup tables before finalizing the constraint \
+         system"
+  | Compiled_fixed_lookup_tables flts ->
+      let get_table_size (flt : _ Kimchi_types.lookup_table) =
+        if Array.length flt.data = 0 then 0
+        else Array.length (Array.get flt.data 0)
+      in
+      Array.fold_left (fun acc flt -> acc + get_table_size flt) 0 flts
+
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
 
 (* TODO: glossary of terms in this file (terms, reducing, feeding) + module doc *)
@@ -807,6 +820,8 @@ module Make
   val get_rows_len : t -> int
 
   val next_row : t -> int
+
+  val get_concatenated_fixed_lookup_table_size : t -> int
 
   val add_constraint :
        ?label:string
@@ -978,6 +993,9 @@ end = struct
   let get_rows_len (sys : t) = get_rows_len sys
 
   let next_row (sys : t) = sys.next_row
+
+  let get_concatenated_fixed_lookup_table_size (sys : t) =
+    get_concatenated_fixed_lookup_table_size sys
 
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
