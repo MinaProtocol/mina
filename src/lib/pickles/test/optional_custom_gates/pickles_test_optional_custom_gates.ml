@@ -306,6 +306,55 @@ let _main_fixed_lookup_tables_randomized () =
               ; w6 = vv3
               } ) )
 
+let main_simple_fixed_lookup_tables_and_xor () =
+  add_plonk_constraint
+    (Xor
+       { in1 = fresh_int 0
+       ; in2 = fresh_int 0
+       ; out = fresh_int 0
+       ; in1_0 = fresh_int 0
+       ; in1_1 = fresh_int 0
+       ; in1_2 = fresh_int 0
+       ; in1_3 = fresh_int 0
+       ; in2_0 = fresh_int 0
+       ; in2_1 = fresh_int 0
+       ; in2_2 = fresh_int 0
+       ; in2_3 = fresh_int 0
+       ; out_0 = fresh_int 0
+       ; out_1 = fresh_int 0
+       ; out_2 = fresh_int 0
+       ; out_3 = fresh_int 0
+       } ) ;
+  add_plonk_constraint (Raw { kind = Zero; values = [||]; coeffs = [||] }) ;
+  (* the XOR table has ID 0, we don't want to conflict with it, therefore using
+     1. 1 is for RangeCheck but as it is not used, it is fine *)
+  add_plonk_constraint
+    (AddFixedLookupTable
+       { id = 1l
+       ; data =
+           [| [| Field.Constant.of_int 0
+               ; Field.Constant.of_int 1
+               ; Field.Constant.of_int 2
+               ; Field.Constant.of_int 3
+              |]
+            ; [| Field.Constant.of_int 87
+               ; Field.Constant.of_int 84
+               ; Field.Constant.of_int 83
+               ; Field.Constant.of_int 5
+              |]
+           |]
+       } ) ;
+  add_plonk_constraint
+    (Lookup
+       { w0 = fresh_int 0
+       ; w1 = fresh_int 0
+       ; w2 = fresh_int 87
+       ; w3 = fresh_int 3
+       ; w4 = fresh_int 5
+       ; w5 = fresh_int 1
+       ; w6 = fresh_int 84
+       } )
+
 let add_tests, get_tests =
   let tests = ref [] in
   ( (fun name testcases -> tests := (name, testcases) :: !tests)
@@ -325,6 +374,10 @@ let constraint_constants =
   }
 
 let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
+  (* We use only if statements. We test at the same time that the test still
+     passes if the feature flag is not set to true *)
+  if feature_flags.xor && feature_flags.lookup then
+    main_simple_fixed_lookup_tables_and_xor () ;
   if feature_flags.rot then main_rot () ;
   if feature_flags.xor then main_xor () ;
   if feature_flags.range_check0 then main_range_check0 () ;
@@ -415,6 +468,8 @@ let () =
       , Plonk_types.Features.{ none_bool with foreign_field_mul = true } )
     ; ( "Fixed lookup tables"
       , Plonk_types.Features.{ none_bool with lookup = true } )
+    ; ( "Fixed lookup tables and XOR "
+      , Plonk_types.Features.{ none_bool with lookup = true; xor = true } )
     ]
   in
   List.iter ~f:register_feature_test configurations ;
