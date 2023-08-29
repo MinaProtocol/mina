@@ -1,5 +1,5 @@
-(executable
- (name pickles_test_optional_custom_gates)
+(tests
+ (names pickles_test_optional_custom_gates)
  (libraries
    ;; opam libraries
    stdio
