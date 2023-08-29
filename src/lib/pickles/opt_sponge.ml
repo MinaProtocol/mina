@@ -21,7 +21,7 @@ type 'f sponge_state =
 type 'f t =
   { mutable state : 'f array
   ; params : 'f Sponge.Params.t
-  ; needs_final_permute_if_empty : bool
+  ; mutable needs_final_permute_if_empty : bool
   ; mutable sponge_state : 'f sponge_state
   }
 
@@ -224,6 +224,7 @@ struct
     | Absorbing { next_index; xs } ->
         consume ~needs_final_permute_if_empty:t.needs_final_permute_if_empty
           ~start_pos:next_index ~params:t.params (Array.of_list_rev xs) t.state ;
+        t.needs_final_permute_if_empty <- true ;
         t.sponge_state <- Squeezed 1 ;
         t.state.(0)
 

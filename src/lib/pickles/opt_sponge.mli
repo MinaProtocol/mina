@@ -8,7 +8,7 @@ type 'f sponge_state =
 type 'f t =
   { mutable state : 'f array
   ; params : 'f Sponge.Params.t
-  ; needs_final_permute_if_empty : bool
+  ; mutable needs_final_permute_if_empty : bool
   ; mutable sponge_state : 'f sponge_state
   }
 
