@@ -108,55 +108,7 @@ type 'bool all_feature_flags = 'bool Lazy.t Plonk_types.Features.Full.t
 
 let expand_feature_flags (type boolean)
     (module B : Bool_intf with type t = boolean)
-    ({ range_check0
-     ; range_check1
-     ; foreign_field_add = _
-     ; foreign_field_mul
-     ; xor
-     ; rot
-     ; lookup
-     ; runtime_tables = _
-     } as features :
-      boolean Plonk_types.Features.t ) : boolean all_feature_flags =
-  let lookup_pattern_range_check =
-    (* RangeCheck, Rot gates use RangeCheck lookup pattern *)
-    lazy B.(range_check0 ||| range_check1 ||| rot)
-  in
-  let lookup_pattern_xor =
-    (* Xor lookup pattern *)
-    lazy xor
-  in
-  (* Make sure these stay up-to-date with the layouts!! *)
-  let table_width_3 =
-    (* Xor have max_joint_size = 3 *)
-    lookup_pattern_xor
-  in
-  let table_width_at_least_2 =
-    (* Lookup has max_joint_size = 2 *)
-    lazy (B.( ||| ) (Lazy.force table_width_3) lookup)
-  in
-  let table_width_at_least_1 =
-    (* RangeCheck, ForeignFieldMul have max_joint_size = 1 *)
-    lazy
-      (B.any
-         [ Lazy.force table_width_at_least_2
-         ; Lazy.force lookup_pattern_range_check
-         ; foreign_field_mul
-         ] )
-  in
-  let lookups_per_row_4 =
-    (* Xor, RangeCheckGate, ForeignFieldMul, have max_lookups_per_row = 4 *)
-    lazy
-      (B.any
-         [ Lazy.force lookup_pattern_xor
-         ; Lazy.force lookup_pattern_range_check
-         ; foreign_field_mul
-         ] )
-  in
-  let lookups_per_row_3 =
-    (* Lookup has max_lookups_per_row = 3 *)
-    lazy (B.( ||| ) (Lazy.force lookups_per_row_4) lookup)
-  in
+    (features : boolean Plonk_types.Features.t) : boolean all_feature_flags =
   let { Plonk_types.Features.range_check0
       ; range_check1
       ; foreign_field_add
@@ -167,6 +119,36 @@ let expand_feature_flags (type boolean)
       ; runtime_tables
       } =
     Plonk_types.Features.map ~f:(fun x -> lazy x) features
+  in
+  let ( ||| ) x y = lazy B.(Lazy.force x ||| Lazy.force y) in
+  let lookup_pattern_range_check =
+    (* RangeCheck, Rot gates use RangeCheck lookup pattern *)
+    range_check0 ||| range_check1 ||| rot
+  in
+  let lookup_pattern_xor =
+    (* Xor lookup pattern *)
+    xor
+  in
+  (* Make sure these stay up-to-date with the layouts!! *)
+  let table_width_3 =
+    (* Xor have max_joint_size = 3 *)
+    lookup_pattern_xor
+  in
+  let table_width_at_least_2 =
+    (* Lookup has max_joint_size = 2 *)
+    table_width_3 ||| lookup
+  in
+  let table_width_at_least_1 =
+    (* RangeCheck, ForeignFieldMul have max_joint_size = 1 *)
+    table_width_at_least_2 ||| lookup_pattern_range_check ||| foreign_field_mul
+  in
+  let lookups_per_row_4 =
+    (* Xor, RangeCheckGate, ForeignFieldMul, have max_lookups_per_row = 4 *)
+    lookup_pattern_xor ||| lookup_pattern_range_check ||| foreign_field_mul
+  in
+  let lookups_per_row_3 =
+    (* Lookup has max_lookups_per_row = 3 *)
+    lookups_per_row_4 ||| lookup
   in
   { uses_lookups = lookups_per_row_3
   ; table_width_at_least_1
