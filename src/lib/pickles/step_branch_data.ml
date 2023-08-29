@@ -167,21 +167,27 @@ let create
           ; foreign_field_mul
           ; xor
           ; rot
-          ; lookup
-          ; runtime_tables
+          ; lookup = _
+          ; runtime_tables = _
           } =
         actual_feature_flags
       in
-      let total_length =
-        ( if range_check0 || range_check1 || foreign_field_mul || rot then
-          Int.pow 2 12
-        else 0 )
-        + (if xor then 3 else Int.pow 2 8)
-        + (if lookup then 0 (* TODO: Need more info. *) else 0)
-        + if runtime_tables then 0 (* TODO: Need more info. *) else 0
+      let combined_lookup_table_length =
+        let range_check_table_used =
+          range_check0 || range_check1 || foreign_field_mul || rot
+        in
+        let xor_table_used = xor in
+        (if range_check_table_used then Int.pow 2 12 else 0)
+        + (if xor_table_used then Int.pow 2 8 else 0)
+        + (* TODO: ask the Plonk_constraint_system.t for the user-provided
+             lookup tables and include their size here.
+             Fix_domains.domains below already constructs the constraint
+             system, so move this code there and use it directly.
+          *)
+        0
       in
       let zk_rows = 3 in
-      Int.ceil_log2 (total_length + zk_rows + 1)
+      Int.ceil_log2 (combined_lookup_table_length + zk_rows + 1)
     in
     Fix_domains.domains ~min_log2:lookup_table_length_log2
       (module Impls.Step)
