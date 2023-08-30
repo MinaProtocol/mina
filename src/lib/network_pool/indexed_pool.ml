@@ -47,7 +47,7 @@ type t =
   ; constraint_constants : Genesis_constants.Constraint_constants.t
   ; consensus_constants : Consensus.Constants.t
   ; time_controller : Block_time.Controller.t
-  ; slot_tx_end : Account_nonce.t option
+  ; slot_tx_end : Global_slot.t option
   }
 [@@deriving sexp_of, equal, compare]
 
@@ -749,13 +749,14 @@ let rec add_from_gossip_exn :
        } as t ) ~verify cmd0 current_nonce balance ->
   let open Command_error in
   let open Result.Let_syntax in
-  let slot =
-    Consensus.Data.Consensus_time.to_global_slot
-      (Consensus.Data.Consensus_time.of_time_exn ~constants:consensus_constants
-         (Block_time.now time_controller) )
+  let current_global_slot =
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:consensus_constants
+           (Block_time.now time_controller) ))
   in
   match slot_tx_end with
-  | Some slot_tx_end' when Account_nonce.(slot >= slot_tx_end') ->
+  | Some slot_tx_end' when Global_slot.(current_global_slot >= slot_tx_end') ->
       Error After_slot_tx_end
   | Some _ | None -> (
       let unchecked_cmd =
@@ -1270,8 +1271,8 @@ let%test_module _ =
                       current_global_slot valid_until ()
                 | Error After_slot_tx_end ->
                     failwith
-                      "Transaction was submitted after th slot defined to stop \
-                       accepting transactions" )
+                      "Transaction was submitted after the slot defined to \
+                       stop accepting transactions" )
           in
           go cmds )
 

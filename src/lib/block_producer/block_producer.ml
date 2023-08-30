@@ -653,15 +653,17 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                   ( Header.protocol_state_proof
                   @@ Mina_block.header (With_hash.data previous_transition) )
             in
-            let slot =
-              Consensus.Data.Consensus_time.to_global_slot
-                   (Consensus.Data.Consensus_time.of_time_exn
-                      ~constants:consensus_constants
-                      (Block_time.now time_controller) )
+            let current_global_slot =
+              Consensus.Data.Consensus_time.(
+                to_global_slot
+                  (of_time_exn ~constants:consensus_constants
+                     (Block_time.now time_controller) ))
             in
             let transactions =
               match slot_tx_end with
-              | Some slot_tx_end' when Mina_numbers.Account_nonce.(slot >= slot_tx_end') ->
+              | Some slot_tx_end'
+                when Mina_numbers.Global_slot.(
+                       current_global_slot >= slot_tx_end') ->
                   Sequence.empty
               | Some _ | None ->
                   Network_pool.Transaction_pool.Resource_pool.transactions

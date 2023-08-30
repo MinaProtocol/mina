@@ -103,7 +103,7 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> slot_tx_end:Mina_numbers.Account_nonce.t option
+    -> slot_tx_end:Mina_numbers.Global_slot.t option
     -> frontier_broadcast_pipe:
          transition_frontier option Broadcast_pipe.Reader.t
     -> log_gossip_heard:bool
@@ -382,8 +382,9 @@ struct
         in
         Deferred.don't_wait_for tf_deferred
 
-      let create ~constraint_constants ~consensus_constants:_ ~time_controller:_ ~slot_tx_end:_
-          ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+      let create ~constraint_constants ~consensus_constants:_ ~time_controller:_
+          ~slot_tx_end:_ ~frontier_broadcast_pipe ~config ~logger
+          ~tf_diff_writer =
         let t =
           { snark_tables =
               { all = Statement_table.create ()
@@ -675,8 +676,8 @@ struct
           res
       | Error _e ->
           create ~config ~logger ~constraint_constants ~consensus_constants
-            ~time_controller ~slot_tx_end ~frontier_broadcast_pipe ~log_gossip_heard
-            ~on_remote_push
+            ~time_controller ~slot_tx_end ~frontier_broadcast_pipe
+            ~log_gossip_heard ~on_remote_push
     in
     store_periodically (resource_pool pool) ;
     (pool, r_sink, l_sink)
@@ -1133,8 +1134,8 @@ let%test_module "random set test" =
           let open Deferred.Let_syntax in
           let network_pool, _, _ =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
-              ~constraint_constants ~consensus_constants ~time_controller ~slot_tx_end
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~constraint_constants ~consensus_constants ~time_controller
+              ~slot_tx_end ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
