@@ -110,7 +110,7 @@ module Constant : sig
 end
 
 val typ :
-     feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+     feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
   -> ('avar, 'aval) Impl.Typ.t
   -> 'n Pickles_types.Nat.t
   -> (('avar, 'n, _) t, ('aval, 'n) Constant.t) Impl.Typ.t

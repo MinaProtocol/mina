@@ -155,7 +155,7 @@ module Wrap : sig
                  , bool
                  , 'f )
                  Snarky_backendless.Typ.t
-            -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+            -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
             -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
             -> ( ( 'c
                  , 'e Scalar_challenge.t
@@ -350,7 +350,7 @@ module Wrap : sig
                  Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                snarky_typ
           -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
-          -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+          -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
           -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
           -> ( 'g
              , 'h
@@ -602,7 +602,7 @@ module Wrap : sig
                Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
              snarky_typ
         -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
-        -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+        -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
         -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
         -> ( 'g
            , 'h
