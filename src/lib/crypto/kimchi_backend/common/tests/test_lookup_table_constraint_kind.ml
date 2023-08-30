@@ -59,6 +59,65 @@ let test_finalize_and_get_gates_with_runtime_table_cfg () =
   assert (rt.(0).id = 1l) ;
   assert (Array.length rt = 1)
 
+let test_compute_witness_with_lookup_to_the_same_idx_twice () =
+  (* See the comment in compute_witness when populating the runtime tables. The
+     function does not check that the runtime table has already been set at a
+     certain position, and it overwrites the previously set value *)
+  let module Tick = Kimchi_backend.Pasta.Vesta_based_plonk in
+  let module Impl = Snarky_backendless.Snark.Run.Make (Tick) in
+  let table_id = 0 in
+  let table_size = 10 in
+  let table_id_var, idx1_var, v1_var, idx2_var, v2_var, idx3_var, v3_var =
+    Snarky_backendless.Cvar.(Var 0, Var 1, Var 2, Var 3, Var 4, Var 5, Var 6)
+  in
+  let first_column = Array.init table_size Tick.Field.of_int in
+  let cs = Tick.R1CS_constraint_system.create () in
+  (* Config *)
+  Tick.R1CS_constraint_system.(
+    add_constraint cs
+      (T (AddRuntimeTableCfg { id = Int32.of_int table_id; first_column }))) ;
+
+  (* We do 3 lookups within the same table *)
+  Tick.R1CS_constraint_system.(
+    add_constraint cs
+      (T
+         (Lookup
+            { w0 = table_id_var
+            ; w1 = idx1_var
+            ; w2 = v1_var
+            ; w3 = idx2_var
+            ; w4 = v2_var
+            ; w5 = idx3_var
+            ; w6 = v3_var
+            } ) )) ;
+  let () = Tick.R1CS_constraint_system.set_primary_input_size cs 0 in
+  let () = Tick.R1CS_constraint_system.set_auxiliary_input_size cs 7 in
+  (* For the external values to give to the compute witness fn *)
+  let ftable_id = Tick.Field.of_int table_id in
+  let repeated_idx = 0 in
+  let frepeated_idx = Tick.Field.of_int repeated_idx in
+  let fv1 = Tick.Field.random () in
+  (* To be sure fv1 is different than fv2 *)
+  let fv2 = Tick.Field.(add fv1 one) in
+  let other_idx = 1 in
+  let fother_idx = Tick.Field.of_int other_idx in
+  (* To be sure fv3 is different than fv1 and fv2 *)
+  let fv3 = Tick.Field.(add fv2 one) in
+  let external_values =
+    Array.get
+      [| ftable_id; frepeated_idx; fv1; frepeated_idx; fv2; fother_idx; fv3 |]
+  in
+  let _ = Tick.R1CS_constraint_system.finalize cs in
+  let _witnesses, runtime_tables =
+    Tick.R1CS_constraint_system.compute_witness cs external_values
+  in
+  (* checking only one table has been created *)
+  assert (Array.length runtime_tables = 1) ;
+  let rt = runtime_tables.(0) in
+  (* Second value is chosen *)
+  assert (Tick.Field.equal rt.data.(repeated_idx) fv2) ;
+  assert (Tick.Field.equal rt.data.(other_idx) fv3)
+
 let test_compute_witness_returns_correctly_filled_runtime_tables_one_lookup () =
   let module Tick = Kimchi_backend.Pasta.Vesta_based_plonk in
   let module Impl = Snarky_backendless.Snark.Run.Make (Tick) in
@@ -84,7 +143,16 @@ let test_compute_witness_returns_correctly_filled_runtime_tables_one_lookup () =
   (* One lookup *)
   Tick.R1CS_constraint_system.(
     add_constraint cs
-      (T (RuntimeLookup { table_id = table_id_var; idx = idx1_var; v = v1_var }))) ;
+      (T
+         (Lookup
+            { w0 = table_id_var
+            ; w1 = idx1_var
+            ; w2 = v1_var
+            ; w3 = idx1_var
+            ; w4 = v1_var
+            ; w5 = idx1_var
+            ; w6 = v1_var
+            } ) )) ;
   let () = Tick.R1CS_constraint_system.set_primary_input_size cs 0 in
   let () = Tick.R1CS_constraint_system.set_auxiliary_input_size cs 3 in
   (* Random value for the lookup *)
@@ -144,8 +212,15 @@ let test_compute_witness_returns_correctly_filled_runtime_tables_multiple_lookup
           Tick.R1CS_constraint_system.(
             add_constraint cs
               (T
-                 (RuntimeLookup
-                    { table_id = table_id_var; idx = idx_var; v = val_var } ) ))
+                 (Lookup
+                    { w0 = table_id_var
+                    ; w1 = idx_var
+                    ; w2 = val_var
+                    ; w3 = idx_var
+                    ; w4 = val_var
+                    ; w5 = idx_var
+                    ; w6 = val_var
+                    } ) ))
         in
         (* Random value for the lookup *)
         let idx = Random.int n in
@@ -182,5 +257,9 @@ let () =
             test_compute_witness_returns_correctly_filled_runtime_tables_one_lookup
         ; test_case "Compute witness with multiple runtime table lookup" `Quick
             test_compute_witness_returns_correctly_filled_runtime_tables_multiple_lookup
+        ; test_case
+            "Compute witness with runtime lookup at same index with\n\
+            \          different values" `Quick
+            test_compute_witness_with_lookup_to_the_same_idx_twice
         ] )
     ]

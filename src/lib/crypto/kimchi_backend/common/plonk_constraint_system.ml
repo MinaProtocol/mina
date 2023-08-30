@@ -308,7 +308,6 @@ module Plonk_constraint = struct
           }
       | AddFixedLookupTable of { id : int32; data : 'f array array }
       | AddRuntimeTableCfg of { id : int32; first_column : 'f array }
-      | RuntimeLookup of { table_id : 'v; idx : 'v; v : 'v }
       | Raw of
           { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
     [@@deriving sexp]
@@ -626,8 +625,6 @@ module Plonk_constraint = struct
           AddFixedLookupTable { id; data }
       | AddRuntimeTableCfg { id; first_column } ->
           AddRuntimeTableCfg { id; first_column }
-      | RuntimeLookup { table_id; idx; v } ->
-          RuntimeLookup { table_id = f table_id; idx = f idx; v = f v }
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
 
@@ -731,7 +728,7 @@ type ('f, 'rust_gates) t =
     *)
     mutable gates : ('f, 'rust_gates) circuit
         (* Witnesses values corresponding to each runtime lookups *)
-  ; mutable runtime_lookups : (V.t * (V.t * V.t)) list
+  ; mutable runtime_lookups_rev : (V.t * (V.t * V.t)) list
         (* The user-provided lookup tables associated with this circuit. *)
   ; mutable fixed_lookup_tables : 'f fixed_lookup_tables
         (* The user-provided runtime table configurations associated with this
@@ -843,7 +840,7 @@ end = struct
   open Core_kernel
   open Pickles_types
 
-  (* Use by compute_witness to build the runtime tables from the RuntimeLookup
+  (* Use by compute_witness to build the runtime tables from the Lookup
      constraint *)
   module MapRuntimeTable = struct
     module T = struct
@@ -954,6 +951,11 @@ end = struct
               let data =
                 Array.mapi first_column ~f:(fun i v ->
                     ignore
+                    (* `add` leaves the value unchanged if the index has been
+                       already used. Therefore, it keeps the first value.
+                       This handles the case that the first column has
+                       duplicated index values.
+                    *)
                     @@ MapRuntimeTable.Table.add map_runtime_tables ~key:(id, v)
                          ~data:(i, rt_idx) ;
                     (* default padding value for lookup *)
@@ -964,7 +966,7 @@ end = struct
     in
 
     (* Fill in the used entries of the runtime lookup tables. *)
-    List.iter sys.runtime_lookups ~f:(fun (id, (idx, v)) ->
+    List.iter (List.rev sys.runtime_lookups_rev) ~f:(fun (id, (idx, v)) ->
         let compute_value x = compute ([ (Fp.one, x) ], None) in
         let vid = compute_value id in
         let vidx = compute_value idx in
@@ -974,13 +976,20 @@ end = struct
            See https://github.com/MinaProtocol/mina/issues/13955
         *)
         let id_int32 = Int32.of_string @@ Fp.to_string vid in
-        (* FIXME: make a better exception. See
-           https://github.com/MinaProtocol/mina/issues/13954 *)
-        let i, rt_idx =
-          MapRuntimeTable.Table.find_exn map_runtime_tables (id_int32, vidx)
+        (* Using find allows to handle fixed lookup tables
+           As the map has been built from the runtime table configurations,
+           except in the case that a runtime table and a fixed table shares the
+           same ID, the lookups in fixed lookup tables will return None.
+        *)
+        let v =
+          MapRuntimeTable.Table.find map_runtime_tables (id_int32, vidx)
         in
-        let rt = runtime_tables.(rt_idx) in
-        rt.data.(i) <- vv ) ;
+        if Option.is_some v then
+          let i, rt_idx = Option.value_exn v in
+          let rt = runtime_tables.(rt_idx) in
+          (* Important note: we do not check if the value has been set before.
+             Theefore, it will always use the latest value *)
+          rt.data.(i) <- vv ) ;
     (* Return the witness. *)
     (res, runtime_tables)
 
@@ -1001,7 +1010,7 @@ end = struct
     ; prev_challenges = Set_once.create ()
     ; internal_vars = Internal_var.Table.create ()
     ; gates = Unfinalized_rev [] (* Gates.create () *)
-    ; runtime_lookups = []
+    ; runtime_lookups_rev = []
     ; fixed_lookup_tables = Unfinalized_fixed_lookup_tables_rev []
     ; runtime_tables_cfg = Unfinalized_runtime_tables_cfg_rev []
     ; rows_rev = []
@@ -1804,16 +1813,37 @@ end = struct
             (Fn.compose add_endoscale_scalar_round
                (Endoscale_scalar_round.map ~f:reduce_to_v) )
     | Plonk_constraint.T (Lookup { w0; w1; w2; w3; w4; w5; w6 }) ->
+        (* table ID *)
+        let red_w0 = reduce_to_v w0 in
+        (* idx1 *)
+        let red_w1 = reduce_to_v w1 in
+        (* v1 *)
+        let red_w2 = reduce_to_v w2 in
+        (* idx2 *)
+        let red_w3 = reduce_to_v w3 in
+        (* v2 *)
+        let red_w4 = reduce_to_v w4 in
+        (* idx3 *)
+        let red_w5 = reduce_to_v w5 in
+        (* v3 *)
+        let red_w6 = reduce_to_v w6 in
         let vars =
-          [| Some (reduce_to_v w0)
-           ; Some (reduce_to_v w1)
-           ; Some (reduce_to_v w2)
-           ; Some (reduce_to_v w3)
-           ; Some (reduce_to_v w4)
-           ; Some (reduce_to_v w5)
-           ; Some (reduce_to_v w6)
+          [| Some red_w0
+           ; Some red_w1
+           ; Some red_w2
+           ; Some red_w3
+           ; Some red_w4
+           ; Some red_w5
+           ; Some red_w6
           |]
         in
+        let lookup1 = (red_w0, (red_w1, red_w2)) in
+        let lookup2 = (red_w0, (red_w3, red_w4)) in
+        let lookup3 = (red_w0, (red_w5, red_w6)) in
+        (* We populate with the first lookup. In the case the user uses the same
+           index multiple times, the last value will be used *)
+        sys.runtime_lookups_rev <-
+          lookup3 :: lookup2 :: lookup1 :: sys.runtime_lookups_rev ;
         add_row sys vars Lookup [||]
     | Plonk_constraint.T
         (RangeCheck0
@@ -2231,19 +2261,6 @@ end = struct
             failwith
               "Trying to add a runtime table configuration  it has been \
                already finalized" )
-    | Plonk_constraint.T (RuntimeLookup { table_id; idx; v }) ->
-        (* FIXME: at the moment, we only do one runtime lookup per row, but we
-                    could do up to 3 within the same table_id. See
-                    https://github.com/MinaProtocol/mina/issues/13952 *)
-        (* Would be nice to have a nicer data structures than a list of tuples to
-           help the runtime table construction *)
-        let red_table_id = reduce_to_v table_id in
-        let red_idx = reduce_to_v idx in
-        let red_v = reduce_to_v v in
-        sys.runtime_lookups <-
-          (red_table_id, (red_idx, red_v)) :: sys.runtime_lookups ;
-        let vars_curr = [| Some red_table_id; Some red_idx; Some red_v |] in
-        add_row sys vars_curr Lookup [||]
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->
