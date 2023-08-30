@@ -852,7 +852,6 @@ struct
         absorb sponge PC (Boolean.true_, x_hat) ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
-        Opt.consume_all_pending sponge ;
         let joint_combiner =
           match messages.lookup with
           | None ->
@@ -860,6 +859,7 @@ struct
           | Maybe (_, _) ->
               failwith "TODO"
           | Some l -> (
+              Opt.consume_all_pending sponge ;
               let absorb_sorted_1 sponge =
                 let (first :: _) = l.sorted in
                 let z = Array.map first ~f:(fun z -> (Boolean.true_, z)) in
