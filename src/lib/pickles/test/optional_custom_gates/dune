@@ -2,6 +2,7 @@
  (names pickles_test_optional_custom_gates)
  (libraries
    ;; opam libraries
+   alcotest
    stdio
    integers
    result
