@@ -170,8 +170,6 @@ On the command line, run the following command from the [automation monitoring](
     terraform apply -target module.o1testnet_alerts.docker_container.update_alert_receivers
 ``` 
 
-from the [automation monitoring](https://github.com/MinaProtocol/mina/tree/develop/automation/terraform/monitoring) directory.
-
 #### View Alert Metrics
 
 When responding to a PagerDuty incident, you'll likely want to check the Alert's *Annotations:Source* for visualizing the metrics series responsible for the firing alert. This information is contained within each incident page under the `ALERTS : CUSTOM DETAILS` section in the form of a URL which links to Grafancloud's Prometheus explorer.
