@@ -17,6 +17,9 @@ module Permuts_minus_1 = Nat.N6
 module Permuts_minus_1_vec = Vector.Vector_6
 module Permuts = Nat.N7
 module Permuts_vec = Vector.Vector_7
+module Lookup_sorted_minus_1 = Nat.N4
+module Lookup_sorted_minus_1_vec = Vector.Vector_4
+module Lookup_sorted = Nat.N5
 module Lookup_sorted_vec = Vector.Vector_5
 
 module Opt = struct
@@ -311,6 +314,17 @@ module Features = struct
     ; rot = Opt.Flag.No
     ; lookup = Opt.Flag.No
     ; runtime_tables = Opt.Flag.No
+    }
+
+  let maybe =
+    { range_check0 = Opt.Flag.Maybe
+    ; range_check1 = Opt.Flag.Maybe
+    ; foreign_field_add = Opt.Flag.Maybe
+    ; foreign_field_mul = Opt.Flag.Maybe
+    ; xor = Opt.Flag.Maybe
+    ; rot = Opt.Flag.Maybe
+    ; lookup = Opt.Flag.Maybe
+    ; runtime_tables = Opt.Flag.Maybe
     }
 
   let none_bool =
@@ -1000,7 +1014,7 @@ module Evals = struct
           ; xor
           ; rot
           ; lookup
-          ; runtime_tables = _ (* Fixme *)
+          ; runtime_tables = _
           } =
         feature_flags
       in
@@ -1223,45 +1237,64 @@ module Messages = struct
   module Lookup = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type 'g t = { sorted : 'g array; aggreg : 'g; runtime : 'g option }
         [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
       end
     end]
 
+    type 'g t =
+      { sorted : 'g Lookup_sorted_minus_1_vec.t
+      ; sorted_5th_column : 'g option
+      ; aggreg : 'g
+      ; runtime : 'g option
+      }
+    [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
+
     module In_circuit = struct
       type ('g, 'bool) t =
-        { sorted : 'g array; aggreg : 'g; runtime : ('g, 'bool) Opt.t }
+        { sorted : 'g Lookup_sorted_minus_1_vec.t
+        ; sorted_5th_column : ('g, 'bool) Opt.t
+        ; aggreg : 'g
+        ; runtime : ('g, 'bool) Opt.t
+        }
       [@@deriving hlist]
     end
 
-    let sorted_length = 5
-
-    let dummy ~runtime_tables z =
+    let dummy ~lookups_per_row_4 ~runtime_tables z =
       { aggreg = z
-      ; sorted = Array.create ~len:sorted_length z
+      ; sorted = Vector.init Lookup_sorted_minus_1.n ~f:(fun _ -> z)
+      ; sorted_5th_column = Option.some_if lookups_per_row_4 z
       ; runtime = Option.some_if runtime_tables z
       }
 
-    let typ bool_typ e ~runtime_tables ~dummy =
+    let typ bool_typ e ~lookups_per_row_4 ~runtime_tables ~dummy =
       Snarky_backendless.Typ.of_hlistable
-        [ Snarky_backendless.Typ.array ~length:sorted_length e
+        [ Vector.typ e Lookup_sorted_minus_1.n
+        ; Opt.typ bool_typ lookups_per_row_4 e ~dummy
         ; e
         ; Opt.typ bool_typ runtime_tables e ~dummy
         ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ bool_typ ~(lookup : Opt.Flag.t) ~(runtime_tables : Opt.Flag.t)
+    let opt_typ bool_typ ~(uses_lookup : Opt.Flag.t)
+        ~(lookups_per_row_4 : Opt.Flag.t) ~(runtime_tables : Opt.Flag.t)
         ~dummy:z elt =
-      Opt.typ bool_typ lookup
+      Opt.typ bool_typ uses_lookup
         ~dummy:
-          (dummy z ~runtime_tables:Opt.Flag.(not (equal runtime_tables No)))
-        (typ bool_typ ~runtime_tables ~dummy:z elt)
+          (dummy z
+             ~lookups_per_row_4:Opt.Flag.(not (equal lookups_per_row_4 No))
+             ~runtime_tables:Opt.Flag.(not (equal runtime_tables No)) )
+        (typ bool_typ ~lookups_per_row_4 ~runtime_tables ~dummy:z elt)
   end
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type 'g t =
         { w_comm : 'g Without_degree_bound.Stable.V1.t Columns_vec.Stable.V1.t
@@ -1272,6 +1305,14 @@ module Messages = struct
       [@@deriving sexp, compare, yojson, fields, hash, equal, hlist]
     end
   end]
+
+  type 'g t =
+    { w_comm : 'g Without_degree_bound.t Columns_vec.t
+    ; z_comm : 'g Without_degree_bound.t
+    ; t_comm : 'g Without_degree_bound.t
+    ; lookup : 'g Without_degree_bound.t Lookup.t option
+    }
+  [@@deriving sexp, compare, yojson, fields, hash, equal, hlist]
 
   module In_circuit = struct
     type ('g, 'bool) t =
@@ -1286,10 +1327,28 @@ module Messages = struct
 
   let typ (type n f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
-      ({ lookup; runtime_tables; _ } : Opt.Flag.t Features.t) ~dummy
+      ({ runtime_tables; _ } as feature_flags : Opt.Flag.t Features.t) ~dummy
       ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
       =
     let open Snarky_backendless.Typ in
+    let uses_lookup, lookups_per_row_4 =
+      let { Features.range_check0
+          ; range_check1
+          ; foreign_field_add = _ (* Doesn't use lookup *)
+          ; foreign_field_mul
+          ; xor
+          ; rot
+          ; lookup
+          ; runtime_tables = _ (* Fixme *)
+          } =
+        feature_flags
+      in
+      let lookups_per_row_4 =
+        Opt.Flag.(
+          range_check0 ||| range_check1 ||| foreign_field_mul ||| xor ||| rot)
+      in
+      (Opt.Flag.(lookups_per_row_4 ||| lookup), lookups_per_row_4)
+    in
     let { Poly.w = w_lens; z; t } = commitment_lengths in
     let array ~length elt = padded_array_typ ~dummy ~length elt in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
@@ -1299,7 +1358,8 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     let lookup =
-      Lookup.opt_typ Impl.Boolean.typ ~lookup ~runtime_tables ~dummy:[| dummy |]
+      Lookup.opt_typ Impl.Boolean.typ ~uses_lookup ~lookups_per_row_4
+        ~runtime_tables ~dummy:[| dummy |]
         (wo [ 1 ])
     in
     of_hlistable
@@ -1311,6 +1371,8 @@ end
 module Proof = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type ('g, 'fq, 'fqv) t =
         { messages : 'g Messages.Stable.V2.t
@@ -1319,6 +1381,10 @@ module Proof = struct
       [@@deriving sexp, compare, yojson, hash, equal]
     end
   end]
+
+  type ('g, 'fq, 'fqv) t =
+    { messages : 'g Messages.t; openings : ('g, 'fq, 'fqv) Openings.t }
+  [@@deriving sexp, compare, yojson, hash, equal]
 end
 
 module Shifts = struct

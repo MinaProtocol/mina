@@ -160,7 +160,7 @@ let create
         ~wrap_rounds:Backend.Tock.Rounds.n ~feature_flags
       (* TODO *)
     in
-    Fix_domains.domains
+    Fix_domains.domains ~feature_flags:actual_feature_flags
       (module Impls.Step)
       (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
       etyp main
