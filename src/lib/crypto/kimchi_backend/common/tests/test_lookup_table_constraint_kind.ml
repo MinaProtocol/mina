@@ -335,6 +335,95 @@ let test_compute_witness_with_fixed_lookup_table_and_runtime_table () =
   assert (Int32.(equal rt.id (of_int rt_cfg_id))) ;
   assert (Tick.Field.equal rt.data.(rt_idx) rt_v)
 
+(* Checking that lookups within a lookup table works correctly with the Lookup
+   constraint in the case of the fixed lookup table does share its ID with a
+   runtime table. *)
+let test_compute_witness_with_fixed_lookup_table_and_runtime_table_sharing_ids
+    () =
+  let module Tick = Kimchi_backend.Pasta.Vesta_based_plonk in
+  let module Impl = Snarky_backendless.Snark.Run.Make (Tick) in
+  let n = 10 in
+  (* Fixed table *)
+  let fixed_lt_id = 2 in
+  let fixed_lt_id_var = Snarky_backendless.Cvar.Var 0 in
+  let indexes = Array.init n Tick.Field.of_int in
+  let fixed_lt_values = Array.init n (fun _ -> Tick.Field.random ()) in
+  let data = [| indexes; fixed_lt_values |] in
+  let cs = Tick.R1CS_constraint_system.create () in
+  (* Add the fixed lookup table to the cs *)
+  Tick.R1CS_constraint_system.(
+    add_constraint cs
+      (T (AddFixedLookupTable { id = Int32.of_int fixed_lt_id; data }))) ;
+  (* Runtime table cfg *)
+  let rt_cfg_id = fixed_lt_id in
+  let rt_cfg_id_var = Snarky_backendless.Cvar.Var 1 in
+  (* Extend the lookup table *)
+  let first_column = Array.init n (fun i -> Tick.Field.of_int (n + i)) in
+  (* Config *)
+  Tick.R1CS_constraint_system.(
+    add_constraint cs
+      (T (AddRuntimeTableCfg { id = Int32.of_int rt_cfg_id; first_column }))) ;
+  (* Lookup into fixed lookup table *)
+  let fixed_lookup_idx = Random.int n in
+  let vfixed_lookup_idx = Snarky_backendless.Cvar.Var 2 in
+  let fixed_lookup_v = fixed_lt_values.(fixed_lookup_idx) in
+  let vfixed_lookup_v = Snarky_backendless.Cvar.Var 3 in
+  Tick.R1CS_constraint_system.(
+    add_constraint cs
+      (T
+         (Lookup
+            { w0 = fixed_lt_id_var
+            ; w1 = vfixed_lookup_idx
+            ; w2 = vfixed_lookup_v
+            ; w3 = vfixed_lookup_idx
+            ; w4 = vfixed_lookup_v
+            ; w5 = vfixed_lookup_idx
+            ; w6 = vfixed_lookup_v
+            } ) )) ;
+  (* Lookup into runtime table *)
+  let rt_idx = n + Random.int n in
+  let vrt_idx = Snarky_backendless.Cvar.Var 4 in
+  let rt_v = Tick.Field.random () in
+  let vrt_v = Snarky_backendless.Cvar.Var 5 in
+  Tick.R1CS_constraint_system.(
+    add_constraint cs
+      (T
+         (Lookup
+            { w0 = rt_cfg_id_var
+            ; w1 = vrt_idx
+            ; w2 = vrt_v
+            ; w3 = vrt_idx
+            ; w4 = vrt_v
+            ; w5 = vrt_idx
+            ; w6 = vrt_v
+            } ) )) ;
+
+  let external_values =
+    [| Tick.Field.of_int fixed_lt_id
+     ; Tick.Field.of_int rt_cfg_id
+     ; Tick.Field.of_int fixed_lookup_idx
+     ; fixed_lookup_v
+     ; Tick.Field.of_int rt_idx
+     ; rt_v
+    |]
+  in
+  let () = Tick.R1CS_constraint_system.set_primary_input_size cs 0 in
+  let () =
+    Tick.R1CS_constraint_system.set_auxiliary_input_size cs
+      (Array.length external_values)
+  in
+
+  let _ = Tick.R1CS_constraint_system.finalize cs in
+  let _witnesses, runtime_tables =
+    Tick.R1CS_constraint_system.compute_witness cs (Array.get external_values)
+  in
+  (* checking only one table has been created *)
+  assert (Array.length runtime_tables = 1) ;
+  let rt = runtime_tables.(0) in
+  (* with the correct ID *)
+  assert (Int32.(equal rt.id (of_int rt_cfg_id))) ;
+  assert (Tick.Field.equal rt.data.(rt_idx - n) rt_v)
+
 let () =
   let open Alcotest in
   run "Test constraint construction"
@@ -356,5 +445,10 @@ let () =
              lookup table, not sharing the same ID"
             `Quick
             test_compute_witness_with_fixed_lookup_table_and_runtime_table
+        ; test_case
+            "Compute witness with lookups within a runtime table and a fixed \
+             lookup table, sharing the table ID"
+            `Quick
+            test_compute_witness_with_fixed_lookup_table_and_runtime_table_sharing_ids
         ] )
     ]
