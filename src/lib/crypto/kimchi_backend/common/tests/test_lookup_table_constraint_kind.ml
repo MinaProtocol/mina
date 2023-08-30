@@ -1,3 +1,5 @@
+(* Keeping the test low-level for learning purposes *)
+
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 (* Verify finalize_and_get_gates *)
