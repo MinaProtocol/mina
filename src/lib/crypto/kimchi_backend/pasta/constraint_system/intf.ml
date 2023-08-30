@@ -27,11 +27,13 @@ module type With_accessors = sig
 end
 
 module type Full = sig
-  include With_accessors
-
   type fp
 
   type gates
+
+  include
+    With_accessors
+      with type t = (fp, gates) Kimchi_backend_common.Plonk_constraint_system.t
 
   val add_constraint :
        ?label:string
