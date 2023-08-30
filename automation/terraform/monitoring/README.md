@@ -22,23 +22,23 @@
 
 Developing alert expressions consists of using Prometheus's domain-specific [query language](https://prometheus.io/docs/prometheus/latest/querying/basics/) ([examples](https://prometheus.io/docs/prometheus/latest/querying/examples/)) coupled with its alert rules specification [format](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) for devising metric and alerting conditions/rules.
 
-To enable variability when defining these rules, each rule set or group is implemented using *terraform*'s [template_file](https://registry.terraform.io/providers/hashicorp/template/latest/docs/data-sources/file) and `(${ ... })` templating mechanisms for including variable substitution where appropriate (**note:** variable substitutions are *optional* and provided as defaults - alert rules can be defined completely according to a custom specification).
+To enable variability when defining these rules, each rule set or group is implemented using *terraform*'s [template_file](https://registry.terraform.io/providers/hashicorp/template/latest/docs/data-sources/file) and `(${ ... })` templating mechanisms for including variable substitution where appropriate. (**Note:** variable substitutions are *optional* and provided as defaults. You can completely define alert rules according to a custom specification).
 
-A standard set of such testnet alert rules based on templates is defined [here](https://github.com/MinaProtocol/mina/blob/develop/automation/terraform/modules/testnet-alerts/templates/testnet-alert-rules.yml.tpl#L6) and should be edited when adding rules to be applied to all testnets.
+A standard set of such testnet alert rules based on templates is defined [here](https://github.com/MinaProtocol/mina/blob/develop/automation/terraform/modules/testnet-alerts/templates/testnet-alert-rules.yml.tpl#L6) and must be edited when you add rules to be applied to all testnets.
 
 Generally, when adding or updating alerts:
-1. Consult [Grafanacloud's Prometheus Explorer](https://o1testnet.grafana.net/explore?orgId=1&left=%5B%22now-1h%22,%22now%22,%22grafanacloud-o1testnet-prom%22,%7B%7D%5D) to ensure the metric to alert on is collected by infrastructure's Prometheus instances. If missing, reach out to [#reliability-engineering](https://discord.com/channels/484437221055922177/610580493859160072) for help on getting it added.
+1. Consult [Grafanacloud's Prometheus Explorer](https://o1testnet.grafana.net/explore?orgId=1&left=%5B%22now-1h%22,%22now%22,%22grafanacloud-o1testnet-prom%22,%7B%7D%5D) to ensure the metric to alert on is collected by infrastructure's Prometheus instances. If missing, reach out on the Mina Protocol Discord in the [#reliability-engineering](https://discord.com/channels/484437221055922177/610580493859160072) channel for help on getting the alert added.
 1. Apply alerting changes to *testnet-alert-rules.yml.tpl* based on the aforementioned Prometheus query language and alerting rules config.
 
 #### Testing
 
-Testing of testnet alerts currently involves leveraging Grafana's [cortex-tools](https://github.com/grafana/cortex-tools), a toolset developed and maintained by the Grafana community for managing Prometheus/Alertmanager alerting configurations. Specifically, the testing process makes use of `lint` and `check` for ensuring alerting rules defined within *testnet-alert-rules.yml* are both syntactically correct and also meet best practices/standards for maintaining consistency in how rules are expressed and formatted. Both operations can be executed automatically in CI or manually within a developer's local environment.
+Testing of testnet alerts involves leveraging Grafana's [cortex-tools](https://github.com/grafana/cortex-tools), a toolset developed and maintained by the Grafana community for managing Prometheus/Alertmanager alerting configurations. Specifically, the testing process makes use of `lint` and `check` for ensuring alerting rules defined in *testnet-alert-rules.yml* are syntactically correct and also meet best practices and standards for maintaining consistency in how rules are expressed and formatted. Both operations can be executed automatically in CI or manually within a developer's local environment.
 
-**Note:** all manual steps should be run from the [automation monitoring](https://github.com/MinaProtocol/mina/tree/develop/automation/terraform/monitoring) directory within the *mina* repo. A copy of the rendered rules configuration will be placed in this directory for reference when testing locally.
+**Note:** You must run all manual steps from the [automation monitoring](https://github.com/MinaProtocol/mina/tree/develop/automation/terraform/monitoring) directory within the *mina* repo. A copy of the rendered rules configuration will be placed in this directory for reference when testing locally.
 
 ##### Linting
 
-[lints](https://github.com/grafana/cortex-tools#rules-lint) a testnet alert rules file. The linter's aim is not to verify correctness but just YAML and PromQL expression formatting within the rule file.
+[lints](https://github.com/grafana/cortex-tools#rules-lint) a testnet alert rules file. The linter verifies YAML and PromQL expression formatting within the rule file but does not verify correctness.
 
 ###### automation
 
