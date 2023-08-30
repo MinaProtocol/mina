@@ -73,29 +73,22 @@ module Wrap = struct
             ; zeta = scalar t.zeta
             ; joint_combiner = Option.map ~f:scalar t.joint_combiner
             }
+
+          module In_circuit = struct
+            type ('challenge, 'scalar_challenge, 'bool) t =
+              { alpha : 'scalar_challenge
+              ; beta : 'challenge
+              ; gamma : 'challenge
+              ; zeta : 'scalar_challenge
+              ; joint_combiner : ('scalar_challenge, 'bool) Opt.t
+              ; feature_flags : 'bool Plonk_types.Features.t
+              }
+          end
         end
 
         open Pickles_types
 
         module In_circuit = struct
-          module Lookup = struct
-            type 'scalar_challenge t = { joint_combiner : 'scalar_challenge }
-            [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
-
-            let[@warning "-45"] to_struct l = Hlist.HlistId.[ l.joint_combiner ]
-
-            let[@warning "-45"] of_struct Hlist.HlistId.[ joint_combiner ] =
-              { joint_combiner }
-
-            let map ~f { joint_combiner } =
-              { joint_combiner = f joint_combiner }
-
-            let typ scalar_challenge =
-              Snarky_backendless.Typ.of_hlistable ~var_to_hlist:to_hlist
-                ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-                ~value_of_hlist:of_hlist [ scalar_challenge ]
-          end
-
           (** All scalar values deferred by a verifier circuit.
               We expose them so the next guy (who can do scalar arithmetic) can check that they
               were computed correctly from the evaluations in the proof and the challenges.
@@ -104,7 +97,7 @@ module Wrap = struct
                , 'scalar_challenge
                , 'fp
                , 'fp_opt
-               , 'lookup_opt
+               , 'scalar_challenge_opt
                , 'bool )
                t =
             { alpha : 'scalar_challenge
@@ -119,7 +112,7 @@ module Wrap = struct
             ; perm : 'fp
                   (** scalar used on one of the permutation polynomial commitments. *)
             ; feature_flags : 'bool Plonk_types.Features.t
-            ; lookup : 'lookup_opt
+            ; joint_combiner : 'scalar_challenge_opt
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
@@ -128,8 +121,8 @@ module Wrap = struct
               alpha = scalar t.alpha
             ; beta = f t.beta
             ; gamma = f t.gamma
+            ; joint_combiner = Opt.map ~f:scalar t.joint_combiner
             ; zeta = scalar t.zeta
-            ; lookup = Opt.map ~f:(Lookup.map ~f:scalar) t.lookup
             }
 
           let map_fields t ~f =
@@ -175,8 +168,8 @@ module Wrap = struct
               ; fp
               ; Plonk_types.Features.typ ~feature_flags bool
               ; Plonk_types.Opt.typ Impl.Boolean.typ uses_lookup
-                  ~dummy:{ joint_combiner = dummy_scalar_challenge }
-                  (Lookup.typ (Scalar_challenge.typ scalar_challenge))
+                  ~dummy:dummy_scalar_challenge
+                  (Scalar_challenge.typ scalar_challenge)
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -190,17 +183,13 @@ module Wrap = struct
               , fp_opt
               , lookup_opt
               , 'bool )
-              In_circuit.t )
-            ~(to_option :
-               lookup_opt -> scalar_challenge In_circuit.Lookup.t option ) :
-            (challenge, scalar_challenge, 'bool) Minimal.t =
+              In_circuit.t ) ~(to_option : lookup_opt -> scalar_challenge option)
+            : (challenge, scalar_challenge, 'bool) Minimal.t =
           { alpha = t.alpha
           ; beta = t.beta
           ; zeta = t.zeta
           ; gamma = t.gamma
-          ; joint_combiner =
-              Option.map (to_option t.lookup) ~f:(fun l ->
-                  l.In_circuit.Lookup.joint_combiner )
+          ; joint_combiner = to_option t.joint_combiner
           ; feature_flags = t.feature_flags
           }
       end
@@ -841,7 +830,7 @@ module Wrap = struct
                        ; zeta_to_domain_size
                        ; perm
                        ; feature_flags
-                       ; lookup
+                       ; joint_combiner
                        }
                    }
                ; sponge_digest_before_evaluations
@@ -878,8 +867,7 @@ module Wrap = struct
           ; bulletproof_challenges
           ; index
           ; Plonk_types.Features.to_data feature_flags
-          ; option_map lookup
-              ~f:Proof_state.Deferred_values.Plonk.In_circuit.Lookup.to_struct
+          ; option_map joint_combiner ~f:(fun x -> Hlist.HlistId.[ x ])
           ]
 
       (** Construct a statement (as structured data) from the flat data-based representation. *)
@@ -892,7 +880,7 @@ module Wrap = struct
             ; bulletproof_challenges
             ; index
             ; feature_flags
-            ; lookup
+            ; joint_combiner
             ] ~feature_flags:flags ~option_map ~of_opt : _ t =
         let open Vector in
         let [ combined_inner_product
@@ -929,11 +917,9 @@ module Wrap = struct
                     ; zeta_to_domain_size
                     ; perm
                     ; feature_flags
-                    ; lookup =
-                        option_map lookup
-                          ~f:
-                            Proof_state.Deferred_values.Plonk.In_circuit.Lookup
-                            .of_struct
+                    ; joint_combiner =
+                        option_map joint_combiner ~f:(fun Hlist.HlistId.[ x ] ->
+                            x )
                     }
                 }
             ; sponge_digest_before_evaluations
@@ -1062,7 +1048,7 @@ module Step = struct
                 ; lookup = false_
                 ; runtime_tables = false_
                 }
-            ; lookup = opt_none
+            ; joint_combiner = opt_none
             }
 
           let of_wrap ~assert_none ~assert_false
@@ -1074,7 +1060,7 @@ module Step = struct
                ; zeta_to_domain_size
                ; perm
                ; feature_flags
-               ; lookup
+               ; joint_combiner
                } :
                 _ Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
             let () =
@@ -1098,7 +1084,7 @@ module Step = struct
               assert_false lookup ;
               assert_false runtime_tables
             in
-            assert_none lookup ;
+            assert_none joint_combiner ;
             { alpha
             ; beta
             ; gamma

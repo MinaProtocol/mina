@@ -204,16 +204,17 @@ module Ipa = struct
   end
 end
 
-let tock_unpadded_public_input_of_statement prev_statement =
+let tock_unpadded_public_input_of_statement ~feature_flags prev_statement =
   let input =
-    let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input () in
+    let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input ~feature_flags () in
     Impls.Wrap.generate_public_input typ prev_statement
   in
   List.init
     (Backend.Tock.Field.Vector.length input)
     ~f:(Backend.Tock.Field.Vector.get input)
 
-let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
+let tock_public_input_of_statement ~feature_flags s =
+  tock_unpadded_public_input_of_statement ~feature_flags s
 
 let tick_public_input_of_statement ~max_proofs_verified ~feature_flags
     (prev_statement : _ Types.Step.Statement.t) =

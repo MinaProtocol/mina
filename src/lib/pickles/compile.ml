@@ -117,7 +117,9 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , 'max_local_max_proofs_verifieds )
          Full_signature.t
       -> ('prev_varss, 'branches) Hlist.Length.t
-      -> ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+      -> ( ( Wrap_main_inputs.Inner_curve.Constant.t
+           , Wrap_main_inputs.Inner_curve.Constant.t option )
+           Wrap_verifier.index'
          , 'branches )
          Vector.t
          Lazy.t
@@ -132,10 +134,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                    , Impls.Wrap.Boolean.var )
                    Plonk_types.Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-                     Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                     .In_circuit
-                     .Lookup
-                     .t
                    , Impls.Wrap.Boolean.var )
                    Pickles_types__Plonk_types.Opt.t
                  , Impls.Wrap.Boolean.var )
@@ -167,9 +165,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -199,9 +194,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -617,7 +609,7 @@ struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
+             Tick.Keypair.full_vk_commitments (fst (Lazy.force vk)) ) )
     in
     Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =
@@ -642,7 +634,7 @@ struct
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
-      let (T (typ, conv, _conv_inv)) = input () in
+      let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
       let main x () : unit = wrap_main (conv x) in
       let () = if true then log_wrap main typ name self.id in
       let self_id = Type_equal.Id.uid self.id in
@@ -1164,9 +1156,6 @@ module Make_adversarial_test (M : sig
          , bool )
          Import.Types.Opt.t
        , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
          , bool )
          Import.Types.Opt.t
        , bool
@@ -1196,9 +1185,6 @@ module Make_adversarial_test (M : sig
          , bool )
          Import.Types.Opt.t
        , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
          , bool )
          Import.Types.Opt.t
        , bool

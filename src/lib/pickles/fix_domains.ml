@@ -7,7 +7,7 @@ let rough_domains =
   let d = Domain.Pow_2_roots_of_unity 20 in
   { Domains.h = d }
 
-let domains (type field)
+let domains (type field) ?(min_log2 = 0)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
     (Spec.ETyp.T (typ, conv, _conv_inv))
     (Spec.ETyp.T (return_typ, _ret_conv, ret_conv_inv)) main =
@@ -23,6 +23,6 @@ let domains (type field)
     let rows =
       zk_rows + public_input_size + Impl.R1CS_constraint_system.get_rows_len sys
     in
-    { Domains.h = Pow_2_roots_of_unity Int.(ceil_log2 rows) }
+    { Domains.h = Pow_2_roots_of_unity Int.(max min_log2 (ceil_log2 rows)) }
   in
   domains2 (Impl.constraint_system ~input_typ:typ ~return_typ main)

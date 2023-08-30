@@ -21,6 +21,8 @@ module Opt : sig
 
   val to_option : ('a, bool) t -> 'a option
 
+  val of_option : 'a option -> ('a, 'bool) t
+
   module Flag : sig
     type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
 
@@ -100,6 +102,8 @@ module Features : sig
 
   val none : options
 
+  val maybe : options
+
   val none_bool : flags
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
@@ -123,6 +127,9 @@ module Permuts_vec = Vector.Vector_7
 module Permuts = Nat.N7
 module Permuts_minus_1 = Nat.N6
 module Permuts_minus_1_vec = Vector.Vector_6
+module Lookup_sorted_minus_1 = Nat.N4
+module Lookup_sorted_minus_1_vec = Vector.Vector_4
+module Lookup_sorted = Nat.N5
 module Lookup_sorted_vec = Vector.Vector_5
 
 module Messages : sig
@@ -131,11 +138,27 @@ module Messages : sig
   end
 
   module Lookup : sig
-    type 'g t = { sorted : 'g array; aggreg : 'g; runtime : 'g option }
+    module Stable : sig
+      module V1 : sig
+        type 'g t = { sorted : 'g array; aggreg : 'g; runtime : 'g option }
+        [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
+      end
+    end
+
+    type 'g t =
+      { sorted : 'g Lookup_sorted_minus_1_vec.t
+      ; sorted_5th_column : 'g option
+      ; aggreg : 'g
+      ; runtime : 'g option
+      }
 
     module In_circuit : sig
       type ('g, 'bool) t =
-        { sorted : 'g array; aggreg : 'g; runtime : ('g, 'bool) Opt.t }
+        { sorted : 'g Lookup_sorted_minus_1_vec.t
+        ; sorted_5th_column : ('g, 'bool) Opt.t
+        ; aggreg : 'g
+        ; runtime : ('g, 'bool) Opt.t
+        }
     end
   end
 
@@ -145,12 +168,12 @@ module Messages : sig
         { w_comm : 'g Poly_comm.Without_degree_bound.t Columns_vec.t
         ; z_comm : 'g Poly_comm.Without_degree_bound.t
         ; t_comm : 'g Poly_comm.Without_degree_bound.t
-        ; lookup : 'g Poly_comm.Without_degree_bound.t Lookup.t option
+        ; lookup : 'g Poly_comm.Without_degree_bound.t Lookup.Stable.V1.t option
         }
     end
   end
 
-  type 'g t = 'g Stable.V2.t =
+  type 'g t =
     { w_comm : 'g Poly_comm.Without_degree_bound.t Columns_vec.t
     ; z_comm : 'g Poly_comm.Without_degree_bound.t
     ; t_comm : 'g Poly_comm.Without_degree_bound.t
@@ -329,7 +352,9 @@ module Proof : sig
   module Stable : sig
     module V2 : sig
       type ('g, 'fq, 'fqv) t =
-        { messages : 'g Messages.t; openings : ('g, 'fq, 'fqv) Openings.t }
+        { messages : 'g Messages.Stable.V2.t
+        ; openings : ('g, 'fq, 'fqv) Openings.t
+        }
 
       include Sigs.Full.S3 with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
     end
@@ -337,8 +362,9 @@ module Proof : sig
     module Latest = V2
   end
 
-  type ('a, 'b, 'c) t = ('a, 'b, 'c) Stable.V2.t =
+  type ('a, 'b, 'c) t =
     { messages : 'a Messages.t; openings : ('a, 'b, 'c) Openings.t }
+  [@@deriving compare, sexp, yojson, hash, equal]
 end
 
 module All_evals : sig
