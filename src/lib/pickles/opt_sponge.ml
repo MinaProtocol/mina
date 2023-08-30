@@ -36,7 +36,7 @@ struct
 
   let _state { state; _ } = Array.copy state
 
-  let _copy { state; params; sponge_state; needs_final_permute_if_empty } =
+  let copy { state; params; sponge_state; needs_final_permute_if_empty } =
     { state = Array.copy state
     ; params
     ; sponge_state
@@ -245,11 +245,46 @@ struct
         let pos =
           consume_pairs ~params:t.params ~state:t.state ~pos:next_index pairs
         in
+        let pos_after =
+          if remaining = 1 then (
+            let b, x = input.(n - 1) in
+            let p = pos in
+            let pos_after = Boolean.( lxor ) p b in
+            add_in t.state p Field.(x * (b :> t)) ;
+            pos_after )
+          else pos
+        in
         (* TODO: We should propagate the emptiness state of the pairs,
            otherwise this will break in some edge cases.
         *)
-        let xs = if remaining = 1 then [ input.(n - 1) ] else [] in
-        t.sponge_state <- Absorbing { next_index = pos; xs }
+        t.sponge_state <- Absorbing { next_index = pos_after; xs = [] }
+
+  let recombine ~original_sponge b (t : t) =
+    match[@warning "-4"] (original_sponge.sponge_state, t.sponge_state) with
+    | Squeezed orig_i, Squeezed curr_i ->
+        if orig_i <> curr_i then failwithf "Squeezed %i vs %i" orig_i curr_i () ;
+        Array.iteri original_sponge.state ~f:(fun i x ->
+            t.state.(i) <- Field.if_ b ~then_:t.state.(i) ~else_:x )
+    | ( Absorbing { next_index = next_index_orig; xs = xs_orig }
+      , Absorbing { next_index = next_index_curr; xs = xs_curr } ) ->
+        (* TODO: Should test for full equality here, if we want to catch all
+           sponge misuses.
+           OTOH, if you're using this sponge then you'd better know what it's
+           doing..
+        *)
+        if List.length xs_orig <> List.length xs_curr then
+          failwithf "Pending absorptions %i vs %i" (List.length xs_orig)
+            (List.length xs_curr) () ;
+        Array.iteri original_sponge.state ~f:(fun i x ->
+            t.state.(i) <- Field.if_ b ~then_:t.state.(i) ~else_:x ) ;
+        t.sponge_state <-
+          Absorbing
+            { next_index =
+                Boolean.if_ b ~then_:next_index_curr ~else_:next_index_orig
+            ; xs = xs_curr
+            }
+    | _, _ ->
+        failwith "Incompatible states"
 
   let%test_module "opt_sponge" =
     ( module struct

@@ -19,6 +19,8 @@ module Make
 
   val create : ?init:Impl.Field.t array -> Impl.Field.t Sponge.Params.t -> t
 
+  val copy : t -> t
+
   val of_sponge : Impl.Field.t Sponge.t -> t
 
   val absorb :
@@ -27,4 +29,6 @@ module Make
   val squeeze : t -> Impl.Field.t
 
   val consume_all_pending : t -> unit
+
+  val recombine : original_sponge:t -> Impl.Boolean.var -> t -> unit
 end

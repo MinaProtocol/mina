@@ -852,6 +852,7 @@ struct
         absorb sponge PC (Boolean.true_, x_hat) ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
+        Opt.consume_all_pending sponge ;
         let joint_combiner =
           match messages.lookup with
           | None ->
@@ -859,12 +860,18 @@ struct
           | Maybe (_, _) ->
               failwith "TODO"
           | Some l -> (
-              let absorb_sorted_first_part () =
-                Vector.iter l.sorted ~f:(fun z ->
+              let absorb_sorted_1 sponge =
+                let (first :: _) = l.sorted in
+                let z = Array.map first ~f:(fun z -> (Boolean.true_, z)) in
+                absorb sponge Without_degree_bound z
+              in
+              let absorb_sorted_2_to_4 () =
+                let (_ :: rest) = l.sorted in
+                Vector.iter rest ~f:(fun z ->
                     let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
                     absorb sponge Without_degree_bound z )
               in
-              let absorb_sorted_second_part () =
+              let absorb_sorted_5 () =
                 match l.sorted_5th_column with
                 | None ->
                     ()
@@ -880,15 +887,52 @@ struct
               with
               | _ :: Some _ :: _, _ | _, Some _ ->
                   let joint_combiner = sample_scalar () in
-                  absorb_sorted_first_part () ;
-                  absorb_sorted_second_part () ;
+                  absorb_sorted_1 sponge ;
+                  absorb_sorted_2_to_4 () ;
+                  absorb_sorted_5 () ;
                   Types.Opt.Some joint_combiner
               | _ :: None :: _, None ->
-                  absorb_sorted_first_part () ;
-                  absorb_sorted_second_part () ;
+                  absorb_sorted_1 sponge ;
+                  absorb_sorted_2_to_4 () ;
+                  absorb_sorted_5 () ;
                   Types.Opt.Some { inner = Field.zero }
+              | _ :: Maybe (b1, _) :: _, Maybe (b2, _) ->
+                  let b = Boolean.(b1 ||| b2) in
+                  let sponge2 = Opt.copy sponge in
+                  let joint_combiner_if_true =
+                    let joint_combiner = sample_scalar () in
+                    absorb_sorted_1 sponge ; joint_combiner
+                  in
+                  let joint_combiner_if_false : Scalar_challenge.t =
+                    absorb_sorted_1 sponge2 ; { inner = Field.zero }
+                  in
+                  Opt.recombine b ~original_sponge:sponge2 sponge ;
+                  absorb_sorted_2_to_4 () ;
+                  absorb_sorted_5 () ;
+                  Types.Opt.Some
+                    { inner =
+                        Field.if_ b ~then_:joint_combiner_if_true.inner
+                          ~else_:joint_combiner_if_false.inner
+                    }
+              | _ :: Maybe (b, _) :: _, _ | _, Maybe (b, _) ->
+                  let sponge2 = Opt.copy sponge in
+                  let joint_combiner_if_true =
+                    let joint_combiner = sample_scalar () in
+                    absorb_sorted_1 sponge ; joint_combiner
+                  in
+                  let joint_combiner_if_false : Scalar_challenge.t =
+                    absorb_sorted_1 sponge2 ; { inner = Field.zero }
+                  in
+                  Opt.recombine b ~original_sponge:sponge2 sponge ;
+                  absorb_sorted_2_to_4 () ;
+                  absorb_sorted_5 () ;
+                  Types.Opt.Some
+                    { inner =
+                        Field.if_ b ~then_:joint_combiner_if_true.inner
+                          ~else_:joint_combiner_if_false.inner
+                    }
               | _ ->
-                  failwith "TODO" )
+                  . )
         in
         let lookup_table_comm =
           match (messages.lookup, joint_combiner) with
