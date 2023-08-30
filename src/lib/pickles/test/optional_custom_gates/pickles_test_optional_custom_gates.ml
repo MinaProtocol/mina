@@ -183,6 +183,33 @@ let main_foreign_field_mul () =
   add_plonk_constraint
     (Raw { kind = Zero; values = [| fresh_int 0 |]; coeffs = [||] })
 
+let main_fixed_lookup_tables_simple () =
+  let table_id = Random.int 1_000 in
+  (* We start with a simple test with a small and fixed lookup table, with a random ID *)
+  let size = 1 + Random.int 1_000 in
+  let indexes = Array.init size Tick.Field.of_Int in
+  let values = Array.init size (fun _ -> Tick.Field.random ()) in
+  add_plonk_constraint
+    (AddFixedLookupTable
+       { id = Int32.of_Int table_id; data = [| indexes; values |] } ) ;
+  let idx1 = Random.int size in
+  let v1 = values.(idx1) in
+  let idx2 = Random.int size in
+  let v2 = values.(idx2) in
+  let idx3 = Random.int size in
+  let v3 = values.(idx3) in
+  add_plonk_constraint
+    (Lookup
+       { (* table id *)
+         w0 = fresh_int 0
+       ; (* idx1 *) w1 = fresh_int idx1
+       ; (* v1 *) w2 = exists Field.typ ~compute:(fun () -> v1)
+       ; (* idx2 *) w3 = fresh_int idx2
+       ; (* v2 *) w4 = exists Field.typ ~compute:(fun () -> v2)
+       ; (* idx3 *) w5 = fresh_int idx3
+       ; (* v3 *) w4 = exists Field.typ ~compute:(fun () -> v2)
+       } )
+
 module Make_test (Inputs : sig
   val feature_flags1 : bool Plonk_types.Features.t
 
