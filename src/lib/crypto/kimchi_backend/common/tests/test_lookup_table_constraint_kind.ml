@@ -2,9 +2,13 @@
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
+module Tick = Kimchi_backend.Pasta.Vesta_based_plonk
+module Impl = Snarky_backendless.Snark.Run.Make (Tick)
+
+let add_constraint c = Impl.assert_ { basic = T c; annotation = None }
+
 (* Verify finalize_and_get_gates *)
 let test_finalize_and_get_gates_with_lookup_tables () =
-  let module Tick = Kimchi_backend.Pasta.Vesta_based_plonk in
   let cs = Tick.R1CS_constraint_system.create () in
   let xor_table =
     [| [| Tick.Field.zero; Tick.Field.zero; Tick.Field.zero |]
@@ -37,7 +41,6 @@ let test_finalize_and_get_gates_with_lookup_tables () =
   assert (Array.length lts = 2)
 
 let test_finalize_and_get_gates_with_runtime_table_cfg () =
-  let module Tick = Kimchi_backend.Pasta.Vesta_based_plonk in
   let cs = Tick.R1CS_constraint_system.create () in
 
   let indexed_runtime_table_cfg = Array.init 4 Tick.Field.of_int in
@@ -59,53 +62,64 @@ let test_compute_witness_with_lookup_to_the_same_idx_twice () =
   (* See the comment in compute_witness when populating the runtime tables. The
      function does not check that the runtime table has already been set at a
      certain position, and it overwrites the previously set value *)
-  let module Tick = Kimchi_backend.Pasta.Vesta_based_plonk in
-  let module Impl = Snarky_backendless.Snark.Run.Make (Tick) in
   let table_id = 0 in
   let table_size = 10 in
-  let table_id_var, idx1_var, v1_var, idx2_var, v2_var, idx3_var, v3_var =
-    Snarky_backendless.Cvar.(Var 0, Var 1, Var 2, Var 3, Var 4, Var 5, Var 6)
-  in
   let first_column = Array.init table_size Tick.Field.of_int in
-  let cs = Tick.R1CS_constraint_system.create () in
-  (* Config *)
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T (AddRuntimeTableCfg { id = Int32.of_int table_id; first_column }))) ;
-
-  (* We do 3 lookups within the same table *)
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T
-         (Lookup
-            { w0 = table_id_var
-            ; w1 = idx1_var
-            ; w2 = v1_var
-            ; w3 = idx2_var
-            ; w4 = v2_var
-            ; w5 = idx3_var
-            ; w6 = v3_var
-            } ) )) ;
-  let () = Tick.R1CS_constraint_system.set_primary_input_size cs 0 in
-  let () = Tick.R1CS_constraint_system.set_auxiliary_input_size cs 7 in
-  (* For the external values to give to the compute witness fn *)
-  let ftable_id = Tick.Field.of_int table_id in
   let repeated_idx = 0 in
-  let frepeated_idx = Tick.Field.of_int repeated_idx in
-  let fv1 = Tick.Field.random () in
-  (* To be sure fv1 is different than fv2 *)
-  let fv2 = Tick.Field.(add fv1 one) in
   let other_idx = 1 in
-  let fother_idx = Tick.Field.of_int other_idx in
-  (* To be sure fv3 is different than fv1 and fv2 *)
-  let fv3 = Tick.Field.(add fv2 one) in
+  let fv2 = Tick.Field.random () in
+  let fv3 = Tick.Field.random () in
   let external_values =
-    Array.get
-      [| ftable_id; frepeated_idx; fv1; frepeated_idx; fv2; fother_idx; fv3 |]
+    Tick.Field.
+      [| of_int table_id
+       ; of_int repeated_idx
+       ; random ()
+       ; of_int repeated_idx
+       ; fv2
+       ; of_int other_idx
+       ; fv3
+      |]
+  in
+  let cs =
+    Impl.constraint_system ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
+      (fun () () ->
+        let vtable_id =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(0))
+        in
+        let vidx1 =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(1))
+        in
+        let vv1 =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(2))
+        in
+        let vidx2 =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(3))
+        in
+        let vv2 =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(4))
+        in
+        let vidx3 =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(5))
+        in
+        let vv3 =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(6))
+        in
+        add_constraint
+          (AddRuntimeTableCfg { id = Int32.of_int table_id; first_column }) ;
+        add_constraint
+          (Lookup
+             { w0 = vtable_id
+             ; w1 = vidx1
+             ; w2 = vv1
+             ; w3 = vidx2
+             ; w4 = vv2
+             ; w5 = vidx3
+             ; w6 = vv3
+             } ) )
   in
   let _ = Tick.R1CS_constraint_system.finalize cs in
   let _witnesses, runtime_tables =
-    Tick.R1CS_constraint_system.compute_witness cs external_values
+    Tick.R1CS_constraint_system.compute_witness cs (Array.get external_values)
   in
   (* checking only one table has been created *)
   assert (Array.length runtime_tables = 1) ;
