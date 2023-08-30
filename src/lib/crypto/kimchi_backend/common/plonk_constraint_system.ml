@@ -1009,6 +1009,7 @@ end = struct
            As the map has been built from the runtime table configurations,
            except in the case that a runtime table and a fixed table shares the
            same ID, the lookups in fixed lookup tables will return None.
+           See https://github.com/MinaProtocol/mina/issues/14016
         *)
         let v =
           MapRuntimeTable.Table.find map_runtime_tables (id_int32, vidx)
