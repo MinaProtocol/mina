@@ -860,7 +860,6 @@ let wrap
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             [%log internal] "Backend_tock_proof_create_async" ;
             let%map.Promise proof =
-              (* TODO(dw) pass runtime tables *)
               Backend.Tock.Proof.create_async ~primary:public_inputs
                 ~auxiliary:auxiliary_inputs pk ~message:next_accumulator
             in
