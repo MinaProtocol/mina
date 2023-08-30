@@ -136,7 +136,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (List.filter
               ~f:(fun n ->
                 String.(Network.Node.id n <> Network.Node.id first_bp) )
-              (Core.String.Map.data (Network.all_nodes network)) ) )
+              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
     in
     let keymap =
       List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
