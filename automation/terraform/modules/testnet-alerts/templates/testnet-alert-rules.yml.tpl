@@ -724,6 +724,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/NodeRestarted-99a1cf710ff14aa6930a9f12ad5813a5"
 
 - name: Berkeley archive node alerts
+  rules:
   - alert: HighUnparentedBlockCount
     expr: max by (testnet) (Coda_Archive_unparented_blocks {${berkeley_testnet}}) > 30
     for: ${alert_evaluation_duration}
