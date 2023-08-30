@@ -40,13 +40,7 @@ let test_finalize_and_get_gates_with_runtime_table_cfg () =
   let module Tick = Kimchi_backend.Pasta.Vesta_based_plonk in
   let cs = Tick.R1CS_constraint_system.create () in
 
-  let indexed_runtime_table_cfg =
-    [| Tick.Field.zero
-     ; Tick.Field.one
-     ; Tick.Field.(one + one)
-     ; Tick.Field.(one + one + one)
-    |]
-  in
+  let indexed_runtime_table_cfg = Array.init 4 Tick.Field.of_int in
 
   let () =
     Tick.R1CS_constraint_system.(
