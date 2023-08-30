@@ -930,9 +930,7 @@ struct
                     { inner =
                         Field.if_ b ~then_:joint_combiner_if_true.inner
                           ~else_:joint_combiner_if_false.inner
-                    }
-              | _ ->
-                  . )
+                    } )
         in
         let lookup_table_comm =
           match (messages.lookup, joint_combiner) with
