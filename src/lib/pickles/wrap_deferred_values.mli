@@ -27,9 +27,7 @@ val expand_deferred :
        , Challenge.Constant.t Kimchi_types.scalar_challenge
        , Pasta_bindings.Fp.t Shifted_value.Type1.t
        , 'a
-       , Challenge.Constant.t Kimchi_types.scalar_challenge
-         Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
-         option
+       , Challenge.Constant.t Kimchi_types.scalar_challenge option
        , bool )
        Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
      , Challenge.Constant.t Kimchi_types.scalar_challenge
