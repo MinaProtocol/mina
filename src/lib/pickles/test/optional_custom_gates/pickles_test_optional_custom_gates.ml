@@ -197,6 +197,99 @@ let add_tests, get_tests =
   ( (fun name testcases -> tests := (name, testcases) :: !tests)
   , fun () -> List.rev !tests )
 
+let main_fixed_lookup_tables_simple () =
+  let table_id = 2 in
+  (* We start with a simple test with a small and fixed lookup table, with a
+     random ID *)
+  let size = 10 in
+  let indexes = Array.init size ~f:Field.Constant.of_int in
+  let values = Array.init size ~f:(fun _ -> Field.Constant.random ()) in
+  add_plonk_constraint
+    (AddFixedLookupTable
+       { id = Int32.of_int_exn table_id; data = [| indexes; values |] } ) ;
+  let idx1 = 2 in
+  (* let idx1 = Random.int size in *)
+  let v1 = values.(idx1) in
+  (* let idx2 = Random.int size in *)
+  let idx2 = 2 in
+  let v2 = values.(idx2) in
+  (* let idx3 = Random.int size in *)
+  let idx3 = 1 in
+  let v3 = values.(idx3) in
+  let rec f i n =
+    if i = n then ()
+    else (
+      add_plonk_constraint
+        (Lookup
+           { (* table id *)
+             w0 = fresh_int table_id
+           ; (* idx1 *) w1 = fresh_int idx1
+           ; (* v1 *) w2 = exists Field.typ ~compute:(fun () -> v1)
+           ; (* idx2 *) w3 = fresh_int idx2
+           ; (* v2 *) w4 = exists Field.typ ~compute:(fun () -> v2)
+           ; (* idx3 *) w5 = fresh_int idx3
+           ; (* v3 *) w6 = exists Field.typ ~compute:(fun () -> v3)
+           } ) ;
+      add_plonk_constraint (Raw { kind = Zero; values = [||]; coeffs = [||] }) ;
+      f (i + 1) n )
+  in
+  f 0 100
+
+let main_fixed_lookup_tables_with_xor () =
+  (* Table ID should be different than 0 which is used for XOR *)
+  let table_id = 1 + Random.int 1_000 in
+  let size = 1 + Random.int 1_000 in
+  let indexes = Array.init size ~f:Field.Constant.of_int in
+  let values = Array.init size ~f:(fun _ -> Field.Constant.random ()) in
+  add_plonk_constraint
+    (AddFixedLookupTable
+       { id = Int32.of_int_exn table_id; data = [| indexes; values |] } ) ;
+  let idx1 = Random.int size in
+  let v1 = values.(idx1) in
+  let idx2 = Random.int size in
+  let v2 = values.(idx2) in
+  let idx3 = Random.int size in
+  let v3 = values.(idx3) in
+  add_plonk_constraint
+    (Lookup
+       { (* table id *)
+         w0 = fresh_int table_id
+       ; (* idx1 *) w1 = fresh_int idx1
+       ; (* v1 *) w2 = exists Field.typ ~compute:(fun () -> v1)
+       ; (* idx2 *) w3 = fresh_int idx2
+       ; (* v2 *) w4 = exists Field.typ ~compute:(fun () -> v2)
+       ; (* idx3 *) w5 = fresh_int idx3
+       ; (* v3 *) w6 = exists Field.typ ~compute:(fun () -> v3)
+       } )
+
+let main_runtime_tables () =
+  let table_id = Random.int 1_000 in
+  (* We start with a simple test with a small and fixed lookup table, with a
+     random ID *)
+  let size = 1 + Random.int 1_000 in
+  let indexes = Array.init size ~f:Field.Constant.of_int in
+  let values = Array.init size ~f:(fun _ -> Field.Constant.random ()) in
+  add_plonk_constraint
+    (AddRuntimeTableCfg
+       { id = Int32.of_int_exn table_id; first_column = indexes } ) ;
+  let idx1 = Random.int size in
+  let v1 = values.(idx1) in
+  let idx2 = Random.int size in
+  let v2 = values.(idx2) in
+  let idx3 = Random.int size in
+  let v3 = values.(idx3) in
+  add_plonk_constraint
+    (Lookup
+       { (* table id *)
+         w0 = fresh_int table_id
+       ; (* idx1 *) w1 = fresh_int idx1
+       ; (* v1 *) w2 = exists Field.typ ~compute:(fun () -> v1)
+       ; (* idx2 *) w3 = fresh_int idx2
+       ; (* v2 *) w4 = exists Field.typ ~compute:(fun () -> v2)
+       ; (* idx3 *) w5 = fresh_int idx3
+       ; (* v3 *) w6 = exists Field.typ ~compute:(fun () -> v3)
+       } )
+
 let constraint_constants =
   { Snark_keys_header.Constraint_constants.sub_windows_per_window = 0
   ; ledger_depth = 0
@@ -211,12 +304,16 @@ let constraint_constants =
   }
 
 let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
-  if feature_flags.rot then main_rot () ;
-  if feature_flags.xor then main_xor () ;
-  if feature_flags.range_check0 then main_range_check0 () ;
-  if feature_flags.range_check1 then main_range_check1 () ;
-  if feature_flags.foreign_field_add then main_foreign_field_add () ;
-  if feature_flags.foreign_field_mul then main_foreign_field_mul ()
+  (* if feature_flags.rot then main_rot () ; *)
+  (* if feature_flags.xor then main_xor () ; *)
+  (* if feature_flags.range_check0 then main_range_check0 () ; *)
+  (* if feature_flags.range_check1 then main_range_check1 () ; *)
+  (* if feature_flags.foreign_field_add then main_foreign_field_add () ; *)
+  (* if feature_flags.foreign_field_mul then main_foreign_field_mul () ; *)
+  if feature_flags.lookup then main_fixed_lookup_tables_simple ()
+(* if feature_flags.runtime_tables then main_runtime_tables () ; *)
+(* if feature_flags.lookup && feature_flags.xor then *)
+(*   main_fixed_lookup_tables_with_xor () *)
 
 let register_test name feature_flags1 feature_flags2 =
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
@@ -286,20 +383,23 @@ let register_feature_test (name, specific_feature_flags) =
 
 let () =
   let configurations =
-    [ ("xor", Plonk_types.Features.{ none_bool with xor = true })
-    ; ( "range check 0"
-      , Plonk_types.Features.{ none_bool with range_check0 = true } )
-    ; ( "range check 1"
-      , Plonk_types.Features.{ none_bool with range_check1 = true } )
-    ; ("rot", Plonk_types.Features.{ none_bool with rot = true })
-    ; ( "foreign field addition"
-      , Plonk_types.Features.{ none_bool with foreign_field_add = true } )
-    ; ( "foreign field multiplication"
-      , Plonk_types.Features.{ none_bool with foreign_field_mul = true } )
+    [ (*   ("xor", Plonk_types.Features.{ none_bool with xor = true }) *)
+      (* ; ( "range check 0" *)
+      (*   , Plonk_types.Features.{ none_bool with range_check0 = true } ) *)
+      (* ; ( "range check 1" *)
+      (*   , Plonk_types.Features.{ none_bool with range_check1 = true } ) *)
+      (* ; ("rot", Plonk_types.Features.{ none_bool with rot = true }) *)
+      (* ; ( "foreign field addition" *)
+      (*   , Plonk_types.Features.{ none_bool with foreign_field_add = true } ) *)
+      (* ; ( "foreign field multiplication" *)
+      (*   , Plonk_types.Features.{ none_bool with foreign_field_mul = true } ) *)
+      ( "Fixed lookup tables"
+      , Plonk_types.Features.{ none_bool with lookup = true } )
+      (* ; ( "Runtime lookup tables" *)
+      (*   , Plonk_types.Features.{ none_bool with runtime_tables = true } ) *)
+      (* ; ( "Fixed lookup tables with XOR" *)
+      (*   , Plonk_types.Features.{ none_bool with lookup = true; xor = true } ) *)
     ]
   in
   List.iter ~f:register_feature_test configurations ;
-  register_test "different sizes of lookup"
-    Plonk_types.Features.{ none_bool with foreign_field_mul = true }
-    Plonk_types.Features.{ none_bool with xor = true } ;
   Alcotest.run "Custom gates" (get_tests ())

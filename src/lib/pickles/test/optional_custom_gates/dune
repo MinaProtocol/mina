@@ -1,5 +1,6 @@
 (tests
  (names test_fix_domains pickles_test_optional_custom_gates)
+ (flags :standard -w -32)
  (libraries
   ;; opam libraries
   alcotest
