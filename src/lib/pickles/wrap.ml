@@ -84,9 +84,7 @@ type deferred_values_and_hints =
         , scalar_challenge_constant
         , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
         , (Tick.Field.t Shifted_value.Type1.t, bool) Opt.t
-        , ( scalar_challenge_constant Deferred_values.Plonk.In_circuit.Lookup.t
-          , bool )
-          Opt.t
+        , (scalar_challenge_constant, bool) Opt.t
         , bool )
         Deferred_values.Plonk.In_circuit.t
       , scalar_challenge_constant
@@ -263,13 +261,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
           ; alpha = plonk0.alpha
           ; beta = chal plonk0.beta
           ; gamma = chal plonk0.gamma
-          ; lookup =
-              Opt.map plonk.lookup ~f:(fun _ ->
-                  { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                    .In_circuit
-                    .Lookup
-                    .joint_combiner = Option.value_exn plonk0.joint_combiner
-                  } )
+          ; joint_combiner = Plonk_types.Opt.of_option plonk0.joint_combiner
           }
       }
   ; x_hat_evals = x_hat
@@ -383,6 +375,11 @@ let%test_module "gate finalization" =
           ~step_vk:vk ~public_input ~proof ~actual_proofs_verified:Nat.N0.n
       in
 
+      let full_features =
+        Plonk_types.Features.to_full ~or_:Plonk_types.Opt.Flag.( ||| )
+          feature_flags
+      in
+
       (* Define Typ.t for Deferred_values.t -- A Type.t defines how to convert a value of some type
                                               in OCaml into a var in circuit/Snarky.
 
@@ -394,7 +391,7 @@ let%test_module "gate finalization" =
         let open Step_verifier in
         Wrap.Proof_state.Deferred_values.In_circuit.typ
           (module Impls.Step)
-          ~feature_flags ~challenge:Challenge.typ
+          ~feature_flags:full_features ~challenge:Challenge.typ
           ~scalar_challenge:Challenge.typ
           ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
           ~dummy_scalar_challenge:
@@ -414,14 +411,15 @@ let%test_module "gate finalization" =
           { deferred_values with
             plonk =
               { deferred_values.plonk with
-                lookup = Opt.to_option_unsafe deferred_values.plonk.lookup
+                joint_combiner =
+                  Opt.to_option_unsafe deferred_values.plonk.joint_combiner
               }
           }
       (* Prepare all of the evaluations (i.e. all of the columns in the proof that we open)
          for use in the circuit *)
       and evals =
         constant
-          (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
+          (Plonk_types.All_evals.typ (module Impls.Step) full_features)
           { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
           ; ft_eval1 = proof.openings.ft_eval1
           }
@@ -855,7 +853,7 @@ let wrap
     |> Wrap_hack.pad_accumulator
   in
   let%map.Promise next_proof =
-    let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
+    let (T (input, conv, _conv_inv)) = Impls.Wrap.input ~feature_flags () in
     Common.time "wrap proof" (fun () ->
         [%log internal] "Wrap_generate_witness_conv" ;
         Impls.Wrap.generate_witness_conv
@@ -884,9 +882,10 @@ let wrap
                   { next_statement.proof_state.deferred_values with
                     plonk =
                       { next_statement.proof_state.deferred_values.plonk with
-                        lookup =
-                          (* TODO: This assumes wrap circuits do not use lookup *)
-                          None
+                        joint_combiner =
+                          Plonk_types.Opt.to_option
+                            next_statement.proof_state.deferred_values.plonk
+                              .joint_combiner
                       }
                   }
               }

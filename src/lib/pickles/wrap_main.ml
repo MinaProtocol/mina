@@ -90,7 +90,9 @@ let wrap_main
       , max_local_max_proofs_verifieds )
       Full_signature.t ) (pi_branches : (prev_varss, branches) Hlist.Length.t)
     (step_keys :
-      ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+      ( ( Wrap_main_inputs.Inner_curve.Constant.t
+        , Wrap_main_inputs.Inner_curve.Constant.t option )
+        Wrap_verifier.index'
       , branches )
       Vector.t
       Lazy.t ) (step_widths : (int, branches) Vector.t)
@@ -211,7 +213,13 @@ let wrap_main
           with_label __LOC__ (fun () ->
               Wrap_verifier.choose_key which_branch
                 (Vector.map (Lazy.force step_keys)
-                   ~f:(Plonk_verification_key_evals.map ~f:Inner_curve.constant) ) )
+                   ~f:
+                     (Plonk_verification_key_evals.Step.map
+                        ~f:Inner_curve.constant ~f_opt:(function
+                       | None ->
+                           Opt.None
+                       | Some x ->
+                           Opt.Some (Inner_curve.constant x) ) ) ) )
         in
         let prev_step_accs =
           with_label __LOC__ (fun () ->

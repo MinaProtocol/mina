@@ -152,7 +152,9 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , 'max_local_max_proofs_verifieds )
          Full_signature.t
       -> ('prev_varss, 'branches) Hlist.Length.t
-      -> ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+      -> ( ( Wrap_main_inputs.Inner_curve.Constant.t
+           , Wrap_main_inputs.Inner_curve.Constant.t option )
+           Wrap_verifier.index'
          , 'branches )
          Vector.t
          Lazy.t
@@ -167,10 +169,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                    , Impls.Wrap.Boolean.var )
                    Plonk_types.Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-                     Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                     .In_circuit
-                     .Lookup
-                     .t
                    , Impls.Wrap.Boolean.var )
                    Pickles_types__Plonk_types.Opt.t
                  , Impls.Wrap.Boolean.var )
@@ -202,9 +200,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -234,9 +229,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -332,7 +324,9 @@ val wrap_main_dummy_override :
      , 'max_local_max_proofs_verifieds )
      Full_signature.t
   -> ('prev_varss, 'branches) Hlist.Length.t
-  -> ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+  -> ( ( Wrap_main_inputs.Inner_curve.Constant.t
+       , Wrap_main_inputs.Inner_curve.Constant.t option )
+       Wrap_verifier.index'
      , 'branches )
      Vector.t
      Lazy.t
@@ -347,10 +341,6 @@ val wrap_main_dummy_override :
                , Impls.Wrap.Boolean.var )
                Plonk_types.Opt.t
              , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-                 Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                 .In_circuit
-                 .Lookup
-                 .t
                , Impls.Wrap.Boolean.var )
                Pickles_types__Plonk_types.Opt.t
              , Impls.Wrap.Boolean.var )
@@ -380,10 +370,6 @@ module Make_adversarial_test : functor
             , bool )
             Import.Types.Opt.t
           , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-              .In_circuit
-              .Lookup
-              .t
             , bool )
             Import.Types.Opt.t
           , bool
@@ -413,10 +399,6 @@ module Make_adversarial_test : functor
             , bool )
             Import.Types.Opt.t
           , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-              .In_circuit
-              .Lookup
-              .t
             , bool )
             Import.Types.Opt.t
           , bool

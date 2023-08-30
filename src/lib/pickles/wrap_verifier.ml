@@ -11,8 +11,6 @@ open Import
    below from being hidden by the included functor application at the end of
    the module, so that we can re-export it in the end. *)
 module G = struct
-  let lookup_verification_enabled = false
-
   (* given [chals], compute
      \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
   let challenge_polynomial (type a)
@@ -188,25 +186,67 @@ struct
 
   module One_hot_vector = One_hot_vector.Make (Impl)
 
-  type 'a index' = 'a Plonk_verification_key_evals.t
+  type ('a, 'a_opt) index' = ('a, 'a_opt) Plonk_verification_key_evals.Step.t
 
   (* Mask out the given vector of indices with the given one-hot vector *)
   let choose_key :
       type n.
          n One_hot_vector.t
-      -> (Inner_curve.t index', n) Vector.t
-      -> Inner_curve.t index' =
+      -> ( (Inner_curve.t, (Inner_curve.t, Boolean.var) Plonk_types.Opt.t) index'
+         , n )
+         Vector.t
+      -> (Inner_curve.t, (Inner_curve.t, Boolean.var) Plonk_types.Opt.t) index'
+      =
     let open Tuple_lib in
-    let map = Plonk_verification_key_evals.map in
-    let map2 = Plonk_verification_key_evals.map2 in
+    let map ~f_bool ~f =
+      Plonk_verification_key_evals.Step.map ~f ~f_opt:(function
+        | Plonk_types.Opt.None ->
+            Plonk_types.Opt.None
+        | Plonk_types.Opt.Maybe (b, x) ->
+            Plonk_types.Opt.Maybe (f_bool b, f x)
+        | Plonk_types.Opt.Some x ->
+            Plonk_types.Opt.Some (f x) )
+    in
+    let map2 ~f_bool ~f =
+      Plonk_verification_key_evals.Step.map2 ~f ~f_opt:(fun x y ->
+          match (x, y) with
+          | Plonk_types.Opt.None, Plonk_types.Opt.None ->
+              Plonk_types.Opt.None
+          | Plonk_types.Opt.Some x, Plonk_types.Opt.Some y ->
+              Plonk_types.Opt.Some (f x y)
+          | ( (Plonk_types.Opt.Some _ | Maybe _ | None)
+            , (Plonk_types.Opt.Some _ | Maybe _ | None) ) ->
+              let to_maybe = function
+                | Plonk_types.Opt.None ->
+                    (Boolean.false_, (Field.zero, Field.zero))
+                | Plonk_types.Opt.Maybe (b, x) ->
+                    (b, x)
+                | Plonk_types.Opt.Some x ->
+                    (Boolean.true_, x)
+              in
+              let b1, x1 = to_maybe x in
+              let b2, x2 = to_maybe y in
+              Plonk_types.Opt.Maybe (f_bool b1 b2, f x1 x2) )
+    in
     fun bs keys ->
       let open Field in
       Vector.map2
         (bs :> (Boolean.var, n) Vector.t)
         keys
-        ~f:(fun b key -> map key ~f:(fun g -> Double.map g ~f:(( * ) (b :> t))))
-      |> Vector.reduce_exn ~f:(map2 ~f:(Double.map2 ~f:( + )))
-      |> map ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
+        ~f:(fun b key ->
+          map key
+            ~f:(fun g -> Double.map g ~f:(( * ) (b :> t)))
+            ~f_bool:(fun b_inner -> Boolean.(b &&& b_inner)) )
+      |> Vector.reduce_exn
+           ~f:
+             (map2 ~f:(Double.map2 ~f:( + ))
+                ~f_bool:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
+                  Boolean.Unsafe.of_cvar
+                    Field.(add (b1 :> Field.t) (b2 :> Field.t)) ) )
+      |> map
+           ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
+           ~f_bool:(fun (b : Boolean.var) ->
+             Boolean.Unsafe.of_cvar (Util.seal (module Impl) (b :> t)) )
 
   (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
@@ -351,32 +391,54 @@ struct
     let combine batch ~xi without_bound with_bound =
       let { Curve_opt.non_zero; point } =
         Pcs_batch.combine_split_commitments batch
-          ~scale_and_add:(fun ~(acc : Curve_opt.t) ~xi (keep, (p : Point.t)) ->
+          ~scale_and_add:(fun ~(acc : Curve_opt.t) ~xi
+                              (p : (Point.t, Boolean.var) Plonk_types.Opt.t) ->
             (* match acc.non_zero, keep with
                | false, false -> acc
                | true, false -> acc
                | false, true -> { point= p; non_zero= true }
                | true, true -> { point= p + xi * acc; non_zero= true }
             *)
-            let point =
-              Inner_curve.(
-                if_ keep
-                  ~then_:
-                    (if_ acc.non_zero
-                       ~then_:(Point.add p (Scalar_challenge.endo acc.point xi))
-                       ~else_:
-                         ((* In this branch, the accumulator was zero, so there is no harm in
-                             putting the potentially junk underlying point here. *)
-                          Point.underlying p ) )
-                  ~else_:acc.point)
+            let point keep p =
+              let point =
+                Inner_curve.(
+                  if_ keep
+                    ~then_:
+                      (if_ acc.non_zero
+                         ~then_:
+                           (Point.add p (Scalar_challenge.endo acc.point xi))
+                         ~else_:
+                           ((* In this branch, the accumulator was zero, so there is no harm in
+                               putting the potentially junk underlying point here. *)
+                            Point.underlying p ) )
+                    ~else_:acc.point)
+              in
+              let non_zero =
+                Boolean.(keep &&& Point.finite p ||| acc.non_zero)
+              in
+              { Curve_opt.non_zero; point }
             in
-            let non_zero = Boolean.(keep &&& Point.finite p ||| acc.non_zero) in
-            { Curve_opt.non_zero; point } )
+            match p with
+            | Plonk_types.Opt.None ->
+                acc
+            | Plonk_types.Opt.Maybe (keep, p) ->
+                point keep p
+            | Plonk_types.Opt.Some p ->
+                point Boolean.true_ p )
           ~xi
-          ~init:(fun (keep, p) ->
-            { non_zero = Boolean.(keep &&& Point.finite p)
-            ; point = Point.underlying p
-            } )
+          ~init:(function
+            | Plonk_types.Opt.None ->
+                None
+            | Plonk_types.Opt.Maybe (keep, p) ->
+                Some
+                  { non_zero = Boolean.(keep &&& Point.finite p)
+                  ; point = Point.underlying p
+                  }
+            | Plonk_types.Opt.Some p ->
+                Some
+                  { non_zero = Boolean.(true_ &&& Point.finite p)
+                  ; point = Point.underlying p
+                  } )
           without_bound with_bound
       in
       Boolean.Assert.is_true non_zero ;
@@ -478,39 +540,153 @@ struct
 
   (* Just for exhaustiveness over fields *)
   let iter2 ~chal ~scalar_chal
-      { Plonk.Minimal.alpha = alpha_0
+      { Plonk.Minimal.In_circuit.alpha = alpha_0
       ; beta = beta_0
       ; gamma = gamma_0
       ; zeta = zeta_0
-      ; joint_combiner = _
+      ; joint_combiner = joint_combiner_0
       ; feature_flags = _
       }
-      { Plonk.Minimal.alpha = alpha_1
+      { Plonk.Minimal.In_circuit.alpha = alpha_1
       ; beta = beta_1
       ; gamma = gamma_1
       ; zeta = zeta_1
-      ; joint_combiner = _
+      ; joint_combiner = joint_combiner_1
       ; feature_flags = _
       } =
-    if G.lookup_verification_enabled then failwith "Wrap_verifier.iter2:TODO" ;
+    with_label __LOC__ (fun () ->
+        match (joint_combiner_0, joint_combiner_1) with
+        | None, None ->
+            ()
+        | Maybe (b0, j0), Maybe (b1, j1) ->
+            Boolean.Assert.(b0 = b1) ;
+            let (Typ { var_to_fields; _ }) = Scalar_challenge.typ in
+            Array.iter2_exn ~f:Field.Assert.equal
+              (fst @@ var_to_fields j0)
+              (fst @@ var_to_fields j1)
+        | Some j0, Some j1 ->
+            let (Typ { var_to_fields; _ }) = Scalar_challenge.typ in
+            Array.iter2_exn ~f:Field.Assert.equal
+              (fst @@ var_to_fields j0)
+              (fst @@ var_to_fields j1)
+        | ( ((Plonk_types.Opt.Some _ | Maybe _ | None) as j0)
+          , ((Plonk_types.Opt.Some _ | Maybe _ | None) as j1) ) ->
+            let sexp_of t =
+              Sexp.to_string
+              @@ Types.Opt.sexp_of_t
+                   (fun _ -> Sexp.Atom "")
+                   (fun _ -> Sexp.Atom "")
+                   t
+            in
+            failwithf
+              "incompatible optional states for joint_combiners: %s vs %s"
+              (sexp_of j0) (sexp_of j1) () ) ;
     with_label __LOC__ (fun () -> chal beta_0 beta_1) ;
     with_label __LOC__ (fun () -> chal gamma_0 gamma_1) ;
     with_label __LOC__ (fun () -> scalar_chal alpha_0 alpha_1) ;
     with_label __LOC__ (fun () -> scalar_chal zeta_0 zeta_1)
 
   let assert_eq_plonk
-      (m1 : (_, Field.t Import.Scalar_challenge.t, _) Plonk.Minimal.t)
-      (m2 : (_, Scalar_challenge.t, _) Plonk.Minimal.t) =
+      (m1 : (_, Field.t Import.Scalar_challenge.t, _) Plonk.Minimal.In_circuit.t)
+      (m2 : (_, Scalar_challenge.t, _) Plonk.Minimal.In_circuit.t) =
     iter2 m1 m2
       ~chal:(fun c1 c2 -> Field.Assert.equal c1 c2)
       ~scalar_chal:(fun ({ inner = t1 } : _ Import.Scalar_challenge.t)
                         ({ inner = t2 } : Scalar_challenge.t) ->
         Field.Assert.equal t1 t2 )
 
+  let index_to_field_elements ~g (m : _ Plonk_verification_key_evals.Step.t) =
+    let { Plonk_verification_key_evals.Step.sigma_comm
+        ; coefficients_comm
+        ; generic_comm
+        ; psm_comm
+        ; complete_add_comm
+        ; mul_comm
+        ; emul_comm
+        ; endomul_scalar_comm
+        ; range_check0_comm
+        ; range_check1_comm
+        ; foreign_field_mul_comm
+        ; foreign_field_add_comm
+        ; xor_comm
+        ; rot_comm
+        ; lookup_table_comm
+        ; lookup_table_ids
+        ; runtime_tables_selector
+        ; lookup_selector_xor
+        ; lookup_selector_lookup
+        ; lookup_selector_range_check
+        ; lookup_selector_ffmul
+        } =
+      m
+    in
+    let g_opt = Plonk_types.Opt.map ~f:g in
+    List.map
+      ( Vector.to_list sigma_comm
+      @ Vector.to_list coefficients_comm
+      @ [ generic_comm
+        ; psm_comm
+        ; complete_add_comm
+        ; mul_comm
+        ; emul_comm
+        ; endomul_scalar_comm
+        ] )
+      ~f:(fun x -> Plonk_types.Opt.Some (g x))
+    @ [ g_opt range_check0_comm
+      ; g_opt range_check1_comm
+      ; g_opt foreign_field_mul_comm
+      ; g_opt foreign_field_add_comm
+      ; g_opt xor_comm
+      ; g_opt rot_comm
+      ]
+    @ List.map ~f:g_opt (Vector.to_list lookup_table_comm)
+    @ [ g_opt lookup_table_ids
+      ; g_opt runtime_tables_selector
+      ; g_opt lookup_selector_xor
+      ; g_opt lookup_selector_lookup
+      ; g_opt lookup_selector_range_check
+      ; g_opt lookup_selector_ffmul
+      ]
+
+  (** Simulate an [Opt_sponge.t] locally in a block, but without running the
+      expensive optional logic that is otherwise required.
+
+      Invariant: This requires that the sponge 'state' (i.e. the state after
+      absorbing or squeezing) is consistent between the initial state and the
+      final state when using the sponge.
+  *)
+  let simulate_optional_sponge_with_alignment (sponge : Sponge.t) ~f = function
+    | Plonk_types.Opt.None ->
+        Plonk_types.Opt.None
+    | Plonk_types.Opt.Maybe (b, x) ->
+        (* Cache the sponge state before *)
+        let sponge_state_before = sponge.sponge_state in
+        let state_before = Array.copy sponge.state in
+        (* Use the sponge *)
+        let res = f sponge x in
+        (* Check that the sponge ends in a compatible state. *)
+        ( match (sponge_state_before, sponge.sponge_state) with
+        | Absorbed x, Absorbed y ->
+            [%test_eq: int] x y
+        | Squeezed x, Squeezed y ->
+            [%test_eq: int] x y
+        | Absorbed _, Squeezed _ ->
+            [%test_eq: string] "absorbed" "squeezed"
+        | Squeezed _, Absorbed _ ->
+            [%test_eq: string] "squeezed" "absorbed" ) ;
+        let state =
+          Array.map2_exn sponge.state state_before ~f:(fun then_ else_ ->
+              Field.if_ b ~then_ ~else_ )
+        in
+        sponge.state <- state ;
+        Plonk_types.Opt.Maybe (b, res)
+    | Plonk_types.Opt.Some x ->
+        Plonk_types.Opt.Some (f sponge x)
+
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
       ~actual_proofs_verified_mask ~step_domains ~srs
-      ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
+      ~verification_key:(m : _ Plonk_verification_key_evals.Step.t) ~xi ~sponge
       ~(public_input :
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
          array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
@@ -530,12 +706,18 @@ struct
         let index_digest =
           with_label "absorb verifier index" (fun () ->
               let index_sponge = Sponge.create sponge_params in
-              Array.iter
-                (Types.index_to_field_elements
+              List.iter
+                (index_to_field_elements
                    ~g:(fun (z : Inputs.Inner_curve.t) ->
                      List.to_array (Inner_curve.to_field_elements z) )
                    m )
-                ~f:(fun x -> Sponge.absorb index_sponge x) ;
+                ~f:(fun x ->
+                  let (_ : (unit, _) Plonk_types.Opt.t) =
+                    simulate_optional_sponge_with_alignment index_sponge x
+                      ~f:(fun sponge x ->
+                        Array.iter ~f:(Sponge.absorb sponge) x )
+                  in
+                  () ) ;
               Sponge.squeeze_field index_sponge )
         in
         let without = Type.Without_degree_bound in
@@ -626,8 +808,218 @@ struct
         absorb sponge PC (Boolean.true_, x_hat) ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
+        let joint_combiner =
+          match messages.lookup with
+          | None ->
+              Types.Opt.None
+          | Maybe (_, _) ->
+              failwith "TODO"
+          | Some l -> (
+              let absorb_sorted_first_part () =
+                Vector.iter l.sorted ~f:(fun z ->
+                    let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
+                    absorb sponge Without_degree_bound z )
+              in
+              let absorb_sorted_second_part () =
+                match l.sorted_5th_column with
+                | None ->
+                    ()
+                | Maybe (b, z) ->
+                    let z = Array.map z ~f:(fun z -> (b, z)) in
+                    absorb sponge Without_degree_bound z
+                | Some z ->
+                    let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
+                    absorb sponge Without_degree_bound z
+              in
+              match[@warning "-4"]
+                (m.lookup_table_comm, m.runtime_tables_selector)
+              with
+              | _ :: Some _ :: _, _ | _, Some _ ->
+                  let joint_combiner = sample_scalar () in
+                  absorb_sorted_first_part () ;
+                  absorb_sorted_second_part () ;
+                  Types.Opt.Some joint_combiner
+              | _ :: None :: _, None ->
+                  absorb_sorted_first_part () ;
+                  absorb_sorted_second_part () ;
+                  Types.Opt.Some { inner = Field.zero }
+              | _ ->
+                  failwith "TODO" )
+        in
+        let lookup_table_comm =
+          match (messages.lookup, joint_combiner) with
+          | Types.Opt.None, Types.Opt.None ->
+              Types.Opt.None
+          | ( Types.Opt.Maybe (b_l, l)
+            , Types.Opt.Maybe (b_joint_combiner, joint_combiner) ) ->
+              ignore ((b_l, l, b_joint_combiner, joint_combiner) : _ * _ * _ * _) ;
+              failwith "TODO"
+          | Types.Opt.Some l, Types.Opt.Some joint_combiner ->
+              let (first_column :: second_column :: rest) =
+                Vector.map
+                  ~f:(Types.Opt.map ~f:(fun x -> [| x |]))
+                  m.lookup_table_comm
+              in
+              let second_column_with_runtime =
+                match (second_column, l.runtime) with
+                | Types.Opt.None, comm | comm, Types.Opt.None ->
+                    comm
+                | ( Types.Opt.Maybe (has_second_column, second_column)
+                  , Types.Opt.Maybe (has_runtime, runtime) ) ->
+                    let second_with_runtime =
+                      let sum =
+                        Array.map2_exn ~f:Inner_curve.( + ) second_column
+                          runtime
+                      in
+                      Array.map2_exn second_column sum
+                        ~f:(fun second_column sum ->
+                          Inner_curve.if_ has_runtime ~then_:sum
+                            ~else_:second_column )
+                    in
+                    let res =
+                      Array.map2_exn second_with_runtime runtime
+                        ~f:(fun second_with_runtime runtime ->
+                          Inner_curve.if_ has_second_column
+                            ~then_:second_with_runtime ~else_:runtime )
+                    in
+                    let b = Boolean.(has_second_column ||| has_runtime) in
+                    Types.Opt.Maybe (b, res)
+                | ( Types.Opt.Maybe (has_second_column, second_column)
+                  , Types.Opt.Some runtime ) ->
+                    let res =
+                      let sum =
+                        Array.map2_exn ~f:Inner_curve.( + ) second_column
+                          runtime
+                      in
+                      Array.map2_exn runtime sum ~f:(fun runtime sum ->
+                          Inner_curve.if_ has_second_column ~then_:sum
+                            ~else_:runtime )
+                    in
+                    Types.Opt.Some res
+                | ( Types.Opt.Some second_column
+                  , Types.Opt.Maybe (has_runtime, runtime) ) ->
+                    let res =
+                      let sum =
+                        Array.map2_exn ~f:Inner_curve.( + ) second_column
+                          runtime
+                      in
+                      Array.map2_exn second_column sum
+                        ~f:(fun second_column sum ->
+                          Inner_curve.if_ has_runtime ~then_:sum
+                            ~else_:second_column )
+                    in
+                    Types.Opt.Some res
+                | Types.Opt.Some second_column, Types.Opt.Some runtime ->
+                    Types.Opt.Some
+                      (Array.map2_exn ~f:Inner_curve.( + ) second_column runtime)
+              in
+              let rest_rev =
+                Vector.rev (first_column :: second_column_with_runtime :: rest)
+              in
+              let table_ids =
+                Types.Opt.map m.lookup_table_ids ~f:(fun x -> [| x |])
+              in
+              Vector.fold ~init:table_ids rest_rev ~f:(fun acc comm ->
+                  match acc with
+                  | Types.Opt.None ->
+                      comm
+                  | Types.Opt.Maybe (has_acc, acc) -> (
+                      match comm with
+                      | Types.Opt.None ->
+                          Types.Opt.Maybe (has_acc, acc)
+                      | Types.Opt.Maybe (has_comm, comm) ->
+                          let scaled_acc =
+                            Array.map acc ~f:(fun acc ->
+                                Scalar_challenge.endo acc joint_combiner )
+                          in
+                          let sum =
+                            Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
+                          in
+                          let acc_with_comm =
+                            Array.map2_exn sum comm ~f:(fun sum comm ->
+                                Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
+                          in
+                          let res =
+                            Array.map2_exn acc acc_with_comm
+                              ~f:(fun acc acc_with_comm ->
+                                Inner_curve.if_ has_comm ~then_:acc_with_comm
+                                  ~else_:acc )
+                          in
+                          let b = Boolean.(has_acc ||| has_comm) in
+                          Types.Opt.Maybe (b, res)
+                      | Types.Opt.Some comm ->
+                          let scaled_acc =
+                            Array.map acc ~f:(fun acc ->
+                                Scalar_challenge.endo acc joint_combiner )
+                          in
+                          let sum =
+                            Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
+                          in
+                          let res =
+                            Array.map2_exn sum comm ~f:(fun sum comm ->
+                                Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
+                          in
+                          Types.Opt.Some res )
+                  | Types.Opt.Some acc -> (
+                      match comm with
+                      | Types.Opt.None ->
+                          Types.Opt.Some acc
+                      | Types.Opt.Maybe (has_comm, comm) ->
+                          let scaled_acc =
+                            Array.map acc ~f:(fun acc ->
+                                Scalar_challenge.endo acc joint_combiner )
+                          in
+                          let sum =
+                            Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
+                          in
+                          let res =
+                            Array.map2_exn sum acc ~f:(fun sum acc ->
+                                Inner_curve.if_ has_comm ~then_:sum ~else_:acc )
+                          in
+                          Types.Opt.Some res
+                      | Types.Opt.Some comm ->
+                          let scaled_acc =
+                            Array.map acc ~f:(fun acc ->
+                                Scalar_challenge.endo acc joint_combiner )
+                          in
+                          Types.Opt.Some
+                            (Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm)
+                      ) )
+          | ( (Types.Opt.None | Maybe _ | Some _)
+            , (Types.Opt.None | Maybe _ | Some _) ) ->
+              assert false
+        in
+        let lookup_sorted =
+          let lookup_sorted_minus_1 =
+            Nat.to_int Plonk_types.Lookup_sorted_minus_1.n
+          in
+          Vector.init Plonk_types.Lookup_sorted.n ~f:(fun i ->
+              match messages.lookup with
+              | Types.Opt.None ->
+                  Types.Opt.None
+              | Types.Opt.Maybe (b, l) ->
+                  if i = lookup_sorted_minus_1 then l.sorted_5th_column
+                  else
+                    Types.Opt.Maybe (b, Option.value_exn (Vector.nth l.sorted i))
+              | Types.Opt.Some l ->
+                  if i = lookup_sorted_minus_1 then l.sorted_5th_column
+                  else Types.Opt.Some (Option.value_exn (Vector.nth l.sorted i)) )
+        in
         let beta = sample () in
         let gamma = sample () in
+        let () =
+          match messages.lookup with
+          | None ->
+              ()
+          | Maybe (b, l) ->
+              let aggreg = Array.map l.aggreg ~f:(fun z -> (b, z)) in
+              absorb sponge Without_degree_bound aggreg
+          | Some l ->
+              let aggreg =
+                Array.map l.aggreg ~f:(fun z -> (Boolean.true_, z))
+              in
+              absorb sponge Without_degree_bound aggreg
+        in
         let z_comm = messages.z_comm in
         absorb_g z_comm ;
         let alpha = sample_scalar () in
@@ -675,7 +1067,10 @@ struct
                 ~add:(Ops.add_fast ?check_finite:None)
                 ~scale:scale_fast ~negate:Inner_curve.negate
                 ~endoscale:(Scalar_challenge.endo ?num_bits:None)
-                ~verification_key:m ~plonk ~alpha ~t_comm )
+                ~verification_key:
+                  (Plonk_verification_key_evals.Step.forget_optional_commitments
+                     m )
+                ~plonk ~alpha ~t_comm )
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
@@ -686,8 +1081,25 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
-          let num_commitments_without_degree_bound = Nat.N45.n in
+          let len_1, len_1_add = Plonk_types.(Columns.add Permuts_minus_1.n) in
+          let len_2, len_2_add = Plonk_types.(Columns.add len_1) in
+          let _len_3, len_3_add = Nat.N9.add len_2 in
+          let _len_4, len_4_add = Nat.N6.add Plonk_types.Lookup_sorted.n in
+          let len_5, len_5_add =
+            (* NB: Using explicit 11 because we can't get add on len_4 *)
+            Nat.N11.add Nat.N7.n
+          in
+          let len_6, len_6_add = Nat.N45.add len_5 in
+          let num_commitments_without_degree_bound = len_6 in
           let without_degree_bound =
+            let append_chain len second first =
+              Vector.append first second len
+            in
+            let undo_chunking =
+              Types.Opt.map ~f:(fun x ->
+                  assert (Array.length x = 1) ;
+                  x.(0) )
+            in
             (* sg_old
                x_hat
                ft_comm
@@ -697,22 +1109,54 @@ struct
                w_comms
                all but last sigma_comm
             *)
-            Vector.append sg_old
-              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
-                :: [| m.psm_comm |] :: [| m.complete_add_comm |]
-                :: [| m.mul_comm |] :: [| m.emul_comm |]
-                :: [| m.endomul_scalar_comm |]
-                :: Vector.append w_comm
-                     (Vector.append
-                        (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
-                        (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
-                        (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
-                     (snd
-                        Plonk_types.(
-                          Columns.add (fst (Columns.add Permuts_minus_1.n))) )
-              |> Vector.map ~f:(Array.map ~f:(fun g -> (Boolean.true_, g))) )
-              (snd
-                 (Max_proofs_verified.add num_commitments_without_degree_bound) )
+            Vector.map sg_old
+              ~f:
+                (Array.map ~f:(fun (keep, p) ->
+                     Plonk_types.Opt.Maybe (keep, p) ) )
+            |> append_chain
+                 (snd (Max_proofs_verified.add len_6))
+                 ( [ [| x_hat |]
+                   ; [| ft_comm |]
+                   ; z_comm
+                   ; [| m.generic_comm |]
+                   ; [| m.psm_comm |]
+                   ; [| m.complete_add_comm |]
+                   ; [| m.mul_comm |]
+                   ; [| m.emul_comm |]
+                   ; [| m.endomul_scalar_comm |]
+                   ]
+                 |> append_chain len_3_add
+                      (Vector.append w_comm
+                         (Vector.append
+                            (Vector.map m.coefficients_comm ~f:(fun g ->
+                                 [| g |] ) )
+                            (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                            len_1_add )
+                         len_2_add )
+                 |> Vector.map
+                      ~f:(Array.map ~f:(fun g -> Plonk_types.Opt.Some g))
+                 |> append_chain len_6_add
+                      ( [ m.range_check0_comm
+                        ; m.range_check1_comm
+                        ; m.foreign_field_add_comm
+                        ; m.foreign_field_mul_comm
+                        ; m.xor_comm
+                        ; m.rot_comm
+                        ]
+                      |> append_chain len_4_add
+                           (Vector.map ~f:undo_chunking lookup_sorted)
+                      |> append_chain len_5_add
+                           [ undo_chunking
+                             @@ Plonk_types.Opt.map messages.lookup ~f:(fun l ->
+                                    l.aggreg )
+                           ; undo_chunking lookup_table_comm
+                           ; m.runtime_tables_selector
+                           ; m.lookup_selector_xor
+                           ; m.lookup_selector_lookup
+                           ; m.lookup_selector_range_check
+                           ; m.lookup_selector_ffmul
+                           ]
+                      |> Vector.map ~f:(fun x -> [| x |]) ) )
           in
           check_bulletproof
             ~pcs_batch:
@@ -721,18 +1165,16 @@ struct
             ~sponge:sponge_before_evaluations ~xi ~advice ~openings_proof
             ~polynomials:
               ( Vector.map without_degree_bound
-                  ~f:(Array.map ~f:(fun (keep, x) -> (keep, `Finite x)))
+                  ~f:
+                    (Array.map ~f:(Plonk_types.Opt.map ~f:(fun x -> `Finite x)))
               , [] )
-        in
-        let joint_combiner =
-          if G.lookup_verification_enabled then failwith "TODO" else None
         in
         assert_eq_plonk
           { alpha = plonk.alpha
           ; beta = plonk.beta
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
-          ; joint_combiner
+          ; joint_combiner = plonk.joint_combiner
           ; feature_flags = plonk.feature_flags
           }
           { alpha

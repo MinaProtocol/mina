@@ -18,7 +18,7 @@ module Basic = struct
     ; wrap_domains : Domains.t
     ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
     }
 end
 
@@ -38,7 +38,7 @@ module Side_loaded = struct
     type ('var, 'value, 'n1, 'n2) t =
       { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
-      ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+      ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
       ; branches : 'n2 Nat.t
       }
   end
@@ -82,7 +82,7 @@ module Compiled = struct
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
     }
 
   (* This is the data associated to an inductive proof system with statement type
@@ -99,7 +99,7 @@ module Compiled = struct
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
     }
 
   type packed =
@@ -140,7 +140,7 @@ module For_step = struct
         | `Side_loaded of
           Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
     }
 
   let of_side_loaded (type a b c d)
@@ -251,7 +251,8 @@ let public_input :
 
 let feature_flags :
     type var value.
-    (var, value, _, _) Tag.t -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+       (var, value, _, _) Tag.t
+    -> Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t =
  fun tag ->
   match tag.kind with
   | Compiled ->

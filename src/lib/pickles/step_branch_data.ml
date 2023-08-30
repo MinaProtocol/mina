@@ -73,7 +73,7 @@ let create
     (type branches max_proofs_verified var value a_var a_value ret_var ret_value)
     ~index ~(self : (var, value, max_proofs_verified, branches) Tag.t)
     ~wrap_domains
-    ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
+    ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t)
     ~(actual_feature_flags : bool Plonk_types.Features.t)
     ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
@@ -160,7 +160,7 @@ let create
         ~wrap_rounds:Backend.Tock.Rounds.n ~feature_flags
       (* TODO *)
     in
-    Fix_domains.domains
+    Fix_domains.domains ~feature_flags:actual_feature_flags
       (module Impls.Step)
       (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
       etyp main

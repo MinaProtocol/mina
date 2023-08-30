@@ -182,7 +182,8 @@ let verify_heterogenous (ts : Instance.t list) =
           }
         in
         let input =
-          tock_unpadded_public_input_of_statement prepared_statement
+          tock_unpadded_public_input_of_statement
+            ~feature_flags:Plonk_types.Features.Full.maybe prepared_statement
         in
         let message =
           Wrap_hack.pad_accumulator

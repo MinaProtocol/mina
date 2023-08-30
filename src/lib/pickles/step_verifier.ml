@@ -7,8 +7,6 @@ open Util
 open Types.Step
 open Pickles_types
 
-let lookup_verification_enabled = false
-
 module Make
     (Inputs : Intf.Step_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
@@ -273,8 +271,10 @@ struct
                   )
                 ~xi
                 ~init:(function
-                  | `Finite x -> `Finite x | `Maybe_finite x -> `Maybe_finite x
-                  )
+                  | `Finite x ->
+                      Some (`Finite x)
+                  | `Maybe_finite x ->
+                      Some (`Maybe_finite x) )
                 (Vector.map without_degree_bound
                    ~f:(Array.map ~f:(fun x -> `Finite x)) )
                 (Vector.map with_degree_bound
@@ -597,9 +597,7 @@ struct
                 ~sponge:sponge_before_evaluations ~xi ~advice ~opening
                 ~polynomials:(without_degree_bound, []) )
         in
-        let joint_combiner =
-          if lookup_verification_enabled then failwith "TODO" else None
-        in
+        let joint_combiner = None in
         assert_eq_deferred_values
           { alpha = plonk.alpha
           ; beta = plonk.beta
