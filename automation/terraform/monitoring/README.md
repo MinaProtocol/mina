@@ -64,7 +64,7 @@ Executed by CI's *Lint/TestnetAlerts* [job](https://github.com/MinaProtocol/mina
 
 #### Deployment
 
-Deploying testnet alert rules entails syncing the rendered configuration in source with the Prometheus instance rules config found [here](https://o1testnet.grafana.net/a/grafana-alerting-ui-app/?tab=rules&rulessource=grafanacloud-o1testnet-prom). Appropriate AWS access is necessary for authenticating with Grafanacloud and should be similar to, if not the same, as those used for deploying testnets.
+Deploying testnet alert rules entails syncing the rendered configuration in source with the Prometheus instance rules config found [here](https://o1testnet.grafana.net/a/grafana-alerting-ui-app/?tab=rules&rulessource=grafanacloud-o1testnet-prom). Appropriate AWS access is necessary for authenticating with Grafanacloud and must be similar to, if not the same, as those used for deploying testnets.
 
 ###### automation
 
@@ -76,12 +76,12 @@ Executed by CI's *Release/TestnetAlerts* [job](https://github.com/MinaProtocol/m
     terraform apply -target module.o1testnet_alerts.docker_container.sync_alert_rules
 ```
 
-**Note:** operation will sync provisioned alerts with exact match of alert file state (e.g. alerts removed from the alert file will be unprovisioned on Grafanacloud)
+**Note:** Operation will sync provisioned alerts with an exact match of alert file state (e.g. alerts removed from the alert file will be unprovisioned on Grafanacloud)
 
-**Warning:** Unfortunately terraform silences errors which cortextool is producing, for example when syncing rules. In order to debug sync rules process:
-- Obtain secrets (id,address,key) from aws secret manager 
-- Run above terraform command once again
-- Run below command in automation/terraform/monitoring folder: 
+**Warning:** Unfortunately terraform silences errors which cortextool is producing, for example when syncing rules. To debug sync rules, follow these steps:
+    - Obtain secrets (id,address,key) from AWS secret manager 
+    - Run the previous terraform command once again
+    - Run the following command in automation/terraform/monitoring folder: 
 
 ```
     ~/.local/bin/cortextool rules sync --rule-files alert_rules.yml --id ... --address ... --key ... 
@@ -101,7 +101,7 @@ Alerting rule violations can also be viewed in Grafanacloud's Alertmanager [UI](
 
 #### PagerDuty
 
-PagerDuty is O(1) Lab's primary alert receiver and is currently configured with a single [service](https://o1labs.pagerduty.com/service-directory/PY2JUNP) for monitoring Mina testnet deployments. This service receives alert notifications requiring attention from the development team to assist in repairing issues and restoring network health.
+PagerDuty is O(1) Lab's primary alert receiver and is configured with a single [service](https://o1labs.pagerduty.com/service-directory/PY2JUNP) for monitoring Mina testnet deployments. This service receives alert notifications requiring attention from the development team to assist in repairing issues and restoring network health.
 
 For more information, reach out to [#reliability-engineering](https://discord.com/channels/484437221055922177/610580493859160072) on Mina's Discord channel with questions etc.
 
@@ -114,7 +114,8 @@ For more information, reach out to [#reliability-engineering](https://discord.co
 
 ##### Creating new silences
 
-When creating new alert silences (from the above links or otherwise), you'll likely want to make use of the AlertManager's `Matchers` construct, which basically consists of a set of key-value pairs used to target the alert to silence. For example, if silencing the "LowFillRate" alert currently firing for testnet *devnet*, you would create a new silence with individual `Matchers` for the alert name and testnet like the following:
+When creating new alert silences (from the preceding links or otherwise), you'll likely want to make use of the AlertManager `Matchers` construct that basically consists of a set of key-value pairs used to target the alert to silence. For example, to silence the "LowFillRate" alert currently firing for testnet *devnet*, 
+ create a new silence with individual `Matchers` for the alert name and testnet like the following:
 
 ###### Matchers example
 
@@ -125,15 +126,15 @@ When creating new alert silences (from the above links or otherwise), you'll lik
 
 ![Grafanacloud New Silence](https://storage.googleapis.com/shared-artifacts/grafanacloud-new-silence-example.png)
 
-Note the `Start`, `Duration` and `End` inputs in the UI. Typically only the duration of a silence would be updated though Alertmanager supports specification of start and end times based on internet timing standards [RFC3339](https://xml2rfc.tools.ietf.org/public/rfc/html/rfc3339.html#anchor14).
+Note the `Start`, `Duration`, and `End` inputs in the UI. Typically, only the duration of a silence is updated although Alertmanager supports the specification of start and end times based on internet timing standards [RFC3339](https://xml2rfc.tools.ietf.org/public/rfc/html/rfc3339.html#anchor14).
 
 **Be sure to set the *Creator* and *Comments* field accordingly to provide insight into the reasoning for the silence and guidelines for following up.**
 
 #### Update Alert Receivers
 
-Alert receivers are reporting endpoints for messaging alert rules which are in violation. Think a *PagerDuty* page, *incident* email, SMS message or Discord notification. A list of available receivers along with their associated configuration documentation can be found [here](https://prometheus.io/docs/alerting/latest/configuration/). All receivers are configured within an *Alertmanager* service's receivers config which sets a series of alerting routes based on `match` and `match_re` (regular expression) qualifiers applied to incoming rule violations received by the service. Currently both PagerDuty and Discord webhook receivers are setup for receiving these rule violations and forwarding to their appropriate destinations and are configured [here](https://github.com/MinaProtocol/mina/blob/develop/automation/terraform/modules/testnet-alerts/templates/testnet-alert-receivers.yml.tpl).
+Alert receivers are reporting endpoints for messaging alert rules that are in violation, like *PagerDuty* pages, *incident* emails, SMS messages, or Discord notifications. A list of available receivers, along with their associated configuration documentation, can be found in the [Prometheus documentation](https://prometheus.io/docs/alerting/latest/configuration/). All receivers are configured in an *Alertmanager* service's receivers config that sets a series of alerting routes based on `match` and `match_re` (regular expression) qualifiers applied to incoming rule violations received by the service. Both PagerDuty and Discord webhook receivers are setup for receiving these rule violations and forwarding to their appropriate destinations and are configured in the [testnet-alert-receivers.yml.tpl](https://github.com/MinaProtocol/mina/blob/develop/automation/terraform/modules/testnet-alerts/templates/testnet-alert-receivers.yml.tpl) file.
 
-Updates to testnet alert receivers will typically involve 1 or more of the following tasks:
+Updates to testnet alert receivers typically involve 1 or more of the following tasks:
 * modify which testnets trigger Pagerduty incidents when alert rule violations occur
 * modify which testnets are included within the monitoring and alerting system (e.g. to exclude testnets launched by CI)
 * update the Testnet PagerDuty service integration key
@@ -143,25 +144,27 @@ Updates to testnet alert receivers will typically involve 1 or more of the follo
 
 The list of testnets which trigger PagerDuty incidents when rule violations occur is controlled by a single regular expression defined in the [o1-testnet-alerts](https://github.com/MinaProtocol/mina/blob/develop/automation/terraform/monitoring/o1-testnet-alerts.tf#L17) terraform module config. 
 
-This value can be modified to any regex for capturing testnets by name though should generally be a relatively simple expression (e.g. `"mainnet|qanet|release-net"`) considering the critical nature of the setting and allowing easy identification of which testnets developers will be paged about.
+You can modify this value to any regex for capturing testnets by name, although the value is generally a relatively simple expression (e.g. `"mainnet|qanet|release-net"`) considering the critical nature of the setting and allowing easy identification of which testnets the developers will be paged about.
 
 ##### Modify monitored testnets
 
-Like the list of testnets which trigger PagerDuty incidents, the list of testnets monitored is also controlled by a single regular expression defined in the [o1-testnet-alerts](https://github.com/MinaProtocol/mina/blob/develop/automation/terraform/monitoring/o1-testnet-alerts.tf#L15) terraform module config. This setting should always be a superset of the testnets alerting to PagerDuty since it manages all testnets to be included in the monitoring and alerting pipeline and both operationally and technically should be as expressive as visibility calls for.
+Like the list of testnets that trigger PagerDuty incidents, the list of testnets monitored is also controlled by a single regular expression defined in the [o1-testnet-alerts](https://github.com/MinaProtocol/mina/blob/develop/automation/terraform/monitoring/o1-testnet-alerts.tf#L15) terraform module config. This setting must always be a superset of the testnets alerting to PagerDuty since it manages all testnets to be included in the monitoring and alerting pipeline and both operationally and technically must be as expressive as visibility calls for.
 
 ##### Update Pagerduty Testnet Service Integration Key 
 
-Reach out to *#reliability-engineering* for assistance.
+For assistance, reach out to the *#reliability-engineering* channel in Mina Protocol Discord.
 
 ##### Update Discord webhook integration key 
 
-Reach out to *#reliability-engineering* for assistance.
+For assistance, reach out to the *#reliability-engineering* channel in Mina Protocol Discord.
 
 #### Deploy Alert Receiver Updates
 
 To view the current alerting receiver configuration or verify changes following a deployment, visit O(1) Lab's Grafanacloud alertmanager receiver [configuration](https://o1testnet.grafana.net/a/grafana-alerting-ui-app/?tab=config&alertmanager=grafanacloud-o1testnet-alertmanager).
 
 ##### Steps
+
+On the command line, run the following command from the [automation monitoring](https://github.com/MinaProtocol/mina/tree/develop/automation/terraform/monitoring) directory:
 
 ```
     terraform apply -target module.o1testnet_alerts.docker_container.update_alert_receivers
