@@ -114,14 +114,6 @@ module Proof = Plonk_dlog_proof.Make (struct
           Promise.run_in_thread (fun () ->
               create pk auxiliary_input runtime_tables prev_challenges prev_sgs ) )
 
-    let create_and_verify_async (pk : Keypair.t) ~primary ~auxiliary
-        ~runtime_tables ~prev_chals ~prev_comms =
-      create_aux pk primary auxiliary runtime_tables prev_chals prev_comms
-        ~f:(fun pk auxiliary_input runtime_tables prev_challenges prev_sgs ->
-          Promise.run_in_thread (fun () ->
-              create_and_verify pk auxiliary_input runtime_tables
-                prev_challenges prev_sgs ) )
-
     let create (pk : Keypair.t) ~primary ~auxiliary ~runtime_tables ~prev_chals
         ~prev_comms =
       create_aux pk primary auxiliary runtime_tables prev_chals prev_comms

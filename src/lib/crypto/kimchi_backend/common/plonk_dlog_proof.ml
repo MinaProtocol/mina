@@ -110,15 +110,6 @@ module type Inputs_intf = sig
       -> prev_comms:Curve.Affine.Backend.t array
       -> t Promise.t
 
-    val create_and_verify_async :
-         Index.t
-      -> primary:Scalar_field.Vector.t
-      -> auxiliary:Scalar_field.Vector.t
-      -> runtime_tables:Scalar_field.t Kimchi_types.runtime_table array
-      -> prev_chals:Scalar_field.t array
-      -> prev_comms:Curve.Affine.Backend.t array
-      -> t Promise.t
-
     val verify : Verifier_index.t -> t -> bool
 
     val batch_verify : Verifier_index.t array -> t array -> bool Promise.t
@@ -526,26 +517,6 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let%map.Promise res =
       Backend.create_async pk ~primary ~auxiliary ~runtime_tables
-        ~prev_chals:challenges ~prev_comms:commitments
-    in
-    of_backend res
-
-  let create_and_verify_async ?message pk ~primary ~auxiliary ~runtime_tables =
-    let chal_polys =
-      match (message : message option) with Some s -> s | None -> []
-    in
-    let challenges =
-      List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
-          challenges )
-      |> Array.concat
-    in
-    let commitments =
-      Array.of_list_map chal_polys
-        ~f:(fun { Challenge_polynomial.commitment; _ } ->
-          G.Affine.to_backend (Finite commitment) )
-    in
-    let%map.Promise res =
-      Backend.create_and_verify_async pk ~primary ~auxiliary ~runtime_tables
         ~prev_chals:challenges ~prev_comms:commitments
     in
     of_backend res
