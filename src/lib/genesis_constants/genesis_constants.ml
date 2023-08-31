@@ -174,8 +174,7 @@ module Constraint_constants = struct
                 fork_previous_state_hash
           ; previous_length = Mina_numbers.Length.of_int fork_previous_length
           ; previous_global_slot =
-              Mina_numbers.Global_slot_since_genesis.of_int
-                fork_genesis_slot
+              Mina_numbers.Global_slot_since_genesis.of_int fork_genesis_slot
           }
 
       [%%endif]
