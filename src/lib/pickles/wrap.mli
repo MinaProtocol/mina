@@ -16,9 +16,6 @@ val wrap :
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Plonk_types.Opt.t
          , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Plonk_types.Opt.t
@@ -39,7 +36,7 @@ val wrap :
   -> step_vk:Kimchi_bindings.Protocol.VerifierIndex.Fp.t
   -> actual_wrap_domains:(Core_kernel.Int.t, 'c) Pickles_types.Vector.t
   -> step_plonk_indices:'d
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
   -> actual_feature_flags:bool Plonk_types.Features.t
   -> ?tweak_statement:
        (   ( Import.Challenge.Constant.t
@@ -49,10 +46,6 @@ val wrap :
              , bool )
              Import.Types.Opt.t
            , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-               Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-               .In_circuit
-               .Lookup
-               .t
              , bool )
              Import.Types.Opt.t
            , bool
@@ -82,10 +75,6 @@ val wrap :
              , bool )
              Import.Types.Opt.t
            , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-               Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-               .In_circuit
-               .Lookup
-               .t
              , bool )
              Import.Types.Opt.t
            , bool

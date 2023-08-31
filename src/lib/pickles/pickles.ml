@@ -228,7 +228,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         { max_proofs_verified
         ; public_input = typ
         ; branches = Verification_key.Max_branches.n
-        ; feature_flags
+        ; feature_flags =
+            Plonk_types.(Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags)
         }
 
     module Proof = struct
@@ -1136,7 +1137,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let full_signature =
             { Full_signature.padded; maxes = (module Maxes) }
           in
-          let feature_flags = Plonk_types.Features.none in
+          let feature_flags = Plonk_types.Features.Full.none in
           let actual_feature_flags = Plonk_types.Features.none_bool in
           let wrap_domains =
             let module M =
@@ -1257,7 +1258,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let (wrap_pk, wrap_vk), disk_key =
             let open Impls.Wrap in
-            let (T (typ, conv, _conv_inv)) = input () in
+            let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
             let main x () : unit = wrap_main (conv x) in
             let self_id = Type_equal.Id.uid self.id in
             let disk_key_prover =
@@ -1425,7 +1426,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     let module O = Tick.Oracles in
                     let public_input =
                       tick_public_input_of_statement ~max_proofs_verified
-                        ~feature_flags:Plonk_types.Features.none
+                        ~feature_flags:Plonk_types.Features.Full.none
                         prev_statement_with_hashes
                     in
                     let prev_challenges =
@@ -1708,7 +1709,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                   ; alpha = plonk0.alpha
                                   ; beta = chal plonk0.beta
                                   ; gamma = chal plonk0.gamma
-                                  ; lookup = Plonk_types.Opt.None
+                                  ; joint_combiner = Plonk_types.Opt.None
                                   }
                               }
                           ; sponge_digest_before_evaluations =
@@ -1727,7 +1728,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         next_statement.proof_state.messages_for_next_wrap_proof
                     in
                     let%map.Promise next_proof =
-                      let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
+                      let (T (input, conv, _conv_inv)) =
+                        Impls.Wrap.input ~feature_flags ()
+                      in
                       Common.time "wrap proof" (fun () ->
                           Impls.Wrap.generate_witness_conv
                             ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs
@@ -1773,7 +1776,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                             .deferred_values
                                             .plonk
                                           with
-                                          lookup = None
+                                          joint_combiner = None
                                         }
                                     }
                                 }
