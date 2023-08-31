@@ -16,6 +16,8 @@ module Plonk_constraint_system : sig
   val get_concatenated_runtime_lookup_table_size : ('a, 'b) t -> int
 
   val get_rows_len : ('a, 'b) t -> int
+
+  val finalize : _ t -> unit
 end
 
 module Dlog_plonk_based_keypair = Dlog_plonk_based_keypair
