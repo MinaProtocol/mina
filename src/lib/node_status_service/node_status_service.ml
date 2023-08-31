@@ -152,12 +152,12 @@ let reset_gauges () =
   Queue.clear Transition_frontier.rejected_blocks
 
 let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
-    ~network ~addrs_and_ports ~start_time ~slot_duration =
+    ~network ~addrs_and_ports ~start_time  =
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
-  let five_slots = Time.Span.scale slot_duration 5. in
+  let report_interval = Time.Span.minute in
   reset_gauges () ;
-  every ~start:(after five_slots) ~continue_on_error:true five_slots
+  every ~start:(after report_interval) ~continue_on_error:true report_interval
   @@ fun () ->
   don't_wait_for
   @@ O1trace.thread "node_status_service"

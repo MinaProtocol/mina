@@ -1391,9 +1391,6 @@ let start t =
           ~sync_status:t.sync_status ~chain_id:t.config.chain_id
           ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
           ~start_time:t.config.start_time
-          ~slot_duration:
-            (Block_time.Span.to_time_span
-               t.config.precomputed_values.consensus_constants.slot_duration_ms )
     | None ->
         ()
   in
