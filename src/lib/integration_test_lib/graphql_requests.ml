@@ -153,6 +153,15 @@ module Graphql = struct
   |}]
 
   module Best_chain =
+  (* "slot" is serialized using Graphql_lib.Scalars.Slot
+     to use that, we'd need to add the 'consensus' library,
+     which seems an undesirable dependency
+
+     semantically, it's a slot since hard fork, so decode it as such
+
+     that benign mismatch could be avoided by changing the encoding type
+     in proof_of_stake.ml
+  *)
   [%graphql
   {|
     query ($max_length: Int) @encoders(module: "Encoders"){
@@ -161,6 +170,13 @@ module Graphql = struct
         commandTransactionCount
         creatorAccount {
           publicKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+        }
+        protocolState {
+          consensusState {
+            blockHeight
+            slotSinceGenesis @ppxCustom(module: "Graphql_lib.Scalars.GlobalSlotSinceGenesis")
+            slot @ppxCustom(module: "Graphql_lib.Scalars.GlobalSlotSinceHardFork")
+          }
         }
       }
     }
@@ -342,6 +358,11 @@ let get_best_chain ?max_length ~logger node_uri =
                        pk
                    | _ ->
                        "unknown" )
+               ; height = block.protocolState.consensusState.blockHeight
+               ; global_slot_since_genesis =
+                   block.protocolState.consensusState.slotSinceGenesis
+               ; global_slot_since_hard_fork =
+                   block.protocolState.consensusState.slot
                } )
            (Array.to_list chain)
 
