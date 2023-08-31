@@ -143,45 +143,40 @@ let test_compute_witness_returns_correctly_filled_runtime_tables_one_lookup () =
      We start with one lookup
   *)
   let n = 10 in
-  let indexed_runtime_table_cfg = Array.init n Tick.Field.of_int in
+  let first_column = Array.init n Tick.Field.of_int in
   let table_id = 0 in
-  let table_id_var, idx1_var, v1_var =
-    Snarky_backendless.Cvar.(Var 0, Var 1, Var 2)
-  in
-  let cs = Tick.R1CS_constraint_system.create () in
-  (* Config *)
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T
-         (AddRuntimeTableCfg
-            { id = Int32.of_int table_id
-            ; first_column = indexed_runtime_table_cfg
-            } ) )) ;
-  (* One lookup *)
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T
-         (Lookup
-            { w0 = table_id_var
-            ; w1 = idx1_var
-            ; w2 = v1_var
-            ; w3 = idx1_var
-            ; w4 = v1_var
-            ; w5 = idx1_var
-            ; w6 = v1_var
-            } ) )) ;
-  let () = Tick.R1CS_constraint_system.set_primary_input_size cs 0 in
-  let () = Tick.R1CS_constraint_system.set_auxiliary_input_size cs 3 in
-  (* Random value for the lookup *)
   let idx = Random.int n in
   let v = Tick.Field.random () in
-  (* For the external values to give to the compute witness fn *)
-  let ftable_id = Tick.Field.of_int table_id in
-  let fidx = Tick.Field.of_int idx in
-  let external_values = Array.get [| ftable_id; fidx; v |] in
+  let external_values = Tick.Field.[| of_int table_id; of_int idx; v |] in
+  let cs =
+    Impl.constraint_system ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
+      (fun () () ->
+        let vtable_id =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(0))
+        in
+        let vidx =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(1))
+        in
+        let vv =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(2))
+        in
+        (* Config *)
+        add_constraint
+          (AddRuntimeTableCfg { id = Int32.of_int table_id; first_column }) ;
+        add_constraint
+          (Lookup
+             { w0 = vtable_id
+             ; w1 = vidx
+             ; w2 = vv
+             ; w3 = vidx
+             ; w4 = vv
+             ; w5 = vidx
+             ; w6 = vv
+             } ) )
+  in
   let _ = Tick.R1CS_constraint_system.finalize cs in
   let _witnesses, runtime_tables =
-    Tick.R1CS_constraint_system.compute_witness cs external_values
+    Tick.R1CS_constraint_system.compute_witness cs (Array.get external_values)
   in
   (* checking only one table has been created *)
   assert (Array.length runtime_tables = 1) ;
@@ -198,57 +193,48 @@ let test_compute_witness_returns_correctly_filled_runtime_tables_multiple_lookup
      We start with one lookup
   *)
   let n = 10 in
-  let indexed_runtime_table_cfg = Array.init n Tick.Field.of_int in
+  let first_column = Array.init n Tick.Field.of_int in
   let table_id = 0 in
-  let table_id_var = Snarky_backendless.Cvar.Var 0 in
-  let cs = Tick.R1CS_constraint_system.create () in
-  (* Config *)
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T
-         (AddRuntimeTableCfg
-            { id = Int32.of_int table_id
-            ; first_column = indexed_runtime_table_cfg
-            } ) )) ;
+  let exp_rt_data = Array.init n (fun _ -> Tick.Field.zero) in
   (* nb of lookups *)
   let m = Random.int n in
-  let exp_rt_data = Array.init n (fun _ -> Tick.Field.zero) in
-  (* For the external values to give to the compute witness fn *)
-  let ftable_id = Tick.Field.of_int table_id in
   let external_values = Array.init (1 + (m * 2)) (fun _ -> Tick.Field.zero) in
-  external_values.(0) <- ftable_id ;
-  let _ =
-    List.init m (fun i ->
-        let j = (2 * i) + 1 in
-        let idx_var = Snarky_backendless.Cvar.Var j in
-        let val_var = Snarky_backendless.Cvar.Var (j + 1) in
-        (* One lookup *)
-        let _ =
-          Tick.R1CS_constraint_system.(
-            add_constraint cs
-              (T
-                 (Lookup
-                    { w0 = table_id_var
-                    ; w1 = idx_var
-                    ; w2 = val_var
-                    ; w3 = idx_var
-                    ; w4 = val_var
-                    ; w5 = idx_var
-                    ; w6 = val_var
-                    } ) ))
+  let cs =
+    Impl.constraint_system ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
+      (fun () () ->
+        let vtable_id =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(0))
         in
-        (* Random value for the lookup *)
-        let idx = Random.int n in
-        let v = Tick.Field.random () in
-        external_values.(j) <- Tick.Field.of_int idx ;
-        external_values.(j + 1) <- v ;
-        exp_rt_data.(idx) <- v ;
-        (idx_var, val_var) )
+        (* Config *)
+        add_constraint
+          (AddRuntimeTableCfg { id = Int32.of_int table_id; first_column }) ;
+        ignore
+        @@ List.init m (fun i ->
+               let j = (2 * i) + 1 in
+               let idx = Random.int n in
+               let v = Tick.Field.random () in
+               external_values.(j) <- Tick.Field.of_int idx ;
+               external_values.(j + 1) <- v ;
+               exp_rt_data.(idx) <- v ;
+               let vidx =
+                 Impl.exists Impl.Field.typ ~compute:(fun () ->
+                     external_values.(j) )
+               in
+               let vv =
+                 Impl.exists Impl.Field.typ ~compute:(fun () ->
+                     external_values.(j + 1) )
+               in
+               add_constraint
+                 (Lookup
+                    { w0 = vtable_id
+                    ; w1 = vidx
+                    ; w2 = vv
+                    ; w3 = vidx
+                    ; w4 = vv
+                    ; w5 = vidx
+                    ; w6 = vv
+                    } ) ) )
   in
-  let nb_aux = (2 * m) + 1 in
-  let () = Tick.R1CS_constraint_system.set_primary_input_size cs 0 in
-  let () = Tick.R1CS_constraint_system.set_auxiliary_input_size cs nb_aux in
-
   let _ = Tick.R1CS_constraint_system.finalize cs in
   let _witnesses, runtime_tables =
     Tick.R1CS_constraint_system.compute_witness cs (Array.get external_values)
@@ -267,59 +253,17 @@ let test_compute_witness_with_fixed_lookup_table_and_runtime_table () =
   let n = 10 in
   (* Fixed table *)
   let fixed_lt_id = 2 in
-  let fixed_lt_id_var = Snarky_backendless.Cvar.Var 0 in
   let indexes = Array.init n Tick.Field.of_int in
   let fixed_lt_values = Array.init n (fun _ -> Tick.Field.random ()) in
   let data = [| indexes; fixed_lt_values |] in
-  let cs = Tick.R1CS_constraint_system.create () in
-  (* Add the fixed lookup table to the cs *)
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T (AddFixedLookupTable { id = Int32.of_int fixed_lt_id; data }))) ;
-  (* Runtime table cfg *)
-  let rt_cfg_id = 3 in
-  let rt_cfg_id_var = Snarky_backendless.Cvar.Var 1 in
-  let first_column = Array.init n Tick.Field.of_int in
-  let data = Array.init n (fun _ -> Tick.Field.random ()) in
-  (* Config *)
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T (AddRuntimeTableCfg { id = Int32.of_int rt_cfg_id; first_column }))) ;
-  (* Lookup into fixed lookup table *)
+  (* Lookup info for fixed lookup *)
   let fixed_lookup_idx = 0 in
-  let vfixed_lookup_idx = Snarky_backendless.Cvar.Var 2 in
   let fixed_lookup_v = fixed_lt_values.(fixed_lookup_idx) in
-  let vfixed_lookup_v = Snarky_backendless.Cvar.Var 3 in
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T
-         (Lookup
-            { w0 = fixed_lt_id_var
-            ; w1 = vfixed_lookup_idx
-            ; w2 = vfixed_lookup_v
-            ; w3 = vfixed_lookup_idx
-            ; w4 = vfixed_lookup_v
-            ; w5 = vfixed_lookup_idx
-            ; w6 = vfixed_lookup_v
-            } ) )) ;
-  (* Lookup into runtime table *)
+  (* rt *)
+  let rt_cfg_id = 3 in
+  let first_column = Array.init n Tick.Field.of_int in
   let rt_idx = 1 in
-  let vrt_idx = Snarky_backendless.Cvar.Var 4 in
-  let rt_v = data.(rt_idx) in
-  let vrt_v = Snarky_backendless.Cvar.Var 5 in
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T
-         (Lookup
-            { w0 = rt_cfg_id_var
-            ; w1 = vrt_idx
-            ; w2 = vrt_v
-            ; w3 = vrt_idx
-            ; w4 = vrt_v
-            ; w5 = vrt_idx
-            ; w6 = vrt_v
-            } ) )) ;
-
+  let rt_v = Tick.Field.random () in
   let external_values =
     [| Tick.Field.of_int fixed_lt_id
      ; Tick.Field.of_int rt_cfg_id
@@ -329,10 +273,57 @@ let test_compute_witness_with_fixed_lookup_table_and_runtime_table () =
      ; rt_v
     |]
   in
-  let () = Tick.R1CS_constraint_system.set_primary_input_size cs 0 in
-  let () =
-    Tick.R1CS_constraint_system.set_auxiliary_input_size cs
-      (Array.length external_values)
+  let cs =
+    Impl.constraint_system ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
+      (fun () () ->
+        (* Add the fixed lookup table to the cs *)
+        add_constraint
+          (AddFixedLookupTable { id = Int32.of_int fixed_lt_id; data }) ;
+        let vfixed_lt_id =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(0))
+        in
+
+        (* Runtime table cfg *)
+        let vrt_cfg_id =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(1))
+        in
+        (* Config *)
+        add_constraint
+          (AddRuntimeTableCfg { id = Int32.of_int rt_cfg_id; first_column }) ;
+        (* Lookup into fixed lookup table *)
+        let vfixed_lookup_idx =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(2))
+        in
+        let vfixed_lookup_v =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(3))
+        in
+        add_constraint
+          (Lookup
+             { w0 = vfixed_lt_id
+             ; w1 = vfixed_lookup_idx
+             ; w2 = vfixed_lookup_v
+             ; w3 = vfixed_lookup_idx
+             ; w4 = vfixed_lookup_v
+             ; w5 = vfixed_lookup_idx
+             ; w6 = vfixed_lookup_v
+             } ) ;
+        (* Lookup into runtime table *)
+        let vrt_idx =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(4))
+        in
+        let vrt_v =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(5))
+        in
+        add_constraint
+          (Lookup
+             { w0 = vrt_cfg_id
+             ; w1 = vrt_idx
+             ; w2 = vrt_v
+             ; w3 = vrt_idx
+             ; w4 = vrt_v
+             ; w5 = vrt_idx
+             ; w6 = vrt_v
+             } ) )
   in
 
   let _ = Tick.R1CS_constraint_system.finalize cs in
@@ -354,59 +345,15 @@ let test_compute_witness_with_fixed_lookup_table_and_runtime_table_sharing_ids
   let n = 10 in
   (* Fixed table *)
   let fixed_lt_id = 2 in
-  let fixed_lt_id_var = Snarky_backendless.Cvar.Var 0 in
+  let rt_cfg_id = fixed_lt_id in
   let indexes = Array.init n Tick.Field.of_int in
   let fixed_lt_values = Array.init n (fun _ -> Tick.Field.random ()) in
   let data = [| indexes; fixed_lt_values |] in
-  let cs = Tick.R1CS_constraint_system.create () in
-  (* Add the fixed lookup table to the cs *)
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T (AddFixedLookupTable { id = Int32.of_int fixed_lt_id; data }))) ;
-  (* Runtime table cfg *)
-  let rt_cfg_id = fixed_lt_id in
-  let rt_cfg_id_var = Snarky_backendless.Cvar.Var 1 in
-  (* Extend the lookup table *)
-  let first_column = Array.init n (fun i -> Tick.Field.of_int (n + i)) in
-  (* Config *)
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T (AddRuntimeTableCfg { id = Int32.of_int rt_cfg_id; first_column }))) ;
   (* Lookup into fixed lookup table *)
   let fixed_lookup_idx = Random.int n in
-  let vfixed_lookup_idx = Snarky_backendless.Cvar.Var 2 in
   let fixed_lookup_v = fixed_lt_values.(fixed_lookup_idx) in
-  let vfixed_lookup_v = Snarky_backendless.Cvar.Var 3 in
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T
-         (Lookup
-            { w0 = fixed_lt_id_var
-            ; w1 = vfixed_lookup_idx
-            ; w2 = vfixed_lookup_v
-            ; w3 = vfixed_lookup_idx
-            ; w4 = vfixed_lookup_v
-            ; w5 = vfixed_lookup_idx
-            ; w6 = vfixed_lookup_v
-            } ) )) ;
-  (* Lookup into runtime table *)
   let rt_idx = n + Random.int n in
-  let vrt_idx = Snarky_backendless.Cvar.Var 4 in
   let rt_v = Tick.Field.random () in
-  let vrt_v = Snarky_backendless.Cvar.Var 5 in
-  Tick.R1CS_constraint_system.(
-    add_constraint cs
-      (T
-         (Lookup
-            { w0 = rt_cfg_id_var
-            ; w1 = vrt_idx
-            ; w2 = vrt_v
-            ; w3 = vrt_idx
-            ; w4 = vrt_v
-            ; w5 = vrt_idx
-            ; w6 = vrt_v
-            } ) )) ;
-
   let external_values =
     [| Tick.Field.of_int fixed_lt_id
      ; Tick.Field.of_int rt_cfg_id
@@ -416,12 +363,58 @@ let test_compute_witness_with_fixed_lookup_table_and_runtime_table_sharing_ids
      ; rt_v
     |]
   in
-  let () = Tick.R1CS_constraint_system.set_primary_input_size cs 0 in
-  let () =
-    Tick.R1CS_constraint_system.set_auxiliary_input_size cs
-      (Array.length external_values)
-  in
+  (* Extend the lookup table *)
+  let first_column = Array.init n (fun i -> Tick.Field.of_int (n + i)) in
+  let cs =
+    Impl.constraint_system ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
+      (fun () () ->
+        (* Add the fixed lookup table to the cs *)
+        add_constraint
+          (AddFixedLookupTable { id = Int32.of_int fixed_lt_id; data }) ;
 
+        let vfixed_lt_id =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(0))
+        in
+        let vrt_cfg_id =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(1))
+        in
+        (* Config *)
+        add_constraint
+          (AddRuntimeTableCfg { id = Int32.of_int rt_cfg_id; first_column }) ;
+        let vfixed_lookup_idx =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(2))
+        in
+        let vfixed_lookup_v =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(3))
+        in
+        add_constraint
+          (Lookup
+             { w0 = vfixed_lt_id
+             ; w1 = vfixed_lookup_idx
+             ; w2 = vfixed_lookup_v
+             ; w3 = vfixed_lookup_idx
+             ; w4 = vfixed_lookup_v
+             ; w5 = vfixed_lookup_idx
+             ; w6 = vfixed_lookup_v
+             } ) ;
+        (* Lookup into runtime table *)
+        let vrt_idx =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(4))
+        in
+        let vrt_v =
+          Impl.exists Impl.Field.typ ~compute:(fun () -> external_values.(5))
+        in
+        add_constraint
+          (Lookup
+             { w0 = vrt_cfg_id
+             ; w1 = vrt_idx
+             ; w2 = vrt_v
+             ; w3 = vrt_idx
+             ; w4 = vrt_v
+             ; w5 = vrt_idx
+             ; w6 = vrt_v
+             } ) )
+  in
   let _ = Tick.R1CS_constraint_system.finalize cs in
   let _witnesses, runtime_tables =
     Tick.R1CS_constraint_system.compute_witness cs (Array.get external_values)
