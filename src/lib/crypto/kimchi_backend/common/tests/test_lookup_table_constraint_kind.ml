@@ -1,3 +1,12 @@
+(** Testing
+    -------
+    Component: Kimchi_backend_common
+    Subject: Testing computation of the witness and the tracking of fixed and
+      runtime lookup tables
+    Invocation: dune exec \
+      src/lib/crypto/kimchi_backend/common/tests/test_lookup_table_constraint_kind.exe
+*)
+
 (* Keeping the test low-level for learning purposes *)
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
