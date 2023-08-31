@@ -5,6 +5,7 @@
   alcotest
   bignum.bigint
   core_kernel
+  base
   digestif
   ppx_inline_test.config
   zarith
