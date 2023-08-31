@@ -418,21 +418,23 @@ struct
       let rec go :
           type a b c d.
              (a, b, c, d) H4.T(IR).t
-          -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+          -> Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t =
        fun rules ->
         match rules with
         | [] ->
-            Plonk_types.Features.none
+            Plonk_types.Features.Full.none
         | [ r ] ->
             Plonk_types.Features.map r.feature_flags ~f:(function
               | true ->
                   Plonk_types.Opt.Flag.Yes
               | false ->
                   Plonk_types.Opt.Flag.No )
+            |> Plonk_types.Features.to_full ~or_:Plonk_types.Opt.Flag.( ||| )
         | r :: rules ->
             let feature_flags = go rules in
-            Plonk_types.Features.map2 r.feature_flags feature_flags
-              ~f:(fun enabled flag ->
+            Plonk_types.Features.Full.map2
+              (Plonk_types.Features.to_full ~or_:( || ) r.feature_flags)
+              feature_flags ~f:(fun enabled flag ->
                 match (enabled, flag) with
                 | true, Yes ->
                     Plonk_types.Opt.Flag.Yes
@@ -863,7 +865,9 @@ module Side_loaded = struct
       { max_proofs_verified
       ; public_input = typ
       ; branches = Verification_key.Max_branches.n
-      ; feature_flags
+      ; feature_flags =
+          Plonk_types.Features.to_full ~or_:Plonk_types.Opt.Flag.( ||| )
+            feature_flags
       }
 
   module Proof = struct

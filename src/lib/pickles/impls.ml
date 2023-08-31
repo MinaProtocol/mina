@@ -222,23 +222,12 @@ module Wrap = struct
     let _to_bits x = Field.unpack x ~length:Field.size_in_bits
   end
 
-  let input ~feature_flags () =
+  let input
+      ~feature_flags:
+        ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags) () =
+    let feature_flags = Plonk_types.Features.of_full feature_flags in
     let lookup =
-      { Types.Wrap.Lookup_parameters.use =
-          (let { Plonk_types.Features.range_check0
-               ; range_check1
-               ; foreign_field_add = _ (* Doesn't use lookup *)
-               ; foreign_field_mul
-               ; xor
-               ; rot
-               ; lookup
-               ; runtime_tables = _
-               } =
-             feature_flags
-           in
-           Plonk_types.Opt.Flag.(
-             range_check0 ||| range_check1 ||| foreign_field_mul ||| xor ||| rot
-             ||| lookup) )
+      { Types.Wrap.Lookup_parameters.use = uses_lookups
       ; zero =
           { value =
               { challenge = Limb_vector.Challenge.Constant.zero

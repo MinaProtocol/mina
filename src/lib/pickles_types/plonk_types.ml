@@ -191,6 +191,185 @@ module Opt = struct
 end
 
 module Features = struct
+  module Full = struct
+    type 'bool t =
+      { range_check0 : 'bool
+      ; range_check1 : 'bool
+      ; foreign_field_add : 'bool
+      ; foreign_field_mul : 'bool
+      ; xor : 'bool
+      ; rot : 'bool
+      ; lookup : 'bool
+      ; runtime_tables : 'bool
+      ; uses_lookups : 'bool
+      ; table_width_at_least_1 : 'bool
+      ; table_width_at_least_2 : 'bool
+      ; table_width_3 : 'bool
+      ; lookups_per_row_3 : 'bool
+      ; lookups_per_row_4 : 'bool
+      ; lookup_pattern_xor : 'bool
+      ; lookup_pattern_range_check : 'bool
+      }
+    [@@deriving sexp, compare, yojson, hash, equal, hlist]
+
+    let get_feature_flag (feature_flags : _ t)
+        (feature : Kimchi_types.feature_flag) =
+      match feature with
+      | RangeCheck0 ->
+          Some feature_flags.range_check0
+      | RangeCheck1 ->
+          Some feature_flags.range_check1
+      | ForeignFieldAdd ->
+          Some feature_flags.foreign_field_add
+      | ForeignFieldMul ->
+          Some feature_flags.foreign_field_mul
+      | Xor ->
+          Some feature_flags.xor
+      | Rot ->
+          Some feature_flags.rot
+      | LookupTables ->
+          Some feature_flags.uses_lookups
+      | RuntimeLookupTables ->
+          Some feature_flags.runtime_tables
+      | TableWidth 3 ->
+          Some feature_flags.table_width_3
+      | TableWidth 2 ->
+          Some feature_flags.table_width_at_least_2
+      | TableWidth i when i <= 1 ->
+          Some feature_flags.table_width_at_least_1
+      | TableWidth _ ->
+          None
+      | LookupsPerRow 4 ->
+          Some feature_flags.lookups_per_row_4
+      | LookupsPerRow i when i <= 3 ->
+          Some feature_flags.lookups_per_row_3
+      | LookupsPerRow _ ->
+          None
+      | LookupPattern Lookup ->
+          Some feature_flags.lookup
+      | LookupPattern Xor ->
+          Some feature_flags.lookup_pattern_xor
+      | LookupPattern RangeCheck ->
+          Some feature_flags.lookup_pattern_range_check
+      | LookupPattern ForeignFieldMul ->
+          Some feature_flags.foreign_field_mul
+
+    let map
+        { range_check0
+        ; range_check1
+        ; foreign_field_add
+        ; foreign_field_mul
+        ; rot
+        ; xor
+        ; lookup
+        ; runtime_tables
+        ; uses_lookups
+        ; table_width_at_least_1
+        ; table_width_at_least_2
+        ; table_width_3
+        ; lookups_per_row_3
+        ; lookups_per_row_4
+        ; lookup_pattern_xor
+        ; lookup_pattern_range_check
+        } ~f =
+      { range_check0 = f range_check0
+      ; range_check1 = f range_check1
+      ; foreign_field_add = f foreign_field_add
+      ; foreign_field_mul = f foreign_field_mul
+      ; xor = f xor
+      ; rot = f rot
+      ; lookup = f lookup
+      ; runtime_tables = f runtime_tables
+      ; uses_lookups = f uses_lookups
+      ; table_width_at_least_1 = f table_width_at_least_1
+      ; table_width_at_least_2 = f table_width_at_least_2
+      ; table_width_3 = f table_width_3
+      ; lookups_per_row_3 = f lookups_per_row_3
+      ; lookups_per_row_4 = f lookups_per_row_4
+      ; lookup_pattern_xor = f lookup_pattern_xor
+      ; lookup_pattern_range_check = f lookup_pattern_range_check
+      }
+
+    let map2 x1 x2 ~f =
+      { range_check0 = f x1.range_check0 x2.range_check0
+      ; range_check1 = f x1.range_check1 x2.range_check1
+      ; foreign_field_add = f x1.foreign_field_add x2.foreign_field_add
+      ; foreign_field_mul = f x1.foreign_field_mul x2.foreign_field_mul
+      ; xor = f x1.xor x2.xor
+      ; rot = f x1.rot x2.rot
+      ; lookup = f x1.lookup x2.lookup
+      ; runtime_tables = f x1.runtime_tables x2.runtime_tables
+      ; uses_lookups = f x1.uses_lookups x2.uses_lookups
+      ; table_width_at_least_1 =
+          f x1.table_width_at_least_1 x2.table_width_at_least_1
+      ; table_width_at_least_2 =
+          f x1.table_width_at_least_2 x2.table_width_at_least_2
+      ; table_width_3 = f x1.table_width_3 x2.table_width_3
+      ; lookups_per_row_3 = f x1.lookups_per_row_3 x2.lookups_per_row_3
+      ; lookups_per_row_4 = f x1.lookups_per_row_4 x2.lookups_per_row_4
+      ; lookup_pattern_xor = f x1.lookup_pattern_xor x2.lookup_pattern_xor
+      ; lookup_pattern_range_check =
+          f x1.lookup_pattern_range_check x2.lookup_pattern_range_check
+      }
+
+    let none =
+      { range_check0 = Opt.Flag.No
+      ; range_check1 = Opt.Flag.No
+      ; foreign_field_add = Opt.Flag.No
+      ; foreign_field_mul = Opt.Flag.No
+      ; xor = Opt.Flag.No
+      ; rot = Opt.Flag.No
+      ; lookup = Opt.Flag.No
+      ; runtime_tables = Opt.Flag.No
+      ; uses_lookups = Opt.Flag.No
+      ; table_width_at_least_1 = Opt.Flag.No
+      ; table_width_at_least_2 = Opt.Flag.No
+      ; table_width_3 = Opt.Flag.No
+      ; lookups_per_row_3 = Opt.Flag.No
+      ; lookups_per_row_4 = Opt.Flag.No
+      ; lookup_pattern_xor = Opt.Flag.No
+      ; lookup_pattern_range_check = Opt.Flag.No
+      }
+
+    let maybe =
+      { range_check0 = Opt.Flag.Maybe
+      ; range_check1 = Opt.Flag.Maybe
+      ; foreign_field_add = Opt.Flag.Maybe
+      ; foreign_field_mul = Opt.Flag.Maybe
+      ; xor = Opt.Flag.Maybe
+      ; rot = Opt.Flag.Maybe
+      ; lookup = Opt.Flag.Maybe
+      ; runtime_tables = Opt.Flag.Maybe
+      ; uses_lookups = Opt.Flag.Maybe
+      ; table_width_at_least_1 = Opt.Flag.Maybe
+      ; table_width_at_least_2 = Opt.Flag.Maybe
+      ; table_width_3 = Opt.Flag.Maybe
+      ; lookups_per_row_3 = Opt.Flag.Maybe
+      ; lookups_per_row_4 = Opt.Flag.Maybe
+      ; lookup_pattern_xor = Opt.Flag.Maybe
+      ; lookup_pattern_range_check = Opt.Flag.Maybe
+      }
+
+    let none_bool =
+      { range_check0 = false
+      ; range_check1 = false
+      ; foreign_field_add = false
+      ; foreign_field_mul = false
+      ; xor = false
+      ; rot = false
+      ; lookup = false
+      ; runtime_tables = false
+      ; uses_lookups = false
+      ; table_width_at_least_1 = false
+      ; table_width_at_least_2 = false
+      ; table_width_3 = false
+      ; lookups_per_row_3 = false
+      ; lookups_per_row_4 = false
+      ; lookup_pattern_xor = false
+      ; lookup_pattern_range_check = false
+      }
+  end
+
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -207,6 +386,93 @@ module Features = struct
       [@@deriving sexp, compare, yojson, hash, equal, hlist]
     end
   end]
+
+  let of_full
+      ({ range_check0
+       ; range_check1
+       ; foreign_field_add
+       ; foreign_field_mul
+       ; xor
+       ; rot
+       ; lookup
+       ; runtime_tables
+       ; uses_lookups = _
+       ; table_width_at_least_1 = _
+       ; table_width_at_least_2 = _
+       ; table_width_3 = _
+       ; lookups_per_row_3 = _
+       ; lookups_per_row_4 = _
+       ; lookup_pattern_xor = _
+       ; lookup_pattern_range_check = _
+       } :
+        'bool Full.t ) =
+    { range_check0
+    ; range_check1
+    ; foreign_field_add
+    ; foreign_field_mul
+    ; xor
+    ; rot
+    ; lookup
+    ; runtime_tables
+    }
+
+  let to_full ~or_:( ||| )
+      { range_check0
+      ; range_check1
+      ; foreign_field_add
+      ; foreign_field_mul
+      ; xor
+      ; rot
+      ; lookup
+      ; runtime_tables
+      } : _ Full.t =
+    let lookup_pattern_range_check =
+      (* RangeCheck, Rot gates use RangeCheck lookup pattern *)
+      range_check0 ||| range_check1 ||| rot
+    in
+    let lookup_pattern_xor =
+      (* Xor lookup pattern *)
+      xor
+    in
+    (* Make sure these stay up-to-date with the layouts!! *)
+    let table_width_3 =
+      (* Xor have max_joint_size = 3 *)
+      lookup_pattern_xor
+    in
+    let table_width_at_least_2 =
+      (* Lookup has max_joint_size = 2 *)
+      table_width_3 ||| lookup
+    in
+    let table_width_at_least_1 =
+      (* RangeCheck, ForeignFieldMul have max_joint_size = 1 *)
+      table_width_at_least_2 ||| lookup_pattern_range_check
+      ||| foreign_field_mul
+    in
+    let lookups_per_row_4 =
+      (* Xor, RangeCheckGate, ForeignFieldMul, have max_lookups_per_row = 4 *)
+      lookup_pattern_xor ||| lookup_pattern_range_check ||| foreign_field_mul
+    in
+    let lookups_per_row_3 =
+      (* Lookup has max_lookups_per_row = 3 *)
+      lookups_per_row_4 ||| lookup
+    in
+    { uses_lookups = lookups_per_row_3
+    ; table_width_at_least_1
+    ; table_width_at_least_2
+    ; table_width_3
+    ; lookups_per_row_3
+    ; lookups_per_row_4
+    ; lookup_pattern_xor
+    ; lookup_pattern_range_check
+    ; range_check0
+    ; range_check1
+    ; foreign_field_add
+    ; foreign_field_mul
+    ; xor
+    ; rot
+    ; lookup
+    ; runtime_tables
+    }
 
   type options = Opt.Flag.t t
 
@@ -1001,32 +1267,24 @@ module Evals = struct
 
   let typ (type f a_var a)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      ~dummy e (feature_flags : _ Features.t) :
+      ~dummy e
+      ({ uses_lookups; lookups_per_row_3; lookups_per_row_4; _ } as
+       feature_flags :
+        _ Features.Full.t ) :
       ((a_var, Impl.Boolean.var) In_circuit.t, a t, f) Snarky_backendless.Typ.t
       =
     let open Impl in
     let opt flag = Opt.typ Impl.Boolean.typ flag e ~dummy in
-    let uses_lookup =
-      let { Features.range_check0
-          ; range_check1
-          ; foreign_field_add = _ (* Doesn't use lookup *)
-          ; foreign_field_mul
-          ; xor
-          ; rot
-          ; lookup
-          ; runtime_tables = _
-          } =
-        feature_flags
-      in
-      Array.reduce_exn ~f:Opt.Flag.( ||| )
-        [| range_check0; range_check1; foreign_field_mul; xor; rot; lookup |]
-    in
     let lookup_sorted =
-      match uses_lookup with
-      | Opt.Flag.No ->
-          Opt.Flag.No
-      | Yes | Maybe ->
-          Opt.Flag.Maybe
+      let lookups_per_row_3 = opt lookups_per_row_3 in
+      let lookups_per_row_4 = opt lookups_per_row_4 in
+      Vector.typ'
+        [ lookups_per_row_3
+        ; lookups_per_row_3
+        ; lookups_per_row_3
+        ; lookups_per_row_3
+        ; lookups_per_row_4
+        ]
     in
     Typ.of_hlistable
       [ Vector.typ e Columns.n
@@ -1045,18 +1303,14 @@ module Evals = struct
       ; opt feature_flags.foreign_field_mul
       ; opt feature_flags.xor
       ; opt feature_flags.rot
-      ; opt uses_lookup
-      ; opt uses_lookup
-      ; Vector.typ (opt lookup_sorted) Nat.N5.n (* TODO: Fixme *)
+      ; opt uses_lookups
+      ; opt uses_lookups
+      ; lookup_sorted
       ; opt feature_flags.runtime_tables
       ; opt feature_flags.runtime_tables
-      ; opt feature_flags.xor
+      ; opt feature_flags.lookup_pattern_xor
       ; opt feature_flags.lookup
-      ; opt
-          Opt.Flag.(
-            feature_flags.range_check0 ||| feature_flags.range_check1
-            ||| feature_flags.rot)
-        (* TODO: This logic does not belong here. *)
+      ; opt feature_flags.lookup_pattern_range_check
       ; opt feature_flags.foreign_field_mul
       ]
       ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
@@ -1327,28 +1581,11 @@ module Messages = struct
 
   let typ (type n f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
-      ({ runtime_tables; _ } as feature_flags : Opt.Flag.t Features.t) ~dummy
+      ({ runtime_tables; uses_lookups; lookups_per_row_4; _ } :
+        Opt.Flag.t Features.Full.t ) ~dummy
       ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
       =
     let open Snarky_backendless.Typ in
-    let uses_lookup, lookups_per_row_4 =
-      let { Features.range_check0
-          ; range_check1
-          ; foreign_field_add = _ (* Doesn't use lookup *)
-          ; foreign_field_mul
-          ; xor
-          ; rot
-          ; lookup
-          ; runtime_tables = _ (* Fixme *)
-          } =
-        feature_flags
-      in
-      let lookups_per_row_4 =
-        Opt.Flag.(
-          range_check0 ||| range_check1 ||| foreign_field_mul ||| xor ||| rot)
-      in
-      (Opt.Flag.(lookups_per_row_4 ||| lookup), lookups_per_row_4)
-    in
     let { Poly.w = w_lens; z; t } = commitment_lengths in
     let array ~length elt = padded_array_typ ~dummy ~length elt in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
@@ -1358,8 +1595,8 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     let lookup =
-      Lookup.opt_typ Impl.Boolean.typ ~uses_lookup ~lookups_per_row_4
-        ~runtime_tables ~dummy:[| dummy |]
+      Lookup.opt_typ Impl.Boolean.typ ~uses_lookup:uses_lookups
+        ~lookups_per_row_4 ~runtime_tables ~dummy:[| dummy |]
         (wo [ 1 ])
     in
     of_hlistable
