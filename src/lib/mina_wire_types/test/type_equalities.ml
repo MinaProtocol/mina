@@ -60,18 +60,11 @@ module Assert_equal4V1
     (W : V1S4 with type ('a, 'b, 'c, 'd) V1.t = ('a, 'b, 'c, 'd) O.V1.t) =
 struct end
 
-module Assert_equal9V1
-    (O : V1S9)
-    (W : V1S9
-           with type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) V1.t =
-             ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) O.V1.t) =
-struct end
-
-module Assert_equal9V2
-    (O : V2S9)
-    (W : V2S9
-           with type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) V2.t =
-             ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) O.V2.t) =
+module Assert_equal8V1
+    (O : V1S8)
+    (W : V1S8
+           with type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) V1.t =
+             ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) O.V1.t) =
 struct end
 
 (** {2 Actual tests}
@@ -119,7 +112,16 @@ module Mina_numbers = struct
   module O = Mina_numbers
   module W = WT.Mina_numbers
   include Assert_equal0V1 (O.Account_nonce.Stable) (W.Account_nonce)
-  include Assert_equal0V1 (O.Global_slot.Stable) (W.Global_slot)
+  include Assert_equal0V1 (O.Global_slot_legacy.Stable) (W.Global_slot_legacy)
+  include
+    Assert_equal0V1
+      (O.Global_slot_since_genesis.Stable)
+      (W.Global_slot_since_genesis)
+  include
+    Assert_equal0V1
+      (O.Global_slot_since_hard_fork.Stable)
+      (W.Global_slot_since_hard_fork)
+  include Assert_equal0V1 (O.Global_slot_span.Stable) (W.Global_slot_span)
   include Assert_equal0V1 (O.Length.Stable) (W.Length)
   include Assert_equal0V1 (O.Index.Stable) (W.Index)
 end
@@ -349,7 +351,7 @@ module Mina_transaction_logic = struct
   module O = Mina_transaction_logic
   module W = WT.Mina_transaction_logic
   include
-    Assert_equal9V1
+    Assert_equal8V1
       (O.Zkapp_command_logic.Local_state.Stable)
       (W.Zkapp_command_logic.Local_state)
   include
@@ -402,7 +404,7 @@ module Consensus = struct
   module W = WT.Consensus
   include Assert_equal0V1 (O.Body_reference.Stable) (W.Body_reference)
   include
-    Assert_equal0V1
+    Assert_equal0V2
       (O.Data.Consensus_state.Value.Stable)
       (W.Data.Consensus_state.Value)
 end

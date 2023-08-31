@@ -7,8 +7,6 @@ open Util
 open Types.Step
 open Pickles_types
 
-let lookup_verification_enabled = false
-
 module Make
     (Inputs : Intf.Step_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
@@ -273,8 +271,10 @@ struct
                   )
                 ~xi
                 ~init:(function
-                  | `Finite x -> `Finite x | `Maybe_finite x -> `Maybe_finite x
-                  )
+                  | `Finite x ->
+                      Some (`Finite x)
+                  | `Maybe_finite x ->
+                      Some (`Maybe_finite x) )
                 (Vector.map without_degree_bound
                    ~f:(Array.map ~f:(fun x -> `Finite x)) )
                 (Vector.map with_degree_bound
@@ -319,12 +319,12 @@ struct
         ( 'a
         , Inputs.Impl.Field.t Import.Scalar_challenge.t
         , _ )
-        Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t )
+        Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t )
       (m2 :
         ( Inputs.Impl.Field.t
         , Inputs.Impl.Field.t Import.Scalar_challenge.t
         , _ )
-        Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t ) =
+        Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t ) =
     let open Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
     let scalar_chal
@@ -568,12 +568,14 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
-          let num_commitments_without_degree_bound = Nat.N41.n in
+          let num_commitments_without_degree_bound = Nat.N45.n in
           let without_degree_bound =
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
-              :: [| m.psm_comm |]
+              :: [| m.psm_comm |] :: [| m.complete_add_comm |]
+              :: [| m.mul_comm |] :: [| m.emul_comm |]
+              :: [| m.endomul_scalar_comm |]
               :: Vector.append w_comm
                    (Vector.append
                       (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
@@ -595,9 +597,7 @@ struct
                 ~sponge:sponge_before_evaluations ~xi ~advice ~opening
                 ~polynomials:(without_degree_bound, []) )
         in
-        let joint_combiner =
-          if lookup_verification_enabled then failwith "TODO" else None
-        in
+        let joint_combiner = None in
         assert_eq_deferred_values
           { alpha = plonk.alpha
           ; beta = plonk.beta
@@ -836,9 +836,6 @@ struct
       (which_log2, unique_domains)
       ~shifts ~domain_generator
 
-  let field_array_if b ~then_ ~else_ =
-    Array.map2_exn then_ else_ ~f:(fun x1 x2 -> Field.if_ b ~then_:x1 ~else_:x2)
-
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
      1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
@@ -882,7 +879,7 @@ struct
       SC.to_field_checked (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
     in
     let plonk =
-      Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
+      Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
         ~f:Fn.id ~scalar plonk
     in
     let domain =
@@ -926,13 +923,44 @@ struct
       Sponge.absorb sponge (`Field (fst evals.public_input)) ;
       Sponge.absorb sponge (`Field (snd evals.public_input)) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
-      Plonk_types.Opt.Early_stop_sequence.fold field_array_if xs ~init:()
-        ~f:(fun () (x1, x2) ->
+      (* This is a hacky, but much more efficient, version of the opt sponge.
+         This uses the assumption that the sponge 'absorption state' will align
+         after each optional absorption, letting us skip the expensive tracking
+         that this would otherwise require.
+         To future-proof this, we assert that the states are indeed compatible.
+      *)
+      List.iter xs ~f:(fun opt ->
           let absorb =
             Array.iter ~f:(fun x -> Sponge.absorb sponge (`Field x))
           in
-          absorb x1 ; absorb x2 )
-        ~finish:(fun () -> Array.copy sponge.state)
+          match opt with
+          | None ->
+              ()
+          | Some (x1, x2) ->
+              absorb x1 ; absorb x2
+          | Maybe (b, (x1, x2)) ->
+              (* Cache the sponge state before *)
+              let sponge_state_before = sponge.sponge_state in
+              let state_before = Array.copy sponge.state in
+              (* Absorb the points *)
+              absorb x1 ;
+              absorb x2 ;
+              (* Check that the sponge ends in a compatible state. *)
+              ( match (sponge_state_before, sponge.sponge_state) with
+              | Absorbed x, Absorbed y ->
+                  [%test_eq: int] x y
+              | Squeezed x, Squeezed y ->
+                  [%test_eq: int] x y
+              | Absorbed _, Squeezed _ ->
+                  [%test_eq: string] "absorbed" "squeezed"
+              | Squeezed _, Absorbed _ ->
+                  [%test_eq: string] "squeezed" "absorbed" ) ;
+              let state =
+                Array.map2_exn sponge.state state_before ~f:(fun then_ else_ ->
+                    Field.if_ b ~then_ ~else_ )
+              in
+              sponge.state <- state ) ;
+      Array.copy sponge.state
     in
     sponge.state <- sponge_state ;
     let squeeze () = squeeze_challenge sponge in
@@ -1061,7 +1089,7 @@ struct
     in
     let plonk_checks_passed =
       with_label "plonk_checks_passed" (fun () ->
-          Plonk_checks.checked ~feature_flags
+          Plonk_checks.checked
             (module Impl)
             ~env ~shift:shift1 plonk combined_evals )
     in
@@ -1161,8 +1189,6 @@ struct
         , _ Shifted_value.Type2.t
         , _
         , _
-        , _
-        , _
         , _ )
         Types.Step.Proof_state.Per_proof.In_circuit.t ) =
     let public_input :
@@ -1196,7 +1222,11 @@ struct
         ~xi ~verification_key:wrap_verification_key ~sponge ~sponge_after_index
         ~public_input ~sg_old
         ~advice:{ b; combined_inner_product }
-        ~proof ~plonk:unfinalized.deferred_values.plonk
+        ~proof
+        ~plonk:
+          (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+           .to_wrap ~opt_none:Opt.None ~false_:Boolean.false_
+             unfinalized.deferred_values.plonk )
     in
     with_label __LOC__ (fun () ->
         with_label __LOC__ (fun () ->

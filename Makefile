@@ -74,7 +74,7 @@ genesis_ledger: ocaml_checks
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir $(GENESIS_DIR)
 	$(info Genesis ledger and genesis proof generated)
 
-# checks that every OCaml packages in the project build without issues
+# Checks that every OCaml packages in the project build without issues
 check: ocaml_checks libp2p_helper
 	dune build @src/check
 
@@ -113,25 +113,16 @@ build_intgtest: ocaml_checks
 	dune build --profile=$(DUNE_PROFILE) src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 	$(info Build complete)
 
-client_sdk: ocaml_checks
-	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js
-	$(info Build complete)
-
-client_sdk_test_sigs: ocaml_checks
-	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures.exe --profile=mainnet
-	$(info Build complete)
-
-client_sdk_test_sigs_nonconsensus: ocaml_checks
-	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures_nonconsensus.exe --profile=nonconsensus_mainnet
-	$(info Build complete)
-
 snarkyjs: ocaml_checks
 	$(info Starting Build)
 	((ulimit -s 65532) || true) && (ulimit -n 10240 || true) \
 	&& bash ./src/lib/snarkyjs/src/bindings/scripts/build-snarkyjs-node.sh
+	$(info Build complete)
+
+snarkyjs_no_types: ocaml_checks
+	$(info Starting Build)
+	((ulimit -s 65532) || true) && (ulimit -n 10240 || true) \
+	&& bash ./src/lib/snarkyjs/src/bindings/scripts/build-snarkyjs-node-artifacts.sh
 	$(info Build complete)
 
 rosetta_lib_encodings: ocaml_checks
@@ -151,7 +142,7 @@ dhall_types: ocaml_checks
 
 replayer: ocaml_checks
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=testnet_postake_medium_curves
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=devnet
 	$(info Build complete)
 
 delegation_compliance: ocaml_checks
@@ -226,6 +217,9 @@ check-format: ocaml_checks
 
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
+
+check-proof-systems-submodule:
+	./scripts/check-proof-systems-submodule.sh
 
 #######################################
 ## Environment setup
@@ -347,4 +341,4 @@ ml-docs: ocaml_checks
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all build check-format clean client_sdk client_sdk_test_sigs deb dev mina-docker reformat doc_diagrams ml-docs macos-setup setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks genesis_ledger_from_tsv ocaml_version ocaml_word_size ocaml_checks
+.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs macos-setup setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks genesis_ledger_from_tsv ocaml_version ocaml_word_size ocaml_checks

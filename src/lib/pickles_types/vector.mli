@@ -178,3 +178,16 @@ val extend_front :
 val extend_front_exn : 'a 'n 'm. ('a, 'n) vec -> 'm Nat.t -> 'a -> ('a, 'm) vec
 
 val transpose : 'a 'n 'm. (('a, 'n) vec, 'm) vec -> (('a, 'm) vec, 'n) vec
+
+(** [nth v i] returns the [i]-th element [e] of vector [v]. The first element is
+    at position 0.
+
+    @return [None] if [i] is not a valid index for vector [v]
+*)
+val nth : ('a, 'n) vec -> int -> 'a option
+
+(** [nth_exn v i] returns the [i]-th element of vector [v]. The first element is
+    at position 0.
+
+    @raise Invalid_argument if [i] is not a valid index for vector [v] *)
+val nth_exn : ('a, 'n) vec -> int -> 'a

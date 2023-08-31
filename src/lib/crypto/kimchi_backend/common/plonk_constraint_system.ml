@@ -168,6 +168,8 @@ module Plonk_constraint = struct
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
       | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
+      | Lookup of
+          { w0 : 'v; w1 : 'v; w2 : 'v; w3 : 'v; w4 : 'v; w5 : 'v; w6 : 'v }
       | RangeCheck0 of
           { v0 : 'v (* Value to constrain to 88-bits *)
           ; v0p0 : 'v (* MSBs *)
@@ -253,31 +255,34 @@ module Plonk_constraint = struct
           ; sign : 'f
           }
       | ForeignFieldMul of
-          { (* Current row *)
-            left_input0 : 'v
+          { left_input0 : 'v
           ; left_input1 : 'v
           ; left_input2 : 'v
           ; right_input0 : 'v
           ; right_input1 : 'v
           ; right_input2 : 'v
-          ; carry1_lo : 'v
-          ; carry1_hi : 'v
-          ; carry0 : 'v
+          ; remainder01 : 'v
+          ; remainder2 : 'v
           ; quotient0 : 'v
           ; quotient1 : 'v
           ; quotient2 : 'v
-          ; quotient_bound_carry : 'v
-          ; product1_hi_1 : 'v
-          ; (* Next row *) remainder0 : 'v
-          ; remainder1 : 'v
-          ; remainder2 : 'v
-          ; quotient_bound01 : 'v
-          ; quotient_bound2 : 'v
+          ; quotient_hi_bound : 'v
           ; product1_lo : 'v
           ; product1_hi_0 : 'v
-          ; (* Coefficients *) foreign_field_modulus0 : 'f
-          ; foreign_field_modulus1 : 'f
-          ; foreign_field_modulus2 : 'f
+          ; product1_hi_1 : 'v
+          ; carry0 : 'v
+          ; carry1_0 : 'v
+          ; carry1_12 : 'v
+          ; carry1_24 : 'v
+          ; carry1_36 : 'v
+          ; carry1_48 : 'v
+          ; carry1_60 : 'v
+          ; carry1_72 : 'v
+          ; carry1_84 : 'v
+          ; carry1_86 : 'v
+          ; carry1_88 : 'v
+          ; carry1_90 : 'v
+          ; (* Coefficients *) foreign_field_modulus2 : 'f
           ; neg_foreign_field_modulus0 : 'f
           ; neg_foreign_field_modulus1 : 'f
           ; neg_foreign_field_modulus2 : 'f
@@ -301,6 +306,8 @@ module Plonk_constraint = struct
           ; bound_crumb7 : 'v
           ; (* Coefficients *) two_to_rot : 'f (* Rotation scalar 2^rot *)
           }
+      | AddFixedLookupTable of { id : int32; data : 'f array array }
+      | AddRuntimeTableCfg of { id : int32; first_column : 'f array }
       | Raw of
           { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
     [@@deriving sexp]
@@ -339,6 +346,16 @@ module Plonk_constraint = struct
           EC_endoscalar
             { state =
                 Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
+            }
+      | Lookup { w0; w1; w2; w3; w4; w5; w6 } ->
+          Lookup
+            { w0 = f w0
+            ; w1 = f w1
+            ; w2 = f w2
+            ; w3 = f w3
+            ; w4 = f w4
+            ; w5 = f w5
+            ; w6 = f w6
             }
       | RangeCheck0
           { v0
@@ -503,59 +520,67 @@ module Plonk_constraint = struct
             ; sign
             }
       | ForeignFieldMul
-          { (* Current row *) left_input0
+          { left_input0
           ; left_input1
           ; left_input2
           ; right_input0
           ; right_input1
           ; right_input2
-          ; carry1_lo
-          ; carry1_hi
-          ; carry0
+          ; remainder01
+          ; remainder2
           ; quotient0
           ; quotient1
           ; quotient2
-          ; quotient_bound_carry
-          ; product1_hi_1
-          ; (* Next row *) remainder0
-          ; remainder1
-          ; remainder2
-          ; quotient_bound01
-          ; quotient_bound2
+          ; quotient_hi_bound
           ; product1_lo
           ; product1_hi_0
-          ; (* Coefficients *) foreign_field_modulus0
-          ; foreign_field_modulus1
-          ; foreign_field_modulus2
+          ; product1_hi_1
+          ; carry0
+          ; carry1_0
+          ; carry1_12
+          ; carry1_24
+          ; carry1_36
+          ; carry1_48
+          ; carry1_60
+          ; carry1_72
+          ; carry1_84
+          ; carry1_86
+          ; carry1_88
+          ; carry1_90
+          ; (* Coefficients *) foreign_field_modulus2
           ; neg_foreign_field_modulus0
           ; neg_foreign_field_modulus1
           ; neg_foreign_field_modulus2
           } ->
           ForeignFieldMul
-            { (* Current row *) left_input0 = f left_input0
+            { left_input0 = f left_input0
             ; left_input1 = f left_input1
             ; left_input2 = f left_input2
             ; right_input0 = f right_input0
             ; right_input1 = f right_input1
             ; right_input2 = f right_input2
-            ; carry1_lo = f carry1_lo
-            ; carry1_hi = f carry1_hi
-            ; carry0 = f carry0
+            ; remainder01 = f remainder01
+            ; remainder2 = f remainder2
             ; quotient0 = f quotient0
             ; quotient1 = f quotient1
             ; quotient2 = f quotient2
-            ; quotient_bound_carry = f quotient_bound_carry
-            ; product1_hi_1 = f product1_hi_1
-            ; (* Next row *) remainder0 = f remainder0
-            ; remainder1 = f remainder1
-            ; remainder2 = f remainder2
-            ; quotient_bound01 = f quotient_bound01
-            ; quotient_bound2 = f quotient_bound2
+            ; quotient_hi_bound = f quotient_hi_bound
             ; product1_lo = f product1_lo
             ; product1_hi_0 = f product1_hi_0
-            ; (* Coefficients *) foreign_field_modulus0
-            ; foreign_field_modulus1
-            ; foreign_field_modulus2
+            ; product1_hi_1 = f product1_hi_1
+            ; carry0 = f carry0
+            ; carry1_0 = f carry1_0
+            ; carry1_12 = f carry1_12
+            ; carry1_24 = f carry1_24
+            ; carry1_36 = f carry1_36
+            ; carry1_48 = f carry1_48
+            ; carry1_60 = f carry1_60
+            ; carry1_72 = f carry1_72
+            ; carry1_84 = f carry1_84
+            ; carry1_86 = f carry1_86
+            ; carry1_88 = f carry1_88
+            ; carry1_90 = f carry1_90
+            ; (* Coefficients *) foreign_field_modulus2
             ; neg_foreign_field_modulus0
             ; neg_foreign_field_modulus1
             ; neg_foreign_field_modulus2
@@ -579,7 +604,7 @@ module Plonk_constraint = struct
           ; (* Coefficients *) two_to_rot
           } ->
           Rot64
-            { (* Current row *) word = f word
+            { word = f word
             ; rotated = f rotated
             ; excess = f excess
             ; bound_limb0 = f bound_limb0
@@ -596,6 +621,10 @@ module Plonk_constraint = struct
             ; bound_crumb7 = f bound_crumb7
             ; (* Coefficients *) two_to_rot
             }
+      | AddFixedLookupTable { id; data } ->
+          AddFixedLookupTable { id; data }
+      | AddRuntimeTableCfg { id; first_column } ->
+          AddRuntimeTableCfg { id; first_column }
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
 
@@ -677,6 +706,14 @@ type ('f, 'rust_gates) circuit =
     and a list of gates that corresponds to the circuit.
   *)
 
+type 'f fixed_lookup_tables =
+  | Unfinalized_fixed_lookup_tables_rev of 'f Kimchi_types.lookup_table list
+  | Compiled_fixed_lookup_tables of 'f Kimchi_types.lookup_table array
+
+type 'f runtime_tables_cfg =
+  | Unfinalized_runtime_tables_cfg_rev of 'f Kimchi_types.runtime_table_cfg list
+  | Compiled_runtime_tables_cfg of 'f Kimchi_types.runtime_table_cfg array
+
 (** The constraint system. *)
 type ('f, 'rust_gates) t =
   { (* Map of cells that share the same value (enforced by to the permutation). *)
@@ -690,6 +727,11 @@ type ('f, 'rust_gates) t =
        The finalized tag contains the digest of the circuit.
     *)
     mutable gates : ('f, 'rust_gates) circuit
+        (* The user-provided lookup tables associated with this circuit. *)
+  ; mutable fixed_lookup_tables : 'f fixed_lookup_tables
+        (* The user-provided runtime table configurations associated with this
+            circuit. *)
+  ; mutable runtime_tables_cfg : 'f runtime_tables_cfg
   ; (* The row to use the next time we add a constraint. *)
     mutable next_row : int
   ; (* The size of the public input (which fills the first rows of our constraint system. *)
@@ -726,6 +768,31 @@ let get_prev_challenges sys = sys.prev_challenges
 
 let set_prev_challenges sys challenges =
   Core_kernel.Set_once.set_exn sys.prev_challenges [%here] challenges
+
+let get_concatenated_fixed_lookup_table_size sys =
+  match sys.fixed_lookup_tables with
+  | Unfinalized_fixed_lookup_tables_rev _ ->
+      failwith
+        "Cannot get the fixed lookup tables before finalizing the constraint \
+         system"
+  | Compiled_fixed_lookup_tables flts ->
+      let get_table_size (flt : _ Kimchi_types.lookup_table) =
+        if Array.length flt.data = 0 then 0
+        else Array.length (Array.get flt.data 0)
+      in
+      Array.fold_left (fun acc flt -> acc + get_table_size flt) 0 flts
+
+let get_concatenated_runtime_lookup_table_size sys =
+  match sys.runtime_tables_cfg with
+  | Unfinalized_runtime_tables_cfg_rev _ ->
+      failwith
+        "Cannot get the runtime table configurations before finalizing the \
+         constraint system"
+  | Compiled_runtime_tables_cfg rt_cfgs ->
+      Array.fold_left
+        (fun acc (rt_cfg : _ Kimchi_types.runtime_table_cfg) ->
+          acc + Array.length rt_cfg.first_column )
+        0 rt_cfgs
 
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
 
@@ -766,6 +833,10 @@ module Make
 
   val next_row : t -> int
 
+  val get_concatenated_fixed_lookup_table_size : t -> int
+
+  val get_concatenated_runtime_lookup_table_size : t -> int
+
   val add_constraint :
        ?label:string
     -> t
@@ -778,7 +849,11 @@ module Make
 
   val finalize : t -> unit
 
-  val finalize_and_get_gates : t -> Gates.t
+  val finalize_and_get_gates :
+       t
+    -> Gates.t
+       * Fp.t Kimchi_types.lookup_table array
+       * Fp.t Kimchi_types.runtime_table_cfg array
 
   val num_constraints : t -> int
 
@@ -818,7 +893,9 @@ end = struct
     let res = Relative_position.Table.create () in
     Hashtbl.iter equivalence_classes ~f:(fun ps ->
         let rotate_left = function [] -> [] | x :: xs -> xs @ [ x ] in
-        let ps = Hash_set.to_list ps in
+        let ps =
+          Hash_set.to_list ps |> List.sort ~compare:[%compare: Row.t Position.t]
+        in
         List.iter2_exn ps (rotate_left ps) ~f:(fun input output ->
             Hashtbl.add_exn res ~key:input ~data:output ) ) ;
     res
@@ -894,6 +971,8 @@ end = struct
     ; prev_challenges = Set_once.create ()
     ; internal_vars = Internal_var.Table.create ()
     ; gates = Unfinalized_rev [] (* Gates.create () *)
+    ; fixed_lookup_tables = Unfinalized_fixed_lookup_tables_rev []
+    ; runtime_tables_cfg = Unfinalized_runtime_tables_cfg_rev []
     ; rows_rev = []
     ; next_row = 0
     ; equivalence_classes = V.Table.create ()
@@ -928,6 +1007,12 @@ end = struct
   let get_rows_len (sys : t) = get_rows_len sys
 
   let next_row (sys : t) = sys.next_row
+
+  let get_concatenated_fixed_lookup_table_size (sys : t) =
+    get_concatenated_fixed_lookup_table_size sys
+
+  let get_concatenated_runtime_lookup_table_size (sys : t) =
+    get_concatenated_runtime_lookup_table_size sys
 
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
@@ -970,14 +1055,38 @@ end = struct
     *)
   let rec finalize_and_get_gates sys =
     match sys with
-    | { gates = Compiled (_, gates); _ } ->
-        gates
+    | { gates = Compiled (_, gates)
+      ; fixed_lookup_tables = Compiled_fixed_lookup_tables fixed_lookup_tables
+      ; runtime_tables_cfg = Compiled_runtime_tables_cfg runtime_tables_cfg
+      ; _
+      } ->
+        (gates, fixed_lookup_tables, runtime_tables_cfg)
+    (* Finalizing lookup tables and runtime table cfgs first *)
+    | { fixed_lookup_tables =
+          Unfinalized_fixed_lookup_tables_rev fixed_lookup_tables_rev
+      ; _
+      } ->
+        let fixed_lookup_tables = Array.of_list_rev fixed_lookup_tables_rev in
+        sys.fixed_lookup_tables <-
+          Compiled_fixed_lookup_tables fixed_lookup_tables ;
+        finalize_and_get_gates sys
+    | { runtime_tables_cfg =
+          Unfinalized_runtime_tables_cfg_rev runtime_tables_cfg_rev
+      ; _
+      } ->
+        let runtime_tables_cfg = Array.of_list_rev runtime_tables_cfg_rev in
+        sys.runtime_tables_cfg <- Compiled_runtime_tables_cfg runtime_tables_cfg ;
+        finalize_and_get_gates sys
     | { pending_generic_gate = Some (l, r, o, coeffs); _ } ->
         (* Finalize any pending generic constraint first. *)
         add_row sys [| l; r; o |] Generic coeffs ;
         sys.pending_generic_gate <- None ;
         finalize_and_get_gates sys
-    | { gates = Unfinalized_rev gates_rev; _ } ->
+    | { gates = Unfinalized_rev gates_rev
+      ; fixed_lookup_tables = Compiled_fixed_lookup_tables fixed_lookup_tables
+      ; runtime_tables_cfg = Compiled_runtime_tables_cfg runtime_tables_cfg
+      ; _
+      } ->
         let rust_gates = Gates.create () in
 
         (* Create rows for public input. *)
@@ -1050,15 +1159,24 @@ end = struct
         sys.gates <- Compiled (md5_digest, rust_gates) ;
 
         (* return the gates *)
-        rust_gates
+        (rust_gates, fixed_lookup_tables, runtime_tables_cfg)
 
   (** Calls [finalize_and_get_gates] and ignores the result. *)
-  let finalize t = ignore (finalize_and_get_gates t : Gates.t)
+  let finalize t =
+    ignore
+      ( finalize_and_get_gates t
+        : Gates.t
+          * Fp.t Kimchi_types.lookup_table array
+          * Fp.t Kimchi_types.runtime_table_cfg array )
 
-  let num_constraints sys = finalize_and_get_gates sys |> Gates.len
+  let num_constraints sys =
+    let gates, _, _ = finalize_and_get_gates sys in
+    Gates.len gates
 
   let to_json (sys : t) : string =
-    let gates = finalize_and_get_gates sys in
+    (* TODO: add lookup tables and runtime table cfgs *)
+    (* https://github.com/MinaProtocol/mina/issues/13886 *)
+    let gates, _, _ = finalize_and_get_gates sys in
     let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
     Gates.to_json public_input_size gates
 
@@ -1660,6 +1778,18 @@ end = struct
           ~f:
             (Fn.compose add_endoscale_scalar_round
                (Endoscale_scalar_round.map ~f:reduce_to_v) )
+    | Plonk_constraint.T (Lookup { w0; w1; w2; w3; w4; w5; w6 }) ->
+        let vars =
+          [| Some (reduce_to_v w0)
+           ; Some (reduce_to_v w1)
+           ; Some (reduce_to_v w2)
+           ; Some (reduce_to_v w3)
+           ; Some (reduce_to_v w4)
+           ; Some (reduce_to_v w5)
+           ; Some (reduce_to_v w6)
+          |]
+        in
+        add_row sys vars Lookup [||]
     | Plonk_constraint.T
         (RangeCheck0
           { v0
@@ -1899,95 +2029,97 @@ end = struct
           |]
     | Plonk_constraint.T
         (ForeignFieldMul
-          { (* Current row *) left_input0
+          { left_input0
           ; left_input1
           ; left_input2
           ; right_input0
           ; right_input1
           ; right_input2
-          ; carry1_lo
-          ; carry1_hi
-          ; carry0
+          ; remainder01
+          ; remainder2
           ; quotient0
           ; quotient1
           ; quotient2
-          ; quotient_bound_carry
-          ; product1_hi_1
-          ; (* Next row *) remainder0
-          ; remainder1
-          ; remainder2
-          ; quotient_bound01
-          ; quotient_bound2
+          ; quotient_hi_bound
           ; product1_lo
           ; product1_hi_0
-          ; (* Coefficients *) foreign_field_modulus0
-          ; foreign_field_modulus1
-          ; foreign_field_modulus2
+          ; product1_hi_1
+          ; carry0
+          ; carry1_0
+          ; carry1_12
+          ; carry1_24
+          ; carry1_36
+          ; carry1_48
+          ; carry1_60
+          ; carry1_72
+          ; carry1_84
+          ; carry1_86
+          ; carry1_88
+          ; carry1_90
+          ; (* Coefficients *) foreign_field_modulus2
           ; neg_foreign_field_modulus0
           ; neg_foreign_field_modulus1
           ; neg_foreign_field_modulus2
           } ) ->
         (*
-        //! | Gate   | `ForeignFieldMul`            | `Zero`                    |
-        //! | ------ | ---------------------------- | ------------------------- |
-        //! | Column | `Curr`                       | `Next`                    |
-        //! | ------ | ---------------------------- | ------------------------- |
-        //! |      0 | `left_input0`         (copy) | `remainder0`       (copy) |
-        //! |      1 | `left_input1`         (copy) | `remainder1`       (copy) |
-        //! |      2 | `left_input2`         (copy) | `remainder2`       (copy) |
-        //! |      3 | `right_input0`        (copy) | `quotient_bound01` (copy) |
-        //! |      4 | `right_input1`        (copy) | `quotient_bound2`  (copy) |
-        //! |      5 | `right_input2`        (copy) | `product1_lo`      (copy) |
-        //! |      6 | `carry1_lo`           (copy) | `product1_hi_0`    (copy) |
-        //! |      7 | `carry1_hi`        (plookup) |                           |
-        //! |      8 | `carry0`                     |                           |
-        //! |      9 | `quotient0`                  |                           |
-        //! |     10 | `quotient1`                  |                           |
-        //! |     11 | `quotient2`                  |                           |
-        //! |     12 | `quotient_bound_carry`       |                           |
-        //! |     13 | `product1_hi_1`              |                           |
-        //! |     14 |                              |                           |
+          | col | `ForeignFieldMul`       | `Zero`                     |
+          | --- | ----------------------- | -------------------------- |
+          |   0 | `left_input0`    (copy) | `remainder01`       (copy) |
+          |   1 | `left_input1`    (copy) | `remainder2`        (copy) |
+          |   2 | `left_input2`    (copy) | `quotient0`         (copy) |
+          |   3 | `right_input0`   (copy) | `quotient1`         (copy) |
+          |   4 | `right_input1`   (copy) | `quotient2`         (copy) |
+          |   5 | `right_input2`   (copy) | `quotient_hi_bound` (copy) |
+          |   6 | `product1_lo`    (copy) | `product1_hi_0`     (copy) |
+          |   7 | `carry1_0`    (plookup) | `product1_hi_1`    (dummy) |
+          |   8 | `carry1_12    (plookup) | `carry1_48`      (plookup) |
+          |   9 | `carry1_24`   (plookup) | `carry1_60`      (plookup) |
+          |  10 | `carry1_36`   (plookup) | `carry1_72`      (plookup) |
+          |  11 | `carry1_84`             | `carry0`                   |
+          |  12 | `carry1_86`             |                            |
+          |  13 | `carry1_88`             |                            |
+          |  14 | `carry1_90`             |                            |
         *)
+        (* Current row *)
         let vars_curr =
-          [| (* Current row *) Some (reduce_to_v left_input0)
+          [| Some (reduce_to_v left_input0)
            ; Some (reduce_to_v left_input1)
            ; Some (reduce_to_v left_input2)
            ; Some (reduce_to_v right_input0)
            ; Some (reduce_to_v right_input1)
            ; Some (reduce_to_v right_input2)
-           ; Some (reduce_to_v carry1_lo)
-           ; Some (reduce_to_v carry1_hi)
-           ; Some (reduce_to_v carry0)
+           ; Some (reduce_to_v product1_lo)
+           ; Some (reduce_to_v carry1_0)
+           ; Some (reduce_to_v carry1_12)
+           ; Some (reduce_to_v carry1_24)
+           ; Some (reduce_to_v carry1_36)
+           ; Some (reduce_to_v carry1_84)
+           ; Some (reduce_to_v carry1_86)
+           ; Some (reduce_to_v carry1_88)
+           ; Some (reduce_to_v carry1_90)
+          |]
+        in
+        (* Next row *)
+        let vars_next =
+          [| Some (reduce_to_v remainder01)
+           ; Some (reduce_to_v remainder2)
            ; Some (reduce_to_v quotient0)
            ; Some (reduce_to_v quotient1)
            ; Some (reduce_to_v quotient2)
-           ; Some (reduce_to_v quotient_bound_carry)
-           ; Some (reduce_to_v product1_hi_1)
-           ; None
-          |]
-        in
-        let vars_next =
-          [| (* Next row *) Some (reduce_to_v remainder0)
-           ; Some (reduce_to_v remainder1)
-           ; Some (reduce_to_v remainder2)
-           ; Some (reduce_to_v quotient_bound01)
-           ; Some (reduce_to_v quotient_bound2)
-           ; Some (reduce_to_v product1_lo)
+           ; Some (reduce_to_v quotient_hi_bound)
            ; Some (reduce_to_v product1_hi_0)
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
+           ; Some (reduce_to_v product1_hi_1)
+           ; Some (reduce_to_v carry1_48)
+           ; Some (reduce_to_v carry1_60)
+           ; Some (reduce_to_v carry1_72)
+           ; Some (reduce_to_v carry0)
            ; None
            ; None
            ; None
           |]
         in
         add_row sys vars_curr ForeignFieldMul
-          [| foreign_field_modulus0
-           ; foreign_field_modulus1
-           ; foreign_field_modulus2
+          [| foreign_field_modulus2
            ; neg_foreign_field_modulus0
            ; neg_foreign_field_modulus1
            ; neg_foreign_field_modulus2
@@ -1995,7 +2127,7 @@ end = struct
         add_row sys vars_next Zero [||]
     | Plonk_constraint.T
         (Rot64
-          { (* Current row *) word
+          { word
           ; rotated
           ; excess
           ; bound_limb0
@@ -2013,25 +2145,25 @@ end = struct
           ; (* Coefficients *) two_to_rot
           } ) ->
         (*
-        //! | Gate   | `Rot64`             | `RangeCheck0` gadget designer's duty |
-        //! | ------ | ------------------- | ------------------------------------ |
-        //! | Column | `Curr`              | `Next`           |
-        //! | ------ | ------------------- | ---------------- |
-        //! |      0 | copy `word`         |`shifted`         |
-        //! |      1 | copy `rotated`      | 0                |
-        //! |      2 |      `excess`       | 0                |
-        //! |      3 |      `bound_limb0`  | `shifted_limb0`  |
-        //! |      4 |      `bound_limb1`  | `shifted_limb1`  |
-        //! |      5 |      `bound_limb2`  | `shifted_limb2`  |
-        //! |      6 |      `bound_limb3`  | `shifted_limb3`  |
-        //! |      7 |      `bound_crumb0` | `shifted_crumb0` |
-        //! |      8 |      `bound_crumb1` | `shifted_crumb1` |
-        //! |      9 |      `bound_crumb2` | `shifted_crumb2` |
-        //! |     10 |      `bound_crumb3` | `shifted_crumb3` |
-        //! |     11 |      `bound_crumb4` | `shifted_crumb4` |
-        //! |     12 |      `bound_crumb5` | `shifted_crumb5` |
-        //! |     13 |      `bound_crumb6` | `shifted_crumb6` |
-        //! |     14 |      `bound_crumb7` | `shifted_crumb7` |
+        //! | Gate   | `Rot64`             | `RangeCheck0` gadgets (designer's duty)                   |
+        //! | ------ | ------------------- | --------------------------------------------------------- |
+        //! | Column | `Curr`              | `Next`           | `Next` + 1      | `Next`+ 2, if needed |
+        //! | ------ | ------------------- | ---------------- | --------------- | -------------------- |
+        //! |      0 | copy `word`         |`shifted`         |   copy `excess` |    copy      `word`  |
+        //! |      1 | copy `rotated`      | 0                |              0  |                  0   |
+        //! |      2 |      `excess`       | 0                |              0  |                  0   |
+        //! |      3 |      `bound_limb0`  | `shifted_limb0`  |  `excess_limb0` |        `word_limb0`  |
+        //! |      4 |      `bound_limb1`  | `shifted_limb1`  |  `excess_limb1` |        `word_limb1`  |
+        //! |      5 |      `bound_limb2`  | `shifted_limb2`  |  `excess_limb2` |        `word_limb2`  |
+        //! |      6 |      `bound_limb3`  | `shifted_limb3`  |  `excess_limb3` |        `word_limb3`  |
+        //! |      7 |      `bound_crumb0` | `shifted_crumb0` | `excess_crumb0` |       `word_crumb0`  |
+        //! |      8 |      `bound_crumb1` | `shifted_crumb1` | `excess_crumb1` |       `word_crumb1`  |
+        //! |      9 |      `bound_crumb2` | `shifted_crumb2` | `excess_crumb2` |       `word_crumb2`  |
+        //! |     10 |      `bound_crumb3` | `shifted_crumb3` | `excess_crumb3` |       `word_crumb3`  |
+        //! |     11 |      `bound_crumb4` | `shifted_crumb4` | `excess_crumb4` |       `word_crumb4`  |
+        //! |     12 |      `bound_crumb5` | `shifted_crumb5` | `excess_crumb5` |       `word_crumb5`  |
+        //! |     13 |      `bound_crumb6` | `shifted_crumb6` | `excess_crumb6` |       `word_crumb6`  |
+        //! |     14 |      `bound_crumb7` | `shifted_crumb7` | `excess_crumb7` |       `word_crumb7`  |
         *)
         let vars_curr =
           [| (* Current row *) Some (reduce_to_v word)
@@ -2052,6 +2184,28 @@ end = struct
           |]
         in
         add_row sys vars_curr Rot64 [| two_to_rot |]
+    | Plonk_constraint.T (AddFixedLookupTable { id; data }) -> (
+        match sys.fixed_lookup_tables with
+        | Unfinalized_fixed_lookup_tables_rev fixed_lookup_tables ->
+            let lt : Fp.t Kimchi_types.lookup_table list =
+              { id; data } :: fixed_lookup_tables
+            in
+            sys.fixed_lookup_tables <- Unfinalized_fixed_lookup_tables_rev lt
+        | Compiled_fixed_lookup_tables _ ->
+            failwith
+              "Trying to add a fixed lookup tables when it has been already \
+               finalized" )
+    | Plonk_constraint.T (AddRuntimeTableCfg { id; first_column }) -> (
+        match sys.runtime_tables_cfg with
+        | Unfinalized_runtime_tables_cfg_rev runtime_tables_cfg ->
+            let rt_cfg : Fp.t Kimchi_types.runtime_table_cfg list =
+              { id; first_column } :: runtime_tables_cfg
+            in
+            sys.runtime_tables_cfg <- Unfinalized_runtime_tables_cfg_rev rt_cfg
+        | Compiled_runtime_tables_cfg _ ->
+            failwith
+              "Trying to add a runtime table configuration  it has been \
+               already finalized" )
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->

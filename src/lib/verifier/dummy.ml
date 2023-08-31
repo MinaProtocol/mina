@@ -75,7 +75,7 @@ let verify_transaction_snarks _ ts =
       (Or_error.error_string "Transaction_snark.verify: Mismatched sok_message")
 
 let get_blockchain_verification_key { proof_level; constraint_constants } =
-  Deferred.Or_error.try_with (fun () ->
+  Deferred.Or_error.try_with ~here:[%here] (fun () ->
       let module T = Transaction_snark.Make (struct
         let constraint_constants = constraint_constants
 
@@ -91,3 +91,5 @@ let get_blockchain_verification_key { proof_level; constraint_constants } =
       Deferred.return @@ Lazy.force B.Proof.verification_key )
 
 let toggle_internal_tracing _ _ = Deferred.Or_error.ok_unit
+
+let set_itn_logger_data _ ~daemon_port:_ = Deferred.Or_error.ok_unit

@@ -68,9 +68,12 @@ let setup_daemon logger =
     flag "--block-producer-key" ~aliases:[ "block-producer-key" ]
       ~doc:
         (sprintf
-           "KEYFILE Private key file for the block producer. You cannot \
+           "DEPRECATED: Use environment variable `MINA_BP_PRIVKEY` instead. \
+            Private key file for the block producer. Providing this flag or \
+            the environment variable will enable block production. You cannot \
             provide both `block-producer-key` and `block-producer-pubkey`. \
-            (default: don't produce blocks). %s"
+            (default: use environment variable `MINA_BP_PRIVKEY`, if provided, \
+            or else don't produce any blocks) %s"
            receiver_key_warning )
       (optional string)
   and block_production_pubkey =
@@ -80,8 +83,8 @@ let setup_daemon logger =
         (sprintf
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both \
-            `block-producer-key` and `block-producer-pubkey`. (default: don't \
-            produce blocks). %s"
+            `block-producer-key` (or `MINA_BP_PRIVKEY`) and \
+            `block-producer-pubkey`. (default: don't produce blocks) %s"
            receiver_key_warning )
       (optional public_key_compressed)
   and block_production_password =
@@ -219,6 +222,7 @@ let setup_daemon logger =
   and log_json = Flag.Log.json
   and log_level = Flag.Log.level
   and file_log_level = Flag.Log.file_log_level
+  and file_log_rotations = Flag.Log.file_log_rotations
   and snark_work_fee =
     flag "--snark-worker-fee" ~aliases:[ "snark-worker-fee" ]
       ~doc:
@@ -508,13 +512,12 @@ let setup_daemon logger =
         Stdout_log.setup log_json log_level ;
         (* 512MB logrotate max size = 1GB max filesystem usage *)
         let logrotate_max_size = 1024 * 1024 * 10 in
-        let logrotate_num_rotate = 50 in
         Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
           ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina.log" ~max_size:logrotate_max_size
-               ~num_rotate:logrotate_num_rotate ) ;
+               ~num_rotate:file_log_rotations ) ;
         let best_tip_diff_log_size = 1024 * 1024 * 5 in
         Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
           ~processor:(Logger.Processor.raw ())
@@ -534,8 +537,10 @@ let setup_daemon logger =
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
-               ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ;
+               ~max_size:logrotate_max_size ~num_rotate:file_log_rotations ) ;
         (* Consumer for `[%log internal]` logging used for internal tracing *)
+        Itn_logger.set_message_postprocessor
+          Internal_tracing.For_itn_logger.post_process_message ;
         Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
           ~processor:Internal_tracing.For_logger.processor
           ~transport:
@@ -942,21 +947,39 @@ let setup_daemon logger =
                   Unix.putenv ~key:Secrets.Keypair.env ~data:password )
             block_production_password ;
           let%bind block_production_keypair =
-            match (block_production_key, block_production_pubkey) with
-            | Some _, Some _ ->
+            match
+              ( block_production_key
+              , block_production_pubkey
+              , Sys.getenv "MINA_BP_PRIVKEY" )
+            with
+            | Some _, Some _, _ ->
                 Mina_user_error.raise
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
-            | None, None ->
+            | None, Some _, Some _ ->
+                Mina_user_error.raise
+                  "You cannot provide both `MINA_BP_PRIVKEY` and \
+                   `block_production_pubkey`"
+            | None, None, None ->
                 Deferred.return None
-            | Some sk_file, _ ->
+            | None, None, Some base58_privkey ->
+                let kp =
+                  Private_key.of_base58_check_exn base58_privkey
+                  |> Keypair.of_private_key_exn
+                in
+                Deferred.return (Some kp)
+            (* CLI argument takes precedence over env variable *)
+            | Some sk_file, None, (Some _ | None) ->
+                [%log warn]
+                  "`block-producer-key` is deprecated. Please set \
+                   `MINA_BP_PRIVKEY` environment variable instead." ;
                 let%map kp =
                   Secrets.Keypair.Terminal_stdin.read_exn
                     ~should_prompt_user:false ~which:"block producer keypair"
                     sk_file
                 in
                 Some kp
-            | _, Some tracked_pubkey ->
+            | None, Some tracked_pubkey, None ->
                 let%map kp =
                   Secrets.Wallets.get_tracked_keypair ~logger
                     ~which:"block producer keypair"
@@ -1011,6 +1034,11 @@ let setup_daemon logger =
                 | Sexp.Atom _ ->
                     failwith "Expeted a sexp list" )
           in
+          let o1trace context =
+            Execution_context.find_local context O1trace.local_storage_id
+            |> Option.value ~default:[]
+            |> List.map ~f:(fun x -> `String x)
+          in
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
                ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest) )
@@ -1021,8 +1049,10 @@ let setup_daemon logger =
                 ~metadata:
                   [ ("long_async_cycle", `Float secs)
                   ; ("monitors", `List monitor_infos)
+                  ; ("o1trace", `List (o1trace context))
                   ]
-                "Long async cycle, $long_async_cycle seconds, $monitors" ;
+                "Long async cycle, $long_async_cycle seconds, $monitors, \
+                 $o1trace" ;
               Mina_metrics.(
                 Runtime.Long_async_histogram.observe Runtime.long_async_cycle
                   secs) ) ;
@@ -1034,6 +1064,7 @@ let setup_daemon logger =
                 ~metadata:
                   [ ("long_async_job", `Float secs)
                   ; ("monitors", `List monitor_infos)
+                  ; ("o1trace", `List (o1trace context))
                   ; ( "most_recent_2_backtrace"
                     , `String
                         (String.concat ~sep:"␤"
@@ -1042,7 +1073,7 @@ let setup_daemon logger =
                                  (Execution_context.backtrace_history context)
                                  2 ) ) ) )
                   ]
-                "Long async job, $long_async_job seconds" ;
+                "Long async job, $long_async_job seconds, $monitors, $o1trace" ;
               Mina_metrics.(
                 Runtime.Long_job_histogram.observe Runtime.long_async_job secs) ) ;
           let trace_database_initialization typ location =

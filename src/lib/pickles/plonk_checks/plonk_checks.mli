@@ -109,7 +109,6 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
     -> (module Field_intf with type t = 't)
     -> env:'t Scalars.Env.t
     -> shift:'t Shifted_value.Shift.t
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
     -> ( 't
        , 't
        , 'b )
@@ -119,12 +118,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        , 't
        , 't Shifted_value.t
        , ('t Shifted_value.t, 'b) Pickles_types.Plonk_types.Opt.t
-       , ( 't
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
-         , 'b )
-         Pickles_types.Plonk_types.Opt.t
+       , ('t, 'b) Pickles_types.Plonk_types.Opt.t
        , 'b )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
 
@@ -132,7 +126,6 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        (module Snarky_backendless.Snark_intf.Run with type field = 't)
     -> shift:'t Snarky_backendless.Cvar.t Shifted_value.Shift.t
     -> env:'t Snarky_backendless.Cvar.t Scalars.Env.t
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
     -> ( 't Snarky_backendless.Cvar.t
        , 't Snarky_backendless.Cvar.t
        , 't Snarky_backendless.Cvar.t Shifted_value.t
@@ -140,9 +133,6 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
          , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
          Pickles_types.Plonk_types.Opt.t
        , ( 't Snarky_backendless.Cvar.t
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
          , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
          Pickles_types.Plonk_types.Opt.t
        , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )

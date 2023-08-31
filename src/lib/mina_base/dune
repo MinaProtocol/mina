@@ -40,6 +40,7 @@
    rosetta_coding
    random_oracle
    hash_prefix_states
+   hash_prefix_create
    dummy_values
    currency
    mina_numbers
@@ -70,6 +71,7 @@
    kimchi_backend
    hex
    snark_bits
+   error_json
    ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)

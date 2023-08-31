@@ -26,6 +26,12 @@ module Make_ext (M : Monad.S) = struct
         List.append acc ys )
 
   let iter_m ~f xs = fold_m ~f:(fun () x -> f x) ~init:() xs
+
+  let sequence ms =
+    fold_m ms ~init:[] ~f:(fun acc m ->
+        let open M.Let_syntax in
+        let%map x = m in
+        x :: acc )
 end
 
 module Make_ext2 (M : Monad.S2) = struct
@@ -53,4 +59,10 @@ module Make_ext2 (M : Monad.S2) = struct
         List.append acc ys )
 
   let iter_m ~f xs = fold_m ~f:(fun () x -> f x) ~init:() xs
+
+  let sequence ms =
+    fold_m ms ~init:[] ~f:(fun acc m ->
+        let open M.Let_syntax in
+        let%map x = m in
+        x :: acc )
 end

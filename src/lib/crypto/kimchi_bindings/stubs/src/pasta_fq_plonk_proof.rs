@@ -8,7 +8,10 @@ use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
 use groupmap::GroupMap;
-use kimchi::prover_index::ProverIndex;
+use kimchi::{
+    circuits::lookup::runtime_tables::{caml::CamlRuntimeTable, RuntimeTable},
+    prover_index::ProverIndex,
+};
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use kimchi::{
     proof::{
@@ -24,6 +27,7 @@ use mina_poseidon::{
 };
 use poly_commitment::commitment::{CommitmentCurve, PolyComm};
 use poly_commitment::evaluation_proof::OpeningProof;
+use std::array;
 use std::convert::TryInto;
 
 #[ocaml_gen::func]
@@ -31,6 +35,7 @@ use std::convert::TryInto;
 pub fn caml_pasta_fq_plonk_proof_create(
     index: CamlPastaFqPlonkIndexPtr<'static>,
     witness: Vec<CamlFqVector>,
+    runtime_tables: Vec<CamlRuntimeTable<CamlFq>>,
     prev_challenges: Vec<CamlFq>,
     prev_sgs: Vec<CamlGPallas>,
 ) -> Result<CamlProofWithPublic<CamlGPallas, CamlFq>, ocaml::Error> {
@@ -67,6 +72,9 @@ pub fn caml_pasta_fq_plonk_proof_create(
         .expect("the witness should be a column of 15 vectors");
     let index: &ProverIndex<Pallas> = &index.as_ref().0;
 
+    let runtime_tables: Vec<RuntimeTable<Fq>> =
+        runtime_tables.into_iter().map(Into::into).collect();
+
     // public input
     let public_input = witness[0][0..index.cs.public].to_vec();
 
@@ -81,7 +89,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
         let proof = ProverProof::create_recursive::<
             DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
             DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
-        >(&group_map, witness, &[], index, prev, None)
+        >(&group_map, witness, &runtime_tables, index, prev, None)
         .map_err(|e| ocaml::Error::Error(e.into()))?;
         Ok((proof, public_input).into())
     })
@@ -179,9 +187,27 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProofWithPublic<CamlGPallas, Cam
         coefficients: array_init(|_| eval()),
         z: eval(),
         s: array_init(|_| eval()),
-        lookup: None,
         generic_selector: eval(),
         poseidon_selector: eval(),
+        complete_add_selector: eval(),
+        mul_selector: eval(),
+        emul_selector: eval(),
+        endomul_scalar_selector: eval(),
+        range_check0_selector: None,
+        range_check1_selector: None,
+        foreign_field_add_selector: None,
+        foreign_field_mul_selector: None,
+        xor_selector: None,
+        rot_selector: None,
+        lookup_aggregation: None,
+        lookup_table: None,
+        lookup_sorted: array::from_fn(|_| None),
+        runtime_lookup_table: None,
+        runtime_lookup_table_selector: None,
+        xor_lookup_selector: None,
+        lookup_gate_lookup_selector: None,
+        range_check_lookup_selector: None,
+        foreign_field_mul_lookup_selector: None,
     };
 
     let public = vec![Fq::one(), Fq::one()];

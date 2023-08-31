@@ -36,9 +36,9 @@ in {
       # better error messages
       # TODO: find a less hacky way to make adjustments to jsoo compiler output
       # `s` is the jsoo representation of the error message string, and `s.c` is the actual JS string
-      sed -i 's/function failwith(s){throw \[0,Failure,s\]/function failwith(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
-      sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
-      sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+      sed -i 's/function failwith(s){throw \[0,Failure,s\]/function failwith(s){throw globalThis.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+      sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw globalThis.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+      sed -i 's/return \[0,Exn,t\]/return globalThis.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
     '';
     npmBuild = "npm run build";
   };
@@ -82,4 +82,3 @@ in {
     '';
   };
 }
-

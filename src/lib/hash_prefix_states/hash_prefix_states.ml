@@ -1,9 +1,10 @@
 open Core_kernel
 open Hash_prefixes
 
-let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
+let salt (s : Hash_prefixes.t) = Hash_prefix_create.salt (s :> string)
 
-let salt_legacy (s : Hash_prefixes.t) = Random_oracle.Legacy.salt (s :> string)
+let salt_legacy (s : Hash_prefixes.t) =
+  Hash_prefix_create.salt_legacy (s :> string)
 
 let receipt_chain_signed_command = salt_legacy receipt_chain_user_command
 
@@ -60,23 +61,32 @@ let signature_for_mainnet = salt signature_mainnet
 
 let signature_for_testnet = salt signature_testnet
 
-let signature =
-  match Mina_signature_kind.t with
+let signature_for_other chain_name = salt @@ signature_other chain_name
+
+let signature ?(signature_kind = Mina_signature_kind.t) =
+  match signature_kind with
   | Mainnet ->
       signature_for_mainnet
   | Testnet ->
       signature_for_testnet
+  | Other_network chain_name ->
+      signature_for_other chain_name
 
 let signature_for_mainnet_legacy = salt_legacy signature_mainnet
 
 let signature_for_testnet_legacy = salt_legacy signature_testnet
 
-let signature_legacy =
-  match Mina_signature_kind.t with
+let signature_for_other_legacy chain_name =
+  salt_legacy @@ signature_other chain_name
+
+let signature_legacy ?(signature_kind = Mina_signature_kind.t) =
+  match signature_kind with
   | Mainnet ->
       signature_for_mainnet_legacy
   | Testnet ->
       signature_for_testnet_legacy
+  | Other_network chain_name ->
+      signature_for_other_legacy chain_name
 
 let vrf_output = salt vrf_output
 
