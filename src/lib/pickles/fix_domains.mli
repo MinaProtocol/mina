@@ -1,10 +1,12 @@
 val domains :
-     ?min_log2:int
-       (** The minimum domain size to calculate. This can be overridden if
-           there are e.g. fixed-size lookup tables that will affect the domain
-           size of the circuit.
-        *)
-  -> (module Snarky_backendless.Snark_intf.Run with type field = 'field)
+     ?feature_flags:bool Pickles_types.Plonk_types.Features.t
+  -> (module Snarky_backendless.Snark_intf.Run
+        with type field = 'field
+         and type R1CS_constraint_system.t = ( 'field
+                                             , 'gates )
+                                             Kimchi_backend_common
+                                             .Plonk_constraint_system
+                                             .t )
   -> ('a, 'b, 'field) Import.Spec.ETyp.t
   -> ('c, 'd, 'field) Import.Spec.ETyp.t
   -> ('a -> 'c)
