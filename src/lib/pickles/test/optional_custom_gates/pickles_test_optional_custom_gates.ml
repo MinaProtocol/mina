@@ -218,7 +218,7 @@ let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
   if feature_flags.foreign_field_add then main_foreign_field_add () ;
   if feature_flags.foreign_field_mul then main_foreign_field_mul ()
 
-let register_test name feature_flags1 feature_flags2 =
+let register_test name ~feature_flags1 ~feature_flags2 =
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
@@ -278,11 +278,13 @@ let register_test name feature_flags1 feature_flags2 =
 
 let register_feature_test (name, specific_feature_flags) =
   (* Tests activating "on" logic*)
-  register_test name specific_feature_flags specific_feature_flags ;
+  register_test name ~feature_flags1:specific_feature_flags
+    ~feature_flags2:specific_feature_flags ;
   (* Tests activating "maybe on" logic *)
   register_test
     (Printf.sprintf "%s (maybe)" name)
-    specific_feature_flags Plonk_types.Features.none_bool
+    ~feature_flags1:specific_feature_flags
+    ~feature_flags2:Plonk_types.Features.none_bool
 
 let () =
   let configurations =
