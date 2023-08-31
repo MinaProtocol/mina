@@ -794,6 +794,23 @@ let get_concatenated_runtime_lookup_table_size sys =
           acc + Array.length rt_cfg.first_column )
         0 rt_cfgs
 
+let finalize_fixed_lookup_tables sys =
+  match sys.fixed_lookup_tables with
+  | Unfinalized_fixed_lookup_tables_rev fixed_lt_rev ->
+      sys.fixed_lookup_tables <-
+        Compiled_fixed_lookup_tables
+          (Core_kernel.Array.of_list_rev fixed_lt_rev)
+  | Compiled_fixed_lookup_tables _ ->
+      failwith "Fixed lookup tables have already been finalized"
+
+let finalize_runtime_lookup_tables sys =
+  match sys.runtime_tables_cfg with
+  | Unfinalized_runtime_tables_cfg_rev rt_cfgs_rev ->
+      sys.runtime_tables_cfg <-
+        Compiled_runtime_tables_cfg (Core_kernel.Array.of_list_rev rt_cfgs_rev)
+  | Compiled_runtime_tables_cfg _ ->
+      failwith "Runtime table configurations have already been finalized"
+
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
 
 (* TODO: glossary of terms in this file (terms, reducing, feeding) + module doc *)
@@ -1062,20 +1079,11 @@ end = struct
       } ->
         (gates, fixed_lookup_tables, runtime_tables_cfg)
     (* Finalizing lookup tables and runtime table cfgs first *)
-    | { fixed_lookup_tables =
-          Unfinalized_fixed_lookup_tables_rev fixed_lookup_tables_rev
-      ; _
-      } ->
-        let fixed_lookup_tables = Array.of_list_rev fixed_lookup_tables_rev in
-        sys.fixed_lookup_tables <-
-          Compiled_fixed_lookup_tables fixed_lookup_tables ;
+    | { fixed_lookup_tables = Unfinalized_fixed_lookup_tables_rev _; _ } ->
+        finalize_fixed_lookup_tables sys ;
         finalize_and_get_gates sys
-    | { runtime_tables_cfg =
-          Unfinalized_runtime_tables_cfg_rev runtime_tables_cfg_rev
-      ; _
-      } ->
-        let runtime_tables_cfg = Array.of_list_rev runtime_tables_cfg_rev in
-        sys.runtime_tables_cfg <- Compiled_runtime_tables_cfg runtime_tables_cfg ;
+    | { runtime_tables_cfg = Unfinalized_runtime_tables_cfg_rev _; _ } ->
+        finalize_runtime_lookup_tables sys ;
         finalize_and_get_gates sys
     | { pending_generic_gate = Some (l, r, o, coeffs); _ } ->
         (* Finalize any pending generic constraint first. *)
