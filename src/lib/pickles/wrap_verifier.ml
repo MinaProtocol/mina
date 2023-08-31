@@ -198,55 +198,99 @@ struct
       -> (Inner_curve.t, (Inner_curve.t, Boolean.var) Plonk_types.Opt.t) index'
       =
     let open Tuple_lib in
-    let map ~f_bool ~f =
-      Plonk_verification_key_evals.Step.map ~f ~f_opt:(function
-        | Plonk_types.Opt.None ->
-            Plonk_types.Opt.None
-        | Plonk_types.Opt.Maybe (b, x) ->
-            Plonk_types.Opt.Maybe (f_bool b, f x)
-        | Plonk_types.Opt.Some x ->
-            Plonk_types.Opt.Some (f x) )
-    in
-    let map2 ~f_bool ~f =
-      Plonk_verification_key_evals.Step.map2 ~f ~f_opt:(fun x y ->
-          match (x, y) with
-          | Plonk_types.Opt.None, Plonk_types.Opt.None ->
-              Plonk_types.Opt.None
-          | Plonk_types.Opt.Some x, Plonk_types.Opt.Some y ->
-              Plonk_types.Opt.Some (f x y)
-          | ( (Plonk_types.Opt.Some _ | Maybe _ | None)
-            , (Plonk_types.Opt.Some _ | Maybe _ | None) ) ->
-              let to_maybe = function
-                | Plonk_types.Opt.None ->
-                    (Boolean.false_, (Field.zero, Field.zero))
-                | Plonk_types.Opt.Maybe (b, x) ->
-                    (b, x)
-                | Plonk_types.Opt.Some x ->
-                    (Boolean.true_, x)
-              in
-              let b1, x1 = to_maybe x in
-              let b2, x2 = to_maybe y in
-              Plonk_types.Opt.Maybe (f_bool b1 b2, f x1 x2) )
-    in
     fun bs keys ->
       let open Field in
       Vector.map2
         (bs :> (Boolean.var, n) Vector.t)
         keys
         ~f:(fun b key ->
-          map key
+          Plonk_verification_key_evals.Step.map key
             ~f:(fun g -> Double.map g ~f:(( * ) (b :> t)))
-            ~f_bool:(fun b_inner -> Boolean.(b &&& b_inner)) )
+            ~f_opt:(function
+              (* Here, we split the 3 variants into 3 separate accumulators. This
+                 allows us to only compute the 'maybe' flag when we need to, and
+                 allows us to fall back to the basically-free `None` when a
+                 feature is entirely unused, or to the less expensive `Some` if
+                 it is used for every circuit.
+                 In particular, it is important that we generate exactly `None`
+                 when none of the optional gates are used, otherwise we will
+                 change the serialization of the protocol circuits.
+              *)
+              | Plonk_types.Opt.None ->
+                  ([], [], [ b ])
+              | Plonk_types.Opt.Maybe (b_x, x) ->
+                  ([], [ (b, b_x, x) ], [])
+              | Plonk_types.Opt.Some x ->
+                  ([ (b, x) ], [], []) ) )
       |> Vector.reduce_exn
            ~f:
-             (map2 ~f:(Double.map2 ~f:( + ))
-                ~f_bool:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
-                  Boolean.Unsafe.of_cvar
-                    Field.(add (b1 :> Field.t) (b2 :> Field.t)) ) )
-      |> map
-           ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
-           ~f_bool:(fun (b : Boolean.var) ->
-             Boolean.Unsafe.of_cvar (Util.seal (module Impl) (b :> t)) )
+             (Plonk_verification_key_evals.Step.map2 ~f:(Double.map2 ~f:( + ))
+                ~f_opt:(fun (yes_1, maybe_1, no_1) (yes_2, maybe_2, no_2) ->
+                  (yes_1 @ yes_2, maybe_1 @ maybe_2, no_1 @ no_2) ) )
+      |> Plonk_verification_key_evals.Step.map ~f:Fn.id ~f_opt:(function
+           | [], [], _nones ->
+               (* We only have `None`s, so we can emit exactly `None` without
+                  further computation.
+               *)
+               Plonk_types.Opt.None
+           | somes, [], [] ->
+               (* Special case: we don't need to compute the 'maybe' bool
+                  because we know statically that all entries are `Some`.
+               *)
+               let sum =
+                 somes
+                 |> List.map ~f:(fun ((b : Boolean.var), g) ->
+                        Double.map g ~f:(( * ) (b :> t)) )
+                 |> List.reduce_exn ~f:(Double.map2 ~f:( + ))
+               in
+               Plonk_types.Opt.Some sum
+           | somes, maybes, nones ->
+               let is_none =
+                 List.reduce nones
+                   ~f:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
+                     Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t)) )
+               in
+               let none_sum =
+                 Option.map is_none ~f:(fun (b : Boolean.var) ->
+                     Double.map Inner_curve.one ~f:(( * ) (b :> t)) )
+               in
+               let some_is_yes, some_sum =
+                 somes
+                 |> List.map ~f:(fun ((b : Boolean.var), g) ->
+                        (b, Double.map g ~f:(( * ) (b :> t))) )
+                 |> List.reduce
+                      ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2)
+                         ->
+                        ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
+                        , Double.map2 ~f:( + ) g1 g2 ) )
+                 |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
+               in
+               let maybe_is_yes, maybe_sum =
+                 maybes
+                 |> List.map
+                      ~f:(fun ((b : Boolean.var), (b_g : Boolean.var), g) ->
+                        ( Boolean.Unsafe.of_cvar Field.(mul (b :> t) (b_g :> t))
+                        , Double.map g ~f:(( * ) (b :> t)) ) )
+                 |> List.reduce
+                      ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2)
+                         ->
+                        ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
+                        , Double.map2 ~f:( + ) g1 g2 ) )
+                 |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
+               in
+               let is_yes =
+                 [| some_is_yes; maybe_is_yes |]
+                 |> Array.filter_map ~f:Fn.id
+                 |> Array.reduce_exn
+                      ~f:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
+                        Boolean.Unsafe.of_cvar ((b1 :> t) + (b2 :> t)) )
+               in
+               let sum =
+                 [| none_sum; maybe_sum; some_sum |]
+                 |> Array.filter_map ~f:Fn.id
+                 |> Array.reduce_exn ~f:(Double.map2 ~f:( + ))
+               in
+               Plonk_types.Opt.Maybe (is_yes, sum) )
 
   (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
@@ -815,12 +859,19 @@ struct
           | Maybe (_, _) ->
               failwith "TODO"
           | Some l -> (
-              let absorb_sorted_first_part () =
-                Vector.iter l.sorted ~f:(fun z ->
+              Opt.consume_all_pending sponge ;
+              let absorb_sorted_1 sponge =
+                let (first :: _) = l.sorted in
+                let z = Array.map first ~f:(fun z -> (Boolean.true_, z)) in
+                absorb sponge Without_degree_bound z
+              in
+              let absorb_sorted_2_to_4 () =
+                let (_ :: rest) = l.sorted in
+                Vector.iter rest ~f:(fun z ->
                     let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
                     absorb sponge Without_degree_bound z )
               in
-              let absorb_sorted_second_part () =
+              let absorb_sorted_5 () =
                 match l.sorted_5th_column with
                 | None ->
                     ()
@@ -836,15 +887,50 @@ struct
               with
               | _ :: Some _ :: _, _ | _, Some _ ->
                   let joint_combiner = sample_scalar () in
-                  absorb_sorted_first_part () ;
-                  absorb_sorted_second_part () ;
+                  absorb_sorted_1 sponge ;
+                  absorb_sorted_2_to_4 () ;
+                  absorb_sorted_5 () ;
                   Types.Opt.Some joint_combiner
               | _ :: None :: _, None ->
-                  absorb_sorted_first_part () ;
-                  absorb_sorted_second_part () ;
+                  absorb_sorted_1 sponge ;
+                  absorb_sorted_2_to_4 () ;
+                  absorb_sorted_5 () ;
                   Types.Opt.Some { inner = Field.zero }
-              | _ ->
-                  failwith "TODO" )
+              | _ :: Maybe (b1, _) :: _, Maybe (b2, _) ->
+                  let b = Boolean.(b1 ||| b2) in
+                  let sponge2 = Opt.copy sponge in
+                  let joint_combiner_if_true =
+                    let joint_combiner = sample_scalar () in
+                    absorb_sorted_1 sponge ; joint_combiner
+                  in
+                  let joint_combiner_if_false : Scalar_challenge.t =
+                    absorb_sorted_1 sponge2 ; { inner = Field.zero }
+                  in
+                  Opt.recombine b ~original_sponge:sponge2 sponge ;
+                  absorb_sorted_2_to_4 () ;
+                  absorb_sorted_5 () ;
+                  Types.Opt.Some
+                    { inner =
+                        Field.if_ b ~then_:joint_combiner_if_true.inner
+                          ~else_:joint_combiner_if_false.inner
+                    }
+              | _ :: Maybe (b, _) :: _, _ | _, Maybe (b, _) ->
+                  let sponge2 = Opt.copy sponge in
+                  let joint_combiner_if_true =
+                    let joint_combiner = sample_scalar () in
+                    absorb_sorted_1 sponge ; joint_combiner
+                  in
+                  let joint_combiner_if_false : Scalar_challenge.t =
+                    absorb_sorted_1 sponge2 ; { inner = Field.zero }
+                  in
+                  Opt.recombine b ~original_sponge:sponge2 sponge ;
+                  absorb_sorted_2_to_4 () ;
+                  absorb_sorted_5 () ;
+                  Types.Opt.Some
+                    { inner =
+                        Field.if_ b ~then_:joint_combiner_if_true.inner
+                          ~else_:joint_combiner_if_false.inner
+                    } )
         in
         let lookup_table_comm =
           match (messages.lookup, joint_combiner) with
