@@ -854,6 +854,13 @@ module Make
 
   val get_concatenated_runtime_lookup_table_size : t -> int
 
+  (** Finalize the fixed lookup tables. The function can not be called twice *)
+  val finalize_fixed_lookup_tables : t -> unit
+
+  (** Finalize the runtime lookup table configurations. The function can not be
+      called twice. *)
+  val finalize_runtime_lookup_tables : t -> unit
+
   val add_constraint :
        ?label:string
     -> t
@@ -1030,6 +1037,10 @@ end = struct
 
   let get_concatenated_runtime_lookup_table_size (sys : t) =
     get_concatenated_runtime_lookup_table_size sys
+
+  let finalize_fixed_lookup_tables = finalize_fixed_lookup_tables
+
+  let finalize_runtime_lookup_tables = finalize_runtime_lookup_tables
 
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.

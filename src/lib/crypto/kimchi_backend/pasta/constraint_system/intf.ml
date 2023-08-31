@@ -58,6 +58,12 @@ module type Full = sig
   (** Return the size of all the runtime lookup tables concatenated *)
   val get_concatenated_runtime_lookup_table_size : t -> int
 
+  (** Finalize the fixed lookup tables. The function can not be called twice *)
+  val finalize_fixed_lookup_tables : t -> unit
+
+  (** Finalize the runtime lookup table configurations. The function can not be called twice. *)
+  val finalize_runtime_lookup_tables : t -> unit
+
   val digest : t -> Md5.t
 
   val to_json : t -> string
