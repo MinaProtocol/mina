@@ -17,6 +17,7 @@ module Permuts_minus_1 = Nat.N6
 module Permuts_minus_1_vec = Vector.Vector_6
 module Permuts = Nat.N7
 module Permuts_vec = Vector.Vector_7
+module Lookup_sorted_vec = Vector.Vector_5
 
 module Opt = struct
   [@@@warning "-4"]
@@ -378,7 +379,7 @@ module Evals = struct
         ; rot_selector : 'a option
         ; lookup_aggregation : 'a option
         ; lookup_table : 'a option
-        ; lookup_sorted : 'a option array
+        ; lookup_sorted : 'a option Lookup_sorted_vec.Stable.V1.t
         ; runtime_lookup_table : 'a option
         ; runtime_lookup_table_selector : 'a option
         ; xor_lookup_selector : 'a option
@@ -389,6 +390,71 @@ module Evals = struct
       [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
     end
   end]
+
+  let validate_feature_flags ~feature_flags:(f : bool Features.t)
+      { w = _
+      ; coefficients = _
+      ; z = _
+      ; s = _
+      ; generic_selector = _
+      ; poseidon_selector = _
+      ; complete_add_selector = _
+      ; mul_selector = _
+      ; emul_selector = _
+      ; endomul_scalar_selector = _
+      ; range_check0_selector
+      ; range_check1_selector
+      ; foreign_field_add_selector
+      ; foreign_field_mul_selector
+      ; xor_selector
+      ; rot_selector
+      ; lookup_aggregation
+      ; lookup_table
+      ; lookup_sorted
+      ; runtime_lookup_table
+      ; runtime_lookup_table_selector
+      ; xor_lookup_selector
+      ; lookup_gate_lookup_selector
+      ; range_check_lookup_selector
+      ; foreign_field_mul_lookup_selector
+      } =
+    let enable_if x flag = Bool.(Option.is_some x = flag) in
+    let range_check_lookup = f.range_check0 || f.range_check1 || f.rot in
+    let lookups_per_row_4 =
+      f.xor || range_check_lookup || f.foreign_field_mul
+    in
+    let lookups_per_row_3 = lookups_per_row_4 || f.lookup in
+    let lookups_per_row_2 = lookups_per_row_3 in
+    Array.reduce_exn ~f:( && )
+      [| enable_if range_check0_selector f.range_check0
+       ; enable_if range_check1_selector f.range_check1
+       ; enable_if foreign_field_add_selector f.foreign_field_add
+       ; enable_if foreign_field_mul_selector f.foreign_field_mul
+       ; enable_if xor_selector f.xor
+       ; enable_if rot_selector f.rot
+       ; enable_if lookup_aggregation lookups_per_row_2
+       ; enable_if lookup_table lookups_per_row_2
+       ; Vector.foldi lookup_sorted ~init:true ~f:(fun i acc x ->
+             let flag =
+               (* NB: lookups_per_row + 1 in sorted, due to the lookup table. *)
+               match i with
+               | 0 | 1 | 2 ->
+                   lookups_per_row_2
+               | 3 ->
+                   lookups_per_row_3
+               | 4 ->
+                   lookups_per_row_4
+               | _ ->
+                   assert false
+             in
+             acc && enable_if x flag )
+       ; enable_if runtime_lookup_table f.runtime_tables
+       ; enable_if runtime_lookup_table_selector f.runtime_tables
+       ; enable_if xor_lookup_selector f.xor
+       ; enable_if lookup_gate_lookup_selector f.lookup
+       ; enable_if range_check_lookup_selector range_check_lookup
+       ; enable_if foreign_field_mul_lookup_selector f.foreign_field_mul
+      |]
 
   let to_absorption_sequence
       { w
@@ -453,7 +519,7 @@ module Evals = struct
         ]
     in
     always_present @ optional_gates
-    @ Array.to_list (Array.filter_map ~f:Fn.id lookup_sorted)
+    @ List.filter_map ~f:Fn.id (Vector.to_list lookup_sorted)
     @ lookup_final_terms
 
   module In_circuit = struct
@@ -476,7 +542,7 @@ module Evals = struct
       ; rot_selector : ('f, 'bool) Opt.t
       ; lookup_aggregation : ('f, 'bool) Opt.t
       ; lookup_table : ('f, 'bool) Opt.t
-      ; lookup_sorted : ('f, 'bool) Opt.t array
+      ; lookup_sorted : ('f, 'bool) Opt.t Lookup_sorted_vec.t
       ; runtime_lookup_table : ('f, 'bool) Opt.t
       ; runtime_lookup_table_selector : ('f, 'bool) Opt.t
       ; xor_lookup_selector : ('f, 'bool) Opt.t
@@ -532,7 +598,7 @@ module Evals = struct
       ; rot_selector = Opt.map ~f rot_selector
       ; lookup_aggregation = Opt.map ~f lookup_aggregation
       ; lookup_table = Opt.map ~f lookup_table
-      ; lookup_sorted = Array.map ~f:(Opt.map ~f) lookup_sorted
+      ; lookup_sorted = Vector.map ~f:(Opt.map ~f) lookup_sorted
       ; runtime_lookup_table = Opt.map ~f runtime_lookup_table
       ; runtime_lookup_table_selector = Opt.map ~f runtime_lookup_table_selector
       ; xor_lookup_selector = Opt.map ~f xor_lookup_selector
@@ -594,7 +660,7 @@ module Evals = struct
         ]
       in
       always_present @ optional_gates
-      @ Array.to_list lookup_sorted
+      @ Vector.to_list lookup_sorted
       @ [ lookup_aggregation
         ; lookup_table
         ; runtime_lookup_table
@@ -659,7 +725,7 @@ module Evals = struct
       let some x = Opt.Some x in
       List.map ~f:some always_present
       @ optional_gates
-      @ Array.to_list lookup_sorted
+      @ Vector.to_list lookup_sorted
       @ [ runtime_lookup_table
         ; runtime_lookup_table_selector
         ; xor_lookup_selector
@@ -715,7 +781,7 @@ module Evals = struct
     ; rot_selector = Opt.of_option rot_selector
     ; lookup_aggregation = Opt.of_option lookup_aggregation
     ; lookup_table = Opt.of_option lookup_table
-    ; lookup_sorted = Array.map ~f:Opt.of_option lookup_sorted
+    ; lookup_sorted = Vector.map ~f:Opt.of_option lookup_sorted
     ; runtime_lookup_table = Opt.of_option runtime_lookup_table
     ; runtime_lookup_table_selector =
         Opt.of_option runtime_lookup_table_selector
@@ -772,7 +838,7 @@ module Evals = struct
     ; rot_selector = Option.map ~f rot_selector
     ; lookup_aggregation = Option.map ~f lookup_aggregation
     ; lookup_table = Option.map ~f lookup_table
-    ; lookup_sorted = Array.map ~f:(Option.map ~f) lookup_sorted
+    ; lookup_sorted = Vector.map ~f:(Option.map ~f) lookup_sorted
     ; runtime_lookup_table = Option.map ~f runtime_lookup_table
     ; runtime_lookup_table_selector =
         Option.map ~f runtime_lookup_table_selector
@@ -812,7 +878,7 @@ module Evals = struct
         Option.map2 ~f t1.lookup_aggregation t2.lookup_aggregation
     ; lookup_table = Option.map2 ~f t1.lookup_table t2.lookup_table
     ; lookup_sorted =
-        Array.map2_exn ~f:(Option.map2 ~f) t1.lookup_sorted t2.lookup_sorted
+        Vector.map2 ~f:(Option.map2 ~f) t1.lookup_sorted t2.lookup_sorted
     ; runtime_lookup_table =
         Option.map2 ~f t1.runtime_lookup_table t2.runtime_lookup_table
     ; runtime_lookup_table_selector =
@@ -907,7 +973,7 @@ module Evals = struct
         ]
     in
     always_present @ optional_gates
-    @ Array.to_list (Array.filter_map ~f:Fn.id lookup_sorted)
+    @ List.filter_map ~f:Fn.id (Vector.to_list lookup_sorted)
     @ List.filter_map ~f:Fn.id
         [ lookup_aggregation
         ; lookup_table
@@ -967,7 +1033,7 @@ module Evals = struct
       ; opt feature_flags.rot
       ; opt uses_lookup
       ; opt uses_lookup
-      ; Typ.array ~length:5 (opt lookup_sorted) (* TODO: Fixme *)
+      ; Vector.typ (opt lookup_sorted) Nat.N5.n (* TODO: Fixme *)
       ; opt feature_flags.runtime_tables
       ; opt feature_flags.runtime_tables
       ; opt feature_flags.xor

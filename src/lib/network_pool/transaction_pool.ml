@@ -433,7 +433,7 @@ struct
           else true
 
     let diff_error_of_indexed_pool_error :
-        Indexed_pool.Command_error.t -> Diff_versioned.Diff_error.t = function
+        Command_error.t -> Diff_versioned.Diff_error.t = function
       | Invalid_nonce _ ->
           Invalid_nonce
       | Insufficient_funds _ ->
@@ -450,7 +450,7 @@ struct
           Expired
 
     let indexed_pool_error_metadata = function
-      | Indexed_pool.Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
+      | Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
           let nonce_json = Account.Nonce.to_yojson in
           [ ( "between"
             , `Assoc [ ("low", nonce_json low); ("hi", nonce_json hi) ] )
@@ -991,8 +991,8 @@ struct
       let of_indexed_pool_error e =
         (diff_error_of_indexed_pool_error e, indexed_pool_error_metadata e)
 
-      let report_command_error ~logger ~is_sender_local tx
-          (e : Indexed_pool.Command_error.t) =
+      let report_command_error ~logger ~is_sender_local tx (e : Command_error.t)
+          =
         let diff_err, error_extra = of_indexed_pool_error e in
         if is_sender_local then
           [%str_log error]
@@ -1584,13 +1584,22 @@ let%test_module _ =
 
       type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
 
-      let create : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
+      let create ?permissions :
+          unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
        fun () ->
         let zkappify_account (account : Account.t) : Account.t =
           let zkapp =
             Some { Zkapp_account.default with verification_key = Some vk }
           in
-          { account with zkapp }
+          { account with
+            zkapp
+          ; permissions =
+              ( match permissions with
+              | Some p ->
+                  p
+              | None ->
+                  Permissions.user_default )
+          }
         in
         let pipe_r, pipe_w =
           Broadcast_pipe.create
@@ -1757,7 +1766,7 @@ let%test_module _ =
       assert (List.is_sorted txns ~compare)
 
     let assert_pool_txs test txs =
-      Indexed_pool.For_tests.assert_invariants test.txn_pool.pool ;
+      Indexed_pool.For_tests.assert_pool_consistency test.txn_pool.pool ;
       assert_locally_generated test.txn_pool ;
       assert_fee_wu_ordering test.txn_pool ;
       assert_user_command_sets_equal
@@ -1770,8 +1779,10 @@ let%test_module _ =
                 User_command.forget_check )
            txs )
 
-    let setup_test () =
-      let frontier, best_tip_diff_w = Mock_transition_frontier.create () in
+    let setup_test ?permissions () =
+      let frontier, best_tip_diff_w =
+        Mock_transition_frontier.create ?permissions ()
+      in
       let _, best_tip_ref = frontier in
       let frontier_pipe_r, frontier_pipe_w =
         Broadcast_pipe.create @@ Some frontier
@@ -1821,6 +1832,35 @@ let%test_module _ =
                 { receiver_pk = get_pk receiver_idx
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
+
+    let mk_single_account_update ~chain ~fee_payer_idx ~zkapp_account_idx ~fee
+        ~nonce ~ledger =
+      let fee = Currency.Fee.of_nanomina_int_exn fee in
+      let fee_payer_kp = test_keys.(fee_payer_idx) in
+      let nonce = Account.Nonce.of_int nonce in
+      let spec : Transaction_snark.For_tests.Single_account_update_spec.t =
+        Transaction_snark.For_tests.Single_account_update_spec.
+          { fee_payer = (fee_payer_kp, nonce)
+          ; fee
+          ; memo = Signed_command_memo.create_from_string_exn "invalid proof"
+          ; zkapp_account_keypair = test_keys.(zkapp_account_idx)
+          ; update = { Account_update.Update.noop with zkapp_uri = Set "abcd" }
+          ; call_data = Snark_params.Tick.Field.zero
+          ; events = []
+          ; actions = []
+          }
+      in
+      let%map zkapp_command =
+        Transaction_snark.For_tests.single_account_update ~chain
+          ~constraint_constants spec
+      in
+      Or_error.ok_exn
+        (Zkapp_command.Verifiable.create ~status:Applied
+           ~find_vk:
+             (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                ~get:Mina_ledger.Ledger.get
+                ~location_of_account:Mina_ledger.Ledger.location_of_account )
+           zkapp_command )
 
     let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
         ~receiver_idx ~fee ~nonce ~amount () =
@@ -2910,4 +2950,85 @@ let%test_module _ =
             run_test_cases send_command
           in
           return () )
+
+    (* This test uses dummy verifiers, that's why it's not rejecting the problematic zkapp command
+       But this test is still useful, since it exercises the parts that doesn't requires a pickles instance
+       Combining together with the test that uses pickles directly, these 2 tests would make sure that
+       the problematic zkapp command would fail exactly for the invalid proof
+    *)
+    let%test "account update with a different network id that uses proof \
+              authorization would pass verification under dummy verifier" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind test =
+            setup_test
+              ~permissions:
+                { Permissions.user_default with set_zkapp_uri = Proof }
+              ()
+          in
+          let%bind zkapp_command =
+            mk_single_account_update
+              ~chain:Mina_signature_kind.(Other_network "invalid")
+              ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
+              ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
+          in
+          match%map
+            Test.Resource_pool.Diff.verify test.txn_pool
+              (Envelope.Incoming.wrap
+                 ~data:
+                   [ User_command.forget_check
+                     @@ Zkapp_command
+                          (Zkapp_command.Valid.of_verifiable zkapp_command)
+                   ]
+                 ~sender:Envelope.Sender.Local )
+          with
+          | Error e ->
+              failwith (Error.to_string_hum e)
+          | Ok _ ->
+              true )
+
+    let%test "account update with a different network id that uses proof \
+              authorization would fail verification under pickles" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind test =
+            setup_test
+              ~permissions:
+                { Permissions.user_default with set_zkapp_uri = Proof }
+              ()
+          in
+          let%bind zkapp_command =
+            mk_single_account_update
+              ~chain:Mina_signature_kind.(Other_network "invalid")
+              ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
+              ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
+          in
+          let Zkapp_command.Verifiable.{ account_updates; _ } = zkapp_command in
+          let zkapp_command_with_hashes_list =
+            account_updates |> Zkapp_statement.zkapp_statements_of_forest'
+            |> Zkapp_command.Call_forest.With_hashes_and_data
+               .to_zkapp_command_with_hashes_list
+          in
+          let to_verify =
+            List.map zkapp_command_with_hashes_list
+              ~f:(fun ((p, (vk_opt, _stmt)), _) ->
+                match p.authorization with
+                | Proof pi ->
+                    let vk = Option.value_exn vk_opt in
+                    let stmt =
+                      Zkapp_statement.Poly.
+                        { account_update =
+                            ( Zkapp_command.Digest.Account_update.create p
+                              :> Zkapp_command.Transaction_commitment.t )
+                        ; calls =
+                            ( Zkapp_command.Call_forest.hash []
+                              :> Zkapp_command.Transaction_commitment.t )
+                        }
+                    in
+                    (vk.data, stmt, pi)
+                | _ ->
+                    failwith "mk_single_account_update doesn't have proof auth" )
+          in
+          let%map result =
+            Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
+          in
+          Or_error.is_error result )
   end )

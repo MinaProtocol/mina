@@ -4736,10 +4736,9 @@ module Mutations = struct
               ~wait_span ~stop_signal ~stop_time ~uuid keypairs )
           else return ()
         in
-        let%bind accounts = Ledger.to_list ledger in
-        [%log debug] "The accounts were not in the best tip $ledger, try again"
-          ~metadata:
-            [ ("ledger", `List (List.map accounts ~f:Account.to_yojson)) ] ;
+        [%log debug]
+          "Some deployed zkApp accounts weren't found in the best tip ledger, \
+           trying again" ;
         let%bind () =
           Async.after
             (Time.Span.of_ms
@@ -4852,6 +4851,12 @@ module Mutations = struct
                                 (Public_key.compress public_key, private_key) )
                             |> Public_key.Compressed.Map.of_alist_exn
                           in
+                          let unused_pks =
+                            List.map unused_keypairs
+                              ~f:(fun { public_key; _ } ->
+                                Public_key.compress public_key )
+                            |> Public_key.Compressed.Hash_set.of_list
+                          in
                           let `VK vk, `Prover prover =
                             Transaction_snark.For_tests.create_trivial_snapp
                               ~constraint_constants ()
@@ -4960,7 +4965,8 @@ module Mutations = struct
                                             ~fee_payer_keypair:fee_payer ~keymap
                                             ~account_state_tbl
                                             ~generate_new_accounts ~ledger ~vk
-                                            () )
+                                            ~available_public_keys:unused_pks ()
+                                        )
                                         ~size:1
                                         ~random:
                                           (Splittable_random.State.create
@@ -5186,12 +5192,133 @@ module Mutations = struct
             let s = sprintf "Deleted %d log%s" n (if n > 1 then "s" else "") in
             return @@ Ok s )
 
+    let stop_daemon =
+      (* minimum delay is to allow this GraphQL request to return *)
+      let min_delay_secs = 5 in
+      io_field "stopDaemon" ~doc:"Stop the Mina daemon"
+        ~args:
+          Arg.
+            [ arg "delaySeconds"
+                ~doc:
+                  (sprintf
+                     "Seconds to delay before stopping daemon (minimum %d)"
+                     min_delay_secs )
+                ~typ:int
+            ; arg "cleanConfig"
+                ~doc:
+                  "Whether to remove saved configuration data (default false)"
+                ~typ:bool
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () delay_secs clean_config ->
+          O1trace.thread "itn_stop_daemon"
+          @@ fun () ->
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            let delay_secs =
+              Option.value_map delay_secs ~default:min_delay_secs ~f:Fn.id
+            in
+            if delay_secs < min_delay_secs then
+              return
+              @@ Error
+                   (sprintf "Delay of %d seconds is less than minimum %d"
+                      delay_secs min_delay_secs )
+            else
+              let clean_config = Option.value ~default:false clean_config in
+              let conf_dir = (Mina_lib.config mina).conf_dir in
+              if clean_config then
+                Exit_handlers.register_async_shutdown_handler
+                  ~logger:(Mina_lib.config mina).logger
+                  ~description:"Remove configuration data" (fun () ->
+                    let epoch_ledger_json_file =
+                      conf_dir ^/ "epoch_ledger.json"
+                    in
+                    let%bind () =
+                      match%bind Sys.file_exists epoch_ledger_json_file with
+                      | `Yes -> (
+                          let json =
+                            In_channel.with_file epoch_ledger_json_file
+                              ~f:(fun ic ->
+                                In_channel.input_all ic
+                                |> Yojson.Safe.from_string )
+                          in
+                          match json with
+                          | `Assoc items ->
+                              let find_uuid name =
+                                match
+                                  List.Assoc.find items name ~equal:String.equal
+                                with
+                                | Some (`String s) ->
+                                    s
+                                | _ ->
+                                    failwithf
+                                      "In epoch ledger JSON file, expected to \
+                                       find entry for %s"
+                                      name ()
+                              in
+                              let staking_uuid = find_uuid "staking" in
+                              let next_uuid = find_uuid "next" in
+                              let rm_epoch_ledger uuid =
+                                let path =
+                                  conf_dir ^/ sprintf "epoch_ledger%s" uuid
+                                in
+                                match%bind Sys.file_exists path with
+                                | `Yes ->
+                                    File_system.remove_dir path
+                                | `No | `Unknown ->
+                                    Deferred.unit
+                              in
+                              let%bind () = rm_epoch_ledger staking_uuid in
+                              rm_epoch_ledger next_uuid
+                          | _ ->
+                              failwith "Expected JSON record" )
+                      | `No | `Unknown ->
+                          Deferred.unit
+                    in
+                    let files_to_remove =
+                      [ "epoch_ledger.json"; "root" ^/ "root" ]
+                    in
+                    let%bind () =
+                      Deferred.List.iter files_to_remove ~f:(fun file ->
+                          let path = conf_dir ^/ file in
+                          match%bind Sys.file_exists path with
+                          | `Yes ->
+                              Sys.remove path
+                          | `No | `Unknown ->
+                              Deferred.unit )
+                    in
+                    let dirs_to_remove =
+                      [ "root" ^/ "snarked_ledger"; "frontier" ]
+                    in
+                    Deferred.List.iter dirs_to_remove ~f:(fun dir ->
+                        let path = conf_dir ^/ dir in
+                        match%bind Sys.file_exists path with
+                        | `Yes ->
+                            File_system.remove_dir path
+                        | `No | `Unknown ->
+                            Deferred.unit ) ) ;
+              let s =
+                let clean_str =
+                  if clean_config then
+                    sprintf ", will clean configuration directory %s" conf_dir
+                  else ""
+                in
+                sprintf "Stopping daemon in %d seconds%s" delay_secs clean_str
+              in
+              let delay_span = delay_secs |> Float.of_int |> Time.Span.of_sec in
+              Async.Deferred.don't_wait_for
+                (let%bind () = Async.after delay_span in
+                 let%bind () = Scheduler.yield () in
+                 exit 0 ) ;
+              return @@ Ok s )
+
     let commands =
       [ schedule_payments
       ; schedule_zkapp_commands
       ; stop_scheduled_transactions
       ; update_gating
       ; flush_internal_logs
+      ; stop_daemon
       ]
   end
 end
@@ -5908,6 +6035,83 @@ module Queries = struct
         Mina_lib.runtime_config mina
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
 
+  let fork_config =
+    let rec map_results ~f = function
+      | [] ->
+          Result.return []
+      | r :: rs ->
+          let open Result.Let_syntax in
+          let%bind r' = f r in
+          let%map rs = map_results ~f rs in
+          r' :: rs
+    in
+    field "fork_config"
+      ~doc:
+        "The runtime configuration for a blockchain fork intended to be a \
+         continuation of the current one."
+      ~typ:(non_null Types.json)
+      ~args:Arg.[]
+      ~resolve:(fun { ctx = mina; _ } () ->
+        match Mina_lib.best_tip mina with
+        | `Bootstrapping ->
+            `Assoc [ ("error", `String "Daemon is bootstrapping") ]
+        | `Active best_tip -> (
+            let block = Transition_frontier.Breadcrumb.(block best_tip) in
+            let global_slot =
+              Mina_block.blockchain_length block |> Unsigned.UInt32.to_int
+            in
+            let accounts_or_error =
+              Transition_frontier.Breadcrumb.staged_ledger best_tip
+              |> Staged_ledger.ledger
+              |> Ledger.foldi ~init:[] ~f:(fun _ accum act -> act :: accum)
+              |> map_results
+                   ~f:Runtime_config.Json_layout.Accounts.Single.of_account
+            in
+            let protocol_state =
+              Transition_frontier.Breadcrumb.protocol_state best_tip
+            in
+            match accounts_or_error with
+            | Error e ->
+                `Assoc [ ("error", `String e) ]
+            | Ok accounts ->
+                let runtime_config = Mina_lib.runtime_config mina in
+                let ledger = Option.value_exn runtime_config.ledger in
+                let previous_length =
+                  let open Option.Let_syntax in
+                  let%bind proof = runtime_config.proof in
+                  let%map fork = proof.fork in
+                  fork.previous_length + global_slot
+                in
+                let fork =
+                  Runtime_config.Fork_config.
+                    { previous_state_hash =
+                        State_hash.to_base58_check
+                          protocol_state.previous_state_hash
+                    ; previous_length =
+                        Option.value ~default:global_slot previous_length
+                    ; previous_global_slot = global_slot
+                    }
+                in
+                let update =
+                  Runtime_config.make
+                  (* add_genesis_winner must be set to false, because this
+                     config effectively creates a continuation of the current
+                     blockchain state and therefore the genesis ledger already
+                     contains the winner of the previous block. No need to
+                     artificially add it. In fact, it wouldn't work at all,
+                     because the new node would try to create this account at
+                     startup, even though it already exists, leading to an error.*)
+                    ~ledger:
+                      { ledger with
+                        base = Accounts accounts
+                      ; add_genesis_winner = Some false
+                      }
+                    ~proof:(Runtime_config.Proof_keys.make ~fork ())
+                    ()
+                in
+                let new_config = Runtime_config.combine runtime_config update in
+                Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic ) )
+
   let thread_graph =
     field "threadGraph"
       ~doc:
@@ -6022,6 +6226,7 @@ module Queries = struct
     ; evaluate_vrf
     ; check_vrf
     ; runtime_config
+    ; fork_config
     ; thread_graph
     ; blockchain_verification_key
     ]

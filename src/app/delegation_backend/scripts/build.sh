@@ -22,7 +22,7 @@ cp "$ref_signer"/*.h "$OUT/headers"
 
 case "$1" in
   test)
-    cd src
+    cd src/delegation_backend
     LD_LIBRARY_PATH="$OUT" $GO test
     ;;
   docker-run)
@@ -43,7 +43,7 @@ case "$1" in
     scripts/release-docker.sh -s delegation-backend${1:6} -v "$VERSION"
     ;;
   "")
-    cd src/delegation_backend
+    cd src/cmd/delegation_backend
     $GO build -o "$OUT/bin/delegation_backend"
     echo "to run use cmd: LD_LIBRARY_PATH=result ./result/bin/delegation_backend"
     ;;

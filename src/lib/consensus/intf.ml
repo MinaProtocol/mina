@@ -236,6 +236,8 @@ module type State_hooks = sig
 
   val genesis_winner : Public_key.Compressed.t * Private_key.t
 
+  val genesis_winner_account : Mina_base.Account.t
+
   module For_tests : sig
     val gen_consensus_state :
          constraint_constants:Genesis_constants.Constraint_constants.t
