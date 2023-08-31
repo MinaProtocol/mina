@@ -138,8 +138,6 @@ let test_compute_witness_with_lookup_to_the_same_idx_twice () =
   assert (Tick.Field.equal rt.data.(other_idx) fv3)
 
 let test_compute_witness_returns_correctly_filled_runtime_tables_one_lookup () =
-  let module Tick = Kimchi_backend.Pasta.Vesta_based_plonk in
-  let module Impl = Snarky_backendless.Snark.Run.Make (Tick) in
   (* We have one table with ID 0, indexed from 0 to n, and we will fill with
      some values using the constraint RuntimeLookup.
      We start with one lookup
@@ -195,8 +193,6 @@ let test_compute_witness_returns_correctly_filled_runtime_tables_one_lookup () =
 
 let test_compute_witness_returns_correctly_filled_runtime_tables_multiple_lookup
     () =
-  let module Tick = Kimchi_backend.Pasta.Vesta_based_plonk in
-  let module Impl = Snarky_backendless.Snark.Run.Make (Tick) in
   (* We have one table with ID 0, indexed from 0 to n, and we will fill with
      some values using the constraint RuntimeLookup.
      We start with one lookup
@@ -268,8 +264,6 @@ let test_compute_witness_returns_correctly_filled_runtime_tables_multiple_lookup
    constraint in the case of the fixed lookup table does not share its ID with a
    runtime table *)
 let test_compute_witness_with_fixed_lookup_table_and_runtime_table () =
-  let module Tick = Kimchi_backend.Pasta.Vesta_based_plonk in
-  let module Impl = Snarky_backendless.Snark.Run.Make (Tick) in
   let n = 10 in
   (* Fixed table *)
   let fixed_lt_id = 2 in
@@ -357,8 +351,6 @@ let test_compute_witness_with_fixed_lookup_table_and_runtime_table () =
    runtime table. *)
 let test_compute_witness_with_fixed_lookup_table_and_runtime_table_sharing_ids
     () =
-  let module Tick = Kimchi_backend.Pasta.Vesta_based_plonk in
-  let module Impl = Snarky_backendless.Snark.Run.Make (Tick) in
   let n = 10 in
   (* Fixed table *)
   let fixed_lt_id = 2 in
