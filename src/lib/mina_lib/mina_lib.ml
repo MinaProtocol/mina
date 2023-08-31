@@ -444,7 +444,8 @@ let get_node_state t =
   }
 
 (* This is a hack put in place to deal with nodes getting stuck
-   in Offline states, that is, not receiving blocks for an extended period.
+   in Offline states, that is, not receiving blocks for an extended period,
+   or stuck in Bootstrap for too long
 
    To address this, we restart the libp2p helper when we become offline. *)
 let next_helper_restart = ref None
@@ -452,6 +453,8 @@ let next_helper_restart = ref None
 let offline_shutdown = ref None
 
 exception Offline_shutdown
+
+exception Bootstrap_stuck_shutdown
 
 let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
@@ -527,6 +530,9 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     let offline_timeout_duration = Time.Span.of_min offline_timeout_min in
     let offline_timeout = ref None in
     let offline_warned = ref false in
+    let bootstrap_timeout_min = 120.0 in
+    let bootstrap_timeout_duration = Time.Span.of_min bootstrap_timeout_min in
+    let bootstrap_timeout = ref None in
     let log_offline_warning _tm =
       [%log error]
         "Daemon has not received any gossip messages for %0.0f minutes; check \
@@ -556,16 +562,46 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
       | None ->
           ()
     in
-    let handle_status_change status =
-      if match status with `Offline -> true | _ -> false then
-        start_offline_timeout ()
-      else stop_offline_timeout ()
+    let log_bootstrap_error_and_restart _tm =
+      [%log error] "Daemon has been in bootstrap for %0.0f minutes"
+        bootstrap_timeout_min ;
+      raise Bootstrap_stuck_shutdown
+    in
+    let start_bootstrap_timeout () =
+      match !bootstrap_timeout with
+      | Some _ ->
+          ()
+      | None ->
+          bootstrap_timeout :=
+            Some
+              (Timeout.create () bootstrap_timeout_duration
+                 ~f:log_bootstrap_error_and_restart )
+    in
+    let stop_bootstrap_timeout () =
+      match !bootstrap_timeout with
+      | Some timeout ->
+          Timeout.cancel () timeout () ;
+          bootstrap_timeout := None
+      | None ->
+          ()
+    in
+    let handle_status_change sync_status =
+      ( match sync_status with
+      | `Offline ->
+          start_offline_timeout ()
+      | _ ->
+          stop_offline_timeout () ) ;
+      match sync_status with
+      | `Bootstrap ->
+          start_bootstrap_timeout ()
+      | _ ->
+          stop_bootstrap_timeout ()
     in
     Observer.on_update_exn observer ~f:(function
-      | Initialized value ->
-          handle_status_change value
-      | Changed (_, value) ->
-          handle_status_change value
+      | Initialized sync_status ->
+          handle_status_change sync_status
+      | Changed (_old_sync_status, new_sync_status) ->
+          handle_status_change new_sync_status
       | Invalidated ->
           () ) ) ;
   (* recompute Mina status on an interval *)
@@ -1352,7 +1388,7 @@ let start t =
         Node_status_service.start ~logger:t.config.logger ~node_status_url
           ~network:t.components.net
           ~transition_frontier:t.components.transition_frontier
-          ~sync_status:t.sync_status
+          ~sync_status:t.sync_status ~chain_id:t.config.chain_id
           ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
           ~start_time:t.config.start_time
           ~slot_duration:
@@ -1361,14 +1397,17 @@ let start t =
     | None ->
         ()
   in
+  let built_with_commit_sha =
+    if t.config.uptime_send_node_commit then Some Mina_version.commit_id_short
+    else None
+  in
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
     ~transition_frontier:t.components.transition_frontier
     ~time_controller:t.config.time_controller
     ~block_produced_bvar:t.components.block_produced_bvar
     ~uptime_submitter_keypair:t.config.uptime_submitter_keypair
-    ~graphql_control_port:t.config.graphql_control_port
-    ~built_with_commit_sha:Mina_version.commit_id_short
+    ~graphql_control_port:t.config.graphql_control_port ~built_with_commit_sha
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)
     ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;

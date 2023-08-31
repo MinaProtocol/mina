@@ -111,11 +111,48 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
   ; genesis_ledger
   }
 
-(* map from global slots (since genesis) to state hash, ledger hash pairs *)
-let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t =
+(* map from global slots (since genesis) to state hash, ledger hash, snarked ledger hash triples *)
+let global_slot_hashes_tbl :
+    (Int64.t, State_hash.t * Ledger_hash.t * Frozen_ledger_hash.t) Hashtbl.t =
   Int64.Table.create ()
 
 let get_slot_hashes slot = Hashtbl.find global_slot_hashes_tbl slot
+
+module First_pass_ledger_hashes = struct
+  (* ledger hashes after 1st pass, indexed by order of occurrence *)
+
+  module T = struct
+    type t = Ledger_hash.Stable.Latest.t * int
+    [@@deriving bin_io_unversioned, compare, sexp, hash]
+  end
+
+  include T
+  include Hashable.Make_binable (T)
+
+  let hash_set = Hash_set.create ()
+
+  let add =
+    let count = ref 0 in
+    fun ledger_hash ->
+      Base.Hash_set.add hash_set (ledger_hash, !count) ;
+      incr count
+
+  let find ledger_hash =
+    Base.Hash_set.find hash_set ~f:(fun (hash, _n) ->
+        Ledger_hash.equal hash ledger_hash )
+
+  (* once we find a snarked ledger hash corresponding to a ledger hash, don't need to store earlier ones *)
+  let flush_older_than ndx =
+    let elts = Base.Hash_set.to_list hash_set in
+    List.iter elts ~f:(fun ((_hash, n) as elt) ->
+        if n < ndx then Base.Hash_set.remove hash_set elt )
+
+  let get_last_snarked_hash, set_last_snarked_hash =
+    let last_snarked_hash = ref Ledger_hash.empty_hash in
+    let getter () = !last_snarked_hash in
+    let setter hash = last_snarked_hash := hash in
+    (getter, setter)
+end
 
 let process_block_infos_of_state_hash ~logger pool ~state_hash ~start_slot ~f =
   match%bind
@@ -633,26 +670,47 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             let%bind max_slot =
               query_db ~f:(fun db -> Sql.Block.get_max_slot db ())
             in
-            [%log info] "Maximum global slot since genesis in blocks is %Ldd"
+            [%log info] "Maximum global slot since genesis in blocks is %Ld"
               max_slot ;
             try_slot ~logger pool max_slot
       in
-      [%log info] "Loading block information using target state hash" ;
-      let%bind block_ids =
+      [%log info]
+        "Loading block information using target state hash and start slot" ;
+      let%bind block_ids, oldest_block_id =
         process_block_infos_of_state_hash ~logger pool
           ~state_hash:target_state_hash
           ~start_slot:input.start_slot_since_genesis ~f:(fun block_infos ->
+            let ({ id = oldest_block_id; _ } : Sql.Block_info.t) =
+              Option.value_exn
+                (List.min_elt block_infos ~compare:(fun bi1 bi2 ->
+                     Int64.compare bi1.global_slot_since_genesis
+                       bi2.global_slot_since_genesis ) )
+            in
             let ids = List.map block_infos ~f:(fun { id; _ } -> id) in
             (* build mapping from global slots to state and ledger hashes *)
-            List.iter block_infos
-              ~f:(fun { global_slot_since_genesis; state_hash; ledger_hash; _ }
-                 ->
-                Hashtbl.add_exn global_slot_hashes_tbl
-                  ~key:global_slot_since_genesis
-                  ~data:
-                    ( State_hash.of_base58_check_exn state_hash
-                    , Ledger_hash.of_base58_check_exn ledger_hash ) ) ;
-            return (Int.Set.of_list ids) )
+            let%bind () =
+              Deferred.List.iter block_infos
+                ~f:(fun
+                     { global_slot_since_genesis
+                     ; state_hash
+                     ; ledger_hash
+                     ; snarked_ledger_hash_id
+                     ; _
+                     }
+                   ->
+                  let%map snarked_hash =
+                    query_db ~f:(fun db ->
+                        Sql.Snarked_ledger_hashes.run db snarked_ledger_hash_id )
+                  in
+
+                  Hashtbl.add_exn global_slot_hashes_tbl
+                    ~key:global_slot_since_genesis
+                    ~data:
+                      ( State_hash.of_base58_check_exn state_hash
+                      , Ledger_hash.of_base58_check_exn ledger_hash
+                      , Frozen_ledger_hash.of_base58_check_exn snarked_hash ) )
+            in
+            return (Int.Set.of_list ids, oldest_block_id) )
       in
       if Int64.equal input.start_slot_since_genesis 0L then
         (* check that genesis block is in chain to target hash                                                                                                                                                                                          assumption: genesis block occupies global slot 0
@@ -676,7 +734,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         let least_slot =
           Option.value_exn @@ List.min_elt slots ~compare:Int64.compare
         in
-        let state_hash, _ledger_hash =
+        let state_hash, _ledger_hash, _snarked_hash =
           Int64.Table.find_exn global_slot_hashes_tbl least_slot
         in
         let%bind { staking_epoch_data_id; next_epoch_data_id; _ } =
@@ -860,6 +918,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       let%bind max_canonical_slot =
         query_db ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
       in
+      let%bind genesis_snarked_ledger_hash =
+        let%map hash_str =
+          query_db ~f:(fun db ->
+              Sql.Block.genesis_snarked_ledger db input.start_slot_since_genesis )
+        in
+        Frozen_ledger_hash.of_base58_check_exn hash_str
+      in
       let incr_checkpoint_target () =
         Option.iter !checkpoint_target ~f:(fun target ->
             match checkpoint_interval_i64 with
@@ -879,6 +944,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             | None ->
                 failwith "Expected a checkpoint interval" )
       in
+      let found_snarked_ledger_hash = ref false in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands ~last_global_slot_since_genesis ~last_block_id
           ~(block_txns : Mina_transaction.Transaction.t list)
@@ -1012,7 +1078,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               [%log fatal]
                 "Missing state hash information for current global slot" ;
               Core.exit 1
-          | Some (state_hash, _ledger_hash) ->
+          | Some (state_hash, _ledger_hash, _snarked_hash) ->
               [%log info]
                 ~metadata:
                   [ ( "state_hash"
@@ -1039,7 +1105,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                   "Missing ledger hash information for last global slot, which \
                    is not the start slot" ;
                 Core.exit 1 )
-          | Some (state_hash, ledger_hash) ->
+          | Some (state_hash, ledger_hash, snarked_hash) ->
               let write_checkpoint_file () =
                 let write_checkpoint () =
                   write_replayer_checkpoint ~logger ~ledger
@@ -1113,6 +1179,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                             ~txn_state_view ledger txn
                         with
                         | Ok partially_applied ->
+                            (* the current ledger may become a snarked ledger *)
+                            First_pass_ledger_hashes.add
+                              (Ledger.merkle_root ledger) ;
                             let%bind () =
                               update_staking_epoch_data ~logger pool
                                 ~last_block_id ~ledger ~staking_epoch_ledger
@@ -1175,6 +1244,40 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 in
                 apply_transaction_phases (List.rev block_txns)
               in
+              ( if
+                Frozen_ledger_hash.equal snarked_hash
+                  (First_pass_ledger_hashes.get_last_snarked_hash ())
+              then
+                [%log info]
+                  "Snarked ledger hash same as in the preceding block, not \
+                   checking it again"
+              else if
+              Frozen_ledger_hash.equal snarked_hash genesis_snarked_ledger_hash
+            then
+                [%log info] "Snarked ledger hash is genesis snarked ledger hash"
+              else
+                match First_pass_ledger_hashes.find snarked_hash with
+                | None ->
+                    if not !found_snarked_ledger_hash then (
+                      [%log info]
+                        "Current snarked ledger hash not among first-pass \
+                         ledger hashes, but we haven't yet found one. The \
+                         transaction that created this ledger hash might have \
+                         been in a replayer run that created a checkpoint file" ;
+                      First_pass_ledger_hashes.set_last_snarked_hash
+                        snarked_hash )
+                    else
+                      [%log error]
+                        "Current snarked ledger hash does not appear among \
+                         first-pass ledger hashes" ;
+                    if continue_on_error then incr error_count
+                    else Core_kernel.exit 1
+                | Some (_hash, n) ->
+                    [%log info]
+                      "Found snarked ledger hash among first-pass ledger hashes" ;
+                    found_snarked_ledger_hash := true ;
+                    First_pass_ledger_hashes.set_last_snarked_hash snarked_hash ;
+                    First_pass_ledger_hashes.flush_older_than n ) ;
               if List.is_empty block_txns then (
                 [%log info]
                   "No transactions to run for block with state hash $state_hash"
@@ -1395,16 +1498,6 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                   ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
                   ~last_block_id:zkc.block_id internal_cmds user_cmds zkcs )
       in
-      let%bind unparented_ids =
-        query_db ~f:(fun db -> Sql.Block.get_unparented db ())
-      in
-      let genesis_block_id =
-        match List.filter unparented_ids ~f:(Int.Set.mem block_ids) with
-        | [ id ] ->
-            id
-        | _ ->
-            failwith "Expected only the genesis block to have an unparented id"
-      in
       let%bind start_slot_since_genesis =
         let%map slot_opt =
           query_db ~f:(fun db ->
@@ -1438,7 +1531,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
           =
         apply_commands ~block_txns:[]
           ~last_global_slot_since_genesis:start_slot_since_genesis
-          ~last_block_id:genesis_block_id sorted_internal_cmds sorted_user_cmds
+          ~last_block_id:oldest_block_id sorted_internal_cmds sorted_user_cmds
           sorted_zkapp_cmds
       in
       match input.target_epoch_ledgers_state_hash with

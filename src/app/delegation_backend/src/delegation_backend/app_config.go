@@ -10,16 +10,14 @@ import (
 func loadAwsCredentials(filename string, log logging.EventLogger) {
 	file, err := os.Open(filename)
 	if err != nil {
-		log.Errorf("Error loading credentials file: %s", err)
-		os.Exit(1)
+		log.Fatalf("Error loading credentials file: %s", err)
 	}
 	defer file.Close()
 	decoder := json.NewDecoder(file)
 	var credentials AwsCredentials
 	err = decoder.Decode(&credentials)
 	if err != nil {
-		log.Errorf("Error loading credentials file: %s", err)
-		os.Exit(1)
+		log.Fatalf("Error loading credentials file: %s", err)
 	}
 	os.Setenv("AWS_ACCESS_KEY_ID", credentials.AccessKeyId)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", credentials.SecretAccessKey)
@@ -32,15 +30,13 @@ func LoadEnv(log logging.EventLogger) AppConfig {
 	if configFile != "" {
 		file, err := os.Open(configFile)
 		if err != nil {
-			log.Errorf("Error loading config file: %s", err)
-			os.Exit(1)
+			log.Fatalf("Error loading config file: %s", err)
 		}
 		defer file.Close()
 		decoder := json.NewDecoder(file)
 		err = decoder.Decode(&config)
 		if err != nil {
-			log.Errorf("Error loading config file: %s", err)
-			os.Exit(1)
+			log.Fatalf("Error loading config file: %s", err)
 		}
 	} else {
 		networkName := os.Getenv("CONFIG_NETWORK_NAME")
