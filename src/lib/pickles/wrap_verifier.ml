@@ -937,147 +937,158 @@ struct
         in
 
         let lookup_table_comm =
+          let g_lookup (l : _ Messages.Lookup.In_circuit.t) joint_combiner =
+            let (first_column :: second_column :: rest) =
+              Vector.map
+                ~f:(Types.Opt.map ~f:(fun x -> [| x |]))
+                m.lookup_table_comm
+            in
+            let second_column_with_runtime =
+              match (second_column, l.runtime) with
+              | Types.Opt.None, comm | comm, Types.Opt.None ->
+                  comm
+              | ( Types.Opt.Maybe (has_second_column, second_column)
+                , Types.Opt.Maybe (has_runtime, runtime) ) ->
+                  let second_with_runtime =
+                    let sum =
+                      Array.map2_exn ~f:Inner_curve.( + ) second_column runtime
+                    in
+                    Array.map2_exn second_column sum
+                      ~f:(fun second_column sum ->
+                        Inner_curve.if_ has_runtime ~then_:sum
+                          ~else_:second_column )
+                  in
+                  let res =
+                    Array.map2_exn second_with_runtime runtime
+                      ~f:(fun second_with_runtime runtime ->
+                        Inner_curve.if_ has_second_column
+                          ~then_:second_with_runtime ~else_:runtime )
+                  in
+                  let b = Boolean.(has_second_column ||| has_runtime) in
+                  Types.Opt.Maybe (b, res)
+              | ( Types.Opt.Maybe (has_second_column, second_column)
+                , Types.Opt.Some runtime ) ->
+                  let res =
+                    let sum =
+                      Array.map2_exn ~f:Inner_curve.( + ) second_column runtime
+                    in
+                    Array.map2_exn runtime sum ~f:(fun runtime sum ->
+                        Inner_curve.if_ has_second_column ~then_:sum
+                          ~else_:runtime )
+                  in
+                  Types.Opt.Some res
+              | ( Types.Opt.Some second_column
+                , Types.Opt.Maybe (has_runtime, runtime) ) ->
+                  let res =
+                    let sum =
+                      Array.map2_exn ~f:Inner_curve.( + ) second_column runtime
+                    in
+                    Array.map2_exn second_column sum
+                      ~f:(fun second_column sum ->
+                        Inner_curve.if_ has_runtime ~then_:sum
+                          ~else_:second_column )
+                  in
+                  Types.Opt.Some res
+              | Types.Opt.Some second_column, Types.Opt.Some runtime ->
+                  Types.Opt.Some
+                    (Array.map2_exn ~f:Inner_curve.( + ) second_column runtime)
+            in
+            let rest_rev =
+              Vector.rev (first_column :: second_column_with_runtime :: rest)
+            in
+            let table_ids =
+              Types.Opt.map m.lookup_table_ids ~f:(fun x -> [| x |])
+            in
+            Vector.fold ~init:table_ids rest_rev ~f:(fun acc comm ->
+                match acc with
+                | Types.Opt.None ->
+                    comm
+                | Types.Opt.Maybe (has_acc, acc) -> (
+                    match comm with
+                    | Types.Opt.None ->
+                        Types.Opt.Maybe (has_acc, acc)
+                    | Types.Opt.Maybe (has_comm, comm) ->
+                        let scaled_acc =
+                          Array.map acc ~f:(fun acc ->
+                              Scalar_challenge.endo acc joint_combiner )
+                        in
+                        let sum =
+                          Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
+                        in
+                        let acc_with_comm =
+                          Array.map2_exn sum comm ~f:(fun sum comm ->
+                              Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
+                        in
+                        let res =
+                          Array.map2_exn acc acc_with_comm
+                            ~f:(fun acc acc_with_comm ->
+                              Inner_curve.if_ has_comm ~then_:acc_with_comm
+                                ~else_:acc )
+                        in
+                        let b = Boolean.(has_acc ||| has_comm) in
+                        Types.Opt.Maybe (b, res)
+                    | Types.Opt.Some comm ->
+                        let scaled_acc =
+                          Array.map acc ~f:(fun acc ->
+                              Scalar_challenge.endo acc joint_combiner )
+                        in
+                        let sum =
+                          Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
+                        in
+                        let res =
+                          Array.map2_exn sum comm ~f:(fun sum comm ->
+                              Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
+                        in
+                        Types.Opt.Some res )
+                | Types.Opt.Some acc -> (
+                    match comm with
+                    | Types.Opt.None ->
+                        Types.Opt.Some acc
+                    | Types.Opt.Maybe (has_comm, comm) ->
+                        let scaled_acc =
+                          Array.map acc ~f:(fun acc ->
+                              Scalar_challenge.endo acc joint_combiner )
+                        in
+                        let sum =
+                          Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
+                        in
+                        let res =
+                          Array.map2_exn sum acc ~f:(fun sum acc ->
+                              Inner_curve.if_ has_comm ~then_:sum ~else_:acc )
+                        in
+                        Types.Opt.Some res
+                    | Types.Opt.Some comm ->
+                        let scaled_acc =
+                          Array.map acc ~f:(fun acc ->
+                              Scalar_challenge.endo acc joint_combiner )
+                        in
+                        Types.Opt.Some
+                          (Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm)
+                    ) )
+          in
+          let pp_opt ppf = function
+            | Types.Opt.None ->
+                Format.fprintf ppf "none"
+            | Types.Opt.Some _ ->
+                Format.fprintf ppf "some"
+            | Types.Opt.Maybe _ ->
+                Format.fprintf ppf "maybe"
+          in
           match (messages.lookup, joint_combiner) with
           | Types.Opt.None, Types.Opt.None ->
               Types.Opt.None
-          | ( Types.Opt.Maybe (b_l, l)
-            , Types.Opt.Maybe (b_joint_combiner, joint_combiner) ) ->
-              ignore ((b_l, l, b_joint_combiner, joint_combiner) : _ * _ * _ * _) ;
-              failwith "TODO"
+          | ( Types.Opt.Maybe (_b_l, l)
+            , Types.Opt.Maybe (_b_joint_combiner, joint_combiner) ) ->
+              g_lookup l joint_combiner
           | Types.Opt.Some l, Types.Opt.Some joint_combiner ->
-              let (first_column :: second_column :: rest) =
-                Vector.map
-                  ~f:(Types.Opt.map ~f:(fun x -> [| x |]))
-                  m.lookup_table_comm
-              in
-              let second_column_with_runtime =
-                match (second_column, l.runtime) with
-                | Types.Opt.None, comm | comm, Types.Opt.None ->
-                    comm
-                | ( Types.Opt.Maybe (has_second_column, second_column)
-                  , Types.Opt.Maybe (has_runtime, runtime) ) ->
-                    let second_with_runtime =
-                      let sum =
-                        Array.map2_exn ~f:Inner_curve.( + ) second_column
-                          runtime
-                      in
-                      Array.map2_exn second_column sum
-                        ~f:(fun second_column sum ->
-                          Inner_curve.if_ has_runtime ~then_:sum
-                            ~else_:second_column )
-                    in
-                    let res =
-                      Array.map2_exn second_with_runtime runtime
-                        ~f:(fun second_with_runtime runtime ->
-                          Inner_curve.if_ has_second_column
-                            ~then_:second_with_runtime ~else_:runtime )
-                    in
-                    let b = Boolean.(has_second_column ||| has_runtime) in
-                    Types.Opt.Maybe (b, res)
-                | ( Types.Opt.Maybe (has_second_column, second_column)
-                  , Types.Opt.Some runtime ) ->
-                    let res =
-                      let sum =
-                        Array.map2_exn ~f:Inner_curve.( + ) second_column
-                          runtime
-                      in
-                      Array.map2_exn runtime sum ~f:(fun runtime sum ->
-                          Inner_curve.if_ has_second_column ~then_:sum
-                            ~else_:runtime )
-                    in
-                    Types.Opt.Some res
-                | ( Types.Opt.Some second_column
-                  , Types.Opt.Maybe (has_runtime, runtime) ) ->
-                    let res =
-                      let sum =
-                        Array.map2_exn ~f:Inner_curve.( + ) second_column
-                          runtime
-                      in
-                      Array.map2_exn second_column sum
-                        ~f:(fun second_column sum ->
-                          Inner_curve.if_ has_runtime ~then_:sum
-                            ~else_:second_column )
-                    in
-                    Types.Opt.Some res
-                | Types.Opt.Some second_column, Types.Opt.Some runtime ->
-                    Types.Opt.Some
-                      (Array.map2_exn ~f:Inner_curve.( + ) second_column runtime)
-              in
-              let rest_rev =
-                Vector.rev (first_column :: second_column_with_runtime :: rest)
-              in
-              let table_ids =
-                Types.Opt.map m.lookup_table_ids ~f:(fun x -> [| x |])
-              in
-              Vector.fold ~init:table_ids rest_rev ~f:(fun acc comm ->
-                  match acc with
-                  | Types.Opt.None ->
-                      comm
-                  | Types.Opt.Maybe (has_acc, acc) -> (
-                      match comm with
-                      | Types.Opt.None ->
-                          Types.Opt.Maybe (has_acc, acc)
-                      | Types.Opt.Maybe (has_comm, comm) ->
-                          let scaled_acc =
-                            Array.map acc ~f:(fun acc ->
-                                Scalar_challenge.endo acc joint_combiner )
-                          in
-                          let sum =
-                            Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
-                          in
-                          let acc_with_comm =
-                            Array.map2_exn sum comm ~f:(fun sum comm ->
-                                Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
-                          in
-                          let res =
-                            Array.map2_exn acc acc_with_comm
-                              ~f:(fun acc acc_with_comm ->
-                                Inner_curve.if_ has_comm ~then_:acc_with_comm
-                                  ~else_:acc )
-                          in
-                          let b = Boolean.(has_acc ||| has_comm) in
-                          Types.Opt.Maybe (b, res)
-                      | Types.Opt.Some comm ->
-                          let scaled_acc =
-                            Array.map acc ~f:(fun acc ->
-                                Scalar_challenge.endo acc joint_combiner )
-                          in
-                          let sum =
-                            Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
-                          in
-                          let res =
-                            Array.map2_exn sum comm ~f:(fun sum comm ->
-                                Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
-                          in
-                          Types.Opt.Some res )
-                  | Types.Opt.Some acc -> (
-                      match comm with
-                      | Types.Opt.None ->
-                          Types.Opt.Some acc
-                      | Types.Opt.Maybe (has_comm, comm) ->
-                          let scaled_acc =
-                            Array.map acc ~f:(fun acc ->
-                                Scalar_challenge.endo acc joint_combiner )
-                          in
-                          let sum =
-                            Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
-                          in
-                          let res =
-                            Array.map2_exn sum acc ~f:(fun sum acc ->
-                                Inner_curve.if_ has_comm ~then_:sum ~else_:acc )
-                          in
-                          Types.Opt.Some res
-                      | Types.Opt.Some comm ->
-                          let scaled_acc =
-                            Array.map acc ~f:(fun acc ->
-                                Scalar_challenge.endo acc joint_combiner )
-                          in
-                          Types.Opt.Some
-                            (Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm)
-                      ) )
+              g_lookup l joint_combiner
           | ( (Types.Opt.None | Maybe _ | Some _)
             , (Types.Opt.None | Maybe _ | Some _) ) ->
-              assert false
+              let msg =
+                Format.asprintf "unexpected lookup %a vs joint_combiner %a"
+                  pp_opt messages.lookup pp_opt joint_combiner
+              in
+              failwith msg
         in
         let lookup_sorted =
           let lookup_sorted_minus_1 =
