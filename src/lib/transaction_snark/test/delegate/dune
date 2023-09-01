@@ -9,6 +9,8 @@
    base
    core_kernel
    yojson
+   ppx_deriving_yojson.runtime
+   result
    ;; local libraries
    mina_base.import
    pickles
