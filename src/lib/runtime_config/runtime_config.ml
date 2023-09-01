@@ -409,7 +409,7 @@ module Accounts = struct
         ; vesting_period : Mina_numbers.Global_slot_span.Stable.Latest.t
         ; vesting_increment : Currency.Amount.Stable.Latest.t
         }
-      [@@deriving bin_io_unversioned, sexp]
+      [@@deriving bin_io_unversioned, sexp, to_yojson]
     end
 
     module Permissions = Json_layout.Accounts.Single.Permissions

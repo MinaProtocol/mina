@@ -9,7 +9,13 @@ open Ci_interaction
 
 let config_path = config_path
 
+let keypairs_path = keypairs_path
+
+let mina_image = mina_image
+
 let alias = alias
+
+let archive_image = archive_image
 
 module Node = struct
   type t =
@@ -25,12 +31,10 @@ module Node = struct
 
   let network_keypair { network_keypair; _ } = network_keypair
 
-  let start ?(git_commit = Mina_version.commit_id_short) ~fresh_state t :
-      unit Malleable_error.t =
+  let start ~fresh_state t : unit Malleable_error.t =
     try
       let args =
         [ ("fresh_state", `Bool fresh_state)
-        ; ("git_commit", `String git_commit)
         ; ("network_id", `String t.network_id)
         ; ("node_id", `String t.node_id)
         ]

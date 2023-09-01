@@ -14,7 +14,8 @@ module Network_manager = struct
     ; constants : Test_config.constants
     ; mutable deployed : bool
     ; genesis_keypairs : Network_keypair.t Core.String.Map.t
-    ; test_config_path : string
+    ; runtime_config_path : string
+    ; topology_path : string
     }
 
   let run_cmd t prog args = Util.run_cmd t.testnet_dir prog args
@@ -46,11 +47,21 @@ module Network_manager = struct
     in
     let open Deferred.Let_syntax in
     [%log info] "Making testnet dir %s" testnet_dir ;
-    let%bind exists = Sys.file_exists_exn testnet_dir in
-    ignore @@ if exists then Unix.remove testnet_dir else return () ;
+    let rec rmrf path =
+      let open Stdlib in
+      match Sys.is_directory path with
+      | true ->
+          Sys.readdir path
+          |> Array.iter (fun name -> rmrf (Filename.concat path name)) ;
+          Core.Unix.rmdir path
+      | false ->
+          Sys.remove path
+    in
+    if Stdlib.Sys.file_exists testnet_dir then rmrf testnet_dir ;
     let () = mkdir_p testnet_dir in
     let network_config_filename = testnet_dir ^/ "network_config.json" in
-    let test_config_filename = testnet_dir ^/ "test_config.json" in
+    let runtime_config_filename = testnet_dir ^/ "runtime_config.json" in
+    let topology_filename = testnet_dir ^/ "topology.json" in
     let t =
       { logger
       ; network_id = network_config.config.network_id
@@ -60,28 +71,32 @@ module Network_manager = struct
       ; constants = network_config.constants
       ; deployed = false
       ; genesis_keypairs = network_config.genesis_keypairs
-      ; test_config_path = test_config_filename
+      ; runtime_config_path = runtime_config_filename
+      ; topology_path = topology_filename
       }
     in
-    [%log info] "Writing network configuration into %s" network_config_filename ;
+    [%log info] "Writing network configuration to %s" network_config_filename ;
     Out_channel.with_file ~fail_if_exists:true network_config_filename
       ~f:(fun ch ->
         Network_config.to_yojson network_config |> Yojson.Safe.to_channel ch ) ;
-    [%log info] "Writing test configuration into %s" test_config_filename ;
-    Out_channel.with_file ~fail_if_exists:true test_config_filename
+    [%log info] "Writing runtime configuration to %s" runtime_config_filename ;
+    Out_channel.with_file ~fail_if_exists:true runtime_config_filename
       ~f:(fun ch ->
-        Test_config.to_yojson test_config |> Yojson.Safe.to_channel ch ) ;
-    [%log info]
-      "Writing out the genesis keys (in case you want to use them manually) to \
-       testnet dir %s"
-      testnet_dir ;
-    let kps_base_path = String.concat [ testnet_dir; "/genesis_keys" ] in
+        Test_config.runtime_config_of_test_config test_config
+        |> Result.ok_or_failwith |> Runtime_config.Ledger.to_yojson
+        |> Yojson.Safe.to_channel ch ) ;
+    [%log info] "Writing topology to %s" topology_filename ;
+    Out_channel.with_file ~fail_if_exists:true topology_filename ~f:(fun ch ->
+        Test_config.topology_of_test_config test_config
+        |> Yojson.Safe.to_channel ch ) ;
+    [%log info] "Writing out the genesis keys to testnet dir %s" testnet_dir ;
+    let kps_base_path = testnet_dir ^ "/genesis_keys" in
     let%bind () = Unix.mkdir kps_base_path in
     let%bind () =
       Core.String.Map.iter network_config.genesis_keypairs ~f:(fun kp ->
           Network_keypair.to_yojson kp
           |> Yojson.Safe.to_file
-               (String.concat [ kps_base_path; "/"; kp.keypair_name; ".json" ]) )
+               (sprintf "%s/%s.json" kps_base_path kp.keypair_name) )
       |> Deferred.return
     in
     Malleable_error.return t
@@ -97,7 +112,8 @@ module Network_manager = struct
           ~config:!Abstract_network.config_path
           ~args:
             [ ("network_id", `String t.network_id)
-            ; ("test_config", `String t.test_config_path)
+            ; ("runtime_config", `String t.runtime_config_path)
+            ; ("topology", `String t.topology_path)
             ]
           "create_network"
       with

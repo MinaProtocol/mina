@@ -64,24 +64,45 @@ module Test_Account = struct
 end
 
 module Archive_node = struct
-  type t = { node_name : string; account_name : string } [@@deriving to_yojson]
+  type t = { node_name : string; account_name : string; docker_image : string }
+  [@@deriving to_yojson]
 end
 
 module Block_producer_node = struct
-  type t = { node_name : string; account_name : string } [@@deriving to_yojson]
+  type t =
+    { node_name : string
+    ; account_name : string
+    ; libp2p_keypair : Yojson.Safe.t
+    ; libp2p_peerid : string
+    ; docker_image : string
+    }
+  [@@deriving to_yojson]
 end
 
 module Seed_node = struct
-  type t = { node_name : string; account_name : string } [@@deriving to_yojson]
+  type t =
+    { node_name : string
+    ; account_name : string
+    ; libp2p_keypair : Yojson.Safe.t
+    ; libp2p_peerid : string
+    ; docker_image : string
+    }
+  [@@deriving to_yojson]
 end
 
 module Snark_coordinator_node = struct
-  type t = { node_name : string; account_name : string; worker_nodes : int }
+  type t =
+    { node_name : string
+    ; account_name : string
+    ; docker_image : string
+    ; worker_nodes : int
+    }
   [@@deriving to_yojson]
 end
 
 module Snark_worker_node = struct
-  type t = { node_name : string; account_name : string } [@@deriving to_yojson]
+  type t = { node_name : string; account_name : string; docker_image : string }
+  [@@deriving to_yojson]
 end
 
 type constants =
@@ -130,10 +151,23 @@ module Node_role = struct
         `String "Snark_worker"
 end
 
-type topology = topology_node list
+module Topology = struct
+  type node_info =
+    { pk : string
+    ; sk : string
+    ; role : Node_role.t
+    ; docker_image : string
+    ; libp2p_keypair : Yojson.Safe.t
+    ; libp2p_peerid : Yojson.Safe.t
+    }
+  [@@deriving to_yojson]
 
-and topology_node = { alias : string; pk : string; role : Node_role.t }
-[@@deriving to_yojson]
+  type t = (string * node_info) list
+
+  let to_yojson nodes : Yojson.Safe.t =
+    let alist = List.map nodes ~f:(fun (a, b) -> (a, node_info_to_yojson b)) in
+    `Assoc alist
+end
 
 let proof_config_default : Runtime_config.Proof_keys.t =
   { level = Some Full
@@ -266,26 +300,83 @@ let runtime_config_of_test_config t =
   |> sprintf {| { "accounts": %s } |}
   |> from_string |> Runtime_config.Ledger.of_yojson
 
-let generate_pk () =
+let generate_pk_sk () =
   let open Signature_lib in
-  (Keypair.create ()).public_key |> Public_key.compress
-  |> Public_key.Compressed.to_base58_check
+  let kp = Keypair.create () in
+  let sk = kp.private_key |> Private_key.to_base58_check in
+  let pk =
+    kp.public_key |> Public_key.compress
+    |> Public_key.Compressed.to_base58_check
+  in
+  (pk, sk)
 
 let topology_of_test_config t : Yojson.Safe.t =
-  let topology_of_archive { Archive_node.node_name; _ } =
-    { alias = node_name; pk = generate_pk (); role = Archive_node }
+  let topology_of_archive { Archive_node.node_name; docker_image; _ } :
+      string * Topology.node_info =
+    let pk, sk = generate_pk_sk () in
+    ( node_name
+    , { pk
+      ; sk
+      ; role = Archive_node
+      ; docker_image
+      ; libp2p_keypair = `Null
+      ; libp2p_peerid = `Null
+      } )
   in
-  let topology_of_block_producer { Block_producer_node.node_name; _ } =
-    { alias = node_name; pk = generate_pk (); role = Block_producer }
+  let topology_of_block_producer
+      { Block_producer_node.node_name
+      ; docker_image
+      ; libp2p_keypair
+      ; libp2p_peerid
+      ; _
+      } : string * Topology.node_info =
+    let pk, sk = generate_pk_sk () in
+    ( node_name
+    , { pk
+      ; sk
+      ; role = Block_producer
+      ; docker_image
+      ; libp2p_keypair
+      ; libp2p_peerid = `String libp2p_peerid
+      } )
   in
-  let topology_of_seed { Seed_node.node_name; _ } =
-    { alias = node_name; pk = generate_pk (); role = Seed_node }
+  let topology_of_seed
+      { Seed_node.node_name; docker_image; libp2p_keypair; libp2p_peerid; _ } :
+      string * Topology.node_info =
+    let pk, sk = generate_pk_sk () in
+    ( node_name
+    , { pk
+      ; sk
+      ; role = Seed_node
+      ; docker_image
+      ; libp2p_keypair
+      ; libp2p_peerid = `String libp2p_peerid
+      } )
   in
-  let topology_of_snark_coordinator { Snark_coordinator_node.node_name; _ } =
-    { alias = node_name; pk = generate_pk (); role = Snark_coordinator }
+  let topology_of_snark_coordinator
+      { Snark_coordinator_node.node_name; docker_image; _ } :
+      string * Topology.node_info =
+    let pk, sk = generate_pk_sk () in
+    ( node_name
+    , { pk
+      ; sk
+      ; role = Snark_coordinator
+      ; docker_image
+      ; libp2p_keypair = `Null
+      ; libp2p_peerid = `Null
+      } )
   in
-  let topology_of_snark_worker { Snark_worker_node.node_name; _ } =
-    { alias = node_name; pk = generate_pk (); role = Snark_worker }
+  let topology_of_snark_worker { Snark_worker_node.node_name; docker_image; _ }
+      : string * Topology.node_info =
+    let pk, sk = generate_pk_sk () in
+    ( node_name
+    , { pk
+      ; sk
+      ; role = Snark_worker
+      ; docker_image
+      ; libp2p_keypair = `Null
+      ; libp2p_peerid = `Null
+      } )
   in
   let snark_coordinator =
     match Option.map t.snark_coordinator ~f:topology_of_snark_coordinator with
@@ -300,14 +391,21 @@ let topology_of_test_config t : Yojson.Safe.t =
   @ map t.block_producers ~f:topology_of_block_producer
   @ map t.seed_nodes ~f:topology_of_seed
   @ map t.snark_workers ~f:topology_of_snark_worker
-  |> topology_to_yojson
+  |> Topology.to_yojson
 
-let test_account ?(pk = generate_pk ())
+let test_account ?(pk = generate_pk_sk () |> fst)
     ?(timing = Mina_base.Account.Timing.Untimed) account_name balance :
     Test_Account.t =
   { account_name; balance; timing; pk }
 
-let topology_info ~alias ~pk ~role : topology_node = { alias; pk; role }
+let bp ?(libp2p_keypair = `Null) ?(libp2p_peerid = "") node_name
+    ?(account_name = node_name ^ "-key") docker_image =
+  { Block_producer_node.node_name
+  ; account_name
+  ; libp2p_keypair
+  ; libp2p_peerid
+  ; docker_image
+  }
 
 module Unit_tests = struct
   let test_config =
@@ -319,19 +417,41 @@ module Unit_tests = struct
         ]
         @ List.init 2 ~f:(fun i ->
               let i_str = Int.to_string i in
-              test_account (sprintf "sender-account%s" i_str) "10000" )
+              test_account (sprintf "sender-account-%s" i_str) "10000" )
     ; block_producers =
-        [ { node_name = "receiver"; account_name = "receiver-key" }
-        ; { node_name = "empty_node-1"; account_name = "empty-bp-key" }
-        ; { node_name = "empty_node-2"; account_name = "empty-bp-key" }
-        ; { node_name = "empty_node-3"; account_name = "empty-bp-key" }
-        ; { node_name = "empty_node-4"; account_name = "empty-bp-key" }
-        ; { node_name = "observer"; account_name = "empty-bp-key" }
+        [ { node_name = "receiver"
+          ; account_name = "receiver-key"
+          ; docker_image = "bp-image-0"
+          ; libp2p_keypair =
+              Yojson.Safe.from_string
+                {json|
+                  {
+                    "box_primitive": "xsalsa20poly1305",
+                    "pw_primitive": "argon2i",
+                    "nonce": "8tXZ3yVev59WGBFDhVkXYsqAkAy1oa4a9GkAgke",
+                    "pwsalt": "AbLiWBzfVzdPK2YYRhhUxvQv7W8C",
+                    "pwdiff": [
+                      134217728,
+                      6
+                    ],
+                    "ciphertext": "8uu1u388h2YJDfQGdAPurUrTgWGiUuRfz2t6TrRPEaqQoPVMHBvZFSC7BMZwCqoWk1PNAQVEPuBLQAhcBtdktmrjBnjhr2P38UiDzSa3gX7uawToQBV1WJh2gTNwPBYh2YRnRZNUY3ThaqqJmx7t7rrApYSqbSoAsLjydGSRYhxdrPtHeokmtcbtzFJ65Q5SWL6vAdhJqCqMcGXUhLDMpCsBwreqkFxn3QmQ9UinG1HTKGNV2FyrXDKUxseboBB3EEmq1Xvmt7ZaPropVcWeL9doWwYVW3xjiMXwR"
+                  }
+                |json}
+          ; libp2p_peerid =
+              "12D3KooWAZBFbTQWmegLFt8YSExEMTwJEiufRf4skYdZtaGxEXXo"
+          }
+        ; { node_name = "empty_node"
+          ; account_name = "empty-bp-key"
+          ; docker_image = "bp-image-1"
+          ; libp2p_keypair = `Null
+          ; libp2p_peerid = ""
+          }
         ]
     ; snark_coordinator =
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key"
+          ; docker_image = "snark-coordinator-image"
           ; worker_nodes = 4
           }
     ; txpool_max_size = 10_000_000
@@ -344,23 +464,23 @@ module Unit_tests = struct
         }
     }
 
+  open Yojson.Safe
+
   let%test_unit "runtime_config_of_test_config" =
-    let () =
-      print_endline "=== Runtime config ===" ;
+    let config_json =
       runtime_config_of_test_config test_config
       |> Result.ok_or_failwith |> Runtime_config.Ledger.to_yojson
-      |> Yojson.Safe.pretty_to_string |> print_endline
     in
-    ignore
-      ( runtime_config_of_test_config test_config
-        |> Result.ok_or_failwith |> Runtime_config.Ledger.to_yojson
-        : Yojson.Safe.t )
+    let () =
+      print_endline "=== Runtime config ===" ;
+      pretty_to_string config_json |> print_endline
+    in
+    ignore (config_json : t)
 
   let%test_unit "topology_of_test_config" =
     let () =
       print_endline "\n=== Topology ===" ;
-      topology_of_test_config test_config
-      |> Yojson.Safe.pretty_to_string |> print_endline
+      topology_of_test_config test_config |> pretty_to_string |> print_endline
     in
-    ignore (topology_of_test_config test_config : Yojson.Safe.t)
+    ignore (topology_of_test_config test_config : t)
 end

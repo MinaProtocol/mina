@@ -43,8 +43,7 @@ module Engine = struct
 
       val network_keypair : t -> Network_keypair.t option
 
-      val start :
-        ?git_commit:string -> fresh_state:bool -> t -> unit Malleable_error.t
+      val start : fresh_state:bool -> t -> unit Malleable_error.t
 
       val stop : t -> unit Malleable_error.t
 
@@ -260,8 +259,17 @@ module Engine = struct
     (*** [alias] is instantiated when command line args are parsed *)
     val alias : (string * string) option ref
 
+    (*** [archive_image] is instantiated when command line args are parsed *)
+    val archive_image : string option ref
+
     (*** [config_path] is instantiated when command line args are parsed *)
     val config_path : string ref
+
+    (*** [keypairs_path] is instantiated when command line args are parsed *)
+    val keypairs_path : string ref
+
+    (*** [mina_image] is instantiated when command line args are parsed *)
+    val mina_image : string ref
   end
 
   module type Network_manager_intf = sig
