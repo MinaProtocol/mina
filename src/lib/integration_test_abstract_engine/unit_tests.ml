@@ -1,6 +1,6 @@
 open Core_kernel
 open Integration_test_lib
-open Ci_interaction
+open Config_util
 
 module Test_values = struct
   let config_file =
@@ -17,7 +17,7 @@ module Test_values = struct
 
   let start_node_raw_cmd =
     "minimina node start --network-id {{network_id}} --node-id {{node_id}} \
-     {{fresh_state}} --git-commit {{git_commit}}"
+     {{fresh_state}}"
 
   let deploy_network_action =
     sprintf
@@ -53,8 +53,7 @@ module Test_values = struct
           "args": {
             "network_id": "string",
             "node_id": "string",
-            "fresh_state": "bool",
-            "git_commit": "string"
+            "fresh_state": "bool"
           },
           "command": "%s"
         }
@@ -139,7 +138,6 @@ module Config_tests = struct
       [ ("network_id", `String "network0")
       ; ("node_id", `String "node0")
       ; ("fresh_state", `Bool true)
-      ; ("git_commit", `String "0123456abcdef")
       ]
     in
     assert (validate_args ~args ~action)
@@ -157,10 +155,8 @@ module Config_tests = struct
     let action = Yojson.Safe.from_string start_node_action in
     let node_id = "node0" in
     let network_id = "network0" in
-    let git_commit = "0123456abcdef" in
     let args =
       [ ("fresh_state", `Bool true)
-      ; ("git_commit", `String git_commit)
       ; ("network_id", `String network_id)
       ; ("node_id", `String node_id)
       ]
@@ -175,8 +171,6 @@ module Config_tests = struct
       ; "--node-id"
       ; node_id
       ; "--fresh-state"
-      ; "--git-commit"
-      ; git_commit
       ]
     in
     assert (prog = List.hd_exn expect) ;
@@ -196,9 +190,10 @@ module Run_command_tests = struct
         @@ run_command ~suppress_logs:true ~config:config_file
              ~args:[ (arg, value) ]
              "echo"
-      with Invalid_arg_type (arg_name, arg_value, arg_type) ->
+      with Invalid_arg_type (action_name, arg_name, arg_value, arg_type) ->
         assert (
-          arg_name = "msg" && arg_type = Arg_type.string
+          action_name = "\"echo\"" && arg_name = "msg"
+          && arg_type = Arg_type.string
           && Yojson.Safe.equal arg_value value )
 
     let%test_unit "run command arg number failure" =
@@ -222,7 +217,8 @@ module Run_command_tests = struct
              "echo"
       with Missing_arg (action_name, arg_name, arg_type) ->
         assert (
-          action_name = "echo" && arg_name = "msg" && arg_type = Arg_type.string )
+          action_name = "\"echo\"" && arg_name = "msg"
+          && arg_type = Arg_type.string )
   end
 
   module Successful = struct

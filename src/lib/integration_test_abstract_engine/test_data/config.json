@@ -32,10 +32,9 @@
       "args": {
         "network_id":"string",
         "node_id":"string",
-        "fresh_state":"bool",
-        "git_commit":"string"
+        "fresh_state":"bool"
       },
-      "command": "minimina node start --network-id {{network_id}} --node-id {{node_id}} {{fresh_state}} --git-commit {{git_commit}}"
+      "command": "minimina node start --network-id {{network_id}} --node-id {{node_id}} {{fresh_state}}"
     },
     {
       "name": "stop_node",
