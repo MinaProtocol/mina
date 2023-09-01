@@ -2,7 +2,7 @@ open Core
 open Core_unix
 open Async
 open Integration_test_lib
-open Ci_interaction
+open Config_util
 
 module Network_manager = struct
   type t =

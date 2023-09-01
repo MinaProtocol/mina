@@ -656,7 +656,7 @@ module Config_file = struct
 
   exception Missing_arg of string * string * string
 
-  exception Invalid_arg_type of string * Yojson.Safe.t * string
+  exception Invalid_arg_type of string * string * Yojson.Safe.t * string
 
   let version config =
     match Yojson.Safe.Util.member "version" config with
@@ -726,7 +726,10 @@ module Config_file = struct
               raise @@ Missing_arg (action_name action, arg_name, arg_type)
           in
           if validate_arg_type arg_type arg_value then aux rest
-          else raise @@ Invalid_arg_type (arg_name, arg_value, arg_type)
+          else
+            raise
+            @@ Invalid_arg_type
+                 (action_name action, arg_name, arg_value, arg_type)
     in
     aux arg_list
 

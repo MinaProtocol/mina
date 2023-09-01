@@ -2,7 +2,7 @@ open Core_kernel
 open Async
 open Integration_test_lib
 open Mina_transaction
-open Ci_interaction
+open Config_util
 
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
@@ -1290,7 +1290,6 @@ let all_node_id t =
   let pods = all_pods t |> Core.Map.to_alist in
   List.fold pods ~init:[] ~f:(fun acc (_, node) -> node.node_id :: acc)
 
-(* TODO: expand or remove *)
 let initialize_infra ~logger network =
   [%log trace] "initialize_infra: %s" network.network_id ;
   Malleable_error.return ()
