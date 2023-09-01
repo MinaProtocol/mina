@@ -8,8 +8,17 @@ open Integration_test_lib
 (* [alias] is instantiated when command line args are parsed *)
 let alias = ref None
 
+(* [archive_image] is instantiated when command line args are parsed *)
+let archive_image : string option ref = ref None
+
 (* [config_path] is instantiated when command line args are parsed *)
 let config_path = ref ""
+
+(* [keypairs_path] is instantiated when command line args are parsed *)
+let keypairs_path = ref ""
+
+(* [mina_image] is instantiated when command line args are parsed *)
+let mina_image = ref ""
 
 module Network_config = struct
   module Cli_inputs = Cli_inputs
@@ -61,16 +70,54 @@ module Network_config = struct
 
   let testnet_log_filter t = t.config.network_id
 
-  (* TODO: add config file command call here *)
+  let pull_keypairs num_keypairs =
+    let int_list = List.range ~stop:`inclusive 1 10_000 in
+    let random_nums =
+      Quickcheck.Generator.(of_list int_list |> list_with_length num_keypairs)
+      |> Quickcheck.random_value
+    in
+    let normalize_path path =
+      if String.(suffix path 1 = "/") then String.drop_suffix path 1 else path
+    in
+    (* network keypairs + private keys *)
+    let keypairs_path = normalize_path !keypairs_path in
+    let base_filename n =
+      sprintf "%s/network-keypairs/sender-account-%d.json" keypairs_path n
+    in
+    let read_sk n = In_channel.read_all (base_filename n ^ ".sk") in
+    let read_keypair n =
+      let open Yojson.Safe in
+      let json = from_file (base_filename n) in
+      let sk = read_sk n |> Private_key.of_base58_check_exn in
+      { Network_keypair.keypair = Keypair.of_private_key_exn sk
+      ; keypair_name = Util.member "keypair_name" json |> to_string
+      ; privkey_password = Util.member "privkey_password" json |> to_string
+      ; public_key = Util.member "public_key" json |> to_string
+      ; private_key = Util.member "private_key" json |> to_string
+      }
+    in
+    (* libp2p keypairs *)
+    let libp2p_base_filename n =
+      sprintf "%s/libp2p-keypairs/libp2p-keypair-%d.json" keypairs_path n
+    in
+    let read_peerid n =
+      In_channel.read_all (libp2p_base_filename n ^ ".peerid")
+    in
+    let read_libp2p n = Yojson.Safe.from_file (libp2p_base_filename n) in
+    ( List.map random_nums ~f:read_keypair
+    , List.map random_nums ~f:read_sk
+    , List.map random_nums ~f:read_libp2p
+    , List.map random_nums ~f:read_peerid )
+
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
     let { requires_graphql
         ; genesis_ledger
+        ; archive_nodes
         ; block_producers
         ; snark_coordinator
         ; snark_worker_fee
-        ; num_archive_nodes
         ; log_precomputed_blocks
         ; proof_config
         ; Test_config.k
@@ -78,6 +125,7 @@ module Network_config = struct
         ; slots_per_epoch
         ; slots_per_sub_window
         ; txpool_max_size
+        ; _
         } =
       test_config
     in
@@ -88,7 +136,7 @@ module Network_config = struct
     let user_len = Int.min 5 (String.length user_sanitized) in
     let user = String.sub user_sanitized ~pos:0 ~len:user_len in
     let git_commit = Mina_version.commit_id_short in
-    let network_id = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
+    let network_id = sprintf "it-%s-%s-%s" user git_commit test_name in
     (* check to make sure the test writer hasn't accidentally created duplicate names of accounts and keys *)
     let key_names_list =
       List.map genesis_ledger ~f:(fun acct -> acct.account_name)
@@ -105,29 +153,25 @@ module Network_config = struct
       failwith
         "All nodes in testnet must have unique names.  Check to make sure you \
          are not using the same node_name more than once" ;
-
-    (* GENERATE ACCOUNTS AND KEYPAIRS *)
-    let keypairs =
-      List.take
-        (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
-        (List.drop
-           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
-           1 )
-        (List.length genesis_ledger)
+    (* ACCOUNTS AND KEYPAIRS *)
+    let before = Time.now () in
+    let num_keypairs = List.length genesis_ledger in
+    let network_keypairs, private_keys, _libp2p_keypairs, _libp2p_peerids =
+      pull_keypairs (List.length genesis_ledger)
     in
+    [%log trace] "Pulled %d keypairs from %s in %s" num_keypairs !keypairs_path
+      Time.(abs_diff before @@ now () |> Span.to_string) ;
     let labeled_accounts :
-        ( Runtime_config.Accounts.single
-        * (Public_key.Compressed.t * Private_key.t) )
+        (Runtime_config.Accounts.single * (Network_keypair.t * Private_key.t))
         String.Map.t =
       String.Map.empty
     in
-    let rec add_accounts mp zip =
-      match zip with
+    let rec add_accounts acc = function
       | [] ->
-          mp
+          acc
       | hd :: tl ->
-          let ( { Test_config.Test_Account.balance; account_name; timing }
-              , (pk, sk) ) =
+          let ( { Test_config.Test_Account.balance; account_name; timing; _ }
+              , (network_keypair, sk) ) =
             hd
           in
           let timing =
@@ -145,6 +189,8 @@ module Network_config = struct
                   }
           in
           let default = Runtime_config.Accounts.Single.default in
+          let sk = Private_key.of_base58_check_exn sk in
+          let pk = Public_key.(of_private_key_exn sk |> compress) in
           let acct =
             { default with
               pk = Public_key.Compressed.to_string pk
@@ -157,10 +203,18 @@ module Network_config = struct
             }
           in
           add_accounts
-            (String.Map.add_exn mp ~key:account_name ~data:(acct, (pk, sk)))
+            (String.Map.add_exn acc ~key:account_name
+               ~data:(acct, (network_keypair, sk)) )
             tl
     in
     let genesis_ledger_accounts =
+      let network_keypairs =
+        List.mapi network_keypairs ~f:(fun n kp ->
+            { kp with
+              keypair_name = (List.nth_exn genesis_ledger n).account_name
+            } )
+      in
+      let keypairs = List.zip_exn network_keypairs private_keys in
       add_accounts labeled_accounts (List.zip_exn genesis_ledger keypairs)
     in
     (* DAEMON CONFIG *)
@@ -187,15 +241,14 @@ module Network_config = struct
             ; slots_per_epoch = Some slots_per_epoch
             ; slots_per_sub_window = Some slots_per_sub_window
             ; genesis_state_timestamp =
-                Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
+                Some Core.Time.(to_string_abs ~zone:Zone.utc @@ now ())
             }
       ; proof = Some proof_config (* TODO: prebake ledger and only set hash *)
       ; ledger =
           Some
             { base =
                 Accounts
-                  ( String.Map.data genesis_ledger_accounts
-                  |> List.map ~f:(fun tup -> fst tup) )
+                  (String.Map.data genesis_ledger_accounts |> List.map ~f:fst)
             ; add_genesis_winner = None
             ; num_accounts = None
             ; balances = []
@@ -214,18 +267,12 @@ module Network_config = struct
       { constraints = constraint_constants; genesis = genesis_constants }
     in
     (* BLOCK PRODUCER CONFIG *)
-    let mk_net_keypair keypair_name (pk, sk) =
-      let keypair =
-        { Keypair.public_key = Public_key.decompress_exn pk; private_key = sk }
-      in
-      Network_keypair.create_network_keypair ~keypair_name ~keypair
-    in
     let block_producer_config name keypair =
       { name; keypair; libp2p_secret = "" }
     in
     let block_producer_configs =
-      List.map block_producers ~f:(fun node ->
-          let _, key_tup =
+      List.mapi block_producers ~f:(fun n node ->
+          let _ =
             match String.Map.find genesis_ledger_accounts node.account_name with
             | Some acct ->
                 acct
@@ -240,14 +287,13 @@ module Network_config = struct
                 failwith failstring
           in
           block_producer_config node.node_name
-            (mk_net_keypair node.account_name key_tup) )
+          @@ List.nth_exn network_keypairs n )
     in
     let mina_archive_schema = "create_schema.sql" in
     let long_commit_id =
-      if String.is_substring Mina_version.commit_id ~substring:"[DIRTY]" then
-        String.sub Mina_version.commit_id ~pos:7
-          ~len:(String.length Mina_version.commit_id - 7)
-      else Mina_version.commit_id
+      let open String in
+      let id = Mina_version.commit_id in
+      if prefix id 7 = "[DIRTY]" then suffix id (length id - 7) else id
     in
     let mina_archive_base_url =
       "https://raw.githubusercontent.com/MinaProtocol/mina/" ^ long_commit_id
@@ -258,17 +304,13 @@ module Network_config = struct
       ; mina_archive_base_url ^ "zkapp_tables.sql"
       ]
     in
-    let before = Time.now () in
     let genesis_keypairs =
       String.Map.of_alist_exn
         (List.map (String.Map.to_alist genesis_ledger_accounts)
            ~f:(fun element ->
-             let kp_name, (_, (pk, sk)) = element in
-             (kp_name, mk_net_keypair kp_name (pk, sk)) ) )
+             let kp_name, (_, (keypair, _)) = element in
+             (kp_name, keypair) ) )
     in
-    [%log trace] "Genesis keypairs (%d): %s"
-      (String.Map.length genesis_keypairs)
-      Time.(abs_diff before @@ now () |> Span.to_string) ;
     let snark_coordinator_config =
       match snark_coordinator with
       | None ->
@@ -312,7 +354,7 @@ module Network_config = struct
         ; runtime_config = Runtime_config.to_yojson runtime_config
         ; block_producer_configs
         ; log_precomputed_blocks
-        ; archive_node_count = num_archive_nodes
+        ; archive_node_count = List.length archive_nodes
         ; mina_archive_schema
         ; mina_archive_schema_aux_files
         ; snark_coordinator_config
@@ -459,15 +501,14 @@ module Network_deployed = struct
         raise @@ Invalid_argument (Yojson.Safe.to_string uri)
 
   let of_yojson =
-    let f network_id accum : Yojson.Safe.t -> t = function
-      | `Assoc
-          [ ( node_id
-            , `Assoc
-                [ ("graphql_uri", graphql_uri)
-                ; ("node_type", `String nt)
-                ; ("private_key", private_key)
-                ] )
-          ] ->
+    let node_info_helper network_id accum : string * Yojson.Safe.t -> t =
+      function
+      | ( node_id
+        , `Assoc
+            [ ("graphql_uri", graphql_uri)
+            ; ("node_type", `String nt)
+            ; ("private_key", private_key)
+            ] ) ->
           Core.String.Map.set accum ~key:node_id
             ~data:
               { node_id
@@ -476,15 +517,15 @@ module Network_deployed = struct
               ; network_keypair = network_keypair_of_yojson node_id private_key
               ; graphql_uri = graphql_uri_of_yojson graphql_uri
               }
-      | t ->
-          raise @@ Invalid_entry (Yojson.Safe.to_string t)
+      | node_id, t ->
+          raise
+          @@ Invalid_entry (sprintf "%s: %s" node_id @@ Yojson.Safe.to_string t)
     in
     function
-    | `Assoc [ ("network_id", `String network_id); ("nodes", `List nodes) ] ->
-        Ok (List.fold nodes ~init:Core.String.Map.empty ~f:(f network_id))
-    | `Assoc [ ("network_id", `String _network_id) ] ->
-        (* TODO: remove *)
-        Ok Core.String.Map.empty
+    | `Assoc [ ("network_id", `String network_id); ("nodes", `Assoc nodes) ] ->
+        Ok
+          (List.fold nodes ~init:Core.String.Map.empty
+             ~f:(node_info_helper network_id) )
     | t ->
         print_endline @@ Yojson.Safe.pretty_to_string t ;
         raise @@ Invalid_output (Yojson.Safe.to_string t)
@@ -613,7 +654,7 @@ module Config_file = struct
 
   exception Invalid_args_num of string * string list * string list
 
-  exception Missing_arg of string * string
+  exception Missing_arg of string * string * string
 
   exception Invalid_arg_type of string * Yojson.Safe.t * string
 
@@ -681,7 +722,8 @@ module Config_file = struct
             try
               List.find_map_exn args ~f:(fun (name, value) ->
                   Option.some_if (String.equal name arg_name) value )
-            with Not_found_s _ -> raise @@ Missing_arg (arg_name, arg_type)
+            with Not_found_s _ ->
+              raise @@ Missing_arg (action_name action, arg_name, arg_type)
           in
           if validate_arg_type arg_type arg_value then aux rest
           else raise @@ Invalid_arg_type (arg_name, arg_value, arg_type)

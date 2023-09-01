@@ -31,6 +31,7 @@ type inputs =
   ; archive_image : string option
   ; debug : bool
   ; config_path : string option
+  ; keypairs_path : string
   ; mock_alias : (string * string) option
   }
 
@@ -45,7 +46,8 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
     [%log fatal] "mina-image argument cannot be an empty string" ;
     exit 1 )
   else if
-    test_config.num_archive_nodes > 0 && Option.is_none inputs.archive_image
+    List.length test_config.archive_nodes > 0
+    && Option.is_none inputs.archive_image
   then (
     [%log fatal]
       "This test uses archive nodes.  archive-image argument cannot be absent \
@@ -63,6 +65,36 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
       [%log fatal]
         "Must provide either --mock command line arg or set MOCK_NETWORK env \
          var" ;
+      ignore @@ exit 1 ) ;
+    let keypairs_path =
+      if String.(suffix inputs.keypairs_path 1 = "/") then
+        String.drop_suffix inputs.keypairs_path 1
+      else inputs.keypairs_path
+    in
+    let keypairs_ls = Stdlib.Sys.readdir keypairs_path in
+    (* check network-keypairs *)
+    if
+      not
+        ( Array.exists keypairs_ls ~f:(String.equal "network-keypairs")
+        && (Stdlib.Sys.is_directory @@ keypairs_path ^ "/network-keypairs") )
+    then (
+      [%log fatal]
+        "No network-keypairs directory present in %s \n\
+        \ Consider cloning the pre-generated keypairs repo: \n\
+        \   git clone git@github.com:MinaFoundation/lucy-keypairs.git"
+        keypairs_path ;
+      ignore @@ exit 1 ) ;
+    (* check libp2p-keypairs *)
+    if
+      not
+        ( Array.exists keypairs_ls ~f:(String.equal "libp2p-keypairs")
+        && (Stdlib.Sys.is_directory @@ keypairs_path ^ "/libp2p-keypairs") )
+    then (
+      [%log fatal]
+        "No libp2p-keypairs directory present in %s \n\
+        \ Consider cloning the pre-generated keypairs repo: \n\
+        \   git clone git@github.com:MinaFoundation/lucy-keypairs.git"
+        keypairs_path ;
       ignore @@ exit 1 ) ;
     match Inputs.Engine.name with
     | "abstract" ->
@@ -434,6 +466,14 @@ let mock_alias_arg =
     & opt (some string) None
     & info [ "mock-network"; "mock"; "alias" ] ~env ~docv:"MOCK_NETWORK" ~doc)
 
+let keypair_dir_path_arg =
+  let doc = "Path to the pre-generated network and libp2p keypair directory." in
+  let env = Arg.env_var "MINA_KEYPAIRS_PATH" ~doc in
+  Arg.(
+    required
+    & opt (some dir) None
+    & info [ "keypairs-path" ] ~env ~docv:"MINA_KEYPAIRS_PATH" ~doc)
+
 let mina_image_arg =
   let doc = "Identifier of the Mina docker image to test." in
   let env = Arg.env_var "MINA_IMAGE" ~doc in
@@ -478,6 +518,18 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Option.iter path ~f:(fun p -> Engine.Network.config_path := p) ;
     path
   in
+  let set_keypair path =
+    Engine.Network.keypairs_path := path ;
+    path
+  in
+  let set_mina_image image =
+    Engine.Network.mina_image := image ;
+    image
+  in
+  let set_archive_image image =
+    Engine.Network.archive_image := image ;
+    image
+  in
   let set_alias alias =
     let alias = Option.map alias ~f:(fun a -> ("MOCK_NETWORK", a)) in
     Engine.Network.alias := alias ;
@@ -490,22 +542,26 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs test_inputs test archive_image debug mina_image config_path
-        mock_alias =
+    let cons_inputs test_inputs test debug archive_image mina_image config_path
+        keypairs_path mock_alias =
       { test_inputs
       ; test
       ; mina_image
       ; archive_image
       ; debug
       ; config_path
+      ; keypairs_path
       ; mock_alias
       }
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg
       $ test_arg (module Inputs)
-      $ archive_image_arg $ debug_arg $ mina_image_arg
+      $ debug_arg
+      $ (const set_archive_image $ archive_image_arg)
+      $ (const set_mina_image $ mina_image_arg)
       $ (const set_config $ config_path_arg)
+      $ (const set_keypair $ keypair_dir_path_arg)
       $ (const set_alias $ mock_alias_arg))
   in
   (Term.(const start $ inputs_term), info)
