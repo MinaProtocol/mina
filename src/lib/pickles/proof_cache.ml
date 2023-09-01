@@ -1,6 +1,74 @@
 open Core_kernel
 
-type t = unit
+module Yojson_map = Map.Make (struct
+  type t =
+    [ `Null
+    | `Bool of bool
+    | `Int of int
+    | `Intlit of string
+    | `Float of float
+    | `String of string
+    | `Assoc of (string * t) list
+    | `List of t list
+    | `Tuple of t list
+    | `Variant of string * t option ]
+  [@@deriving compare, sexp]
+end)
+
+type t = Yojson.Safe.t Yojson_map.t Yojson_map.t ref
+
+(* We use a slightly more verbose format here, so that it's easy to debug.
+   There are some overheads to handling this, but the amount of computation we
+   save by caching the proofs is orders of magnitude higher, so it's not really
+   an issue.
+*)
+let to_yojson t =
+  `List
+    (Map.fold ~init:[] !t ~f:(fun ~key ~data xs ->
+         let proofs =
+           Map.fold ~init:[] data ~f:(fun ~key ~data xs ->
+               `Assoc [ ("public_input", key); ("proof", data) ] :: xs )
+         in
+         `Assoc [ ("verification_key", key); ("proofs", `List proofs) ] :: xs )
+    )
+
+(* This mirrors the format of [to_yojson], carefully ensuring that we can
+   decode what we encode, and reporting an error when the format differs from
+   what we expect.
+
+   Note that, since this is a cache, it should always be possible to rejenerate
+   proofs for the cache by starting with the empty cache and calling
+   [to_yojson] on the result.
+*)
+let of_yojson t =
+  Result.try_with (fun () ->
+      match t with
+      | `List xs ->
+          let for_vks =
+            List.map xs ~f:(function
+              | `Assoc [ ("verification_key", key); ("proofs", `List proofs) ]
+                ->
+                  let proofs =
+                    List.map proofs ~f:(function
+                      | `Assoc [ ("public_input", key); ("proof", data) ] ->
+                          (key, data)
+                      | _ ->
+                          failwith
+                            "Expected fields `public_input`, `proof` as a \
+                             record in that order; received something \
+                             different" )
+                  in
+                  (key, Yojson_map.of_alist_exn proofs)
+              | _ ->
+                  failwith
+                    "Expected fields `verification_key`, `proofs` as a record \
+                     in that order, where `proofs` is a list; received \
+                     something different" )
+          in
+          ref (Yojson_map.of_alist_exn for_vks)
+      | _ ->
+          failwith "Expected a list, got something different" )
+  |> Result.map_error ~f:Exn.to_string
 
 (* Alias types with a [deriving to_yojson] annotation, so that we don't have to
    spell out the serialization explicitly.
@@ -101,12 +169,12 @@ module Json = struct
       verifier_index]
 end
 
-let empty () = ()
+let empty () = ref Yojson_map.empty
 
-let get_proof _t ~verification_key ~public_input =
-  Format.eprintf "verification_key:@.%a@.public_input:@.%a@." Yojson.Safe.pp
-    verification_key Yojson.Safe.pp public_input ;
-  None
+let get_proof t ~verification_key ~public_input =
+  let open Option.Let_syntax in
+  let%bind for_vk = Map.find !t verification_key in
+  Map.find for_vk public_input
 
 let get_step_proof t ~keypair ~public_input =
   let open Option.Let_syntax in
@@ -138,11 +206,13 @@ let get_wrap_proof t ~keypair ~public_input =
   Option.try_with (fun () ->
       Result.ok_or_failwith @@ Backend.Tock.Proof.of_yojson proof_json )
 
-let set_proof _t ~verification_key ~public_input proof =
-  Format.eprintf "verification_key:@.%a@.public_input:@.%a@.proof:@.%a@."
-    Yojson.Safe.pp verification_key Yojson.Safe.pp public_input Yojson.Safe.pp
-    proof ;
-  ()
+let set_proof t ~verification_key ~public_input proof =
+  t :=
+    Map.update !t verification_key ~f:(function
+      | None ->
+          Yojson_map.singleton public_input proof
+      | Some for_vk ->
+          Map.set for_vk ~key:public_input ~data:proof )
 
 let set_step_proof t ~keypair ~public_input proof =
   let open Option.Let_syntax in

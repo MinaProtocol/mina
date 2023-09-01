@@ -4,7 +4,7 @@
     The proofs are encoded in Yojson format, to ensure that a change to
     serialization doesn't cause a hard failure of tests using the cache.
 *)
-type t
+type t [@@deriving yojson]
 
 val empty : unit -> t
 
