@@ -183,12 +183,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let input =
           tock_unpadded_public_input_of_statement
-            ~feature_flags:
-              Plonk_types.(
-                Features.map
-                  ~f:(fun _ -> Opt.Flag.Maybe)
-                  t.statement.proof_state.deferred_values.plonk.feature_flags)
-            prepared_statement
+            ~feature_flags:Plonk_types.Features.Full.maybe prepared_statement
         in
         let message =
           Wrap_hack.pad_accumulator

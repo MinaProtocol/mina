@@ -62,6 +62,40 @@ module Opt : sig
 end
 
 module Features : sig
+  module Full : sig
+    type 'bool t = private
+      { range_check0 : 'bool
+      ; range_check1 : 'bool
+      ; foreign_field_add : 'bool
+      ; foreign_field_mul : 'bool
+      ; xor : 'bool
+      ; rot : 'bool
+      ; lookup : 'bool
+      ; runtime_tables : 'bool
+      ; uses_lookups : 'bool
+      ; table_width_at_least_1 : 'bool
+      ; table_width_at_least_2 : 'bool
+      ; table_width_3 : 'bool
+      ; lookups_per_row_3 : 'bool
+      ; lookups_per_row_4 : 'bool
+      ; lookup_pattern_xor : 'bool
+      ; lookup_pattern_range_check : 'bool
+      }
+    [@@deriving sexp, compare, yojson, hash, equal, hlist]
+
+    val get_feature_flag : 'bool t -> Kimchi_types.feature_flag -> 'bool option
+
+    val map : 'a t -> f:('a -> 'b) -> 'b t
+
+    val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
+
+    val none : Opt.Flag.t t
+
+    val maybe : Opt.Flag.t t
+
+    val none_bool : bool t
+  end
+
   [%%versioned:
   module Stable : sig
     module V1 : sig
@@ -78,6 +112,10 @@ module Features : sig
       [@@deriving sexp, compare, yojson, hash, equal, hlist]
     end
   end]
+
+  val to_full : or_:('bool -> 'bool -> 'bool) -> 'bool t -> 'bool Full.t
+
+  val of_full : 'a Full.t -> 'a t
 
   (** {2 Type aliases} *)
 
@@ -204,7 +242,7 @@ module Messages : sig
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
     -> ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> Opt.Flag.t Features.t
+    -> Opt.Flag.t Features.Full.t
     -> dummy:'b
     -> commitment_lengths:((int, 'n) Vector.vec, int, int) Poly.t
     -> bool:('c, bool, 'f) Snarky_backendless.Typ.t
@@ -410,7 +448,7 @@ module All_evals : sig
 
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> Opt.Flag.t Features.t
+    -> Opt.Flag.t Features.Full.t
     -> ( ( 'f Snarky_backendless.Cvar.t
          , 'f Snarky_backendless.Cvar.t array
          , 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )

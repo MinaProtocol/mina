@@ -314,3 +314,16 @@ module Foreign_field_mul = Make_test (struct
 
   let feature_flags2 = feature_flags
 end)
+
+module Different_sizes_of_lookup = Make_test (struct
+  let feature_flags1 =
+    Plonk_types.Features.{ none_bool with foreign_field_mul = true }
+
+  let feature_flags2 = Plonk_types.Features.{ none_bool with xor = true }
+end)
+
+module With_and_without_lookup = Make_test (struct
+  let feature_flags1 = Plonk_types.Features.{ none_bool with xor = true }
+
+  let feature_flags2 = Plonk_types.Features.none_bool
+end)

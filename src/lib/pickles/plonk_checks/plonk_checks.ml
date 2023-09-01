@@ -104,79 +104,15 @@ let evals_of_split_evals field ~zeta ~zetaw (es : _ Plonk_types.Evals.t) ~rounds
 
 open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
 
-type 'bool all_feature_flags =
-  { lookup_tables : 'bool Lazy.t
-  ; table_width_at_least_1 : 'bool Lazy.t
-  ; table_width_at_least_2 : 'bool Lazy.t
-  ; table_width_3 : 'bool Lazy.t
-  ; lookups_per_row_3 : 'bool Lazy.t
-  ; lookups_per_row_4 : 'bool Lazy.t
-  ; lookup_pattern_xor : 'bool Lazy.t
-  ; lookup_pattern_range_check : 'bool Lazy.t
-  ; features : 'bool Plonk_types.Features.t
-  }
+type 'bool all_feature_flags = 'bool Lazy.t Plonk_types.Features.Full.t
 
 let expand_feature_flags (type boolean)
     (module B : Bool_intf with type t = boolean)
-    ({ range_check0
-     ; range_check1
-     ; foreign_field_add = _
-     ; foreign_field_mul
-     ; xor
-     ; rot
-     ; lookup
-     ; runtime_tables = _
-     } as features :
-      boolean Plonk_types.Features.t ) : boolean all_feature_flags =
-  let lookup_pattern_range_check =
-    (* RangeCheck, Rot gates use RangeCheck lookup pattern *)
-    lazy B.(range_check0 ||| range_check1 ||| rot)
-  in
-  let lookup_pattern_xor =
-    (* Xor lookup pattern *)
-    lazy xor
-  in
-  (* Make sure these stay up-to-date with the layouts!! *)
-  let table_width_3 =
-    (* Xor have max_joint_size = 3 *)
-    lookup_pattern_xor
-  in
-  let table_width_at_least_2 =
-    (* Lookup has max_joint_size = 2 *)
-    lazy (B.( ||| ) (Lazy.force table_width_3) lookup)
-  in
-  let table_width_at_least_1 =
-    (* RangeCheck, ForeignFieldMul have max_joint_size = 1 *)
-    lazy
-      (B.any
-         [ Lazy.force table_width_at_least_2
-         ; Lazy.force lookup_pattern_range_check
-         ; foreign_field_mul
-         ] )
-  in
-  let lookups_per_row_4 =
-    (* Xor, RangeCheckGate, ForeignFieldMul, have max_lookups_per_row = 4 *)
-    lazy
-      (B.any
-         [ Lazy.force lookup_pattern_xor
-         ; Lazy.force lookup_pattern_range_check
-         ; foreign_field_mul
-         ] )
-  in
-  let lookups_per_row_3 =
-    (* Lookup has max_lookups_per_row = 3 *)
-    lazy (B.( ||| ) (Lazy.force lookups_per_row_4) lookup)
-  in
-  { lookup_tables = lookups_per_row_3
-  ; table_width_at_least_1
-  ; table_width_at_least_2
-  ; table_width_3
-  ; lookups_per_row_3
-  ; lookups_per_row_4
-  ; lookup_pattern_xor
-  ; lookup_pattern_range_check
-  ; features
-  }
+    (features : boolean Plonk_types.Features.t) : boolean all_feature_flags =
+  features
+  |> Plonk_types.Features.map ~f:(fun x -> lazy x)
+  |> Plonk_types.Features.to_full ~or_:(fun x y ->
+         lazy B.(Lazy.force x ||| Lazy.force y) )
 
 let lookup_tables_used feature_flags =
   let module Bool = struct
@@ -207,49 +143,14 @@ let lookup_tables_used feature_flags =
     let any = List.fold_left ~f:( ||| ) ~init:false_
   end in
   let all_feature_flags = expand_feature_flags (module Bool) feature_flags in
-  Lazy.force all_feature_flags.lookup_tables
+  Lazy.force all_feature_flags.uses_lookups
 
 let get_feature_flag (feature_flags : _ all_feature_flags)
     (feature : Kimchi_types.feature_flag) =
-  match feature with
-  | RangeCheck0 ->
-      Some feature_flags.features.range_check0
-  | RangeCheck1 ->
-      Some feature_flags.features.range_check1
-  | ForeignFieldAdd ->
-      Some feature_flags.features.foreign_field_add
-  | ForeignFieldMul ->
-      Some feature_flags.features.foreign_field_mul
-  | Xor ->
-      Some feature_flags.features.xor
-  | Rot ->
-      Some feature_flags.features.rot
-  | LookupTables ->
-      Some (Lazy.force feature_flags.lookup_tables)
-  | RuntimeLookupTables ->
-      Some feature_flags.features.runtime_tables
-  | TableWidth 3 ->
-      Some (Lazy.force feature_flags.table_width_3)
-  | TableWidth 2 ->
-      Some (Lazy.force feature_flags.table_width_at_least_2)
-  | TableWidth i when i <= 1 ->
-      Some (Lazy.force feature_flags.table_width_at_least_1)
-  | TableWidth _ ->
-      None
-  | LookupsPerRow 4 ->
-      Some (Lazy.force feature_flags.lookups_per_row_4)
-  | LookupsPerRow i when i <= 3 ->
-      Some (Lazy.force feature_flags.lookups_per_row_3)
-  | LookupsPerRow _ ->
-      None
-  | LookupPattern Lookup ->
-      Some feature_flags.features.lookup
-  | LookupPattern Xor ->
-      Some (Lazy.force feature_flags.lookup_pattern_xor)
-  | LookupPattern RangeCheck ->
-      Some (Lazy.force feature_flags.lookup_pattern_range_check)
-  | LookupPattern ForeignFieldMul ->
-      Some feature_flags.features.foreign_field_mul
+  let lazy_flag =
+    Plonk_types.Features.Full.get_feature_flag feature_flags feature
+  in
+  Option.map ~f:Lazy.force lazy_flag
 
 let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     (module F : Field_with_if_intf with type t = t and type bool = boolean)

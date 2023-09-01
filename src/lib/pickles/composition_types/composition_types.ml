@@ -135,29 +135,10 @@ module Wrap = struct
           let typ (type f fp)
               (module Impl : Snarky_backendless.Snark_intf.Run
                 with type field = f ) ~dummy_scalar ~dummy_scalar_challenge
-              ~challenge ~scalar_challenge ~bool ~feature_flags
+              ~challenge ~scalar_challenge ~bool
+              ~feature_flags:
+                ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags)
               (fp : (fp, _, f) Snarky_backendless.Typ.t) =
-            let uses_lookup =
-              let { Plonk_types.Features.range_check0
-                  ; range_check1
-                  ; foreign_field_add = _ (* Doesn't use lookup *)
-                  ; foreign_field_mul
-                  ; xor
-                  ; rot
-                  ; lookup
-                  ; runtime_tables = _ (* Fixme *)
-                  } =
-                feature_flags
-              in
-              Array.reduce_exn ~f:Opt.Flag.( ||| )
-                [| range_check0
-                 ; range_check1
-                 ; foreign_field_mul
-                 ; xor
-                 ; rot
-                 ; lookup
-                |]
-            in
             Snarky_backendless.Typ.of_hlistable
               [ Scalar_challenge.typ scalar_challenge
               ; challenge
@@ -166,8 +147,10 @@ module Wrap = struct
               ; fp
               ; fp
               ; fp
-              ; Plonk_types.Features.typ ~feature_flags bool
-              ; Plonk_types.Opt.typ Impl.Boolean.typ uses_lookup
+              ; Plonk_types.Features.typ
+                  ~feature_flags:(Plonk_types.Features.of_full feature_flags)
+                  bool
+              ; Plonk_types.Opt.typ Impl.Boolean.typ uses_lookups
                   ~dummy:dummy_scalar_challenge
                   (Scalar_challenge.typ scalar_challenge)
               ]
