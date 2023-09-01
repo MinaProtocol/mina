@@ -1384,7 +1384,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let wrap =
                 let wrap_vk = Lazy.force wrap_vk in
                 let%bind.Promise proof, (), (), _ =
-                  step ~maxes:(module Maxes)
+                  step ~proof_cache:None ~maxes:(module Maxes)
                 in
                 let proof =
                   { proof with

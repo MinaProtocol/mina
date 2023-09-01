@@ -42,7 +42,7 @@ struct
             *)
       max_local_max_proof_verifieds self_branches prev_vars prev_values
       local_widths local_heights prevs_length var value ret_var ret_value
-      auxiliary_var auxiliary_value ) ?handler
+      auxiliary_var auxiliary_value ) ?handler ~proof_cache
       (T branch_data :
         ( A.t
         , A_value.t
@@ -826,7 +826,6 @@ struct
                           ; public_inputs
                           } next_statement_hashed ->
                     [%log internal] "Backend_tick_proof_create_async" ;
-                    let proof_cache = Some (Proof_cache.empty ()) in
                     let create_proof () =
                       Backend.Tick.Proof.create_async ~primary:public_inputs
                         ~auxiliary:auxiliary_inputs
