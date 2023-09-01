@@ -95,9 +95,7 @@ module Network_config = struct
         ; genesis_ledger
         ; archive_nodes
         ; block_producers
-        ; seed_nodes
         ; snark_coordinator
-        ; snark_workers
         ; snark_worker_fee
         ; log_precomputed_blocks (* ; num_plain_nodes *)
         ; proof_config
@@ -106,18 +104,10 @@ module Network_config = struct
         ; slots_per_epoch
         ; slots_per_sub_window
         ; txpool_max_size
+        ; _
         } =
       test_config
     in
-    List.iter archive_nodes ~f:(fun x ->
-        Test_config.Archive_node.to_yojson x
-        |> Yojson.Safe.pretty_to_string |> print_endline ) ;
-    List.iter seed_nodes ~f:(fun x ->
-        Test_config.Seed_node.to_yojson x
-        |> Yojson.Safe.pretty_to_string |> print_endline ) ;
-    List.iter snark_workers ~f:(fun x ->
-        Test_config.Snark_worker_node.to_yojson x
-        |> Yojson.Safe.pretty_to_string |> print_endline ) ;
     let user_from_env = Option.value (Unix.getenv "USER") ~default:"auto" in
     let user_sanitized =
       Str.global_replace (Str.regexp "\\W|_-") "" user_from_env
@@ -145,18 +135,20 @@ module Network_config = struct
         "All nodes in testnet must have unique names.  Check to make sure you \
          are not using the same node_name more than once" ;
 
-    (* GENERATE ACCOUNTS AND KEYPAIRS *)
-    let keypairs =
-      List.take
-        (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
-        (List.drop
-           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
-           1 )
+    (* ACCOUNTS AND KEYPAIRS *)
+    (* ACCOUNTS AND KEYPAIRS *)
+    let before = Time.now () in
+    let num_keypairs = List.length genesis_ledger in
+    let network_keypairs, private_keys, _libp2p_keypairs, _libp2p_peerids =
+      Util.pull_keypairs
+        !Kubernetes_network.keypairs_path
         (List.length genesis_ledger)
     in
+    [%log trace] "Pulled %d keypairs from %s in %s" num_keypairs
+      !Kubernetes_network.keypairs_path
+      Time.(abs_diff before @@ now () |> Span.to_string) ;
     let labeled_accounts :
-        ( Runtime_config.Accounts.single
-        * (Public_key.Compressed.t * Private_key.t) )
+        (Runtime_config.Accounts.single * (Network_keypair.t * Private_key.t))
         String.Map.t =
       String.Map.empty
     in
@@ -166,7 +158,7 @@ module Network_config = struct
           mp
       | hd :: tl ->
           let ( { Test_config.Test_Account.balance; account_name; timing; _ }
-              , (pk, sk) ) =
+              , (network_keypair, sk) ) =
             hd
           in
           let timing =
@@ -184,6 +176,8 @@ module Network_config = struct
                   }
           in
           let default = Runtime_config.Accounts.Single.default in
+          let sk = Private_key.of_base58_check_exn sk in
+          let pk = Public_key.(of_private_key_exn sk |> compress) in
           let acct =
             { default with
               pk = Public_key.Compressed.to_string pk
@@ -196,10 +190,12 @@ module Network_config = struct
             }
           in
           add_accounts
-            (String.Map.add_exn mp ~key:account_name ~data:(acct, (pk, sk)))
+            (String.Map.add_exn mp ~key:account_name
+               ~data:(acct, (network_keypair, sk)) )
             tl
     in
     let genesis_ledger_accounts =
+      let keypairs = List.zip_exn network_keypairs private_keys in
       add_accounts labeled_accounts (List.zip_exn genesis_ledger keypairs)
     in
     (* DAEMON CONFIG *)
@@ -255,18 +251,12 @@ module Network_config = struct
       { constraints = constraint_constants; genesis = genesis_constants }
     in
     (* BLOCK PRODUCER CONFIG *)
-    let mk_net_keypair keypair_name (pk, sk) =
-      let keypair =
-        { Keypair.public_key = Public_key.decompress_exn pk; private_key = sk }
-      in
-      Network_keypair.create_network_keypair ~keypair_name ~keypair
-    in
     let block_producer_config name keypair =
       { name; keypair; libp2p_secret = "" }
     in
     let block_producer_configs =
-      List.map block_producers ~f:(fun node ->
-          let _, key_tup =
+      List.mapi block_producers ~f:(fun n node ->
+          let _, _ =
             match String.Map.find genesis_ledger_accounts node.account_name with
             | Some acct ->
                 acct
@@ -281,7 +271,7 @@ module Network_config = struct
                 failwith failstring
           in
           block_producer_config node.node_name
-            (mk_net_keypair node.account_name key_tup) )
+          @@ List.nth_exn network_keypairs n )
     in
     let mina_archive_schema = "create_schema.sql" in
     let long_commit_id =
@@ -303,8 +293,8 @@ module Network_config = struct
       String.Map.of_alist_exn
         (List.map (String.Map.to_alist genesis_ledger_accounts)
            ~f:(fun element ->
-             let kp_name, (_, (pk, sk)) = element in
-             (kp_name, mk_net_keypair kp_name (pk, sk)) ) )
+             let kp_name, (_, (keypair, _)) = element in
+             (kp_name, keypair) ) )
     in
     let snark_coordinator_config =
       match snark_coordinator with
@@ -333,7 +323,6 @@ module Network_config = struct
             ; worker_nodes = node.worker_nodes
             }
     in
-
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
