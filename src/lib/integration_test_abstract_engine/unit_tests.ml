@@ -8,7 +8,7 @@ module Test_values = struct
     let cwd_list = String.split ~on:'/' @@ Sys.getcwd () in
     let dir_path =
       List.take cwd_list (List.length cwd_list - 5)
-      @ [ "src/lib/integration_test_abstract_engine/config.json" ]
+      @ [ "src/lib/integration_test_abstract_engine/test_data/config.json" ]
     in
     String.concat ~sep:"/" dir_path
 
@@ -220,8 +220,9 @@ module Run_command_tests = struct
         @@ run_command ~suppress_logs:true ~config:config_file
              ~args:[ ("msg0", `String "hello") ]
              "echo"
-      with Missing_arg (arg_name, arg_type) ->
-        assert (arg_name = "msg" && arg_type = Arg_type.string)
+      with Missing_arg (action_name, arg_name, arg_type) ->
+        assert (
+          action_name = "echo" && arg_name = "msg" && arg_type = Arg_type.string )
   end
 
   module Successful = struct
@@ -346,38 +347,33 @@ module Parse_output_tests = struct
     let result =
       {|
         { "network_id": "network0",
-          "nodes": [
-            { "node0": {
-                "graphql_uri": "gql_archive",
-                "node_type": "Archive_node",
-                "private_key": null
-              }
+          "nodes": {
+            "node0": {
+              "graphql_uri": "gql_archive",
+              "node_type": "Archive_node",
+              "private_key": null
             },
-            { "node1": {
-                "graphql_uri": "gql_bp",
-                "node_type": "Block_producer_node",
-                "private_key": null
-              }
+            "node1": {
+              "graphql_uri": "gql_bp",
+              "node_type": "Block_producer_node",
+              "private_key": null
             },
-            { "node2": {
-                "graphql_uri": "gql_seed",
-                "node_type": "Seed_node",
-                "private_key": "EKEQpDAjj7dP3j7fQy4qBU7Kxns85wwq5xMn4zxdyQm83pEWzQ62"
-              }
+            "node2": {
+              "graphql_uri": "gql_seed",
+              "node_type": "Seed_node",
+              "private_key": "EKEQpDAjj7dP3j7fQy4qBU7Kxns85wwq5xMn4zxdyQm83pEWzQ62"
             },
-            { "node3": {
-                "graphql_uri": "gql_snark",
-                "node_type": "Snark_worker",
-                "private_key": null
-              }
+            "node3": {
+              "graphql_uri": "gql_snark",
+              "node_type": "Snark_worker",
+              "private_key": null
             },
-            { "node4": {
-                "graphql_uri": null,
-                "node_type": "Snark_coordinator",
-                "private_key": null
-              }
+            "node4": {
+              "graphql_uri": null,
+              "node_type": "Snark_coordinator",
+              "private_key": null
             }
-          ]
+          }
         }
       |}
       |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith
@@ -551,3 +547,5 @@ module Parse_output_tests = struct
 end
 
 let () = ignore @@ Async.Scheduler.go ()
+
+let () = print_endline "DONE"
