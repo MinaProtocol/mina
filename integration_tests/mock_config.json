@@ -5,9 +5,10 @@
       "name": "create_network",
       "args": {
         "network_id": "string",
-        "test_config": "string"
+        "runtime_config": "string",
+        "topology": "string"
       },
-      "command": "MOCK_NETWORK network create --network-id {{network_id}} --test-config {{test_config}}"
+      "command": "MOCK_NETWORK network create --network-id {{network_id}} --runtime-config {{runtime_config}} --topology {{topology}}"
     },
     {
       "name": "start_network",
@@ -28,10 +29,9 @@
       "args": {
         "network_id": "string",
         "node_id": "string",
-        "fresh_state": "bool",
-        "git_commit": "string"
+        "fresh_state": "bool"
       },
-      "command": "MOCK_NETWORK node start {{fresh_state}} --git-commit {{git_commit}} --network-id {{network_id}} --node-id {{node_id}}"
+      "command": "MOCK_NETWORK node start {{fresh_state}} --network-id {{network_id}} --node-id {{node_id}}"
     },
     {
       "name": "stop_node",

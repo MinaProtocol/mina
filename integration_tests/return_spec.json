@@ -3,7 +3,7 @@
   "return_spec": {
     "create_network": {
       "network_id": "string",
-      "nodes_map": [
+      "nodes": [
         {
           "graphql_uri" : "string",
           "network_id" : "string",
