@@ -4691,6 +4691,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         { tree_with_dummy_auth with
           account_update =
             { account_update_with_dummy_auth with authorization = Proof pi }
+        ; account_update_digest = account_update_digest_with_current_chain
         }
       in
       let forest =
