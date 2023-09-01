@@ -29,40 +29,33 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     { default with
       genesis_ledger =
-        [ { account_name = "untimed-node-a-key"
-          ; balance = "400000"
-          ; timing = Untimed (* 400_000_000_000_000 *)
-          }
-        ; { account_name = "untimed-node-b-key"
-          ; balance = "300000"
-          ; timing = Untimed (* 300_000_000_000_000 *)
-          }
-        ; { account_name = "timed-node-c-key"
-          ; balance = "30000"
-          ; timing =
-              make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
-                ~cliff_amount:0 ~vesting_period:4
-                ~vesting_increment:5_000_000_000_000
-              (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
-          }
-        ; { account_name = "snark-node-key1"; balance = "0"; timing = Untimed }
-        ; { account_name = "snark-node-key2"; balance = "0"; timing = Untimed }
-        ; { account_name = "fish1"; balance = "100"; timing = Untimed }
-        ; { account_name = "fish2"; balance = "100"; timing = Untimed }
+        [ test_account "untimed-node-a-key" "400000" (* 400_000_000_000_000 *)
+        ; test_account "untimed-node-b-key" "300000" (* 300_000_000_000_000 *)
+        ; test_account "timed-node-c-key" "30000"
+            ~timing:
+              (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
+                 ~cliff_amount:0 ~vesting_period:4
+                 ~vesting_increment:5_000_000_000_000 )
+          (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
+        ; test_account "snark-node-key1" "0"
+        ; test_account "snark-node-key2" "0"
+        ; test_account "fish1" "100"
+        ; test_account "fish2" "100"
         ]
     ; block_producers =
-        [ { node_name = "untimed-node-a"; account_name = "untimed-node-a-key" }
-        ; { node_name = "untimed-node-b"; account_name = "untimed-node-b-key" }
-        ; { node_name = "timed-node-c"; account_name = "timed-node-c-key" }
+        [ bp "untimed-node-a" !Network.mina_image
+        ; bp "untimed-node-b" !Network.mina_image
+        ; bp "timed-node-c" !Network.mina_image
         ]
     ; snark_coordinator =
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key1"
+          ; docker_image = !Network.mina_image
           ; worker_nodes = 4
           }
     ; snark_worker_fee = "0.0001"
-    ; num_archive_nodes = 1
+    ; archive_nodes = []
     ; proof_config =
         { proof_config_default with
           work_delay = Some 1

@@ -2,6 +2,8 @@ open Core
 open Integration_test_lib
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
+  open Inputs.Engine
+
   open Test_common.Make (Inputs)
 
   let num_extra_keys = 1000
@@ -12,32 +14,26 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     { default with
       genesis_ledger =
-        [ { Test_Account.account_name = "receiver-key"
-          ; balance = "9999999"
-          ; timing = Untimed
-          }
-        ; { account_name = "empty-bp-key"; balance = "0"; timing = Untimed }
-        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
+        [ test_account "receiver-key" "9999999"
+        ; test_account "empty-bp-key" "0"
+        ; test_account "snark-node-key" "0"
         ]
         @ List.init num_extra_keys ~f:(fun i ->
               let i_str = Int.to_string i in
-              { Test_Account.account_name =
-                  String.concat [ "sender-account"; i_str ]
-              ; balance = "10000"
-              ; timing = Untimed
-              } )
+              test_account ("sender-account-" ^ i_str) "10000" )
     ; block_producers =
-        [ { node_name = "receiver"; account_name = "receiver-key" }
-        ; { node_name = "empty_node-1"; account_name = "empty-bp-key" }
-        ; { node_name = "empty_node-2"; account_name = "empty-bp-key" }
-        ; { node_name = "empty_node-3"; account_name = "empty-bp-key" }
-        ; { node_name = "empty_node-4"; account_name = "empty-bp-key" }
-        ; { node_name = "observer"; account_name = "empty-bp-key" }
+        [ bp "receiver" !Network.mina_image
+        ; bp "empty_node-1" ~account_name:"empty-bp-key" !Network.mina_image
+        ; bp "empty_node-2" ~account_name:"empty-bp-key" !Network.mina_image
+        ; bp "empty_node-3" ~account_name:"empty-bp-key" !Network.mina_image
+        ; bp "empty_node-4" ~account_name:"empty-bp-key" !Network.mina_image
+        ; bp "observer" ~account_name:"empty-bp-key" !Network.mina_image
         ]
     ; snark_coordinator =
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key"
+          ; docker_image = !Network.mina_image
           ; worker_nodes = 4
           }
     ; txpool_max_size = 10_000_000

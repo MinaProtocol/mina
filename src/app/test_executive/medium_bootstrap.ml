@@ -16,14 +16,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       k = 2
     ; genesis_ledger =
-        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node-c-key"; balance = "0"; timing = Untimed }
+        [ test_account "node-a-key" "1000"
+        ; test_account "node-b-key" "1000"
+        ; test_account "node-c-key" "0"
         ]
     ; block_producers =
-        [ { node_name = "node-a"; account_name = "node-a-key" }
-        ; { node_name = "node-b"; account_name = "node-b-key" }
-        ; { node_name = "node-c"; account_name = "node-c-key" }
+        [ bp "node-a" !Network.mina_image
+        ; bp "node-b" !Network.mina_image
+        ; bp "node-c" !Network.mina_image
         ]
     }
 

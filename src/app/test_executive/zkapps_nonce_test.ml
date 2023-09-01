@@ -16,24 +16,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     { default with
       genesis_ledger =
-        [ { account_name = "node-a-key"
-          ; balance = "8000000000"
-          ; timing = Untimed
-          }
-        ; { account_name = "node-b-key"; balance = "1000000"; timing = Untimed }
-        ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
-        ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
-        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
+        [ test_account "node-a-key" "8000000000"
+        ; test_account "node-b-key" "1000000"
+        ; test_account "fish1" "3000"
+        ; test_account "fish2" "3000"
+        ; test_account "snark-node-key" "0"
         ]
     ; block_producers =
-        [ { node_name = "node-a"; account_name = "node-a-key" }
-        ; { node_name = "node-b"; account_name = "node-b-key" }
-        ]
-    ; num_archive_nodes = 1
+        [ bp "node-a" !Network.mina_image; bp "node-b" !Network.mina_image ]
+    ; archive_nodes = []
     ; snark_coordinator =
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key"
+          ; docker_image = !Network.mina_image
           ; worker_nodes = 5
           }
     ; snark_worker_fee = "0.0001"

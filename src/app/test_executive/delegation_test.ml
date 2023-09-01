@@ -14,14 +14,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     { default with
       genesis_ledger =
-        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
-        ]
+        [ test_account "node-a-key" "1000"; test_account "node-b-key" "1000" ]
     ; block_producers =
-        [ { node_name = "node-a"; account_name = "node-a-key" }
-        ; { node_name = "node-b"; account_name = "node-b-key" }
-        ]
-    ; num_archive_nodes = 1
+        [ bp "node-a" !Network.mina_image; bp "node-b" !Network.mina_image ]
+    ; archive_nodes = []
     }
 
   let run network t =

@@ -15,10 +15,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     { default with
       genesis_ledger =
-        [ { account_name = "node-key"; balance = "8000000"; timing = Untimed }
-        ; { account_name = "extra-key"; balance = "10"; timing = Untimed }
-        ]
-    ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
+        [ test_account "node-key" "8000000"; test_account "extra-key" "10" ]
+    ; block_producers = [ bp "node" !Network.mina_image ]
     }
 
   let check_and_print_stout_stderr ~logger process =
