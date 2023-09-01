@@ -865,9 +865,27 @@ let wrap
         Impls.Wrap.generate_witness_conv
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             [%log internal] "Backend_tock_proof_create_async" ;
-            let%map.Promise proof =
+            let proof_cache = Some (Proof_cache.empty ()) in
+            let create_proof () =
               Backend.Tock.Proof.create_async ~primary:public_inputs
                 ~auxiliary:auxiliary_inputs pk ~message:next_accumulator
+            in
+            let%map.Promise proof =
+              match proof_cache with
+              | None ->
+                  create_proof ()
+              | Some proof_cache -> (
+                  match
+                    Proof_cache.get_wrap_proof proof_cache ~keypair:pk
+                      ~public_input:public_inputs
+                  with
+                  | None ->
+                      let%map.Promise proof = create_proof () in
+                      Proof_cache.set_wrap_proof proof_cache ~keypair:pk
+                        ~public_input:public_inputs proof ;
+                      proof
+                  | Some proof ->
+                      Promise.return proof )
             in
             [%log internal] "Backend_tock_proof_create_async_done" ;
             proof )
