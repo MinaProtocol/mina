@@ -1517,11 +1517,11 @@ module Messages = struct
       [@@deriving hlist]
     end
 
-    let dummy ~lookups_per_row_4 ~runtime_tables z =
+    let dummy z =
       { aggreg = z
       ; sorted = Vector.init Lookup_sorted_minus_1.n ~f:(fun _ -> z)
-      ; sorted_5th_column = Option.some_if lookups_per_row_4 z
-      ; runtime = Option.some_if runtime_tables z
+      ; sorted_5th_column = None
+      ; runtime = None
       }
 
     let typ bool_typ e ~lookups_per_row_4 ~runtime_tables ~dummy =
@@ -1537,11 +1537,7 @@ module Messages = struct
     let opt_typ bool_typ ~(uses_lookup : Opt.Flag.t)
         ~(lookups_per_row_4 : Opt.Flag.t) ~(runtime_tables : Opt.Flag.t)
         ~dummy:z elt =
-      Opt.typ bool_typ uses_lookup
-        ~dummy:
-          (dummy z
-             ~lookups_per_row_4:Opt.Flag.(not (equal lookups_per_row_4 No))
-             ~runtime_tables:Opt.Flag.(not (equal runtime_tables No)) )
+      Opt.typ bool_typ uses_lookup ~dummy:(dummy z)
         (typ bool_typ ~lookups_per_row_4 ~runtime_tables ~dummy:z elt)
   end
 
