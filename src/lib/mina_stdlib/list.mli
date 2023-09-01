@@ -7,6 +7,10 @@ module Length : sig
    *)
   val equal : 'a t
 
+  (** [unequal l len] returns [true] if [List.length l <> len], [false] otherwise.
+   *)
+  val unequal : 'a t
+
   (** [gte l len] returns [true] if [List.length l >= len], [false]
     otherwise.
    *)
