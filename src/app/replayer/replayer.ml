@@ -670,7 +670,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             let%bind max_slot =
               query_db ~f:(fun db -> Sql.Block.get_max_slot db ())
             in
-            [%log info] "Maximum global slot since genesis in blocks is %Ldd"
+            [%log info] "Maximum global slot since genesis in blocks is %Ld"
               max_slot ;
             try_slot ~logger pool max_slot
       in
@@ -918,11 +918,12 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       let%bind max_canonical_slot =
         query_db ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
       in
-      let%bind genesis_snarked_ledger_hash_str =
-        query_db ~f:(fun db -> Sql.Block.genesis_snarked_ledger db ())
-      in
-      let genesis_snarked_ledger_hash =
-        Frozen_ledger_hash.of_base58_check_exn genesis_snarked_ledger_hash_str
+      let%bind genesis_snarked_ledger_hash =
+        let%map hash_str =
+          query_db ~f:(fun db ->
+              Sql.Block.genesis_snarked_ledger db input.start_slot_since_genesis )
+        in
+        Frozen_ledger_hash.of_base58_check_exn hash_str
       in
       let incr_checkpoint_target () =
         Option.iter !checkpoint_target ~f:(fun target ->

@@ -160,7 +160,7 @@ module Node = struct
     Out_channel.with_file data_file ~f:(fun out_ch ->
         Out_channel.output_string out_ch data )
 
-  let run_replayer ~logger (t : t) =
+  let run_replayer ?(start_slot_since_genesis = 0) ~logger (t : t) =
     [%log info] "Running replayer on archived data (node: %s, container: %s)"
       (List.hd_exn t.pod_ids) mina_archive_container_id ;
     let open Malleable_error.Let_syntax in
@@ -170,8 +170,9 @@ module Node = struct
     in
     let replayer_input =
       sprintf
-        {| { "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }} |}
-        accounts
+        {| { "start_slot_since_genesis": %d,
+             "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }} |}
+        start_slot_since_genesis accounts
     in
     let dest = "replayer-input.json" in
     let%bind _res =
