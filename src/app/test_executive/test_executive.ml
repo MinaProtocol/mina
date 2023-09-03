@@ -400,29 +400,33 @@ let main inputs =
         in
         [%log trace] "initializing network abstraction" ;
         let%bind () = Engine.Network.initialize_infra ~logger network in
-        [%log info] "starting the daemons within the pods" ;
-        let start_print (node : Engine.Network.Node.t) =
-          let open Malleable_error.Let_syntax in
-          [%log info] "starting %s..." (Engine.Network.Node.id node) ;
-          let%bind res = Engine.Network.Node.start ~fresh_state:false node in
-          [%log info] "%s started" (Engine.Network.Node.id node) ;
-          Malleable_error.return res
-        in
-        let seed_nodes =
-          network |> Engine.Network.seeds |> Core.String.Map.data
-        in
-        let non_seed_pods =
-          network |> Engine.Network.all_non_seed_pods |> Core.String.Map.data
-        in
-        (* TODO: parallelize (requires accumlative hard errors) *)
-        let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
-        let%bind () =
-          Dsl.(wait_for dsl @@ Wait_condition.nodes_to_initialize seed_nodes)
-        in
-        let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
-        [%log info] "daemons started" ;
-        [%log trace] "executing test" ;
-        T.run network dsl )
+        if String.equal test_name "mock" then (
+          [%log info] "No node interactions in mock network" ;
+          return () )
+        else (
+          [%log info] "starting the daemons within the pods" ;
+          let start_print (node : Engine.Network.Node.t) =
+            let open Malleable_error.Let_syntax in
+            [%log info] "starting %s..." (Engine.Network.Node.id node) ;
+            let%bind res = Engine.Network.Node.start ~fresh_state:false node in
+            [%log info] "%s started" (Engine.Network.Node.id node) ;
+            Malleable_error.return res
+          in
+          let seed_nodes =
+            network |> Engine.Network.seeds |> Core.String.Map.data
+          in
+          let non_seed_pods =
+            network |> Engine.Network.all_non_seed_pods |> Core.String.Map.data
+          in
+          (* TODO: parallelize (requires accumlative hard errors) *)
+          let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
+          let%bind () =
+            Dsl.(wait_for dsl @@ Wait_condition.nodes_to_initialize seed_nodes)
+          in
+          let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
+          [%log info] "daemons started" ;
+          [%log trace] "executing test" ;
+          T.run network dsl ) )
   in
   let exit_reason, test_result =
     match monitor_test_result with
