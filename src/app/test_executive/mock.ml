@@ -22,7 +22,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               let i_str = Int.to_string i in
               test_account ("sender-account-" ^ i_str) "10000" )
     ; block_producers =
-        [ bp "receiver" !Network.mina_image
+        [ bp "receiver" "another-docker-image"
         ; bp "empty_node-1" ~account_name:"empty-bp-key" !Network.mina_image
         ; bp "empty_node-2" ~account_name:"empty-bp-key" !Network.mina_image
         ; bp "empty_node-3" ~account_name:"empty-bp-key" !Network.mina_image
@@ -44,6 +44,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.small
         }
+    ; seed_nodes =
+        [ { node_name = "seed-0"
+          ; account_name = "seed-0-key"
+          ; docker_image = "seed-docker-image"
+          }
+        ]
+    ; snark_workers =
+        [ { node_name = "snark-0"
+          ; account_name = "snark-0-key"
+          ; docker_image = "snark-docker-image"
+          }
+        ]
+    ; archive_nodes =
+        [ { node_name = "archive-0"
+          ; account_name = "archive-0-key"
+          ; docker_image = "archive-docker-image"
+          }
+        ]
     }
 
   let run _network _t = Malleable_error.return ()

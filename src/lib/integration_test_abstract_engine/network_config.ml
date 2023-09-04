@@ -10,7 +10,12 @@ module Cli_inputs = Cli_inputs
 let keypairs_path = ref ""
 
 type block_producer_config =
-  { name : string; keypair : Network_keypair.t; libp2p_secret : string }
+  { name : string
+  ; keypair : Network_keypair.t
+  ; libp2p_secret : string
+  ; libp2p_keypair : Yojson.Safe.t
+  ; libp2p_peerid : string
+  }
 [@@deriving to_yojson]
 
 type snark_coordinator_config =
@@ -35,6 +40,8 @@ type config =
   ; mina_archive_schema_aux_files : string list
   ; snark_coordinator_config : snark_coordinator_config option
   ; snark_worker_fee : string
+  ; topology : Yojson.Safe.t
+        [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
   }
 [@@deriving to_yojson]
 
@@ -71,7 +78,8 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ; slots_per_epoch
       ; slots_per_sub_window
       ; txpool_max_size
-      ; _
+      ; seed_nodes
+      ; snark_workers
       } =
     test_config
   in
@@ -102,8 +110,14 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
   (* ACCOUNTS AND KEYPAIRS *)
   let before = Time.now () in
   let num_keypairs = List.length genesis_ledger in
-  let network_keypairs, private_keys, _libp2p_keypairs, _libp2p_peerids =
-    Util.pull_keypairs !keypairs_path (List.length genesis_ledger)
+  let network_keypairs, private_keys, libp2p_keypairs, libp2p_peerids =
+    let max_num_nodes =
+      List.length archive_nodes
+      + List.length block_producers
+      + List.length seed_nodes + List.length snark_workers + 1
+    in
+    Util.pull_keypairs !keypairs_path
+      (List.length genesis_ledger + max_num_nodes)
   in
   [%log trace] "Pulled %d keypairs from %s in %s" num_keypairs !keypairs_path
     Time.(abs_diff before @@ now () |> Span.to_string) ;
@@ -154,13 +168,18 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
           tl
   in
   let genesis_ledger_accounts =
+    let num_genesis_accounts = List.length genesis_ledger in
     let network_keypairs =
       List.mapi network_keypairs ~f:(fun n kp ->
-          { kp with
-            keypair_name = (List.nth_exn genesis_ledger n).account_name
-          } )
+          if n < num_genesis_accounts then
+            { kp with
+              keypair_name = (List.nth_exn genesis_ledger n).account_name
+            }
+          else kp )
     in
-    let keypairs = List.zip_exn network_keypairs private_keys in
+    let keypairs =
+      List.(take (zip_exn network_keypairs private_keys) num_genesis_accounts)
+    in
     add_accounts labeled_accounts (List.zip_exn genesis_ledger keypairs)
   in
   (* DAEMON CONFIG *)
@@ -213,32 +232,33 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
     { constraints = constraint_constants; genesis = genesis_constants }
   in
   (* BLOCK PRODUCER CONFIG *)
-  let block_producer_config name keypair =
-    { name; keypair; libp2p_secret = "" }
+  let block_producer_config n name =
+    { name
+    ; keypair = List.nth_exn network_keypairs n
+    ; libp2p_secret = ""
+    ; libp2p_keypair = List.nth_exn libp2p_keypairs n
+    ; libp2p_peerid = List.nth_exn libp2p_peerids n
+    }
   in
   let block_producer_configs =
     List.mapi block_producers ~f:(fun n node ->
-        let _ =
-          match String.Map.find genesis_ledger_accounts node.account_name with
-          | Some acct ->
-              acct
-          | None ->
-              let failstring =
-                Format.sprintf
-                  "Failing because the account key of all initial block \
-                   producers must be in the genesis ledger.  name of Node: \
-                   %s.  name of Account which does not exist: %s"
-                  node.node_name node.account_name
-              in
-              failwith failstring
-        in
-        block_producer_config node.node_name @@ List.nth_exn network_keypairs n )
+        if
+          Option.is_none
+          @@ String.Map.find genesis_ledger_accounts node.account_name
+        then
+          failwith
+          @@ Format.sprintf
+               "Failing because the account key of all initial block producers \
+                must be in the genesis ledger.  name of Node: %s.  name of \
+                Account which does not exist: %s"
+               node.node_name node.account_name ;
+        block_producer_config n node.node_name )
   in
   let mina_archive_schema = "create_schema.sql" in
   let long_commit_id =
     let open String in
     let id = Mina_version.commit_id in
-    if prefix id 7 = "[DIRTY]" then suffix id (length id - 7) else id
+    if prefix id 7 = "[DIRTY]" then drop_prefix id 7 else id
   in
   let mina_archive_base_url =
     "https://raw.githubusercontent.com/MinaProtocol/mina/" ^ long_commit_id
@@ -303,5 +323,10 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ; mina_archive_schema_aux_files
       ; snark_coordinator_config
       ; snark_worker_fee
+      ; topology =
+          Test_config.(
+            topology_of_test_config test_config private_keys libp2p_keypairs
+              libp2p_peerids
+            |> Topology.to_yojson)
       }
   }

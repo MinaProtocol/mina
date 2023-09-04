@@ -89,6 +89,7 @@ module Test_values = struct
     let mina_archive_schema_aux_files = [] in
     let snark_coordinator_config = None in
     let snark_worker_fee = "0.01" in
+    let topology = `Assoc [] in
     { network_id
     ; config_dir
     ; deploy_graphql_ingress
@@ -105,6 +106,7 @@ module Test_values = struct
     ; mina_archive_schema_aux_files
     ; snark_coordinator_config
     ; snark_worker_fee
+    ; topology
     }
 end
 
@@ -319,7 +321,8 @@ module Request_tests = struct
             "mina_archive_schema": "schema",
             "mina_archive_schema_aux_files": [],
             "snark_coordinator_config": null,
-            "snark_worker_fee": "0.01"
+            "snark_worker_fee": "0.01",
+            "topology": "{}"
           }
         }
       |}

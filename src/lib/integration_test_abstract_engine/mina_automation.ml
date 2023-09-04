@@ -25,40 +25,42 @@ module Network_manager = struct
   let run_cmd_or_hard_error t prog args =
     Util.run_cmd_or_hard_error t.testnet_dir prog args
 
-  let create ~logger (network_config : Network_config.t)
-      (test_config : Test_config.t) =
+  let create ~logger (network_config : Network_config.t) _test_config =
     let open Malleable_error.Let_syntax in
+    let testnet_dir =
+      network_config.config.config_dir ^/ "/testnets"
+      ^/ network_config.config.network_id
+    in
     let%bind () =
-      if network_config.debug_arg then
+      if Stdlib.Sys.file_exists testnet_dir then
         Deferred.bind ~f:Malleable_error.return
-          (Util.prompt_continue
-             "Existing namespace of same name detected, pausing startup. Enter \
-              [y/Y] to continue on and remove existing namespace, start clean, \
-              and run the test; press Ctrl-C to quit out: " )
+          (Deferred.map
+             (Util.prompt_continue
+                "Existing namespace of same name detected, pausing startup. \
+                 Enter [y/Y] to continue on and remove existing namespace, \
+                 start clean, and run the test; press Ctrl-C to quit out: " )
+             ~f:(fun () ->
+               let rec rmrf path =
+                 let open Stdlib in
+                 match Sys.is_directory path with
+                 | true ->
+                     Sys.readdir path
+                     |> Array.iter (fun name ->
+                            rmrf (Filename.concat path name) ) ;
+                     Core.Unix.rmdir path
+                 | false ->
+                     Sys.remove path
+               in
+               [%log info] "Deleting old testnet dir %s" testnet_dir ;
+               rmrf testnet_dir ) )
       else Malleable_error.return ()
     in
     (* TODO: prebuild genesis proof and ledger and cache for future use *)
     let testnet_log_filter = Network_config.testnet_log_filter network_config in
     (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
     (* seed node keyname and workload name hardcoded as "seed" *)
-    let testnet_dir =
-      network_config.config.config_dir ^/ "/testnets"
-      ^/ network_config.config.network_id
-    in
-    let open Deferred.Let_syntax in
-    [%log info] "Making testnet dir %s" testnet_dir ;
-    let rec rmrf path =
-      let open Stdlib in
-      match Sys.is_directory path with
-      | true ->
-          Sys.readdir path
-          |> Array.iter (fun name -> rmrf (Filename.concat path name)) ;
-          Core.Unix.rmdir path
-      | false ->
-          Sys.remove path
-    in
-    if Stdlib.Sys.file_exists testnet_dir then rmrf testnet_dir ;
-    let () = mkdir_p testnet_dir in
+    [%log info] "Making new testnet dir %s" testnet_dir ;
+    mkdir_p testnet_dir ;
     let network_config_filename = testnet_dir ^/ "network_config.json" in
     let runtime_config_filename = testnet_dir ^/ "runtime_config.json" in
     let topology_filename = testnet_dir ^/ "topology.json" in
@@ -82,15 +84,13 @@ module Network_manager = struct
     [%log info] "Writing runtime configuration to %s" runtime_config_filename ;
     Out_channel.with_file ~fail_if_exists:true runtime_config_filename
       ~f:(fun ch ->
-        Test_config.runtime_config_of_test_config test_config
-        |> Result.ok_or_failwith |> Runtime_config.Ledger.to_yojson
-        |> Yojson.Safe.to_channel ch ) ;
+        network_config.config.runtime_config |> Yojson.Safe.to_channel ch ) ;
     [%log info] "Writing topology to %s" topology_filename ;
     Out_channel.with_file ~fail_if_exists:true topology_filename ~f:(fun ch ->
-        Test_config.topology_of_test_config test_config
-        |> Yojson.Safe.to_channel ch ) ;
+        network_config.config.topology |> Yojson.Safe.to_channel ch ) ;
     [%log info] "Writing out the genesis keys to testnet dir %s" testnet_dir ;
     let kps_base_path = testnet_dir ^ "/genesis_keys" in
+    let open Deferred.Let_syntax in
     let%bind () = Unix.mkdir kps_base_path in
     let%bind () =
       Core.String.Map.iter network_config.genesis_keypairs ~f:(fun kp ->
