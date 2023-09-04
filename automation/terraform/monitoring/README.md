@@ -20,7 +20,7 @@
 
 #### Developing alert expressions
 
-Developing alert expressions consists of using Prometheus's domain-specific [query language](https://prometheus.io/docs/prometheus/latest/querying/basics/) ([examples](https://prometheus.io/docs/prometheus/latest/querying/examples/)) coupled with its alert rules specification [format](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) for devising metric and alerting conditions/rules.
+You can develop alert expressions for devising metric and alerting conditions and rules. Use the Prometheus domain-specific [query language](https://prometheus.io/docs/prometheus/latest/querying/basics/) ([examples](https://prometheus.io/docs/prometheus/latest/querying/examples/)) and follow the alert rules specification [format](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/).
 
 To enable variability when defining these rules, implement each rule set or group by using the *terraform* [template_file](https://registry.terraform.io/providers/hashicorp/template/latest/docs/data-sources/file) and `(${ ... })` templating mechanisms for including variable substitution where appropriate. (**Note:** Variable substitutions are *optional* and provided as defaults. You can completely define alert rules according to a custom specification).
 
