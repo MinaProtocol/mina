@@ -29,13 +29,9 @@ let pull_keypairs path num_keypairs =
     Quickcheck.Generator.(of_list int_list |> list_with_length num_keypairs)
     |> Quickcheck.random_value
   in
-  let normalize_path path =
-    if String.(suffix path 1 = "/") then String.drop_suffix path 1 else path
-  in
   (* network keypairs + private keys *)
-  let keypairs_path = normalize_path path in
   let base_filename n =
-    sprintf "%s/network-keypairs/sender-account-%d.json" keypairs_path n
+    path ^/ sprintf "network-keypairs/sender-account-%d.json" n
   in
   let read_sk n = In_channel.read_all (base_filename n ^ ".sk") in
   let read_keypair n =
@@ -52,10 +48,12 @@ let pull_keypairs path num_keypairs =
   in
   (* libp2p keypairs *)
   let libp2p_base_filename n =
-    sprintf "%s/libp2p-keypairs/libp2p-keypair-%d.json" keypairs_path n
+    path ^/ sprintf "libp2p-keypairs/libp2p-keypair-%d.json" n
   in
   let read_peerid n =
-    In_channel.read_all (libp2p_base_filename n ^ ".peerid")
+    let raw = In_channel.read_all (libp2p_base_filename n ^ ".peerid") in
+    let open String in
+    if suffix raw 1 = "\n" then drop_suffix raw 1 else raw
   in
   let read_libp2p n = Yojson.Safe.from_file (libp2p_base_filename n) in
   ( List.map random_nums ~f:read_keypair

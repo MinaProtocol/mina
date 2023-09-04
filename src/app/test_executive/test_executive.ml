@@ -76,7 +76,7 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
     if
       not
         ( Array.exists keypairs_ls ~f:(String.equal "network-keypairs")
-        && (Stdlib.Sys.is_directory @@ keypairs_path ^ "/network-keypairs") )
+        && (Stdlib.Sys.is_directory @@ keypairs_path ^/ "network-keypairs") )
     then (
       [%log fatal]
         "No network-keypairs directory present in %s \n\
@@ -88,7 +88,7 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
     if
       not
         ( Array.exists keypairs_ls ~f:(String.equal "libp2p-keypairs")
-        && (Stdlib.Sys.is_directory @@ keypairs_path ^ "/libp2p-keypairs") )
+        && (Stdlib.Sys.is_directory @@ keypairs_path ^/ "libp2p-keypairs") )
     then (
       [%log fatal]
         "No libp2p-keypairs directory present in %s \n\
@@ -423,7 +423,9 @@ let main inputs =
           let%bind () =
             Dsl.(wait_for dsl @@ Wait_condition.nodes_to_initialize seed_nodes)
           in
-          let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
+          let%bind () =
+            Malleable_error.List.iter non_seed_pods ~f:start_print
+          in
           [%log info] "daemons started" ;
           [%log trace] "executing test" ;
           T.run network dsl ) )

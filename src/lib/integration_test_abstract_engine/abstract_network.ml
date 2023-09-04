@@ -1290,6 +1290,4 @@ let all_node_id t =
   let pods = all_pods t |> Core.Map.to_alist in
   List.fold pods ~init:[] ~f:(fun acc (_, node) -> node.node_id :: acc)
 
-let initialize_infra ~logger network =
-  [%log trace] "initialize_infra: %s" network.network_id ;
-  Malleable_error.return ()
+let[@warning "-27"] initialize_infra ~logger network = Malleable_error.return ()
