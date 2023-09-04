@@ -24,10 +24,14 @@ let drop_outer_quotes s =
   s
 
 let pull_keypairs path num_keypairs =
-  let int_list = List.range ~stop:`inclusive 1 10_000 in
   let random_nums =
-    Quickcheck.Generator.(of_list int_list |> list_with_length num_keypairs)
-    |> Quickcheck.random_value
+    let random =
+      Random.State.make_self_init () |> Splittable_random.State.create
+    in
+    let open Quickcheck.Generator in
+    of_list (List.range ~stop:`inclusive 1 10_000)
+    |> list_with_length num_keypairs
+    |> generate ~size:num_keypairs ~random
   in
   (* network keypairs + private keys *)
   let base_filename n =

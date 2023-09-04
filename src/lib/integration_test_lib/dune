@@ -22,6 +22,7 @@
    stdio
    extlib
    sexp_diff_kernel
+   splittable_random
    ;; local libraries
    key_gen
    visualization
