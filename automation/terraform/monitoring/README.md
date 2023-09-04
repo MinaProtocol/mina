@@ -22,7 +22,7 @@
 
 Developing alert expressions consists of using Prometheus's domain-specific [query language](https://prometheus.io/docs/prometheus/latest/querying/basics/) ([examples](https://prometheus.io/docs/prometheus/latest/querying/examples/)) coupled with its alert rules specification [format](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) for devising metric and alerting conditions/rules.
 
-To enable variability when defining these rules, each rule set or group is implemented using *terraform*'s [template_file](https://registry.terraform.io/providers/hashicorp/template/latest/docs/data-sources/file) and `(${ ... })` templating mechanisms for including variable substitution where appropriate. (**Note:** variable substitutions are *optional* and provided as defaults. You can completely define alert rules according to a custom specification).
+To enable variability when defining these rules, implement each rule set or group by using the *terraform* [template_file](https://registry.terraform.io/providers/hashicorp/template/latest/docs/data-sources/file) and `(${ ... })` templating mechanisms for including variable substitution where appropriate. (**Note:** Variable substitutions are *optional* and provided as defaults. You can completely define alert rules according to a custom specification).
 
 A standard set of such testnet alert rules based on templates is defined [here](https://github.com/MinaProtocol/mina/blob/develop/automation/terraform/modules/testnet-alerts/templates/testnet-alert-rules.yml.tpl#L6) and must be edited when you add rules to be applied to all testnets.
 
