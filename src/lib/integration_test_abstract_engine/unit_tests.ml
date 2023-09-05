@@ -83,6 +83,7 @@ module Test_values = struct
     let mina_archive_image = "archive" in
     let runtime_config = `Null in
     let block_producer_configs = [] in
+    let seed_node_configs = [] in
     let log_precomputed_blocks = false in
     let archive_node_count = 0 in
     let mina_archive_schema = "schema" in
@@ -100,6 +101,7 @@ module Test_values = struct
     ; mina_archive_image
     ; runtime_config
     ; block_producer_configs
+    ; seed_node_configs
     ; log_precomputed_blocks
     ; archive_node_count
     ; mina_archive_schema
@@ -316,6 +318,7 @@ module Request_tests = struct
             "mina_archive_image": "archive",
             "runtime_config": "null",
             "block_producer_configs": [],
+            "seed_node_configs": [],
             "log_precomputed_blocks": false,
             "archive_node_count": 0,
             "mina_archive_schema": "schema",

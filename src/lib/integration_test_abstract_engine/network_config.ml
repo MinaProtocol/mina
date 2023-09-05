@@ -12,7 +12,15 @@ let keypairs_path = ref ""
 type block_producer_config =
   { name : string
   ; keypair : Network_keypair.t
-  ; libp2p_secret : string
+  ; libp2p_pass : string
+  ; libp2p_keypair : Yojson.Safe.t
+  ; libp2p_peerid : string
+  }
+[@@deriving to_yojson]
+
+type seed_node_config =
+  { name : string
+  ; libp2p_pass : string
   ; libp2p_keypair : Yojson.Safe.t
   ; libp2p_peerid : string
   }
@@ -34,6 +42,7 @@ type config =
   ; runtime_config : Yojson.Safe.t
         [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
   ; block_producer_configs : block_producer_config list
+  ; seed_node_configs : seed_node_config list
   ; log_precomputed_blocks : bool
   ; archive_node_count : int
   ; mina_archive_schema : string
@@ -121,6 +130,10 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
   in
   [%log trace] "Pulled %d keypairs from %s in %s" num_keypairs !keypairs_path
     Time.(abs_diff before @@ now () |> Span.to_string) ;
+  let topology =
+    Test_config.topology_of_test_config test_config private_keys libp2p_keypairs
+      libp2p_peerids
+  in
   let labeled_accounts :
       (Runtime_config.Accounts.single * (Network_keypair.t * Private_key.t))
       String.Map.t =
@@ -232,17 +245,25 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
     { constraints = constraint_constants; genesis = genesis_constants }
   in
   (* BLOCK PRODUCER CONFIG *)
-  let block_producer_config n name =
-    let keypair = List.nth_exn network_keypairs n in
-    { name
-    ; keypair = { keypair with keypair_name = name }
-    ; libp2p_secret = ""
-    ; libp2p_keypair = List.nth_exn libp2p_keypairs n
-    ; libp2p_peerid = List.nth_exn libp2p_peerids n
+  let block_producer_config (node : Test_config.Block_producer_node.t) =
+    let _, (keypair, _) =
+      Core.String.Map.find_exn genesis_ledger_accounts node.account_name
+    in
+    let node_info =
+      List.find_exn topology ~f:(fun (name, _) ->
+          String.equal name node.node_name )
+      |> snd
+    in
+    { name = node.node_name
+    ; keypair = { keypair with keypair_name = node.node_name }
+    ; libp2p_pass = "naughty blue worm"
+    ; libp2p_keypair = node_info.libp2p_keypair
+    ; libp2p_peerid =
+        Yojson.Safe.to_string node_info.libp2p_peerid |> Util.drop_outer_quotes
     }
   in
   let block_producer_configs =
-    List.mapi block_producers ~f:(fun n node ->
+    List.map block_producers ~f:(fun node ->
         if
           Option.is_none
           @@ String.Map.find genesis_ledger_accounts node.account_name
@@ -253,7 +274,22 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
                 must be in the genesis ledger.  name of Node: %s.  name of \
                 Account which does not exist: %s"
                node.node_name node.account_name ;
-        block_producer_config n node.node_name )
+        block_producer_config node )
+  in
+  let seed_node_configs =
+    List.map seed_nodes ~f:(fun node ->
+        let node_info =
+          List.find_exn topology ~f:(fun (name, _) ->
+              String.equal name node.node_name )
+          |> snd
+        in
+        { name = node.node_name
+        ; libp2p_pass = "naughty blue worm"
+        ; libp2p_keypair = node_info.libp2p_keypair
+        ; libp2p_peerid =
+            Yojson.Safe.to_string node_info.libp2p_peerid
+            |> Util.drop_outer_quotes
+        } )
   in
   let mina_archive_schema = "create_schema.sql" in
   let long_commit_id =
@@ -318,16 +354,13 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ; mina_archive_image = images.archive_node
       ; runtime_config = Runtime_config.to_yojson runtime_config
       ; block_producer_configs
+      ; seed_node_configs
       ; log_precomputed_blocks
       ; archive_node_count = List.length archive_nodes
       ; mina_archive_schema
       ; mina_archive_schema_aux_files
       ; snark_coordinator_config
       ; snark_worker_fee
-      ; topology =
-          Test_config.(
-            topology_of_test_config test_config private_keys libp2p_keypairs
-              libp2p_peerids
-            |> Topology.to_yojson)
+      ; topology = Test_config.Topology.to_yojson topology
       }
   }
