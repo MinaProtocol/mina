@@ -4662,7 +4662,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; may_use_token = No
               ; authorization_kind = Proof (With_hash.hash vk)
               }
-          ; authorization = Control.Proof Mina_base.Proof.blockchain_dummy
+          ; authorization =
+              Control.Proof (Lazy.force Mina_base.Proof.blockchain_dummy)
           }
       in
       let account_update_digest_with_selected_chain =
