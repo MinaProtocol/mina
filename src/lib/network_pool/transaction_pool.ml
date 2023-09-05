@@ -3015,9 +3015,8 @@ let%test_module _ =
                    ]
                  ~sender:Envelope.Sender.Local )
           with
-          | Error e ->
-              String.is_substring (Error.to_string_hum e)
-                ~substring:"Invalid_proof"
-          | Ok _ ->
+          | Error (Intf.Verification_error.Invalid e) ->
+              String.is_substring (Error.to_string_hum e) ~substring:"proof"
+          | _ ->
               false )
   end )
