@@ -416,10 +416,10 @@ let protocol_state =
       "last_vrf_output": "q4zrn2ZlIeTV8_8XPb3PZu4eQusG0n5ieUNy5gyZAAA=",
       "total_currency": "1014488754000001000",
       "curr_global_slot": {
-        "slot_number": ["Since_hard_fork","2831"],
+        "slot_number": "2831",
         "slots_per_epoch": "7140"
       },
-      "global_slot_since_genesis": ["Since_genesis","2831"],
+      "global_slot_since_genesis": "2831",
       "staking_epoch_data": {
         "ledger": {
           "hash": "jxx14ajKiweveJ7iAxtzTiLfAm3KXj5Y4MMvkbLc2qhi2LYnzLS",
@@ -485,7 +485,7 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "nonce": "0",
-                      "valid_until": ["Since_genesis","4294967295"],
+                      "valid_until": "4294967295",
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
@@ -513,7 +513,7 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qrA2eWb592uRLtH5ohzQnx7WTLYp2jGirCw5M7Fb9gTf1RrvTPqX",
                       "nonce": "0",
-                      "valid_until": ["Since_genesis","4294967295"],
+                      "valid_until": "4294967295",
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
@@ -541,7 +541,7 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
                       "nonce": "0",
-                      "valid_until": ["Since_genesis","4294967295"],
+                      "valid_until": "4294967295",
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
@@ -569,7 +569,7 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qp5sdhH48MurWgtHNkXUTphEmUfcKVmZFspYAqxcKZ7YxaPF1pyF",
                       "nonce": "0",
-                      "valid_until": ["Since_genesis","4294967295"],
+                      "valid_until": "4294967295",
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
@@ -597,7 +597,7 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qqR5XfP9CoC5DALUJX2jBoY6aaoLrN46YpM2NQTSV14qgpoWibL7",
                       "nonce": "0",
-                      "valid_until": ["Since_genesis","4294967295"],
+                      "valid_until": "4294967295",
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
@@ -625,7 +625,7 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qr4GMdg4ZVk1Y6BXaDHxgFRtCsZm2sZiyn7PCmubTZnAi3iZDDxq",
                       "nonce": "0",
-                      "valid_until": ["Since_genesis","4294967295"],
+                      "valid_until": "4294967295",
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
@@ -653,7 +653,7 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qpgjtMzVpodthL3kMfXAAzzv1kgGZRMEeLv592u4hSVQKCzTGLvA",
                       "nonce": "0",
-                      "valid_until": ["Since_genesis","4294967295"],
+                      "valid_until": "4294967295",
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [

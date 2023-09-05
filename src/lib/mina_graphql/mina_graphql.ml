@@ -953,6 +953,14 @@ module Types = struct
             ~resolve:(fun { ctx = mina; _ } () ->
               (Mina_lib.config mina).precomputed_values.constraint_constants
                 .coinbase_amount )
+        ; field "genesisTimestamp" ~typ:(non_null string)
+            ~doc:"The genesis timestamp in ISO 8601 format"
+            ~args:Arg.[]
+            ~resolve:(fun { ctx = mina; _ } () ->
+              (Mina_lib.config mina).precomputed_values.genesis_constants
+                .protocol
+                .genesis_state_timestamp
+              |> Genesis_constants.genesis_timestamp_to_string )
         ] )
 
   module AccountObj = struct

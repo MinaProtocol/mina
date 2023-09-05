@@ -5,6 +5,7 @@ let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineMode = ../../Pipeline/Mode.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Command = ../../Command/Base.dhall
 let RunInToolchain = ../../Command/RunInToolchain.dhall
@@ -43,7 +44,8 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = unitDirtyWhen,
         path = "Test",
-        name = "FuzzyZkappTest"
+        name = "FuzzyZkappTest",
+        mode = PipelineMode.Type.Stable
       },
     steps = [
       buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" 3600 150 Size.Small
