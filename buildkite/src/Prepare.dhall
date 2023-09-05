@@ -20,7 +20,7 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
   steps = [
     Command.build Command.Config::{
       commands = [
-        Cmd.run "export BUILDKITE_PIPELINE_MODE=${env:BUILDKITE_PIPELINE_MODE as Text ? "(./buildkite/src/Pipeline/Mode.dhall).PullRequest"}",
+        Cmd.run "export BUILDKITE_PIPELINE_MODE=${env:BUILDKITE_PIPELINE_MODE as Text ? "PullRequest"}",
         Cmd.run "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall",
         triggerCommand "src/Monorepo.dhall"
       ],
