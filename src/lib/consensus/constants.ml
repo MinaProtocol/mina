@@ -239,9 +239,7 @@ let create' (type a b c)
     | None ->
         slots
     | Some f ->
-        M.( + )
-          (M.constant (Unsigned.UInt32.to_int f.previous_global_slot))
-          slots
+        M.( + ) (M.constant (Unsigned.UInt32.to_int f.genesis_slot)) slots
   in
   let res : (a, b, c) Poly.t =
     { Poly.k = to_length k

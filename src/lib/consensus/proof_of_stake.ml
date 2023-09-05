@@ -2033,10 +2033,10 @@ module Data = struct
         match constraint_constants.fork with
         | None ->
             (Length.zero, Mina_numbers.Global_slot.zero)
-        | Some { previous_length; previous_global_slot; _ } ->
+        | Some { previous_length; genesis_slot; _ } ->
             (*Note: global_slot_since_genesis at fork point is the same as global_slot_since_genesis in the new genesis. This value is used to check transaction validity and existence of locked tokens.
               For reviewers, should this be incremented by 1 because it's technically a new block? we don't really know how many slots passed since the fork point*)
-            (previous_length, previous_global_slot)
+            (previous_length, genesis_slot)
       in
       let default_epoch_data =
         Genesis_epoch_data.Data.
@@ -3625,7 +3625,7 @@ let%test_module "Proof of stake tests" =
       | Some fork ->
           assert (
             Mina_numbers.Global_slot.(
-              equal fork.previous_global_slot
+              equal fork.genesis_slot
                 previous_consensus_state.global_slot_since_genesis) ) ;
           assert (
             Mina_numbers.Length.(
@@ -3701,7 +3701,7 @@ let%test_module "Proof of stake tests" =
           assert (
             Mina_numbers.Global_slot.(
               equal
-                (add fork.previous_global_slot slot_diff)
+                (add fork.genesis_slot slot_diff)
                 next_consensus_state.global_slot_since_genesis) ) ;
           assert (
             Mina_numbers.Length.(
@@ -3806,7 +3806,7 @@ let%test_module "Proof of stake tests" =
                      (`String
                        "3NL3bc213VQEFx6XTLbc3HxHqHH9ANbhHxRxSnBcRzXcKgeFA6TY" ) )
             ; previous_length = Mina_numbers.Length.of_int 100
-            ; previous_global_slot = Mina_numbers.Global_slot.of_int 200
+            ; genesis_slot = Mina_numbers.Global_slot.of_int 200
             }
         in
         { constraint_constants with fork = fork_constants }

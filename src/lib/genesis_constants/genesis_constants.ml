@@ -28,7 +28,7 @@ module Fork_constants = struct
   type t =
     { previous_state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
     ; previous_length : Mina_numbers.Length.Stable.Latest.t
-    ; previous_global_slot : Mina_numbers.Global_slot.Stable.Latest.t
+    ; genesis_slot : Mina_numbers.Global_slot.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 end
@@ -67,13 +67,12 @@ module Constraint_constants = struct
     ; account_creation_fee = Currency.Fee.to_uint64 t.account_creation_fee
     ; fork =
         ( match t.fork with
-        | Some { previous_length; previous_state_hash; previous_global_slot } ->
+        | Some { previous_length; previous_state_hash; genesis_slot } ->
             Some
               { previous_length = Unsigned.UInt32.to_int previous_length
               ; previous_state_hash =
                   Pickles.Backend.Tick.Field.to_string previous_state_hash
-              ; previous_global_slot =
-                  Unsigned.UInt32.to_int previous_global_slot
+              ; genesis_slot = Unsigned.UInt32.to_int genesis_slot
               }
         | None ->
             None )
@@ -171,7 +170,7 @@ module Constraint_constants = struct
           ; previous_state_hash =
               Data_hash_lib.State_hash.of_base58_check_exn
                 fork_previous_state_hash
-          ; previous_global_slot =
+          ; genesis_slot =
               Mina_numbers.Global_slot.of_int fork_previous_global_slot
           }
 
