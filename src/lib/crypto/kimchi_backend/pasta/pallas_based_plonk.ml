@@ -115,10 +115,8 @@ module Proof = Plonk_dlog_proof.Make (struct
           Promise.run_in_thread (fun () ->
               create pk auxiliary_input runtime_tables prev_challenges prev_sgs ) )
 
-    let create (pk : Keypair.t) ~primary ~auxiliary ~prev_chals
-        ~prev_comms =
-      create_aux pk ~primary ~auxiliary ~prev_chals ~prev_comms
-        ~f:create
+    let create (pk : Keypair.t) ~primary ~auxiliary ~prev_chals ~prev_comms =
+      create_aux pk ~primary ~auxiliary ~prev_chals ~prev_comms ~f:create
   end
 
   module Verifier_index = Kimchi_bindings.Protocol.VerifierIndex.Fq

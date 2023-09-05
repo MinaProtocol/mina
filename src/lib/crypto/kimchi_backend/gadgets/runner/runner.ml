@@ -25,8 +25,7 @@ let generate_and_verify_proof ?cs circuit =
           (* Only block_on_async for testing; do not do this in production!! *)
           Promise.block_on_async_exn (fun () ->
               Tick.Proof.create_async ~primary:public_inputs
-                ~auxiliary:auxiliary_inputs ~message:[]
-                prover_index )
+                ~auxiliary:auxiliary_inputs ~message:[] prover_index )
         in
         (proof, next_statement_hashed) )
       ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
