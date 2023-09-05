@@ -50,7 +50,7 @@ val zkapp_account : Field.t State.t
 
 val zkapp_payload : Field.t State.t
 
-val zkapp_body : Field.t State.t
+val zkapp_body : ?chain:Mina_signature_kind.t -> Field.t State.t
 
 val zkapp_precondition : Field.t State.t
 
@@ -59,8 +59,6 @@ val zkapp_precondition_account : Field.t State.t
 val zkapp_precondition_protocol_state : Field.t State.t
 
 val account_update_account_precondition : Field.t State.t
-
-val account_update : Field.t State.t
 
 val account_update_cons : Field.t State.t
 

@@ -526,6 +526,9 @@ module Accounts = struct
       }
     [@@deriving bin_io_unversioned, sexp]
 
+    let of_account : Mina_base.Account.t -> (t, string) Result.t =
+      Json_layout.Accounts.Single.of_account
+
     let to_json_layout : t -> Json_layout.Accounts.Single.t = Fn.id
 
     let of_json_layout : Json_layout.Accounts.Single.t -> (t, string) Result.t =

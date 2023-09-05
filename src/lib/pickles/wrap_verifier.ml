@@ -198,55 +198,99 @@ struct
       -> (Inner_curve.t, (Inner_curve.t, Boolean.var) Plonk_types.Opt.t) index'
       =
     let open Tuple_lib in
-    let map ~f_bool ~f =
-      Plonk_verification_key_evals.Step.map ~f ~f_opt:(function
-        | Plonk_types.Opt.None ->
-            Plonk_types.Opt.None
-        | Plonk_types.Opt.Maybe (b, x) ->
-            Plonk_types.Opt.Maybe (f_bool b, f x)
-        | Plonk_types.Opt.Some x ->
-            Plonk_types.Opt.Some (f x) )
-    in
-    let map2 ~f_bool ~f =
-      Plonk_verification_key_evals.Step.map2 ~f ~f_opt:(fun x y ->
-          match (x, y) with
-          | Plonk_types.Opt.None, Plonk_types.Opt.None ->
-              Plonk_types.Opt.None
-          | Plonk_types.Opt.Some x, Plonk_types.Opt.Some y ->
-              Plonk_types.Opt.Some (f x y)
-          | ( (Plonk_types.Opt.Some _ | Maybe _ | None)
-            , (Plonk_types.Opt.Some _ | Maybe _ | None) ) ->
-              let to_maybe = function
-                | Plonk_types.Opt.None ->
-                    (Boolean.false_, (Field.zero, Field.zero))
-                | Plonk_types.Opt.Maybe (b, x) ->
-                    (b, x)
-                | Plonk_types.Opt.Some x ->
-                    (Boolean.true_, x)
-              in
-              let b1, x1 = to_maybe x in
-              let b2, x2 = to_maybe y in
-              Plonk_types.Opt.Maybe (f_bool b1 b2, f x1 x2) )
-    in
     fun bs keys ->
       let open Field in
       Vector.map2
         (bs :> (Boolean.var, n) Vector.t)
         keys
         ~f:(fun b key ->
-          map key
+          Plonk_verification_key_evals.Step.map key
             ~f:(fun g -> Double.map g ~f:(( * ) (b :> t)))
-            ~f_bool:(fun b_inner -> Boolean.(b &&& b_inner)) )
+            ~f_opt:(function
+              (* Here, we split the 3 variants into 3 separate accumulators. This
+                 allows us to only compute the 'maybe' flag when we need to, and
+                 allows us to fall back to the basically-free `None` when a
+                 feature is entirely unused, or to the less expensive `Some` if
+                 it is used for every circuit.
+                 In particular, it is important that we generate exactly `None`
+                 when none of the optional gates are used, otherwise we will
+                 change the serialization of the protocol circuits.
+              *)
+              | Plonk_types.Opt.None ->
+                  ([], [], [ b ])
+              | Plonk_types.Opt.Maybe (b_x, x) ->
+                  ([], [ (b, b_x, x) ], [])
+              | Plonk_types.Opt.Some x ->
+                  ([ (b, x) ], [], []) ) )
       |> Vector.reduce_exn
            ~f:
-             (map2 ~f:(Double.map2 ~f:( + ))
-                ~f_bool:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
-                  Boolean.Unsafe.of_cvar
-                    Field.(add (b1 :> Field.t) (b2 :> Field.t)) ) )
-      |> map
-           ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
-           ~f_bool:(fun (b : Boolean.var) ->
-             Boolean.Unsafe.of_cvar (Util.seal (module Impl) (b :> t)) )
+             (Plonk_verification_key_evals.Step.map2 ~f:(Double.map2 ~f:( + ))
+                ~f_opt:(fun (yes_1, maybe_1, no_1) (yes_2, maybe_2, no_2) ->
+                  (yes_1 @ yes_2, maybe_1 @ maybe_2, no_1 @ no_2) ) )
+      |> Plonk_verification_key_evals.Step.map ~f:Fn.id ~f_opt:(function
+           | [], [], _nones ->
+               (* We only have `None`s, so we can emit exactly `None` without
+                  further computation.
+               *)
+               Plonk_types.Opt.None
+           | somes, [], [] ->
+               (* Special case: we don't need to compute the 'maybe' bool
+                  because we know statically that all entries are `Some`.
+               *)
+               let sum =
+                 somes
+                 |> List.map ~f:(fun ((b : Boolean.var), g) ->
+                        Double.map g ~f:(( * ) (b :> t)) )
+                 |> List.reduce_exn ~f:(Double.map2 ~f:( + ))
+               in
+               Plonk_types.Opt.Some sum
+           | somes, maybes, nones ->
+               let is_none =
+                 List.reduce nones
+                   ~f:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
+                     Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t)) )
+               in
+               let none_sum =
+                 Option.map is_none ~f:(fun (b : Boolean.var) ->
+                     Double.map Inner_curve.one ~f:(( * ) (b :> t)) )
+               in
+               let some_is_yes, some_sum =
+                 somes
+                 |> List.map ~f:(fun ((b : Boolean.var), g) ->
+                        (b, Double.map g ~f:(( * ) (b :> t))) )
+                 |> List.reduce
+                      ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2)
+                         ->
+                        ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
+                        , Double.map2 ~f:( + ) g1 g2 ) )
+                 |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
+               in
+               let maybe_is_yes, maybe_sum =
+                 maybes
+                 |> List.map
+                      ~f:(fun ((b : Boolean.var), (b_g : Boolean.var), g) ->
+                        ( Boolean.Unsafe.of_cvar Field.(mul (b :> t) (b_g :> t))
+                        , Double.map g ~f:(( * ) (b :> t)) ) )
+                 |> List.reduce
+                      ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2)
+                         ->
+                        ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
+                        , Double.map2 ~f:( + ) g1 g2 ) )
+                 |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
+               in
+               let is_yes =
+                 [| some_is_yes; maybe_is_yes |]
+                 |> Array.filter_map ~f:Fn.id
+                 |> Array.reduce_exn
+                      ~f:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
+                        Boolean.Unsafe.of_cvar ((b1 :> t) + (b2 :> t)) )
+               in
+               let sum =
+                 [| none_sum; maybe_sum; some_sum |]
+                 |> Array.filter_map ~f:Fn.id
+                 |> Array.reduce_exn ~f:(Double.map2 ~f:( + ))
+               in
+               Plonk_types.Opt.Maybe (is_yes, sum) )
 
   (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
@@ -809,182 +853,243 @@ struct
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
         let joint_combiner =
+          let compute_joint_combiner (l : _ Messages.Lookup.In_circuit.t) =
+            let absorb_sorted_1 sponge =
+              let (first :: _) = l.sorted in
+              let z = Array.map first ~f:(fun z -> (Boolean.true_, z)) in
+              absorb sponge Without_degree_bound z
+            in
+            let absorb_sorted_2_to_4 () =
+              let (_ :: rest) = l.sorted in
+              Vector.iter rest ~f:(fun z ->
+                  let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
+                  absorb sponge Without_degree_bound z )
+            in
+            let absorb_sorted_5 () =
+              match l.sorted_5th_column with
+              | None ->
+                  ()
+              | Maybe (b, z) ->
+                  let z = Array.map z ~f:(fun z -> (b, z)) in
+                  absorb sponge Without_degree_bound z
+              | Some z ->
+                  let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
+                  absorb sponge Without_degree_bound z
+            in
+            match[@warning "-4"]
+              (m.lookup_table_comm, m.runtime_tables_selector)
+            with
+            | _ :: Some _ :: _, _ | _, Some _ ->
+                let joint_combiner = sample_scalar () in
+                absorb_sorted_1 sponge ;
+                absorb_sorted_2_to_4 () ;
+                absorb_sorted_5 () ;
+                joint_combiner
+            | _ :: None :: _, None ->
+                absorb_sorted_1 sponge ;
+                absorb_sorted_2_to_4 () ;
+                absorb_sorted_5 () ;
+                { inner = Field.zero }
+            | _ :: Maybe (b1, _) :: _, Maybe (b2, _) ->
+                let b = Boolean.(b1 ||| b2) in
+                let sponge2 = Opt.copy sponge in
+                let joint_combiner_if_true =
+                  let joint_combiner = sample_scalar () in
+                  absorb_sorted_1 sponge ; joint_combiner
+                in
+                let joint_combiner_if_false : Scalar_challenge.t =
+                  absorb_sorted_1 sponge2 ; { inner = Field.zero }
+                in
+                Opt.recombine b ~original_sponge:sponge2 sponge ;
+                absorb_sorted_2_to_4 () ;
+                absorb_sorted_5 () ;
+                { inner =
+                    Field.if_ b ~then_:joint_combiner_if_true.inner
+                      ~else_:joint_combiner_if_false.inner
+                }
+            | _ :: Maybe (b, _) :: _, _ | _, Maybe (b, _) ->
+                let sponge2 = Opt.copy sponge in
+                let joint_combiner_if_true =
+                  let joint_combiner = sample_scalar () in
+                  absorb_sorted_1 sponge ; joint_combiner
+                in
+                let joint_combiner_if_false : Scalar_challenge.t =
+                  absorb_sorted_1 sponge2 ; { inner = Field.zero }
+                in
+                Opt.recombine b ~original_sponge:sponge2 sponge ;
+                absorb_sorted_2_to_4 () ;
+                absorb_sorted_5 () ;
+                { inner =
+                    Field.if_ b ~then_:joint_combiner_if_true.inner
+                      ~else_:joint_combiner_if_false.inner
+                }
+          in
           match messages.lookup with
           | None ->
               Types.Opt.None
-          | Maybe (_, _) ->
-              failwith "TODO"
-          | Some l -> (
-              let absorb_sorted_first_part () =
-                Vector.iter l.sorted ~f:(fun z ->
-                    let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
-                    absorb sponge Without_degree_bound z )
-              in
-              let absorb_sorted_second_part () =
-                match l.sorted_5th_column with
-                | None ->
-                    ()
-                | Maybe (b, z) ->
-                    let z = Array.map z ~f:(fun z -> (b, z)) in
-                    absorb sponge Without_degree_bound z
-                | Some z ->
-                    let z = Array.map z ~f:(fun z -> (Boolean.true_, z)) in
-                    absorb sponge Without_degree_bound z
-              in
-              match[@warning "-4"]
-                (m.lookup_table_comm, m.runtime_tables_selector)
-              with
-              | _ :: Some _ :: _, _ | _, Some _ ->
-                  let joint_combiner = sample_scalar () in
-                  absorb_sorted_first_part () ;
-                  absorb_sorted_second_part () ;
-                  Types.Opt.Some joint_combiner
-              | _ :: None :: _, None ->
-                  absorb_sorted_first_part () ;
-                  absorb_sorted_second_part () ;
-                  Types.Opt.Some { inner = Field.zero }
-              | _ ->
-                  failwith "TODO" )
+          | Maybe (b, l) ->
+              Opt.consume_all_pending sponge ;
+              let sponge2 = Opt.copy sponge in
+              let joint_combiner = compute_joint_combiner l in
+              Opt.consume_all_pending sponge ;
+              Opt.recombine b ~original_sponge:sponge2 sponge ;
+              (* We explicitly set this, because when we squeeze for [beta], we
+                 there will be no pending values *but* we don't want to add a
+                 dedicated permutation.
+              *)
+              sponge.needs_final_permute_if_empty <- false ;
+              Types.Opt.Maybe (b, joint_combiner)
+          | Some l ->
+              Opt.consume_all_pending sponge ;
+              Types.Opt.Some (compute_joint_combiner l)
         in
         let lookup_table_comm =
+          let compute_lookup_table_comm (l : _ Messages.Lookup.In_circuit.t)
+              joint_combiner =
+            let (first_column :: second_column :: rest) =
+              Vector.map
+                ~f:(Types.Opt.map ~f:(fun x -> [| x |]))
+                m.lookup_table_comm
+            in
+            let second_column_with_runtime =
+              match (second_column, l.runtime) with
+              | Types.Opt.None, comm | comm, Types.Opt.None ->
+                  comm
+              | ( Types.Opt.Maybe (has_second_column, second_column)
+                , Types.Opt.Maybe (has_runtime, runtime) ) ->
+                  let second_with_runtime =
+                    let sum =
+                      Array.map2_exn ~f:Inner_curve.( + ) second_column runtime
+                    in
+                    Array.map2_exn second_column sum
+                      ~f:(fun second_column sum ->
+                        Inner_curve.if_ has_runtime ~then_:sum
+                          ~else_:second_column )
+                  in
+                  let res =
+                    Array.map2_exn second_with_runtime runtime
+                      ~f:(fun second_with_runtime runtime ->
+                        Inner_curve.if_ has_second_column
+                          ~then_:second_with_runtime ~else_:runtime )
+                  in
+                  let b = Boolean.(has_second_column ||| has_runtime) in
+                  Types.Opt.Maybe (b, res)
+              | ( Types.Opt.Maybe (has_second_column, second_column)
+                , Types.Opt.Some runtime ) ->
+                  let res =
+                    let sum =
+                      Array.map2_exn ~f:Inner_curve.( + ) second_column runtime
+                    in
+                    Array.map2_exn runtime sum ~f:(fun runtime sum ->
+                        Inner_curve.if_ has_second_column ~then_:sum
+                          ~else_:runtime )
+                  in
+                  Types.Opt.Some res
+              | ( Types.Opt.Some second_column
+                , Types.Opt.Maybe (has_runtime, runtime) ) ->
+                  let res =
+                    let sum =
+                      Array.map2_exn ~f:Inner_curve.( + ) second_column runtime
+                    in
+                    Array.map2_exn second_column sum
+                      ~f:(fun second_column sum ->
+                        Inner_curve.if_ has_runtime ~then_:sum
+                          ~else_:second_column )
+                  in
+                  Types.Opt.Some res
+              | Types.Opt.Some second_column, Types.Opt.Some runtime ->
+                  Types.Opt.Some
+                    (Array.map2_exn ~f:Inner_curve.( + ) second_column runtime)
+            in
+            let rest_rev =
+              Vector.rev (first_column :: second_column_with_runtime :: rest)
+            in
+            let table_ids =
+              Types.Opt.map m.lookup_table_ids ~f:(fun x -> [| x |])
+            in
+            Vector.fold ~init:table_ids rest_rev ~f:(fun acc comm ->
+                match acc with
+                | Types.Opt.None ->
+                    comm
+                | Types.Opt.Maybe (has_acc, acc) -> (
+                    match comm with
+                    | Types.Opt.None ->
+                        Types.Opt.Maybe (has_acc, acc)
+                    | Types.Opt.Maybe (has_comm, comm) ->
+                        let scaled_acc =
+                          Array.map acc ~f:(fun acc ->
+                              Scalar_challenge.endo acc joint_combiner )
+                        in
+                        let sum =
+                          Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
+                        in
+                        let acc_with_comm =
+                          Array.map2_exn sum comm ~f:(fun sum comm ->
+                              Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
+                        in
+                        let res =
+                          Array.map2_exn acc acc_with_comm
+                            ~f:(fun acc acc_with_comm ->
+                              Inner_curve.if_ has_comm ~then_:acc_with_comm
+                                ~else_:acc )
+                        in
+                        let b = Boolean.(has_acc ||| has_comm) in
+                        Types.Opt.Maybe (b, res)
+                    | Types.Opt.Some comm ->
+                        let scaled_acc =
+                          Array.map acc ~f:(fun acc ->
+                              Scalar_challenge.endo acc joint_combiner )
+                        in
+                        let sum =
+                          Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
+                        in
+                        let res =
+                          Array.map2_exn sum comm ~f:(fun sum comm ->
+                              Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
+                        in
+                        Types.Opt.Some res )
+                | Types.Opt.Some acc -> (
+                    match comm with
+                    | Types.Opt.None ->
+                        Types.Opt.Some acc
+                    | Types.Opt.Maybe (has_comm, comm) ->
+                        let scaled_acc =
+                          Array.map acc ~f:(fun acc ->
+                              Scalar_challenge.endo acc joint_combiner )
+                        in
+                        let sum =
+                          Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
+                        in
+                        let res =
+                          Array.map2_exn sum acc ~f:(fun sum acc ->
+                              Inner_curve.if_ has_comm ~then_:sum ~else_:acc )
+                        in
+                        Types.Opt.Some res
+                    | Types.Opt.Some comm ->
+                        let scaled_acc =
+                          Array.map acc ~f:(fun acc ->
+                              Scalar_challenge.endo acc joint_combiner )
+                        in
+                        Types.Opt.Some
+                          (Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm)
+                    ) )
+          in
           match (messages.lookup, joint_combiner) with
           | Types.Opt.None, Types.Opt.None ->
               Types.Opt.None
           | ( Types.Opt.Maybe (b_l, l)
-            , Types.Opt.Maybe (b_joint_combiner, joint_combiner) ) ->
-              ignore ((b_l, l, b_joint_combiner, joint_combiner) : _ * _ * _ * _) ;
-              failwith "TODO"
+            , Types.Opt.Maybe (_b_joint_combiner, joint_combiner) ) -> (
+              (* NB: b_l = _b_joint_combiner by construction *)
+              match compute_lookup_table_comm l joint_combiner with
+              | Types.Opt.None ->
+                  Types.Opt.None
+              | Types.Opt.Maybe (b_lookup_table_comm, lookup_table_comm) ->
+                  Types.Opt.Maybe
+                    (Boolean.(b_l &&& b_lookup_table_comm), lookup_table_comm)
+              | Types.Opt.Some lookup_table_comm ->
+                  Types.Opt.Maybe (b_l, lookup_table_comm) )
           | Types.Opt.Some l, Types.Opt.Some joint_combiner ->
-              let (first_column :: second_column :: rest) =
-                Vector.map
-                  ~f:(Types.Opt.map ~f:(fun x -> [| x |]))
-                  m.lookup_table_comm
-              in
-              let second_column_with_runtime =
-                match (second_column, l.runtime) with
-                | Types.Opt.None, comm | comm, Types.Opt.None ->
-                    comm
-                | ( Types.Opt.Maybe (has_second_column, second_column)
-                  , Types.Opt.Maybe (has_runtime, runtime) ) ->
-                    let second_with_runtime =
-                      let sum =
-                        Array.map2_exn ~f:Inner_curve.( + ) second_column
-                          runtime
-                      in
-                      Array.map2_exn second_column sum
-                        ~f:(fun second_column sum ->
-                          Inner_curve.if_ has_runtime ~then_:sum
-                            ~else_:second_column )
-                    in
-                    let res =
-                      Array.map2_exn second_with_runtime runtime
-                        ~f:(fun second_with_runtime runtime ->
-                          Inner_curve.if_ has_second_column
-                            ~then_:second_with_runtime ~else_:runtime )
-                    in
-                    let b = Boolean.(has_second_column ||| has_runtime) in
-                    Types.Opt.Maybe (b, res)
-                | ( Types.Opt.Maybe (has_second_column, second_column)
-                  , Types.Opt.Some runtime ) ->
-                    let res =
-                      let sum =
-                        Array.map2_exn ~f:Inner_curve.( + ) second_column
-                          runtime
-                      in
-                      Array.map2_exn runtime sum ~f:(fun runtime sum ->
-                          Inner_curve.if_ has_second_column ~then_:sum
-                            ~else_:runtime )
-                    in
-                    Types.Opt.Some res
-                | ( Types.Opt.Some second_column
-                  , Types.Opt.Maybe (has_runtime, runtime) ) ->
-                    let res =
-                      let sum =
-                        Array.map2_exn ~f:Inner_curve.( + ) second_column
-                          runtime
-                      in
-                      Array.map2_exn second_column sum
-                        ~f:(fun second_column sum ->
-                          Inner_curve.if_ has_runtime ~then_:sum
-                            ~else_:second_column )
-                    in
-                    Types.Opt.Some res
-                | Types.Opt.Some second_column, Types.Opt.Some runtime ->
-                    Types.Opt.Some
-                      (Array.map2_exn ~f:Inner_curve.( + ) second_column runtime)
-              in
-              let rest_rev =
-                Vector.rev (first_column :: second_column_with_runtime :: rest)
-              in
-              let table_ids =
-                Types.Opt.map m.lookup_table_ids ~f:(fun x -> [| x |])
-              in
-              Vector.fold ~init:table_ids rest_rev ~f:(fun acc comm ->
-                  match acc with
-                  | Types.Opt.None ->
-                      comm
-                  | Types.Opt.Maybe (has_acc, acc) -> (
-                      match comm with
-                      | Types.Opt.None ->
-                          Types.Opt.Maybe (has_acc, acc)
-                      | Types.Opt.Maybe (has_comm, comm) ->
-                          let scaled_acc =
-                            Array.map acc ~f:(fun acc ->
-                                Scalar_challenge.endo acc joint_combiner )
-                          in
-                          let sum =
-                            Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
-                          in
-                          let acc_with_comm =
-                            Array.map2_exn sum comm ~f:(fun sum comm ->
-                                Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
-                          in
-                          let res =
-                            Array.map2_exn acc acc_with_comm
-                              ~f:(fun acc acc_with_comm ->
-                                Inner_curve.if_ has_comm ~then_:acc_with_comm
-                                  ~else_:acc )
-                          in
-                          let b = Boolean.(has_acc ||| has_comm) in
-                          Types.Opt.Maybe (b, res)
-                      | Types.Opt.Some comm ->
-                          let scaled_acc =
-                            Array.map acc ~f:(fun acc ->
-                                Scalar_challenge.endo acc joint_combiner )
-                          in
-                          let sum =
-                            Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
-                          in
-                          let res =
-                            Array.map2_exn sum comm ~f:(fun sum comm ->
-                                Inner_curve.if_ has_acc ~then_:sum ~else_:comm )
-                          in
-                          Types.Opt.Some res )
-                  | Types.Opt.Some acc -> (
-                      match comm with
-                      | Types.Opt.None ->
-                          Types.Opt.Some acc
-                      | Types.Opt.Maybe (has_comm, comm) ->
-                          let scaled_acc =
-                            Array.map acc ~f:(fun acc ->
-                                Scalar_challenge.endo acc joint_combiner )
-                          in
-                          let sum =
-                            Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm
-                          in
-                          let res =
-                            Array.map2_exn sum acc ~f:(fun sum acc ->
-                                Inner_curve.if_ has_comm ~then_:sum ~else_:acc )
-                          in
-                          Types.Opt.Some res
-                      | Types.Opt.Some comm ->
-                          let scaled_acc =
-                            Array.map acc ~f:(fun acc ->
-                                Scalar_challenge.endo acc joint_combiner )
-                          in
-                          Types.Opt.Some
-                            (Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm)
-                      ) )
+              compute_lookup_table_comm l joint_combiner
           | ( (Types.Opt.None | Maybe _ | Some _)
             , (Types.Opt.None | Maybe _ | Some _) ) ->
               assert false
