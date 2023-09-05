@@ -1565,9 +1565,9 @@ module Body = struct
         ; Authorization_kind.Checked.to_input authorization_kind
         ]
 
-    let digest (t : t) =
+    let digest ?chain (t : t) =
       Random_oracle.Checked.(
-        hash ~init:Hash_prefix.zkapp_body (pack_input (to_input t)))
+        hash ~init:(Hash_prefix.zkapp_body ?chain) (pack_input (to_input t)))
   end
 
   let typ () : (Checked.t, t) Typ.t =
@@ -1638,8 +1638,9 @@ module Body = struct
       ; Authorization_kind.to_input authorization_kind
       ]
 
-  let digest (t : t) =
-    Random_oracle.(hash ~init:Hash_prefix.zkapp_body (pack_input (to_input t)))
+  let digest ?chain (t : t) =
+    Random_oracle.(
+      hash ~init:(Hash_prefix.zkapp_body ?chain) (pack_input (to_input t)))
 
   module Digested = struct
     type t = Random_oracle.Digest.t
@@ -1791,12 +1792,12 @@ module T = struct
   let of_simple (p : Simple.t) : t =
     { body = Body.of_simple p.body; authorization = p.authorization }
 
-  let digest (t : t) = Body.digest t.body
+  let digest ?chain (t : t) = Body.digest ?chain t.body
 
   module Checked = struct
     type t = Body.Checked.t
 
-    let digest (t : t) = Body.Checked.digest t
+    let digest ?chain (t : t) = Body.Checked.digest ?chain t
   end
 end
 

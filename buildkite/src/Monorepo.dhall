@@ -23,7 +23,7 @@ let jobs : List JobSpec.Type =
 let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
   let dirtyWhen = SelectFiles.compile job.dirtyWhen
   let trigger = triggerCommand "src/Jobs/${job.path}/${job.name}.dhall"
-  let pipelineType : PipelineMode = env:BUILDKITE_PIPELINE_MODE ? PipelineMode.PullRequest
+  let pipelineType : PipelineMode.Type = env:BUILDKITE_PIPELINE_MODE ? job.mode
   let pipelineHandlers = {
     PullRequest = ''
       if cat _computed_diff.txt | egrep -q '${dirtyWhen}'; then
