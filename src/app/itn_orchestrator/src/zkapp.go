@@ -9,21 +9,21 @@ import (
 )
 
 type ZkappSubParams struct {
-	ExperimentName    string  `json:"experimentName"`
-	Tps               float64 `json:"tps"`
-	MinTps            float64 `json:"minTps"`
-	DurationInMinutes int     `json:"durationMin"`
-	MaxFee            uint64  `json:"maxFee"`
-	MinFee            uint64  `json:"minFee"`
-	ZkappsToDeploy    int     `json:"zkapps"`
-	NewAccounts       int     `json:"newAccounts"`
-	AccountQueueSize  int     `json:"queueSize"`
-	Gap               int     `json:"gap"`
-	NoPrecondition    bool    `json:"noPrecondition"`
-	MaxCost           bool    `json:"maxCost"`
-	MinBalanceChange  uint64  `json:"minBalanceChange"`
-	MaxBalanceChange  uint64  `json:"maxBalanceChange"`
-	DeploymentFee     uint64  `json:"deploymentFee"`
+	ExperimentName   string  `json:"experimentName"`
+	Tps              float64 `json:"tps"`
+	MinTps           float64 `json:"minTps"`
+	DurationMin      int     `json:"durationMin"`
+	MaxFee           uint64  `json:"maxFee"`
+	MinFee           uint64  `json:"minFee"`
+	ZkappsToDeploy   int     `json:"zkapps"`
+	NewAccounts      int     `json:"newAccounts"`
+	AccountQueueSize int     `json:"queueSize"`
+	Gap              int     `json:"gap"`
+	NoPrecondition   bool    `json:"noPrecondition"`
+	MaxCost          bool    `json:"maxCost"`
+	MinBalanceChange uint64  `json:"minBalanceChange"`
+	MaxBalanceChange uint64  `json:"maxBalanceChange"`
+	DeploymentFee    uint64  `json:"deploymentFee"`
 }
 
 type ZkappCommandParams struct {
@@ -42,7 +42,7 @@ func ZkappKeygenRequirements(params ZkappSubParams) (int, uint64) {
 	initBalance := 1e10 * uint64(params.NewAccounts+1)
 	txCost := params.MaxBalanceChange + params.MaxFee
 	tpsGap := uint64(math.Round(params.Tps * float64(params.Gap)))
-	totalTxs := uint64(math.Ceil(float64(params.DurationInMinutes) * 60 * params.Tps))
+	totalTxs := uint64(math.Ceil(float64(params.DurationMin) * 60 * params.Tps))
 	balance := 3 * ((initBalance+params.DeploymentFee)*tpsGap*3 + txCost*totalTxs)
 	keys := maxParticipants + int(tpsGap)*2
 	return keys, balance
@@ -51,7 +51,7 @@ func ZkappKeygenRequirements(params ZkappSubParams) (int, uint64) {
 func scheduleZkappCommandsDo(config Config, params ZkappCommandParams, nodeAddress NodeAddress, batchIx int, tps float64, zkappsToDeploy, accountQueueSize int, feePayers []itn_json_types.MinaPrivateKey) (string, error) {
 	paymentInput := ZkappCommandsDetails{
 		MemoPrefix:        fmt.Sprintf("%s-%d", params.ExperimentName, batchIx),
-		DurationMin:       params.DurationInMinutes,
+		DurationMin:       params.DurationMin,
 		Tps:               tps,
 		NumZkappsToDeploy: zkappsToDeploy,
 		NumNewAccounts:    params.NewAccounts,
