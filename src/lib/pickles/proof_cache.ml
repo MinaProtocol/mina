@@ -36,7 +36,7 @@ let to_yojson t =
    decode what we encode, and reporting an error when the format differs from
    what we expect.
 
-   Note that, since this is a cache, it should always be possible to rejenerate
+   Note that, since this is a cache, it should always be possible to regenerate
    proofs for the cache by starting with the empty cache and calling
    [to_yojson] on the result.
 *)
