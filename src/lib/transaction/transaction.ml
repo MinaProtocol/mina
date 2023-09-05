@@ -152,20 +152,21 @@ let check_well_formedness ~genesis_constants (t : t) =
       Ok ()
 
 let yojson_summary_of_command =
-  let mk_record type_ memo hash =
+  let mk_record type_ memo signature =
     `List
       [ `String type_
-      ; `String (Transaction_hash.to_base58_check hash)
+      ; `String (Signature.to_base58_check signature)
       ; `String (Signed_command_memo.to_string_hum memo)
       ]
   in
   function
-  | User_command.Zkapp_command cmd as ucmd ->
+  | User_command.Zkapp_command cmd ->
       mk_record "zkapp" (Zkapp_command.memo cmd)
-        (Transaction_hash.hash_command ucmd)
-  | Signed_command cmd as ucmd ->
+        ( Zkapp_command.fee_payer_account_update cmd
+        |> Account_update.Fee_payer.authorization )
+  | Signed_command cmd ->
       mk_record "payment" (Signed_command.memo cmd)
-        (Transaction_hash.hash_command ucmd)
+        (Signed_command.signature cmd)
 
 let yojson_summary = function
   | Command cmd ->
