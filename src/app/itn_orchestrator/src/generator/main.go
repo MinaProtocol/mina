@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	lib "itn_orchestrator"
@@ -44,7 +45,7 @@ func sampleStopRatio(minRatio, maxRatio float64) float64 {
 
 type Params struct {
 	BaseTps, StressTps, SenderRatio, ZkappRatio, NewAccountRatio float64
-	RedeployRatio, MinStopRatio, MaxStopRatio                    float64
+	StopCleanRatio, MinStopRatio, MaxStopRatio                   float64
 	RoundDurationMin, PauseMin, Rounds, StopsPerRound, Gap       int
 	SendFromNonBpsOnly, StopOnlyBps, UseRestartScript, MaxCost   bool
 	ExperimentName, PasswordEnv, FundKeyPrefix                   string
@@ -55,6 +56,8 @@ type Params struct {
 	RotationKeys, RotationServers                                []string
 	RotationPermutation                                          bool
 	RotationRatio                                                float64
+	MixMaxCostTpsRatio                                           float64
+	LargePauseEveryNRounds, LargePauseMin                        int
 }
 
 type Command struct {
@@ -103,11 +106,19 @@ type ZkappRefParams struct {
 }
 
 func zkapps(feePayersRef int, nodesRef int, nodesName string, params lib.ZkappSubParams) Command {
-	return Command{Action: lib.ZkappCommandsAction{}.Name(), Params: ZkappRefParams{
+	cmd := Command{Action: lib.ZkappCommandsAction{}.Name(), Params: ZkappRefParams{
 		ZkappSubParams: params,
 		FeePayers:      lib.LocalComplexValue(feePayersRef, "key"),
 		Nodes:          lib.LocalComplexValue(nodesRef, nodesName),
 	}}
+	maxCostStr := ""
+	if params.MaxCost {
+		maxCostStr = "max-cost "
+	}
+	comment := fmt.Sprintf("Scheduling %d %szkapp transactions to be sent over period of %d minutes (%.2f txs/min)",
+		int(params.Tps*float64(params.DurationMin)*60), maxCostStr, params.DurationMin, params.Tps*60,
+	)
+	return withComment(comment, cmd)
 }
 
 type PaymentRefParams struct {
@@ -117,10 +128,20 @@ type PaymentRefParams struct {
 }
 
 func payments(feePayersRef int, nodesRef int, nodesName string, params lib.PaymentSubParams) Command {
-	return Command{Action: lib.PaymentsAction{}.Name(), Params: PaymentRefParams{
+	cmd := Command{Action: lib.PaymentsAction{}.Name(), Params: PaymentRefParams{
 		PaymentSubParams: params,
 		FeePayers:        lib.LocalComplexValue(feePayersRef, "key"),
 		Nodes:            lib.LocalComplexValue(nodesRef, nodesName),
+	}}
+	comment := fmt.Sprintf("Scheduling %d payments to be sent over period of %d minutes (%.2f txs/min)",
+		int(params.Tps*float64(params.DurationMin)*60), params.DurationMin, params.Tps*60,
+	)
+	return withComment(comment, cmd)
+}
+
+func waitMin(min int) Command {
+	return Command{Action: lib.WaitAction{}.Name(), Params: lib.WaitParams{
+		Minutes: min,
 	}}
 }
 
@@ -135,7 +156,7 @@ type RestartRefParams struct {
 	Clean bool             `json:"clean,omitempty"`
 }
 
-func restart(useRestartScript bool, nodesRef int, nodesName string, clean bool) Command {
+func stopDaemon(useRestartScript bool, nodesRef int, nodesName string, clean bool) Command {
 	var name string
 	if useRestartScript {
 		name = lib.RestartAction{}.Name()
@@ -177,28 +198,59 @@ func withComment(comment string, cmd Command) Command {
 	return cmd
 }
 
+func formatDur(min, sec int) string {
+	sec += min * 60
+	min = sec / 60
+	sec %= 60
+	hour := min / 60
+	min %= 60
+	day := hour / 24
+	hour %= 24
+	parts := []string{}
+	if day > 0 {
+		parts = append(parts, strconv.Itoa(day), "days")
+	}
+	if hour > 0 {
+		parts = append(parts, strconv.Itoa(hour), "hours")
+	}
+	if min > 0 {
+		parts = append(parts, strconv.Itoa(min), "mins")
+	}
+	if sec > 0 {
+		parts = append(parts, strconv.Itoa(sec), "secs")
+	}
+	return strings.Join(parts, " ")
+}
+
 func (p *Params) Generate(round int) GeneratedRound {
 	zkappsKeysDir := fmt.Sprintf("%s/round-%d/zkapps", p.FundKeyPrefix, round)
 	paymentsKeysDir := fmt.Sprintf("%s/round-%d/payments", p.FundKeyPrefix, round)
 	tps := sampleTps(p.BaseTps, p.StressTps)
+	maxCost := p.MaxCost
+	zkappRatio := p.ZkappRatio
+	if p.MixMaxCostTpsRatio > 1e-3 && (round&1) == 1 {
+		maxCost = true
+		zkappRatio = 1
+		tps *= p.MixMaxCostTpsRatio
+	}
 	experimentName := fmt.Sprintf("%s-%d", p.ExperimentName, round)
-	onlyZkapps := math.Abs(1-p.ZkappRatio) < 1e-3
-	onlyPayments := p.ZkappRatio < 1e-3
-	zkappTps := tps * p.ZkappRatio
+	onlyZkapps := math.Abs(1-zkappRatio) < 1e-3
+	onlyPayments := zkappRatio < 1e-3
+	zkappTps := tps * zkappRatio
 	newAccounts := int(zkappTps * float64(p.RoundDurationMin*60-p.Gap*4) * p.NewAccountRatio)
 	zkappParams := lib.ZkappSubParams{
-		ExperimentName:    experimentName,
-		Tps:               zkappTps,
-		MinTps:            0.01,
-		DurationInMinutes: p.RoundDurationMin,
-		Gap:               p.Gap,
-		MinBalanceChange:  0,
-		MaxBalanceChange:  1e5,
-		MinFee:            2e9,
-		MaxFee:            4e9,
-		DeploymentFee:     2e9,
-		MaxCost:           p.MaxCost,
-		NewAccounts:       newAccounts,
+		ExperimentName:   experimentName,
+		Tps:              zkappTps,
+		MinTps:           0.01,
+		DurationMin:      p.RoundDurationMin,
+		Gap:              p.Gap,
+		MinBalanceChange: 0,
+		MaxBalanceChange: 1e5,
+		MinFee:           2e9,
+		MaxFee:           4e9,
+		DeploymentFee:    2e9,
+		MaxCost:          maxCost,
+		NewAccounts:      newAccounts,
 	}
 	paymentParams := lib.PaymentSubParams{
 		ExperimentName: experimentName,
@@ -211,7 +263,7 @@ func (p *Params) Generate(round int) GeneratedRound {
 		Receiver:       p.PaymentReceiver,
 	}
 	cmds := []Command{}
-	roundStartMin := round * (p.RoundDurationMin + p.PauseMin)
+	roundStartMin := round*(p.RoundDurationMin+p.PauseMin) + round/p.LargePauseEveryNRounds*p.LargePauseMin
 	if len(p.RotationKeys) > 0 {
 		var mapping []int
 		nKeys := len(p.RotationKeys)
@@ -231,7 +283,7 @@ func (p *Params) Generate(round int) GeneratedRound {
 			PasswordEnv: p.PasswordEnv,
 		}))
 	}
-	cmds = append(cmds, withComment(fmt.Sprintf("Starting round %d, %d min since start", round, roundStartMin), discovery(lib.DiscoveryParams{
+	cmds = append(cmds, withComment(fmt.Sprintf("Starting round %d, %s since start", round, formatDur(roundStartMin, 0)), discovery(lib.DiscoveryParams{
 		OffsetMin:        15,
 		NoBlockProducers: p.SendFromNonBpsOnly,
 	})))
@@ -265,7 +317,7 @@ func (p *Params) Generate(round int) GeneratedRound {
 	stopRatio := sampleStopRatio(p.MinStopRatio, p.MaxStopRatio)
 	elapsed := 0
 	for _, waitSec := range stopWaits {
-		cmds = append(cmds, withComment(fmt.Sprintf("Running round %d, %d min %d sec since start, waiting for %d sec", round, roundStartMin+elapsed/60, elapsed%60, waitSec), wait(waitSec)))
+		cmds = append(cmds, withComment(fmt.Sprintf("Running round %d, %s since start, waiting for %s", round, formatDur(roundStartMin, elapsed), formatDur(0, waitSec)), wait(waitSec)))
 		cmds = append(cmds, discovery(lib.DiscoveryParams{
 			OffsetMin:          15,
 			OnlyBlockProducers: p.StopOnlyBps,
@@ -275,25 +327,40 @@ func (p *Params) Generate(round int) GeneratedRound {
 			exceptRefName = "participant"
 		}
 		cmds = append(cmds, except(-1, "participant", sendersCmdId-len(cmds)-1, exceptRefName))
-		redeployRatio := p.RedeployRatio * stopRatio
-		restartRatio := (1 - p.RedeployRatio) * stopRatio
-		if redeployRatio > 1e-6 && restartRatio > 1e-6 {
-			cmds = append(cmds, sample(-1, "group", []float64{redeployRatio, restartRatio}))
-			cmds = append(cmds, restart(p.UseRestartScript, -1, "group1", true))
-			cmds = append(cmds, restart(p.UseRestartScript, -2, "group2", false))
-		} else if redeployRatio > 1e-6 {
-			cmds = append(cmds, sample(-1, "group", []float64{redeployRatio}))
-			cmds = append(cmds, restart(p.UseRestartScript, -1, "group1", true))
-		} else if restartRatio > 1e-6 {
-			cmds = append(cmds, sample(-1, "group", []float64{restartRatio}))
-			cmds = append(cmds, restart(p.UseRestartScript, -1, "group1", false))
+		stopCleanRatio := p.StopCleanRatio * stopRatio
+		stopNoCleanRatio := (1 - p.StopCleanRatio) * stopRatio
+		nodesOrBps := "nodes"
+		if p.StopOnlyBps {
+			nodesOrBps = "block producers"
+		}
+		if stopCleanRatio > 1e-6 && stopNoCleanRatio > 1e-6 {
+			cmds = append(cmds, sample(-1, "group", []float64{stopCleanRatio, stopNoCleanRatio}))
+			comment1 := fmt.Sprintf("Stopping %.1f%% %s with cleaning", stopCleanRatio*100, nodesOrBps)
+			cmds = append(cmds, withComment(comment1, stopDaemon(p.UseRestartScript, -1, "group1", true)))
+			comment2 := fmt.Sprintf("Stopping %.1f%% %s without cleaning", stopNoCleanRatio*100, nodesOrBps)
+			cmds = append(cmds, withComment(comment2, stopDaemon(p.UseRestartScript, -2, "group2", false)))
+		} else if stopCleanRatio > 1e-6 {
+			comment := fmt.Sprintf("Stopping %.1f%% %s with cleaning", stopCleanRatio*100, nodesOrBps)
+			cmds = append(cmds, sample(-1, "group", []float64{stopCleanRatio}))
+			cmds = append(cmds, withComment(comment, stopDaemon(p.UseRestartScript, -1, "group1", true)))
+		} else if stopNoCleanRatio > 1e-6 {
+			comment := fmt.Sprintf("Stopping %.1f%% %s without cleaning", stopNoCleanRatio*100, nodesOrBps)
+			cmds = append(cmds, sample(-1, "group", []float64{stopNoCleanRatio}))
+			cmds = append(cmds, withComment(comment, stopDaemon(p.UseRestartScript, -1, "group1", false)))
 		}
 		elapsed += waitSec
 	}
 	if round < p.Rounds-1 {
-		cmds = append(cmds,
-			withComment(fmt.Sprintf("Waiting for remainder of round %d and pause, %d min %d sec since start", round, roundStartMin+elapsed/60, elapsed%60),
-				wait((p.RoundDurationMin+p.PauseMin)*60-elapsed)))
+		comment1 := fmt.Sprintf("Waiting for remainder of round %d, %s since start", round, formatDur(roundStartMin, elapsed))
+		cmds = append(cmds, withComment(comment1, wait(p.RoundDurationMin*60-elapsed)))
+		if p.PauseMin > 0 {
+			comment2 := fmt.Sprintf("Pause after round %d, %s since start", round, formatDur(roundStartMin+p.RoundDurationMin, 0))
+			cmds = append(cmds, withComment(comment2, waitMin(p.PauseMin)))
+		}
+		if p.LargePauseMin > 0 && (round+1)%p.LargePauseEveryNRounds == 0 {
+			comment3 := fmt.Sprintf("Large pause after round %d, %s since start", round, formatDur(roundStartMin+p.RoundDurationMin+p.PauseMin, 0))
+			cmds = append(cmds, withComment(comment3, waitMin(p.LargePauseMin)))
+		}
 	}
 	fundCmds := []lib.FundParams{}
 	if !onlyPayments {
@@ -332,6 +399,8 @@ func checkRatio(ratio float64, msg string) {
 	}
 }
 
+const mixMaxCostTpsRatioHelp = "when provided, specifies ratio of tps (proportional to total tps) for max cost transactions to be used every other round, zkapps ratio for these rounds is set to 100%"
+
 func main() {
 	var rotateKeys, rotateServers string
 	var mode string
@@ -342,7 +411,7 @@ func main() {
 	flag.Float64Var(&p.MaxStopRatio, "stop-max-ratio", 0.5, "float in range [0..1], maximum ratio of nodes to stop at an interval")
 	flag.Float64Var(&p.SenderRatio, "sender-ratio", 0.5, "float in range [0..1], max proportion of nodes selected for transaction sending")
 	flag.Float64Var(&p.ZkappRatio, "zkapp-ratio", 0.5, "float in range [0..1], ratio of zkapp transactions of all transactions generated")
-	flag.Float64Var(&p.RedeployRatio, "redeploy-ratio", 0.1, "float in range [0..1], ratio of redeploys of all node stops")
+	flag.Float64Var(&p.StopCleanRatio, "stop-clean-ratio", 0.1, "float in range [0..1], ratio of stops with cleaning of all stops")
 	flag.Float64Var(&p.NewAccountRatio, "new-account-ratio", 0, "float in range [0..1], ratio of new accounts, in relation to expected number of zkapp txs")
 	flag.BoolVar(&p.SendFromNonBpsOnly, "send-from-non-bps", false, "send only from non block producers")
 	flag.BoolVar(&p.StopOnlyBps, "stop-only-bps", false, "stop only block producers")
@@ -364,12 +433,24 @@ func main() {
 	flag.StringVar(&rotateServers, "rotate-servers", "", "Comma-separated list of servers for rotation")
 	flag.Float64Var(&p.RotationRatio, "rotate-ratio", 0.3, "Ratio of balance to rotate")
 	flag.BoolVar(&p.RotationPermutation, "rotate-permutation", false, "Whether to generate only permutation mappings for rotation")
+	flag.IntVar(&p.LargePauseMin, "large-pause", 0, "duration of the large pause, minutes")
+	flag.IntVar(&p.LargePauseEveryNRounds, "large-pause-every", 8, "number of rounds in between large pauses")
+	flag.Float64Var(&p.MixMaxCostTpsRatio, "max-cost-mixed", 0, mixMaxCostTpsRatioHelp)
 	flag.Parse()
 	checkRatio(p.SenderRatio, "wrong sender ratio")
 	checkRatio(p.ZkappRatio, "wrong zkapp ratio")
 	checkRatio(p.MinStopRatio, "wrong min stop ratio")
 	checkRatio(p.MaxStopRatio, "wrong max stop ratio")
-	checkRatio(p.RedeployRatio, "wrong redeploy ratio")
+	checkRatio(p.StopCleanRatio, "wrong stop-clean ratio")
+	checkRatio(p.MixMaxCostTpsRatio, "wrong max-cost-mixed ratio")
+	if p.MaxCost && p.MixMaxCostTpsRatio > 1e-3 {
+		fmt.Fprintln(os.Stderr, "both max-cost-mixed and max-cost specified")
+		os.Exit(2)
+	}
+	if p.LargePauseEveryNRounds <= 0 {
+		fmt.Fprintln(os.Stderr, "wrong large-pause-every: should be a positive number")
+		os.Exit(2)
+	}
 	if p.RoundDurationMin*60 < p.Gap*4 {
 		fmt.Fprintln(os.Stderr, "increase round duration: roundDurationMin*60 should be more than gap*4")
 		os.Exit(9)
