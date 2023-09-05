@@ -28,7 +28,7 @@ module Network_manager = struct
   let create ~logger (network_config : Network_config.t) _test_config =
     let open Malleable_error.Let_syntax in
     let testnet_dir =
-      network_config.config.config_dir ^/ "/testnets"
+      network_config.config.config_dir ^/ "testnets"
       ^/ network_config.config.network_id
     in
     let%bind () =
@@ -85,18 +85,43 @@ module Network_manager = struct
     Out_channel.with_file ~fail_if_exists:true runtime_config_filename
       ~f:(fun ch ->
         network_config.config.runtime_config |> Yojson.Safe.to_channel ch ) ;
-    [%log info] "Writing topology to %s" topology_filename ;
+    [%log info] "Writing topology file to %s" topology_filename ;
     Out_channel.with_file ~fail_if_exists:true topology_filename ~f:(fun ch ->
         network_config.config.topology |> Yojson.Safe.to_channel ch ) ;
-    [%log info] "Writing out the genesis keys to testnet dir %s" testnet_dir ;
-    let kps_base_path = testnet_dir ^ "/genesis_keys" in
+    let network_kps_base_path = testnet_dir ^/ "genesis_keys" in
+    let libp2p_kps_base_path = testnet_dir ^/ "libp2p_keys" in
     let open Deferred.Let_syntax in
-    let%bind () = Unix.mkdir kps_base_path in
+    let%bind () = Unix.mkdir network_kps_base_path in
+    let%bind () = Unix.mkdir libp2p_kps_base_path in
+    [%log info] "Writing genesis keypairs to %s" network_kps_base_path ;
     let%bind () =
       Core.String.Map.iter network_config.genesis_keypairs ~f:(fun kp ->
           Network_keypair.to_yojson kp
           |> Yojson.Safe.to_file
-               (sprintf "%s/%s.json" kps_base_path kp.keypair_name) )
+               (sprintf "%s/%s.json" network_kps_base_path kp.keypair_name) )
+      |> Deferred.return
+    in
+    [%log info] "Writing block producer libp2p keypairs to %s"
+      libp2p_kps_base_path ;
+    let%bind () =
+      List.iter network_config.config.block_producer_configs ~f:(fun config ->
+          let keypair_file =
+            sprintf "%s/%s.json" libp2p_kps_base_path config.name
+          in
+          Yojson.Safe.to_file keypair_file config.libp2p_keypair ;
+          Out_channel.write_all (keypair_file ^ ".peerid")
+            ~data:config.libp2p_peerid )
+      |> Deferred.return
+    in
+    [%log info] "Writing seed node libp2p keypairs to %s" libp2p_kps_base_path ;
+    let%bind () =
+      List.iter network_config.config.seed_node_configs ~f:(fun config ->
+          let keypair_file =
+            sprintf "%s/%s.json" libp2p_kps_base_path config.name
+          in
+          Yojson.Safe.to_file keypair_file config.libp2p_keypair ;
+          Out_channel.write_all (keypair_file ^ ".peerid")
+            ~data:config.libp2p_peerid )
       |> Deferred.return
     in
     Malleable_error.return t

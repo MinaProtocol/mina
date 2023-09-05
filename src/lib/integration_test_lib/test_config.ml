@@ -145,6 +145,7 @@ module Topology = struct
     ; sk : string
     ; role : Node_role.t
     ; docker_image : string
+    ; libp2p_pass : string
     ; libp2p_keypair : Yojson.Safe.t
     ; libp2p_peerid : Yojson.Safe.t
     }
@@ -258,6 +259,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
     in
     (pk, sk)
   in
+  let libp2p_pass = "naughty blue worm" in
   let topology_of_block_producer n
       { Block_producer_node.node_name; docker_image; _ } :
       string * Topology.node_info =
@@ -267,6 +269,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
       ; sk
       ; role = Block_producer
       ; docker_image
+      ; libp2p_pass
       ; libp2p_keypair = List.nth_exn libp2p_keypairs n
       ; libp2p_peerid = `String List.(nth_exn libp2p_peerids n)
       } )
@@ -280,6 +283,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
       ; sk
       ; role = Snark_coordinator
       ; docker_image
+      ; libp2p_pass = ""
       ; libp2p_keypair = `Null
       ; libp2p_peerid = `Null
       } )
@@ -300,6 +304,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
       ; sk
       ; role = Archive_node
       ; docker_image
+      ; libp2p_pass = ""
       ; libp2p_keypair = `Null
       ; libp2p_peerid = `Null
       } )
@@ -313,6 +318,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
       ; sk
       ; role = Seed_node
       ; docker_image
+      ; libp2p_pass
       ; libp2p_keypair = List.nth_exn libp2p_keypairs n
       ; libp2p_peerid = `String List.(nth_exn libp2p_peerids n)
       } )
@@ -327,6 +333,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
       ; sk
       ; role = Snark_worker
       ; docker_image
+      ; libp2p_pass = ""
       ; libp2p_keypair = `Null
       ; libp2p_peerid = `Null
       } )
