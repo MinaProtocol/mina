@@ -233,8 +233,9 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
   in
   (* BLOCK PRODUCER CONFIG *)
   let block_producer_config n name =
+    let keypair = List.nth_exn network_keypairs n in
     { name
-    ; keypair = List.nth_exn network_keypairs n
+    ; keypair = { keypair with keypair_name = name }
     ; libp2p_secret = ""
     ; libp2p_keypair = List.nth_exn libp2p_keypairs n
     ; libp2p_peerid = List.nth_exn libp2p_peerids n
