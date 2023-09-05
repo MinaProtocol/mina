@@ -38,12 +38,6 @@ end
 val assert_n_bits :
   n:int -> Pasta_bindings.Fp.t Snarky_backendless.Cvar.t -> unit
 
-type field := Step_main_inputs.Impl.Field.t
-
-type snark_field := field Snarky_backendless.Cvar.t
-
-type ('a, 'b) vector := ('a, 'b) Pickles_types.Vector.t
-
 val finalize_other_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)
   -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
@@ -64,7 +58,6 @@ val finalize_other_proof :
        Composition_types.Opt.t
      , ( Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Import.Scalar_challenge.t
-         Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
        , Step_main_inputs.Impl.Boolean.var )
        Composition_types.Opt.t
      , ( Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
@@ -153,9 +146,6 @@ val verify :
        Pickles_types.Plonk_types.Opt.t
      , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
          Composition_types.Scalar_challenge.t
-         Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-         .Lookup
-         .t
        , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Snarky_backendless.Snark_intf.Boolean0.t )
        Pickles_types.Plonk_types.Opt.t

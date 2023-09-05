@@ -9,7 +9,11 @@ use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
 use groupmap::GroupMap;
-use kimchi::prover_index::ProverIndex;
+use kimchi::verifier::verify;
+use kimchi::{
+    circuits::lookup::runtime_tables::{caml::CamlRuntimeTable, RuntimeTable},
+    prover_index::ProverIndex,
+};
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use kimchi::{
     proof::{
@@ -36,6 +40,7 @@ type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>;
 pub fn caml_pasta_fp_plonk_proof_create(
     index: CamlPastaFpPlonkIndexPtr<'static>,
     witness: Vec<CamlFpVector>,
+    runtime_tables: Vec<CamlRuntimeTable<CamlFp>>,
     prev_challenges: Vec<CamlFp>,
     prev_sgs: Vec<CamlGVesta>,
 ) -> Result<CamlProverProof<CamlGVesta, CamlFp>, ocaml::Error> {
@@ -71,6 +76,8 @@ pub fn caml_pasta_fp_plonk_proof_create(
         .try_into()
         .map_err(|_| ocaml::Error::Message("the witness should be a column of 15 vectors"))?;
     let index: &ProverIndex<Vesta> = &index.as_ref().0;
+    let runtime_tables: Vec<RuntimeTable<Fp>> =
+        runtime_tables.into_iter().map(Into::into).collect();
 
     // public input
     let public_input = witness[0][0..index.cs.public].to_vec();
@@ -86,7 +93,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
         let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
             &group_map,
             witness,
-            &[],
+            &runtime_tables,
             index,
             prev,
             None,
@@ -98,9 +105,82 @@ pub fn caml_pasta_fp_plonk_proof_create(
 
 #[ocaml_gen::func]
 #[ocaml::func]
+pub fn caml_pasta_fp_plonk_proof_create_and_verify(
+    index: CamlPastaFpPlonkIndexPtr<'static>,
+    witness: Vec<CamlFpVector>,
+    runtime_tables: Vec<CamlRuntimeTable<CamlFp>>,
+    prev_challenges: Vec<CamlFp>,
+    prev_sgs: Vec<CamlGVesta>,
+) -> Result<CamlProverProof<CamlGVesta, CamlFp>, ocaml::Error> {
+    {
+        let ptr: &mut poly_commitment::srs::SRS<Vesta> =
+            unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
+        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+    }
+    let prev = if prev_challenges.is_empty() {
+        Vec::new()
+    } else {
+        let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
+        prev_sgs
+            .into_iter()
+            .map(Into::<Vesta>::into)
+            .enumerate()
+            .map(|(i, sg)| {
+                let chals = prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
+                    .iter()
+                    .map(Into::<Fp>::into)
+                    .collect();
+                let comm = PolyComm::<Vesta> {
+                    unshifted: vec![sg],
+                    shifted: None,
+                };
+                RecursionChallenge { chals, comm }
+            })
+            .collect()
+    };
+
+    let witness: Vec<Vec<_>> = witness.iter().map(|x| (*x.0).clone()).collect();
+    let witness: [Vec<_>; COLUMNS] = witness
+        .try_into()
+        .map_err(|_| ocaml::Error::Message("the witness should be a column of 15 vectors"))?;
+    let index: &ProverIndex<Vesta> = &index.as_ref().0;
+    let runtime_tables: Vec<RuntimeTable<Fp>> =
+        runtime_tables.into_iter().map(Into::into).collect();
+
+    // public input
+    let public_input = witness[0][0..index.cs.public].to_vec();
+
+    // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
+    // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
+    // to doing this instead.
+    let runtime = unsafe { ocaml::Runtime::recover_handle() };
+
+    // Release the runtime lock so that other threads can run using it while we generate the proof.
+    runtime.releasing_runtime(|| {
+        let group_map = GroupMap::<Fq>::setup();
+        let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+            &group_map,
+            witness,
+            &runtime_tables,
+            index,
+            prev,
+            None,
+        )
+        .map_err(|e| ocaml::Error::Error(e.into()))?;
+
+        let verifier_index = index.verifier_index();
+
+        // Verify proof
+        verify::<Vesta, EFqSponge, EFrSponge>(&group_map, &verifier_index, &proof, &public_input)?;
+
+        Ok((proof, public_input).into())
+    })
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     srs: CamlFpSrs,
-    indexed: bool,
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlFp,
@@ -110,7 +190,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     use kimchi::circuits::{
         constraints::ConstraintSystem,
         gate::{CircuitGate, GateType},
-        lookup::runtime_tables::{RuntimeTable, RuntimeTableCfg, RuntimeTableSpec},
+        lookup::runtime_tables::{RuntimeTable, RuntimeTableCfg},
         polynomial::COLUMNS,
         wires::Wire,
     };
@@ -121,16 +201,9 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 
     let mut runtime_tables_setup = vec![];
     for table_id in 0..num_tables {
-        let cfg = if indexed {
-            RuntimeTableCfg::Indexed(RuntimeTableSpec {
-                id: table_id as i32,
-                len: 5,
-            })
-        } else {
-            RuntimeTableCfg::Custom {
-                id: table_id as i32,
-                first_column: [8u32, 9, 8, 7, 1].into_iter().map(Into::into).collect(),
-            }
+        let cfg = RuntimeTableCfg {
+            id: table_id,
+            first_column: [8u32, 9, 8, 7, 1].into_iter().map(Into::into).collect(),
         };
         runtime_tables_setup.push(cfg);
     }
@@ -168,7 +241,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
             // create queries into our runtime lookup table
             let lookup_cols = &mut lookup_cols[1..];
             for chunk in lookup_cols.chunks_mut(2) {
-                chunk[0][row] = if indexed { 1u32.into() } else { 9u32.into() }; // index
+                chunk[0][row] = 9u32.into(); // index
                 chunk[1][row] = 2u32.into(); // value
             }
         }
