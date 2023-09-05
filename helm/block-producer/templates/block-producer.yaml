@@ -27,12 +27,12 @@ spec:
       {{ include "sideCar.podAttrs" (dict "resources" $.Values.resources "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
       initContainers:
       {{ if $.Values.itn.enable }}
-      - name: download-config
-        image: curlimages/curl
-        command: ['sh', '-c', 'curl -o /itn-daemon-config/daemon.json http://65.21.195.80:3333/daemon.json']
-        volumeMounts:
-          - name: itn-daemon-config
-            mountPath: /itn-daemon-config
+      # - name: download-config
+      #   image: curlimages/curl
+      #   command: ['sh', '-c', 'curl -o /itn-daemon-config/daemon.json http://65.21.195.80:3333/daemon.json']
+      #   volumeMounts:
+      #     - name: itn-daemon-config
+      #       mountPath: /itn-daemon-config
       - name: fix-uptime-key-perms
         image: busybox
         command:
@@ -280,7 +280,7 @@ spec:
           "-uptime-url", "http://65.21.195.80:6000/v1/submit",
           "-node-status-url", "https://node-stats-viable-systems.minaprotocol.tools/submit",
           "-node-error-url", "https://node-error-viable-systems.minaprotocol.tools/submit",
-          "-config-file", "/itn-daemon-config/daemon.json",
+          # "-config-file", "/itn-daemon-config/daemon.json",
           {{- end }}
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
