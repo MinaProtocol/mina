@@ -306,6 +306,8 @@ module Plonk_constraint = struct
           ; bound_crumb7 : 'v
           ; (* Coefficients *) two_to_rot : 'f (* Rotation scalar 2^rot *)
           }
+      | AddFixedLookupTable of { id : int32; data : 'f array array }
+      | AddRuntimeTableCfg of { id : int32; first_column : 'f array }
       | Raw of
           { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
     [@@deriving sexp]
@@ -619,6 +621,10 @@ module Plonk_constraint = struct
             ; bound_crumb7 = f bound_crumb7
             ; (* Coefficients *) two_to_rot
             }
+      | AddFixedLookupTable { id; data } ->
+          AddFixedLookupTable { id; data }
+      | AddRuntimeTableCfg { id; first_column } ->
+          AddRuntimeTableCfg { id; first_column }
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
 
@@ -700,6 +706,14 @@ type ('f, 'rust_gates) circuit =
     and a list of gates that corresponds to the circuit.
   *)
 
+type 'f fixed_lookup_tables =
+  | Unfinalized_fixed_lookup_tables_rev of 'f Kimchi_types.lookup_table list
+  | Compiled_fixed_lookup_tables of 'f Kimchi_types.lookup_table array
+
+type 'f runtime_tables_cfg =
+  | Unfinalized_runtime_tables_cfg_rev of 'f Kimchi_types.runtime_table_cfg list
+  | Compiled_runtime_tables_cfg of 'f Kimchi_types.runtime_table_cfg array
+
 (** The constraint system. *)
 type ('f, 'rust_gates) t =
   { (* Map of cells that share the same value (enforced by to the permutation). *)
@@ -713,6 +727,11 @@ type ('f, 'rust_gates) t =
        The finalized tag contains the digest of the circuit.
     *)
     mutable gates : ('f, 'rust_gates) circuit
+        (* The user-provided lookup tables associated with this circuit. *)
+  ; mutable fixed_lookup_tables : 'f fixed_lookup_tables
+        (* The user-provided runtime table configurations associated with this
+            circuit. *)
+  ; mutable runtime_tables_cfg : 'f runtime_tables_cfg
   ; (* The row to use the next time we add a constraint. *)
     mutable next_row : int
   ; (* The size of the public input (which fills the first rows of our constraint system. *)
@@ -749,6 +768,31 @@ let get_prev_challenges sys = sys.prev_challenges
 
 let set_prev_challenges sys challenges =
   Core_kernel.Set_once.set_exn sys.prev_challenges [%here] challenges
+
+let get_concatenated_fixed_lookup_table_size sys =
+  match sys.fixed_lookup_tables with
+  | Unfinalized_fixed_lookup_tables_rev _ ->
+      failwith
+        "Cannot get the fixed lookup tables before finalizing the constraint \
+         system"
+  | Compiled_fixed_lookup_tables flts ->
+      let get_table_size (flt : _ Kimchi_types.lookup_table) =
+        if Array.length flt.data = 0 then 0
+        else Array.length (Array.get flt.data 0)
+      in
+      Array.fold_left (fun acc flt -> acc + get_table_size flt) 0 flts
+
+let get_concatenated_runtime_lookup_table_size sys =
+  match sys.runtime_tables_cfg with
+  | Unfinalized_runtime_tables_cfg_rev _ ->
+      failwith
+        "Cannot get the runtime table configurations before finalizing the \
+         constraint system"
+  | Compiled_runtime_tables_cfg rt_cfgs ->
+      Array.fold_left
+        (fun acc (rt_cfg : _ Kimchi_types.runtime_table_cfg) ->
+          acc + Array.length rt_cfg.first_column )
+        0 rt_cfgs
 
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
 
@@ -789,6 +833,10 @@ module Make
 
   val next_row : t -> int
 
+  val get_concatenated_fixed_lookup_table_size : t -> int
+
+  val get_concatenated_runtime_lookup_table_size : t -> int
+
   val add_constraint :
        ?label:string
     -> t
@@ -801,7 +849,11 @@ module Make
 
   val finalize : t -> unit
 
-  val finalize_and_get_gates : t -> Gates.t
+  val finalize_and_get_gates :
+       t
+    -> Gates.t
+       * Fp.t Kimchi_types.lookup_table array
+       * Fp.t Kimchi_types.runtime_table_cfg array
 
   val num_constraints : t -> int
 
@@ -919,6 +971,8 @@ end = struct
     ; prev_challenges = Set_once.create ()
     ; internal_vars = Internal_var.Table.create ()
     ; gates = Unfinalized_rev [] (* Gates.create () *)
+    ; fixed_lookup_tables = Unfinalized_fixed_lookup_tables_rev []
+    ; runtime_tables_cfg = Unfinalized_runtime_tables_cfg_rev []
     ; rows_rev = []
     ; next_row = 0
     ; equivalence_classes = V.Table.create ()
@@ -953,6 +1007,12 @@ end = struct
   let get_rows_len (sys : t) = get_rows_len sys
 
   let next_row (sys : t) = sys.next_row
+
+  let get_concatenated_fixed_lookup_table_size (sys : t) =
+    get_concatenated_fixed_lookup_table_size sys
+
+  let get_concatenated_runtime_lookup_table_size (sys : t) =
+    get_concatenated_runtime_lookup_table_size sys
 
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
@@ -995,14 +1055,38 @@ end = struct
     *)
   let rec finalize_and_get_gates sys =
     match sys with
-    | { gates = Compiled (_, gates); _ } ->
-        gates
+    | { gates = Compiled (_, gates)
+      ; fixed_lookup_tables = Compiled_fixed_lookup_tables fixed_lookup_tables
+      ; runtime_tables_cfg = Compiled_runtime_tables_cfg runtime_tables_cfg
+      ; _
+      } ->
+        (gates, fixed_lookup_tables, runtime_tables_cfg)
+    (* Finalizing lookup tables and runtime table cfgs first *)
+    | { fixed_lookup_tables =
+          Unfinalized_fixed_lookup_tables_rev fixed_lookup_tables_rev
+      ; _
+      } ->
+        let fixed_lookup_tables = Array.of_list_rev fixed_lookup_tables_rev in
+        sys.fixed_lookup_tables <-
+          Compiled_fixed_lookup_tables fixed_lookup_tables ;
+        finalize_and_get_gates sys
+    | { runtime_tables_cfg =
+          Unfinalized_runtime_tables_cfg_rev runtime_tables_cfg_rev
+      ; _
+      } ->
+        let runtime_tables_cfg = Array.of_list_rev runtime_tables_cfg_rev in
+        sys.runtime_tables_cfg <- Compiled_runtime_tables_cfg runtime_tables_cfg ;
+        finalize_and_get_gates sys
     | { pending_generic_gate = Some (l, r, o, coeffs); _ } ->
         (* Finalize any pending generic constraint first. *)
         add_row sys [| l; r; o |] Generic coeffs ;
         sys.pending_generic_gate <- None ;
         finalize_and_get_gates sys
-    | { gates = Unfinalized_rev gates_rev; _ } ->
+    | { gates = Unfinalized_rev gates_rev
+      ; fixed_lookup_tables = Compiled_fixed_lookup_tables fixed_lookup_tables
+      ; runtime_tables_cfg = Compiled_runtime_tables_cfg runtime_tables_cfg
+      ; _
+      } ->
         let rust_gates = Gates.create () in
 
         (* Create rows for public input. *)
@@ -1075,15 +1159,24 @@ end = struct
         sys.gates <- Compiled (md5_digest, rust_gates) ;
 
         (* return the gates *)
-        rust_gates
+        (rust_gates, fixed_lookup_tables, runtime_tables_cfg)
 
   (** Calls [finalize_and_get_gates] and ignores the result. *)
-  let finalize t = ignore (finalize_and_get_gates t : Gates.t)
+  let finalize t =
+    ignore
+      ( finalize_and_get_gates t
+        : Gates.t
+          * Fp.t Kimchi_types.lookup_table array
+          * Fp.t Kimchi_types.runtime_table_cfg array )
 
-  let num_constraints sys = finalize_and_get_gates sys |> Gates.len
+  let num_constraints sys =
+    let gates, _, _ = finalize_and_get_gates sys in
+    Gates.len gates
 
   let to_json (sys : t) : string =
-    let gates = finalize_and_get_gates sys in
+    (* TODO: add lookup tables and runtime table cfgs *)
+    (* https://github.com/MinaProtocol/mina/issues/13886 *)
+    let gates, _, _ = finalize_and_get_gates sys in
     let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
     Gates.to_json public_input_size gates
 
@@ -2064,9 +2157,9 @@ end = struct
         //! |      5 |      `bound_limb2`  | `shifted_limb2`  |  `excess_limb2` |        `word_limb2`  |
         //! |      6 |      `bound_limb3`  | `shifted_limb3`  |  `excess_limb3` |        `word_limb3`  |
         //! |      7 |      `bound_crumb0` | `shifted_crumb0` | `excess_crumb0` |       `word_crumb0`  |
-        //! |      8 |      `bound_crumb1` | `shifted_crumb1` | `excess_crumb1` |       `word_crumb1`  | 
-        //! |      9 |      `bound_crumb2` | `shifted_crumb2` | `excess_crumb2` |       `word_crumb2`  | 
-        //! |     10 |      `bound_crumb3` | `shifted_crumb3` | `excess_crumb3` |       `word_crumb3`  | 
+        //! |      8 |      `bound_crumb1` | `shifted_crumb1` | `excess_crumb1` |       `word_crumb1`  |
+        //! |      9 |      `bound_crumb2` | `shifted_crumb2` | `excess_crumb2` |       `word_crumb2`  |
+        //! |     10 |      `bound_crumb3` | `shifted_crumb3` | `excess_crumb3` |       `word_crumb3`  |
         //! |     11 |      `bound_crumb4` | `shifted_crumb4` | `excess_crumb4` |       `word_crumb4`  |
         //! |     12 |      `bound_crumb5` | `shifted_crumb5` | `excess_crumb5` |       `word_crumb5`  |
         //! |     13 |      `bound_crumb6` | `shifted_crumb6` | `excess_crumb6` |       `word_crumb6`  |
@@ -2091,6 +2184,28 @@ end = struct
           |]
         in
         add_row sys vars_curr Rot64 [| two_to_rot |]
+    | Plonk_constraint.T (AddFixedLookupTable { id; data }) -> (
+        match sys.fixed_lookup_tables with
+        | Unfinalized_fixed_lookup_tables_rev fixed_lookup_tables ->
+            let lt : Fp.t Kimchi_types.lookup_table list =
+              { id; data } :: fixed_lookup_tables
+            in
+            sys.fixed_lookup_tables <- Unfinalized_fixed_lookup_tables_rev lt
+        | Compiled_fixed_lookup_tables _ ->
+            failwith
+              "Trying to add a fixed lookup tables when it has been already \
+               finalized" )
+    | Plonk_constraint.T (AddRuntimeTableCfg { id; first_column }) -> (
+        match sys.runtime_tables_cfg with
+        | Unfinalized_runtime_tables_cfg_rev runtime_tables_cfg ->
+            let rt_cfg : Fp.t Kimchi_types.runtime_table_cfg list =
+              { id; first_column } :: runtime_tables_cfg
+            in
+            sys.runtime_tables_cfg <- Unfinalized_runtime_tables_cfg_rev rt_cfg
+        | Compiled_runtime_tables_cfg _ ->
+            failwith
+              "Trying to add a runtime table configuration  it has been \
+               already finalized" )
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->

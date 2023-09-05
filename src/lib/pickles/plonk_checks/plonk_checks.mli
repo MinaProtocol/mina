@@ -91,7 +91,7 @@ val scalars_env :
   -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
   -> 't Scalars.Env.t
 
-module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : sig
+module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : sig
   val ft_eval0 :
        't field
     -> domain:< shifts : 't array ; .. >
@@ -118,12 +118,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : s
        , 't
        , 't Shifted_value.t
        , ('t Shifted_value.t, 'b) Pickles_types.Plonk_types.Opt.t
-       , ( 't
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
-         , 'b )
-         Pickles_types.Plonk_types.Opt.t
+       , ('t, 'b) Pickles_types.Plonk_types.Opt.t
        , 'b )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
 
@@ -138,9 +133,6 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : s
          , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
          Pickles_types.Plonk_types.Opt.t
        , ( 't Snarky_backendless.Cvar.t
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
          , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
          Pickles_types.Plonk_types.Opt.t
        , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )

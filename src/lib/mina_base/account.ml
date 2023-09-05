@@ -626,7 +626,7 @@ let empty =
   ; zkapp = None
   }
 
-let empty_digest = digest empty
+let empty_digest = lazy (digest empty)
 
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
