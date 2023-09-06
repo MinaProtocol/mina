@@ -5,10 +5,10 @@
       "name": "create_network",
       "args": {
         "network_id": "string",
-        "runtime_config": "string",
+        "genesis_ledger": "string",
         "topology": "string"
       },
-      "command": "MOCK_NETWORK network create --network-id {{network_id}} --runtime-config {{runtime_config}} --topology {{topology}}"
+      "command": "MOCK_NETWORK network create --network-id {{network_id}} --genesis-ledger {{genesis_ledger}} --topology {{topology}}"
     },
     {
       "name": "start_network",

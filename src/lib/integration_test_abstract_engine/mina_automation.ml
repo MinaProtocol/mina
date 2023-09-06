@@ -14,7 +14,7 @@ module Network_manager = struct
     ; constants : Test_config.constants
     ; mutable deployed : bool
     ; genesis_keypairs : Network_keypair.t Core.String.Map.t
-    ; runtime_config_path : string
+    ; genesis_ledger_path : string
     ; topology_path : string
     }
 
@@ -62,7 +62,7 @@ module Network_manager = struct
     [%log info] "Making new testnet dir %s" testnet_dir ;
     mkdir_p testnet_dir ;
     let network_config_filename = testnet_dir ^/ "network_config.json" in
-    let runtime_config_filename = testnet_dir ^/ "runtime_config.json" in
+    let genesis_ledger_filename = testnet_dir ^/ "genesis_ledger.json" in
     let topology_filename = testnet_dir ^/ "topology.json" in
     let t =
       { logger
@@ -73,7 +73,7 @@ module Network_manager = struct
       ; constants = network_config.constants
       ; deployed = false
       ; genesis_keypairs = network_config.genesis_keypairs
-      ; runtime_config_path = runtime_config_filename
+      ; genesis_ledger_path = genesis_ledger_filename
       ; topology_path = topology_filename
       }
     in
@@ -81,8 +81,8 @@ module Network_manager = struct
     Out_channel.with_file ~fail_if_exists:true network_config_filename
       ~f:(fun ch ->
         Network_config.to_yojson network_config |> Yojson.Safe.to_channel ch ) ;
-    [%log info] "Writing runtime configuration to %s" runtime_config_filename ;
-    Out_channel.with_file ~fail_if_exists:true runtime_config_filename
+    [%log info] "Writing runtime configuration to %s" genesis_ledger_filename ;
+    Out_channel.with_file ~fail_if_exists:true genesis_ledger_filename
       ~f:(fun ch ->
         network_config.config.runtime_config |> Yojson.Safe.to_channel ch ) ;
     [%log info] "Writing topology file to %s" topology_filename ;
@@ -137,7 +137,7 @@ module Network_manager = struct
           ~config:!Abstract_network.config_path
           ~args:
             [ ("network_id", `String t.network_id)
-            ; ("runtime_config", `String t.runtime_config_path)
+            ; ("genesis_ledger", `String t.genesis_ledger_path)
             ; ("topology", `String t.topology_path)
             ]
           "create_network"
