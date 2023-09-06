@@ -252,6 +252,13 @@ func (p *Params) Generate(round int) GeneratedRound {
 		MaxCost:          maxCost,
 		NewAccounts:      newAccounts,
 	}
+	if maxCost {
+		// This can be set to arbitrary value as for max-cost it only
+		// matters that total zkapps deployed is above 5
+		// We need to set it this way to override setting accountQueueSize
+		// by the orchestrator
+		zkappParams.ZkappsToDeploy = 20
+	}
 	paymentParams := lib.PaymentSubParams{
 		ExperimentName: experimentName,
 		Tps:            tps - zkappTps,
