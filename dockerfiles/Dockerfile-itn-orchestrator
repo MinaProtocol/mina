@@ -1,0 +1,38 @@
+ARG image=ubuntu
+FROM ${image}
+
+ARG deb_version
+ARG deb_release=unstable
+ARG deb_codename=bullseye
+ARG network=mainnet
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt-get update --quiet --yes \
+    && apt-get upgrade --quiet --yes \
+    && apt-get install --quiet --yes --no-install-recommends \
+        apt-transport-https \
+        ca-certificates \
+        wget \ 
+        build-essential
+
+WORKDIR /root
+
+# Snapp test transaction package
+RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
+  && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+  && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN wget https://golang.org/dl/go1.20.linux-amd64.tar.gz
+RUN tar -C /usr/local -xf go1.20.linux-amd64.tar.gz
+ENV PATH="${PATH}:/usr/local/go/bin"
+
+COPY . /root/app/
+
+WORKDIR /root/app
+
+RUN make clean orchestrator generator
+
+ENTRYPOINT ["sleep","infinity"]
