@@ -1,4 +1,7 @@
 module SC = Scalar_challenge
+open Core_kernel
+open Async_kernel
+module P = Proof
 open Pickles_types
 open Poly_types
 open Hlist
@@ -16,7 +19,7 @@ module Make
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
 struct
-  let _double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
+  let double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
   module E = struct
     type t = Tock.Field.t array Double.t Plonk_types.Evals.t * Tock.Field.t
@@ -76,15 +79,13 @@ struct
         , (_, prevs_length) Vector.t
         , _
         , (_, Max_proofs_verified.n) Vector.t )
-        Proof.Base.Step.t
+        P.Base.Step.t
       * ret_value
       * auxiliary_value
       * (int, prevs_length) Vector.t )
       Promise.t =
     let logger = Internal_tracing_context_logger.get () in
     [%log internal] "Pickles_step_proof" ;
-    let _ = auxiliary_typ in
-    (* unused *)
     let _, prev_vars_length = branch_data.proofs_verified in
     let T = Length.contr prev_vars_length prevs_length in
     let (module Req) = branch_data.requests in
@@ -106,7 +107,7 @@ struct
         , Tick.Field.t Shifted_value.Type1.t
         , Tick.Field.t Shifted_value.Type1.t option
         , Challenge.Constant.t Scalar_challenge.t
-          Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
           option
         , bool
         , Digest.Constant.t
@@ -118,14 +119,15 @@ struct
         Wrap.Statement.In_circuit.t
     end in
     let challenge_polynomial =
-      Wrap_verifier.challenge_polynomial (module Backend.Tock.Field)
+      let open Backend.Tock.Field in
+      Wrap_verifier.challenge_polynomial ~add ~mul ~one
     in
     let expand_proof :
         type var value local_max_proofs_verified m.
            Impls.Wrap.Verification_key.t
         -> 'a
         -> value
-        -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t
+        -> (local_max_proofs_verified, local_max_proofs_verified) P.t
         -> (var, value, local_max_proofs_verified, m) Tag.t
         -> must_verify:bool
         -> [ `Sg of Tock.Curve.Affine.t ]
@@ -147,8 +149,8 @@ struct
             }
         }
       in
+      let proof = Wrap_wire_proof.to_kimchi_proof t.proof in
       let data = Types_map.lookup_basic tag in
-      let feature_flags = data.feature_flags in
       let plonk0 = t.statement.proof_state.deferred_values.plonk in
       let plonk =
         let domain =
@@ -221,11 +223,12 @@ struct
         time "plonk_checks" (fun () ->
             let module Field = struct
               include Tick.Field
+
+              type nonrec bool = bool
             end in
             Plonk_checks.Type1.derive_plonk
               (module Field)
-              ~feature_flags ~env ~shift:Shifts.tick1 plonk_minimal
-              combined_evals )
+              ~env ~shift:Shifts.tick1 plonk_minimal combined_evals )
       in
       let (module Local_max_proofs_verified) = data.max_proofs_verified in
       let T = Local_max_proofs_verified.eq in
@@ -235,6 +238,12 @@ struct
         Vector.map ~f:Ipa.Wrap.compute_challenges
           statement.proof_state.messages_for_next_wrap_proof
             .old_bulletproof_challenges
+      in
+      let deferred_values_computed =
+        Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
+          ~old_bulletproof_challenges:
+            statement.messages_for_next_step_proof.old_bulletproof_challenges
+          ~proof_state:statement.proof_state
       in
       let prev_statement_with_hashes :
           ( _
@@ -261,32 +270,37 @@ struct
                   statement.messages_for_next_step_proof )
                ~app_state:to_field_elements )
         ; proof_state =
-            { statement.proof_state with
-              deferred_values =
-                { statement.proof_state.deferred_values with
-                  plonk =
-                    { plonk with
-                      zeta = plonk0.zeta
-                    ; alpha = plonk0.alpha
-                    ; beta = plonk0.beta
-                    ; gamma = plonk0.gamma
-                    ; lookup =
-                        Option.map (Opt.to_option_unsafe plonk.lookup)
-                          ~f:(fun _l ->
-                            { Composition_types.Wrap.Proof_state.Deferred_values
-                              .Plonk
-                              .In_circuit
-                              .Lookup
-                              .joint_combiner =
-                                Option.value_exn plonk0.joint_combiner
-                            } )
-                    ; optional_column_scalars =
-                        Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                        .In_circuit
-                        .Optional_column_scalars
-                        .map ~f:Opt.to_option plonk.optional_column_scalars
-                    }
-                }
+            { deferred_values =
+                (let deferred_values = deferred_values_computed in
+                 { plonk =
+                     { plonk with
+                       zeta = plonk0.zeta
+                     ; alpha = plonk0.alpha
+                     ; beta = plonk0.beta
+                     ; gamma = plonk0.gamma
+                     ; lookup =
+                         Option.map (Opt.to_option_unsafe plonk.lookup)
+                           ~f:(fun l ->
+                             { Composition_types.Wrap.Proof_state
+                               .Deferred_values
+                               .Plonk
+                               .In_circuit
+                               .Lookup
+                               .joint_combiner =
+                                 Option.value_exn plonk0.joint_combiner
+                             } )
+                     }
+                 ; combined_inner_product =
+                     deferred_values.combined_inner_product
+                 ; b = deferred_values.b
+                 ; xi = deferred_values.xi
+                 ; bulletproof_challenges =
+                     statement.proof_state.deferred_values
+                       .bulletproof_challenges
+                 ; branch_data = deferred_values.branch_data
+                 } )
+            ; sponge_digest_before_evaluations =
+                statement.proof_state.sponge_digest_before_evaluations
             ; messages_for_next_wrap_proof =
                 Wrap_hack.hash_messages_for_next_wrap_proof
                   Local_max_proofs_verified.n
@@ -316,9 +330,9 @@ struct
                 ; challenges = Vector.to_array chals
                 } )
           |> Wrap_hack.pad_accumulator )
-          public_input t.proof
+          public_input proof
       in
-      let ((x_hat_1, _x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
+      let ((x_hat_1, x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
       let scalar_chal f =
         Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
       in
@@ -382,7 +396,7 @@ struct
       in
       let challenge_polynomial_commitment =
         if not must_verify then Ipa.Wrap.compute_sg new_bulletproof_challenges
-        else t.proof.openings.proof.challenge_polynomial_commitment
+        else proof.openings.proof.challenge_polynomial_commitment
       in
       let witness : _ Per_proof_witness.Constant.No_app_state.t =
         { app_state = ()
@@ -405,8 +419,8 @@ struct
               Local_max_proofs_verified.n Dummy.Ipa.Step.challenges_computed
         ; wrap_proof =
             { opening =
-                { t.proof.openings.proof with challenge_polynomial_commitment }
-            ; messages = t.proof.messages
+                { proof.openings.proof with challenge_polynomial_commitment }
+            ; messages = proof.messages
             }
         }
       in
@@ -420,7 +434,7 @@ struct
       let tock_combined_evals =
         Plonk_checks.evals_of_split_evals
           (module Tock.Field)
-          t.proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
+          proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
           ~zeta:As_field.zeta ~zetaw
         |> Plonk_types.Evals.to_in_circuit
       in
@@ -463,7 +477,7 @@ struct
           tock_plonk_minimal tock_combined_evals
       in
       let combined_inner_product =
-        let e = t.proof.openings.evals in
+        let e = proof.openings.evals in
         let b_polys =
           Vector.map
             ~f:(fun chals ->
@@ -493,18 +507,24 @@ struct
         in
         let open Tock.Field in
         combine ~which_eval:`Fst ~ft_eval:ft_eval0 As_field.zeta
-        + (r * combine ~which_eval:`Snd ~ft_eval:t.proof.openings.ft_eval1 zetaw)
+        + (r * combine ~which_eval:`Snd ~ft_eval:proof.openings.ft_eval1 zetaw)
       in
       let chal = Challenge.Constant.of_tock_field in
       let plonk =
         let module Field = struct
           include Tock.Field
+
+          type nonrec bool = bool
         end in
         (* Wrap proof, no features *)
-        Plonk_checks.Type2.derive_plonk ~feature_flags:Plonk_types.Features.none
+        Plonk_checks.Type2.derive_plonk
           (module Field)
           ~env:tock_env ~shift:Shifts.tock2 tock_plonk_minimal
           tock_combined_evals
+        |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+           .of_wrap
+             ~assert_none:(fun x -> assert (Option.is_none (Opt.to_option x)))
+             ~assert_false:(fun x -> assert (not x))
       in
       let shifted_value =
         Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2
@@ -517,20 +537,6 @@ struct
                 ; alpha = plonk0.alpha
                 ; beta = chal plonk0.beta
                 ; gamma = chal plonk0.gamma
-                ; lookup =
-                    Option.map (Opt.to_option_unsafe plonk.lookup) ~f:(fun _l ->
-                        { Composition_types.Wrap.Proof_state.Deferred_values
-                          .Plonk
-                          .In_circuit
-                          .Lookup
-                          .joint_combiner =
-                            Option.value_exn plonk0.joint_combiner
-                        } )
-                ; optional_column_scalars =
-                    Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                    .In_circuit
-                    .Optional_column_scalars
-                    .map ~f:Opt.to_option plonk.optional_column_scalars
                 }
             ; combined_inner_product = shifted_value combined_inner_product
             ; xi
@@ -563,7 +569,7 @@ struct
           , witnesses'
           , prev_proofs'
           , actual_wrap_domains' ) =
-        let[@warning "-4"] rec go :
+        let rec go :
             type vars values ns ms k.
                (vars, values, ns, ms) H4.T(Tag).t
             -> ( values
@@ -635,14 +641,14 @@ struct
       module type S = sig
         type res
 
-        val f : _ Proof.t -> res
+        val f : _ P.t -> res
       end
     end in
     let extract_from_proofs (type res)
         (module Extract : Extract.S with type res = res) =
       let rec go :
           type vars values ns ms len.
-             (ns, ns) H2.T(Proof).t
+             (ns, ns) H2.T(P).t
           -> (values, vars, ns, ms) H4.T(Tag).t
           -> (vars, len) Length.t
           -> (res, len) Vector.t =
@@ -667,7 +673,7 @@ struct
                  Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
                  Step_bp_vec.t
 
-               let f (T t : _ Proof.t) =
+               let f (T t : _ P.t) =
                  t.statement.proof_state.deferred_values.bulletproof_challenges
              end )
          in
@@ -696,7 +702,7 @@ struct
     in
     let messages_for_next_wrap_proof_padded =
       let rec pad :
-          type n k maxes.
+          type n k maxes pvals lws lhs.
              (Digest.Constant.t, k) Vector.t
           -> maxes H1.T(Nat).t
           -> (maxes, n) Hlist.Length.t
@@ -705,11 +711,11 @@ struct
         match (xs, maxes, l) with
         | [], [], Z ->
             []
-        | _x :: _xs, [], Z ->
+        | x :: xs, [], Z ->
             assert false
         | x :: xs, _ :: ms, S n ->
             x :: pad xs ms n
-        | [], _m :: ms, S n ->
+        | [], m :: ms, S n ->
             let t : _ Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
               { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges =
@@ -779,7 +785,7 @@ struct
              ( module struct
                type res = Tick.Curve.Affine.t
 
-               let f (T t : _ Proof.t) =
+               let f (T t : _ P.t) =
                  t.statement.proof_state.messages_for_next_wrap_proof
                    .challenge_polynomial_commitment
              end )
@@ -794,7 +800,7 @@ struct
                } )
            |> to_list) )
     in
-    let%map.Promise (next_proof : Tick.Proof.t), _next_statement_hashed =
+    let%map.Promise (next_proof : Tick.Proof.t), next_statement_hashed =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n ~feature_flags
@@ -844,15 +850,16 @@ struct
         ( module struct
           type res = E.t
 
-          let f (T t : _ Proof.t) =
-            (t.proof.openings.evals, t.proof.openings.ft_eval1)
+          let f (T t : _ P.t) =
+            let proof = Wrap_wire_proof.to_kimchi_proof t.proof in
+            (proof.openings.evals, proof.openings.ft_eval1)
         end )
     in
     let messages_for_next_wrap_proof =
       let rec go :
-          type a.
-             (a, a) H2.T(Proof).t
-          -> a H1.T(Proof.Base.Messages_for_next_proof_over_same_field.Wrap).t =
+          type a a.
+             (a, a) H2.T(P).t
+          -> a H1.T(P.Base.Messages_for_next_proof_over_same_field.Wrap).t =
         function
         | [] ->
             []
@@ -871,7 +878,7 @@ struct
       }
     in
     [%log internal] "Pickles_step_proof_done" ;
-    ( { Proof.Base.Step.proof = next_proof
+    ( { P.Base.Step.proof = next_proof
       ; statement = next_statement
       ; index = branch_data.index
       ; prev_evals =

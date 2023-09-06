@@ -75,18 +75,21 @@ module Group = struct
 end
 
 module Message = struct
-  module Global_slot = Mina_numbers.Global_slot
+  module Global_slot_since_hard_fork = Mina_numbers.Global_slot_since_hard_fork
 
   type ('global_slot, 'epoch_seed, 'delegator) t =
     { global_slot : 'global_slot; seed : 'epoch_seed; delegator : 'delegator }
   [@@deriving sexp, hlist]
 
   type value =
-    (Global_slot.t, Mina_base.Epoch_seed.t, Mina_base.Account.Index.t) t
+    ( Global_slot_since_hard_fork.t
+    , Mina_base.Epoch_seed.t
+    , Mina_base.Account.Index.t )
+    t
   [@@deriving sexp]
 
   type var =
-    ( Global_slot.Checked.t
+    ( Global_slot_since_hard_fork.Checked.t
     , Mina_base.Epoch_seed.var
     , Mina_base.Account.Index.Unpacked.var )
     t
@@ -97,7 +100,7 @@ module Message = struct
     let open Random_oracle.Input.Chunked in
     Array.reduce_exn ~f:append
       [| field (seed :> Tick.field)
-       ; Global_slot.to_input global_slot
+       ; Global_slot_since_hard_fork.to_input global_slot
        ; Mina_base.Account.Index.to_input
            ~ledger_depth:constraint_constants.ledger_depth delegator
       |]
@@ -105,7 +108,7 @@ module Message = struct
   let typ ~(constraint_constants : Genesis_constants.Constraint_constants.t) :
       (var, value) Tick.Typ.t =
     Tick.Typ.of_hlistable
-      [ Global_slot.typ
+      [ Global_slot_since_hard_fork.typ
       ; Mina_base.Epoch_seed.typ
       ; Mina_base.Account.Index.Unpacked.typ
           ~ledger_depth:constraint_constants.ledger_depth
@@ -123,7 +126,7 @@ module Message = struct
       let open Random_oracle.Input.Chunked in
       Array.reduce_exn ~f:append
         [| field (Mina_base.Epoch_seed.var_to_hash_packed seed)
-         ; Global_slot.Checked.to_input global_slot
+         ; Global_slot_since_hard_fork.Checked.to_input global_slot
          ; Mina_base.Account.Index.Unpacked.to_input delegator
         |]
 
@@ -137,7 +140,7 @@ module Message = struct
 
   let gen ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
     let open Quickcheck.Let_syntax in
-    let%map global_slot = Global_slot.gen
+    let%map global_slot = Global_slot_since_hard_fork.gen
     and seed = Mina_base.Epoch_seed.gen
     and delegator =
       Mina_base.Account.Index.gen
@@ -145,6 +148,8 @@ module Message = struct
     in
     { global_slot; seed; delegator }
 end
+
+module M = Message
 
 (* c is a constant factor on vrf-win likelihood *)
 (* c = 2^0 is production behavior *)
@@ -487,7 +492,10 @@ type evaluation =
   Vrf_lib.Standalone.Evaluation.Poly.t
 
 type context =
-  ( (Unsigned.uint32, Pasta_bindings.Fp.t, int) Message.t
+  ( ( Mina_numbers.Global_slot_since_hard_fork.t
+    , Pasta_bindings.Fp.t
+    , int )
+    Message.t
   , Pasta_bindings.Pallas.t )
   Vrf_lib.Standalone.Context.t
 
@@ -499,7 +507,8 @@ module Layout = struct
   *)
   module Message = struct
     type t =
-      { global_slot : Mina_numbers.Global_slot.t [@key "globalSlot"]
+      { global_slot : Mina_numbers.Global_slot_since_hard_fork.t
+            [@key "globalSlot"]
       ; epoch_seed : Mina_base.Epoch_seed.t [@key "epochSeed"]
       ; delegator_index : int [@key "delegatorIndex"]
       }

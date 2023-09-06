@@ -12,6 +12,8 @@ module Make_ext : functor (M : Monad.S) -> sig
   val concat_map_m : f:('a -> 'b list t) -> 'a list -> 'b list t
 
   val iter_m : f:('a -> unit t) -> 'a list -> unit t
+
+  val sequence : 'a t list -> 'a list t
 end
 
 module Make_ext2 : functor (M : Monad.S2) -> sig
@@ -24,4 +26,6 @@ module Make_ext2 : functor (M : Monad.S2) -> sig
   val concat_map_m : f:('a -> ('b list, 'c) t) -> 'a list -> ('b list, 'c) t
 
   val iter_m : f:('a -> (unit, 'b) t) -> 'a list -> (unit, 'b) t
+
+  val sequence : ('a, 'b) t list -> ('a list, 'b) t
 end

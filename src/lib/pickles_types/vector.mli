@@ -116,6 +116,8 @@ val sexp_of_t :
   -> ('a, 'c) t
   -> Ppx_sexp_conv_lib.Sexp.t
 
+val nth : ('a, 'n) t -> int -> 'a option
+
 (** [zip v1 v2] combines together vectors [v1] and [v2] of length ['b].  *)
 val zip : ('a, 'b) t -> ('c, 'b) t -> ('a * 'c, 'b) t
 
@@ -155,9 +157,6 @@ val length : ('a, 'n) t -> 'n Nat.t
 
 val append :
   ('a, 'n) vec -> ('a, 'm) vec -> ('n, 'm, 'n_m) Nat.Adds.t -> ('a, 'n_m) vec
-
-(** [singleton x] is [x] *)
-val singleton : 'a -> ('a, Nat.z Nat.s) t
 
 val unsingleton : ('a, Nat.z Nat.s) t -> 'a
 

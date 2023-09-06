@@ -103,7 +103,7 @@ end = struct
   let location_of_account_batch _t accts =
     List.map accts ~f:(fun acct -> (acct, None))
 
-  let accounts _t = Account_id.Set.empty
+  let accounts _t = Async.Deferred.return Account_id.Set.empty
 
   let token_owner _t _tid = None
 
@@ -113,13 +113,15 @@ end = struct
 
   let iteri _t ~f:_ = ()
 
-  let fold_until _t ~init ~f:_ ~finish = finish init
+  let fold_until _t ~init ~f:_ ~finish = Async.Deferred.return @@ finish init
 
   let foldi_with_ignored_accounts _t _ ~init ~f:_ = init
 
   let foldi _t ~init ~f:_ = init
 
-  let to_list _t = []
+  let to_list _t = Async.Deferred.return []
+
+  let to_list_sequential _t = []
 
   let make_space_for _t _tot = ()
 

@@ -219,6 +219,7 @@ let setup_daemon logger =
   and log_json = Flag.Log.json
   and log_level = Flag.Log.level
   and file_log_level = Flag.Log.file_log_level
+  and file_log_rotations = Flag.Log.file_log_rotations
   and snark_work_fee =
     flag "--snark-worker-fee" ~aliases:[ "snark-worker-fee" ]
       ~doc:
@@ -476,6 +477,13 @@ let setup_daemon logger =
          for the associated private key that is being tracked by this daemon. \
          You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
+  and uptime_send_node_commit =
+    flag "--uptime-send-node-commit-sha"
+      ~aliases:[ "uptime-send-node-commit-sha" ]
+      ~doc:
+        "true|false Whether to send the commit SHA used to build the node to \
+         the uptime service. (default: false)"
+      no_arg
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -503,18 +511,17 @@ let setup_daemon logger =
             Daemon.daemonize ~allow_threads_to_have_been_created:true
               ~redirect_stdout:`Dev_null ?cd:working_dir
               ~redirect_stderr:`Dev_null () )
-          else ignore (Option.map working_dir ~f:Caml.Sys.chdir)
+          else Option.iter working_dir ~f:Caml.Sys.chdir
         in
         Stdout_log.setup log_json log_level ;
         (* 512MB logrotate max size = 1GB max filesystem usage *)
         let logrotate_max_size = 1024 * 1024 * 10 in
-        let logrotate_num_rotate = 50 in
         Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
           ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina.log" ~max_size:logrotate_max_size
-               ~num_rotate:logrotate_num_rotate ) ;
+               ~num_rotate:file_log_rotations ) ;
         let best_tip_diff_log_size = 1024 * 1024 * 5 in
         Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
           ~processor:(Logger.Processor.raw ())
@@ -534,8 +541,10 @@ let setup_daemon logger =
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
-               ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ;
+               ~max_size:logrotate_max_size ~num_rotate:file_log_rotations ) ;
         (* Consumer for `[%log internal]` logging used for internal tracing *)
+        Itn_logger.set_message_postprocessor
+          Internal_tracing.For_itn_logger.post_process_message ;
         Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
           ~processor:Internal_tracing.For_logger.processor
           ~transport:
@@ -1009,7 +1018,12 @@ let setup_daemon logger =
                 | Sexp.List sexps ->
                     `List (List.map ~f:Error_json.sexp_record_to_yojson sexps)
                 | Sexp.Atom _ ->
-                    failwith "Expeted a sexp list" )
+                    failwith "Expected a sexp list" )
+          in
+          let o1trace context =
+            Execution_context.find_local context O1trace.local_storage_id
+            |> Option.value ~default:[]
+            |> List.map ~f:(fun x -> `String x)
           in
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
@@ -1017,12 +1031,18 @@ let setup_daemon logger =
             ~f:(fun (span, context) ->
               let secs = Time_ns.Span.to_sec span in
               let monitor_infos = get_monitor_infos context.monitor in
+              let o1trace = o1trace context in
+              [%log internal] "Long_async_cycle"
+                ~metadata:
+                  [ ("duration", `Float secs); ("trace", `List o1trace) ] ;
               [%log debug]
                 ~metadata:
                   [ ("long_async_cycle", `Float secs)
                   ; ("monitors", `List monitor_infos)
+                  ; ("o1trace", `List o1trace)
                   ]
-                "Long async cycle, $long_async_cycle seconds, $monitors" ;
+                "Long async cycle, $long_async_cycle seconds, $monitors, \
+                 $o1trace" ;
               Mina_metrics.(
                 Runtime.Long_async_histogram.observe Runtime.long_async_cycle
                   secs) ) ;
@@ -1030,10 +1050,15 @@ let setup_daemon logger =
             ~f:(fun (context, span) ->
               let secs = Time_ns.Span.to_sec span in
               let monitor_infos = get_monitor_infos context.monitor in
+              let o1trace = o1trace context in
+              [%log internal] "Long_async_job"
+                ~metadata:
+                  [ ("duration", `Float secs); ("trace", `List o1trace) ] ;
               [%log debug]
                 ~metadata:
                   [ ("long_async_job", `Float secs)
                   ; ("monitors", `List monitor_infos)
+                  ; ("o1trace", `List o1trace)
                   ; ( "most_recent_2_backtrace"
                     , `String
                         (String.concat ~sep:"␤"
@@ -1042,7 +1067,7 @@ let setup_daemon logger =
                                  (Execution_context.backtrace_history context)
                                  2 ) ) ) )
                   ]
-                "Long async job, $long_async_job seconds" ;
+                "Long async job, $long_async_job seconds, $monitors, $o1trace" ;
               Mina_metrics.(
                 Runtime.Long_job_histogram.observe Runtime.long_async_job secs) ) ;
           let trace_database_initialization typ location =
@@ -1347,8 +1372,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~log_block_creation ~precomputed_values ~start_time
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~stop_time ~node_status_url
-                 ~graphql_control_port:itn_graphql_port () )
+                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
+                 ~node_status_url ~graphql_control_port:itn_graphql_port () )
           in
           { mina
           ; client_trustlist
@@ -1797,29 +1822,24 @@ let mina_commands logger =
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
   ]
 
-[%%if integration_tests]
-
-module type Integration_test = sig
-  val name : string
-
-  val command : Async.Command.t
-end
-
-let mina_commands logger =
-  let open Tests in
-  let group =
-    List.map
-      ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (* (module Coda_shared_state_test)
-             ; (module Coda_transitive_peers_test) *)
-          (module Coda_change_snark_worker_test)
-        ]
-        : (module Integration_test) list )
+let print_version_help coda_exe version =
+  (* mimic Jane Street command help *)
+  let lines =
+    [ "print version information"
+    ; ""
+    ; sprintf "  %s %s" (Filename.basename coda_exe) version
+    ; ""
+    ; "=== flags ==="
+    ; ""
+    ; "  [-help]  print this help text and exit"
+    ; "           (alias: -?)"
+    ]
   in
-  mina_commands logger
-  @ [ ("integration-tests", Command.group ~summary:"Integration tests" group) ]
+  List.iter lines ~f:(Core.printf "%s\n%!")
 
-[%%endif]
+let print_version_info () =
+  Core.printf "Commit %s on branch %s\n" Mina_version.commit_id
+    Mina_version.branch
 
 let () =
   Random.self_init () ;

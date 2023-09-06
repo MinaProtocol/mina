@@ -13,12 +13,16 @@ let account_with_timing account_id balance (timing : Intf.Timing.t) =
       let initial_minimum_balance =
         Currency.Balance.of_nanomina_int_exn t.initial_minimum_balance
       in
-      let cliff_time = Mina_numbers.Global_slot.of_int t.cliff_time in
+      let cliff_time =
+        Mina_numbers.Global_slot_since_genesis.of_int t.cliff_time
+      in
       let cliff_amount = Currency.Amount.of_nanomina_int_exn t.cliff_amount in
       let vesting_increment =
         Currency.Amount.of_nanomina_int_exn t.vesting_increment
       in
-      let vesting_period = Mina_numbers.Global_slot.of_int t.vesting_period in
+      let vesting_period =
+        Mina_numbers.Global_slot_span.of_int t.vesting_period
+      in
       Account.create_timed account_id balance ~initial_minimum_balance
         ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       |> Or_error.ok_exn
@@ -121,11 +125,14 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
       | `Path directory_name ->
           lazy (Ledger.create ~directory_name ~depth (), false)
     in
-    if insert_accounts then
-      List.iter (Lazy.force accounts) ~f:(fun (_, account) ->
-          Ledger.create_new_account_exn ledger
-            (Account.identifier account)
-            account ) ;
+    ( if insert_accounts then
+      let addrs_and_accounts =
+        let ledger_depth = Ledger.depth ledger in
+        Lazy.force accounts
+        |> List.mapi ~f:(fun i (_, acct) ->
+               (Ledger.Addr.of_int_exn ~ledger_depth i, acct) )
+      in
+      Ledger.set_batch_accounts ledger addrs_and_accounts ) ;
     ledger
 
   include Utils

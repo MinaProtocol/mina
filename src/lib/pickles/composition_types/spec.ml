@@ -120,7 +120,7 @@ let rec pack :
             Option.map t_constant_opt ~f:(fun t_const -> t_const.(i))
           in
           pack ~zero ~one p spec t_constant_opt t )
-  | Opt { inner; dummy1; dummy2; flag = _; bool = _ } -> (
+  | Opt { inner; flag; dummy1; dummy2 } -> (
       match t with
       | None ->
           let t_constant_opt = Option.map t_constant_opt ~f:(fun _ -> dummy1) in
@@ -139,7 +139,7 @@ let rec pack :
           Array.append
             (p.pack Bool b_constant_opt b)
             (pack ~zero ~one p inner x_constant_opt x) )
-  | Opt_unflagged { inner; dummy1; dummy2; flag = _ } -> (
+  | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
       match t with
       | None ->
           let t_constant_opt = Option.map t_constant_opt ~f:(fun _ -> dummy1) in
@@ -165,7 +165,7 @@ let rec typ :
     -> (var, value, f) Snarky_backendless.Typ.t =
   let open Snarky_backendless.Typ in
   fun t spec ->
-    match[@warning "-45"] spec with
+    match spec with
     | B spec ->
         t.typ spec
     | Scalar chal ->
@@ -203,7 +203,7 @@ let rec typ :
                  ~back:(fun () -> None)
             |> Snarky_backendless.Typ.transport_var
                  ~there:(function Some _ -> assert false | None -> ())
-                 ~back:(fun _ -> None)
+                 ~back:(fun x -> None)
         | Plonk_types.Opt.Flag.(Yes | Maybe) ->
             typ t inner
             |> Snarky_backendless.Typ.transport
@@ -226,6 +226,10 @@ let rec typ :
         |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
         |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
 
+type 'env exists = T : ('t1, 't2, 'env) T.t -> 'env exists
+
+type generic_spec = { spec : 'env. 'env exists }
+
 module ETyp = struct
   type ('var, 'value, 'f) t =
     | T :
@@ -244,7 +248,7 @@ let rec etyp :
     (f, env) etyp -> (value, var, env) T.t -> (var, value, f) ETyp.t =
   let open Snarky_backendless.Typ in
   fun e spec ->
-    match[@warning "-45"] spec with
+    match spec with
     | B spec ->
         e.etyp spec
     | Scalar chal ->
@@ -295,7 +299,7 @@ let rec etyp :
               ~false_:(f_bool' B.false_) bool flag a
           , f
           , f' )
-    | Opt_unflagged { inner; dummy1; dummy2; flag = _ } ->
+    | Opt_unflagged { inner; flag; dummy1; dummy2 } ->
         let (T (typ, f, f_inv)) = etyp e inner in
         let f x = Some (f x) in
         let f_inv = function None -> f_inv dummy2 | Some x -> f_inv x in
@@ -305,7 +309,7 @@ let rec etyp :
                ~there:(Option.value ~default:dummy1) ~back:(fun x -> Some x)
         in
         T (typ, f, f_inv)
-    | Constant (x, _assert_eq, spec) ->
+    | Constant (x, assert_eq, spec) ->
         let (T (Typ typ, f, f')) = etyp e spec in
         let constant_var =
           let fields, aux = typ.value_to_fields x in

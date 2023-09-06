@@ -433,7 +433,7 @@ struct
           else true
 
     let diff_error_of_indexed_pool_error :
-        Indexed_pool.Command_error.t -> Diff_versioned.Diff_error.t = function
+        Command_error.t -> Diff_versioned.Diff_error.t = function
       | Invalid_nonce _ ->
           Invalid_nonce
       | Insufficient_funds _ ->
@@ -450,7 +450,7 @@ struct
           Expired
 
     let indexed_pool_error_metadata = function
-      | Indexed_pool.Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
+      | Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
           let nonce_json = Account.Nonce.to_yojson in
           [ ( "between"
             , `Assoc [ ("low", nonce_json low); ("hi", nonce_json hi) ] )
@@ -475,9 +475,11 @@ struct
       | Expired
           ( `Valid_until valid_until
           , `Global_slot_since_genesis global_slot_since_genesis ) ->
-          [ ("valid_until", Mina_numbers.Global_slot.to_yojson valid_until)
+          [ ( "valid_until"
+            , Mina_numbers.Global_slot_since_genesis.to_yojson valid_until )
           ; ( "current_global_slot"
-            , Mina_numbers.Global_slot.to_yojson global_slot_since_genesis )
+            , Mina_numbers.Global_slot_since_genesis.to_yojson
+                global_slot_since_genesis )
           ]
 
     let indexed_pool_error_log_info e =
@@ -604,21 +606,15 @@ struct
               Set.union set set' )
         in
         let get_account =
-          let account_state (account : Account.t) =
-            ( account.nonce
-            , Currency.Amount.of_uint64
-              @@ Currency.Balance.to_uint64 account.balance )
-          in
-          let empty_state = (Account.Nonce.zero, Currency.Amount.zero) in
           let existing_account_states_by_id =
             preload_accounts best_tip_ledger accounts_to_check
           in
           fun id ->
             match Map.find existing_account_states_by_id id with
             | Some account ->
-                account_state account
+                account
             | None ->
-                if Set.mem accounts_to_check id then empty_state
+                if Set.mem accounts_to_check id then Account.empty
                 else
                   failwith
                     "did not expect Indexed_pool.revalidate to call \
@@ -762,8 +758,7 @@ struct
       Mina_metrics.(
         Gauge.set Transaction_pool.pool_size
           (Float.of_int (Indexed_pool.size pool))) ;
-      t.pool <- pool ;
-      Deferred.unit
+      t.pool <- pool
 
     let create ~constraint_constants ~consensus_constants ~time_controller
         ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
@@ -823,9 +818,6 @@ struct
                  t.best_tip_ledger <- Some validation_ledger ;
                  (* The frontier has changed, so transactions in the pool may
                     not be valid against the current best tip. *)
-                 let global_slot =
-                   Indexed_pool.global_slot_since_genesis t.pool
-                 in
                  let new_pool, dropped =
                    Indexed_pool.revalidate t.pool ~logger:t.logger `Entire_pool
                      (fun sender ->
@@ -834,18 +826,13 @@ struct
                            sender
                        with
                        | None ->
-                           (Account.Nonce.zero, Currency.Amount.zero)
+                           Account.empty
                        | Some loc ->
-                           let acc =
-                             Option.value_exn
-                               ~message:
-                                 "Somehow a public key has a location but no \
-                                  account"
-                               (Base_ledger.get validation_ledger loc)
-                           in
-                           ( acc.nonce
-                           , Account.liquid_balance_at_slot ~global_slot acc
-                             |> Currency.Balance.to_amount ) )
+                           Option.value_exn
+                             ~message:
+                               "Somehow a public key has a location but no \
+                                account"
+                             (Base_ledger.get validation_ledger loc) )
                  in
                  let dropped_locally_generated =
                    Sequence.filter dropped ~f:(fun cmd ->
@@ -1004,8 +991,8 @@ struct
       let of_indexed_pool_error e =
         (diff_error_of_indexed_pool_error e, indexed_pool_error_metadata e)
 
-      let report_command_error ~logger ~is_sender_local tx
-          (e : Indexed_pool.Command_error.t) =
+      let report_command_error ~logger ~is_sender_local tx (e : Command_error.t)
+          =
         let diff_err, error_extra = of_indexed_pool_error e in
         if is_sender_local then
           [%str_log error]
@@ -1033,74 +1020,68 @@ struct
 
       (** DO NOT mutate any transaction pool state in this function, you may only mutate in the synchronous `apply` function. *)
       let verify (t : pool) (diff : t Envelope.Incoming.t) :
-          verified Envelope.Incoming.t Deferred.Or_error.t =
-        let open Deferred.Or_error.Let_syntax in
-        let ok_if_true cond ~error =
-          Deferred.return
-            (Result.ok_if_true cond ~error:(Error.of_string error))
-        in
+          ( verified Envelope.Incoming.t
+          , Intf.Verification_error.t )
+          Deferred.Result.t =
+        let open Deferred.Result.Let_syntax in
         let is_sender_local =
           Envelope.Sender.(equal Local) (Envelope.Incoming.sender diff)
         in
+        let open Intf.Verification_error in
         let%bind () =
           (* TODO: we should probably remove this -- the libp2p gossip cache should cover this already (#11704) *)
           let (`Already_mem already_mem) =
             Lru_cache.add t.recently_seen (Lru_cache.T.hash diff.data)
           in
-          ok_if_true
-            (not (already_mem && not is_sender_local))
-            ~error:"Recently seen"
+          Deferred.return
+          @@ Result.ok_if_true
+               (not (already_mem && not is_sender_local))
+               ~error:Recently_seen
         in
         let%bind () =
-          let cmds_with_insufficient_fees =
-            List.filter
-              (Envelope.Incoming.data diff)
-              ~f:User_command.has_insufficient_fee
-          in
-          List.iter cmds_with_insufficient_fees ~f:(fun cmd ->
-              [%log' debug t.logger]
-                "User command $cmd from $sender has insufficient fee."
-                ~metadata:
-                  [ ("cmd", User_command.to_yojson cmd)
-                  ; ( "sender"
-                    , Envelope.(Sender.to_yojson (Incoming.sender diff)) )
-                  ] ) ;
-          let too_big_cmds =
-            List.filter (Envelope.Incoming.data diff) ~f:(fun cmd ->
-                let size_validity =
-                  User_command.valid_size
-                    ~genesis_constants:t.config.genesis_constants cmd
-                in
-                match size_validity with
+          let well_formedness_errors =
+            List.fold (Envelope.Incoming.data diff) ~init:[]
+              ~f:(fun acc user_cmd ->
+                match
+                  User_command.check_well_formedness
+                    ~genesis_constants:t.config.genesis_constants user_cmd
+                with
                 | Ok () ->
-                    false
-                | Error err ->
-                    [%log' debug t.logger] "User command is too big"
+                    acc
+                | Error errs ->
+                    [%log' debug t.logger]
+                      "User command $cmd from $sender has one or more \
+                       well-formedness errors."
                       ~metadata:
-                        [ ("cmd", User_command.to_yojson cmd)
+                        [ ("cmd", User_command.to_yojson user_cmd)
                         ; ( "sender"
                           , Envelope.(Sender.to_yojson (Incoming.sender diff))
                           )
-                        ; ("size_violation", Error_json.error_to_yojson err)
+                        ; ( "errors"
+                          , `List
+                              (List.map errs
+                                 ~f:User_command.Well_formedness_error.to_yojson )
+                          )
                         ] ;
-                    true )
+                    errs @ acc )
           in
-          let sufficient_fees = List.is_empty cmds_with_insufficient_fees in
-          let valid_sizes = List.is_empty too_big_cmds in
-          match (sufficient_fees, valid_sizes) with
-          | true, true ->
-              Deferred.Or_error.return ()
-          | false, true ->
-              Deferred.Or_error.fail
-              @@ Error.of_string "Some commands have an insufficient fee"
-          | true, false ->
-              Deferred.Or_error.fail
-              @@ Error.of_string "Some commands are too big"
-          | false, false ->
-              Deferred.Or_error.fail
-              @@ Error.of_string
-                   "Some commands have an insufficient fee, and some are too \
-                    big"
+          match
+            List.dedup_and_sort well_formedness_errors
+              ~compare:User_command.Well_formedness_error.compare
+          with
+          | [] ->
+              return ()
+          | errs ->
+              let err_str =
+                List.map errs ~f:User_command.Well_formedness_error.to_string
+                |> String.concat ~sep:","
+              in
+              Deferred.Result.fail
+              @@ Invalid
+                   (Error.createf
+                      "Some commands have one or more well-formedness errors: \
+                       %s "
+                      err_str )
         in
         (* TODO: batch `to_verifiable` (#11705) *)
         let%bind ledger =
@@ -1108,9 +1089,11 @@ struct
           | Some ledger ->
               return ledger
           | None ->
-              Deferred.Or_error.error_string
-                "We don't have a transition frontier at the moment, so we're \
-                 unable to verify any transactions."
+              Deferred.Result.fail
+              @@ Failure
+                   (Error.of_string
+                      "We don't have a transition frontier at the moment, so \
+                       we're unable to verify any transactions." )
         in
 
         let%bind diff' =
@@ -1135,7 +1118,7 @@ struct
           |> Envelope.Incoming.lift_error
           |> Result.map
                ~f:(Envelope.Incoming.map ~f:(List.map ~f:With_status.data))
-          |> Result.map_error ~f:(Error.tag ~tag:"Verification_failed")
+          |> Result.map_error ~f:(fun e -> Invalid e)
           |> Deferred.return
         in
         match%bind.Deferred
@@ -1151,7 +1134,7 @@ struct
                 [ ( "transaction_pool_diff"
                   , Diff_versioned.to_yojson (Envelope.Incoming.data diff) )
                 ] ;
-            Deferred.return (Error (Error.tag e ~tag:"Internal_error"))
+            Deferred.Result.fail (Failure e)
         | Ok (Error invalid) ->
             let err = Verifier.invalid_to_error invalid in
             [%log' error t.logger]
@@ -1165,20 +1148,19 @@ struct
                     ( "rejecting command because had invalid signature or proof"
                     , [] ) )
             in
-            Error (Error.tag err ~tag:"Verification_failed")
+            Error (Invalid err)
         | Ok (Ok commands) ->
             (* TODO: avoid duplicate hashing (#11706) *)
             O1trace.sync_thread "hashing_transactions_after_verification"
               (fun () ->
-                Deferred.return
-                  (Ok
-                     { diff with
-                       data =
-                         List.map commands
-                           ~f:
-                             Transaction_hash.User_command_with_valid_signature
-                             .create
-                     } ) )
+                return
+                  { diff with
+                    data =
+                      List.map commands
+                        ~f:
+                          Transaction_hash.User_command_with_valid_signature
+                          .create
+                  } )
 
       let register_locally_generated t txn =
         Hashtbl.update t.locally_generated_uncommitted txn ~f:(function
@@ -1240,14 +1222,10 @@ struct
             | None ->
                 Error Diff_error.Fee_payer_account_not_found
             | Some account ->
-                if
-                  not
-                    ( Account.has_permission ~to_:`Access
-                        ~control:Control.Tag.Signature account
-                    && Account.has_permission ~to_:`Send
-                         ~control:Control.Tag.Signature account )
-                then Error Diff_error.Fee_payer_not_permitted_to_send
-                else Ok ()
+                Result.ok_if_true
+                  ( Account.has_permission_to_send account
+                  && Account.has_permission_to_increment_nonce account )
+                  ~error:Diff_error.Fee_payer_not_permitted_to_send
         in
         let pool, add_results =
           List.fold_map (Envelope.Incoming.data diff) ~init:t.pool
@@ -1390,7 +1368,7 @@ struct
         in
         (decision, accepted, rejected)
 
-      let unsafe_apply' (t : pool) (diff : verified Envelope.Incoming.t) :
+      let unsafe_apply (t : pool) (diff : verified Envelope.Incoming.t) :
           ([ `Accept | `Reject ] * t * rejected, _) Result.t =
         match apply t diff with
         | Ok (decision, accepted, rejected) ->
@@ -1411,24 +1389,51 @@ struct
         | Error e ->
             Error (`Other e)
 
-      let unsafe_apply t diff = Deferred.return (unsafe_apply' t diff)
-
       type Structured_log_events.t +=
         | Transactions_received of { txns : t; sender : Envelope.Sender.t }
         [@@deriving
           register_event
             { msg = "Received transaction-pool diff $txns from $sender" }]
 
-      let update_metrics envelope valid_cb gossip_heard_logger_option =
+      let update_metrics ~logger ~log_gossip_heard envelope valid_cb =
         Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_received) ;
         let diff = Envelope.Incoming.data envelope in
-        Option.iter gossip_heard_logger_option ~f:(fun logger ->
-            [%str_log debug]
-              (Transactions_received
-                 { txns = diff; sender = Envelope.Incoming.sender envelope } ) ) ;
+        if log_gossip_heard then
+          [%str_log debug]
+            (Transactions_received
+               { txns = diff; sender = Envelope.Incoming.sender envelope } ) ;
         Mina_net2.Validation_callback.set_message_type valid_cb `Transaction ;
         Mina_metrics.(Counter.inc_one Network.Transaction.received)
+
+      let log_internal ?reason ~logger msg
+          { Envelope.Incoming.data = diff; sender; _ } =
+        let metadata =
+          [ ( "diff"
+            , `List
+                (List.map diff
+                   ~f:Mina_transaction.Transaction.yojson_summary_of_command )
+            )
+          ]
+        in
+        let metadata =
+          match sender with
+          | Remote addr ->
+              ("sender", `String (Core.Unix.Inet_addr.to_string @@ Peer.ip addr))
+              :: metadata
+          | Local ->
+              metadata
+        in
+        let metadata =
+          Option.value_map reason
+            ~f:(fun r -> List.cons ("reason", `String r))
+            ~default:ident metadata
+        in
+        if not (is_empty diff) then
+          [%log internal] "%s" ("Transaction_diff_" ^ msg) ~metadata
+
+      let t_of_verified =
+        List.map ~f:Transaction_hash.User_command_with_valid_signature.command
     end
 
     let get_rebroadcastable (t : t) ~has_timed_out =
@@ -1593,7 +1598,7 @@ let%test_module _ =
         compile_time_genesis.data |> Mina_state.Protocol_state.body
       in
       { (Mina_state.Protocol_state.Body.view state_body) with
-        global_slot_since_genesis = Mina_numbers.Global_slot.zero
+        global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis.zero
       }
 
     module Mock_transition_frontier = struct
@@ -1611,13 +1616,22 @@ let%test_module _ =
 
       type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
 
-      let create : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
+      let create ?permissions :
+          unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
        fun () ->
         let zkappify_account (account : Account.t) : Account.t =
           let zkapp =
             Some { Zkapp_account.default with verification_key = Some vk }
           in
-          { account with zkapp }
+          { account with
+            zkapp
+          ; permissions =
+              ( match permissions with
+              | Some p ->
+                  p
+              | None ->
+                  Permissions.user_default )
+          }
         in
         let pipe_r, pipe_w =
           Broadcast_pipe.create
@@ -1784,7 +1798,7 @@ let%test_module _ =
       assert (List.is_sorted txns ~compare)
 
     let assert_pool_txs test txs =
-      Indexed_pool.For_tests.assert_invariants test.txn_pool.pool ;
+      Indexed_pool.For_tests.assert_pool_consistency test.txn_pool.pool ;
       assert_locally_generated test.txn_pool ;
       assert_fee_wu_ordering test.txn_pool ;
       assert_user_command_sets_equal
@@ -1797,8 +1811,10 @@ let%test_module _ =
                 User_command.forget_check )
            txs )
 
-    let setup_test () =
-      let frontier, best_tip_diff_w = Mock_transition_frontier.create () in
+    let setup_test ?(verifier = verifier) ?permissions () =
+      let frontier, best_tip_diff_w =
+        Mock_transition_frontier.create ?permissions ()
+      in
       let _, best_tip_ref = frontier in
       let frontier_pipe_r, frontier_pipe_w =
         Broadcast_pipe.create @@ Some frontier
@@ -1845,10 +1861,38 @@ let%test_module _ =
            ~memo:(Signed_command_memo.create_by_digesting_string_exn "foo")
            ~body:
              (Signed_command_payload.Body.Payment
-                { source_pk = get_pk sender_idx
-                ; receiver_pk = get_pk receiver_idx
+                { receiver_pk = get_pk receiver_idx
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
+
+    let mk_single_account_update ~chain ~fee_payer_idx ~zkapp_account_idx ~fee
+        ~nonce ~ledger =
+      let fee = Currency.Fee.of_nanomina_int_exn fee in
+      let fee_payer_kp = test_keys.(fee_payer_idx) in
+      let nonce = Account.Nonce.of_int nonce in
+      let spec : Transaction_snark.For_tests.Single_account_update_spec.t =
+        Transaction_snark.For_tests.Single_account_update_spec.
+          { fee_payer = (fee_payer_kp, nonce)
+          ; fee
+          ; memo = Signed_command_memo.create_from_string_exn "invalid proof"
+          ; zkapp_account_keypair = test_keys.(zkapp_account_idx)
+          ; update = { Account_update.Update.noop with zkapp_uri = Set "abcd" }
+          ; call_data = Snark_params.Tick.Field.zero
+          ; events = []
+          ; actions = []
+          }
+      in
+      let%map zkapp_command =
+        Transaction_snark.For_tests.single_account_update ~chain
+          ~constraint_constants spec
+      in
+      Or_error.ok_exn
+        (Zkapp_command.Verifiable.create ~status:Applied
+           ~find_vk:
+             (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                ~get:Mina_ledger.Ledger.get
+                ~location_of_account:Mina_ledger.Ledger.location_of_account )
+           zkapp_command )
 
     let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
         ~receiver_idx ~fee ~nonce ~amount () =
@@ -2049,14 +2093,15 @@ let%test_module _ =
                ~libp2p_port:8302 )
       in
       let tm0 = Time.now () in
-      let%bind verified =
+      let%map verified =
         Test.Resource_pool.Diff.verify test.txn_pool
           (Envelope.Incoming.wrap
              ~data:(List.map ~f:User_command.forget_check cs)
              ~sender )
-        >>| Or_error.ok_exn
+        >>| Fn.compose Or_error.ok_exn
+              (Result.map_error ~f:Intf.Verification_error.to_error)
       in
-      let%map result =
+      let result =
         Test.Resource_pool.Diff.unsafe_apply test.txn_pool verified
       in
       let tm1 = Time.now () in
@@ -2103,7 +2148,8 @@ let%test_module _ =
               let applied =
                 Or_error.ok_exn
                 @@ Mina_ledger.Ledger.apply_user_command ~constraint_constants
-                     ~txn_global_slot:Mina_numbers.Global_slot.zero ledger valid
+                     ~txn_global_slot:
+                       Mina_numbers.Global_slot_since_genesis.zero ledger valid
               in
               match applied.body with
               | Failed ->
@@ -2238,9 +2284,12 @@ let%test_module _ =
 
     let current_global_slot () =
       let current_time = Block_time.now time_controller in
+      (* for testing, consider this slot to be a since-genesis slot *)
       Consensus.Data.Consensus_time.(
         of_time_exn ~constants:consensus_constants current_time
         |> to_global_slot)
+      |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
+      |> Mina_numbers.Global_slot_since_genesis.of_uint32
 
     let mk_now_invalid_test t _cmds ~mk_command =
       let cmd1 =
@@ -2286,9 +2335,9 @@ let%test_module _ =
         at (Block_time.to_time_exn slot_end)
       in
       let curr_slot = current_global_slot () in
-      let slot_padding = Mina_numbers.Global_slot.of_int padding in
+      let slot_padding = Mina_numbers.Global_slot_span.of_int padding in
       let curr_slot_plus_padding =
-        Mina_numbers.Global_slot.add curr_slot slot_padding
+        Mina_numbers.Global_slot_since_genesis.add curr_slot slot_padding
       in
       let valid_command =
         mk_payment ~valid_until:curr_slot_plus_padding ~sender_idx:1
@@ -2336,10 +2385,12 @@ let%test_module _ =
           assert_pool_txs t [] ;
           let curr_slot = current_global_slot () in
           let curr_slot_plus_three =
-            Mina_numbers.Global_slot.(add curr_slot (of_int 3))
+            Mina_numbers.Global_slot_since_genesis.add curr_slot
+              (Mina_numbers.Global_slot_span.of_int 3)
           in
           let curr_slot_plus_seven =
-            Mina_numbers.Global_slot.(add curr_slot (of_int 7))
+            Mina_numbers.Global_slot_since_genesis.add curr_slot
+              (Mina_numbers.Global_slot_span.of_int 7)
           in
           let few_now =
             List.take independent_cmds (List.length independent_cmds / 2)
@@ -2414,10 +2465,12 @@ let%test_module _ =
           assert_pool_txs t [] ;
           let curr_slot = current_global_slot () in
           let curr_slot_plus_three =
-            Mina_numbers.Global_slot.(add curr_slot (of_int 3))
+            Mina_numbers.Global_slot_since_genesis.add curr_slot
+              (Mina_numbers.Global_slot_span.of_int 3)
           in
           let curr_slot_plus_seven =
-            Mina_numbers.Global_slot.(add curr_slot (of_int 7))
+            Mina_numbers.Global_slot_since_genesis.add curr_slot
+              (Mina_numbers.Global_slot_span.of_int 7)
           in
           let few_now =
             List.take independent_cmds (List.length independent_cmds / 2)
@@ -2490,13 +2543,11 @@ let%test_module _ =
           match tx.payload with
           | { common; body = Payment payload } ->
               { common = { common with fee_payer_pk = sender_pk }
-              ; body = Payment { payload with source_pk = sender_pk }
+              ; body = Payment payload
               }
           | { common; body = Stake_delegation (Set_delegate payload) } ->
               { common = { common with fee_payer_pk = sender_pk }
-              ; body =
-                  Stake_delegation
-                    (Set_delegate { payload with delegator = sender_pk })
+              ; body = Stake_delegation (Set_delegate payload)
               }
         in
         User_command.Signed_command (Signed_command.sign sender_kp payload)
@@ -2750,7 +2801,7 @@ let%test_module _ =
       Deferred.return zkapp_command
 
     let mk_basic_zkapp ?(fee = 10_000_000_000) ?(empty_update = false)
-        ?(preconditions = None) nonce fee_payer_kp =
+        ?preconditions ?permissions nonce fee_payer_kp =
       let open Zkapp_command_builder in
       let preconditions =
         Option.value preconditions
@@ -2761,13 +2812,23 @@ let%test_module _ =
               ; valid_while = Ignore
               }
       in
+      let update : Account_update.Update.t =
+        let permissions =
+          match permissions with
+          | None ->
+              Zkapp_basic.Set_or_keep.Keep
+          | Some perms ->
+              Zkapp_basic.Set_or_keep.Set perms
+        in
+        { Account_update.Update.noop with permissions }
+      in
       let account_updates =
         if empty_update then []
         else
           mk_forest
             [ mk_node
                 (mk_account_update_body Signature No fee_payer_kp
-                   Token_id.default 0 ~preconditions )
+                   Token_id.default 0 ~preconditions ~update )
                 []
             ]
       in
@@ -2796,4 +2857,166 @@ let%test_module _ =
             >>| assert_pool_apply [ valid_command2 ]
           in
           Deferred.unit )
+
+    let%test_unit "commands are rejected if fee payer permissions are not \
+                   handled" =
+      let test_permissions ~is_able_to_send send_command permissions =
+        let%bind t = setup_test () in
+        assert_pool_txs t [] ;
+        let%bind set_permissions_command =
+          mk_basic_zkapp 0 test_keys.(0) ~permissions
+          |> mk_zkapp_user_cmd t.txn_pool
+        in
+        let%bind () = add_commands' t [ set_permissions_command ] in
+        let%bind () = advance_chain t [ set_permissions_command ] in
+        assert_pool_txs t [] ;
+        let%map result = add_commands t [ send_command ] in
+        let expectation = if is_able_to_send then [ send_command ] else [] in
+        assert_pool_apply expectation result
+      in
+      let run_test_cases send_cmd =
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              send = Permissions.Auth_required.Signature
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              send = Permissions.Auth_required.Either
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              send = Permissions.Auth_required.None
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:false send_cmd
+            { Permissions.user_default with
+              send = Permissions.Auth_required.Impossible
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:false send_cmd
+            { Permissions.user_default with
+              send = Permissions.Auth_required.Proof
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              increment_nonce = Permissions.Auth_required.Signature
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              increment_nonce = Permissions.Auth_required.Either
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              increment_nonce = Permissions.Auth_required.None
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:false send_cmd
+            { Permissions.user_default with
+              increment_nonce = Permissions.Auth_required.Impossible
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:false send_cmd
+            { Permissions.user_default with
+              increment_nonce = Permissions.Auth_required.Proof
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              access = Permissions.Auth_required.Signature
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              access = Permissions.Auth_required.Either
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              access = Permissions.Auth_required.None
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:false send_cmd
+            { Permissions.user_default with
+              access = Permissions.Auth_required.Impossible
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:false send_cmd
+            { Permissions.user_default with
+              access = Permissions.Auth_required.Proof
+            }
+        in
+        return ()
+      in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind () =
+            let send_command =
+              mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:1 ~receiver_idx:1
+                ~amount:1_000_000 ()
+            in
+            run_test_cases send_command
+          in
+          let%bind () =
+            let send_command =
+              mk_transfer_zkapp_command ~fee_payer_idx:(0, 1) ~sender_idx:0
+                ~fee:minimum_fee ~nonce:2 ~receiver_idx:1 ~amount:1_000_000 ()
+            in
+            run_test_cases send_command
+          in
+          return () )
+
+    let%test "account update with a different network id that uses proof \
+              authorization would be rejected" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind verifier_full =
+            Verifier.create ~logger ~proof_level:Full ~constraint_constants
+              ~conf_dir:None
+              ~pids:(Child_processes.Termination.create_pid_table ())
+              ()
+          in
+          let%bind test =
+            setup_test ~verifier:verifier_full
+              ~permissions:
+                { Permissions.user_default with set_zkapp_uri = Proof }
+              ()
+          in
+          let%bind zkapp_command =
+            mk_single_account_update
+              ~chain:Mina_signature_kind.(Other_network "invalid")
+              ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
+              ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
+          in
+          match%map
+            Test.Resource_pool.Diff.verify test.txn_pool
+              (Envelope.Incoming.wrap
+                 ~data:
+                   [ User_command.forget_check
+                     @@ Zkapp_command
+                          (Zkapp_command.Valid.of_verifiable zkapp_command)
+                   ]
+                 ~sender:Envelope.Sender.Local )
+          with
+          | Error (Intf.Verification_error.Invalid e) ->
+              String.is_substring (Error.to_string_hum e) ~substring:"proof"
+          | _ ->
+              false )
   end )

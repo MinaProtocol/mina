@@ -1,5 +1,5 @@
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run) (_ : sig
+    (Impl : Snarky_backendless.Snark_intf.Run) (B : sig
       val params : Impl.field Sponge.Params.t
 
       val to_the_alpha : Impl.field -> Impl.field

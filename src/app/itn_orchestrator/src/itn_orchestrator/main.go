@@ -19,20 +19,29 @@ import (
 
 var actions map[string]lib.Action
 
+func addAction(actions map[string]lib.Action, action lib.Action) {
+	actions[action.Name()] = action
+}
+
 func init() {
-	actions = map[string]lib.Action{
-		"discovery":      lib.DiscoverParticipantsAction{},
-		"payments":       lib.PaymentsAction{},
-		"load-keys":      lib.KeyloaderAction{},
-		"stop":           lib.StopAction{},
-		"wait":           lib.WaitAction{},
-		"fund-keys":      lib.FundAction{},
-		"zkapp-txs":      lib.ZkappCommandsAction{},
-		"slots-won":      lib.SlotsWonAction{},
-		"reset-gating":   lib.ResetGatingAction{},
-		"isolate":        lib.IsolateAction{},
-		"allocate-slots": lib.AllocateSlotsAction{},
-	}
+	actions = map[string]lib.Action{}
+	addAction(actions, lib.DiscoveryAction{})
+	addAction(actions, lib.PaymentsAction{})
+	addAction(actions, lib.KeyloaderAction{})
+	addAction(actions, lib.StopAction{})
+	addAction(actions, lib.WaitAction{})
+	addAction(actions, lib.FundAction{})
+	addAction(actions, lib.ZkappCommandsAction{})
+	addAction(actions, lib.SlotsWonAction{})
+	addAction(actions, lib.ResetGatingAction{})
+	addAction(actions, lib.IsolateAction{})
+	addAction(actions, lib.AllocateSlotsAction{})
+	addAction(actions, lib.RestartAction{})
+	addAction(actions, lib.JoinAction{})
+	addAction(actions, lib.SampleAction{})
+	addAction(actions, lib.ExceptAction{})
+	addAction(actions, lib.StopDaemonAction{})
+
 }
 
 type AppConfig struct {
@@ -40,10 +49,11 @@ type AppConfig struct {
 	LogFile          string        `json:",omitempty"`
 	Key              itn_json_types.Ed25519Privkey
 	UptimeBucket     string
-	Daemon           string `json:",omitempty"`
-	MinaExec         string `json:",omitempty"`
+	FundDaemonPorts  []string `json:",omitempty"`
+	MinaExec         string   `json:",omitempty"`
 	SlotDurationMs   int
 	GenesisTimestamp itn_json_types.Time
+	ControlExec      string `json:",omitempty"`
 }
 
 func loadAppConfig() (res AppConfig) {
@@ -66,6 +76,23 @@ func loadAppConfig() (res AppConfig) {
 		return
 	}
 	return
+}
+
+type CommandOrComment struct {
+	command *lib.Command
+	comment string
+}
+
+func (v *CommandOrComment) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &v.comment); err == nil {
+		return nil
+	}
+	cmd := lib.Command{}
+	if err := json.Unmarshal(data, &cmd); err != nil {
+		return err
+	}
+	v.command = &cmd
+	return nil
 }
 
 func main() {
@@ -91,16 +118,20 @@ func main() {
 	config := lib.Config{
 		Ctx:              ctx,
 		UptimeBucket:     client.Bucket(appConfig.UptimeBucket),
-		GetGqlClient:     lib.GetGqlClient(ed25519.PrivateKey(appConfig.Key), nodeData),
+		Sk:               ed25519.PrivateKey(appConfig.Key),
 		Log:              log,
-		Daemon:           appConfig.Daemon,
+		FundDaemonPorts:  appConfig.FundDaemonPorts,
 		MinaExec:         appConfig.MinaExec,
 		NodeData:         nodeData,
 		SlotDurationMs:   appConfig.SlotDurationMs,
 		GenesisTimestamp: time.Time(appConfig.GenesisTimestamp),
+		ControlExec:      appConfig.ControlExec,
 	}
 	if config.MinaExec == "" {
 		config.MinaExec = "mina"
+	}
+	if config.StopDaemonDelaySec == 0 {
+		config.StopDaemonDelaySec = 10
 	}
 	outCache := map[string]map[int]map[string]lib.OutputCacheEntry{
 		"": {},
@@ -109,23 +140,8 @@ func main() {
 		OutputCache: outCache,
 	}
 	inDecoder := json.NewDecoder(os.Stdin)
-	for step := 0; ; step++ {
-		var cmd lib.Command
-		if err := inDecoder.Decode(&cmd); err != nil {
-			if err != io.EOF {
-				log.Errorf("Error decoding command for step %d: %v", step, err)
-				os.Exit(5)
-			}
-			break
-		}
-		params, err := lib.ResolveParams(rconfig, step, cmd.Params)
-		if err != nil {
-			log.Errorf("Error resolving params for step %d: %v", step, err)
-			os.Exit(6)
-			return
-		}
-		log.Infof("Performing step %s (%d)", cmd.Action, step)
-		err = actions[cmd.Action].Run(config, params, func(name string, value_ any, multiple bool, sensitive bool) {
+	outputF := func(step int) func(string, any, bool, bool) {
+		return func(name string, value_ any, multiple bool, sensitive bool) {
 			value, err := json.Marshal(value_)
 			if err != nil {
 				log.Errorf("Error marshalling value %s for step %d: %v", name, step, err)
@@ -161,11 +177,70 @@ func main() {
 					return
 				}
 			}
-		})
+		}
+	}
+	step := 0
+	var prevAction lib.BatchAction
+	var actionAccum []lib.ActionIO
+	handlePrevAction := func() {
+		log.Infof("Performing steps %s (%d-%d)", prevAction.Name(), step-len(actionAccum), step-1)
+		err = prevAction.RunMany(config, actionAccum)
 		if err != nil {
-			log.Errorf("Error running step %d: %v", step, err)
+			log.Errorf("Error running steps %d-%d: %v", step-len(actionAccum), step-1, err)
 			os.Exit(9)
 			return
 		}
+		prevAction = nil
+		actionAccum = nil
+	}
+	for {
+		var commandOrComment CommandOrComment
+		if err := inDecoder.Decode(&commandOrComment); err != nil {
+			if err != io.EOF {
+				log.Errorf("Error decoding command for step %d: %v", step, err)
+				os.Exit(5)
+			}
+			break
+		}
+		if commandOrComment.command == nil {
+			fmt.Fprintln(os.Stderr, commandOrComment.comment)
+			continue
+		}
+		cmd := *commandOrComment.command
+		if prevAction != nil && prevAction.Name() != cmd.Action {
+			handlePrevAction()
+		}
+		params, err := lib.ResolveParams(rconfig, step, cmd.Params)
+		if err != nil {
+			log.Errorf("Error resolving params for step %d: %v", step, err)
+			os.Exit(6)
+			return
+		}
+		action := actions[cmd.Action]
+		if action == nil {
+			log.Errorf("Unknown action name: %d", cmd.Action)
+			os.Exit(10)
+			return
+		}
+		batchAction, isBatchAction := action.(lib.BatchAction)
+		if isBatchAction {
+			prevAction = batchAction
+			actionAccum = append(actionAccum, lib.ActionIO{
+				Params: params,
+				Output: outputF(step),
+			})
+		} else {
+			log.Infof("Performing step %s (%d)", cmd.Action, step)
+			err = action.Run(config, params, outputF(step))
+			if err != nil {
+				log.Errorf("Error running step %d: %v", step, err)
+				os.Exit(9)
+				return
+			}
+		}
+		step++
+	}
+	if prevAction != nil {
+		handlePrevAction()
 	}
 }

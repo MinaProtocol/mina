@@ -64,8 +64,9 @@ const getRequest = async (url) => {
 
 const handler = async (event, req) => {
   const buildkiteTrigger = {};
-  // PR Gating Lifting section
-  if (
+  if (event == "issue_comment") {
+    // PR Gating Lifting section
+    if (
       // we are creating the comment
       req.body.action == "created" &&
       // and this is actually a pull request
@@ -91,11 +92,11 @@ const handler = async (event, req) => {
           "mina-pr-gating",
           { PR_GATE: "lifted" }
         );
-        return buildkite;
+        return [buildkite, null];
       } else {
         return [
-          "comment author is not authorized to approve for mainnet",
-          "comment author is not authorized to approve for mainnet",
+          "comment author is not (publically) a member of the core team",
+          "comment author is not (publically) a member of the core team",
         ];
       }
     }
@@ -127,7 +128,10 @@ const handler = async (event, req) => {
           "mina",
           {}
         );
-        return buildkite;
+        const circle = await runCircleBuild({
+          pull_request: prData.data,
+        });
+        return [buildkite, circle];
       } else {
         // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
         return [
@@ -136,8 +140,9 @@ const handler = async (event, req) => {
         ];
       }
     }
-    return null;
-  };
+  }
+  return [null, null];
+};
 
 /**
  * HTTP Cloud Function for GitHub Webhook events.
@@ -165,16 +170,24 @@ exports.githubWebhookHandler = async (req, res) => {
     github.validateWebhook(req);
 
     const githubEvent = req.headers["x-github-event"];
-    const buildkite = await handler(githubEvent, req);
+    const [buildkite, circle] = await handler(githubEvent, req);
     if (buildkite && buildkite.web_url) {
       console.info(`Triggered buildkite build at ${buildkite.web_url}`);
     } else {
       console.error(`Failed to trigger buildkite build for some reason:`);
       console.error(buildkite);
     }
+
+    if (circle && circle.number) {
+      console.info(`Triggered circle build #${circle.number}`);
+    } else {
+      console.error(`Failed to trigger circle build for some reason:`);
+      console.error(circle);
+    }
+
     res.status(200);
     console.info(`HTTP 200: ${githubEvent} event`);
-    res.send({ buildkite } || {});
+    res.send({ buildkite, circle } || {});
   } catch (e) {
     if (e instanceof HTTPError) {
       res.status(e.statusCode).send(e.message);

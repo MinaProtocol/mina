@@ -436,7 +436,8 @@ let batch_send_payments =
       { receiver : string
       ; amount : Currency.Amount.t
       ; fee : Currency.Fee.t
-      ; valid_until : Mina_numbers.Global_slot.t option [@sexp.option]
+      ; valid_until : Mina_numbers.Global_slot_since_genesis.t option
+            [@sexp.option]
       }
     [@@deriving sexp]
   end in
@@ -453,7 +454,8 @@ let batch_send_payments =
           { Payment_info.receiver =
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
-          ; valid_until = Some (Mina_numbers.Global_slot.random ())
+          ; valid_until =
+              Some (Mina_numbers.Global_slot_since_genesis.random ())
           ; amount = Currency.Amount.of_nanomina_int_exn (Random.int 100)
           ; fee = Currency.Fee.of_nanomina_int_exn (Random.int 100)
           }
@@ -481,7 +483,7 @@ let batch_send_payments =
           in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty ~valid_until
-            ~body:(Payment { source_pk = signer_pk; receiver_pk; amount })
+            ~body:(Payment { receiver_pk; amount })
             ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
     in
     Daemon_rpcs.Client.dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
@@ -1039,7 +1041,7 @@ let pending_snark_work =
                               Currency.Amount.Signed.of_fee
                                 (to_signed_fee_exn f.sign
                                    (Currency.Amount.to_fee f.fee_magnitude) )
-                          ; supply_increase = w.supply_change.fee_magnitude
+                          ; supply_increase = w.supply_increase
                           ; source_first_pass_ledger_hash =
                               w.source_first_pass_ledger_hash
                           ; target_first_pass_ledger_hash =
@@ -1510,7 +1512,7 @@ let create_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createAccount.account.public_key
+             response.createAccount.public_key
          in
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ) )
 
@@ -1527,7 +1529,7 @@ let create_hd_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createHDAccount.account.public_key
+             response.createHDAccount.public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
            (Mina_numbers.Hd_index.to_string hd_index)
@@ -1561,7 +1563,7 @@ let unlock_account =
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
-                 response.unlockAccount.account.public_key
+                 response.unlockAccount.public_key
              in
              printf "\n🔓 Unlocked account!\nPublic key: %s\n" pk_string
          | Error e ->
@@ -2306,7 +2308,7 @@ let client_trustlist_group =
     ]
 
 let advanced =
-  Command.group ~summary:"Advanced client commands"
+  let cmds0 =
     [ ("get-nonce", get_nonce_cmd)
     ; ("client-trustlist", client_trustlist_group)
     ; ("get-trust-status", get_trust_status)
@@ -2347,8 +2349,14 @@ let advanced =
     ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
-    ; ("itn-create-accounts", itn_create_accounts)
     ]
+  in
+  let cmds =
+    if Mina_compile_config.itn_features then
+      ("itn-create-accounts", itn_create_accounts) :: cmds0
+    else cmds0
+  in
+  Command.group ~summary:"Advanced client commands" cmds
 
 let ledger =
   Command.group ~summary:"Ledger commands"

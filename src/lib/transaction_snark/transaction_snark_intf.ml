@@ -185,7 +185,7 @@ module type Full = sig
    *)
   val zkapp_command_witnesses_exn :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_body:Transaction_protocol_state.Block_data.t
     -> fee_excess:Currency.Amount.Signed.t
     -> ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
@@ -232,7 +232,8 @@ module type Full = sig
            , 'h
            , 'i
            , ( Tick.Boolean.var
-             , Mina_numbers.Global_slot.Checked.var
+             , Mina_numbers.Global_slot_since_genesis.Checked.var
+             , Mina_numbers.Global_slot_span.Checked.var
              , Currency.Balance.var
              , Currency.Amount.var )
              Account_timing.As_record.t
@@ -240,10 +241,11 @@ module type Full = sig
            , 'k )
            Account.Poly.t
       -> txn_amount:Currency.Amount.var option
-      -> txn_global_slot:Mina_numbers.Global_slot.Checked.var
+      -> txn_global_slot:Mina_numbers.Global_slot_since_genesis.Checked.var
       -> ( [> `Min_balance of Currency.Balance.var ]
          * ( Tick.Boolean.var
-           , Mina_numbers.Global_slot.Checked.var
+           , Mina_numbers.Global_slot_since_genesis.Checked.var
+           , Mina_numbers.Global_slot_span.Checked.var
            , Currency.Balance.var
            , Currency.Amount.var )
            Account_timing.As_record.t )
@@ -285,6 +287,36 @@ module type Full = sig
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Deploy_snapp_spec.t
       -> Zkapp_command.t
+
+    module Single_account_update_spec : sig
+      type t =
+        { fee : Currency.Fee.t
+        ; fee_payer : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+        ; zkapp_account_keypair : Signature_lib.Keypair.t
+        ; memo : Signed_command_memo.t
+        ; update : Account_update.Update.t
+        ; actions : Tick.Field.t array list
+        ; events : Tick.Field.t array list
+        ; call_data : Tick.Field.t
+        }
+    end
+
+    val single_account_update :
+         ?zkapp_prover_and_vk:
+           ( unit
+           , unit
+           , unit
+           , Zkapp_statement.t
+           , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+             Async.Deferred.t )
+           Pickles.Prover.t
+           * ( Pickles.Side_loaded.Verification_key.t
+             , Snark_params.Tick.Field.t )
+             With_hash.t
+      -> chain:Mina_signature_kind.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> Single_account_update_spec.t
+      -> Zkapp_command.t Async.Deferred.t
 
     module Update_states_spec : sig
       type t =
