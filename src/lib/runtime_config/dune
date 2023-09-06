@@ -7,15 +7,23 @@
    bin_prot.shape
    base.caml
    base
+   base64
    sexplib0
    result
    ;; local libraries
    currency
+   data_hash_lib
+   mina_base
    mina_numbers
    ppx_dhall_type
    snark_params
    unsigned_extended
+   pasta
    pickles
+   pickles.backend
+   pickles_types
+   signature_lib
+   with_hash
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson ppx_dhall_type ppx_version ppx_compare)))

@@ -67,7 +67,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; account_name = "snark-node-key1"
           ; worker_nodes = 4
           }
-    ; snark_worker_fee = "0.0001"
+    ; snark_worker_fee = "0.0002"
     ; num_archive_nodes = 1
     ; proof_config =
         { proof_config_default with
@@ -475,15 +475,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard
         "change snark worker key from snark-node-key1 to snark-node-key2"
-        (let%bind () =
-           Integration_test_lib.Graphql_requests.must_set_snark_worker ~logger
-             (Network.Node.get_ingress_uri snark_coordinator)
-             ~new_snark_pub_key:
-               ( snark_node_key2.keypair.public_key
-               |> Signature_lib.Public_key.compress )
-         in
-         (* adding a wait for 3 minutes so that the new snark worker can start.  this is a temporary solution to what's essentially a race condition causing lots of flakiness/non-determinism for this test *)
-         Malleable_error.lift (Async.after (Time.Span.of_int_sec 180)) )
+        (Integration_test_lib.Graphql_requests.must_set_snark_worker ~logger
+           (Network.Node.get_ingress_uri snark_coordinator)
+           ~new_snark_pub_key:
+             ( snark_node_key2.keypair.public_key
+             |> Signature_lib.Public_key.compress ) )
+    in
+    let new_snark_work_fee = Currency.Amount.of_formatted_string "0.0001" in
+    let%bind () =
+      section_hard "change snark work fee from 0.0002 to 0.0001"
+        (Integration_test_lib.Graphql_requests.must_set_snark_work_fee ~logger
+           (Network.Node.get_ingress_uri snark_coordinator)
+           ~new_snark_work_fee:(Currency.Amount.to_int new_snark_work_fee) )
     in
     let%bind () =
       section_hard
@@ -519,22 +522,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                ( snark_node_key2.keypair.public_key
                |> Signature_lib.Public_key.compress )
          in
-         let key_2_balance_expected =
-           Currency.Amount.of_formatted_string config.snark_worker_fee
-         in
          if
            Currency.Amount.( >= )
              (Currency.Balance.to_amount key_2_balance_actual)
-             key_2_balance_expected
+             new_snark_work_fee
          then (
            [%log info]
              "balance check successful.  \n\
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
-              snark-worker-fee: %s"
+              new-snark-worker-fee: %s"
              (Currency.Balance.to_formatted_string key_1_balance_actual)
              (Currency.Balance.to_formatted_string key_2_balance_actual)
-             config.snark_worker_fee ;
+             (Currency.Amount.to_formatted_string new_snark_work_fee) ;
 
            Malleable_error.return () )
          else
@@ -542,10 +542,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Error with balance of snark-node-key2.  \n\
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
-              snark-worker-fee: %s"
+              new-snark-worker-fee: %s"
              (Currency.Balance.to_formatted_string key_1_balance_actual)
              (Currency.Balance.to_formatted_string key_2_balance_actual)
-             config.snark_worker_fee )
+             (Currency.Amount.to_formatted_string new_snark_work_fee) )
     in
     section_hard "running replayer"
       (let%bind logs =
