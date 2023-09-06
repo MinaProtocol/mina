@@ -292,7 +292,8 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
   in
   let num_bp_sc_an = num_bp_sc + List.length t.archive_nodes in
   let num_bp_sc_an_sn = num_bp_sc_an + List.length t.seed_nodes in
-  let pk_sk n =
+  let keypairs = ref Core.String.Map.empty in
+  let pk_sk name n =
     let open Signature_lib in
     let sk = List.nth_exn private_keys n in
     let pk =
@@ -300,12 +301,18 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
       Private_key.of_base58_check_exn sk
       |> of_private_key_exn |> compress |> Compressed.to_base58_check
     in
-    (pk, sk)
+    match Core.String.Map.find !keypairs name with
+    | Some keys ->
+        keys
+    | None ->
+        keypairs := Core.String.Map.add_exn !keypairs ~key:name ~data:(pk, sk) ;
+        (pk, sk)
   in
   let libp2p_pass = "naughty blue worm" in
   let topology_of_block_producer n
-      { Block_producer_node.node_name; docker_image; _ } : Topology.top_info =
-    let pk, sk = pk_sk n in
+      { Block_producer_node.account_name; node_name; docker_image } :
+      Topology.top_info =
+    let pk, sk = pk_sk account_name n in
     Node
       ( node_name
       , { pk
@@ -319,9 +326,12 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         } )
   in
   let topology_of_snark_coordinator
-      { Snark_coordinator_node.node_name; docker_image; worker_nodes; _ } :
-      Topology.top_info =
-    let pk, sk = pk_sk num_bp in
+      { Snark_coordinator_node.account_name
+      ; node_name
+      ; docker_image
+      ; worker_nodes
+      } : Topology.top_info =
+    let pk, sk = pk_sk account_name num_bp in
     Snark_coordinator
       ( node_name
       , { pk; sk; role = Snark_coordinator; docker_image; worker_nodes } )
@@ -333,10 +343,11 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
     | Some sc ->
         [ sc ]
   in
-  let topology_of_archive n { Archive_node.node_name; docker_image; _ } :
-      Topology.top_info =
+  let topology_of_archive n
+      { Archive_node.account_name; node_name; docker_image } : Topology.top_info
+      =
     let n = n + num_bp_sc in
-    let pk, sk = pk_sk n in
+    let pk, sk = pk_sk account_name n in
     Archive
       ( node_name
       , { pk
@@ -347,10 +358,10 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         ; zkapp_file = "instantiated in network_config.ml"
         } )
   in
-  let topology_of_seed n { Seed_node.node_name; docker_image; _ } :
+  let topology_of_seed n { Seed_node.account_name; node_name; docker_image } :
       Topology.top_info =
     let n = n + num_bp_sc_an in
-    let pk, sk = pk_sk n in
+    let pk, sk = pk_sk account_name n in
     Node
       ( node_name
       , { pk
@@ -364,9 +375,10 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         } )
   in
   let topology_of_snark_worker n
-      { Snark_worker_node.node_name; docker_image; _ } : Topology.top_info =
+      { Snark_worker_node.account_name; node_name; docker_image } :
+      Topology.top_info =
     let n = n + num_bp_sc_an_sn in
-    let pk, sk = pk_sk n in
+    let pk, sk = pk_sk account_name n in
     Snark_worker (node_name, { pk; sk; role = Snark_worker; docker_image })
   in
   snark_coordinator
