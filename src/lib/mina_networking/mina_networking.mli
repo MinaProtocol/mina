@@ -9,8 +9,7 @@ exception No_initial_peers
 
 type Structured_log_events.t +=
   | Gossip_new_state of { state_hash : State_hash.t }
-  | Gossip_transaction_pool_diff of
-      { txns : Transaction_pool.Resource_pool.Diff.t }
+  | Gossip_transaction_pool_diff of { fee_payer_sigs : Signature.t list }
   | Gossip_snark_pool_diff of { work : Snark_pool.Resource_pool.Diff.compact }
   [@@deriving register_event]
 

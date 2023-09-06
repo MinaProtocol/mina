@@ -422,3 +422,10 @@ let check_well_formedness ~genesis_constants t :
         Zkapp_too_big err :: errs0
   in
   if List.is_empty errs then Ok () else Error errs
+
+let fee_payer_signature = function
+  | Zkapp_command cmd ->
+      Zkapp_command.fee_payer_account_update cmd
+      |> Account_update.Fee_payer.authorization
+  | Signed_command cmd ->
+      Signed_command.signature cmd

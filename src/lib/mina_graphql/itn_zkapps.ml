@@ -271,13 +271,15 @@ let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
           @@ fun () ->
           match%map Zkapps.send_zkapp_command mina zkapp_command with
           | Ok _ ->
-              [%log info] "Sent out zkApp $command"
-                ~metadata:[ ("command", Zkapp_command.to_yojson zkapp_command) ]
-          | Error e ->
-              [%log info] "Failed to send out zkApp $command, see $error"
+              [%log info] "Sent out zkApp with fee payer's signature $signature"
                 ~metadata:
-                  [ ("command", Zkapp_command.to_yojson zkapp_command)
-                  ; ("error", `String e)
+                  [ ( "signature"
+                    , Zkapp_command.fee_payer_account_update zkapp_command
+                      |> Account_update.Fee_payer.authorization
+                      |> Signature.to_yojson )
                   ]
+          | Error e ->
+              [%log info] "Failed to send out zkApp command, see $error"
+                ~metadata:[ ("error", `String e) ]
         in
         repeat tm_next counter
