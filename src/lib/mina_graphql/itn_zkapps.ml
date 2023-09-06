@@ -88,20 +88,11 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
               let%bind () = after wait_span in
               Deferred.return (`Repeat ()) )
 
-let is_zkapp_deployed kp ledger =
-  match
-    Option.try_with (fun () ->
-        let account = Utils.account_of_kp kp ledger in
-        Option.is_some account.zkapp )
-  with
-  | Some true ->
-      true
-  | _ ->
-      false
+let is_zkapp_deployed ledger kp =
+  try Option.is_some (Utils.account_of_kp kp ledger).zkapp with _ -> false
 
 let all_zkapps_deployed ~ledger (keypairs : Signature_lib.Keypair.t list) =
-  List.map keypairs ~f:(fun kp -> is_zkapp_deployed kp ledger)
-  |> List.for_all ~f:Fn.id
+  List.map keypairs ~f:(is_zkapp_deployed ledger) |> List.for_all ~f:Fn.id
 
 let rec wait_until_zkapps_deployed ?(deployed = false) ~scheduler_tbl ~mina
     ~ledger ~deployment_fee ~max_cost ~init_balance
