@@ -417,7 +417,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
       (`Prover_error
         ( err
         , ( previous_protocol_state_proof
-          , internal_transition
+          , _internal_transition
           , pending_coinbase_witness ) ) ) ->
       let msg : (_, unit, string, unit) format4 =
         "Prover failed to prove freshly generated transition: $error"
@@ -427,8 +427,9 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
         ; ("prev_state", Protocol_state.value_to_yojson previous_protocol_state)
         ; ("prev_state_proof", Proof.to_yojson previous_protocol_state_proof)
         ; ("next_state", Protocol_state.value_to_yojson protocol_state)
-        ; ( "internal_transition"
-          , Internal_transition.to_yojson internal_transition )
+          (* Commented out because for large blocks it's an oversized log *)
+          (* ; ( "internal_transition"
+             , Internal_transition.to_yojson internal_transition ) *)
         ; ( "pending_coinbase_witness"
           , Pending_coinbase_witness.to_yojson pending_coinbase_witness )
         ; time_metadata
@@ -696,8 +697,11 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             in
             let start = Block_time.now time_controller in
             [%log info]
-              ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson crumb) ]
-              "Producing new block with parent $breadcrumb%!" ;
+              ~metadata:
+                [ ( "parent_hash"
+                  , Breadcrumb.parent_hash crumb |> State_hash.to_yojson )
+                ]
+              "Producing new block with parent $parent_hash%!" ;
             let previous_transition = Breadcrumb.block_with_hash crumb in
             let previous_protocol_state =
               Header.protocol_state

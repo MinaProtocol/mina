@@ -230,7 +230,8 @@ module Breadcrumb_added = struct
 
   type t =
     { state_hash : State_hash.t
-    ; user_commands : User_command.Valid.t With_status.t list
+    ; transaction_hashes :
+        Mina_transaction.Transaction_hash.t With_status.t list
     }
   [@@deriving to_yojson]
 
@@ -244,11 +245,11 @@ module Breadcrumb_added = struct
     let state_hash =
       parser_from_of_yojson State_hash.of_yojson state_hash_json
     in
-    let%map user_commands =
+    let%map transaction_hashes =
       get_metadata message "user_commands"
       >>= parse valid_commands_with_statuses
     in
-    { state_hash; user_commands }
+    { state_hash; transaction_hashes }
 
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
@@ -378,9 +379,7 @@ module Gossip = struct
   end
 
   module Transactions = struct
-    type r =
-      { txns : Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t }
-    [@@deriving yojson, hash]
+    type r = { fee_payer_sigs : Signature.t list } [@@deriving yojson, hash]
 
     type t = r With_direction.t [@@deriving yojson]
 
@@ -393,10 +392,10 @@ module Gossip = struct
     let parse_func message =
       match%bind parse id message with
       | Network_pool.Transaction_pool.Resource_pool.Diff.Transactions_received
-          { txns; sender = _ } ->
-          Ok ({ txns }, Direction.Received)
-      | Mina_networking.Gossip_transaction_pool_diff { txns } ->
-          Ok ({ txns }, Sent)
+          { fee_payer_sigs; sender = _ } ->
+          Ok ({ fee_payer_sigs }, Direction.Received)
+      | Mina_networking.Gossip_transaction_pool_diff { fee_payer_sigs } ->
+          Ok ({ fee_payer_sigs }, Sent)
       | _ ->
           bad_parse
 

@@ -36,15 +36,13 @@ let parser_from_of_yojson of_yojson js =
         ~metadata:[ ("module", `String modl); ("json", js) ] ;
       failwithf "Could not parse JSON using %s.of_yojson" modl ()
 
-let valid_commands_with_statuses :
-    Mina_base.User_command.Valid.t Mina_base.With_status.t list parser =
-  function
+let valid_commands_with_statuses = function
   | `List cmds ->
       let cmd_or_errors =
         List.map cmds
           ~f:
             (Mina_base.With_status.of_yojson
-               Mina_base.User_command.Valid.of_yojson )
+               Mina_transaction.Transaction_hash.of_yojson )
       in
       List.fold cmd_or_errors ~init:[] ~f:(fun accum cmd_or_err ->
           match (accum, cmd_or_err) with
