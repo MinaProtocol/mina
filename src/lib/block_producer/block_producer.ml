@@ -897,12 +897,18 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                              | `Prover_error _ ) as err ->
                                err )
                     in
+                    let txs =
+                      Mina_block.transactions ~constraint_constants
+                        (Breadcrumb.block breadcrumb)
+                      |> List.map ~f:Transaction.yojson_summary_with_status
+                    in
                     [%log internal] "@block_metadata"
                       ~metadata:
                         [ ( "blockchain_length"
                           , Mina_numbers.Length.to_yojson
                             @@ Mina_block.blockchain_length
                             @@ Breadcrumb.block breadcrumb )
+                        ; ("transactions", `List txs)
                         ] ;
                     [%str_log info]
                       ~metadata:

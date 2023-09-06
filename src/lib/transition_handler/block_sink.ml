@@ -18,6 +18,7 @@ type block_sink_config =
   ; log_gossip_heard : bool
   ; consensus_constants : Consensus.Constants.t
   ; genesis_constants : Genesis_constants.t
+  ; constraint_constants : Genesis_constants.Constraint_constants.t
   }
 
 type t =
@@ -30,6 +31,7 @@ type t =
       ; log_gossip_heard : bool
       ; consensus_constants : Consensus.Constants.t
       ; genesis_constants : Genesis_constants.t
+      ; constraint_constants : Genesis_constants.Constraint_constants.t
       }
   | Void
 
@@ -50,6 +52,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       ; log_gossip_heard
       ; consensus_constants
       ; genesis_constants
+      ; constraint_constants
       } ->
       O1trace.sync_thread "handle_block_gossip"
       @@ fun () ->
@@ -65,11 +68,17 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       @@ fun () ->
       Internal_tracing.with_state_hash state_hash
       @@ fun () ->
+      let open Mina_transaction in
+      let txs =
+        Mina_block.transactions ~constraint_constants state
+        |> List.map ~f:Transaction.yojson_summary_with_status
+      in
       [%log internal] "@block_metadata"
         ~metadata:
           [ ( "blockchain_length"
             , Mina_numbers.Length.to_yojson (Mina_block.blockchain_length state)
             )
+          ; ("transactions", `List txs)
           ] ;
       [%log internal] "External_block_received" ;
       let processing_start_time =
@@ -197,6 +206,7 @@ let create
     ; log_gossip_heard
     ; consensus_constants
     ; genesis_constants
+    ; constraint_constants
     } =
   let rate_limiter =
     Network_pool.Rate_limiter.create
@@ -217,6 +227,7 @@ let create
       ; log_gossip_heard
       ; consensus_constants
       ; genesis_constants
+      ; constraint_constants
       } )
 
 let void = Void
