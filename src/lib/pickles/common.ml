@@ -255,7 +255,7 @@ let combined_evaluation (type f)
   let open Impl in
   let open Field in
   let mul_and_add ~(acc : Field.t) ~(xi : Field.t)
-      (fx : (Field.t, Boolean.var) Plonk_types.Opt.t) : Field.t =
+      (fx : (Field.t, Boolean.var) Opt.t) : Field.t =
     match fx with
     | None ->
         acc

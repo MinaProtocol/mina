@@ -117,7 +117,7 @@ module Side_loaded : sig
   val create :
        name:string
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    -> feature_flags:Opt.Flag.t Plonk_types.Features.t
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
@@ -167,10 +167,10 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                  , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                  , ( Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                    , Impls.Wrap.Boolean.var )
-                   Plonk_types.Opt.t
+                   Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                    , Impls.Wrap.Boolean.var )
-                   Pickles_types__Plonk_types.Opt.t
+                   Pickles_types__Opt.t
                  , Impls.Wrap.Boolean.var )
                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                  .In_circuit
@@ -339,10 +339,10 @@ val wrap_main_dummy_override :
              , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
              , ( Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                , Impls.Wrap.Boolean.var )
-               Plonk_types.Opt.t
+               Opt.t
              , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                , Impls.Wrap.Boolean.var )
-               Pickles_types__Plonk_types.Opt.t
+               Pickles_types__Opt.t
              , Impls.Wrap.Boolean.var )
              Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
              .t

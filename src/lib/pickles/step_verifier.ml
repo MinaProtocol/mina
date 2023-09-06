@@ -849,7 +849,7 @@ struct
      Meaning it needs opt sponge. *)
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
-      ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
+      ~(feature_flags : Plonk_types.Features.options)
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
       ~(* TODO: Add "actual proofs verified" so that proofs don't
@@ -1036,8 +1036,7 @@ struct
             (e : (Field.t array, _) Evals.In_circuit.t) =
           let sg_evals =
             sg_evals |> Vector.to_list
-            |> List.map ~f:(fun (keep, eval) ->
-                   [| Plonk_types.Opt.Maybe (keep, eval) |] )
+            |> List.map ~f:(fun (keep, eval) -> [| Opt.Maybe (keep, eval) |])
           in
           let a =
             Evals.In_circuit.to_list e
@@ -1045,9 +1044,9 @@ struct
                  | None ->
                      [||]
                  | Some a ->
-                     Array.map a ~f:(fun x -> Plonk_types.Opt.Some x)
+                     Array.map a ~f:Opt.some
                  | Maybe (b, a) ->
-                     Array.map a ~f:(fun x -> Plonk_types.Opt.Maybe (b, x)) )
+                     Array.map a ~f:(Opt.maybe b) )
           in
           let v =
             List.append sg_evals ([| Some x_hat |] :: [| Some ft |] :: a)
@@ -1199,9 +1198,8 @@ struct
             (Types.Wrap.Statement.In_circuit.spec
                (module Impl)
                lookup_parameters feature_flags )
-            (Types.Wrap.Statement.In_circuit.to_data
-               ~option_map:Plonk_types.Opt.map statement
-               ~to_opt:Plonk_types.Opt.to_option_unsafe ) )
+            (Types.Wrap.Statement.In_circuit.to_data ~option_map:Opt.map
+               statement ~to_opt:Opt.to_option_unsafe ) )
       |> Array.map ~f:(function
            | `Field (Shifted_value.Type1.Shifted_value x) ->
                `Field x

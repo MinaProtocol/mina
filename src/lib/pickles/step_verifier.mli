@@ -40,7 +40,7 @@ val assert_n_bits :
 
 val finalize_other_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> feature_flags:Opt.Flag.t Plonk_types.Features.t
   -> step_domains:
        [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
        | `Side_loaded ]
@@ -126,7 +126,7 @@ val verify :
        , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
          Pickles_types.Hlist0.Id.t )
        Composition_types.Wrap.Lookup_parameters.t
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> feature_flags:Opt.Flag.t Plonk_types.Features.t
   -> proof:Wrap_proof.Checked.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fq.t
   -> wrap_domain:
@@ -143,12 +143,12 @@ val verify :
      , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
      , ( Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
        , Step_main_inputs.Impl.Boolean.var )
-       Pickles_types.Plonk_types.Opt.t
+       Pickles_types.Opt.t
      , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
          Composition_types.Scalar_challenge.t
        , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Snarky_backendless.Snark_intf.Boolean0.t )
-       Pickles_types.Plonk_types.Opt.t
+       Pickles_types.Opt.t
      , Step_main_inputs.Impl.Boolean.var
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t

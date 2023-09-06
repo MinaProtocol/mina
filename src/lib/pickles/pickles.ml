@@ -1709,7 +1709,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                   ; alpha = plonk0.alpha
                                   ; beta = chal plonk0.beta
                                   ; gamma = chal plonk0.gamma
-                                  ; joint_combiner = Plonk_types.Opt.None
+                                  ; joint_combiner = Opt.None
                                   }
                               }
                           ; sponge_digest_before_evaluations =
@@ -1785,7 +1785,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof
                       ; statement =
                           Types.Wrap.Statement.to_minimal
-                            ~to_option:Plonk_types.Opt.to_option next_statement
+                            ~to_option:Opt.to_option next_statement
                       ; prev_evals =
                           { Plonk_types.All_evals.evals =
                               { public_input = x_hat
@@ -2533,8 +2533,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               respond Unhandled
 
         let maybe_features =
-          Plonk_types.Features.(
-            map none ~f:(fun _ -> Plonk_types.Opt.Flag.Maybe))
+          Plonk_types.Features.(map none ~f:(fun _ -> Opt.Flag.Maybe))
 
         let side_loaded_tag =
           Side_loaded.create ~name:"foo"
