@@ -6,59 +6,57 @@ module Ledger = Mina_ledger.Ledger
 open Signature_lib
 open Currency
 open Schema
+module Scalars = Graphql_lib.Scalars
 
-include struct
-  open Graphql_lib.Scalars
+let private_key : (Mina_lib.t, Scalars.PrivateKey.t option) typ =
+  Scalars.PrivateKey.typ ()
 
-  let private_key : (Mina_lib.t, PrivateKey.t option) typ = PrivateKey.typ ()
+let public_key = Scalars.PublicKey.typ ()
 
-  let public_key = PublicKey.typ ()
+let uint16 = Scalars.UInt16.typ ()
 
-  let uint16 = UInt16.typ ()
+let uint32 = Scalars.UInt32.typ ()
 
-  let uint32 = UInt32.typ ()
+let token_id = Scalars.TokenId.typ ()
 
-  let token_id = TokenId.typ ()
+let json = Scalars.JSON.typ ()
 
-  let json = JSON.typ ()
+let epoch_seed = Scalars.EpochSeed.typ ()
 
-  let epoch_seed = EpochSeed.typ ()
+let balance = Scalars.Balance.typ ()
 
-  let balance = Balance.typ ()
+let amount = Scalars.Amount.typ ()
 
-  let amount = Amount.typ ()
+let fee = Scalars.Fee.typ ()
 
-  let fee = Fee.typ ()
+let block_time = Scalars.BlockTime.typ ()
 
-  let block_time = BlockTime.typ ()
+let global_slot_since_genesis = Scalars.GlobalSlotSinceGenesis.typ ()
 
-  let global_slot_since_genesis = GlobalSlotSinceGenesis.typ ()
+(* type annotation required because we're not using this yet *)
+let global_slot_since_hard_fork :
+    (Mina_lib.t, Scalars.GlobalSlotSinceHardFork.t option) typ =
+  Scalars.GlobalSlotSinceHardFork.typ ()
 
-  (* type annotation required because we're not using this yet *)
-  let global_slot_since_hard_fork :
-      (Mina_lib.t, GlobalSlotSinceHardFork.t option) typ =
-    GlobalSlotSinceHardFork.typ ()
+let global_slot_span = Scalars.GlobalSlotSpan.typ ()
 
-  let global_slot_span = GlobalSlotSpan.typ ()
+let length = Scalars.Length.typ ()
 
-  let length = Length.typ ()
+let span = Scalars.Span.typ ()
 
-  let span = Span.typ ()
+let ledger_hash = Scalars.LedgerHash.typ ()
 
-  let ledger_hash = LedgerHash.typ ()
+let state_hash = Scalars.StateHash.typ ()
 
-  let state_hash = StateHash.typ ()
+let account_nonce = Scalars.AccountNonce.typ ()
 
-  let account_nonce = AccountNonce.typ ()
+let chain_hash = Scalars.ChainHash.typ ()
 
-  let chain_hash = ChainHash.typ ()
+let transaction_hash = Scalars.TransactionHash.typ ()
 
-  let transaction_hash = TransactionHash.typ ()
+let transaction_id = Scalars.TransactionId.typ ()
 
-  let transaction_id = TransactionId.typ ()
-
-  let precomputed_block_proof = PrecomputedBlockProof.typ ()
-end
+let precomputed_block_proof = Scalars.PrecomputedBlockProof.typ ()
 
 let account_id : (Mina_lib.t, Account_id.t option) typ =
   obj "AccountId" ~fields:(fun _ ->
