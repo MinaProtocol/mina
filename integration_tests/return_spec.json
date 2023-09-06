@@ -3,15 +3,13 @@
   "return_spec": {
     "create_network": {
       "network_id": "string",
-      "nodes": [
-        {
+      "nodes": {
+        "$node_id": {
           "graphql_uri" : "string",
-          "network_id" : "string",
-          "network_keypair" : "string",
-          "node_id" : "string",
-          "node_type" : "string"
+          "node_type" : "string",
+          "private_key" : "string"
         }
-      ]
+      }
     },
     "start_network": {
       "network_id": "string"

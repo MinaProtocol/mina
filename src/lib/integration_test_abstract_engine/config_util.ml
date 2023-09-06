@@ -109,8 +109,7 @@ module Network_deployed = struct
         (fun (m : Network_keypair.t) n ->
           Public_key.equal m.keypair.public_key n.keypair.public_key
           && String.equal m.public_key n.public_key
-          && String.equal m.privkey_password n.privkey_password
-          && String.equal m.keypair_name n.keypair_name )
+          && String.equal m.privkey_password n.privkey_password )
         m.network_keypair n.network_keypair
     in
     let graphql = Option.equal String.equal m.graphql_uri n.graphql_uri in
@@ -137,12 +136,12 @@ module Network_deployed = struct
     | `Null ->
         None
     | `String private_key ->
-        let keypair_name = node_id ^ "_key" in
         let keypair =
           Keypair.of_private_key_exn
           @@ Private_key.of_base58_check_exn private_key
         in
-        Some (Network_keypair.create_network_keypair ~keypair_name ~keypair)
+        Some
+          (Network_keypair.create_network_keypair ~keypair_name:node_id ~keypair)
     | _ ->
         raise @@ Invalid_keypair private_key
 

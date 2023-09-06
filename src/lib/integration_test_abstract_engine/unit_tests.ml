@@ -390,7 +390,7 @@ module Parse_output_tests = struct
         let public_key = Public_key.of_private_key_exn private_key in
         Keypair.{ public_key; private_key }
       in
-      Network_keypair.create_network_keypair ~keypair_name:"node2_key" ~keypair
+      Network_keypair.create_network_keypair ~keypair_name:"node2" ~keypair
     in
     let archive =
       { node_id = "node0"

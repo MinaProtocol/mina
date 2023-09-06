@@ -108,9 +108,7 @@ module Node = struct
   module Scalars = Graphql_lib.Scalars
 
   module Graphql = struct
-    let ingress_uri node =
-      let path = sprintf "/%s/graphql" node.graphql_uri in
-      Uri.make ~scheme:"http" ~path ~port:80 ()
+    let ingress_uri node = Uri.of_string node.graphql_uri
 
     module Client = Graphql_lib.Client.Make (struct
       let preprocess_variables_string = Fn.id
