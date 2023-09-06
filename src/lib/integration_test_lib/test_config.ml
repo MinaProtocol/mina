@@ -140,21 +140,49 @@ module Node_role = struct
 end
 
 module Topology = struct
+  type base_info =
+    { pk : string; sk : string; role : Node_role.t; docker_image : string }
+  [@@deriving to_yojson]
+
+  type archive_info =
+    { pk : string
+    ; sk : string
+    ; role : Node_role.t
+    ; docker_image : string
+    ; schema_file : string
+    ; zkapp_file : string
+    }
+  [@@deriving to_yojson]
+
   type node_info =
     { pk : string
     ; sk : string
     ; role : Node_role.t
     ; docker_image : string
     ; libp2p_pass : string
+    ; libp2p_keyfile : string
     ; libp2p_keypair : Yojson.Safe.t
     ; libp2p_peerid : Yojson.Safe.t
     }
   [@@deriving to_yojson]
 
-  type t = (string * node_info) list
+  type top_info =
+    | Base of string * base_info
+    | Archive of string * archive_info
+    | Node of string * node_info
+
+  type t = top_info list
 
   let to_yojson nodes : Yojson.Safe.t =
-    let alist = List.map nodes ~f:(fun (a, b) -> (a, node_info_to_yojson b)) in
+    let alist =
+      List.map nodes ~f:(function
+        | Base (a, b) ->
+            (a, base_info_to_yojson b)
+        | Archive (a, b) ->
+            (a, archive_info_to_yojson b)
+        | Node (a, b) ->
+            (a, node_info_to_yojson b) )
+    in
     `Assoc alist
 end
 
@@ -261,32 +289,25 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
   in
   let libp2p_pass = "naughty blue worm" in
   let topology_of_block_producer n
-      { Block_producer_node.node_name; docker_image; _ } :
-      string * Topology.node_info =
+      { Block_producer_node.node_name; docker_image; _ } : Topology.top_info =
     let pk, sk = pk_sk n in
-    ( node_name
-    , { pk
-      ; sk
-      ; role = Block_producer
-      ; docker_image
-      ; libp2p_pass
-      ; libp2p_keypair = List.nth_exn libp2p_keypairs n
-      ; libp2p_peerid = `String List.(nth_exn libp2p_peerids n)
-      } )
+    Node
+      ( node_name
+      , { pk
+        ; sk
+        ; role = Block_producer
+        ; docker_image
+        ; libp2p_pass
+        ; libp2p_keyfile = "" (* value set in network_config.ml*)
+        ; libp2p_keypair = List.nth_exn libp2p_keypairs n
+        ; libp2p_peerid = `String List.(nth_exn libp2p_peerids n)
+        } )
   in
   let topology_of_snark_coordinator
-      { Snark_coordinator_node.node_name; docker_image; _ } :
-      string * Topology.node_info =
+      { Snark_coordinator_node.node_name; docker_image; _ } : Topology.top_info
+      =
     let pk, sk = pk_sk num_bp in
-    ( node_name
-    , { pk
-      ; sk
-      ; role = Snark_coordinator
-      ; docker_image
-      ; libp2p_pass = ""
-      ; libp2p_keypair = `Null
-      ; libp2p_peerid = `Null
-      } )
+    Base (node_name, { pk; sk; role = Snark_coordinator; docker_image })
   in
   let snark_coordinator =
     match Option.map t.snark_coordinator ~f:topology_of_snark_coordinator with
@@ -296,47 +317,40 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         [ sc ]
   in
   let topology_of_archive n { Archive_node.node_name; docker_image; _ } :
-      string * Topology.node_info =
+      Topology.top_info =
     let n = n + num_bp_sc in
     let pk, sk = pk_sk n in
-    ( node_name
-    , { pk
-      ; sk
-      ; role = Archive_node
-      ; docker_image
-      ; libp2p_pass = ""
-      ; libp2p_keypair = `Null
-      ; libp2p_peerid = `Null
-      } )
+    Archive
+      ( node_name
+      , { pk
+        ; sk
+        ; role = Archive_node
+        ; docker_image
+        ; schema_file = ""
+        ; zkapp_file = ""
+        } )
   in
   let topology_of_seed n { Seed_node.node_name; docker_image; _ } :
-      string * Topology.node_info =
+      Topology.top_info =
     let n = n + num_bp_sc_an in
     let pk, sk = pk_sk n in
-    ( node_name
-    , { pk
-      ; sk
-      ; role = Seed_node
-      ; docker_image
-      ; libp2p_pass
-      ; libp2p_keypair = List.nth_exn libp2p_keypairs n
-      ; libp2p_peerid = `String List.(nth_exn libp2p_peerids n)
-      } )
+    Node
+      ( node_name
+      , { pk
+        ; sk
+        ; role = Seed_node
+        ; docker_image
+        ; libp2p_pass
+        ; libp2p_keyfile = "" (* value set in network_config.ml*)
+        ; libp2p_keypair = List.nth_exn libp2p_keypairs n
+        ; libp2p_peerid = `String List.(nth_exn libp2p_peerids n)
+        } )
   in
   let topology_of_snark_worker n
-      { Snark_worker_node.node_name; docker_image; _ } :
-      string * Topology.node_info =
+      { Snark_worker_node.node_name; docker_image; _ } : Topology.top_info =
     let n = n + num_bp_sc_an_sn in
     let pk, sk = pk_sk n in
-    ( node_name
-    , { pk
-      ; sk
-      ; role = Snark_worker
-      ; docker_image
-      ; libp2p_pass = ""
-      ; libp2p_keypair = `Null
-      ; libp2p_peerid = `Null
-      } )
+    Base (node_name, { pk; sk; role = Snark_worker; docker_image })
   in
   snark_coordinator
   @ List.mapi t.archive_nodes ~f:topology_of_archive
@@ -547,24 +561,5 @@ module Unit_tests = struct
       |> Topology.to_yojson
     in
     print_endline "=== Topology ===" ;
-    topology |> pretty_to_string |> print_endline ;
-    (* only block producers and seed nodes get libp2p keypairs *)
-    let get_libp2p_keypair node_name =
-      Util.(member node_name topology |> member "libp2p_keypair")
-    in
-    assert (
-      List.for_all test_config.block_producers ~f:(fun bp ->
-          not @@ equal `Null @@ get_libp2p_keypair bp.node_name ) ) ;
-    assert (
-      List.for_all test_config.seed_nodes ~f:(fun sn ->
-          not @@ equal `Null @@ get_libp2p_keypair sn.node_name ) ) ;
-    assert (
-      List.for_all test_config.archive_nodes ~f:(fun an ->
-          equal `Null @@ get_libp2p_keypair an.node_name ) ) ;
-    assert (
-      List.for_all test_config.snark_workers ~f:(fun sw ->
-          equal `Null @@ get_libp2p_keypair sw.node_name ) ) ;
-    assert (
-      Option.for_all test_config.snark_coordinator ~f:(fun sc ->
-          equal `Null @@ get_libp2p_keypair sc.node_name ) )
+    topology |> pretty_to_string |> print_endline
 end
