@@ -1,6 +1,6 @@
 (library
  (name structured_log_events_examples)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (library_flags -linkall)
  (libraries core_kernel yojson result)
  (preprocess

@@ -1,5 +1,5 @@
 (library
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (name pickles_types)
  (public_name pickles_types)
  ; Deactivated warnings

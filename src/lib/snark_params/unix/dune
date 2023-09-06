@@ -1,7 +1,7 @@
 (library
  (name snark_params_unix)
  (public_name snark_params.unix)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    graphql-async
