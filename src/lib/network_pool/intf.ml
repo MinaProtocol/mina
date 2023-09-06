@@ -311,7 +311,7 @@ module type Snark_pool_diff_intf = sig
   type verified = t [@@deriving compare, sexp]
 
   type compact =
-    { work : Transaction_snark_work.Statement.t
+    { work_ids : int One_or_two.t
     ; fee : Currency.Fee.t
     ; prover : Signature_lib.Public_key.Compressed.t
     }
@@ -366,7 +366,8 @@ module type Transaction_pool_diff_intf = sig
   end
 
   type Structured_log_events.t +=
-    | Transactions_received of { txns : t; sender : Envelope.Sender.t }
+    | Transactions_received of
+        { fee_payer_sigs : Signature.t list; sender : Envelope.Sender.t }
     [@@deriving register_event]
 
   include

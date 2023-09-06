@@ -95,22 +95,18 @@ module Base
         if BC.is_expired cb then Deferred.return None
         else
           let summary = `String (Diff.summary @@ Envelope.Incoming.data env) in
-          [%log debug] "Verifying $diff from $sender"
-            ~metadata:
-              [ ("diff", summary)
-              ; ("sender", Envelope.Sender.to_yojson env.sender)
-              ] ;
+          let metadata =
+            [ ("diff", summary)
+            ; ("sender", Envelope.Sender.to_yojson env.sender)
+            ]
+          in
+          [%log debug] "Verifying $diff from $sender" ~metadata ;
           match
             Rate_limiter.add rl env.sender ~now:(Time.now ())
               ~score:(Diff.score env.data)
           with
           | `Capacity_exceeded ->
-              [%log debug]
-                ~metadata:
-                  [ ("sender", Envelope.Sender.to_yojson env.sender)
-                  ; ("diff", summary)
-                  ]
-                "exceeded capacity from $sender" ;
+              [%log debug] ~metadata "exceeded capacity from $sender" ;
               BC.error (Error.of_string "exceeded capacity") cb ;
               Diff.log_internal ~logger "rejected" ~reason:"rate_limit" env ;
               Deferred.return None
@@ -127,22 +123,12 @@ module Base
                         "Refusing to rebroadcast $diff. Verification error: \
                          $error"
                         ~metadata:
-                          [ ("diff", summary)
-                          ; ("error", Error_json.error_to_yojson err)
-                          ] ;
+                          (("error", Error_json.error_to_yojson err) :: metadata) ;
                       (*reject incoming messages*)
                       BC.error err cb ;
                       None
                   | Ok verified_diff ->
-                      [%log debug] "Verified diff: $verified_diff"
-                        ~metadata:
-                          [ ( "verified_diff"
-                            , Diff.verified_to_yojson
-                              @@ Envelope.Incoming.data verified_diff )
-                          ; ( "sender"
-                            , Envelope.Sender.to_yojson
-                              @@ Envelope.Incoming.sender verified_diff )
-                          ] ;
+                      [%log debug] "Verified diff: $diff" ~metadata ;
                       Some verified_diff ) )
 
   let push t (msg, cb) =
@@ -174,7 +160,7 @@ module Base
                   [%log error]
                     !"Validation timed out on %s $diff"
                     Diff.label
-                    ~metadata:[ ("diff", Diff.to_yojson diff) ]
+                    ~metadata:[ ("diff", `String (Diff.summary diff)) ]
               | Some _ ->
                   () )
         | _ ->
