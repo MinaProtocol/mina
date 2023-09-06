@@ -153,7 +153,7 @@ let user_commands_from_block_id ~mainnet_pool block_id =
       let valid_until =
         Option.map user_cmd.valid_until ~f:(fun valid_until ->
             Unsigned.UInt32.of_int64 valid_until
-            |> Mina_numbers.Global_slot.of_uint32 )
+            |> Mina_numbers.Global_slot_since_genesis.of_uint32 )
       in
       let memo =
         Mina_base.Signed_command_memo.of_base58_check_exn user_cmd.memo
@@ -171,11 +171,11 @@ let user_commands_from_block_id ~mainnet_pool block_id =
             | "payment" ->
                 let amount = Option.value_exn amount in
                 Mina_base.Signed_command_payload.Body.Payment
-                  { source_pk = source; receiver_pk = receiver; amount }
+                  { receiver_pk = receiver; amount }
             | "delegation" ->
                 let set_delegate =
                   Mina_base.Stake_delegation.Set_delegate
-                    { delegator = source; new_delegate = receiver }
+                    { new_delegate = receiver }
                 in
                 Mina_base.Signed_command_payload.Body.Stake_delegation
                   set_delegate
@@ -388,11 +388,11 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
   let height = Unsigned.UInt32.of_int64 block.height in
   let global_slot_since_hard_fork =
     block.global_slot_since_hard_fork |> Unsigned.UInt32.of_int64
-    |> Mina_numbers.Global_slot.of_uint32
+    |> Mina_numbers.Global_slot_since_hard_fork.of_uint32
   in
   let global_slot_since_genesis =
     block.global_slot_since_genesis |> Unsigned.UInt32.of_int64
-    |> Mina_numbers.Global_slot.of_uint32
+    |> Mina_numbers.Global_slot_since_genesis.of_uint32
   in
   let timestamp = Block_time.of_int64 block.timestamp in
   let%bind block_id =
