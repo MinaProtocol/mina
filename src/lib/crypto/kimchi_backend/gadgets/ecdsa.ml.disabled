@@ -98,10 +98,8 @@ let signature_scalar_check (type f)
    *           Right input r_inv is bound checked below
    *           Result bound check is covered by scalar_checks
    *)
-  Foreign_field.External_checks.append_bound_check scalar_checks
-  @@ Foreign_field.Element.Standard.to_limbs r ;
-  Foreign_field.External_checks.append_bound_check scalar_checks
-  @@ Foreign_field.Element.Standard.to_limbs r_inv ;
+  Foreign_field.External_checks.append_bound_check scalar_checks r ;
+  Foreign_field.External_checks.append_bound_check scalar_checks r_inv ;
   (* Assert r * r^-1 = 1 *)
   Foreign_field.Element.Standard.assert_equal (module Circuit) computed_one one ;
 
@@ -113,10 +111,8 @@ let signature_scalar_check (type f)
    *           Right input s_inv is bound checked below
    *           Result bound check is covered by scalar_checks
    *)
-  Foreign_field.External_checks.append_bound_check scalar_checks
-  @@ Foreign_field.Element.Standard.to_limbs s ;
-  Foreign_field.External_checks.append_bound_check scalar_checks
-  @@ Foreign_field.Element.Standard.to_limbs s_inv ;
+  Foreign_field.External_checks.append_bound_check scalar_checks s ;
+  Foreign_field.External_checks.append_bound_check scalar_checks s_inv ;
   (* Assert s * s^-1 = 1 *)
   Foreign_field.Element.Standard.assert_equal (module Circuit) computed_one one
 
@@ -250,8 +246,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Right input u1 checked below
    *           Result is gadget input (already checked externally).
    *)
-  Foreign_field.External_checks.append_bound_check scalar_checks
-  @@ Foreign_field.Element.Standard.to_limbs u1 ;
+  Foreign_field.External_checks.append_bound_check scalar_checks u1 ;
 
   (* Assert s * u1 = z *)
   Foreign_field.Element.Standard.assert_equal
@@ -269,8 +264,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Right input u2 checked below
    *           Result is gadget input (already checked externally).
    *)
-  Foreign_field.External_checks.append_bound_check scalar_checks
-  @@ Foreign_field.Element.Standard.to_limbs u2 ;
+  Foreign_field.External_checks.append_bound_check scalar_checks u2 ;
 
   (* Assert s * u2 = r *)
   Foreign_field.Element.Standard.assert_equal (module Circuit) r_computed r ;
@@ -313,10 +307,8 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Initial accumulator is gadget input (checked externally or public parameter)
    *           Result bound check for u1_point below.
    *)
-  Foreign_field.External_checks.append_bound_check base_checks
-  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x u1_point ;
-  Foreign_field.External_checks.append_bound_check base_checks
-  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y u1_point ;
+  Foreign_field.External_checks.append_bound_check base_checks @@ Affine.x u1_point ;
+  Foreign_field.External_checks.append_bound_check base_checks @@ Affine.y u1_point ;
 
   (* C6: Constrain scalar multiplication u2P *)
   let u2_point =
@@ -329,10 +321,8 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Initial accumulator is gadget input (checked externally or public parameter)
    *           Result bound check for u2_point below.
    *)
-  Foreign_field.External_checks.append_bound_check base_checks
-  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x u2_point ;
-  Foreign_field.External_checks.append_bound_check base_checks
-  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y u2_point ;
+  Foreign_field.External_checks.append_bound_check base_checks @@ Affine.x u2_point ;
+  Foreign_field.External_checks.append_bound_check base_checks @@ Affine.y u2_point ;
 
   (* C7: R = u1G + u2P *)
   let result =
@@ -342,10 +332,8 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Bounds 7: Left and right inputs checked by (Bounds 5) and (Bounds 6)
    *           Result bound is bound checked below
    *)
-  Foreign_field.External_checks.append_bound_check base_checks
-  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x result ;
-  Foreign_field.External_checks.append_bound_check base_checks
-  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y result ;
+  Foreign_field.External_checks.append_bound_check base_checks @@ Affine.x result ;
+  Foreign_field.External_checks.append_bound_check base_checks @@ Affine.y result ;
 
   (* Constrain that r = Rx (mod n), where n is the scalar field modulus
    *
@@ -415,8 +403,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Right input (n - 1) is a public parameter so not checked
    *           Result bound check is already covered by scalar_checks
    *)
-  Foreign_field.External_checks.append_bound_check scalar_checks
-  @@ Foreign_field.Element.Standard.to_limbs quotient ;
+  Foreign_field.External_checks.append_bound_check scalar_checks quotient ;
 
   (* C9: Compute qn = q * (n - 1) + q *)
   let quotient_times_n =
@@ -448,8 +435,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *            Right input x_prime bounds checked below
    *            Result already bound checked by (Bounds 7)
    *)
-  Foreign_field.External_checks.append_bound_check scalar_checks
-  @@ Foreign_field.Element.Standard.to_limbs x_prime ;
+  Foreign_field.External_checks.append_bound_check scalar_checks x_prime ;
 
   (* C11: Check qn + r = Rx *)
   Foreign_field.Element.Standard.assert_equal
