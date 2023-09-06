@@ -119,6 +119,12 @@ spec:
           protocol: TCP
           containerPort: {{ .Values.mina.ports.p2p }}
           hostPort: {{ .Values.mina.ports.p2p }}
+        {{- if $.Values.mina.exposeItnGraphql }}
+        - name: http-itn-graphql
+          protocol: TCP
+          port: {{ $.Values.mina.itn.port }}
+          targetPort: {{ $.Values.mina.itn.port }}
+        {{- end }}  
 {{$name := include "archive-node.fullname" . }}
 {{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
@@ -214,7 +220,7 @@ spec:
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
   {{- if $.Values.mina.exposeItnGraphql }}
-  - name: http-int-graphql
+  - name: http-itn-graphql
     protocol: TCP
     port: {{ $.Values.mina.itn.port }}
     targetPort: {{ $.Values.mina.itn.port }}

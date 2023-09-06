@@ -262,7 +262,7 @@ spec:
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
   {{- if $.Values.mina.exposeItnGraphql }}
-  - name: http-int-graphql
+  - name: http-itn-graphql
     protocol: TCP
     port: {{ $.Values.mina.itn.port }}
     targetPort: {{ $.Values.mina.itn.port }}
