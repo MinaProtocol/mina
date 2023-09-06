@@ -249,10 +249,12 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
     let _, (keypair, _) =
       Core.String.Map.find_exn genesis_ledger_accounts node.account_name
     in
-    let node_info =
-      List.find_exn topology ~f:(fun (name, _) ->
-          String.equal name node.node_name )
-      |> snd
+    let[@warning "-8"] (Test_config.Topology.Node (_, node_info)) =
+      List.find_exn topology ~f:(function
+        | Node (name, _) ->
+            String.equal name node.node_name
+        | _ ->
+            false )
     in
     { name = node.node_name
     ; keypair = { keypair with keypair_name = node.node_name }
@@ -278,10 +280,12 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
   in
   let seed_node_configs =
     List.map seed_nodes ~f:(fun node ->
-        let node_info =
-          List.find_exn topology ~f:(fun (name, _) ->
-              String.equal name node.node_name )
-          |> snd
+        let[@warning "-8"] (Test_config.Topology.Node (_, node_info)) =
+          List.find_exn topology ~f:(function
+            | Node (name, _) ->
+                String.equal name node.node_name
+            | _ ->
+                false )
         in
         { name = node.node_name
         ; libp2p_pass = "naughty blue worm"
@@ -301,10 +305,24 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
     "https://raw.githubusercontent.com/MinaProtocol/mina/" ^ long_commit_id
     ^ "/src/app/archive/"
   in
-  let mina_archive_schema_aux_files =
-    [ mina_archive_base_url ^ "create_schema.sql"
-    ; mina_archive_base_url ^ "zkapp_tables.sql"
-    ]
+  let schema_file = mina_archive_base_url ^ "create_schema.sql" in
+  let zkapp_file = mina_archive_base_url ^ "zkapp_tables.sql" in
+  let mina_archive_schema_aux_files = [ schema_file; zkapp_file ] in
+  let libp2p_keyfile name =
+    let open Core in
+    cli_inputs.mina_automation_location ^/ "testnets" ^/ network_id
+    ^/ "libp2p_keys" ^/ name ^ ".json"
+  in
+  (* instantiate remaining topology information *)
+  let topology =
+    List.map topology ~f:(function
+      | Archive (name, archive_info) ->
+          Test_config.Topology.Archive
+            (name, { archive_info with schema_file; zkapp_file })
+      | Node (name, node_info) ->
+          Node (name, { node_info with libp2p_keyfile = libp2p_keyfile name })
+      | x ->
+          x )
   in
   let genesis_keypairs =
     String.Map.of_alist_exn
