@@ -48,14 +48,18 @@ let domains (type field gates) ?feature_flags
             let xor_table_used = xor in
             (if range_check_table_used then Int.pow 2 12 else 0)
             + (if xor_table_used then Int.pow 2 8 else 0)
-            + ( if lookup then
+            + ( if lookup then (
                 Kimchi_backend_common.Plonk_constraint_system
-                .get_concatenated_fixed_lookup_table_size sys
+                .finalize_fixed_lookup_tables sys ;
+                Kimchi_backend_common.Plonk_constraint_system
+                .get_concatenated_fixed_lookup_table_size sys )
               else 0 )
             +
-            if runtime_tables then
+            if runtime_tables then (
               Kimchi_backend_common.Plonk_constraint_system
-              .get_concatenated_runtime_lookup_table_size sys
+              .finalize_runtime_lookup_tables sys ;
+              Kimchi_backend_common.Plonk_constraint_system
+              .get_concatenated_runtime_lookup_table_size sys )
             else 0
           in
 
