@@ -756,7 +756,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a zkapp with a different chain id"
         (send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri node)
-           zkapp_command_cross_network_replay "Verification_failed" )
+           zkapp_command_cross_network_replay "Invalid_proof" )
     in
     let%bind () =
       section_hard "Send a zkapp with an insufficient fee"
