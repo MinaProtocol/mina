@@ -1736,11 +1736,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs
                                     ; public_inputs
                                     } () ->
-                              (* TODO(dw): pass runtime tables information *)
                               Backend.Tock.Proof.create_async
                                 ~primary:public_inputs
                                 ~auxiliary:auxiliary_inputs pk
-                                ~runtime_tables:[||]
                                 ~message:
                                   ( Vector.map2
                                       (Vector.extend_front_exn
