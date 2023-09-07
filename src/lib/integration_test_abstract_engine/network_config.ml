@@ -303,8 +303,8 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
     ^ "/src/app/archive/"
   in
   let schema_file = mina_archive_base_url ^ "create_schema.sql" in
-  let zkapp_file = mina_archive_base_url ^ "zkapp_tables.sql" in
-  let mina_archive_schema_aux_files = [ schema_file; zkapp_file ] in
+  let zkapp_table = mina_archive_base_url ^ "zkapp_tables.sql" in
+  let mina_archive_schema_aux_files = [ schema_file; zkapp_table ] in
   let libp2p_keyfile name =
     let open Core in
     cli_inputs.mina_automation_location ^/ "testnets" ^/ network_id
@@ -315,7 +315,7 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
     List.map topology ~f:(function
       | Archive (name, archive_info) ->
           Test_config.Topology.Archive
-            (name, { archive_info with schema_file; zkapp_file })
+            (name, { archive_info with schema_file; zkapp_table })
       | Node (name, node_info) ->
           Node (name, { node_info with libp2p_keyfile = libp2p_keyfile name })
       | x ->

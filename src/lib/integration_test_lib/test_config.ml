@@ -133,6 +133,7 @@ module Topology = struct
     ; role : Node_role.t
     ; docker_image : string
     ; worker_nodes : int
+    ; snark_worker_fee : string
     }
   [@@deriving to_yojson]
 
@@ -146,7 +147,7 @@ module Topology = struct
     ; role : Node_role.t
     ; docker_image : string
     ; schema_file : string
-    ; zkapp_file : string
+    ; zkapp_table : string
     }
   [@@deriving to_yojson]
 
@@ -166,7 +167,6 @@ module Topology = struct
     | Archive of string * archive_info
     | Node of string * node_info
     | Snark_coordinator of string * snark_coordinator_info
-    | Snark_worker_fee of string
 
   type t = top_info list
 
@@ -178,9 +178,7 @@ module Topology = struct
         | Node (a, b) ->
             (a, node_info_to_yojson b)
         | Snark_coordinator (a, b) ->
-            (a, snark_coordinator_info_to_yojson b)
-        | Snark_worker_fee fee ->
-            ("snark_worker_fee", `String fee) )
+            (a, snark_coordinator_info_to_yojson b) )
     in
     `Assoc alist
 end
@@ -316,7 +314,13 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
     let pk, sk = pk_sk account_name num_bp in
     Snark_coordinator
       ( node_name
-      , { pk; sk; role = Snark_coordinator; docker_image; worker_nodes } )
+      , { pk
+        ; sk
+        ; role = Snark_coordinator
+        ; docker_image
+        ; worker_nodes
+        ; snark_worker_fee = t.snark_worker_fee
+        } )
   in
   let snark_coordinator =
     match Option.map t.snark_coordinator ~f:topology_of_snark_coordinator with
@@ -337,7 +341,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         ; role = Archive_node
         ; docker_image
         ; schema_file = "instantiated in network_config.ml"
-        ; zkapp_file = "instantiated in network_config.ml"
+        ; zkapp_table = "instantiated in network_config.ml"
         } )
   in
   let topology_of_seed n { Seed_node.account_name; node_name; docker_image } :
@@ -360,7 +364,6 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
   @ List.mapi t.archive_nodes ~f:topology_of_archive
   @ List.mapi t.block_producers ~f:topology_of_block_producer
   @ List.mapi t.seed_nodes ~f:topology_of_seed
-  @ [ Snark_worker_fee t.snark_worker_fee ]
 
 let test_account ?(pk = "") ?(timing = Mina_base.Account.Timing.Untimed)
     account_name balance : Test_Account.t =
