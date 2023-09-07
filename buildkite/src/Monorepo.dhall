@@ -1,5 +1,7 @@
 let Prelude = ./External/Prelude.dhall
 let List/map = Prelude.List.map
+let List/filter = Prelude.List.filter
+
 
 let SelectFiles = ./Lib/SelectFiles.dhall
 let Cmd = ./Lib/Cmds.dhall
@@ -9,8 +11,12 @@ let Docker = ./Command/Docker/Type.dhall
 let JobSpec = ./Pipeline/JobSpec.dhall
 let Pipeline = ./Pipeline/Dsl.dhall
 let PipelineMode = ./Pipeline/Mode.dhall
+let PipelineStage = ./Pipeline/Stage.dhall
 let Size = ./Command/Size.dhall
 let triggerCommand = ./Pipeline/TriggerCommand.dhall
+
+let mode = env:BUILDKITE_PIPELINE_MODE as Text ? "PullRequest"
+let stage = env:BUILDKITE_PIPELINE_STAGE as Text ? "Test"
 
 let jobs : List JobSpec.Type =
   List/map
@@ -19,43 +25,44 @@ let jobs : List JobSpec.Type =
     (\(composite: Pipeline.CompoundType) -> composite.spec)
     ./gen/Jobs.dhall
 
--- Run a job if we touched a dirty path
-let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
-  let dirtyWhen = SelectFiles.compile job.dirtyWhen
-  let trigger = triggerCommand "src/Jobs/${job.path}/${job.name}.dhall"
-  let requestedPipelineName : Text = env:BUILDKITE_PIPELINE_MODE as Text? "PullRequest"
-  let jobPipelineName = PipelineMode.capitalName job.mode
-  let pipelineHandlers = {
-    PullRequest = ''
-      if [ "${requestedPipelineName}" == "PullRequest" ]; then
-        if (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
-          echo "Triggering ${job.name} for reason:"
-          cat _computed_diff.txt | egrep '${dirtyWhen}'
-          ${Cmd.format trigger}
-        fi
-      else 
-        echo "Triggering ${job.name} because this is a stable buildkite run"
-        ${Cmd.format trigger}
-      fi
-    '',
-    Stable = ''
-      if [ "${requestedPipelineName}" == "PullRequest" ]; then
-        echo "Skipping ${job.name} because this is a PR buildkite run"
-      else 
-        echo "Triggering ${job.name} because this is a stable buildkite run"
-        ${Cmd.format trigger}
-      fi
-    ''
-  }
-  in Cmd.quietly (merge pipelineHandlers job.mode)
-
 let prefixCommands = [
   Cmd.run "git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt", -- Tell git where to find certs for https connections
   Cmd.run "git fetch origin", -- Freshen the cache
   Cmd.run "./buildkite/scripts/generate-diff.sh > _computed_diff.txt"
 ]
 
-let commands = Prelude.List.map JobSpec.Type Cmd.Type makeCommand jobs
+
+-- Run a job if we touched a dirty path
+let commands: Text -> Text -> List Cmd.Type  =  \(target_stage: Text) -> \(target_mode: Text) ->
+  Prelude.List.map 
+    JobSpec.Type 
+    Cmd.Type 
+    (\(job: JobSpec.Type) ->
+      let job_mode = PipelineMode.capitalName job.mode
+      let job_stage = PipelineStage.capitalName job.stage
+
+      let dirtyWhen = SelectFiles.compile job.dirtyWhen
+      let trigger = triggerCommand "src/Jobs/${job.path}/${job.name}.dhall"
+      let pipelineHandlers = {
+        PullRequest = ''
+          if [ "${job_mode}" == "${target_mode}" ] && [ "${job_stage}" == "${target_stage}" ]; then
+            if (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
+              echo "Triggering ${job.name} for reason:"
+              cat _computed_diff.txt | egrep '${dirtyWhen}'
+              ${Cmd.format trigger}
+            fi 
+          fi
+        '',
+        Stable = ''
+          if [ "${job_stage}" == "${target_stage}" ]; then
+            echo "Triggering ${job.name} because this is a stable buildkite run"
+            ${Cmd.format trigger}
+          fi
+        ''
+      }
+      in Cmd.quietly (merge pipelineHandlers job.mode)
+    ) 
+    jobs
 
 in Pipeline.build Pipeline.Config::{
   spec = JobSpec::{
@@ -66,9 +73,9 @@ in Pipeline.build Pipeline.Config::{
   steps = [
   Command.build
     Command.Config::{
-      commands = prefixCommands # commands,
-      label = "Monorepo triage",
-      key = "cmds",
+      commands = prefixCommands # (commands stage mode),
+      label = "Monorepo triage ${stage}",
+      key = "cmds-${stage}",
       target = Size.Small,
       docker = Some Docker::{
         image = (./Constants/ContainerImages.dhall).toolchainBase,
@@ -77,4 +84,3 @@ in Pipeline.build Pipeline.Config::{
     }
   ]
 }
-
