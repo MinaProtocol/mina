@@ -192,11 +192,10 @@ struct
   let choose_key :
       type n.
          n One_hot_vector.t
-      -> ( (Inner_curve.t, (Inner_curve.t, Boolean.var) Plonk_types.Opt.t) index'
+      -> ( (Inner_curve.t, (Inner_curve.t, Boolean.var) Opt.t) index'
          , n )
          Vector.t
-      -> (Inner_curve.t, (Inner_curve.t, Boolean.var) Plonk_types.Opt.t) index'
-      =
+      -> (Inner_curve.t, (Inner_curve.t, Boolean.var) Opt.t) index' =
     let open Tuple_lib in
     fun bs keys ->
       let open Field in
@@ -216,11 +215,11 @@ struct
                  when none of the optional gates are used, otherwise we will
                  change the serialization of the protocol circuits.
               *)
-              | Plonk_types.Opt.None ->
+              | Opt.None ->
                   ([], [], [ b ])
-              | Plonk_types.Opt.Maybe (b_x, x) ->
+              | Opt.Maybe (b_x, x) ->
                   ([], [ (b, b_x, x) ], [])
-              | Plonk_types.Opt.Some x ->
+              | Opt.Some x ->
                   ([ (b, x) ], [], []) ) )
       |> Vector.reduce_exn
            ~f:
@@ -232,7 +231,7 @@ struct
                (* We only have `None`s, so we can emit exactly `None` without
                   further computation.
                *)
-               Plonk_types.Opt.None
+               Opt.None
            | somes, [], [] ->
                (* Special case: we don't need to compute the 'maybe' bool
                   because we know statically that all entries are `Some`.
@@ -243,7 +242,7 @@ struct
                         Double.map g ~f:(( * ) (b :> t)) )
                  |> List.reduce_exn ~f:(Double.map2 ~f:( + ))
                in
-               Plonk_types.Opt.Some sum
+               Opt.Some sum
            | somes, maybes, nones ->
                let is_none =
                  List.reduce nones
@@ -290,7 +289,7 @@ struct
                  |> Array.filter_map ~f:Fn.id
                  |> Array.reduce_exn ~f:(Double.map2 ~f:( + ))
                in
-               Plonk_types.Opt.Maybe (is_yes, sum) )
+               Opt.Maybe (is_yes, sum) )
 
   (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
@@ -436,7 +435,7 @@ struct
       let { Curve_opt.non_zero; point } =
         Pcs_batch.combine_split_commitments batch
           ~scale_and_add:(fun ~(acc : Curve_opt.t) ~xi
-                              (p : (Point.t, Boolean.var) Plonk_types.Opt.t) ->
+                              (p : (Point.t, Boolean.var) Opt.t) ->
             (* match acc.non_zero, keep with
                | false, false -> acc
                | true, false -> acc
@@ -463,22 +462,22 @@ struct
               { Curve_opt.non_zero; point }
             in
             match p with
-            | Plonk_types.Opt.None ->
+            | Opt.None ->
                 acc
-            | Plonk_types.Opt.Maybe (keep, p) ->
+            | Opt.Maybe (keep, p) ->
                 point keep p
-            | Plonk_types.Opt.Some p ->
+            | Opt.Some p ->
                 point Boolean.true_ p )
           ~xi
           ~init:(function
-            | Plonk_types.Opt.None ->
+            | Opt.None ->
                 None
-            | Plonk_types.Opt.Maybe (keep, p) ->
+            | Opt.Maybe (keep, p) ->
                 Some
                   { non_zero = Boolean.(keep &&& Point.finite p)
                   ; point = Point.underlying p
                   }
-            | Plonk_types.Opt.Some p ->
+            | Opt.Some p ->
                 Some
                   { non_zero = Boolean.(true_ &&& Point.finite p)
                   ; point = Point.underlying p
@@ -613,8 +612,8 @@ struct
             Array.iter2_exn ~f:Field.Assert.equal
               (fst @@ var_to_fields j0)
               (fst @@ var_to_fields j1)
-        | ( ((Plonk_types.Opt.Some _ | Maybe _ | None) as j0)
-          , ((Plonk_types.Opt.Some _ | Maybe _ | None) as j1) ) ->
+        | ( ((Pickles_types.Opt.Some _ | Maybe _ | None) as j0)
+          , ((Pickles_types.Opt.Some _ | Maybe _ | None) as j1) ) ->
             let sexp_of t =
               Sexp.to_string
               @@ Types.Opt.sexp_of_t
@@ -664,7 +663,8 @@ struct
         } =
       m
     in
-    let g_opt = Plonk_types.Opt.map ~f:g in
+    let open Pickles_types in
+    let g_opt = Opt.map ~f:g in
     List.map
       ( Vector.to_list sigma_comm
       @ Vector.to_list coefficients_comm
@@ -675,7 +675,7 @@ struct
         ; emul_comm
         ; endomul_scalar_comm
         ] )
-      ~f:(fun x -> Plonk_types.Opt.Some (g x))
+      ~f:(fun x -> Opt.Some (g x))
     @ [ g_opt range_check0_comm
       ; g_opt range_check1_comm
       ; g_opt foreign_field_mul_comm
@@ -700,9 +700,9 @@ struct
       final state when using the sponge.
   *)
   let simulate_optional_sponge_with_alignment (sponge : Sponge.t) ~f = function
-    | Plonk_types.Opt.None ->
-        Plonk_types.Opt.None
-    | Plonk_types.Opt.Maybe (b, x) ->
+    | Pickles_types.Opt.None ->
+        Pickles_types.Opt.None
+    | Pickles_types.Opt.Maybe (b, x) ->
         (* Cache the sponge state before *)
         let sponge_state_before = sponge.sponge_state in
         let state_before = Array.copy sponge.state in
@@ -723,9 +723,9 @@ struct
               Field.if_ b ~then_ ~else_ )
         in
         sponge.state <- state ;
-        Plonk_types.Opt.Maybe (b, res)
-    | Plonk_types.Opt.Some x ->
-        Plonk_types.Opt.Some (f sponge x)
+        Pickles_types.Opt.Maybe (b, res)
+    | Pickles_types.Opt.Some x ->
+        Pickles_types.Opt.Some (f sponge x)
 
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
@@ -756,7 +756,7 @@ struct
                      List.to_array (Inner_curve.to_field_elements z) )
                    m )
                 ~f:(fun x ->
-                  let (_ : (unit, _) Plonk_types.Opt.t) =
+                  let (_ : (unit, _) Pickles_types.Opt.t) =
                     simulate_optional_sponge_with_alignment index_sponge x
                       ~f:(fun sponge x ->
                         Array.iter ~f:(Sponge.absorb sponge) x )
@@ -1217,7 +1217,7 @@ struct
             Vector.map sg_old
               ~f:
                 (Array.map ~f:(fun (keep, p) ->
-                     Plonk_types.Opt.Maybe (keep, p) ) )
+                     Pickles_types.Opt.Maybe (keep, p) ) )
             |> append_chain
                  (snd (Max_proofs_verified.add len_6))
                  ( [ [| x_hat |]
@@ -1238,8 +1238,7 @@ struct
                             (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
                             len_1_add )
                          len_2_add )
-                 |> Vector.map
-                      ~f:(Array.map ~f:(fun g -> Plonk_types.Opt.Some g))
+                 |> Vector.map ~f:(Array.map ~f:Pickles_types.Opt.some)
                  |> append_chain len_6_add
                       ( [ m.range_check0_comm
                         ; m.range_check1_comm
@@ -1252,8 +1251,8 @@ struct
                            (Vector.map ~f:undo_chunking lookup_sorted)
                       |> append_chain len_5_add
                            [ undo_chunking
-                             @@ Plonk_types.Opt.map messages.lookup ~f:(fun l ->
-                                    l.aggreg )
+                             @@ Pickles_types.Opt.map messages.lookup
+                                  ~f:(fun l -> l.aggreg)
                            ; undo_chunking lookup_table_comm
                            ; m.runtime_tables_selector
                            ; m.lookup_selector_xor
@@ -1271,7 +1270,8 @@ struct
             ~polynomials:
               ( Vector.map without_degree_bound
                   ~f:
-                    (Array.map ~f:(Plonk_types.Opt.map ~f:(fun x -> `Finite x)))
+                    (Array.map
+                       ~f:(Pickles_types.Opt.map ~f:(fun x -> `Finite x)) )
               , [] )
         in
         assert_eq_plonk
@@ -1528,12 +1528,12 @@ struct
                      | None ->
                          [||]
                      | Some a ->
-                         Array.map a ~f:(fun x -> Plonk_types.Opt.Some x)
+                         Array.map a ~f:Pickles_types.Opt.some
                      | Maybe (b, a) ->
-                         Array.map a ~f:(fun x -> Plonk_types.Opt.Maybe (b, x)) )
+                         Array.map a ~f:(Pickles_types.Opt.maybe b) )
               in
               let sg_evals =
-                Vector.map sg_evals ~f:(fun x -> [| Plonk_types.Opt.Some x |])
+                Vector.map sg_evals ~f:(fun x -> [| Pickles_types.Opt.Some x |])
                 |> Vector.to_list
                 (* TODO: This was the code before the wrap hack was put in
                    match actual_proofs_verified with
@@ -1591,7 +1591,7 @@ struct
             (module Impl)
             ~env ~shift:shift2
             (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-             .to_wrap ~opt_none:Plonk_types.Opt.None ~false_:Boolean.false_
+             .to_wrap ~opt_none:Pickles_types.Opt.None ~false_:Boolean.false_
                plonk )
             combined_evals )
     in

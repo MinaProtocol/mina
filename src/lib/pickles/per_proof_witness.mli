@@ -26,8 +26,8 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , Impl.Field.t Pickles_types.Shifted_value.Type1.t
       , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
         , Impl.Boolean.var )
-        Pickles_types.Plonk_types.Opt.t
-      , (scalar_challenge, Impl.Boolean.var) Pickles_types.Plonk_types.Opt.t
+        Pickles_types.Opt.t
+      , (scalar_challenge, Impl.Boolean.var) Pickles_types.Opt.t
       , Impl.Boolean.var
       , unit
       , Import.Digest.Make(Impl).t
@@ -110,7 +110,7 @@ module Constant : sig
 end
 
 val typ :
-     feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
+     feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> ('avar, 'aval) Impl.Typ.t
   -> 'n Pickles_types.Nat.t
   -> (('avar, 'n, _) t, ('aval, 'n) Constant.t) Impl.Typ.t
