@@ -34,20 +34,19 @@ let pull_keypairs path num_keypairs =
     |> generate ~size:num_keypairs ~random
   in
   (* network keypairs + private keys *)
-  let base_filename n =
-    path ^/ sprintf "network-keypairs/sender-account-%d.json" n
-  in
+  let keypair_name = sprintf "network-keypairs/network-keypair-%d" in
+  let base_filename n = path ^/ keypair_name n ^ ".json" in
   let read_sk n = In_channel.read_all (base_filename n ^ ".sk") in
   let read_keypair n =
-    let open Yojson.Safe in
     let open Signature_lib in
-    let json = from_file (base_filename n) in
     let sk = read_sk n |> Private_key.of_base58_check_exn in
     { Network_keypair.keypair = Keypair.of_private_key_exn sk
-    ; keypair_name = Util.member "keypair_name" json |> to_string
-    ; privkey_password = Util.member "privkey_password" json |> to_string
-    ; public_key = Util.member "public_key" json |> to_string
-    ; private_key = Util.member "private_key" json |> to_string
+    ; keypair_name = keypair_name n
+    ; privkey_password = "naughty blue worm"
+    ; public_key =
+        Public_key.(
+          of_private_key_exn sk |> compress |> Compressed.to_base58_check)
+    ; private_key = In_channel.read_all (base_filename n)
     }
   in
   (* libp2p keypairs *)

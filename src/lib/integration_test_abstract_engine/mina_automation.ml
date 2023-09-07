@@ -90,15 +90,27 @@ module Network_manager = struct
         network_config.config.topology |> Yojson.Safe.to_channel ch ) ;
     let network_kps_base_path = testnet_dir ^/ "genesis_keys" in
     let libp2p_kps_base_path = testnet_dir ^/ "libp2p_keys" in
+    let bp_keys_base_path = testnet_dir ^/ "block_producer_keys" in
     let open Deferred.Let_syntax in
     let%bind () = Unix.mkdir network_kps_base_path in
     let%bind () = Unix.mkdir libp2p_kps_base_path in
+    let%bind () = Unix.mkdir bp_keys_base_path in
     [%log info] "Writing genesis keypairs to %s" network_kps_base_path ;
     let%bind () =
       Core.String.Map.iter network_config.genesis_keypairs ~f:(fun kp ->
           Network_keypair.to_yojson kp
           |> Yojson.Safe.to_file
                (sprintf "%s/%s.json" network_kps_base_path kp.keypair_name) )
+      |> Deferred.return
+    in
+    [%log info] "Writing block producer private keys to %s" bp_keys_base_path ;
+    let%bind () =
+      List.iter network_config.config.block_producer_configs ~f:(fun config ->
+          let keypair_file =
+            sprintf "%s/%s.json" bp_keys_base_path config.name
+          in
+          Yojson.Safe.from_string config.keypair.private_key
+          |> Yojson.Safe.to_file keypair_file )
       |> Deferred.return
     in
     [%log info] "Writing block producer libp2p keypairs to %s"
