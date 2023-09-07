@@ -128,10 +128,7 @@ const handler = async (event, req) => {
           "mina",
           {}
         );
-        const circle = await runCircleBuild({
-          pull_request: prData.data,
-        });
-        return [buildkite, circle];
+        return [buildkite];
       } else {
         // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
         return [
@@ -165,10 +162,7 @@ const handler = async (event, req) => {
           "mina-end-to-end-nightlies",
           {}
         );
-        const circle = await runCircleBuild({
-          pull_request: prData.data,
-        });
-        return [buildkite, circle];
+        return [buildkite];
       } else {
         // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
         return [
