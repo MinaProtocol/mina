@@ -65,7 +65,7 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V1 = struct
+      module V2 = struct
         type t =
           | Insufficient_replace_fee
           | Invalid_signature
@@ -83,6 +83,49 @@ module Diff_versioned = struct
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
+      end
+
+      module V1 = struct
+        type t =
+          | Insufficient_replace_fee
+          | Invalid_signature
+          | Duplicate
+          | Sender_account_does_not_exist
+          | Invalid_nonce
+          | Insufficient_funds
+          | Insufficient_fee
+          | Overflow
+          | Bad_token
+          | Unwanted_fee_token
+          | Expired
+          | Overloaded
+        [@@deriving sexp, yojson]
+
+        let to_latest = function
+          | Insufficient_replace_fee ->
+              V2.Insufficient_replace_fee
+          | Invalid_signature ->
+              V2.Invalid_signature
+          | Duplicate ->
+              V2.Duplicate
+          | Sender_account_does_not_exist ->
+              V2.Sender_account_does_not_exist
+          | Invalid_nonce ->
+              V2.Invalid_nonce
+          | Insufficient_funds ->
+              V2.Insufficient_funds
+          | Insufficient_fee ->
+              V2.Insufficient_fee
+          | Overflow ->
+              V2.Overflow
+          | Bad_token ->
+              V2.Bad_token
+          | Unwanted_fee_token ->
+              V2.Unwanted_fee_token
+          | Expired ->
+              V2.Expired
+          | Overloaded ->
+              V2.Overloaded
       end
     end]
 
@@ -145,11 +188,20 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
+      module V2 = struct
+        type t = (User_command.Stable.V1.t * Diff_error.Stable.V2.t) list
+        [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
         [@@deriving sexp, yojson]
 
-        let to_latest = Fn.id
+        let to_latest =
+          List.map ~f:(fun (cmds, diff) ->
+              (cmds, Diff_error.Stable.V1.to_latest diff) )
       end
     end]
 
