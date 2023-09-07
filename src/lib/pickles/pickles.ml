@@ -1709,7 +1709,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                   ; alpha = plonk0.alpha
                                   ; beta = chal plonk0.beta
                                   ; gamma = chal plonk0.gamma
-                                  ; joint_combiner = Opt.None
+                                  ; joint_combiner = Opt.nothing
                                   }
                               }
                           ; sponge_digest_before_evaluations =

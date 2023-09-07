@@ -2,48 +2,48 @@ open Core_kernel
 
 [@@@warning "-4"]
 
-type ('a, 'bool) t = Some of 'a | None | Maybe of 'bool * 'a
+type ('a, 'bool) t = Just of 'a | Nothing | Maybe of 'bool * 'a
 [@@deriving sexp, compare, yojson, hash, equal]
 
-let some a = Some a
+let just a = Just a
 
-let none = None
+let nothing = Nothing
 
 let maybe b x = Maybe (b, x)
 
 let to_option : ('a, bool) t -> 'a option = function
-  | Some x ->
+  | Just x ->
       Some x
   | Maybe (true, x) ->
       Some x
   | Maybe (false, _x) ->
       None
-  | None ->
+  | Nothing ->
       None
 
 let to_option_unsafe : ('a, 'bool) t -> 'a option = function
-  | Some x ->
+  | Just x ->
       Some x
   | Maybe (_, x) ->
       Some x
-  | None ->
+  | Nothing ->
       None
 
 let value_exn = function
-  | Some x ->
+  | Just x ->
       x
   | Maybe (_, x) ->
       x
-  | None ->
+  | Nothing ->
       invalid_arg "Opt.value_exn"
 
 let of_option (t : 'a option) : ('a, 'bool) t =
-  match t with None -> None | Some x -> Some x
+  match t with None -> Nothing | Some x -> Just x
 
-let lift ?on_maybe ~none f = function
-  | None ->
-      none
-  | Some v ->
+let lift ?on_maybe ~nothing f = function
+  | Nothing ->
+      nothing
+  | Just v ->
       f v
   | Maybe (b, v) -> (
       match on_maybe with None -> f v | Some g -> g b v )
@@ -63,10 +63,10 @@ end
 
 let map t ~f =
   match t with
-  | None ->
-      None
-  | Some x ->
-      Some (f x)
+  | Nothing ->
+      Nothing
+  | Just x ->
+      Just (f x)
   | Maybe (b, x) ->
       Maybe (b, f x)
 
@@ -77,11 +77,11 @@ let some_typ (type a a_var f bool_var) (t : (a_var, a, f) Typ.t) :
   Typ.transport t ~there:(fun x -> Option.value_exn x) ~back:Option.return
   |> Typ.transport_var
        ~there:(function
-         | Some x ->
+         | Just x ->
              x
-         | Maybe _ | None ->
-             failwith "Opt.some_typ: expected Some" )
-       ~back:(fun x -> Some x)
+         | Maybe _ | Nothing ->
+             failwith "Opt.some_typ: expected Just" )
+       ~back:(fun x -> Just x)
 
 let none_typ (type a a_var f bool) () : ((a_var, bool) t, a option, f) Typ.t =
   Typ.transport (Typ.unit ())
@@ -89,11 +89,11 @@ let none_typ (type a a_var f bool) () : ((a_var, bool) t, a option, f) Typ.t =
     ~back:(fun () : _ Option.t -> None)
   |> Typ.transport_var
        ~there:(function
-         | None ->
+         | Nothing ->
              ()
-         | Maybe _ | Some _ ->
-             failwith "Opt.none_typ: expected None" )
-       ~back:(fun () : _ t -> None)
+         | Maybe _ | Just _ ->
+             failwith "Opt.none_typ: expected Nothing" )
+       ~back:(fun () : _ t -> Nothing)
 
 let maybe_typ (type a a_var bool_var f)
     (bool_typ : (bool_var, bool, f) Snarky_backendless.Typ.t) ~(dummy : a)
@@ -108,7 +108,7 @@ let maybe_typ (type a a_var bool_var f)
          match t with
          | Maybe (b, x) ->
              (b, x)
-         | None | Some _ ->
+         | Nothing | Just _ ->
              failwith "Opt.maybe_typ: expected Maybe" )
        ~back:(fun (b, x) -> Maybe (b, x))
 
@@ -137,12 +137,13 @@ let constant_layout_typ (type a a_var f) (bool_typ : _ Typ.t) ~true_ ~false_
          match t with
          | Maybe (b, x) ->
              (b, x)
-         | None ->
+         | Nothing ->
              (false_, dummy_var)
-         | Some x ->
+         | Just x ->
              (true_, x) )
        ~back:(fun (b, x) ->
-         match flag with No -> None | Yes -> Some x | Maybe -> Maybe (b, x) )
+         match flag with No -> Nothing | Yes -> Just x | Maybe -> Maybe (b, x)
+         )
 
 let typ (type a a_var f) bool_typ (flag : Flag.t) (a_typ : (a_var, a, f) Typ.t)
     ~(dummy : a) =
@@ -167,9 +168,9 @@ module Early_stop_sequence = struct
     let rec go acc = function
       | [] ->
           finish acc
-      | None :: xs ->
+      | Nothing :: xs ->
           go acc xs
-      | Some x :: xs ->
+      | Just x :: xs ->
           go (f acc x) xs
       | Maybe (b, x) :: xs ->
           (* Computing this first makes mutation in f OK. *)
