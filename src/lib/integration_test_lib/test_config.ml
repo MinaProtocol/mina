@@ -378,16 +378,20 @@ module Unit_tests = struct
       genesis_ledger =
         [ test_account "receiver" "9999999"
         ; test_account "empty-bp" "0"
-        ; test_account "snark-node-key" "0"
+        ; test_account "snark-node" "0"
         ]
         @ List.init 2 ~f:(fun i ->
               test_account (sprintf "sender-account-%d" i) "10000" )
     ; block_producers =
         [ { node_name = "receiver"
           ; account_name = "receiver-key"
+          ; docker_image = "bp-image"
+          }
+        ; { node_name = "empty-node-0"
+          ; account_name = "empty-bp-key"
           ; docker_image = "bp-image-0"
           }
-        ; { node_name = "empty-node"
+        ; { node_name = "empty-node-1"
           ; account_name = "empty-bp-key"
           ; docker_image = "bp-image-1"
           }
@@ -568,5 +572,20 @@ module Unit_tests = struct
       |> Topology.to_yojson
     in
     print_endline "=== Topology ===" ;
-    topology |> pretty_to_string |> print_endline
+    topology |> pretty_to_string |> print_endline ;
+    let empty_node_0 = Util.member "empty-node-0" topology in
+    let empty_node_1 = Util.member "empty-node-1" topology in
+    let pk_0 = Util.member "pk" empty_node_0 in
+    let sk_0 = Util.member "sk" empty_node_0 in
+    let kp_0 = Util.member "libp2p_keypair" empty_node_0 in
+    let pk_1 = Util.member "pk" empty_node_1 in
+    let sk_1 = Util.member "sk" empty_node_1 in
+    let kp_1 = Util.member "libp2p_keypair" empty_node_1 in
+    let ( = ) = equal in
+    assert (
+      (* same public + private keys *)
+      (not (pk_0 = `Null))
+      && pk_0 = pk_1 && sk_0 = sk_1
+      (* different libp2p keys *)
+      && not (kp_0 = kp_1) )
 end
