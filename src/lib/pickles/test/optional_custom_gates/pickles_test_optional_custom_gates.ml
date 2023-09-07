@@ -192,6 +192,33 @@ let main_foreign_field_mul () =
   add_plonk_constraint
     (Raw { kind = Zero; values = [| fresh_int 0 |]; coeffs = [||] })
 
+let main_fixed_lookup_tables_simple_small_values_small_table_id () =
+  let table_id = 1 in
+  let size = 10 in
+  let indexes = Array.init size ~f:Field.Constant.of_int in
+  let values = Array.init size ~f:Field.Constant.of_int in
+  add_plonk_constraint
+    (AddFixedLookupTable
+       { id = Int32.of_int_exn table_id; data = [| indexes; values |] } ) ;
+  let idx1 = Random.int size in
+  let v1 = values.(idx1) in
+  let idx2 = Random.int size in
+  let v2 = values.(idx2) in
+  let idx3 = Random.int size in
+  let v3 = values.(idx3) in
+  add_plonk_constraint
+    (Lookup
+       { (* table id *)
+         w0 = fresh_int table_id
+       ; (* idx1 *) w1 = fresh_int idx1
+       ; (* v1 *) w2 = exists Field.typ ~compute:(fun () -> v1)
+       ; (* idx2 *) w3 = fresh_int idx2
+       ; (* v2 *) w4 = exists Field.typ ~compute:(fun () -> v2)
+       ; (* idx3 *) w5 = fresh_int idx3
+       ; (* v3 *) w6 = exists Field.typ ~compute:(fun () -> v3)
+       } ) ;
+  add_plonk_constraint (Raw { kind = Zero; values = [||]; coeffs = [||] })
+
 let add_tests, get_tests =
   let tests = ref [] in
   ( (fun name testcases -> tests := (name, testcases) :: !tests)
@@ -216,7 +243,9 @@ let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
   if feature_flags.range_check0 then main_range_check0 () ;
   if feature_flags.range_check1 then main_range_check1 () ;
   if feature_flags.foreign_field_add then main_foreign_field_add () ;
-  if feature_flags.foreign_field_mul then main_foreign_field_mul ()
+  if feature_flags.foreign_field_mul then main_foreign_field_mul () ;
+  if feature_flags.lookup then
+    main_fixed_lookup_tables_simple_small_values_small_table_id ()
 
 let register_test name feature_flags1 feature_flags2 =
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
@@ -296,6 +325,8 @@ let () =
       , Plonk_types.Features.{ none_bool with foreign_field_add = true } )
     ; ( "foreign field multiplication"
       , Plonk_types.Features.{ none_bool with foreign_field_mul = true } )
+    ; ( "Fixed lookup tables"
+      , Plonk_types.Features.{ none_bool with lookup = true } )
     ]
   in
   List.iter ~f:register_feature_test configurations ;
