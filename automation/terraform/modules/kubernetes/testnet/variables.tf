@@ -71,6 +71,11 @@ variable "mina_agent_image" {
   default = "codaprotocol/coda-user-agent:0.1.4"
 }
 
+variable "priority_class" {
+  type    = string
+  default = null
+}
+
 #this var doesn't actually hook up to anything
 variable "mina_agent_active" {
   type    = string
@@ -352,3 +357,14 @@ variable "upload_blocks_to_gcloud" {
 #   type    = string
 #   default = ""
 # }
+
+variable "zkapps_dashboard_key" {
+  type    = string
+  default = ""
+}
+
+
+variable "enable_working_dir_persitence" {
+  type    = bool
+  default = false
+}
