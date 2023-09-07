@@ -236,8 +236,7 @@ let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
                      ( zkapp_command_details.min_fee
                      , zkapp_command_details.max_fee )
                    ~balance_change_range:
-                     ( zkapp_command_details.min_balance_change
-                     , zkapp_command_details.max_balance_change )
+                     zkapp_command_details.balance_change_range
                    ~ignore_sequence_events_precond:true ~no_token_accounts:true
                    ~limited:true ~fee_payer_keypair:fee_payer ~keymap
                    ~account_state_tbl ~generate_new_accounts ~ledger ~vk
