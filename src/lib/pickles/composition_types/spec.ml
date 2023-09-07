@@ -122,11 +122,11 @@ let rec pack :
           pack ~zero ~one p spec t_constant_opt t )
   | Opt { inner; dummy1; dummy2; flag = _; bool = _ } -> (
       match t with
-      | None ->
+      | Nothing ->
           let t_constant_opt = Option.map t_constant_opt ~f:(fun _ -> dummy1) in
           Array.append [| zero |]
             (pack ~zero ~one p inner t_constant_opt dummy2)
-      | Some x ->
+      | Just x ->
           let t_constant_opt =
             Option.map ~f:(fun x -> Option.value_exn x) t_constant_opt
           in
@@ -280,10 +280,10 @@ let rec etyp :
         let (T (a, f_a, f_a')) = etyp e inner in
         let opt_map ~f1 ~f2 (x : _ Opt.t) : _ Opt.t =
           match x with
-          | None ->
-              None
-          | Some x ->
-              Some (f1 x)
+          | Nothing ->
+              Opt.nothing
+          | Just x ->
+              Opt.just (f1 x)
           | Maybe (b, x) ->
               Maybe (f2 b, f1 x)
         in

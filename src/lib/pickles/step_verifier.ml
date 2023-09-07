@@ -934,9 +934,9 @@ struct
             Array.iter ~f:(fun x -> Sponge.absorb sponge (`Field x))
           in
           match opt with
-          | None ->
+          | Nothing ->
               ()
-          | Some (x1, x2) ->
+          | Just (x1, x2) ->
               absorb x1 ; absorb x2
           | Maybe (b, (x1, x2)) ->
               (* Cache the sponge state before *)
@@ -1041,15 +1041,15 @@ struct
           let a =
             Evals.In_circuit.to_list e
             |> List.map ~f:(function
-                 | None ->
+                 | Nothing ->
                      [||]
-                 | Some a ->
-                     Array.map a ~f:Opt.some
+                 | Just a ->
+                     Array.map a ~f:Opt.just
                  | Maybe (b, a) ->
                      Array.map a ~f:(Opt.maybe b) )
           in
           let v =
-            List.append sg_evals ([| Some x_hat |] :: [| Some ft |] :: a)
+            List.append sg_evals ([| Opt.just x_hat |] :: [| Opt.just ft |] :: a)
           in
           Common.combined_evaluation (module Impl) ~xi v
         in
@@ -1223,7 +1223,7 @@ struct
         ~proof
         ~plonk:
           (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-           .to_wrap ~opt_none:Opt.None ~false_:Boolean.false_
+           .to_wrap ~opt_none:Opt.nothing ~false_:Boolean.false_
              unfinalized.deferred_values.plonk )
     in
     with_label __LOC__ (fun () ->
