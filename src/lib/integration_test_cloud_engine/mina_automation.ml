@@ -134,8 +134,6 @@ module Network_config = struct
       failwith
         "All nodes in testnet must have unique names.  Check to make sure you \
          are not using the same node_name more than once" ;
-
-    (* ACCOUNTS AND KEYPAIRS *)
     (* ACCOUNTS AND KEYPAIRS *)
     let before = Time.now () in
     let num_keypairs = List.length genesis_ledger in

@@ -88,11 +88,6 @@ module Snark_coordinator_node = struct
   [@@deriving to_yojson]
 end
 
-module Snark_worker_node = struct
-  type t = { node_name : string; account_name : string; docker_image : string }
-  [@@deriving to_yojson]
-end
-
 type constants =
   { constraints : Genesis_constants.Constraint_constants.t
   ; genesis : Genesis_constants.t
@@ -106,7 +101,6 @@ type t =
   ; block_producers : Block_producer_node.t list
   ; seed_nodes : Seed_node.t list
   ; snark_coordinator : Snark_coordinator_node.t option
-  ; snark_workers : Snark_worker_node.t list
   ; snark_worker_fee : string
   ; log_precomputed_blocks : bool
   ; proof_config : Runtime_config.Proof_keys.t
@@ -119,12 +113,7 @@ type t =
 [@@deriving to_yojson]
 
 module Node_role = struct
-  type t =
-    | Archive_node
-    | Block_producer
-    | Seed_node
-    | Snark_coordinator
-    | Snark_worker
+  type t = Archive_node | Block_producer | Seed_node | Snark_coordinator
 
   let to_yojson = function
     | Archive_node ->
@@ -135,8 +124,6 @@ module Node_role = struct
         `String "Seed_node"
     | Snark_coordinator ->
         `String "Snark_coordinator"
-    | Snark_worker ->
-        `String "Snark_worker"
 end
 
 module Topology = struct
@@ -179,7 +166,6 @@ module Topology = struct
     | Archive of string * archive_info
     | Node of string * node_info
     | Snark_coordinator of string * snark_coordinator_info
-    | Snark_worker of string * snark_worker_info
     | Snark_worker_fee of string
 
   type t = top_info list
@@ -193,8 +179,6 @@ module Topology = struct
             (a, node_info_to_yojson b)
         | Snark_coordinator (a, b) ->
             (a, snark_coordinator_info_to_yojson b)
-        | Snark_worker (a, b) ->
-            (a, snark_worker_info_to_yojson b)
         | Snark_worker_fee fee ->
             ("snark_worker_fee", `String fee) )
     in
@@ -221,7 +205,6 @@ let default =
   ; block_producers = []
   ; seed_nodes = []
   ; snark_coordinator = None
-  ; snark_workers = []
   ; snark_worker_fee = "0.025"
   ; log_precomputed_blocks = false
   ; proof_config = proof_config_default
@@ -291,7 +274,6 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
     num_bp + if Option.is_some t.snark_coordinator then 1 else 0
   in
   let num_bp_sc_an = num_bp_sc + List.length t.archive_nodes in
-  let num_bp_sc_an_sn = num_bp_sc_an + List.length t.seed_nodes in
   let keypairs = ref Core.String.Map.empty in
   let pk_sk name n =
     let open Signature_lib in
@@ -374,18 +356,10 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         ; libp2p_peerid = `String List.(nth_exn libp2p_peerids n)
         } )
   in
-  let topology_of_snark_worker n
-      { Snark_worker_node.account_name; node_name; docker_image } :
-      Topology.top_info =
-    let n = n + num_bp_sc_an_sn in
-    let pk, sk = pk_sk account_name n in
-    Snark_worker (node_name, { pk; sk; role = Snark_worker; docker_image })
-  in
   snark_coordinator
   @ List.mapi t.archive_nodes ~f:topology_of_archive
   @ List.mapi t.block_producers ~f:topology_of_block_producer
   @ List.mapi t.seed_nodes ~f:topology_of_seed
-  @ List.mapi t.snark_workers ~f:topology_of_snark_worker
   @ [ Snark_worker_fee t.snark_worker_fee ]
 
 let test_account ?(pk = "") ?(timing = Mina_base.Account.Timing.Untimed)
