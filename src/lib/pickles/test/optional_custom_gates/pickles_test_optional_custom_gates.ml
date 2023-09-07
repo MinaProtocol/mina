@@ -239,6 +239,53 @@ let main_fixed_lookup_tables () =
        ; (* v3 *) w6 = exists Field.typ ~compute:(fun () -> v3)
        } )
 
+(* Parameters *)
+(* nb of fixed lookup tables *)
+let m = Random.State.int state 10
+
+let f_lt_data =
+  Array.init m ~f:(fun _ ->
+      let size = Random.State.int state 100 in
+      let indexes = Array.init size ~f:(fun i -> Field.Constant.of_int i) in
+      let values =
+        Array.init size ~f:(fun _ ->
+            Field.Constant.of_int (Random.State.int state 100_000_000) )
+      in
+      (indexes, values) )
+
+(* nb of lookups *)
+let n = Random.State.int state 10
+
+let lookups =
+  Array.init n ~f:(fun _ ->
+      let table_id = Random.State.int state m in
+      let indexes, values = f_lt_data.(table_id) in
+      let table_size = Array.length indexes in
+      let idx1 = Random.State.int state table_size in
+      let idx2 = Random.State.int state table_size in
+      let idx3 = Random.State.int state table_size in
+      ( table_id
+      , (idx1, values.(idx1))
+      , (idx2, values.(idx2))
+      , (idx3, values.(idx3)) ) )
+
+let main_fixed_lookup_tables_multiple_tables_multiple_lookups () =
+  Array.iteri f_lt_data ~f:(fun table_id (indexes, values) ->
+      add_plonk_constraint
+        (AddFixedLookupTable
+           { id = Int32.of_int_exn table_id; data = [| indexes; values |] } ) ) ;
+  Array.iter lookups ~f:(fun (table_id, (idx1, v1), (idx2, v2), (idx3, v3)) ->
+      add_plonk_constraint
+        (Lookup
+           { w0 = fresh_int table_id
+           ; w1 = fresh_int idx1
+           ; w2 = exists Field.typ ~compute:(fun () -> v1)
+           ; w3 = fresh_int idx2
+           ; w4 = exists Field.typ ~compute:(fun () -> v2)
+           ; w5 = fresh_int idx3
+           ; w6 = exists Field.typ ~compute:(fun () -> v3)
+           } ) )
+
 let add_tests, get_tests =
   let tests = ref [] in
   ( (fun name testcases -> tests := (name, testcases) :: !tests)
@@ -264,7 +311,9 @@ let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
   if feature_flags.range_check1 then main_range_check1 () ;
   if feature_flags.foreign_field_add then main_foreign_field_add () ;
   if feature_flags.foreign_field_mul then main_foreign_field_mul () ;
-  if feature_flags.lookup then main_fixed_lookup_tables ()
+  if feature_flags.lookup then (
+    main_fixed_lookup_tables () ;
+    main_fixed_lookup_tables_multiple_tables_multiple_lookups () )
 
 let register_test name feature_flags1 feature_flags2 =
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
