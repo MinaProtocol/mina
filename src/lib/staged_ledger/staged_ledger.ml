@@ -2764,14 +2764,14 @@ let%test_module "staged ledger tests" =
       assert (List.length cmds = num_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
-    let gen_zkapps ?failure ~num_zkapps zkapps_per_iter :
+    let gen_zkapps ?ledger_init_state ?failure ~num_zkapps zkapps_per_iter :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind zkapp_command_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators
-        .sequence_zkapp_command_with_ledger ~max_token_updates:1
-          ~length:num_zkapps ~vk ?failure ()
+        .sequence_zkapp_command_with_ledger ?ledger_init_state
+          ~max_token_updates:1 ~length:num_zkapps ~vk ?failure ()
       in
       let zkapps =
         List.map zkapp_command_and_fee_payer_keypairs ~f:(function
@@ -2833,7 +2833,8 @@ let%test_module "staged ledger tests" =
       let num_zkapps = transaction_capacity * iters in
       gen_zkapps ~num_zkapps (List.init iters ~f:(Fn.const None))
 
-    let gen_zkapps_below_capacity ?(extra_blocks = false) () :
+    let gen_zkapps_below_capacity ?ledger_init_state ?(extra_blocks = false) ()
+        :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
@@ -2848,7 +2849,8 @@ let%test_module "staged ledger tests" =
           (Int.gen_incl 1 ((transaction_capacity / 2) - 1))
       in
       let num_zkapps = List.fold zkapps_per_iter ~init:0 ~f:( + ) in
-      gen_zkapps ~num_zkapps (List.map ~f:Option.some zkapps_per_iter)
+      gen_zkapps ?ledger_init_state ~num_zkapps
+        (List.map ~f:Option.some zkapps_per_iter)
 
     (*Same as gen_at_capacity except that the number of iterations[iters] is
       the function of [extra_block_count] and is same for all generated values*)
@@ -2894,9 +2896,11 @@ let%test_module "staged ledger tests" =
 
     let gen_all_user_commands_below_capacity () =
       let open Quickcheck.Generator.Let_syntax in
-      let%bind ledger, zkapps, iters_zkapps = gen_zkapps_below_capacity () in
       let%bind ledger_init_state, cmds, iters_signed_commands =
         gen_below_capacity ()
+      in
+      let%bind ledger, zkapps, iters_zkapps =
+        gen_zkapps_below_capacity ~ledger_init_state ()
       in
       Ledger.apply_initial_ledger_state ledger ledger_init_state ;
       let iters = iters_zkapps @ iters_signed_commands in
