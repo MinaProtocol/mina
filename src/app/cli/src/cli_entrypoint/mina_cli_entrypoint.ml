@@ -1052,11 +1052,15 @@ let setup_daemon logger =
             ~f:(fun (span, context) ->
               let secs = Time_ns.Span.to_sec span in
               let monitor_infos = get_monitor_infos context.monitor in
+              let o1trace = o1trace context in
+              [%log internal] "Long_async_cycle"
+                ~metadata:
+                  [ ("duration", `Float secs); ("trace", `List o1trace) ] ;
               [%log debug]
                 ~metadata:
                   [ ("long_async_cycle", `Float secs)
                   ; ("monitors", `List monitor_infos)
-                  ; ("o1trace", `List (o1trace context))
+                  ; ("o1trace", `List o1trace)
                   ]
                 "Long async cycle, $long_async_cycle seconds, $monitors, \
                  $o1trace" ;
@@ -1067,11 +1071,15 @@ let setup_daemon logger =
             ~f:(fun (context, span) ->
               let secs = Time_ns.Span.to_sec span in
               let monitor_infos = get_monitor_infos context.monitor in
+              let o1trace = o1trace context in
+              [%log internal] "Long_async_job"
+                ~metadata:
+                  [ ("duration", `Float secs); ("trace", `List o1trace) ] ;
               [%log debug]
                 ~metadata:
                   [ ("long_async_job", `Float secs)
                   ; ("monitors", `List monitor_infos)
-                  ; ("o1trace", `List (o1trace context))
+                  ; ("o1trace", `List o1trace)
                   ; ( "most_recent_2_backtrace"
                     , `String
                         (String.concat ~sep:"␤"
