@@ -344,7 +344,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          the old key v1"
         (send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri whale1)
-           zkapp_command_update_vk2_refers_vk1 "Verification_failed" )
+           zkapp_command_update_vk2_refers_vk1
+           "Expected vk hash doesn't match hash in vk we received" )
     in
     let%bind () =
       section
