@@ -10,7 +10,7 @@ Hard forks of Mina are implemented by restarting a new chain from a genesis stat
 
 In order to control the data flow and parallelization of generating the hard fork package, we utilize the Buildkite CI platform, which has great support for specifying arbitrary jobs and dependencies between jobs, and these jobs can be scheduled onto Builkite agents that can have any resources we need available (such as a certain number of CPU cores or a certain amount of RAM).
 
-By settup up the hard fork package generation pipeline to have a simple ledger data input, we can utilize the pipeline for generating hard fork test packages from custom ledgers, and for generating release hard fork packages for both planned and unplanned from historical ledgers.
+By setting up the hard fork package generation pipeline to have a simple ledger data input, we can utilize the pipeline for generating hard fork test packages from custom ledgers, and for generating release hard fork packages for both planned and unplanned from historical ledgers.
 
 ## Terms
 
@@ -55,7 +55,7 @@ __IMPORTANT NOTE:__ dumping ledgers back to back needs to not break a node (this
 
 In the case of an unplanned (emergency) hard fork, we do not have the liberty of allowing the daemon to automatically dump the state that we will start the new chain from. Additionally, the state we want to take could be arbitrarily far back in history (obviously we won't take something that is too far back in history since we don't want to undo much history, but we can't make assumptions about how far back we need to look).
 
-In such a circumstance, we must dump this state from the archive db rather than from an actively running daemon. The replayer tool is capable of materializing staged ledgers, snarked ledgers, and epoch ledgers for arbitrary blocks by replaying transactions from the archie db. It is important that this tool should take at most a couple of hours to execute, as the time spent executing this tool is a further delay in generating a new hard fork package for the emergency release.
+In such a circumstance, we must dump this state from the archive db rather than from an actively running daemon. The replayer tool is capable of materializing staged ledgers, snarked ledgers, and epoch ledgers for arbitrary blocks by replaying transactions from the archive db. It is important that this tool should take at most a couple of hours to execute, as the time spent executing this tool is a further delay in generating a new hard fork package for the emergency release.
 
 ### Generating the Hard Fork Package
 
@@ -118,7 +118,7 @@ In order to test the hard fork package, Mina ecosystem partners will coordinate 
 In order to ensure our hard fork generation tooling is sufficient both in the case of a planned hard fork and an unplanned hard fork, we must perform end-to-end tests for each workflow. Automating these tests will be important in the long term, but it will also be a difficult challenge. As such, we will describe only the testing requirements here, which can be applied to either manual or automated execution of these tests.
 
 * Hard fork initialization
-  * When a daemon is configured with a genesis timestamp after if the current time, it sleeps until genesis.
+  * When a daemon is configured with a genesis timestamp after the current time, it sleeps until genesis.
   * When a daemon is configured with genesis state ledger hashes only (no accounts in config), it can successfully load those ledger from disk, assuming they have been packaged with the software.
 * Planned hard fork
   * Daemons are able to dump ledger data without long async cycles or increased rates of validation timeout errors.
