@@ -110,7 +110,7 @@ In order to test the hard fork package, Mina ecosystem partners will coordinate 
 
 - `build_daemon` and `package_deb` together take about 11 minutes in CI today
 - `package_dockerhub` takes about 4 minutes in CI today
-- TODO: benchmark and estimate ledger migration steps
+- the `migrate_*_ledger` jobs take 1-2 minutes each (measured against current mainnet ledger size)
 <!-- - TODO: consider scan state migration steps -->
  
 ## Test plan and functional requirements
