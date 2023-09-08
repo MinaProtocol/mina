@@ -137,7 +137,6 @@ module Wrap : sig
 
           val typ :
                'f Spec.impl
-            -> dummy_scalar:'a
             -> dummy_scalar_challenge:'b Scalar_challenge.t
             -> challenge:
                  ( 'c
