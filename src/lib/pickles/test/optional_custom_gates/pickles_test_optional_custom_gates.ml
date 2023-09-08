@@ -284,17 +284,17 @@ let main_fixed_lookup_tables_multiple_tables_multiple_lookups () =
 (* Parameters *)
 let main_runtime_table_cfg () =
   let num = 5 in
-  print_endline "Hello, world" ;
   let first_column = Array.init size ~f:Field.Constant.of_int in
   let table_ids = Array.init num ~f:Int32.of_int_exn in
   Array.iter table_ids ~f:(fun table_id ->
+      Printf.printf "Initializing table %d\n" (Int32.to_int_exn table_id) ;
       add_plonk_constraint (AddRuntimeTableCfg { id = table_id; first_column }) ) ;
   let num_lookup = 20 in
   let rec make_lookup i n =
     if i = n then ()
     else
-      let table_id = n mod i in
-      print_endline "Hello, World 2" ;
+      let table_id = i mod num in
+      Printf.printf "Doing lookup in table %d\n" table_id ;
       add_plonk_constraint
         (Lookup
            { w0 = fresh_int table_id
