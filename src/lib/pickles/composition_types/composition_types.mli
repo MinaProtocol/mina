@@ -993,8 +993,6 @@ module Wrap : sig
       (** Construct a statement (as structured data) from the flat data-based representation. *)
       val of_data :
            ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp option, 'bool) flat_repr
-        -> feature_flags:
-             Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
         -> option_map:
              ('g Hlist0.Id.t -> f:(('h * unit) Hlist.HlistId.t -> 'h) -> 'j)
         -> ('b, 'c, 'a, 'fp_opt2, 'j, 'bool, 'd, 'd, 'd, 'e, 'f) t

@@ -259,10 +259,10 @@ module Wrap = struct
     let typ =
       Typ.transport typ
         ~there:(In_circuit.to_data ~option_map:Option.map)
-        ~back:(In_circuit.of_data ~feature_flags ~option_map:Option.map)
+        ~back:(In_circuit.of_data ~option_map:Option.map)
     in
     Spec.ETyp.T
       ( typ
-      , (fun x -> In_circuit.of_data ~feature_flags ~option_map:Opt.map (f x))
+      , (fun x -> In_circuit.of_data ~option_map:Opt.map (f x))
       , fun x -> f_inv (In_circuit.to_data ~option_map:Opt.map x) )
 end
