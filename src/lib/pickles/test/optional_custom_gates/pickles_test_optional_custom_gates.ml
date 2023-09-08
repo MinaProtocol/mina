@@ -283,33 +283,27 @@ let main_fixed_lookup_tables_multiple_tables_multiple_lookups () =
 
 (* Parameters *)
 let main_runtime_table_cfg () =
-  let table_id = 2 in
+  let ft_table_id = 2 in
+  let rt_table_id = 3 in
   let size = 10 in
   let first_column = Array.init size ~f:Field.Constant.of_int in
-  let idx1 = 0 in
-  let v1 = Field.Constant.of_int 1 in
-  let idx2 = 1 in
-  let v2 = Field.Constant.of_int 1 in
-  let idx3 = 2 in
-  let v3 = Field.Constant.of_int 1 in
-  let rec f i n =
-    if i = n then ()
-    else (
-      add_plonk_constraint
-        (AddRuntimeTableCfg { id = Int32.of_int_exn table_id; first_column }) ;
-      add_plonk_constraint
-        (Lookup
-           { w0 = fresh_int table_id
-           ; w1 = fresh_int idx1
-           ; w2 = exists Field.typ ~compute:(fun () -> v1)
-           ; w3 = fresh_int idx2
-           ; w4 = exists Field.typ ~compute:(fun () -> v2)
-           ; w5 = fresh_int idx3
-           ; w6 = exists Field.typ ~compute:(fun () -> v3)
-           } ) ;
-      f (i + 1) n )
-  in
-  f 1 10
+  let indexes = Array.init size ~f:Field.Constant.of_int in
+  let values = Array.init size ~f:Field.Constant.of_int in
+  add_plonk_constraint
+    (AddFixedLookupTable
+       { id = Int32.of_int_exn ft_table_id; data = [| indexes; values |] } ) ;
+  add_plonk_constraint
+    (AddRuntimeTableCfg { id = Int32.of_int_exn rt_table_id; first_column }) ;
+  add_plonk_constraint
+    (Lookup
+       { w0 = fresh_int rt_table_id
+       ; w1 = fresh_int 1
+       ; w2 = fresh_int 1
+       ; w3 = fresh_int 2
+       ; w4 = fresh_int 2
+       ; w5 = fresh_int 3
+       ; w6 = fresh_int 3
+       } )
 
 let add_tests, get_tests =
   let tests = ref [] in
