@@ -19,14 +19,13 @@ val wrap :
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Opt.t
          , Impls.Wrap.Impl.Boolean.var
-         , Pasta_bindings.Fq.t Challenge.t
-         , Pasta_bindings.Fq.t Challenge.t
-         , Pasta_bindings.Fq.t Challenge.t
-         , ( Pasta_bindings.Fq.t Challenge.t Import.Scalar_challenge.t
-             Bulletproof_challenge.t
+         , Impls.Wrap.Field.t
+         , Impls.Wrap.Field.t
+         , Impls.Wrap.Field.t
+         , ( Impls.Wrap.Field.t Import.Scalar_challenge.t Bulletproof_challenge.t
            , Nat.z Backend.Tick.Rounds.plus_n )
            Vector.vec
-         , Pasta_bindings.Fq.t Challenge.t )
+         , Impls.Wrap.Field.t )
          Types.Wrap.Statement.In_circuit.t
       -> unit )
   -> typ:('a, 'b) Impls.Step.Typ.t
@@ -38,7 +37,7 @@ val wrap :
   -> ?tweak_statement:
        (   ( Challenge.Constant.t
            , scalar_challenge_constant
-           , Pasta_bindings.Fp.t Shifted_value.Type1.t
+           , Impls.Step.field Shifted_value.Type1.t
            , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
              , bool )
              Import.Types.Opt.t
@@ -64,7 +63,7 @@ val wrap :
            Types.Wrap.Statement.In_circuit.t
         -> ( Challenge.Constant.t
            , scalar_challenge_constant
-           , Pasta_bindings.Fp.t Shifted_value.Type1.t
+           , Impls.Step.field Shifted_value.Type1.t
            , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
              , bool )
              Import.Types.Opt.t
@@ -92,7 +91,7 @@ val wrap :
   -> ( 'b
      , ( ( Challenge.Constant.t
          , Challenge.Constant.t Import.Scalar_challenge.t
-         , Pasta_bindings.Fq.t Shifted_value.Type2.t
+         , Impls.Wrap.field Shifted_value.Type2.t
          , ( Challenge.Constant.t Import.Scalar_challenge.t
              Bulletproof_challenge.t
            , Backend.Tock.Rounds.n )
@@ -110,7 +109,7 @@ val wrap :
        Vector.vec
      , 'max_local_max_proofs_verifieds
        Hlist0.H1(Reduced_messages_for_next_proof_over_same_field.Wrap).t
-     , ( (Pasta_bindings.Fq.t, Pasta_bindings.Fq.t array) Plonk_types.All_evals.t
+     , ( (Impls.Wrap.field, Impls.Wrap.field array) Plonk_types.All_evals.t
        , 'max_proofs_verified )
        Vector.vec )
      Proof.Base.Step.t
