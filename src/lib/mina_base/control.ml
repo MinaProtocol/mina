@@ -9,7 +9,7 @@ open Core_kernel
 module Stable = struct
   module V2 = struct
     type t = Mina_wire_types.Mina_base.Control.V2.t =
-      | Proof of Pickles.Side_loaded.Proof.Stable.V2.t
+      | Proof of Pickles.Side_loaded.Proof.Stable.V2.t [@to_yojson fun t -> `String "Proof <opaque>"]
       | Signature of Signature.Stable.V1.t
       | None_given
     [@@deriving sexp, equal, yojson, hash, compare]
