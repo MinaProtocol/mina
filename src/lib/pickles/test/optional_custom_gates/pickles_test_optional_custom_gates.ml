@@ -241,7 +241,7 @@ let m = 1 + Random.State.int state 10
 let f_lt_data =
   Array.init m ~f:(fun _ ->
       let size = 1 + Random.State.int state 100 in
-      let indexes = Array.init size ~f:(Field.Constant.of_int) in
+      let indexes = Array.init size ~f:Field.Constant.of_int in
       let values =
         Array.init size ~f:(fun _ ->
             Field.Constant.of_int (Random.State.int state 100_000_000) )
