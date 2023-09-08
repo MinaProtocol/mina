@@ -236,11 +236,11 @@ let main_fixed_lookup_tables () =
 
 (* Parameters *)
 (* nb of fixed lookup tables *)
-let m = Random.State.int state 10
+let m = 1 + Random.State.int state 10
 
 let f_lt_data =
   Array.init m ~f:(fun _ ->
-      let size = Random.State.int state 100 in
+      let size = 1 + Random.State.int state 100 in
       let indexes = Array.init size ~f:(Field.Constant.of_int) in
       let values =
         Array.init size ~f:(fun _ ->
@@ -249,7 +249,7 @@ let f_lt_data =
       (indexes, values) )
 
 (* number of lookups *)
-let n = Random.State.int state 10
+let n = 1 + Random.State.int state 10
 
 let lookups =
   Array.init n ~f:(fun _ ->
