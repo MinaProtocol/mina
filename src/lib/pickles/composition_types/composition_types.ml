@@ -328,8 +328,8 @@ module Wrap = struct
         let typ (type f fp)
             ((module Impl) as impl :
               (module Snarky_backendless.Snark_intf.Run with type field = f) )
-            ~dummy_scalar ~dummy_scalar_challenge ~challenge ~scalar_challenge
-            ~feature_flags (fp : (fp, _, f) Snarky_backendless.Typ.t) index =
+            ~dummy_scalar_challenge ~challenge ~scalar_challenge ~feature_flags
+            (fp : (fp, _, f) Snarky_backendless.Typ.t) index =
           Snarky_backendless.Typ.of_hlistable
             [ Plonk.In_circuit.typ impl ~dummy_scalar_challenge ~challenge
                 ~scalar_challenge ~bool:Impl.Boolean.typ ~feature_flags fp
@@ -506,13 +506,12 @@ module Wrap = struct
 
       let typ (type f fp)
           (impl : (module Snarky_backendless.Snark_intf.Run with type field = f))
-          ~dummy_scalar ~dummy_scalar_challenge ~challenge ~scalar_challenge
-          ~feature_flags (fp : (fp, _, f) Snarky_backendless.Typ.t)
+          ~dummy_scalar_challenge ~challenge ~scalar_challenge ~feature_flags
+          (fp : (fp, _, f) Snarky_backendless.Typ.t)
           messages_for_next_wrap_proof digest index =
         Snarky_backendless.Typ.of_hlistable
-          [ Deferred_values.In_circuit.typ impl ~dummy_scalar
-              ~dummy_scalar_challenge ~challenge ~scalar_challenge
-              ~feature_flags fp index
+          [ Deferred_values.In_circuit.typ impl ~dummy_scalar_challenge
+              ~challenge ~scalar_challenge ~feature_flags fp index
           ; digest
           ; messages_for_next_wrap_proof
           ]
@@ -822,7 +821,7 @@ module Wrap = struct
            ; messages_for_next_step_proof
              (* messages_for_next_step_proof is represented as a digest inside the circuit *)
            } :
-            _ t ) ~option_map ~to_opt =
+            _ t ) ~option_map =
         let open Vector in
         let fp =
           [ combined_inner_product
@@ -863,7 +862,7 @@ module Wrap = struct
             ; index
             ; feature_flags
             ; joint_combiner
-            ] ~feature_flags:flags ~option_map ~of_opt : _ t =
+            ] ~feature_flags:_ ~option_map : _ t =
         let open Vector in
         let [ combined_inner_product
             ; b

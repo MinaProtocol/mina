@@ -1198,7 +1198,7 @@ struct
                (module Impl)
                lookup_parameters feature_flags )
             (Types.Wrap.Statement.In_circuit.to_data ~option_map:Opt.map
-               statement ~to_opt:Opt.to_option_unsafe ) )
+               statement ) )
       |> Array.map ~f:(function
            | `Field (Shifted_value.Type1.Shifted_value x) ->
                `Field x

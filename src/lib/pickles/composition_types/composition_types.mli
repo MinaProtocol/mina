@@ -338,7 +338,6 @@ module Wrap : sig
 
         val typ :
              (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-          -> dummy_scalar:'a
           -> dummy_scalar_challenge:'b Scalar_challenge.t
           -> challenge:
                ( 'c
@@ -590,7 +589,6 @@ module Wrap : sig
 
       val typ :
            (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-        -> dummy_scalar:'a
         -> dummy_scalar_challenge:'b Scalar_challenge.t
         -> challenge:
              ( 'c
@@ -990,7 +988,6 @@ module Wrap : sig
            ('a, 'b, 'c, 'fp_opt, 'd, 'bool, 'e, 'e, 'e, 'f, 'g) t
         -> option_map:
              ('d -> f:('h -> ('h * unit) Hlist.HlistId.t) -> 'j Hlist0.Id.t)
-        -> to_opt:('fp_opt -> 'fp_opt2)
         -> ('c, 'a, 'b, 'e, 'f, 'g, 'j, 'fp_opt2, 'bool) flat_repr
 
       (** Construct a statement (as structured data) from the flat data-based representation. *)
@@ -1000,7 +997,6 @@ module Wrap : sig
              Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
         -> option_map:
              ('g Hlist0.Id.t -> f:(('h * unit) Hlist.HlistId.t -> 'h) -> 'j)
-        -> of_opt:(('fp, 'bool) Pickles_types.Opt.t -> 'fp_opt2)
         -> ('b, 'c, 'a, 'fp_opt2, 'j, 'bool, 'd, 'd, 'd, 'e, 'f) t
     end
 
