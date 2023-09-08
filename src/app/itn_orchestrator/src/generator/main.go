@@ -521,18 +521,22 @@ func main() {
 	default:
 		os.Exit(1)
 	}
-	if p.PaymentReceiver == "" {
+	if p.PaymentReceiver == "" && p.ZkappRatio < 0.999 {
 		fmt.Fprintln(os.Stderr, "Payment receiver not specified")
 		os.Exit(2)
 	}
 	encoder := json.NewEncoder(os.Stdout)
-	_ = encoder.Encode("Funding keys for the experiment")
+	writeComment := func(comment string) {
+		if err := encoder.Encode(comment); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing comment: %v\n", err)
+			os.Exit(3)
+		}
+	}
+	writeComment("Generated with: " + strings.Join(os.Args, " "))
+	writeComment("Funding keys for the experiment")
 	writeCommand := func(cmd Command) {
 		if cmd.comment != "" {
-			if err := encoder.Encode(cmd.comment); err != nil {
-				fmt.Fprintf(os.Stderr, "Error writing comment: %v\n", err)
-				os.Exit(3)
-			}
+			writeComment(cmd.comment)
 		}
 		if err := encoder.Encode(cmd); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing command: %v\n", err)

@@ -89,7 +89,6 @@ func scheduleZkappCommandsDo(config Config, params ZkappCommandParams, nodeAddre
 	}
 	handle, err := ScheduleZkappCommands(config, nodeAddress, paymentInput)
 	if err == nil {
-		config.Log.Info(paymentInput)
 		config.Log.Infof("scheduled zkapp batch %d with tps %f for %s: %s", batchIx, tps, nodeAddress, handle)
 	}
 	return handle, err
