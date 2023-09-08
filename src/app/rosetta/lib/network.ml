@@ -144,7 +144,7 @@ module List_ = struct
       | [ blockchain; network ] ->
          return
            { Network_list_response.network_identifiers =
-               [ { Network_identifier.blockchain= "mina"
+               [ { Network_identifier.blockchain
                  ; network
                  ; sub_network_identifier= None } ] }
       | _ ->
