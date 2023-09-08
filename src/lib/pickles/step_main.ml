@@ -42,7 +42,6 @@ let verify_one ~srs
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
-          ~feature_flags:(Plonk_types.Features.of_full d.feature_flags)
           ~sponge ~prev_challenges deferred_values prev_proof_evals )
   in
   let branch_data = deferred_values.branch_data in
