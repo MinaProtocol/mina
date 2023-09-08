@@ -716,10 +716,11 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     let proof = Blockchain_snark.Blockchain.proof block in
                     Interruptible.lift (Deferred.return proof)
                       (Deferred.never ())
-                | Error _ ->
+                | Error err ->
                     [%log error]
                       "Aborting block production: cannot generate a genesis \
-                       proof" ;
+                       proof"
+                      ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
                     Interruptible.lift (Deferred.never ()) (Deferred.return ())
                 )
               else
@@ -896,12 +897,18 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                              | `Prover_error _ ) as err ->
                                err )
                     in
+                    let txs =
+                      Mina_block.transactions ~constraint_constants
+                        (Breadcrumb.block breadcrumb)
+                      |> List.map ~f:Transaction.yojson_summary_with_status
+                    in
                     [%log internal] "@block_metadata"
                       ~metadata:
                         [ ( "blockchain_length"
                           , Mina_numbers.Length.to_yojson
                             @@ Mina_block.blockchain_length
                             @@ Breadcrumb.block breadcrumb )
+                        ; ("transactions", `List txs)
                         ] ;
                     [%str_log info]
                       ~metadata:

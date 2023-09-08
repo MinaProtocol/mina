@@ -4,7 +4,7 @@ import (
 	gonet "net"
 	"testing"
 
-	peer "github.com/libp2p/go-libp2p/core/peer"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/stretchr/testify/require"
@@ -37,7 +37,7 @@ func TestTrustedPrivateConnectionGating(t *testing.T) {
 	allowed := gs.InterceptAddrDial(testInfo.ID, testMa)
 	require.False(t, allowed)
 
-	gs.TrustedPeers[testInfo.ID] = struct{}{}
+	gs.TrustedPeers.Add(testInfo.ID)
 	allowed = gs.InterceptAddrDial(testInfo.ID, testMa)
 	require.True(t, allowed)
 }

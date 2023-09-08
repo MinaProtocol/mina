@@ -11,7 +11,7 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
-	peer "github.com/libp2p/go-libp2p/core/peer"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -150,11 +150,11 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	bannedPeers := make(map[peer.ID]struct{})
+	bannedPeers := peer.NewSet()
 	err = peerIdListForeach(bannedPeerIds, func(peerID string) error {
 		id, err := peer.Decode(peerID)
 		if err == nil {
-			bannedPeers[id] = struct{}{}
+			bannedPeers.Add(id)
 		}
 		return err
 	})
@@ -166,11 +166,11 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	trustedPeers := make(map[peer.ID]struct{})
+	trustedPeers := peer.NewSet()
 	err = peerIdListForeach(trustedPeerIds, func(peerID string) error {
 		id, err := peer.Decode(peerID)
 		if err == nil {
-			trustedPeers[id] = struct{}{}
+			trustedPeers.Add(id)
 		}
 		return nil
 	})
@@ -179,7 +179,7 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	}
 	if !gc.CleanAddedPeers() {
 		for _, peer := range addedPeers {
-			trustedPeers[peer.ID] = struct{}{}
+			trustedPeers.Add(peer.ID)
 		}
 	}
 
