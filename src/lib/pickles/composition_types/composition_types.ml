@@ -347,9 +347,9 @@ module Wrap = struct
 
       let to_minimal
           ({ plonk
-           ; combined_inner_product
-           ; b
-           ; xi
+           ; combined_inner_product = _
+           ; b = _
+           ; xi = _
            ; bulletproof_challenges
            ; branch_data
            } :
