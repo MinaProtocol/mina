@@ -1,5 +1,4 @@
 open Mina_base
-open Mina_transition
 open Core
 open Async
 open Signature_lib
@@ -30,39 +29,35 @@ let load_metadata str =
 
 (* This decoding is also unnecessarily complicated given that we are the creator of those data *)
 let decode_metadata str =
-  match Yojson.Safe.from_string str |> metadata_of_yojson with
-  | Ok
-      { created_at = _
-      ; peer_id = _
-      ; snark_work
-      ; remote_addr = _
-      ; submitter
-      ; block_hash
-      } -> (
-      match submitter |> Public_key.Compressed.of_base58_check with
-      | Ok submitter ->
-          Ok (snark_work, submitter, block_hash)
-      | Error _ ->
-          Error `Fail_to_decode_metadata )
-  | Error _ ->
-      Error `Fail_to_decode_metadata
+  let parsed_meta =
+    match Yojson.Safe.from_string str |> metadata_of_yojson with
+    | Ppx_deriving_yojson_runtime.Result.Ok a ->
+        Ok a
+    | Ppx_deriving_yojson_runtime.Result.Error _ ->
+        Error `Fail_to_decode_metadata
+  in
+  let%bind.Result { snark_work; submitter; block_hash; _ } = parsed_meta in
+  let%bind.Result submitter =
+    Result.map_error ~f:(const `Fail_to_decode_metadata)
+    @@ Public_key.Compressed.of_base58_check submitter
+  in
+  Ok (snark_work, submitter, block_hash)
 
 let load_block ~block_dir ~block_hash =
   let block_path = Filename.concat block_dir (block_hash ^ ".dat") in
   try Ok (In_channel.read_all block_path) with _ -> Error `Fail_to_load_block
 
 let decode_block str =
-  try Ok (Binable.of_string (module External_transition.Stable.Latest) str)
+  try Ok (Binable.of_string (module Mina_block.Stable.Latest) str)
   with _ -> Error `Fail_to_decode_block
 
 let verify_block ~block =
-  let open External_transition in
+  let header = Mina_block.header block in
+  let open Mina_block.Header in
   let verify_blockchain_snarks, _ = force Verifier.verify_functions in
-  let%map result =
-    verify_blockchain_snarks
-      [ (protocol_state block, protocol_state_proof block) ]
-  in
-  if result then Ok () else Error `Invalid_proof
+  verify_blockchain_snarks
+    [ (protocol_state header, protocol_state_proof header) ]
+  |> Deferred.Result.map_error ~f:(const `Invalid_proof)
 
 let decode_snark_work str =
   match Base64.decode str with
@@ -74,8 +69,8 @@ let decode_snark_work str =
 
 let verify_snark_work ~proof ~message =
   let _, verify_transaction_snarks = force Verifier.verify_functions in
-  let%map result = verify_transaction_snarks [ (proof, message) ] in
-  if result then Ok () else Error `Invalid_snark_work
+  verify_transaction_snarks [ (proof, message) ]
+  |> Deferred.Result.map_error ~f:(const `Invalid_snark_work)
 
 let validate_submission ~block_dir ~metadata_path ~no_checks =
   let open Deferred.Result.Let_syntax in
@@ -103,16 +98,22 @@ let validate_submission ~block_dir ~metadata_path ~no_checks =
           in
           verify_snark_work ~proof ~message
   in
-  ( External_transition.state_hash block
-  , External_transition.parent_hash block
-  , External_transition.blockchain_length block
-  , External_transition.global_slot block )
+  let header = Mina_block.header block in
+  let protocol_state = Mina_block.Header.protocol_state header in
+  let consensus_state =
+    Mina_state.Protocol_state.consensus_state protocol_state
+  in
+  ( Mina_state.Protocol_state.hashes protocol_state
+    |> State_hash.State_hashes.state_hash
+  , Mina_state.Protocol_state.previous_state_hash protocol_state
+  , Consensus.Data.Consensus_state.blockchain_length consensus_state
+  , Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state )
 
 type valid_payload =
   { state_hash : State_hash.t
   ; parent : State_hash.t
   ; height : Unsigned.uint32
-  ; slot : Unsigned.uint32
+  ; slot : Mina_numbers.Global_slot_since_genesis.t
   }
 
 let valid_payload_to_yojson { state_hash; parent; height; slot } : Yojson.Safe.t
@@ -121,7 +122,7 @@ let valid_payload_to_yojson { state_hash; parent; height; slot } : Yojson.Safe.t
     [ ("state_hash", State_hash.to_yojson state_hash)
     ; ("parent", State_hash.to_yojson parent)
     ; ("height", `Int (Unsigned.UInt32.to_int height))
-    ; ("slot", `Int (Unsigned.UInt32.to_int slot))
+    ; ("slot", `Int (Mina_numbers.Global_slot_since_genesis.to_int slot))
     ]
 
 let display valid_payload =
@@ -177,6 +178,6 @@ let command =
                 Deferred.unit
             | Error `Invalid_snark_work ->
                 display_error "fail to verify the snark work" ;
-                Deferred.unit))
+                Deferred.unit ))
 
 let () = Async.Command.run command

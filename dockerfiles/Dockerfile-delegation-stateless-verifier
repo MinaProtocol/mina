@@ -3,7 +3,7 @@
 # - builds stateless verification tool
 # - should not include any data related to joining a specific network, only the node software itself
 #################################################################################################
-FROM gcr.io/o1labs-192920/mina-toolchain@sha256:7ef5827fa0854a0bcfdee69dcc0c2c7aef86e1662c630e71f07c1f9162e757fa AS builder
+FROM gcr.io/o1labs-192920/mina-toolchain@sha256:73562fcc35dcabd342f66f1d69ae12704e92d69edc0b37e7c88b4d11bc623f23 AS builder
 
 # Use --build-arg "DUNE_PROFILE=dev" to build a dev image or for CI
 ARG DUNE_PROFILE=devnet
