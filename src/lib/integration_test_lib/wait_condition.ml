@@ -69,6 +69,7 @@ struct
   let wait_condition_id t = t.id
 
   let nodes_to_initialize nodes =
+    let open Network_state in
     network_state ~id:Nodes_to_initialize
       ~description:
         ( nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
@@ -83,6 +84,7 @@ struct
 
   let node_to_initialize node = nodes_to_initialize [ node ]
 
+  (* let blocks_produced ?(active_stake_percentage = 1.0) n = *)
   let blocks_to_be_produced n =
     let init state = Predicate_continuation state.blocks_generated in
     let check init_blocks_generated state =
