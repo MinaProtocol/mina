@@ -84,6 +84,8 @@ module type S = sig
 
   include Hashable.S with type t := t
 
+  val signature : t -> Signature.t
+
   val payload : t -> Signed_command_payload.t
 
   val fee : t -> Currency.Fee.t

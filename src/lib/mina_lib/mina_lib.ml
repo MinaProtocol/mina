@@ -1843,8 +1843,9 @@ let create ?wallets (config : Config.t) =
               ; on_push = notify_online
               ; log_gossip_heard = config.net_config.log_gossip_heard.new_state
               ; time_controller = config.net_config.time_controller
-              ; consensus_constants = config.net_config.consensus_constants
+              ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
+              ; constraint_constants
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
