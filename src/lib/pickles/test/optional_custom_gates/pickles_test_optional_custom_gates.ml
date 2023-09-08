@@ -215,17 +215,12 @@ let idx3 = Random.State.int state size
 
 let main_fixed_lookup_tables () =
   let table_id = random_table_id in
-  let size = size in
   let indexes = Array.init size ~f:Field.Constant.of_int in
-  let values = values in
   add_plonk_constraint
     (AddFixedLookupTable
        { id = Int32.of_int_exn table_id; data = [| indexes; values |] } ) ;
-  let idx1 = idx1 in
   let v1 = values.(idx1) in
-  let idx2 = idx2 in
   let v2 = values.(idx2) in
-  let idx3 = idx3 in
   let v3 = values.(idx3) in
   add_plonk_constraint
     (Lookup
