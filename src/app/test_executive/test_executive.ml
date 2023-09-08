@@ -31,7 +31,7 @@ type inputs =
   ; archive_image : string option
   ; debug : bool
   ; config_path : string option
-  ; keypairs_path : string
+  ; keypairs_path : string option
   ; mock_alias : (string * string) option
   }
 
@@ -66,43 +66,44 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
         "Must provide either --mock command line arg or set MOCK_NETWORK env \
          var" ;
       ignore @@ exit 1 ) ;
-    let keypairs_path =
-      if String.(suffix inputs.keypairs_path 1 = "/") then
-        String.drop_suffix inputs.keypairs_path 1
-      else inputs.keypairs_path
-    in
-    let keypairs_ls = Stdlib.Sys.readdir keypairs_path in
-    (* check network-keypairs *)
-    if
-      not
-        ( Array.exists keypairs_ls ~f:(String.equal "network-keypairs")
-        && (Stdlib.Sys.is_directory @@ keypairs_path ^/ "network-keypairs") )
-    then (
-      [%log fatal]
-        "No network-keypairs directory present in %s \n\
-        \ Consider cloning the pre-generated keypairs repo: \n\
-        \   git clone git@github.com:MinaFoundation/lucy-keypairs.git"
-        keypairs_path ;
-      ignore @@ exit 1 ) ;
-    (* check libp2p-keypairs *)
-    if
-      not
-        ( Array.exists keypairs_ls ~f:(String.equal "libp2p-keypairs")
-        && (Stdlib.Sys.is_directory @@ keypairs_path ^/ "libp2p-keypairs") )
-    then (
-      [%log fatal]
-        "No libp2p-keypairs directory present in %s \n\
-        \ Consider cloning the pre-generated keypairs repo: \n\
-        \   git clone git@github.com:MinaFoundation/lucy-keypairs.git"
-        keypairs_path ;
-      ignore @@ exit 1 ) ;
     match Inputs.Engine.name with
-    | "abstract" ->
+    | "abstract" -> (
         if Option.is_none inputs.config_path then (
           [%log fatal]
             "Must provide a config file when using the abstract engine" ;
           exit 1 )
-        else Deferred.unit
+        else
+          match inputs.keypairs_path with
+          | None ->
+              [%log fatal]
+                "Must provide a config file when using the abstract engine" ;
+              exit 1
+          | Some path ->
+              let keypairs_ls = Stdlib.Sys.readdir path in
+              (* check network-keypairs *)
+              if
+                not
+                  ( Array.exists keypairs_ls ~f:(String.equal "network-keypairs")
+                  && (Stdlib.Sys.is_directory @@ path ^/ "network-keypairs") )
+              then (
+                [%log fatal]
+                  "No network-keypairs directory present in %s \n\
+                  \ Consider cloning the pre-generated keypairs repo: \n\
+                  \   git clone git@github.com:MinaFoundation/lucy-keypairs.git"
+                  path ;
+                exit 1 (* check libp2p-keypairs *) )
+              else if
+                not
+                  ( Array.exists keypairs_ls ~f:(String.equal "libp2p-keypairs")
+                  && (Stdlib.Sys.is_directory @@ path ^/ "libp2p-keypairs") )
+              then (
+                [%log fatal]
+                  "No libp2p-keypairs directory present in %s \n\
+                  \ Consider cloning the pre-generated keypairs repo: \n\
+                  \   git clone git@github.com:MinaFoundation/lucy-keypairs.git"
+                  path ;
+                exit 1 )
+              else Deferred.unit )
     | _ ->
         [%log debug]
           "Config file is only used for the abstract engine. It will be \
@@ -476,7 +477,7 @@ let keypair_dir_path_arg =
   let doc = "Path to the pre-generated network and libp2p keypair directory." in
   let env = Arg.env_var "MINA_KEYPAIRS_PATH" ~doc in
   Arg.(
-    required
+    value
     & opt (some dir) None
     & info [ "keypairs-path" ] ~env ~docv:"MINA_KEYPAIRS_PATH" ~doc)
 
@@ -525,7 +526,7 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     path
   in
   let set_keypair path =
-    Engine.Network.keypairs_path := path ;
+    Option.iter path ~f:(fun p -> Engine.Network.keypairs_path := p) ;
     path
   in
   let set_mina_image image =
