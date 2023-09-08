@@ -76,7 +76,7 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
           match inputs.keypairs_path with
           | None ->
               [%log fatal]
-                "Must provide a config file when using the abstract engine" ;
+                "Must provide a keypair file when using the abstract engine" ;
               exit 1
           | Some path ->
               let keypairs_ls = Stdlib.Sys.readdir path in
