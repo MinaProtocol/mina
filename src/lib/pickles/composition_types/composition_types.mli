@@ -1361,12 +1361,6 @@ module Step : sig
            )
            snarky_typ
         -> assert_16_bits:('a Snarky_backendless.Cvar.t -> unit)
-        -> zero:
-             ( Limb_vector.Challenge.Constant.t
-             , 'a Limb_vector.Challenge.t
-             , 'c Hlist0.Id.t
-             , 'b Hlist0.Id.t )
-             Zero_values.t
         -> ( ( 'a Limb_vector.Challenge.t
              , 'a Limb_vector.Challenge.t Scalar_challenge.t
              , 'b
@@ -1414,11 +1408,6 @@ module Step : sig
 
     val typ :
          'f Spec.impl
-      -> ( Limb_vector.Challenge.Constant.t
-         , 'f Limb_vector.Challenge.t
-         , 'a Hlist0.Id.t
-         , 'b Hlist0.Id.t )
-         Zero_values.t
       -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
       -> (Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
       -> ( 'b

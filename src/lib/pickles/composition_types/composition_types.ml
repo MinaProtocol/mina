@@ -1324,7 +1324,7 @@ module Step = struct
           }
       end
 
-      let typ impl fq ~assert_16_bits ~zero =
+      let typ impl fq ~assert_16_bits =
         let open In_circuit in
         Spec.typ impl fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
         |> Snarky_backendless.Typ.transport ~there:to_data ~back:of_data
@@ -1361,15 +1361,13 @@ module Step = struct
 
     let[@warning "-60"] typ (type n f)
         ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-        as impl ) zero ~assert_16_bits
+        as impl ) ~assert_16_bits
         (proofs_verified : (Opt.Flag.t Plonk_types.Features.t, n) Vector.t) fq :
         ( ((_, _) Vector.t, _) t
         , ((_, _) Vector.t, _) t
         , _ )
         Snarky_backendless.Typ.t =
-      let per_proof feature_flags =
-        Per_proof.typ impl fq ~assert_16_bits ~zero
-      in
+      let per_proof _ = Per_proof.typ impl fq ~assert_16_bits in
       let unfinalized_proofs =
         Vector.typ' (Vector.map proofs_verified ~f:per_proof)
       in
