@@ -281,6 +281,36 @@ let main_fixed_lookup_tables_multiple_tables_multiple_lookups () =
            ; w6 = exists Field.typ ~compute:(fun () -> v3)
            } ) )
 
+(* Parameters *)
+let main_runtime_table_cfg () =
+  let table_id = 2 in
+  let size = 10 in
+  let first_column = Array.init size ~f:Field.Constant.of_int in
+  let idx1 = 0 in
+  let v1 = Field.Constant.of_int 1 in
+  let idx2 = 1 in
+  let v2 = Field.Constant.of_int 1 in
+  let idx3 = 2 in
+  let v3 = Field.Constant.of_int 1 in
+  let rec f i n =
+    if i = n then ()
+    else (
+      add_plonk_constraint
+        (AddRuntimeTableCfg { id = Int32.of_int_exn table_id; first_column }) ;
+      add_plonk_constraint
+        (Lookup
+           { w0 = fresh_int table_id
+           ; w1 = fresh_int idx1
+           ; w2 = exists Field.typ ~compute:(fun () -> v1)
+           ; w3 = fresh_int idx2
+           ; w4 = exists Field.typ ~compute:(fun () -> v2)
+           ; w5 = fresh_int idx3
+           ; w6 = exists Field.typ ~compute:(fun () -> v3)
+           } ) ;
+      f (i + 1) n )
+  in
+  f 1 10
+
 let add_tests, get_tests =
   let tests = ref [] in
   ( (fun name testcases -> tests := (name, testcases) :: !tests)
@@ -300,13 +330,14 @@ let constraint_constants =
   }
 
 let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
-  if feature_flags.rot then main_rot () ;
-  if feature_flags.xor then main_xor () ;
-  if feature_flags.range_check0 then main_range_check0 () ;
-  if feature_flags.range_check1 then main_range_check1 () ;
-  if feature_flags.foreign_field_add then main_foreign_field_add () ;
-  if feature_flags.foreign_field_mul then main_foreign_field_mul () ;
-  if feature_flags.lookup then (
+  if feature_flags.rot then main_rot ()
+  else if feature_flags.xor then main_xor ()
+  else if feature_flags.range_check0 then main_range_check0 ()
+  else if feature_flags.range_check1 then main_range_check1 ()
+  else if feature_flags.foreign_field_add then main_foreign_field_add ()
+  else if feature_flags.foreign_field_mul then main_foreign_field_mul ()
+  else if feature_flags.runtime_tables then main_runtime_table_cfg ()
+  else if feature_flags.lookup then (
     main_fixed_lookup_tables () ;
     main_fixed_lookup_tables_multiple_tables_multiple_lookups () )
 
@@ -390,6 +421,9 @@ let () =
       , Plonk_types.Features.{ none_bool with foreign_field_mul = true } )
     ; ( "Fixed lookup tables"
       , Plonk_types.Features.{ none_bool with lookup = true } )
+    ; ( "Runtime lookup tables"
+      , Plonk_types.Features.
+          { none_bool with lookup = true; runtime_tables = true } )
     ]
   in
   List.iter ~f:register_feature_test configurations ;
