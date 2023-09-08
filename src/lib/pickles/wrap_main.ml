@@ -201,7 +201,6 @@ let wrap_main
               let typ =
                 typ
                   (module Impl)
-                  Common.Lookup_parameters.tock_zero
                   ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
                   (Vector.init Max_proofs_verified.n ~f:(fun _ ->
                        Plonk_types.Features.none ) )
