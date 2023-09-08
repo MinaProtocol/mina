@@ -13,4 +13,4 @@ let verify_functions =
 
       let proof_level = Genesis_constants.Proof_level.compiled
     end) in
-    (B.Proof.verify, T.verify))
+    (B.Proof.verify, T.verify) )
