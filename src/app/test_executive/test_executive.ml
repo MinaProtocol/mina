@@ -372,7 +372,7 @@ let main inputs =
           in
           [%log trace] "initializing network manager" ;
           let%bind net_manager =
-            Engine.Network_manager.create ~logger network_config T.config
+            Engine.Network_manager.create ~logger network_config
           in
           net_manager_ref := Some net_manager ;
           [%log trace] "deploying network" ;
