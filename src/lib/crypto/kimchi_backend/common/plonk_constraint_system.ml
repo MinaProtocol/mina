@@ -895,7 +895,7 @@ end = struct
   open Core_kernel
   open Pickles_types
 
-  (* Use by compute_witness to build the runtime tables from the Lookup
+  (* Used by compute_witness to build the runtime tables from the Lookup
      constraint *)
   module MapRuntimeTable = struct
     module T = struct
@@ -1044,7 +1044,7 @@ end = struct
           let i, rt_idx = Option.value_exn v in
           let rt = runtime_tables.(rt_idx) in
           (* Important note: we do not check if the value has been set before.
-             Theefore, it will always use the latest value *)
+             Therefore, it will always use the latest value *)
           rt.data.(i) <- vv ) ;
     (* Return the witness. *)
     (res, runtime_tables)

@@ -1,5 +1,4 @@
 (library
- (inline_tests (flags -verbose -show-counts))
  (name pickles_types)
  (public_name pickles_types)
  ; Deactivated warnings
@@ -27,7 +26,6 @@
   (backend bisect_ppx))
  (libraries
    ;; opam libraries
-  ppx_inline_test.config
   sexplib0
   result
   core_kernel

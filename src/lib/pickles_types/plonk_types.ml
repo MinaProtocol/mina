@@ -747,9 +747,8 @@ module Evals = struct
         ; range_check_lookup_selector
         ; foreign_field_mul_lookup_selector
         } =
-      let some x = Opt.Some x in
       let always_present =
-        List.map ~f:some
+        List.map ~f:Opt.just
           ( [ z
             ; generic_selector
             ; poseidon_selector
@@ -834,8 +833,8 @@ module Evals = struct
         ; lookup_table
         ]
       in
-      let some x = Opt.Some x in
-      List.map ~f:some always_present
+
+      List.map ~f:Opt.just always_present
       @ optional_gates
       @ Vector.to_list lookup_sorted
       @ [ runtime_lookup_table
