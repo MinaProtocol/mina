@@ -253,7 +253,7 @@ let f_lt_data =
       in
       (indexes, values) )
 
-(* nb of lookups *)
+(* number of lookups *)
 let n = Random.State.int state 10
 
 let lookups =
