@@ -10,6 +10,7 @@ type metadata =
   ; remote_addr : string
   ; submitter : string
   ; block_hash : string
+  ; graphql_control_port: int option [@default None]
   }
 [@@deriving yojson]
 
@@ -33,12 +34,12 @@ let decode_metadata str =
     match Yojson.Safe.from_string str |> metadata_of_yojson with
     | Ppx_deriving_yojson_runtime.Result.Ok a ->
         Ok a
-    | Ppx_deriving_yojson_runtime.Result.Error _ ->
-        Error `Fail_to_decode_metadata
+    | Ppx_deriving_yojson_runtime.Result.Error e ->
+        Error (`Fail_to_decode_metadata e)
   in
   let%bind.Result { snark_work; submitter; block_hash; _ } = parsed_meta in
   let%bind.Result submitter =
-    Result.map_error ~f:(const `Fail_to_decode_metadata)
+    Result.map_error ~f:(fun e -> `Fail_to_decode_metadata (Error.to_string_hum e))
     @@ Public_key.Compressed.of_base58_check submitter
   in
   Ok (snark_work, submitter, block_hash)
@@ -160,8 +161,11 @@ let command =
             | Error `Path_is_invalid ->
                 display_error "path for metadata is invalid" ;
                 exit 1
-            | Error `Fail_to_load_metadata | Error `Fail_to_decode_metadata ->
+            | Error `Fail_to_load_metadata ->
                 display_error "fail to load metadata" ;
+                exit 2
+            | Error (`Fail_to_decode_metadata e) ->
+                display_error ("fail to decode metadata: " ^  e);
                 exit 2
             | Error `Fail_to_load_block ->
                 display_error "fail to load block" ;
