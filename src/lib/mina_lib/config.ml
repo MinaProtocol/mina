@@ -61,5 +61,7 @@ type t =
   ; uptime_send_node_commit : bool [@default false]
   ; stop_time : int
   ; graphql_control_port : int option [@default None]
+  ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
+        [@default None]
   }
 [@@deriving make]

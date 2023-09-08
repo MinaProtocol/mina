@@ -70,109 +70,191 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)
   let%map () = return () in
+  let current_global_slot =
+    let config = Mina_lib.config t in
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:config.precomputed_values.consensus_constants
+           (Block_time.now config.time_controller) ))
+  in
   let open Deferred.Let_syntax in
-  let%map result = Mina_lib.add_transactions t [ user_command_input ] in
-  txn_count := !txn_count + 1 ;
-  match result with
-  | Ok (_, [], [ failed_txn ]) ->
-      Error
-        (Error.of_string
-           (sprintf !"%s"
-              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
-                .to_yojson (snd failed_txn)
-              |> Yojson.Safe.to_string ) ) )
-  | Ok (`Broadcasted, [ Signed_command txn ], []) ->
-      [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:[ ("command", User_command.to_yojson (Signed_command txn)) ]
-        "Scheduled command $command" ;
-      Ok txn
-  | Ok (decision, valid_commands, invalid_commands) ->
-      [%log' info (Mina_lib.top_level_logger t)]
+  match (Mina_lib.config t).slot_tx_end with
+  | Some slot_tx_end
+    when Global_slot_since_hard_fork.(current_global_slot >= slot_tx_end) ->
+      [%log' warn (Mina_lib.top_level_logger t)]
+        "can't produce transaction in slot $slot, tx production ends at $end"
         ~metadata:
-          [ ( "decision"
-            , `String
-                ( match decision with
-                | `Broadcasted ->
-                    "broadcasted"
-                | `Not_broadcasted ->
-                    "not_broadcasted" ) )
-          ; ( "valid_commands"
-            , `List (List.map ~f:User_command.to_yojson valid_commands) )
-          ; ( "invalid_commands"
-            , `List
-                (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
-                     Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
-                     .to_yojson diff_err ) ) )
-          ]
-        "Invalid result when scheduling a user command" ;
-      Error (Error.of_string "Internal error while scheduling a user command")
-  | Error e ->
-      Error e
+          [ ( "slot"
+            , `Int (Global_slot_since_hard_fork.to_int current_global_slot) )
+          ; ("end", `Int (Global_slot_since_hard_fork.to_int slot_tx_end))
+          ] ;
+      Deferred.return (Error (Error.of_string "tx production has ended"))
+  | Some _ | None -> (
+      let%map result = Mina_lib.add_transactions t [ user_command_input ] in
+      txn_count := !txn_count + 1 ;
+      match result with
+      | Ok (_, [], [ failed_txn ]) ->
+          Error
+            (Error.of_string
+               (sprintf !"%s"
+                  ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                    .to_yojson (snd failed_txn)
+                  |> Yojson.Safe.to_string ) ) )
+      | Ok (`Broadcasted, [ Signed_command txn ], []) ->
+          [%log' info (Mina_lib.top_level_logger t)]
+            ~metadata:
+              [ ("command", User_command.to_yojson (Signed_command txn)) ]
+            "Scheduled command $command" ;
+          Ok txn
+      | Ok (decision, valid_commands, invalid_commands) ->
+          [%log' info (Mina_lib.top_level_logger t)]
+            ~metadata:
+              [ ( "decision"
+                , `String
+                    ( match decision with
+                    | `Broadcasted ->
+                        "broadcasted"
+                    | `Not_broadcasted ->
+                        "not_broadcasted" ) )
+              ; ( "valid_commands"
+                , `List (List.map ~f:User_command.to_yojson valid_commands) )
+              ; ( "invalid_commands"
+                , `List
+                    (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
+                         Network_pool.Transaction_pool.Resource_pool.Diff
+                         .Diff_error
+                         .to_yojson diff_err ) ) )
+              ]
+            "Invalid result when scheduling a user command" ;
+          Error
+            (Error.of_string "Internal error while scheduling a user command")
+      | Error e ->
+          Error e )
 
 let setup_and_submit_user_commands t user_command_list =
   let open Participating_state.Let_syntax in
   let%map _is_active = Mina_lib.active_or_bootstrapping t in
-  [%log' warn (Mina_lib.top_level_logger t)]
-    "batch-send-payments does not yet report errors"
-    ~metadata:
-      [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
-  Mina_lib.add_transactions t user_command_list
+  let config = Mina_lib.config t in
+  let current_global_slot =
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:config.precomputed_values.consensus_constants
+           (Block_time.now config.time_controller) ))
+  in
+  match config.slot_tx_end with
+  | Some slot_tx_end
+    when Global_slot_since_hard_fork.(current_global_slot >= slot_tx_end) ->
+      [%log' warn (Mina_lib.top_level_logger t)]
+        "can't produce transactions in slot $slot, tx production ends at $end"
+        ~metadata:
+          [ ( "slot"
+            , `Int (Global_slot_since_hard_fork.to_int current_global_slot) )
+          ; ("end", `Int (Global_slot_since_hard_fork.to_int slot_tx_end))
+          ] ;
+      Deferred.return (Error (Error.of_string "tx production has ended"))
+  | Some _ | None ->
+      [%log' warn (Mina_lib.top_level_logger t)]
+        "batch-send-payments does not yet report errors"
+        ~metadata:
+          [ ("mina_command", `String "scheduling a batch of user transactions")
+          ] ;
+      Mina_lib.add_transactions t user_command_list
 
 let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)
   let%map () = return () in
-  let open Deferred.Let_syntax in
-  let%map result = Mina_lib.add_zkapp_transactions t zkapp_commands in
-  let num_zkapps = List.length zkapp_commands in
-  txn_count := !txn_count + num_zkapps ;
-  match result with
-  | Ok (`Broadcasted, commands, []) ->
-      let zkapp_jsons = List.map commands ~f:User_command.to_yojson in
-      [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:[ ("zkapp_commands", `List zkapp_jsons) ]
-        "Scheduled %d zkApps" num_zkapps ;
-      Ok zkapp_commands
-  | Ok (decision, valid_commands, invalid_commands) ->
-      [%log' info (Mina_lib.top_level_logger t)]
+  let config = Mina_lib.config t in
+  let current_global_slot =
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:config.precomputed_values.consensus_constants
+           (Block_time.now config.time_controller) ))
+  in
+  match config.slot_tx_end with
+  | Some slot_tx_end
+    when Global_slot_since_hard_fork.(current_global_slot >= slot_tx_end) ->
+      [%log' warn (Mina_lib.top_level_logger t)]
+        "can't produce transactions in slot $slot, tx production ends at $end"
         ~metadata:
-          [ ( "decision"
-            , `String
-                ( match decision with
-                | `Broadcasted ->
-                    "broadcasted"
-                | `Not_broadcasted ->
-                    "not_broadcasted" ) )
-          ; ( "valid_zkapp_commands"
-            , `List (List.map ~f:User_command.to_yojson valid_commands) )
-          ; ( "invalid_zkapp_commands"
-            , `List
-                (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
-                     Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
-                     .to_yojson diff_err ) ) )
-          ]
-        "Invalid results when scheduling zkApp commands" ;
-      let err_str =
-        List.map invalid_commands ~f:(fun (_cmd, diff_error) ->
-            Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
-            .to_yojson diff_error
-            |> Yojson.Safe.to_string )
-        |> String.concat ~sep:"; "
-      in
-      Error (Error.of_string err_str)
-  | Error e ->
-      Error e
+          [ ( "slot"
+            , `Int (Global_slot_since_hard_fork.to_int current_global_slot) )
+          ; ("end", `Int (Global_slot_since_hard_fork.to_int slot_tx_end))
+          ] ;
+      Deferred.return (Error (Error.of_string "tx production has ended"))
+  | Some _ | None -> (
+      let open Deferred.Let_syntax in
+      let%map result = Mina_lib.add_zkapp_transactions t zkapp_commands in
+      let num_zkapps = List.length zkapp_commands in
+      txn_count := !txn_count + num_zkapps ;
+      match result with
+      | Ok (`Broadcasted, commands, []) ->
+          let zkapp_jsons = List.map commands ~f:User_command.to_yojson in
+          [%log' info (Mina_lib.top_level_logger t)]
+            ~metadata:[ ("zkapp_commands", `List zkapp_jsons) ]
+            "Scheduled %d zkApps" num_zkapps ;
+          Ok zkapp_commands
+      | Ok (decision, valid_commands, invalid_commands) ->
+          [%log' info (Mina_lib.top_level_logger t)]
+            ~metadata:
+              [ ( "decision"
+                , `String
+                    ( match decision with
+                    | `Broadcasted ->
+                        "broadcasted"
+                    | `Not_broadcasted ->
+                        "not_broadcasted" ) )
+              ; ( "valid_zkapp_commands"
+                , `List (List.map ~f:User_command.to_yojson valid_commands) )
+              ; ( "invalid_zkapp_commands"
+                , `List
+                    (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
+                         Network_pool.Transaction_pool.Resource_pool.Diff
+                         .Diff_error
+                         .to_yojson diff_err ) ) )
+              ]
+            "Invalid results when scheduling zkApp commands" ;
+          let err_str =
+            List.map invalid_commands ~f:(fun (_cmd, diff_error) ->
+                Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                .to_yojson diff_error
+                |> Yojson.Safe.to_string )
+            |> String.concat ~sep:"; "
+          in
+          Error (Error.of_string err_str)
+      | Error e ->
+          Error e )
 
 let setup_and_submit_zkapp_command t (zkapp_command : Zkapp_command.t) =
-  let res = setup_and_submit_zkapp_commands t [ zkapp_command ] in
-  let%map.Participating_state res' = res in
-  match%map.Deferred res' with
-  | Ok [ zkapp ] ->
-      Ok zkapp
-  | Ok ([] | _ :: _) ->
-      failwith "Expected exactly one zkApp"
-  | Error err ->
-      Error err
+  let config = Mina_lib.config t in
+  let current_global_slot =
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:config.precomputed_values.consensus_constants
+           (Block_time.now config.time_controller) ))
+  in
+  match config.slot_tx_end with
+  | Some slot_tx_end
+    when Global_slot_since_hard_fork.(current_global_slot >= slot_tx_end) ->
+      [%log' warn (Mina_lib.top_level_logger t)]
+        "can't produce transactions in slot $slot, tx production ends at $end"
+        ~metadata:
+          [ ( "slot"
+            , `Int (Global_slot_since_hard_fork.to_int current_global_slot) )
+          ; ("end", `Int (Global_slot_since_hard_fork.to_int slot_tx_end))
+          ] ;
+      Participating_state.return
+      @@ Deferred.return (Error (Error.of_string "tx production has ended"))
+  | Some _ | None -> (
+      let res = setup_and_submit_zkapp_commands t [ zkapp_command ] in
+      let%map.Participating_state res' = res in
+      match%map.Deferred res' with
+      | Ok [ zkapp ] ->
+          Ok zkapp
+      | Ok ([] | _ :: _) ->
+          failwith "Expected exactly one zkApp"
+      | Error err ->
+          Error err )
 
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
   type proof_elem = User_command.t

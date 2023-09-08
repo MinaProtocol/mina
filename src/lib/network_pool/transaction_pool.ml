@@ -65,6 +65,25 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
+      module V3 = struct
+        type t =
+          | Insufficient_replace_fee
+          | Duplicate
+          | Invalid_nonce
+          | Insufficient_funds
+          | Overflow
+          | Bad_token
+          | Unwanted_fee_token
+          | Expired
+          | Overloaded
+          | Fee_payer_account_not_found
+          | Fee_payer_not_permitted_to_send
+          | After_slot_tx_end
+        [@@deriving sexp, yojson, compare]
+
+        let to_latest = Fn.id
+      end
+
       module V2 = struct
         type t =
           | Insufficient_replace_fee
@@ -80,7 +99,29 @@ module Diff_versioned = struct
           | Fee_payer_not_permitted_to_send
         [@@deriving sexp, yojson, compare]
 
-        let to_latest = Fn.id
+        let to_latest = function
+          | Insufficient_replace_fee ->
+              V3.Insufficient_replace_fee
+          | Duplicate ->
+              V3.Duplicate
+          | Invalid_nonce ->
+              V3.Invalid_nonce
+          | Insufficient_funds ->
+              V3.Insufficient_funds
+          | Overflow ->
+              V3.Overflow
+          | Bad_token ->
+              V3.Bad_token
+          | Unwanted_fee_token ->
+              V3.Unwanted_fee_token
+          | Expired ->
+              V3.Expired
+          | Overloaded ->
+              V3.Overloaded
+          | Fee_payer_account_not_found ->
+              V3.Fee_payer_account_not_found
+          | Fee_payer_not_permitted_to_send ->
+              V3.Fee_payer_not_permitted_to_send
       end
     end]
 
@@ -99,6 +140,7 @@ module Diff_versioned = struct
       | Overloaded
       | Fee_payer_account_not_found
       | Fee_payer_not_permitted_to_send
+      | After_slot_tx_end
     [@@deriving sexp, yojson]
 
     let to_string_name = function
@@ -124,6 +166,8 @@ module Diff_versioned = struct
           "fee_payer_account_not_found"
       | Fee_payer_not_permitted_to_send ->
           "fee_payer_not_permitted_to_send"
+      | After_slot_tx_end ->
+          "after_slot_tx_end"
 
     let to_string_hum = function
       | Insufficient_replace_fee ->
@@ -152,6 +196,9 @@ module Diff_versioned = struct
           "Fee payer account was not found in the best tip ledger"
       | Fee_payer_not_permitted_to_send ->
           "Fee payer account permissions don't allow sending funds"
+      | After_slot_tx_end ->
+          "This transaction was submitted after the slot defined to stop \
+           accepting transactions"
   end
 
   module Rejected = struct
@@ -159,11 +206,20 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
+      module V4 = struct
+        type t = (User_command.Stable.V2.t * Diff_error.Stable.V3.t) list
+        [@@deriving sexp, yojson, compare]
+
+        let to_latest = Fn.id
+      end
+
       module V3 = struct
         type t = (User_command.Stable.V2.t * Diff_error.Stable.V2.t) list
         [@@deriving sexp, yojson, compare]
 
-        let to_latest = Fn.id
+        let to_latest =
+          List.map ~f:(fun (cmds, diff) ->
+              (cmds, Diff_error.Stable.V2.to_latest diff) )
       end
     end]
 
@@ -448,6 +504,8 @@ struct
           Unwanted_fee_token
       | Expired _ ->
           Expired
+      | After_slot_tx_end ->
+          After_slot_tx_end
 
     let indexed_pool_error_metadata = function
       | Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
@@ -481,6 +539,8 @@ struct
             , Mina_numbers.Global_slot_since_genesis.to_yojson
                 global_slot_since_genesis )
           ]
+      | After_slot_tx_end ->
+          []
 
     let indexed_pool_error_log_info e =
       ( Diff_versioned.Diff_error.to_string_name
@@ -508,264 +568,310 @@ struct
          Don't forget to modify the refcount table as well as remove from the
          index pool.
       *)
+      let global_slot_since_hard_fork =
+        Indexed_pool.global_slot_since_hard_fork t.pool
+      in
       let vk_table_lift = Vk_refcount_table.lift t.verification_key_table in
       let vk_table_lift_hashed =
         Vk_refcount_table.lift_hashed t.verification_key_table
       in
-      let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
-      t.best_tip_ledger <- Some best_tip_ledger ;
-      let pool_max_size = t.config.pool_max_size in
-      let log_indexed_pool_error error_str ~metadata cmd =
-        [%log' debug t.logger]
-          "Couldn't re-add locally generated command $cmd, not valid against \
-           new ledger. Error: $error"
-          ~metadata:
-            ( [ ( "cmd"
-                , Transaction_hash.User_command_with_valid_signature.to_yojson
-                    cmd )
-              ; ("error", `String error_str)
-              ]
-            @ metadata )
-      in
-      List.iter new_commands ~f:(vk_table_lift Vk_refcount_table.inc) ;
-      List.iter removed_commands ~f:(vk_table_lift Vk_refcount_table.dec) ;
-      [%log' trace t.logger]
-        ~metadata:
-          [ ( "removed"
-            , `List
-                (List.map removed_commands
-                   ~f:(With_status.to_yojson User_command.Valid.to_yojson) ) )
-          ; ( "added"
-            , `List
-                (List.map new_commands
-                   ~f:(With_status.to_yojson User_command.Valid.to_yojson) ) )
-          ]
-        "Diff: removed: $removed added: $added from best tip" ;
-      let pool', dropped_backtrack =
-        List.fold (List.rev removed_commands) ~init:(t.pool, Sequence.empty)
-          ~f:(fun (pool, dropped_so_far) unhashed_cmd ->
-            let cmd =
-              Transaction_hash.User_command_with_valid_signature.create
-                unhashed_cmd.data
-            in
-            ( match
-                Hashtbl.find_and_remove t.locally_generated_committed cmd
-              with
-            | None ->
-                ()
-            | Some time_added ->
-                [%log' info t.logger]
-                  "Locally generated command $cmd committed in a block!"
-                  ~metadata:
-                    [ ( "cmd"
-                      , With_status.to_yojson User_command.Valid.to_yojson
-                          unhashed_cmd )
-                    ] ;
-                Hashtbl.add_exn t.locally_generated_uncommitted ~key:cmd
-                  ~data:time_added ) ;
-            let pool', dropped_seq =
-              match cmd |> Indexed_pool.add_from_backtrack pool with
-              | Error e ->
-                  let error_str, metadata = indexed_pool_error_log_info e in
-                  log_indexed_pool_error error_str ~metadata cmd ;
-                  (pool, Sequence.empty)
-              | Ok indexed_pool ->
-                  drop_until_below_max_size ~pool_max_size indexed_pool
-            in
-            (pool', Sequence.append dropped_so_far dropped_seq) )
-      in
-      Sequence.iter dropped_backtrack
-        ~f:(vk_table_lift_hashed Vk_refcount_table.dec) ;
-      (* Track what locally generated commands were removed from the pool
-         during backtracking due to the max size constraint. *)
-      let locally_generated_dropped =
-        Sequence.filter dropped_backtrack
-          ~f:(Hashtbl.mem t.locally_generated_uncommitted)
-        |> Sequence.to_list_rev
-      in
-      if not (List.is_empty locally_generated_dropped) then
-        [%log' debug t.logger]
-          "Dropped locally generated commands $cmds during backtracking to \
-           maintain max size. Will attempt to re-add after forwardtracking."
-          ~metadata:
-            [ ( "cmds"
-              , `List
-                  (List.map
-                     ~f:
-                       Transaction_hash.User_command_with_valid_signature
-                       .to_yojson locally_generated_dropped ) )
-            ] ;
-      let pool'', dropped_commands =
-        let accounts_to_check =
-          List.fold (new_commands @ removed_commands) ~init:Account_id.Set.empty
-            ~f:(fun set cmd ->
-              let set' =
-                With_status.data cmd |> User_command.forget_check
-                |> User_command.accounts_referenced |> Account_id.Set.of_list
-              in
-              Set.union set set' )
-        in
-        let get_account =
-          let existing_account_states_by_id =
-            preload_accounts best_tip_ledger accounts_to_check
-          in
-          fun id ->
-            match Map.find existing_account_states_by_id id with
-            | Some account ->
-                account
-            | None ->
-                if Set.mem accounts_to_check id then Account.empty
-                else
-                  failwith
-                    "did not expect Indexed_pool.revalidate to call \
-                     get_account on account not in accounts_to_check"
-        in
-        Indexed_pool.revalidate pool' ~logger:t.logger
-          (`Subset accounts_to_check) get_account
-      in
-      let committed_commands, dropped_commit_conflicts =
-        let command_hashes =
-          List.fold_left new_commands ~init:Transaction_hash.Set.empty
-            ~f:(fun set cmd ->
-              let cmd_hash =
-                With_status.data cmd
-                |> Transaction_hash.User_command_with_valid_signature.create
-                |> Transaction_hash.User_command_with_valid_signature.hash
-              in
-              Set.add set cmd_hash )
-        in
-        Sequence.to_list dropped_commands
-        |> List.partition_tf ~f:(fun cmd ->
-               Set.mem command_hashes
-                 (Transaction_hash.User_command_with_valid_signature.hash cmd) )
-      in
-      List.iter committed_commands ~f:(fun cmd ->
-          vk_table_lift_hashed Vk_refcount_table.dec cmd ;
-          Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
-          |> Option.iter ~f:(fun data ->
-                 Hashtbl.add_exn t.locally_generated_committed ~key:cmd ~data ) ) ;
-      let commit_conflicts_locally_generated =
-        List.filter dropped_commit_conflicts ~f:(fun cmd ->
-            Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
-            |> Option.is_some )
-      in
-      if not (List.is_empty commit_conflicts_locally_generated) then
-        [%log' info t.logger]
-          "Locally generated commands $cmds dropped because they conflicted \
-           with a committed command."
-          ~metadata:
-            [ ( "cmds"
-              , `List
-                  (List.map commit_conflicts_locally_generated
-                     ~f:
-                       Transaction_hash.User_command_with_valid_signature
-                       .to_yojson ) )
-            ] ;
-      [%log' debug t.logger]
-        !"Finished handling diff. Old pool size %i, new pool size %i. Dropped \
-          %i commands during backtracking to maintain max size."
-        (Indexed_pool.size t.pool) (Indexed_pool.size pool'')
-        (Sequence.length dropped_backtrack) ;
-      Mina_metrics.(
-        Gauge.set Transaction_pool.pool_size
-          (Float.of_int (Indexed_pool.size pool''))) ;
-      t.pool <- pool'' ;
-      List.iter locally_generated_dropped ~f:(fun cmd ->
-          (* If the dropped transaction was included in the winning chain, it'll
-             be in locally_generated_committed. If it wasn't, try re-adding to
-             the pool. *)
-          let remove_cmd () =
-            vk_table_lift_hashed Vk_refcount_table.dec cmd ;
-            assert (
-              Option.is_some
-              @@ Hashtbl.find_and_remove t.locally_generated_uncommitted cmd )
-          in
-          let log_and_remove ?(metadata = []) error_str =
-            log_indexed_pool_error error_str ~metadata cmd ;
-            remove_cmd ()
-          in
-          if not (Hashtbl.mem t.locally_generated_committed cmd) then
-            if
-              not
-                (has_sufficient_fee t.pool
-                   (Transaction_hash.User_command_with_valid_signature.command
-                      cmd )
-                   ~pool_max_size )
-            then (
-              [%log' info t.logger]
-                "Not re-adding locally generated command $cmd to pool, \
-                 insufficient fee"
+      let pool =
+        match Indexed_pool.slot_tx_end t.pool with
+        | Some slot_tx_end
+          when Mina_numbers.Global_slot_since_hard_fork.(
+                 global_slot_since_hard_fork >= slot_tx_end) ->
+            (* discard all transactions *)
+            [%log' debug t.logger]
+              "Discarding all transactions because the current global slot \
+               $slot is past slot_tx_end $slot_tx_end"
+              ~metadata:
+                [ ( "slot"
+                  , Mina_numbers.Global_slot_since_hard_fork.to_yojson
+                      global_slot_since_hard_fork )
+                ; ( "slot_tx_end"
+                  , Mina_numbers.Global_slot_since_hard_fork.to_yojson
+                      slot_tx_end )
+                ] ;
+            List.iter
+              (Indexed_pool.get_all t.pool)
+              ~f:(vk_table_lift_hashed Vk_refcount_table.dec) ;
+            Hashtbl.clear t.locally_generated_uncommitted ;
+            Hashtbl.clear t.locally_generated_committed ;
+            Indexed_pool.drop_all t.pool
+        | None | Some _ ->
+            let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
+            t.best_tip_ledger <- Some best_tip_ledger ;
+            let pool_max_size = t.config.pool_max_size in
+            let log_indexed_pool_error error_str ~metadata cmd =
+              [%log' debug t.logger]
+                "Couldn't re-add locally generated command $cmd, not valid \
+                 against new ledger. Error: $error"
                 ~metadata:
-                  [ ( "cmd"
-                    , Transaction_hash.User_command_with_valid_signature
-                      .to_yojson cmd )
-                  ] ;
-              remove_cmd () )
-            else
-              let unchecked =
-                Transaction_hash.User_command_with_valid_signature.command cmd
-              in
-              match
-                Option.bind
-                  (Base_ledger.location_of_account best_tip_ledger
-                     (User_command.fee_payer unchecked) )
-                  ~f:(Base_ledger.get best_tip_ledger)
-              with
-              | Some acct -> (
-                  match
-                    Indexed_pool.add_from_gossip_exn t.pool cmd acct.nonce
-                      ( Account.liquid_balance_at_slot ~global_slot acct
-                      |> Currency.Balance.to_amount )
-                  with
-                  | Error e ->
-                      let error_str, metadata = indexed_pool_error_log_info e in
-                      log_and_remove error_str
-                        ~metadata:
-                          ( ("user_command", User_command.to_yojson unchecked)
-                          :: metadata )
-                  | Ok (_, pool''', _) ->
-                      [%log' debug t.logger]
-                        "re-added locally generated command $cmd to \
-                         transaction pool after reorg"
+                  ( [ ( "cmd"
+                      , Transaction_hash.User_command_with_valid_signature
+                        .to_yojson cmd )
+                    ; ("error", `String error_str)
+                    ]
+                  @ metadata )
+            in
+            List.iter new_commands ~f:(vk_table_lift Vk_refcount_table.inc) ;
+            List.iter removed_commands ~f:(vk_table_lift Vk_refcount_table.dec) ;
+            [%log' trace t.logger]
+              ~metadata:
+                [ ( "removed"
+                  , `List
+                      (List.map removed_commands
+                         ~f:(With_status.to_yojson User_command.Valid.to_yojson) )
+                  )
+                ; ( "added"
+                  , `List
+                      (List.map new_commands
+                         ~f:(With_status.to_yojson User_command.Valid.to_yojson) )
+                  )
+                ]
+              "Diff: removed: $removed added: $added from best tip" ;
+            let pool', dropped_backtrack =
+              List.fold (List.rev removed_commands)
+                ~init:(t.pool, Sequence.empty)
+                ~f:(fun (pool, dropped_so_far) unhashed_cmd ->
+                  let cmd =
+                    Transaction_hash.User_command_with_valid_signature.create
+                      unhashed_cmd.data
+                  in
+                  ( match
+                      Hashtbl.find_and_remove t.locally_generated_committed cmd
+                    with
+                  | None ->
+                      ()
+                  | Some time_added ->
+                      [%log' info t.logger]
+                        "Locally generated command $cmd committed in a block!"
                         ~metadata:
                           [ ( "cmd"
-                            , Transaction_hash.User_command_with_valid_signature
-                              .to_yojson cmd )
+                            , With_status.to_yojson User_command.Valid.to_yojson
+                                unhashed_cmd )
                           ] ;
-                      vk_table_lift_hashed Vk_refcount_table.inc cmd ;
-                      Mina_metrics.(
-                        Gauge.set Transaction_pool.pool_size
-                          (Float.of_int (Indexed_pool.size pool'''))) ;
-                      t.pool <- pool''' )
-              | None ->
-                  log_and_remove "Fee_payer_account not found"
-                    ~metadata:
-                      [ ("user_command", User_command.to_yojson unchecked) ] ) ;
-      (*Remove any expired user commands*)
-      let expired_commands, pool = Indexed_pool.remove_expired t.pool in
-      Sequence.iter expired_commands ~f:(fun cmd ->
-          [%log' debug t.logger]
-            "Dropping expired user command from the pool $cmd"
-            ~metadata:
-              [ ( "cmd"
-                , Transaction_hash.User_command_with_valid_signature.to_yojson
-                    cmd )
-              ] ;
-          vk_table_lift_hashed Vk_refcount_table.dec cmd ;
-          ignore
-            ( Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
-              : (Time.t * [ `Batch of int ]) option ) ) ;
+                      Hashtbl.add_exn t.locally_generated_uncommitted ~key:cmd
+                        ~data:time_added ) ;
+                  let pool', dropped_seq =
+                    match cmd |> Indexed_pool.add_from_backtrack pool with
+                    | Error e ->
+                        let error_str, metadata =
+                          indexed_pool_error_log_info e
+                        in
+                        log_indexed_pool_error error_str ~metadata cmd ;
+                        (pool, Sequence.empty)
+                    | Ok indexed_pool ->
+                        drop_until_below_max_size ~pool_max_size indexed_pool
+                  in
+                  (pool', Sequence.append dropped_so_far dropped_seq) )
+            in
+            Sequence.iter dropped_backtrack
+              ~f:(vk_table_lift_hashed Vk_refcount_table.dec) ;
+            (* Track what locally generated commands were removed from the pool
+               during backtracking due to the max size constraint. *)
+            let locally_generated_dropped =
+              Sequence.filter dropped_backtrack
+                ~f:(Hashtbl.mem t.locally_generated_uncommitted)
+              |> Sequence.to_list_rev
+            in
+            if not (List.is_empty locally_generated_dropped) then
+              [%log' debug t.logger]
+                "Dropped locally generated commands $cmds during backtracking \
+                 to maintain max size. Will attempt to re-add after \
+                 forwardtracking."
+                ~metadata:
+                  [ ( "cmds"
+                    , `List
+                        (List.map
+                           ~f:
+                             Transaction_hash.User_command_with_valid_signature
+                             .to_yojson locally_generated_dropped ) )
+                  ] ;
+            let pool'', dropped_commands =
+              let accounts_to_check =
+                List.fold (new_commands @ removed_commands)
+                  ~init:Account_id.Set.empty ~f:(fun set cmd ->
+                    let set' =
+                      With_status.data cmd |> User_command.forget_check
+                      |> User_command.accounts_referenced
+                      |> Account_id.Set.of_list
+                    in
+                    Set.union set set' )
+              in
+              let get_account =
+                let existing_account_states_by_id =
+                  preload_accounts best_tip_ledger accounts_to_check
+                in
+                fun id ->
+                  match Map.find existing_account_states_by_id id with
+                  | Some account ->
+                      account
+                  | None ->
+                      if Set.mem accounts_to_check id then Account.empty
+                      else
+                        failwith
+                          "did not expect Indexed_pool.revalidate to call \
+                           get_account on account not in accounts_to_check"
+              in
+              Indexed_pool.revalidate pool' ~logger:t.logger
+                (`Subset accounts_to_check) get_account
+            in
+            let committed_commands, dropped_commit_conflicts =
+              let command_hashes =
+                List.fold_left new_commands ~init:Transaction_hash.Set.empty
+                  ~f:(fun set cmd ->
+                    let cmd_hash =
+                      With_status.data cmd
+                      |> Transaction_hash.User_command_with_valid_signature
+                         .create
+                      |> Transaction_hash.User_command_with_valid_signature.hash
+                    in
+                    Set.add set cmd_hash )
+              in
+              Sequence.to_list dropped_commands
+              |> List.partition_tf ~f:(fun cmd ->
+                     Set.mem command_hashes
+                       (Transaction_hash.User_command_with_valid_signature.hash
+                          cmd ) )
+            in
+            List.iter committed_commands ~f:(fun cmd ->
+                vk_table_lift_hashed Vk_refcount_table.dec cmd ;
+                Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
+                |> Option.iter ~f:(fun data ->
+                       Hashtbl.add_exn t.locally_generated_committed ~key:cmd
+                         ~data ) ) ;
+            let commit_conflicts_locally_generated =
+              List.filter dropped_commit_conflicts ~f:(fun cmd ->
+                  Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
+                  |> Option.is_some )
+            in
+            if not (List.is_empty commit_conflicts_locally_generated) then
+              [%log' info t.logger]
+                "Locally generated commands $cmds dropped because they \
+                 conflicted with a committed command."
+                ~metadata:
+                  [ ( "cmds"
+                    , `List
+                        (List.map commit_conflicts_locally_generated
+                           ~f:
+                             Transaction_hash.User_command_with_valid_signature
+                             .to_yojson ) )
+                  ] ;
+            [%log' debug t.logger]
+              !"Finished handling diff. Old pool size %i, new pool size %i. \
+                Dropped %i commands during backtracking to maintain max size."
+              (Indexed_pool.size t.pool) (Indexed_pool.size pool'')
+              (Sequence.length dropped_backtrack) ;
+            Mina_metrics.(
+              Gauge.set Transaction_pool.pool_size
+                (Float.of_int (Indexed_pool.size pool''))) ;
+            t.pool <- pool'' ;
+            List.iter locally_generated_dropped ~f:(fun cmd ->
+                (* If the dropped transaction was included in the winning chain, it'll
+                   be in locally_generated_committed. If it wasn't, try re-adding to
+                   the pool. *)
+                let remove_cmd () =
+                  vk_table_lift_hashed Vk_refcount_table.dec cmd ;
+                  assert (
+                    Option.is_some
+                    @@ Hashtbl.find_and_remove t.locally_generated_uncommitted
+                         cmd )
+                in
+                let log_and_remove ?(metadata = []) error_str =
+                  log_indexed_pool_error error_str ~metadata cmd ;
+                  remove_cmd ()
+                in
+                if not (Hashtbl.mem t.locally_generated_committed cmd) then
+                  if
+                    not
+                      (has_sufficient_fee t.pool
+                         (Transaction_hash.User_command_with_valid_signature
+                          .command cmd )
+                         ~pool_max_size )
+                  then (
+                    [%log' info t.logger]
+                      "Not re-adding locally generated command $cmd to pool, \
+                       insufficient fee"
+                      ~metadata:
+                        [ ( "cmd"
+                          , Transaction_hash.User_command_with_valid_signature
+                            .to_yojson cmd )
+                        ] ;
+                    remove_cmd () )
+                  else
+                    let unchecked =
+                      Transaction_hash.User_command_with_valid_signature.command
+                        cmd
+                    in
+                    match
+                      Option.bind
+                        (Base_ledger.location_of_account best_tip_ledger
+                           (User_command.fee_payer unchecked) )
+                        ~f:(Base_ledger.get best_tip_ledger)
+                    with
+                    | Some acct -> (
+                        match
+                          Indexed_pool.add_from_gossip_exn t.pool cmd acct.nonce
+                            ( Account.liquid_balance_at_slot ~global_slot acct
+                            |> Currency.Balance.to_amount )
+                        with
+                        | Error e ->
+                            let error_str, metadata =
+                              indexed_pool_error_log_info e
+                            in
+                            log_and_remove error_str
+                              ~metadata:
+                                ( ( "user_command"
+                                  , User_command.to_yojson unchecked )
+                                :: metadata )
+                        | Ok (_, pool''', _) ->
+                            [%log' debug t.logger]
+                              "re-added locally generated command $cmd to \
+                               transaction pool after reorg"
+                              ~metadata:
+                                [ ( "cmd"
+                                  , Transaction_hash
+                                    .User_command_with_valid_signature
+                                    .to_yojson cmd )
+                                ] ;
+                            vk_table_lift_hashed Vk_refcount_table.inc cmd ;
+                            Mina_metrics.(
+                              Gauge.set Transaction_pool.pool_size
+                                (Float.of_int (Indexed_pool.size pool'''))) ;
+                            t.pool <- pool''' )
+                    | None ->
+                        log_and_remove "Fee_payer_account not found"
+                          ~metadata:
+                            [ ("user_command", User_command.to_yojson unchecked)
+                            ] ) ;
+            (*Remove any expired user commands*)
+            let expired_commands, pool = Indexed_pool.remove_expired t.pool in
+            Sequence.iter expired_commands ~f:(fun cmd ->
+                [%log' debug t.logger]
+                  "Dropping expired user command from the pool $cmd"
+                  ~metadata:
+                    [ ( "cmd"
+                      , Transaction_hash.User_command_with_valid_signature
+                        .to_yojson cmd )
+                    ] ;
+                vk_table_lift_hashed Vk_refcount_table.dec cmd ;
+                ignore
+                  ( Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
+                    : (Time.t * [ `Batch of int ]) option ) ) ;
+            pool
+      in
       Mina_metrics.(
         Gauge.set Transaction_pool.pool_size
           (Float.of_int (Indexed_pool.size pool))) ;
       t.pool <- pool
 
     let create ~constraint_constants ~consensus_constants ~time_controller
-        ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+        ~slot_tx_end ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
       let t =
         { pool =
             Indexed_pool.empty ~constraint_constants ~consensus_constants
-              ~time_controller
+              ~time_controller ~slot_tx_end
         ; locally_generated_uncommitted =
             Hashtbl.create
               ( module Transaction_hash.User_command_with_valid_signature.Stable
@@ -919,6 +1025,7 @@ struct
           (*apply*)
           | Fee_payer_account_not_found
           | Fee_payer_not_permitted_to_send
+          | After_slot_tx_end
         [@@deriving sexp, yojson, compare]
 
         let to_string_hum = Diff_versioned.Diff_error.to_string_hum
@@ -931,7 +1038,8 @@ struct
           | Duplicate
           | Overloaded
           | Fee_payer_account_not_found
-          | Fee_payer_not_permitted_to_send ->
+          | Fee_payer_not_permitted_to_send
+          | After_slot_tx_end ->
               false
           | Overflow | Bad_token | Unwanted_fee_token ->
               true
@@ -1811,7 +1919,7 @@ let%test_module _ =
                 User_command.forget_check )
            txs )
 
-    let setup_test ?(verifier = verifier) ?permissions () =
+    let setup_test ?(verifier = verifier) ?permissions ?slot_tx_end () =
       let frontier, best_tip_diff_w =
         Mock_transition_frontier.create ?permissions ()
       in
@@ -1826,7 +1934,7 @@ let%test_module _ =
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
-          ~time_controller ~frontier_broadcast_pipe:frontier_pipe_r
+          ~time_controller ~slot_tx_end ~frontier_broadcast_pipe:frontier_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
       in
       let txn_pool = Test.resource_pool pool_ in
@@ -2531,6 +2639,76 @@ let%test_module _ =
           in
           assert_pool_txs t (List.drop independent_cmds 3) ;
           Deferred.unit )
+
+    let%test_unit "transactions added before slot_tx_end are accepted" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let curr_slot =
+            Consensus.Data.Consensus_time.(
+              to_global_slot
+                (of_time_exn ~constants:consensus_constants
+                   (Block_time.now time_controller) ))
+          in
+          let%bind t =
+            setup_test
+              ~slot_tx_end:
+                Mina_numbers.Global_slot_since_hard_fork.(succ curr_slot)
+              ()
+          in
+          assert_pool_txs t [] ;
+          let%bind () = add_commands' t independent_cmds in
+          assert_pool_txs t independent_cmds ;
+          Deferred.unit )
+
+    let%test_unit "transactions added after slot_tx_end are rejected" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let curr_slot =
+            Consensus.Data.Consensus_time.(
+              to_global_slot
+                (of_time_exn ~constants:consensus_constants
+                   (Block_time.now time_controller) ))
+          in
+          let%bind t = setup_test ~slot_tx_end:curr_slot () in
+          assert_pool_txs t [] ;
+          let%bind _result = add_commands t independent_cmds in
+          assert_pool_txs t [] ; Deferred.unit )
+
+    let%test_unit "transactions from the pool are removed when the transition \
+                   frontier is recreated and current slot is after slot_tx_end"
+        =
+      Thread_safe.block_on_async_exn (fun () ->
+          let curr_slot =
+            Consensus.Data.Consensus_time.(
+              to_global_slot
+                (of_time_exn ~constants:consensus_constants
+                   (Block_time.now time_controller) ))
+          in
+          (* Set up initial frontier *)
+          let%bind t =
+            setup_test
+              ~slot_tx_end:
+                Mina_numbers.Global_slot_since_hard_fork.(succ curr_slot)
+              ()
+          in
+          assert_pool_txs t [] ;
+          let%bind _ = add_commands t independent_cmds in
+          assert_pool_txs t independent_cmds ;
+          (* wait until next slot *)
+          let%bind () =
+            after
+              (Block_time.Span.to_time_span
+                 consensus_constants.block_window_duration_ms )
+          in
+          (* Destroy initial frontier *)
+          Broadcast_pipe.Writer.close t.best_tip_diff_w ;
+          let%bind _ = Broadcast_pipe.Writer.write t.frontier_pipe_w None in
+          (* Set up second frontier *)
+          let frontier2, _best_tip_diff_w2 =
+            Mock_transition_frontier.create ()
+          in
+          let%bind _ =
+            Broadcast_pipe.Writer.write t.frontier_pipe_w (Some frontier2)
+          in
+          assert_pool_txs t [] ; Deferred.unit )
 
     let%test_unit "transaction replacement works" =
       Thread_safe.block_on_async_exn

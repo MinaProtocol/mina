@@ -21,7 +21,10 @@ let logger = Logger.null ()
 
 let time_controller = Block_time.Controller.basic ~logger
 
-let empty = empty ~constraint_constants ~consensus_constants ~time_controller
+let slot_tx_end = None
+
+let empty =
+  empty ~constraint_constants ~consensus_constants ~time_controller ~slot_tx_end
 
 let empty_invariants () = assert_pool_consistency empty
 
@@ -153,7 +156,9 @@ let sequential_adds_all_valid () =
                     %{sexp:Mina_numbers.Global_slot_since_genesis.t} but user \
                     command is only valid until \
                     %{sexp:Mina_numbers.Global_slot_since_genesis.t}"
-                  global_slot_since_genesis valid_until () )
+                  global_slot_since_genesis valid_until ()
+            | Error After_slot_tx_end ->
+                failwith "Transaction is after the slot transaction end time." )
       in
       go cmds )
 

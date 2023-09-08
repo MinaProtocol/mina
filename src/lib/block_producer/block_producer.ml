@@ -610,7 +610,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
-    ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state ~net =
+    ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state ~net
+    ~slot_tx_end =
   let open Context in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
@@ -728,12 +729,25 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                   ( Header.protocol_state_proof
                   @@ Mina_block.header (With_hash.data previous_transition) )
             in
+            let current_global_slot =
+              Consensus.Data.Consensus_time.(
+                to_global_slot
+                  (of_time_exn ~constants:consensus_constants
+                     (Block_time.now time_controller) ))
+            in
             [%log internal] "Get_transactions_from_pool" ;
             let transactions =
-              Network_pool.Transaction_pool.Resource_pool.transactions
-                transaction_resource_pool
-              |> Sequence.map
-                   ~f:Transaction_hash.User_command_with_valid_signature.data
+              match slot_tx_end with
+              | Some slot_tx_end'
+                when Mina_numbers.Global_slot_since_hard_fork.(
+                       current_global_slot >= slot_tx_end') ->
+                  Sequence.empty
+              | Some _ | None ->
+                  Network_pool.Transaction_pool.Resource_pool.transactions
+                    transaction_resource_pool
+                  |> Sequence.map
+                       ~f:
+                         Transaction_hash.User_command_with_valid_signature.data
             in
             let%bind () =
               Interruptible.lift (Deferred.return ()) (Ivar.read ivar)

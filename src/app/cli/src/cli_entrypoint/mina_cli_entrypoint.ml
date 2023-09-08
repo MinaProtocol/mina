@@ -484,6 +484,12 @@ let setup_daemon logger =
         "true|false Whether to send the commit SHA used to build the node to \
          the uptime service. (default: false)"
       no_arg
+  and slot_tx_end =
+    flag "--slot-tx-end" ~aliases:[ "slot-tx-end" ]
+      ~doc:
+        "Slot after which the node will stop accepting transactions. (default: \
+         disabled)"
+      (optional int)
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -1342,6 +1348,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                adding bound to Mina_lib config introduces cycle
             *)
             Option.iter itn_max_logs ~f:Itn_logger.set_queue_bound ;
+          let slot_tx_end =
+            Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
+              slot_tx_end
+          in
           let start_time = Time.now () in
           let%map mina =
             Mina_lib.create ~wallets
@@ -1373,7 +1383,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~node_status_url ~graphql_control_port:itn_graphql_port () )
+                 ~node_status_url ~graphql_control_port:itn_graphql_port ()
+                 ~slot_tx_end )
           in
           { mina
           ; client_trustlist

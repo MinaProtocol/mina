@@ -49,6 +49,7 @@ val empty :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
   -> time_controller:Block_time.Controller.t
+  -> slot_tx_end:Global_slot_since_hard_fork.t option
   -> t
 
 (** How many transactions are currently in the pool *)
@@ -132,6 +133,16 @@ val revalidate :
 
 (** Get the global slot since genesis according to the pool's time controller. *)
 val global_slot_since_genesis : t -> Mina_numbers.Global_slot_since_genesis.t
+
+(** Get the global slot since hard fork according to the pool's time controller. *)
+val global_slot_since_hard_fork :
+  t -> Mina_numbers.Global_slot_since_hard_fork.t
+
+(** Get the slot at which transactions are no longer accepted. *)
+val slot_tx_end : t -> Global_slot_since_hard_fork.t option
+
+(** Empties the pool *)
+val drop_all : t -> t
 
 module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception

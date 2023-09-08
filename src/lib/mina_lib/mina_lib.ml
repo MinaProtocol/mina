@@ -8,6 +8,7 @@ open Pipe_lib
 open Strict_pipe
 open Signature_lib
 open Network_peer
+open Mina_numbers
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
@@ -986,42 +987,81 @@ let get_current_nonce t aid =
       Ok (`Min ledger_nonce, nonce)
 
 let add_transactions t (uc_inputs : User_command_input.t list) =
-  let result_ivar = Ivar.create () in
-  let cmd_inputs = Signed_command_inputs uc_inputs in
-  Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
-  |> Deferred.don't_wait_for ;
-  Ivar.read result_ivar
+  let config = config t in
+  let current_global_slot =
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:config.precomputed_values.consensus_constants
+           (Block_time.now config.time_controller) ))
+  in
+  match config.slot_tx_end with
+  | Some slot_tx_end
+    when Global_slot_since_hard_fork.(current_global_slot >= slot_tx_end) ->
+      [%log' warn (top_level_logger t)]
+        "can't add transactions at slot $slot, tx production ends at $end"
+        ~metadata:
+          [ ( "slot"
+            , `Int (Global_slot_since_hard_fork.to_int current_global_slot) )
+          ; ("end", `Int (Global_slot_since_hard_fork.to_int slot_tx_end))
+          ] ;
+      Deferred.return (Error (Error.of_string "tx production has ended"))
+  | Some _ | None ->
+      let result_ivar = Ivar.create () in
+      let cmd_inputs = Signed_command_inputs uc_inputs in
+      Strict_pipe.Writer.write t.pipes.user_command_input_writer
+        (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
+      |> Deferred.don't_wait_for ;
+      Ivar.read result_ivar
 
 let add_full_transactions t user_commands =
-  let add_all_txns () =
-    let result_ivar = Ivar.create () in
-    Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
-      (user_commands, Ivar.fill result_ivar)
-    |> Deferred.don't_wait_for ;
-    Ivar.read result_ivar
+  let config = config t in
+  let current_global_slot =
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:config.precomputed_values.consensus_constants
+           (Block_time.now config.time_controller) ))
   in
-  let well_formed_errors =
-    List.find_map user_commands ~f:(fun cmd ->
-        match
-          User_command.check_well_formedness
-            ~genesis_constants:t.config.precomputed_values.genesis_constants cmd
-        with
-        | Ok () ->
-            None
-        | Error errs ->
-            Some errs )
-  in
-  match well_formed_errors with
-  | None ->
-      add_all_txns ()
-  | Some errs ->
-      let error =
-        Error.of_string
-          ( List.map errs ~f:User_command.Well_formedness_error.to_string
-          |> String.concat ~sep:"," )
+  match config.slot_tx_end with
+  | Some slot_tx_end
+    when Global_slot_since_hard_fork.(current_global_slot >= slot_tx_end) ->
+      [%log' warn (top_level_logger t)]
+        "can't add transactions at slot $slot, tx production ends at $end"
+        ~metadata:
+          [ ( "slot"
+            , `Int (Global_slot_since_hard_fork.to_int current_global_slot) )
+          ; ("end", `Int (Global_slot_since_hard_fork.to_int slot_tx_end))
+          ] ;
+      Deferred.return (Error (Error.of_string "tx production has ended"))
+  | Some _ | None -> (
+      let add_all_txns () =
+        let result_ivar = Ivar.create () in
+        Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
+          (user_commands, Ivar.fill result_ivar)
+        |> Deferred.don't_wait_for ;
+        Ivar.read result_ivar
       in
-      Deferred.Result.fail error
+      let well_formed_errors =
+        List.find_map user_commands ~f:(fun cmd ->
+            match
+              User_command.check_well_formedness
+                ~genesis_constants:t.config.precomputed_values.genesis_constants
+                cmd
+            with
+            | Ok () ->
+                None
+            | Error errs ->
+                Some errs )
+      in
+      match well_formed_errors with
+      | None ->
+          add_all_txns ()
+      | Some errs ->
+          let error =
+            Error.of_string
+              ( List.map errs ~f:User_command.Well_formedness_error.to_string
+              |> String.concat ~sep:"," )
+          in
+          Deferred.Result.fail error )
 
 let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
   let add_all_txns () =
@@ -1380,7 +1420,8 @@ let start t =
       ~log_block_creation:t.config.log_block_creation
       ~block_reward_threshold:t.config.block_reward_threshold
       ~block_produced_bvar:t.components.block_produced_bvar
-      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net ;
+      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
+      ~slot_tx_end:t.config.slot_tx_end ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -1815,7 +1856,8 @@ let create ?wallets (config : Config.t) =
             (* make transaction pool return writer for local and incoming diffs *)
             Network_pool.Transaction_pool.create ~config:txn_pool_config
               ~constraint_constants ~consensus_constants
-              ~time_controller:config.time_controller ~logger:config.logger
+              ~time_controller:config.time_controller
+              ~slot_tx_end:config.slot_tx_end ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~on_remote_push:notify_online
               ~log_gossip_heard:
@@ -1829,7 +1871,8 @@ let create ?wallets (config : Config.t) =
           let snark_pool, snark_remote_sink, snark_local_sink =
             Network_pool.Snark_pool.create ~config:snark_pool_config
               ~constraint_constants ~consensus_constants
-              ~time_controller:config.time_controller ~logger:config.logger
+              ~time_controller:config.time_controller
+              ~slot_tx_end:config.slot_tx_end ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~on_remote_push:notify_online
               ~log_gossip_heard:
