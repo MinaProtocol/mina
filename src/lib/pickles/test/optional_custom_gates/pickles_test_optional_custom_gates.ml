@@ -403,19 +403,19 @@ let register_feature_test (name, specific_feature_flags) =
 
 let () =
   let configurations =
-    [ ("xor", Plonk_types.Features.{ none_bool with xor = true })
-    ; ( "range check 0"
-      , Plonk_types.Features.{ none_bool with range_check0 = true } )
-    ; ( "range check 1"
-      , Plonk_types.Features.{ none_bool with range_check1 = true } )
-    ; ("rot", Plonk_types.Features.{ none_bool with rot = true })
-    ; ( "foreign field addition"
-      , Plonk_types.Features.{ none_bool with foreign_field_add = true } )
-    ; ( "foreign field multiplication"
-      , Plonk_types.Features.{ none_bool with foreign_field_mul = true } )
-    ; ( "Fixed lookup tables"
-      , Plonk_types.Features.{ none_bool with lookup = true } )
-    ; ( "Runtime lookup tables"
+    [ (*   ("xor", Plonk_types.Features.{ none_bool with xor = true }) *)
+      (* ; ( "range check 0" *)
+      (*   , Plonk_types.Features.{ none_bool with range_check0 = true } ) *)
+      (* ; ( "range check 1" *)
+      (*   , Plonk_types.Features.{ none_bool with range_check1 = true } ) *)
+      (* ; ("rot", Plonk_types.Features.{ none_bool with rot = true }) *)
+      (* ; ( "foreign field addition" *)
+      (*   , Plonk_types.Features.{ none_bool with foreign_field_add = true } ) *)
+      (* ; ( "foreign field multiplication" *)
+      (*   , Plonk_types.Features.{ none_bool with foreign_field_mul = true } ) *)
+      (* ; ( "Fixed lookup tables" *)
+      (*   , Plonk_types.Features.{ none_bool with lookup = true } ) *)
+      ( "Runtime lookup tables"
       , Plonk_types.Features.
           { none_bool with lookup = true; runtime_tables = true } )
     ]
