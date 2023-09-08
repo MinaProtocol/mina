@@ -392,7 +392,6 @@ let%test_module "gate finalization" =
           (module Impls.Step)
           ~feature_flags:full_features ~challenge:Challenge.typ
           ~scalar_challenge:Challenge.typ
-          ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
           ~dummy_scalar_challenge:
             (Kimchi_backend_common.Scalar_challenge.create
                Limb_vector.Challenge.Constant.zero )
