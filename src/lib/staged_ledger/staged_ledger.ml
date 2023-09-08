@@ -1994,6 +1994,9 @@ module T = struct
                               , `String
                                   "Snark fee insufficient to create snark \
                                    worker account" )
+                            ; ( "interrupt_get_completed_work_ids"
+                              , Transaction_snark_work.Statement.compact_json w
+                              )
                             ] ;
                         Stop (seq, count) )
                   | None ->
@@ -2011,6 +2014,8 @@ module T = struct
                           [ ("interrupt_get_completed_work_at", `Int count)
                           ; ( "interrupt_get_completed_work_reason"
                             , `String "Snark work for statement not found" )
+                          ; ( "interrupt_get_completed_work_ids"
+                            , Transaction_snark_work.Statement.compact_json w )
                           ] ;
                       Stop (seq, count) )
                 ~finish:Fn.id
