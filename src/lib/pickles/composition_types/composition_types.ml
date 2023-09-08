@@ -134,8 +134,8 @@ module Wrap = struct
 
           let typ (type f fp)
               (module Impl : Snarky_backendless.Snark_intf.Run
-                with type field = f ) ~dummy_scalar ~dummy_scalar_challenge
-              ~challenge ~scalar_challenge ~bool
+                with type field = f ) ~dummy_scalar_challenge ~challenge
+              ~scalar_challenge ~bool
               ~feature_flags:
                 ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags)
               (fp : (fp, _, f) Snarky_backendless.Typ.t) =
@@ -331,9 +331,8 @@ module Wrap = struct
             ~dummy_scalar ~dummy_scalar_challenge ~challenge ~scalar_challenge
             ~feature_flags (fp : (fp, _, f) Snarky_backendless.Typ.t) index =
           Snarky_backendless.Typ.of_hlistable
-            [ Plonk.In_circuit.typ impl ~dummy_scalar ~dummy_scalar_challenge
-                ~challenge ~scalar_challenge ~bool:Impl.Boolean.typ
-                ~feature_flags fp
+            [ Plonk.In_circuit.typ impl ~dummy_scalar_challenge ~challenge
+                ~scalar_challenge ~bool:Impl.Boolean.typ ~feature_flags fp
             ; fp
             ; fp
             ; Scalar_challenge.typ scalar_challenge
