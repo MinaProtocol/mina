@@ -1135,8 +1135,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let step_domains = Vector.singleton inner_step_data.domains in
           let step_keypair =
             let etyp =
-              Impls.Step.input ~feature_flags
-                ~proofs_verified:Max_proofs_verified.n
+              Impls.Step.input ~proofs_verified:Max_proofs_verified.n
                 ~wrap_rounds:Tock.Rounds.n
             in
             let (T (typ, _conv, conv_inv)) = etyp in
@@ -1388,7 +1387,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     let module O = Tick.Oracles in
                     let public_input =
                       tick_public_input_of_statement ~max_proofs_verified
-                        ~feature_flags:Plonk_types.Features.Full.none
                         prev_statement_with_hashes
                     in
                     let prev_challenges =

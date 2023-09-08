@@ -763,7 +763,7 @@ let wrap
 
   let public_input =
     tick_public_input_of_statement ~max_proofs_verified
-      prev_statement_with_hashes ~feature_flags
+      prev_statement_with_hashes
   in
   let prev_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges

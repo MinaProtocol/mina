@@ -539,7 +539,7 @@ struct
           (struct
             let etyp =
               Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                ~wrap_rounds:Tock.Rounds.n ~feature_flags
+                ~wrap_rounds:Tock.Rounds.n
 
             let f (T b : _ Branch_data.t) =
               let (T (typ, _conv, conv_inv)) = etyp in
