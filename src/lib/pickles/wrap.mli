@@ -22,7 +22,7 @@ val wrap :
          , Pasta_bindings.Fq.t Challenge.t
          , Pasta_bindings.Fq.t Challenge.t
          , Pasta_bindings.Fq.t Challenge.t
-         , ( Pasta_bindings.Fq.t Challenge.t Kimchi_types.scalar_challenge
+         , ( Pasta_bindings.Fq.t Challenge.t Import.Scalar_challenge.t
              Bulletproof_challenge.t
            , Nat.z Backend.Tick.Rounds.plus_n )
            Vector.vec
@@ -50,14 +50,14 @@ val wrap :
              , ( Backend.Tock.Proof.G.Affine.t
                , 'actual_proofs_verified )
                Vector.vec
-             , ( ( Challenge.Constant.t Kimchi_types.scalar_challenge
+             , ( ( Challenge.Constant.t Import.Scalar_challenge.t
                    Bulletproof_challenge.t
                  , 'e )
                  Vector.vec
                , 'actual_proofs_verified )
                Vector.vec )
              Reduced_messages_for_next_proof_over_same_field.Step.t
-           , Challenge.Constant.t Kimchi_types.scalar_challenge
+           , Challenge.Constant.t Import.Scalar_challenge.t
              Bulletproof_challenge.t
              Step_bp_vec.t
            , Branch_data.t )
@@ -76,14 +76,14 @@ val wrap :
              , ( Backend.Tock.Proof.G.Affine.t
                , 'actual_proofs_verified )
                Vector.vec
-             , ( ( Challenge.Constant.t Kimchi_types.scalar_challenge
+             , ( ( Challenge.Constant.t Import.Scalar_challenge.t
                    Bulletproof_challenge.t
                  , 'e )
                  Vector.vec
                , 'actual_proofs_verified )
                Vector.vec )
              Reduced_messages_for_next_proof_over_same_field.Step.t
-           , Challenge.Constant.t Kimchi_types.scalar_challenge
+           , Challenge.Constant.t Import.Scalar_challenge.t
              Bulletproof_challenge.t
              Step_bp_vec.t
            , Branch_data.t )
@@ -91,9 +91,9 @@ val wrap :
   -> Backend.Tock.Keypair.t
   -> ( 'b
      , ( ( Challenge.Constant.t
-         , Challenge.Constant.t Kimchi_types.scalar_challenge
+         , Challenge.Constant.t Import.Scalar_challenge.t
          , Pasta_bindings.Fq.t Shifted_value.Type2.t
-         , ( Challenge.Constant.t Kimchi_types.scalar_challenge
+         , ( Challenge.Constant.t Import.Scalar_challenge.t
              Bulletproof_challenge.t
            , Backend.Tock.Rounds.n )
            Vector.vec
@@ -103,8 +103,7 @@ val wrap :
        , 'max_proofs_verified )
        Vector.vec
      , (Backend.Tock.Proof.G.Affine.t, 'actual_proofs_verified) Vector.vec
-     , ( ( Challenge.Constant.t Kimchi_types.scalar_challenge
-           Bulletproof_challenge.t
+     , ( ( Challenge.Constant.t Import.Scalar_challenge.t Bulletproof_challenge.t
          , 'e )
          Vector.vec
        , 'actual_proofs_verified )
@@ -119,7 +118,7 @@ val wrap :
        Reduced_messages_for_next_proof_over_same_field.Wrap.t
      , ( 'b
        , (Backend.Tock.Proof.G.Affine.t, 'actual_proofs_verified) Vector.vec
-       , ( ( Challenge.Constant.t Kimchi_types.scalar_challenge
+       , ( ( Challenge.Constant.t Import.Scalar_challenge.t
              Bulletproof_challenge.t
            , 'e )
            Vector.vec
