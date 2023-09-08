@@ -862,7 +862,7 @@ module Wrap = struct
             ; index
             ; feature_flags
             ; joint_combiner
-            ] ~feature_flags:_ ~option_map : _ t =
+            ] ~option_map : _ t =
         let open Vector in
         let [ combined_inner_product
             ; b
