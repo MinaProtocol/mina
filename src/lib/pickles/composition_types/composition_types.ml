@@ -1091,8 +1091,7 @@ module Step = struct
             ; perm = f t.perm
             }
 
-          let typ (type f fp) _ ~dummy_scalar ~dummy_scalar_challenge ~challenge
-              ~scalar_challenge ~bool ~feature_flags
+          let typ (type f fp) _ ~challenge ~scalar_challenge
               (fp : (fp, _, f) Snarky_backendless.Typ.t) =
             Snarky_backendless.Typ.of_hlistable
               [ Scalar_challenge.typ scalar_challenge
