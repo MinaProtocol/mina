@@ -386,7 +386,7 @@ module Node = struct
     let%bind () = after (Time.Span.of_sec initial_delay_sec) in
     retry num_tries
 
-  let get_peer_ids ~logger t =
+  let get_peer_id ~logger t =
     let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
       ~metadata:(logger_metadata t) ;
@@ -394,7 +394,7 @@ module Node = struct
     let%bind query_result_obj =
       exec_graphql_request ~logger ~node:t ~query_name:"query_peer_id" query_obj
     in
-    [%log info] "get_peer_ids, finished exec_graphql_request" ;
+    [%log info] "get_peer_id, finished exec_graphql_request" ;
     let self_id_obj = query_result_obj.daemonStatus.addrsAndPorts.peer in
     let%bind self_id =
       match self_id_obj with
@@ -405,13 +405,13 @@ module Node = struct
     in
     let peers = query_result_obj.daemonStatus.peers |> Array.to_list in
     let peer_ids = List.map peers ~f:(fun peer -> peer.peerId) in
-    [%log info]
-      "get_peer_ids, result of graphql query (self_id,[peers]) (%s,%s)" self_id
+    [%log info] "get_peer_id, result of graphql query (self_id,[peers]) (%s,%s)"
+      self_id
       (String.concat ~sep:" " peer_ids) ;
     return (self_id, peer_ids)
 
-  let must_get_peer_ids ~logger t =
-    get_peer_ids ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+  let must_get_peer_id ~logger t =
+    get_peer_id ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let get_best_chain ?max_length ~logger t =
     let open Deferred.Or_error.Let_syntax in

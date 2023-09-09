@@ -144,7 +144,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let fetch_connectivity_data ~logger nodes =
     let open Malleable_error.Let_syntax in
     Malleable_error.List.map nodes ~f:(fun node ->
-        let%map response = Engine.Network.Node.must_get_peer_ids ~logger node in
+        let%map response = Engine.Network.Node.must_get_peer_id ~logger node in
         (node, response) )
 
   let assert_peers_completely_connected nodes_and_responses =
