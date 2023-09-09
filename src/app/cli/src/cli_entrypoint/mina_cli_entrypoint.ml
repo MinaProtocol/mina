@@ -1968,6 +1968,7 @@ let internal_commands logger =
               Format.eprintf "Failed to generate block@.%s@."
                 (Yojson.Safe.to_string @@ Error_json.error_to_yojson err) ;
               exit 1) )
+  ; ("pre-verify-block", Internal_commands.pre_verify_block logger)
   ]
 
 let mina_commands logger =
