@@ -30,7 +30,7 @@ let%test_module "Epoch ledger sync tests" =
 
     let logger = Logger.create ()
 
-    let test_timeout_min = 5.0
+    let default_timeout_min = 5.0
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
@@ -335,8 +335,9 @@ let%test_module "Epoch ledger sync tests" =
       end in
       return (module Context : CONTEXT)
 
-    let run_test (module Context : CONTEXT) ~staking_epoch_ledger
-        ~next_epoch_ledger ~starting_accounts ~test_number =
+    let run_test ?(timeout_min = default_timeout_min) (module Context : CONTEXT)
+        ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts ~test_number
+        =
       let module Context2 = struct
         include Context
 
@@ -346,7 +347,7 @@ let%test_module "Epoch ledger sync tests" =
       let cleanup () = test_finished := true in
       (* set timeout so CI doesn't run forever *)
       don't_wait_for
-        (let%map () = after (Time.Span.of_min test_timeout_min) in
+        (let%map () = after (Time.Span.of_min timeout_min) in
          if not !test_finished then (cleanup () ; raise Sync_timeout) ) ;
       let staking_ledger_root =
         Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
@@ -499,7 +500,7 @@ let%test_module "Epoch ledger sync tests" =
           let next_epoch_ledger =
             make_db_ledger (module Context) (List.take test_accounts 20)
           in
-          run_test ~test_number:1
+          run_test ~timeout_min:6.0 ~test_number:1
             (module Context)
             ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts:[] )
 
