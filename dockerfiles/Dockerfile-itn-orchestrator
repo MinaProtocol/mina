@@ -1,4 +1,4 @@
-ARG image=ubuntu
+ARG image=debian:bullseye-slim
 FROM ${image}
 
 ARG deb_version
