@@ -134,6 +134,10 @@ module Topology = struct
     ; docker_image : string
     ; worker_nodes : int
     ; snark_worker_fee : string
+    ; libp2p_pass : string
+    ; libp2p_keyfile : string
+    ; libp2p_keypair : Yojson.Safe.t
+    ; libp2p_peerid : Yojson.Safe.t
     }
   [@@deriving to_yojson]
 
@@ -154,6 +158,7 @@ module Topology = struct
   type node_info =
     { pk : string
     ; sk : string
+    ; privkey_path : string option
     ; role : Node_role.t
     ; docker_image : string
     ; libp2p_pass : string
@@ -297,6 +302,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
       ( node_name
       , { pk
         ; sk
+        ; privkey_path = Some "instantiated in network_config.ml"
         ; role = Block_producer
         ; docker_image
         ; libp2p_pass
@@ -320,6 +326,10 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         ; docker_image
         ; worker_nodes
         ; snark_worker_fee = t.snark_worker_fee
+        ; libp2p_pass
+        ; libp2p_keyfile = "instantiated in network_config.ml"
+        ; libp2p_keypair = List.nth_exn libp2p_keypairs num_bp
+        ; libp2p_peerid = `String List.(nth_exn libp2p_peerids num_bp)
         } )
   in
   let snark_coordinator =
@@ -352,6 +362,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
       ( node_name
       , { pk
         ; sk
+        ; privkey_path = None
         ; role = Seed_node
         ; docker_image
         ; libp2p_pass

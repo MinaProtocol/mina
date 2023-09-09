@@ -81,7 +81,7 @@ module Network_manager = struct
     Out_channel.with_file ~fail_if_exists:true network_config_filename
       ~f:(fun ch ->
         Network_config.to_yojson network_config |> Yojson.Safe.to_channel ch ) ;
-    [%log info] "Writing runtime configuration to %s" genesis_ledger_filename ;
+    [%log info] "Writing genesis ledger to %s" genesis_ledger_filename ;
     Out_channel.with_file ~fail_if_exists:true genesis_ledger_filename
       ~f:(fun ch ->
         network_config.config.runtime_config |> Yojson.Safe.to_channel ch ) ;
@@ -128,6 +128,19 @@ module Network_manager = struct
     [%log info] "Writing seed node libp2p keypairs to %s" libp2p_kps_base_path ;
     let%bind () =
       List.iter network_config.config.seed_node_configs ~f:(fun config ->
+          let keypair_file =
+            sprintf "%s/%s.json" libp2p_kps_base_path config.name
+          in
+          Yojson.Safe.to_file keypair_file config.libp2p_keypair ;
+          Out_channel.write_all (keypair_file ^ ".peerid")
+            ~data:config.libp2p_peerid )
+      |> Deferred.return
+    in
+    let%bind () =
+      [%log info] "Writing snark coordinator libp2p keypair to %s"
+        libp2p_kps_base_path ;
+      Option.iter network_config.config.snark_coordinator_config
+        ~f:(fun config ->
           let keypair_file =
             sprintf "%s/%s.json" libp2p_kps_base_path config.name
           in

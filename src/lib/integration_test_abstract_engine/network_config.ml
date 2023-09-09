@@ -27,7 +27,13 @@ type seed_node_config =
 [@@deriving to_yojson]
 
 type snark_coordinator_config =
-  { name : string; public_key : string; worker_nodes : int }
+  { name : string
+  ; public_key : string
+  ; worker_nodes : int
+  ; libp2p_pass : string
+  ; libp2p_keypair : Yojson.Safe.t
+  ; libp2p_peerid : string
+  }
 [@@deriving to_yojson]
 
 type config =
@@ -310,16 +316,33 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
     cli_inputs.mina_automation_location ^/ "testnets" ^/ network_id
     ^/ "libp2p_keys" ^/ name ^ ".json"
   in
+  let privkey_path name =
+    let open Core in
+    cli_inputs.mina_automation_location ^/ "testnets" ^/ network_id
+    ^/ "block_producer_keys" ^/ name ^ ".json"
+  in
   (* instantiate remaining topology information *)
   let topology =
     List.map topology ~f:(function
       | Archive (name, archive_info) ->
           Test_config.Topology.Archive
             (name, { archive_info with schema_file; zkapp_table })
-      | Node (name, node_info) ->
-          Node (name, { node_info with libp2p_keyfile = libp2p_keyfile name })
-      | x ->
-          x )
+      | Node (name, node_info) -> (
+          match node_info.role with
+          | Test_config.Node_role.Block_producer ->
+              Node
+                ( name
+                , { node_info with
+                    privkey_path = Some (privkey_path name)
+                  ; libp2p_keyfile = libp2p_keyfile name
+                  } )
+          | _ ->
+              Node
+                (name, { node_info with libp2p_keyfile = libp2p_keyfile name })
+          )
+      | Snark_coordinator (name, snark_info) ->
+          Snark_coordinator
+            (name, { snark_info with libp2p_keyfile = libp2p_keyfile name }) )
   in
   let genesis_keypairs =
     String.Map.of_alist_exn
@@ -331,9 +354,9 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
     match snark_coordinator with
     | None ->
         None
-    | Some node ->
+    | Some snark ->
         let network_kp =
-          match String.Map.find genesis_keypairs node.account_name with
+          match String.Map.find genesis_keypairs snark.account_name with
           | Some acct ->
               acct
           | None ->
@@ -342,17 +365,30 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
                   "Failing because the account key of all initial snark \
                    coordinators must be in the genesis ledger.  name of Node: \
                    %s.  name of Account which does not exist: %s"
-                  node.node_name node.account_name
+                  snark.node_name snark.account_name
               in
               failwith failstring
         in
         Some
-          { name = node.node_name
-          ; public_key =
-              Public_key.Compressed.to_base58_check
-                (Public_key.compress network_kp.keypair.public_key)
-          ; worker_nodes = node.worker_nodes
-          }
+          (let[@warning "-8"] (Test_config.Topology.Snark_coordinator
+                                (_, snark_info) ) =
+             List.find_exn topology ~f:(function
+               | Snark_coordinator (name, _) ->
+                   String.equal name snark.node_name
+               | _ ->
+                   false )
+           in
+           { name = snark.node_name
+           ; public_key =
+               Public_key.Compressed.to_base58_check
+                 (Public_key.compress network_kp.keypair.public_key)
+           ; worker_nodes = snark.worker_nodes
+           ; libp2p_pass = "naughty blue worm"
+           ; libp2p_keypair = snark_info.libp2p_keypair
+           ; libp2p_peerid =
+               Yojson.Safe.to_string snark_info.libp2p_peerid
+               |> Util.drop_outer_quotes
+           } )
   in
   (* NETWORK CONFIG *)
   { debug_arg = debug
