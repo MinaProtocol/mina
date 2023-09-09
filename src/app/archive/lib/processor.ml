@@ -3291,6 +3291,7 @@ module Block = struct
                       global_slot_since_hard_fork, global_slot_since_genesis,
                       protocol_version_id, proposed_protocol_version_id,
                       timestamp, chain_status)
+                     VALUES (?,?,?,?,?,?,?,?,?,?,?::bigint[],?,?,?,?,?,?,?,?,?::chain_status_type)
                      RETURNING id
                |sql} )
             { state_hash = block.state_hash |> State_hash.to_base58_check
