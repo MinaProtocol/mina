@@ -1,0 +1,42 @@
+(executable
+ (name delegation_verify)
+ (libraries
+   core_kernel
+   async
+   async_kernel
+   async_unix
+   core
+   stdio
+   base
+   base.caml
+   ppx_deriving_yojson.runtime
+   yojson
+   base64
+   integers
+   async.async_command
+   ; mina libs
+   signature_lib
+   mina_block
+   transaction_snark
+   blockchain_snark
+   mina_base
+   genesis_constants  
+   uptime_service
+   currency
+   ledger_proof
+   mina_base_import
+   mina_state
+   mina_wire_types
+   consensus
+   data_hash_lib
+   mina_numbers
+   snark_params
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   pasta_bindings
+   pickles
+   pickles_types
+   pickles.backend
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx)))

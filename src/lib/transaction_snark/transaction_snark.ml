@@ -3285,7 +3285,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let start = Time.now () in
     let x = f () in
     let stop = Time.now () in
-    printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
+    eprintf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
     x
 
   let system ~proof_level ~constraint_constants =

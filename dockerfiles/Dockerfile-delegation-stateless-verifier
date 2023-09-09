@@ -1,0 +1,45 @@
+#################################################################################################
+# The "stateless verification build" Stage
+# - builds stateless verification tool
+# - should not include any data related to joining a specific network, only the node software itself
+#################################################################################################
+FROM gcr.io/o1labs-192920/mina-toolchain@sha256:73562fcc35dcabd342f66f1d69ae12704e92d69edc0b37e7c88b4d11bc623f23 AS builder
+
+# Use --build-arg "DUNE_PROFILE=dev" to build a dev image or for CI
+ARG DUNE_PROFILE=devnet
+
+# branch to checkout on first clone (this will be the only availible branch in the container)
+# can also be a tagged release
+ARG MINA_BRANCH=compatible
+
+# repo to checkout the branch from
+ARG MINA_REPO=https://github.com/MinaProtocol/mina
+
+# location of repo used for pins and external package commits
+ARG MINA_DIR=mina
+
+ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
+
+# git will clone into an empty dir, but this also helps us set the workdir in advance
+RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
+  && git clone \
+  -b "${MINA_BRANCH}" \
+  --depth 1 \
+  --shallow-submodules \
+  --recurse-submodules \
+  ${MINA_REPO} ${HOME}/${MINA_DIR}
+
+WORKDIR $HOME/${MINA_DIR}
+
+RUN mkdir ${HOME}/app
+
+# HACK: build without special cpu features to allow more people to run delegation verification tool
+RUN ./scripts/zexe-standardize.sh
+
+RUN eval $(opam config env) \
+  && dune build --profile=${DUNE_PROFILE} \
+    src/app/delegation_verify/delegation_verify.exe \
+  && cp _build/default/src/app/delegation_verify/delegation_verify.exe ./delegation-verify \
+  && rm -rf _build
+
+ENTRYPOINT ["./delegation-verify"]
