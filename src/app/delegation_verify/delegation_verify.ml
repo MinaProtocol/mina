@@ -10,7 +10,7 @@ type metadata =
   ; remote_addr : string
   ; submitter : string
   ; block_hash : string
-  ; graphql_control_port: int option [@default None]
+  ; graphql_control_port : int option [@default None]
   }
 [@@deriving yojson]
 
@@ -21,9 +21,6 @@ let get_filenames =
       input_all stdin |> String.split_lines
   | filenames ->
       filenames
-
-(* This check seems unnecessary if the submission data is published by ourselfes *)
-let check_path _ = Ok ()
 
 let load_metadata str =
   try Ok (In_channel.read_all str) with _ -> Error `Fail_to_load_metadata
@@ -39,7 +36,8 @@ let decode_metadata str =
   in
   let%bind.Result { snark_work; submitter; block_hash; _ } = parsed_meta in
   let%bind.Result submitter =
-    Result.map_error ~f:(fun e -> `Fail_to_decode_metadata (Error.to_string_hum e))
+    Result.map_error ~f:(fun e ->
+        `Fail_to_decode_metadata (Error.to_string_hum e) )
     @@ Public_key.Compressed.of_base58_check submitter
   in
   Ok (snark_work, submitter, block_hash)
@@ -52,10 +50,9 @@ let decode_block str =
   try Ok (Binable.of_string (module Mina_block.Stable.Latest) str)
   with _ -> Error `Fail_to_decode_block
 
-let verify_block ~block =
+let verify_block ~verify_blockchain_snarks ~block =
   let header = Mina_block.header block in
   let open Mina_block.Header in
-  let verify_blockchain_snarks, _ = force Verifier.verify_functions in
   verify_blockchain_snarks
     [ (protocol_state header, protocol_state_proof header) ]
   |> Deferred.Result.map_error ~f:(const `Invalid_proof)
@@ -68,21 +65,23 @@ let decode_snark_work str =
   | Error _ ->
       Error `Fail_to_decode_snark_work
 
-let verify_snark_work ~proof ~message =
-  let _, verify_transaction_snarks = force Verifier.verify_functions in
+let verify_snark_work ~verify_transaction_snarks ~proof ~message =
   verify_transaction_snarks [ (proof, message) ]
   |> Deferred.Result.map_error ~f:(const `Invalid_snark_work)
 
-let validate_submission ~block_dir ~metadata_path ~no_checks =
+let validate_submission ~block_dir ~metadata_path ~no_checks
+    (verify_blockchain_snarks, verify_transaction_snarks) =
   let open Deferred.Result.Let_syntax in
-  let%bind () = Deferred.return @@ check_path metadata_path in
   let%bind metadata_str = Deferred.return @@ load_metadata metadata_path in
   let%bind snark_work_opt, submitter, block_hash =
     Deferred.return @@ decode_metadata metadata_str
   in
   let%bind block_str = Deferred.return @@ load_block ~block_dir ~block_hash in
   let%bind block = Deferred.return @@ decode_block block_str in
-  let%bind () = if no_checks then return () else verify_block ~block in
+  let%bind () =
+    if no_checks then return ()
+    else verify_block ~verify_blockchain_snarks ~block
+  in
   let%map () =
     if no_checks then return ()
     else
@@ -97,7 +96,7 @@ let validate_submission ~block_dir ~metadata_path ~no_checks =
           let message =
             Mina_base.Sok_message.create ~fee:snark_work_fee ~prover:submitter
           in
-          verify_snark_work ~proof ~message
+          verify_snark_work ~verify_transaction_snarks ~proof ~message
   in
   let header = Mina_block.header block in
   let protocol_state = Mina_block.Header.protocol_state header in
@@ -133,27 +132,72 @@ let display valid_payload =
 let display_error e =
   eprintf "%s\n" @@ Yojson.Safe.to_string @@ `Assoc [ ("error", `String e) ]
 
+let config_flag =
+  let open Command.Param in
+  flag "--config-file" ~doc:"FILE config file" (optional string)
+
+let no_checks_flag =
+  let open Command.Param in
+  flag "--no-checks" ~aliases:[ "-no-checks" ]
+    ~doc:"disable all the checks, just extract the info from the submissions"
+    no_arg
+
+let block_dir_flag =
+  let open Command.Param in
+  flag "--block-dir" ~aliases:[ "-block-dir" ]
+    ~doc:"the path to the directory containing blocks for the submission"
+    (required Filename.arg_type)
+
+let instantiate_verify_functions ~logger = function
+  | None ->
+      Deferred.return
+        (Verifier.verify_functions
+           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+           ~proof_level:Genesis_constants.Proof_level.compiled () )
+  | Some config_file ->
+      let%bind.Deferred precomputed_values =
+        let%bind.Deferred.Or_error config_json =
+          Genesis_ledger_helper.load_config_json config_file
+        in
+        let%bind.Deferred.Or_error config =
+          Deferred.return
+          @@ Result.map_error ~f:Error.of_string
+          @@ Runtime_config.of_yojson config_json
+        in
+        Genesis_ledger_helper.init_from_config_file ~logger ~proof_level:None
+          config
+      in
+      let%map.Deferred precomputed_values =
+        match precomputed_values with
+        | Ok (precomputed_values, _) ->
+            Deferred.return precomputed_values
+        | Error _ ->
+            display_error "fail to read config file" ;
+            exit 4
+      in
+      let constraint_constants =
+        Precomputed_values.constraint_constants precomputed_values
+      in
+      Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
+
 let command =
   Command.async
     ~summary:"A tool for verifying JSON payload submitted by the uptime service"
     Command.Let_syntax.(
-      let%map_open block_dir =
-        flag "--block-dir" ~aliases:[ "-block-dir" ]
-          ~doc:"the path to the directory containing blocks for the submission"
-          (required Filename.arg_type)
+      let%map_open block_dir = block_dir_flag
       and inputs = anon (sequence ("filename" %: Filename.arg_type))
-      and no_checks =
-        flag "--no-checks" ~aliases:[ "-no-checks" ]
-          ~doc:
-            "disable all the checks, just extract the info from the submissions"
-          no_arg
-      in
+      and no_checks = no_checks_flag
+      and config_file = config_flag in
       fun () ->
+        let logger = Logger.create () in
+        let%bind.Deferred ver_funs =
+          instantiate_verify_functions ~logger config_file
+        in
         let open Deferred.Let_syntax in
         let metadata_pathes = get_filenames inputs in
         Deferred.List.iter metadata_pathes ~f:(fun metadata_path ->
             match%bind
-              validate_submission ~block_dir ~metadata_path ~no_checks
+              validate_submission ~block_dir ~metadata_path ~no_checks ver_funs
             with
             | Ok (state_hash, parent, height, slot) ->
                 display { state_hash; parent; height; slot } ;
@@ -165,7 +209,7 @@ let command =
                 display_error "fail to load metadata" ;
                 exit 2
             | Error (`Fail_to_decode_metadata e) ->
-                display_error ("fail to decode metadata: " ^  e);
+                display_error ("fail to decode metadata: " ^ e) ;
                 exit 2
             | Error `Fail_to_load_block ->
                 display_error "fail to load block" ;
