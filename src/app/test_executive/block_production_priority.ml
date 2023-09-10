@@ -14,6 +14,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
+    let open Node_config in
     { default with
       genesis_ledger =
         [ test_account "receiver-key" "9999999"
@@ -24,20 +25,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               let i_str = Int.to_string i in
               test_account ("sender-account-" ^ i_str) "10000" )
     ; block_producers =
-        [ bp "receiver" !Network.mina_image
-        ; bp "empty_node-1" ~account_name:"empty-bp-key" !Network.mina_image
-        ; bp "empty_node-2" ~account_name:"empty-bp-key" !Network.mina_image
-        ; bp "empty_node-3" ~account_name:"empty-bp-key" !Network.mina_image
-        ; bp "empty_node-4" ~account_name:"empty-bp-key" !Network.mina_image
-        ; bp "observer" ~account_name:"empty-bp-key" !Network.mina_image
+        [ bp "receiver" ()
+        ; bp "empty_node-1" ~account_name:"empty-bp-key" ()
+        ; bp "empty_node-2" ~account_name:"empty-bp-key" ()
+        ; bp "empty_node-3" ~account_name:"empty-bp-key" ()
+        ; bp "empty_node-4" ~account_name:"empty-bp-key" ()
+        ; bp "observer" ~account_name:"empty-bp-key" ()
         ]
-    ; snark_coordinator =
-        Some
-          { node_name = "snark-node"
-          ; account_name = "snark-node-key"
-          ; docker_image = !Network.mina_image
-          ; worker_nodes = 4
-          }
+    ; snark_coordinator = snark "snark-node" 4
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
     ; proof_config =

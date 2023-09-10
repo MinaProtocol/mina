@@ -13,10 +13,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
+    let open Node_config in
     { default with
       genesis_ledger =
         [ test_account "node-key" "8000000"; test_account "extra-key" "10" ]
-    ; block_producers = [ bp "node" !Network.mina_image ]
+    ; block_producers = [ bp "node" () ]
     }
 
   let check_and_print_stout_stderr ~logger process =

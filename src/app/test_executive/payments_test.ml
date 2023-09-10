@@ -16,6 +16,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   (* TODO: test account creation fee *)
   let config =
     let open Test_config in
+    let open Node_config in
     let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
         ~vesting_increment : Mina_base.Account_timing.t =
       let open Currency in
@@ -43,19 +44,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; test_account "fish2" "100"
         ]
     ; block_producers =
-        [ bp "untimed-node-a" !Network.mina_image
-        ; bp "untimed-node-b" !Network.mina_image
-        ; bp "timed-node-c" !Network.mina_image
-        ]
-    ; snark_coordinator =
-        Some
-          { node_name = "snark-node"
-          ; account_name = "snark-node-key1"
-          ; docker_image = !Network.mina_image
-          ; worker_nodes = 4
-          }
+        [ bp "untimed-node-a" (); bp "untimed-node-b" (); bp "timed-node-c" () ]
+    ; snark_coordinator = snark "snark-node" 4
     ; snark_worker_fee = "0.0001"
-    ; archive_nodes = []
     ; proof_config =
         { proof_config_default with
           work_delay = Some 1

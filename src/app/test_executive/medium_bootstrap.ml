@@ -13,6 +13,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
+    let open Node_config in
     { default with
       k = 2
     ; genesis_ledger =
@@ -20,11 +21,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; test_account "node-b-key" "1000"
         ; test_account "node-c-key" "0"
         ]
-    ; block_producers =
-        [ bp "node-a" !Network.mina_image
-        ; bp "node-b" !Network.mina_image
-        ; bp "node-c" !Network.mina_image
-        ]
+    ; block_producers = [ bp "node-a" (); bp "node-b" (); bp "node-c" () ]
     }
 
   (*

@@ -12,12 +12,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
+    let open Node_config in
     { default with
       genesis_ledger =
         [ test_account "node-a-key" "1000"; test_account "node-b-key" "1000" ]
-    ; block_producers =
-        [ bp "node-a" !Network.mina_image; bp "node-b" !Network.mina_image ]
-    ; archive_nodes = []
+    ; block_producers = [ bp "node-a" (); bp "node-b" () ]
     }
 
   let run network t =

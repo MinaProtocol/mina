@@ -2,8 +2,6 @@ open Core
 open Integration_test_lib
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
-  open Inputs.Engine
-
   open Test_common.Make (Inputs)
 
   let num_extra_keys = 1000
@@ -12,6 +10,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
+    let open Node_config in
     { default with
       genesis_ledger =
         [ test_account "receiver-key" "9999999"
@@ -22,18 +21,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               let i_str = Int.to_string i in
               test_account ("sender-account-" ^ i_str) "10000" )
     ; block_producers =
-        [ bp "receiver" "receiver-docker-image"
-        ; bp "empty_node-1" ~account_name:"empty-bp-key" !Network.mina_image
-        ; bp "empty_node-2" ~account_name:"empty-bp-key" !Network.mina_image
-        ; bp "observer" ~account_name:"empty-bp-key" "observer-docker-image"
+        [ bp "receiver" ~docker_image:"receiver-docker-image" ()
+        ; bp "empty_node-1" ~account_name:"empty-bp-key" ()
+        ; bp "empty_node-2" ~account_name:"empty-bp-key" ()
+        ; bp "observer" ~account_name:"empty-bp-key"
+            ~git_build:(Commit "abcdef0123") ()
         ]
-    ; snark_coordinator =
-        Some
-          { node_name = "snark-node"
-          ; account_name = "snark-node-key"
-          ; docker_image = !Network.mina_image
-          ; worker_nodes = 4
-          }
+    ; snark_coordinator = snark "snark-node" 4
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
     ; proof_config =
@@ -43,23 +37,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Some Runtime_config.Proof_keys.Transaction_capacity.small
         }
     ; seed_nodes =
-        [ { node_name = "seed-0"
-          ; account_name = "seed-0-key"
-          ; docker_image = "seed-docker-image"
-          }
-        ; { node_name = "seed-1"
-          ; account_name = "seed-1-key"
-          ; docker_image = !Network.mina_image
-          }
-        ]
-    ; archive_nodes =
-        [ { node_name = "archive-node"
-          ; account_name = "archive-node-key"
-          ; docker_image =
-              Option.value !Network.archive_image
-                ~default:"default-archive-image"
-          }
-        ]
+        [ seed "seed-0" ~docker_image:"seed-docker-image" (); seed "seed-1" () ]
+    ; archive_nodes = [ archive "archive-node" () ]
     }
 
   let run _network _t = Malleable_error.return ()

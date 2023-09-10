@@ -14,6 +14,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
+    let open Node_config in
     { default with
       genesis_ledger =
         [ test_account "node-a-key" "8000000000"
@@ -22,16 +23,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; test_account "fish2" "3000"
         ; test_account "snark-node-key" "0"
         ]
-    ; block_producers =
-        [ bp "node-a" !Network.mina_image; bp "node-b" !Network.mina_image ]
-    ; archive_nodes = []
-    ; snark_coordinator =
-        Some
-          { node_name = "snark-node"
-          ; account_name = "snark-node-key"
-          ; docker_image = !Network.mina_image
-          ; worker_nodes = 2
-          }
+    ; block_producers = [ bp "node-a" (); bp "node-b" () ]
+    ; snark_coordinator = snark "snark-node" 2
     ; snark_worker_fee = "0.0001"
     ; proof_config =
         { proof_config_default with

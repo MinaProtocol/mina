@@ -65,22 +65,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
+    let open Node_config in
     { default with
       genesis_ledger =
         [ test_account "whale1-key" "9000000000"
         ; test_account "whale2-key" "1000000000"
         ; test_account "snark-node-key" "100"
         ]
-    ; block_producers =
-        [ bp "whale1" !Network.mina_image; bp "whale2" !Network.mina_image ]
-    ; archive_nodes = []
-    ; snark_coordinator =
-        Some
-          { node_name = "snark-node"
-          ; account_name = "snark-node-key"
-          ; docker_image = !Network.mina_image
-          ; worker_nodes = 2
-          }
+    ; block_producers = [ bp "whale1" (); bp "whale2" () ]
+    ; snark_coordinator = snark "snark-node" 2
     ; snark_worker_fee = "0.0001"
     }
 
