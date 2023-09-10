@@ -63,18 +63,43 @@ module Test_Account = struct
   [@@deriving to_yojson]
 end
 
+module Git_build = struct
+  type t = Commit of string | Tag of string [@@deriving to_yojson]
+
+  let to_yojson : t -> Yojson.Safe.t = function
+    | Commit commit ->
+        `Assoc [ ("commit", `String commit) ]
+    | Tag tag ->
+        `Assoc [ ("tag", `String tag) ]
+end
+
 module Archive_node = struct
-  type t = { node_name : string; account_name : string; docker_image : string }
+  type t =
+    { node_name : string
+    ; account_name : string
+    ; docker_image : string option
+    ; git_build : Git_build.t option
+    }
   [@@deriving to_yojson]
 end
 
 module Block_producer_node = struct
-  type t = { node_name : string; account_name : string; docker_image : string }
+  type t =
+    { node_name : string
+    ; account_name : string
+    ; docker_image : string option
+    ; git_build : Git_build.t option
+    }
   [@@deriving to_yojson]
 end
 
 module Seed_node = struct
-  type t = { node_name : string; account_name : string; docker_image : string }
+  type t =
+    { node_name : string
+    ; account_name : string
+    ; docker_image : string option
+    ; git_build : Git_build.t option
+    }
   [@@deriving to_yojson]
 end
 
@@ -82,7 +107,8 @@ module Snark_coordinator_node = struct
   type t =
     { node_name : string
     ; account_name : string
-    ; docker_image : string
+    ; docker_image : string option
+    ; git_build : Git_build.t option
     ; worker_nodes : int
     }
   [@@deriving to_yojson]
@@ -131,7 +157,8 @@ module Topology = struct
     { pk : string
     ; sk : string
     ; role : Node_role.t
-    ; docker_image : string
+    ; docker_image : string option
+    ; git_build : Git_build.t option
     ; worker_nodes : int
     ; snark_worker_fee : string
     ; libp2p_pass : string
@@ -142,14 +169,19 @@ module Topology = struct
   [@@deriving to_yojson]
 
   type snark_worker_info =
-    { pk : string; sk : string; role : Node_role.t; docker_image : string }
+    { pk : string
+    ; sk : string
+    ; role : Node_role.t
+    ; docker_image : string option
+    }
   [@@deriving to_yojson]
 
   type archive_info =
     { pk : string
     ; sk : string
     ; role : Node_role.t
-    ; docker_image : string
+    ; docker_image : string option
+    ; git_build : Git_build.t option
     ; schema_file : string
     ; zkapp_table : string
     }
@@ -160,7 +192,8 @@ module Topology = struct
     ; sk : string
     ; privkey_path : string option
     ; role : Node_role.t
-    ; docker_image : string
+    ; docker_image : string option
+    ; git_build : Git_build.t option
     ; libp2p_pass : string
     ; libp2p_keyfile : string
     ; libp2p_keypair : Yojson.Safe.t
@@ -206,7 +239,13 @@ let default =
   ; genesis_ledger = []
   ; archive_nodes = []
   ; block_producers = []
-  ; seed_nodes = []
+  ; seed_nodes =
+      [ { node_name = "default-seed"
+        ; account_name = "default-seed-key"
+        ; docker_image = None
+        ; git_build = None
+        }
+      ]
   ; snark_coordinator = None
   ; snark_worker_fee = "0.025"
   ; log_precomputed_blocks = false
@@ -295,7 +334,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
   in
   let libp2p_pass = "naughty blue worm" in
   let topology_of_block_producer n
-      { Block_producer_node.account_name; node_name; docker_image } :
+      { Block_producer_node.account_name; node_name; docker_image; git_build } :
       Topology.top_info =
     let pk, sk = pk_sk account_name n in
     Node
@@ -305,6 +344,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         ; privkey_path = Some "instantiated in network_config.ml"
         ; role = Block_producer
         ; docker_image
+        ; git_build
         ; libp2p_pass
         ; libp2p_keyfile = "instantiated in network_config.ml"
         ; libp2p_keypair = List.nth_exn libp2p_keypairs n
@@ -315,6 +355,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
       { Snark_coordinator_node.account_name
       ; node_name
       ; docker_image
+      ; git_build
       ; worker_nodes
       } : Topology.top_info =
     let pk, sk = pk_sk account_name num_bp in
@@ -324,6 +365,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         ; sk
         ; role = Snark_coordinator
         ; docker_image
+        ; git_build
         ; worker_nodes
         ; snark_worker_fee = t.snark_worker_fee
         ; libp2p_pass
@@ -340,8 +382,8 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         [ sc ]
   in
   let topology_of_archive n
-      { Archive_node.account_name; node_name; docker_image } : Topology.top_info
-      =
+      { Archive_node.account_name; node_name; docker_image; git_build } :
+      Topology.top_info =
     let n = n + num_bp_sc in
     let pk, sk = pk_sk account_name n in
     Archive
@@ -350,11 +392,13 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         ; sk
         ; role = Archive_node
         ; docker_image
+        ; git_build
         ; schema_file = "instantiated in network_config.ml"
         ; zkapp_table = "instantiated in network_config.ml"
         } )
   in
-  let topology_of_seed n { Seed_node.account_name; node_name; docker_image } :
+  let topology_of_seed n
+      { Seed_node.account_name; node_name; docker_image; git_build } :
       Topology.top_info =
     let n = n + num_bp_sc_an in
     let pk, sk = pk_sk account_name n in
@@ -365,6 +409,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         ; privkey_path = None
         ; role = Seed_node
         ; docker_image
+        ; git_build
         ; libp2p_pass
         ; libp2p_keyfile = "instantiated in network_config.ml"
         ; libp2p_keypair = List.nth_exn libp2p_keypairs n
@@ -380,9 +425,6 @@ let test_account ?(pk = "") ?(timing = Mina_base.Account.Timing.Untimed)
     account_name balance : Test_Account.t =
   { account_name; balance; timing; pk }
 
-let bp node_name ?(account_name = node_name ^ "-key") docker_image =
-  { Block_producer_node.node_name; account_name; docker_image }
-
 module Unit_tests = struct
   let test_config =
     { default with
@@ -396,28 +438,33 @@ module Unit_tests = struct
     ; block_producers =
         [ { node_name = "receiver"
           ; account_name = "receiver-key"
-          ; docker_image = "bp-image"
+          ; docker_image = Some "bp-image"
+          ; git_build = None
           }
         ; { node_name = "empty-node-0"
           ; account_name = "empty-bp-key"
-          ; docker_image = "bp-image-0"
+          ; docker_image = None
+          ; git_build = Some (Commit "6131f41e")
           }
         ; { node_name = "empty-node-1"
           ; account_name = "empty-bp-key"
-          ; docker_image = "bp-image-1"
+          ; docker_image = Some "bp-image-1"
+          ; git_build = None
           }
         ]
     ; snark_coordinator =
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key"
-          ; docker_image = "snark-coordinator-image"
+          ; docker_image = Some "snark-coordinator-image"
+          ; git_build = None
           ; worker_nodes = 4
           }
     ; seed_nodes =
         [ { node_name = "seed-node-0"
           ; account_name = "seed-node-0-key"
-          ; docker_image = "seed-image-0"
+          ; docker_image = Some "seed-image-0"
+          ; git_build = None
           }
         ]
     ; txpool_max_size = 10_000_000
