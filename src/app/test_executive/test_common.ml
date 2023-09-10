@@ -431,4 +431,50 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     else
       let error = String.concat error_logs ~sep:"\n  " in
       Malleable_error.hard_error_string ("Replayer errors:\n  " ^ error)
+
+  module Node_config = struct
+    open Inputs.Engine.Network
+
+    let archive node_name ?(account_name = node_name ^ "-key")
+        ?(docker_image = !archive_image) ?git_build () =
+      let docker_image =
+        if Option.is_some git_build then None else docker_image
+      in
+      { Test_config.Archive_node.node_name
+      ; account_name
+      ; docker_image
+      ; git_build
+      }
+
+    let bp node_name ?(account_name = node_name ^ "-key")
+        ?(docker_image = !mina_image) ?git_build () =
+      let docker_image =
+        if Option.is_some git_build then None else Some docker_image
+      in
+      { Test_config.Block_producer_node.node_name
+      ; account_name
+      ; docker_image
+      ; git_build
+      }
+
+    let seed node_name ?(account_name = node_name ^ "-key")
+        ?(docker_image = !mina_image) ?git_build () =
+      let docker_image =
+        if Option.is_some git_build then None else Some docker_image
+      in
+      { Test_config.Seed_node.node_name; account_name; docker_image; git_build }
+
+    let snark node_name ?(account_name = node_name ^ "-key")
+        ?(docker_image = !mina_image) ?git_build worker_nodes =
+      let docker_image =
+        if Option.is_some git_build then None else Some docker_image
+      in
+      Some
+        { Test_config.Snark_coordinator_node.node_name
+        ; account_name
+        ; docker_image
+        ; git_build
+        ; worker_nodes
+        }
+  end
 end
