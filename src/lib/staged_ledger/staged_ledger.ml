@@ -1994,6 +1994,9 @@ module T = struct
                               , `String
                                   "Snark fee insufficient to create snark \
                                    worker account" )
+                            ; ( "interrupt_get_completed_work_ids"
+                              , Transaction_snark_work.Statement.compact_json w
+                              )
                             ] ;
                         Stop (seq, count) )
                   | None ->
@@ -2011,6 +2014,8 @@ module T = struct
                           [ ("interrupt_get_completed_work_at", `Int count)
                           ; ( "interrupt_get_completed_work_reason"
                             , `String "Snark work for statement not found" )
+                          ; ( "interrupt_get_completed_work_ids"
+                            , Transaction_snark_work.Statement.compact_json w )
                           ] ;
                       Stop (seq, count) )
                 ~finish:Fn.id
@@ -4418,13 +4423,7 @@ let%test_module "staged ledger tests" =
                   | _ ->
                       failwith "expecting zkapp_command transaction" ) ) )
 
-    (* This test uses dummy verifiers, that's why it's not rejecting the problematic zkapp command
-       But this test is still useful, since it exercises the parts that doesn't requires a pickles
-       instance. Currently we only have the test with dummy verifier. The test that uses a full
-       verifier is still under working.
-    *)
-    let%test_unit "Invalid account_update_hash would not be rejected by dummy \
-                   verifier" =
+    let%test_unit "Invalid account_update_hash would be rejected" =
       let open Transaction_snark.For_tests in
       Quickcheck.test ~trials:1 gen_spec_keypair_and_global_slot
         ~f:(fun ({ init_ledger; specs }, zkapp_account_keypair, global_slot) ->
@@ -4504,15 +4503,30 @@ let%test_module "staged ledger tests" =
                           (Staged_ledger_diff.With_valid_signatures_and_proofs
                            .commands diff )
                         = 1 ) ;
+                      let%bind verifier_full =
+                        Verifier.create ~logger ~proof_level:Full
+                          ~constraint_constants ~conf_dir:None
+                          ~pids:
+                            (Child_processes.Termination.create_pid_table ())
+                          ()
+                      in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl
                           (Staged_ledger_diff.forget diff)
-                          ~logger ~verifier ~current_state_view
+                          ~logger ~verifier:verifier_full ~current_state_view
                           ~state_and_body_hash ~coinbase_receiver
                           ~supercharge_coinbase:false
                       with
                       | Ok _ ->
-                          ()
+                          failwith "invalid block should be rejected"
                       | Error e ->
-                          failwith (Staged_ledger_error.to_string e) ) ) ) )
+                          if
+                            String.is_substring
+                              (Staged_ledger_error.to_string e)
+                              ~substring:"batch verification failed"
+                          then ()
+                          else
+                            failwith
+                              "block should be rejected because batch \
+                               verification failed" ) ) ) )
   end )
