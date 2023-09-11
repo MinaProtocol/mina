@@ -1,0 +1,1 @@
+module Scalar_challenge = Kimchi_backend_common.Scalar_challenge

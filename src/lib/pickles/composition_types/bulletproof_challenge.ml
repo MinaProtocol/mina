@@ -18,5 +18,5 @@ let typ chal =
   let there = pack in
   let back = unpack in
   let open Snarky_backendless in
-  Typ.transport ~there ~back (Kimchi_backend_common.Scalar_challenge.typ chal)
+  Typ.transport ~there ~back (Import.Scalar_challenge.typ chal)
   |> Typ.transport_var ~there ~back

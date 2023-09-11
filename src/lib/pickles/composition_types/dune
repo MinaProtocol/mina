@@ -21,6 +21,7 @@
   -open Core_kernel)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx ))
+ (modules_without_implementation import)
  (libraries
    ;; opam libraries
   sexplib0

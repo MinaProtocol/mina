@@ -42,8 +42,8 @@ module rec T : sig
     | B : ('a, 'b, 'env) basic -> ('a, 'b, 'env) t
     | Scalar :
         ('a, 'b, 'env) basic
-        -> ( 'a Kimchi_backend_common.Scalar_challenge.t
-           , 'b Kimchi_backend_common.Scalar_challenge.t
+        -> ( 'a Import.Scalar_challenge.t
+           , 'b Import.Scalar_challenge.t
            , (< challenge1 : 'a ; challenge2 : 'b ; .. > as 'env) )
            t
     | Vector :
@@ -96,11 +96,10 @@ val typ :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : 'a Branch_data.Checked.t
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
-           Kimchi_backend_common.Scalar_challenge.t
+           Limb_vector.Challenge.Constant.t Import.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           'a Limb_vector.Challenge.t Kimchi_backend_common.Scalar_challenge.t
+           'a Limb_vector.Challenge.t Import.Scalar_challenge.t
            Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
        ; challenge2 : 'a Limb_vector.Challenge.t
@@ -135,11 +134,10 @@ val packed_typ :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : 'a Snarky_backendless.Cvar.t
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
-           Kimchi_backend_common.Scalar_challenge.t
+           Limb_vector.Challenge.Constant.t Import.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           'a Snarky_backendless.Cvar.t Kimchi_backend_common.Scalar_challenge.t
+           'a Snarky_backendless.Cvar.t Import.Scalar_challenge.t
            Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
        ; challenge2 : 'a Snarky_backendless.Cvar.t
@@ -164,11 +162,10 @@ val pack :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : 'f Branch_data.Checked.t
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
-           Kimchi_backend_common.Scalar_challenge.t
+           Limb_vector.Challenge.Constant.t Import.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           'f Limb_vector.Challenge.t Kimchi_backend_common.Scalar_challenge.t
+           'f Limb_vector.Challenge.t Import.Scalar_challenge.t
            Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
        ; challenge2 : 'f Limb_vector.Challenge.t

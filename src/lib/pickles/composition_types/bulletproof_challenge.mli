@@ -20,7 +20,7 @@ val map : 'a t -> f:('a -> 'b) -> 'b t
 
 val typ :
      ('a, 'b, 'c) Snarky_backendless.Typ.t
-  -> ( 'a Kimchi_backend_common.Scalar_challenge.t t
-     , 'b Kimchi_backend_common.Scalar_challenge.t t
+  -> ( 'a Import.Scalar_challenge.t t
+     , 'b Import.Scalar_challenge.t t
      , 'c )
      Snarky_backendless.Typ.t
