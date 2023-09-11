@@ -70,6 +70,9 @@ let map t ~f =
   | Maybe (b, x) ->
       Maybe (b, f x)
 
+let iter t ~f =
+  match t with Nothing -> () | Just x -> f x | Maybe (_, x) -> f x
+
 open Snarky_backendless
 
 let some_typ (type a a_var f bool_var) (t : (a_var, a, f) Typ.t) :
