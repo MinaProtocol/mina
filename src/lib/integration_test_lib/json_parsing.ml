@@ -36,7 +36,7 @@ let parser_from_of_yojson of_yojson js =
         ~metadata:[ ("module", `String modl); ("json", js) ] ;
       failwithf "Could not parse JSON using %s.of_yojson" modl ()
 
-let valid_commands_with_statuses = function
+let transaction_hashes_with_statuses = function
   | `List cmds ->
       let cmd_or_errors =
         List.map cmds
@@ -53,12 +53,12 @@ let valid_commands_with_statuses = function
                 "Failed to parse JSON for user command status" ;
               (* fail on any error *)
               failwith
-                "valid_commands_with_statuses: unable to parse JSON for user \
-                 command"
+                "transaction_hashes_with_statuses: unable to parse JSON for \
+                 user command"
           | cmds, Ok cmd ->
               cmd :: cmds )
   | _ ->
-      failwith "valid_commands_with_statuses: expected `List"
+      failwith "transaction_hashes_with_statuses: expected `List"
 
 let rec find (parser : 'a parser) (json : Yojson.Safe.t) (path : string list) :
     'a Or_error.t =
