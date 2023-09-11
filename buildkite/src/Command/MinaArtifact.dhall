@@ -5,9 +5,6 @@ let S = ../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
 let Pipeline = ../Pipeline/Dsl.dhall
-let PipelineStage = ../Pipeline/Stage.dhall
-let PipelineMode = ../Pipeline/Mode.dhall
-
 let JobSpec = ../Pipeline/JobSpec.dhall
 
 let Command = ./Base.dhall
@@ -19,15 +16,13 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 in
 
-let pipeline : DebianVersions.DebVersion -> PipelineMode.Type -> Pipeline.Config.Type = \(debVersion : DebianVersions.DebVersion) ->
-  \(mode: PipelineMode.Type) -> 
+let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion : DebianVersions.DebVersion) ->
     Pipeline.Config::{
       spec =
         JobSpec::{
           dirtyWhen = DebianVersions.dirtyWhen debVersion,
           path = "Release",
-          name = "MinaArtifact${DebianVersions.capitalName debVersion}",
-          mode = mode
+          name = "MinaArtifact${DebianVersions.capitalName debVersion}"
         },
       steps = [
         Libp2p.step debVersion,
@@ -112,7 +107,7 @@ let pipeline : DebianVersions.DebVersion -> PipelineMode.Type -> Pipeline.Config
 
 in
 {
-  bullseye  = pipeline DebianVersions.DebVersion.Bullseye PipelineMode.Type.PullRequest
-  , buster  = pipeline DebianVersions.DebVersion.Buster PipelineMode.Type.Stable
-  , focal   = pipeline DebianVersions.DebVersion.Focal PipelineMode.Type.Stable
+  bullseye  = pipeline DebianVersions.DebVersion.Bullseye
+  , buster  = pipeline DebianVersions.DebVersion.Buster
+  , focal   = pipeline DebianVersions.DebVersion.Focal
 }
