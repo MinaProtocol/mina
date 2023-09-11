@@ -128,7 +128,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
       -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
       -> ('max_proofs_verified, 'max_local_max_proofs_verifieds) Requests.Wrap.t
          * (   ( ( Impls.Wrap.Field.t
-                 , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
+                 , Wrap_verifier.Challenge.t Import.Scalar_challenge.t
                  , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                    , Impls.Wrap.Boolean.var )
@@ -137,7 +137,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                  .In_circuit
                  .t
-               , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
+               , Wrap_verifier.Challenge.t Import.Scalar_challenge.t
                , Wrap_verifier.Other_field.Packed.t
                  Pickles_types__Shifted_value.Type1.t
                , Impls.Wrap.Field.t
@@ -1123,12 +1123,12 @@ let wrap_main_dummy_override _ _ _ _ _ _ _ =
         ( SC'.to_field_checked'
             (module Impl)
             ~num_bits:16
-            (Kimchi_backend_common.Scalar_challenge.create x)
+            (Import.Scalar_challenge.create x)
           : Field.t * Field.t * Field.t ) ;
       ignore (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
       ignore
         ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
-            (Kimchi_backend_common.Scalar_challenge.create x)
+            (Import.Scalar_challenge.create x)
           : Field.t * Field.t )
     in
     (* Pad the circuit so that its domain size matches the one

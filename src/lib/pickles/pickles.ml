@@ -384,7 +384,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ( SC.to_field_checked'
                 (module Impl)
                 ~num_bits:16
-                (Kimchi_backend_common.Scalar_challenge.create x)
+                (Import.Scalar_challenge.create x)
               : Field.t * Field.t * Field.t ) ;
           ignore
             ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
@@ -394,7 +394,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               : Step_main_inputs.Inner_curve.t ) ;
           ignore
             ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
-                (Kimchi_backend_common.Scalar_challenge.create x)
+                (Import.Scalar_challenge.create x)
               : Field.t * Field.t ))
 
       module No_recursion = struct
@@ -1243,13 +1243,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ( SC'.to_field_checked'
                   (module Impl)
                   ~num_bits:16
-                  (Kimchi_backend_common.Scalar_challenge.create x)
+                  (Import.Scalar_challenge.create x)
                 : Field.t * Field.t * Field.t ) ;
             ignore
               (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
             ignore
               ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
-                  (Kimchi_backend_common.Scalar_challenge.create x)
+                  (Import.Scalar_challenge.create x)
                 : Field.t * Field.t ) ;
             for _i = 0 to 64000 do
               assert_r1cs x y z
@@ -1991,7 +1991,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ( SC.to_field_checked'
                 (module Impl)
                 ~num_bits:16
-                (Kimchi_backend_common.Scalar_challenge.create x)
+                (Import.Scalar_challenge.create x)
               : Field.t * Field.t * Field.t ) ;
           ignore
             ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
@@ -2001,7 +2001,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               : Step_main_inputs.Inner_curve.t ) ;
           ignore
             ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
-                (Kimchi_backend_common.Scalar_challenge.create x)
+                (Import.Scalar_challenge.create x)
               : Field.t * Field.t ))
 
       module No_recursion = struct
@@ -2339,7 +2339,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ( SC.to_field_checked'
                 (module Impl)
                 ~num_bits:16
-                (Kimchi_backend_common.Scalar_challenge.create x)
+                (Import.Scalar_challenge.create x)
               : Field.t * Field.t * Field.t ) ;
           ignore
             ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
@@ -2349,7 +2349,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               : Step_main_inputs.Inner_curve.t ) ;
           ignore
             ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
-                (Kimchi_backend_common.Scalar_challenge.create x)
+                (Import.Scalar_challenge.create x)
               : Field.t * Field.t ))
 
       module No_recursion = struct

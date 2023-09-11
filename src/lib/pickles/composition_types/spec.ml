@@ -2,7 +2,7 @@ module D = Digest
 open Core_kernel
 open Pickles_types
 open Hlist
-module Sc = Kimchi_backend_common.Scalar_challenge
+module Sc = Import.Scalar_challenge
 
 type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
 

@@ -1,5 +1,5 @@
 open Pickles_types
-module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
+module Scalar_challenge = Import.Scalar_challenge
 module Bulletproof_challenge = Bulletproof_challenge
 module Branch_data = Branch_data
 module Digest = Digest
@@ -613,10 +613,8 @@ module Wrap = struct
       Spec.T.Opt
         { inner = Struct [ Scalar Challenge ]
         ; flag = use
-        ; dummy1 =
-            [ Kimchi_backend_common.Scalar_challenge.create value.challenge ]
-        ; dummy2 =
-            [ Kimchi_backend_common.Scalar_challenge.create var.challenge ]
+        ; dummy1 = [ Scalar_challenge.create value.challenge ]
+        ; dummy2 = [ Scalar_challenge.create var.challenge ]
         ; bool = (module Impl.Boolean)
         }
   end
