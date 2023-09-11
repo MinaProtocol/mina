@@ -33,30 +33,42 @@ let prefixCommands = [
 
 
 -- Run a job if we touched a dirty path
-let commands: Text -> Text -> List Cmd.Type  =  \(target_stage: Text) -> \(target_mode: Text) ->
+let commands: Text -> Text -> List Cmd.Type  =  \(targetStage: Text) -> \(targetMode: Text) ->
   Prelude.List.map 
     JobSpec.Type 
     Cmd.Type 
     (\(job: JobSpec.Type) ->
-      let job_mode = PipelineMode.capitalName job.mode
-      let job_stage = PipelineStage.capitalName job.stage
+      let jobMode = PipelineMode.capitalName job.mode
+      let jobStage = PipelineStage.capitalName job.stage
 
       let dirtyWhen = SelectFiles.compile job.dirtyWhen
       let trigger = triggerCommand "src/Jobs/${job.path}/${job.name}.dhall"
       let pipelineHandlers = {
         PullRequest = ''
-          if [ "${job_mode}" == "${target_mode}" ] && [ "${job_stage}" == "${target_stage}" ]; then
-            if (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
-              echo "Triggering ${job.name} for reason:"
-              cat _computed_diff.txt | egrep '${dirtyWhen}'
-              ${Cmd.format trigger}
-            fi 
+          if [ "${targetMode}" == "PullRequest" ]; then
+            if [ "${jobStage}" == "${targetStage}" ];
+              if (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
+                echo "Triggering ${job.name} for reason:"
+                cat _computed_diff.txt | egrep '${dirtyWhen}'
+                ${Cmd.format trigger}
+              fi
+            else
+              echo "Skipping ${job.name} because this is a ${targetStage} stage"
+            fi           
+          else 
+            echo "Skipping ${job.name} because this is a ${targetMode} buildkite run"
           fi
         '',
         Stable = ''
-          if [ "${job_stage}" == "${target_stage}" ]; then
-            echo "Triggering ${job.name} because this is a stable buildkite run"
-            ${Cmd.format trigger}
+          if [ "${targetMode}" == "PullRequest" ]; then
+            echo "Skipping ${job.name} because this is a PR buildkite run"
+          else 
+            if [ "${jobStage}" == "${targetStage}" ];
+              echo "Triggering ${job.name} because this is a stable buildkite run"
+              ${Cmd.format trigger}
+            else
+              echo "Skipping ${job.name} because this is a ${targetStage} stage"
+            fi
           fi
         ''
       }
