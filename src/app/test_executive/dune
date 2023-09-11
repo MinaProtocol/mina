@@ -5,6 +5,7 @@
    async_kernel
    async
    core
+   uri
    yojson
    core_kernel
    cmdliner
@@ -13,7 +14,6 @@
    async_unix
    unsigned_extended
    stdio
-   uri
    ;; local libraries
    mina_wire_types
    with_hash
@@ -28,6 +28,7 @@
    bash_colors
    integration_test_lib
    signature_lib
+   mina_signature_kind
    mina_base
    mina_stdlib
    mina_transaction

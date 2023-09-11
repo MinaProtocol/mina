@@ -90,6 +90,11 @@ module Flagged_option = struct
   let option_typ ~default t =
     Typ.transport (typ t) ~there:(of_option ~default) ~back:to_option
 
+  let lazy_option_typ ~default t =
+    Typ.transport (typ t)
+      ~there:(fun t -> of_option t ~default:(Lazy.force default))
+      ~back:to_option
+
   [%%endif]
 end
 

@@ -121,6 +121,7 @@ let tests : test list =
   ; (module Chain_reliability_test.Make : Intf.Test.Functor_intf)
   ; (module Delegation_test.Make : Intf.Test.Functor_intf)
   ; (module Gossip_consistency.Make : Intf.Test.Functor_intf)
+  ; (module Hard_fork.Make : Intf.Test.Functor_intf)
   ; (module Medium_bootstrap.Make : Intf.Test.Functor_intf)
   ; (module Mock.Make : Intf.Test.Functor_intf)
   ; (module Payments_test.Make : Intf.Test.Functor_intf)

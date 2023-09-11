@@ -94,6 +94,7 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ; slots_per_sub_window
       ; txpool_max_size
       ; seed_nodes
+      ; _
       } =
     test_config
   in

@@ -98,6 +98,10 @@ variable "mem_request" {
   default = "0Mi"
 }
 
+variable "pod_priority" {
+  type    = number
+}
+
 variable "archive_configs" {
   description = "individual archive-node deployment configurations"
   default = null

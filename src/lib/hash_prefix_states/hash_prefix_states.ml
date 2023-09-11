@@ -1,9 +1,10 @@
 open Core_kernel
 open Hash_prefixes
 
-let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
+let salt (s : Hash_prefixes.t) = Hash_prefix_create.salt (s :> string)
 
-let salt_legacy (s : Hash_prefixes.t) = Random_oracle.Legacy.salt (s :> string)
+let salt_legacy (s : Hash_prefixes.t) =
+  Hash_prefix_create.salt_legacy (s :> string)
 
 let receipt_chain_signed_command = salt_legacy receipt_chain_user_command
 
@@ -103,15 +104,13 @@ let zkapp_account = salt zkapp_account
 
 let zkapp_payload = salt zkapp_payload
 
-let zkapp_body = salt zkapp_body
+let zkapp_body ?(chain = Mina_signature_kind.t) = salt @@ zkapp_body ~chain
 
 let zkapp_precondition = salt zkapp_precondition
 
 let zkapp_precondition_account = salt zkapp_precondition_account
 
 let zkapp_precondition_protocol_state = salt zkapp_precondition_protocol_state
-
-let account_update = salt account_update
 
 let account_update_account_precondition =
   salt account_update_account_precondition

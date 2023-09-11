@@ -1,7 +1,7 @@
 (library
  (name uptime_service)
  (public_name uptime_service)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    base64
@@ -59,6 +59,7 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    mina_wire_types
+   o1trace
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_inline_test ppx_deriving.std))

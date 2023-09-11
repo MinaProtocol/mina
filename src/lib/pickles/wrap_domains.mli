@@ -13,7 +13,7 @@ module Make
        ('a, 'b, 'c) Full_signature.t
     -> 'd
     -> ('e, 'b) Hlist.Length.t
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'a)
     -> Import.Domains.t
 
@@ -21,7 +21,7 @@ module Make
        ('a, 'b, 'c) Full_signature.t
     -> 'd
     -> ('e, 'b) Hlist.Length.t
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'a)
     -> Import.Domains.Stable.V2.t
 end

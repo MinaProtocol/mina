@@ -60,7 +60,10 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then (
     let%bind () = after (Time.Span.of_ms 10000.0) in
-    match%bind Node.get_filtered_log_entries ~last_log_index_seen node with
+    match%bind
+      Graphql_requests.get_filtered_log_entries ~last_log_index_seen
+      @@ Node.get_ingress_uri node
+    with
     | Ok log_entries ->
         Array.iter log_entries ~f:(fun log_entry ->
             match parse_event_from_log_entry ~logger log_entry with
@@ -91,7 +94,10 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
 let rec poll_start_filtered_log_node ~logger ~log_filter ~event_writer node =
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then
-    match%bind Node.start_filtered_log ~logger ~log_filter node with
+    match%bind
+      Graphql_requests.start_filtered_log ~logger ~log_filter
+      @@ Node.get_ingress_uri node
+    with
     | Ok () ->
         return (Ok ())
     | Error _ ->

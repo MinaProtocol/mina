@@ -68,9 +68,12 @@ let setup_daemon logger =
     flag "--block-producer-key" ~aliases:[ "block-producer-key" ]
       ~doc:
         (sprintf
-           "KEYFILE Private key file for the block producer. You cannot \
+           "DEPRECATED: Use environment variable `MINA_BP_PRIVKEY` instead. \
+            Private key file for the block producer. Providing this flag or \
+            the environment variable will enable block production. You cannot \
             provide both `block-producer-key` and `block-producer-pubkey`. \
-            (default: don't produce blocks). %s"
+            (default: use environment variable `MINA_BP_PRIVKEY`, if provided, \
+            or else don't produce any blocks) %s"
            receiver_key_warning )
       (optional string)
   and block_production_pubkey =
@@ -80,8 +83,8 @@ let setup_daemon logger =
         (sprintf
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both \
-            `block-producer-key` and `block-producer-pubkey`. (default: don't \
-            produce blocks). %s"
+            `block-producer-key` (or `MINA_BP_PRIVKEY`) and \
+            `block-producer-pubkey`. (default: don't produce blocks) %s"
            receiver_key_warning )
       (optional public_key_compressed)
   and block_production_password =
@@ -477,6 +480,13 @@ let setup_daemon logger =
          for the associated private key that is being tracked by this daemon. \
          You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
+  and uptime_send_node_commit =
+    flag "--uptime-send-node-commit-sha"
+      ~aliases:[ "uptime-send-node-commit-sha" ]
+      ~doc:
+        "true|false Whether to send the commit SHA used to build the node to \
+         the uptime service. (default: false)"
+      no_arg
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -504,7 +514,7 @@ let setup_daemon logger =
             Daemon.daemonize ~allow_threads_to_have_been_created:true
               ~redirect_stdout:`Dev_null ?cd:working_dir
               ~redirect_stderr:`Dev_null () )
-          else ignore (Option.map working_dir ~f:Caml.Sys.chdir)
+          else Option.iter working_dir ~f:Caml.Sys.chdir
         in
         Stdout_log.setup log_json log_level ;
         (* 512MB logrotate max size = 1GB max filesystem usage *)
@@ -944,21 +954,39 @@ let setup_daemon logger =
                   Unix.putenv ~key:Secrets.Keypair.env ~data:password )
             block_production_password ;
           let%bind block_production_keypair =
-            match (block_production_key, block_production_pubkey) with
-            | Some _, Some _ ->
+            match
+              ( block_production_key
+              , block_production_pubkey
+              , Sys.getenv "MINA_BP_PRIVKEY" )
+            with
+            | Some _, Some _, _ ->
                 Mina_user_error.raise
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
-            | None, None ->
+            | None, Some _, Some _ ->
+                Mina_user_error.raise
+                  "You cannot provide both `MINA_BP_PRIVKEY` and \
+                   `block_production_pubkey`"
+            | None, None, None ->
                 Deferred.return None
-            | Some sk_file, _ ->
+            | None, None, Some base58_privkey ->
+                let kp =
+                  Private_key.of_base58_check_exn base58_privkey
+                  |> Keypair.of_private_key_exn
+                in
+                Deferred.return (Some kp)
+            (* CLI argument takes precedence over env variable *)
+            | Some sk_file, None, (Some _ | None) ->
+                [%log warn]
+                  "`block-producer-key` is deprecated. Please set \
+                   `MINA_BP_PRIVKEY` environment variable instead." ;
                 let%map kp =
                   Secrets.Keypair.Terminal_stdin.read_exn
                     ~should_prompt_user:false ~which:"block producer keypair"
                     sk_file
                 in
                 Some kp
-            | _, Some tracked_pubkey ->
+            | None, Some tracked_pubkey, None ->
                 let%map kp =
                   Secrets.Wallets.get_tracked_keypair ~logger
                     ~which:"block producer keypair"
@@ -1011,7 +1039,12 @@ let setup_daemon logger =
                 | Sexp.List sexps ->
                     `List (List.map ~f:Error_json.sexp_record_to_yojson sexps)
                 | Sexp.Atom _ ->
-                    failwith "Expeted a sexp list" )
+                    failwith "Expected a sexp list" )
+          in
+          let o1trace context =
+            Execution_context.find_local context O1trace.local_storage_id
+            |> Option.value ~default:[]
+            |> List.map ~f:(fun x -> `String x)
           in
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
@@ -1019,12 +1052,18 @@ let setup_daemon logger =
             ~f:(fun (span, context) ->
               let secs = Time_ns.Span.to_sec span in
               let monitor_infos = get_monitor_infos context.monitor in
+              let o1trace = o1trace context in
+              [%log internal] "Long_async_cycle"
+                ~metadata:
+                  [ ("duration", `Float secs); ("trace", `List o1trace) ] ;
               [%log debug]
                 ~metadata:
                   [ ("long_async_cycle", `Float secs)
                   ; ("monitors", `List monitor_infos)
+                  ; ("o1trace", `List o1trace)
                   ]
-                "Long async cycle, $long_async_cycle seconds, $monitors" ;
+                "Long async cycle, $long_async_cycle seconds, $monitors, \
+                 $o1trace" ;
               Mina_metrics.(
                 Runtime.Long_async_histogram.observe Runtime.long_async_cycle
                   secs) ) ;
@@ -1032,10 +1071,15 @@ let setup_daemon logger =
             ~f:(fun (context, span) ->
               let secs = Time_ns.Span.to_sec span in
               let monitor_infos = get_monitor_infos context.monitor in
+              let o1trace = o1trace context in
+              [%log internal] "Long_async_job"
+                ~metadata:
+                  [ ("duration", `Float secs); ("trace", `List o1trace) ] ;
               [%log debug]
                 ~metadata:
                   [ ("long_async_job", `Float secs)
                   ; ("monitors", `List monitor_infos)
+                  ; ("o1trace", `List o1trace)
                   ; ( "most_recent_2_backtrace"
                     , `String
                         (String.concat ~sep:"␤"
@@ -1044,7 +1088,7 @@ let setup_daemon logger =
                                  (Execution_context.backtrace_history context)
                                  2 ) ) ) )
                   ]
-                "Long async job, $long_async_job seconds" ;
+                "Long async job, $long_async_job seconds, $monitors, $o1trace" ;
               Mina_metrics.(
                 Runtime.Long_job_histogram.observe Runtime.long_async_job secs) ) ;
           let trace_database_initialization typ location =
@@ -1349,8 +1393,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~log_block_creation ~precomputed_values ~start_time
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~stop_time ~node_status_url
-                 ~graphql_control_port:itn_graphql_port () )
+                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
+                 ~node_status_url ~graphql_control_port:itn_graphql_port () )
           in
           { mina
           ; client_trustlist

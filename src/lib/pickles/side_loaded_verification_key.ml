@@ -41,7 +41,7 @@ let input_size ~of_int ~add ~mul w =
   let size a =
     let (T (Typ typ, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Tock.Rounds.n
-        ~feature_flags:Plonk_types.Features.none
+        ~feature_flags:Plonk_types.Features.Full.none
     in
     typ.size_in_field_elements
   in
@@ -198,7 +198,9 @@ module Stable = struct
         in
         let log2_size = Import.Domain.log2_size d in
         let public =
-          let (T (input, _conv, _conv_inv)) = Impls.Wrap.input () in
+          let (T (input, _conv, _conv_inv)) =
+            Impls.Wrap.input ~feature_flags:Plonk_types.Features.Full.maybe ()
+          in
           let (Typ typ) = input in
           typ.size_in_field_elements
         in
@@ -231,6 +233,12 @@ module Stable = struct
                    ; emul_comm = g c.emul_comm
                    ; complete_add_comm = g c.complete_add_comm
                    ; endomul_scalar_comm = g c.endomul_scalar_comm
+                   ; xor_comm = None
+                   ; range_check0_comm = None
+                   ; range_check1_comm = None
+                   ; foreign_field_add_comm = None
+                   ; foreign_field_mul_comm = None
+                   ; rot_comm = None
                    } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
@@ -357,7 +365,7 @@ let%test_unit "input_size" =
          let (T (Typ typ, _conv, _conv_inv)) =
            Impls.Step.input ~proofs_verified:a
              ~wrap_rounds:Backend.Tock.Rounds.n
-             ~feature_flags:Plonk_types.Features.none
+             ~feature_flags:Plonk_types.Features.Full.none
          in
          typ.size_in_field_elements ) )
 

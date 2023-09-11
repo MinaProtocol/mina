@@ -117,7 +117,9 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , 'max_local_max_proofs_verifieds )
          Full_signature.t
       -> ('prev_varss, 'branches) Hlist.Length.t
-      -> ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+      -> ( ( Wrap_main_inputs.Inner_curve.Constant.t
+           , Wrap_main_inputs.Inner_curve.Constant.t option )
+           Wrap_verifier.index'
          , 'branches )
          Vector.t
          Lazy.t
@@ -130,14 +132,10 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                  , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                  , ( Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                    , Impls.Wrap.Boolean.var )
-                   Plonk_types.Opt.t
+                   Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-                     Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                     .In_circuit
-                     .Lookup
-                     .t
                    , Impls.Wrap.Boolean.var )
-                   Pickles_types__Plonk_types.Opt.t
+                   Pickles_types__Opt.t
                  , Impls.Wrap.Boolean.var )
                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                  .In_circuit
@@ -167,9 +165,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -199,9 +194,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -425,25 +417,26 @@ struct
     let feature_flags =
       let rec go :
           type a b c d.
-             (a, b, c, d) H4.T(IR).t
-          -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+          (a, b, c, d) H4.T(IR).t -> Opt.Flag.t Plonk_types.Features.Full.t =
        fun rules ->
         match rules with
         | [] ->
-            Plonk_types.Features.none
+            Plonk_types.Features.Full.none
         | [ r ] ->
             Plonk_types.Features.map r.feature_flags ~f:(function
               | true ->
-                  Plonk_types.Opt.Flag.Yes
+                  Opt.Flag.Yes
               | false ->
-                  Plonk_types.Opt.Flag.No )
+                  Opt.Flag.No )
+            |> Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| )
         | r :: rules ->
             let feature_flags = go rules in
-            Plonk_types.Features.map2 r.feature_flags feature_flags
-              ~f:(fun enabled flag ->
+            Plonk_types.Features.Full.map2
+              (Plonk_types.Features.to_full ~or_:( || ) r.feature_flags)
+              feature_flags ~f:(fun enabled flag ->
                 match (enabled, flag) with
                 | true, Yes ->
-                    Plonk_types.Opt.Flag.Yes
+                    Opt.Flag.Yes
                 | false, No ->
                     No
                 | _, Maybe | true, No | false, Yes ->
@@ -617,7 +610,7 @@ struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
+             Tick.Keypair.full_vk_commitments (fst (Lazy.force vk)) ) )
     in
     Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =
@@ -642,7 +635,7 @@ struct
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
-      let (T (typ, conv, _conv_inv)) = input () in
+      let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
       let main x () : unit = wrap_main (conv x) in
       let () = if true then log_wrap main typ name self.id in
       let self_id = Type_equal.Id.uid self.id in
@@ -684,6 +677,19 @@ struct
       (r, disk_key_verifier)
     in
     Timer.clock __LOC__ ;
+    let wrap_vk =
+      Lazy.map wrap_vk ~f:(fun ((wrap_vk, _) as res) ->
+          let computed_domain_size = wrap_vk.index.domain.log_size_of_group in
+          let (Pow_2_roots_of_unity proposed_domain_size) = wrap_domains.h in
+          if computed_domain_size <> proposed_domain_size then
+            failwithf
+              "This circuit was compiled for proofs using the wrap domain of \
+               size %d, but the actual wrap domain size for the circuit has \
+               size %d. You should pass the ~override_wrap_domain argument to \
+               set the correct domain size."
+              proposed_domain_size computed_domain_size () ;
+          res )
+    in
     accum_dirty (Lazy.map wrap_pk ~f:snd) ;
     accum_dirty (Lazy.map wrap_vk ~f:snd) ;
     let wrap_vk = Lazy.map wrap_vk ~f:fst in
@@ -858,7 +864,8 @@ module Side_loaded = struct
       { max_proofs_verified
       ; public_input = typ
       ; branches = Verification_key.Max_branches.n
-      ; feature_flags
+      ; feature_flags =
+          Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
       }
 
   module Proof = struct
@@ -1151,9 +1158,6 @@ module Make_adversarial_test (M : sig
          , bool )
          Import.Types.Opt.t
        , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
          , bool )
          Import.Types.Opt.t
        , bool
@@ -1183,9 +1187,6 @@ module Make_adversarial_test (M : sig
          , bool )
          Import.Types.Opt.t
        , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
          , bool )
          Import.Types.Opt.t
        , bool

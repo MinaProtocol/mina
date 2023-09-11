@@ -354,7 +354,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send a zkApp to create a zkApp account with timing"
-        (send_zkapp ~logger node zkapp_command_create_account_with_timing)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_create_account_with_timing )
     in
     let%bind () =
       section
@@ -365,7 +367,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send zkApp to create a 2nd zkApp account with timing"
-        (send_zkapp ~logger node zkapp_command_create_second_account_with_timing)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_create_second_account_with_timing )
     in
     let%bind () =
       section
@@ -376,7 +380,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send zkApp to create a 3rd zkApp account with timing"
-        (send_zkapp ~logger node zkapp_command_create_third_account_with_timing)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_create_third_account_with_timing )
     in
     let%bind () =
       section
@@ -388,7 +394,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "Verify zkApp timing in ledger"
         (let%bind ledger_update =
-           get_account_update ~logger node timing_account_id
+           get_account_update ~logger
+             (Network.Node.get_ingress_uri node)
+             timing_account_id
          in
          if compatible_updates ~ledger_update ~requested_update:timing_update
          then (
@@ -412,20 +420,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  incompatible" ) ) )
     in
     let%bind { total_balance = before_balance; _ } =
-      Network.Node.must_get_account_data ~logger node
+      Graphql_requests.must_get_account_data ~logger
+        (Network.Node.get_ingress_uri node)
         ~account_id:timing_account_id
     in
     let%bind () =
       section "Send invalid zkApp with zero vesting period in timing"
-        (send_invalid_zkapp ~logger node zkapp_command_with_zero_vesting_period
-           "Zero vesting period" )
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_with_zero_vesting_period "Zero vesting period" )
     in
     (* let%bind before_balance =
          get_account_balance ~logger node timing_account_id
        in *)
     let%bind () =
       section "Send a zkApp with transfer from timed account that succeeds"
-        (send_zkapp ~logger node zkapp_command_transfer_from_timed_account)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_transfer_from_timed_account )
     in
     let%bind () =
       section "Waiting for zkApp with transfer from timed account that succeeds"
@@ -436,7 +448,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          get_account_balance ~logger node timing_account_id
        in *)
     let%bind { total_balance = after_balance; _ } =
-      Network.Node.must_get_account_data ~logger node
+      Graphql_requests.must_get_account_data ~logger
+        (Network.Node.get_ingress_uri node)
         ~account_id:timing_account_id
     in
     let%bind () =
@@ -488,7 +501,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         use all the liquid after 1 slot.
     *)
     let%bind { liquid_balance_opt = before_balance; _ } =
-      Network.Node.must_get_account_data ~logger node
+      Graphql_requests.must_get_account_data ~logger
+        (Network.Node.get_ingress_uri node)
         ~account_id:third_timed_account_id
     in
     let before_balance_int =
@@ -546,7 +560,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section
         "Send a zkApp transfer from timed account with all its available funds \
          at current global slot"
-        (send_zkapp ~logger node zkapp_command_transfer_from_third_timed_account)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_transfer_from_third_timed_account )
     in
     let%bind () =
       section
@@ -590,7 +606,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                failwith "Amount to debit more than timed account balance"
          in
          let%bind { locked_balance_opt = locked_balance; _ } =
-           Network.Node.must_get_account_data ~logger node
+           Graphql_requests.must_get_account_data ~logger
+             (Network.Node.get_ingress_uri node)
              ~account_id:timing_account_id
          in
          (* let%bind locked_balance =
@@ -600,7 +617,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          assert (
            Currency.Amount.( < ) proposed_balance
              (Option.value_exn locked_balance |> Currency.Balance.to_amount) ) ;
-         send_zkapp ~logger node
+         send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
            zkapp_command_invalid_transfer_from_timed_account )
     in
     let%bind () =
@@ -619,7 +637,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              get_account_balance ~logger node timing_account_id
            in *)
         (let%bind { total_balance = after_invalid_balance; _ } =
-           Network.Node.must_get_account_data ~logger node
+           Graphql_requests.must_get_account_data ~logger
+             (Network.Node.get_ingress_uri node)
              ~account_id:timing_account_id
          in
          let after_invalid_balance_as_amount =
@@ -650,7 +669,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send a zkApp with invalid timing update"
-        (send_zkapp ~logger node zkapp_command_update_timing)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_update_timing )
     in
     let%bind () =
       section "Wait for snapp with invalid timing update"
@@ -659,7 +680,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "Verify timing has not changed"
         (let%bind ledger_update =
-           get_account_update ~logger node timing_account_id
+           get_account_update ~logger
+             (Network.Node.get_ingress_uri node)
+             timing_account_id
          in
          if
            compatible_item ledger_update.timing timing_update.timing

@@ -31,22 +31,16 @@ let fits_in_bits_as_prover (type f)
 (* Side of rotation *)
 type rot_mode = Left | Right
 
-(* 64-bit Rotation of rot_bits to the `mode` side
- *   Inputs
- *     - word of maximum 64 bits to be rotated
- *     - rot_bits: number of bits to be rotated
- *     - mode: Left or Right
- * Output: rotated word
- *)
-let rot64 (type f)
+(* Performs the 64bit rotation and returns rotated word, excess, and shifted *)
+let rot_aux (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (word : Circuit.Field.t) (rot_bits : int) (mode : rot_mode) :
-    Circuit.Field.t =
+    ?(check64 = false) (word : Circuit.Field.t) (bits : int) (mode : rot_mode) :
+    Circuit.Field.t * Circuit.Field.t * Circuit.Field.t =
   let open Circuit in
   (* Check that the rotation bits is smaller than 64 *)
-  assert (rot_bits < 64) ;
+  assert (bits < 64) ;
   (* Check that the rotation bits is non-negative *)
-  assert (rot_bits >= 0) ;
+  assert (bits >= 0) ;
 
   (* Check that the input word has at most 64 bits *)
   as_prover (fun () ->
@@ -54,7 +48,7 @@ let rot64 (type f)
       () ) ;
 
   (* Compute actual length depending on whether the rotation mode is Left or Right *)
-  let rot_bits = match mode with Left -> rot_bits | Right -> 64 - rot_bits in
+  let rot_bits = match mode with Left -> bits | Right -> 64 - bits in
 
   (* Auxiliary Bignum_bigint values *)
   let big_2_pow_64 = Bignum_bigint.(pow (of_int 2) (of_int 64)) in
@@ -141,7 +135,65 @@ let rot64 (type f)
 
   (* Next row *)
   Range_check.bits64 (module Circuit) shifted ;
+
+  (* Following row *)
+  Range_check.bits64 (module Circuit) excess ;
+
+  if check64 then Range_check.bits64 (module Circuit) word ;
+
+  (rotated, excess, shifted)
+
+(* 64-bit Rotation of rot_bits to the `mode` side
+ *   Inputs
+ *     - check: whether to check the input word is at most 64 bits (default is false)
+ *     - word of maximum 64 bits to be rotated
+ *     - rot_bits: number of bits to be rotated
+ *     - mode: Left or Right
+ * Output: rotated word
+ *)
+let rot64 (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    ?(check64 : bool = false) (word : Circuit.Field.t) (rot_bits : int)
+    (mode : rot_mode) : Circuit.Field.t =
+  let rotated, _excess, _shifted =
+    rot_aux (module Circuit) ~check64 word rot_bits mode
+  in
+
   rotated
+
+(* 64-bit bitwise logical shift of bits to the left side
+ * Inputs
+ *  - check64: whether to check the input word is at most 64 bits (default is false)
+ *  - word of maximum 64 bits to be shifted
+ *  - bits: number of bits to be shifted
+ * Output: left shifted word (with bits 0s at the least significant positions)
+ *)
+let lsl64 (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    ?(check64 : bool = false) (word : Circuit.Field.t) (bits : int) :
+    Circuit.Field.t =
+  let _rotated, _excess, shifted =
+    rot_aux (module Circuit) ~check64 word bits Left
+  in
+
+  shifted
+
+(* 64-bit bitwise logical shift of bits to the right side
+   * Inputs
+   *  - check64: whether to check the input word is at most 64 bits (default is false)
+   *  - word of maximum 64 bits to be shifted
+   *  - bits: number of bits to be shifted
+   * Output: right shifted word (with bits 0s at the most significant positions)
+*)
+let lsr64 (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    ?(check64 : bool = false) (word : Circuit.Field.t) (bits : int) :
+    Circuit.Field.t =
+  let _rotated, excess, _shifted =
+    rot_aux (module Circuit) ~check64 word bits Right
+  in
+
+  excess
 
 (* XOR *)
 
@@ -205,9 +257,6 @@ let bxor (type f)
     let open Circuit in
     (* If inputs are zero and length is zero, add the zero check *)
     if length = 0 then (
-      Field.Assert.equal Field.zero in1 ;
-      Field.Assert.equal Field.zero in2 ;
-      Field.Assert.equal Field.zero out ;
       with_label "xor_zero_check" (fun () ->
           assert_
             { annotation = Some __LOC__
@@ -218,7 +267,11 @@ let bxor (type f)
                      ; values = [| in1; in2; out |]
                      ; coeffs = [||]
                      } )
-            } ) )
+            } ) ;
+      Field.Assert.equal Field.zero in1 ;
+      Field.Assert.equal Field.zero in2 ;
+      Field.Assert.equal Field.zero out ;
+      () )
     else
       (* Define shorthand helper *)
       let of_bits =
@@ -544,7 +597,7 @@ let%test_unit "bitwise rotation gadget" =
               exists Field.typ ~compute:(fun () ->
                   Field.Constant.of_string result )
             in
-            (* Use the xor gate gadget *)
+            (* Use the rot gate gadget *)
             let output_rot = rot64 (module Runner.Impl) word length mode in
             Field.Assert.equal output_rot result
             (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *) )
@@ -570,6 +623,69 @@ let%test_unit "bitwise rotation gadget" =
     assert (Common.is_error (fun () -> test_rot "0" 1 Left "1")) ;
     assert (Common.is_error (fun () -> test_rot "1" 64 Left "1")) ;
     assert (Common.is_error (fun () -> test_rot ~cs "0" 0 Left "0")) ) ;
+  ()
+
+let%test_unit "bitwise shift gadgets" =
+  if tests_enabled then (
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Helper to test LSL and LSR gadgets
+     *   Input operands and expected output: word len mode shifted
+     *   Returns unit if constraints are satisfied, error otherwise.
+     *)
+    let test_shift ?cs word length mode result =
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            (* Set up snarky variables for inputs and output *)
+            let word =
+              exists Field.typ ~compute:(fun () ->
+                  Field.Constant.of_string word )
+            in
+            let result =
+              exists Field.typ ~compute:(fun () ->
+                  Field.Constant.of_string result )
+            in
+            (* Use the xor gate gadget *)
+            let output_shift =
+              match mode with
+              | Left ->
+                  lsl64 (module Runner.Impl) word length
+              | Right ->
+                  lsr64 (module Runner.Impl) word length
+            in
+            Field.Assert.equal output_shift result )
+      in
+      cs
+    in
+    (* Positive tests *)
+    let cs1l = test_shift "0" 1 Left "0" in
+    let cs1r = test_shift "0" 1 Right "0" in
+    let _cs = test_shift ~cs:cs1l "1" 1 Left "2" in
+    let _cs = test_shift ~cs:cs1r "1" 1 Right "0" in
+    let _cs = test_shift "256" 4 Right "16" in
+    let _cs = test_shift "256" 20 Right "0" in
+    let _cs = test_shift "6510615555426900570" 16 Right "99344109427290" in
+    (* All 1's word *)
+    let cs_allones =
+      test_shift "18446744073709551615" 15 Left "18446744073709518848"
+    in
+    (* Random value ADCC7E30EDCAC126 -> ADCC7E30 -> EDCAC12600000000*)
+    let _cs = test_shift "12523523412423524646" 32 Right "2915860016" in
+    let _cs =
+      test_shift "12523523412423524646" 32 Left "17134720101237391360"
+    in
+
+    (* Negatve tests *)
+    assert (Common.is_error (fun () -> test_shift "0" 1 Left "1")) ;
+    assert (Common.is_error (fun () -> test_shift "1" 64 Left "1")) ;
+    assert (Common.is_error (fun () -> test_shift ~cs:cs_allones "0" 0 Left "0"))
+    ) ;
   ()
 
 let%test_unit "bitwise xor gadget" =

@@ -61,18 +61,18 @@ module rec T : sig
            t
     | Opt :
         { inner : ('a1, 'a2, 'env) t
-        ; flag : Pickles_types.Plonk_types.Opt.Flag.t
+        ; flag : Pickles_types.Opt.Flag.t
         ; dummy1 : 'a1
         ; dummy2 : 'a2
         ; bool : (module Bool_intf with type var = 'bool)
         }
         -> ( 'a1 option
-           , ('a2, 'bool) Pickles_types.Plonk_types.Opt.t
+           , ('a2, 'bool) Pickles_types.Opt.t
            , (< bool1 : bool ; bool2 : 'bool ; .. > as 'env) )
            t
     | Opt_unflagged :
         { inner : ('a1, 'a2, (< bool1 : bool ; bool2 : 'bool ; .. > as 'env)) t
-        ; flag : Pickles_types.Plonk_types.Opt.Flag.t
+        ; flag : Pickles_types.Opt.Flag.t
         ; dummy1 : 'a1
         ; dummy2 : 'a2
         }

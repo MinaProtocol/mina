@@ -64,7 +64,7 @@ module Test_Account = struct
 end
 
 module Git_build = struct
-  type t = Commit of string | Tag of string [@@deriving to_yojson]
+  type t = Commit of string | Tag of string
 
   let to_yojson : t -> Yojson.Safe.t = function
     | Commit commit ->
@@ -81,6 +81,16 @@ module Archive_node = struct
     ; git_build : Git_build.t option
     }
   [@@deriving to_yojson]
+end
+
+module Epoch_data = struct
+  module Data = struct
+    (* the seed is a field value in Base58Check format *)
+    type t = { epoch_ledger : Test_Account.t list; epoch_seed : string }
+    [@@deriving to_yojson]
+  end
+
+  type t = { staking : Data.t; next : Data.t option } [@@deriving to_yojson]
 end
 
 module Block_producer_node = struct
@@ -124,6 +134,7 @@ type t =
   { requires_graphql : bool
   ; genesis_ledger : Test_Account.t list
   ; archive_nodes : Archive_node.t list
+  ; epoch_data : Epoch_data.t option
   ; block_producers : Block_producer_node.t list
   ; seed_nodes : Seed_node.t list
   ; snark_coordinator : Snark_coordinator_node.t option
@@ -238,6 +249,7 @@ let default =
   { requires_graphql = true
   ; genesis_ledger = []
   ; archive_nodes = []
+  ; epoch_data = None
   ; block_producers = []
   ; seed_nodes =
       [ { node_name = "default-seed"

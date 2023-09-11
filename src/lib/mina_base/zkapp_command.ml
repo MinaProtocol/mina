@@ -145,16 +145,19 @@ module Call_forest = struct
       module Checked : sig
         include Digest_intf.S_checked
 
-        val create : Account_update.Checked.t -> t
+        val create :
+          ?chain:Mina_signature_kind.t -> Account_update.Checked.t -> t
 
-        val create_body : Account_update.Body.Checked.t -> t
+        val create_body :
+          ?chain:Mina_signature_kind.t -> Account_update.Body.Checked.t -> t
       end
 
       include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
-      val create : Account_update.t -> t
+      val create : ?chain:Mina_signature_kind.t -> Account_update.t -> t
 
-      val create_body : Account_update.Body.t -> t
+      val create_body :
+        ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
     end
 
     module rec Forest : sig
@@ -235,9 +238,12 @@ module Call_forest = struct
         let create_body = Account_update.Body.Checked.digest
       end
 
-      let create : Account_update.t -> t = Account_update.digest
+      let create : ?chain:Mina_signature_kind.t -> Account_update.t -> t =
+        Account_update.digest
 
-      let create_body : Account_update.Body.t -> t = Account_update.Body.digest
+      let create_body :
+          ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t =
+        Account_update.Body.digest
     end
 
     module Forest = struct
@@ -1482,20 +1488,21 @@ let arg_query_string x =
   Fields_derivers_zkapps.Test.Loop.json_to_string_gql @@ to_json x
 
 let dummy =
-  let account_update : Account_update.t =
-    { body = Account_update.Body.dummy
-    ; authorization = Control.dummy_of_tag Signature
-    }
-  in
-  let fee_payer : Account_update.Fee_payer.t =
-    { body = Account_update.Body.Fee_payer.dummy
-    ; authorization = Signature.dummy
-    }
-  in
-  { fee_payer
-  ; account_updates = Call_forest.cons account_update []
-  ; memo = Signed_command_memo.empty
-  }
+  lazy
+    (let account_update : Account_update.t =
+       { body = Account_update.Body.dummy
+       ; authorization = Control.dummy_of_tag Signature
+       }
+     in
+     let fee_payer : Account_update.Fee_payer.t =
+       { body = Account_update.Body.Fee_payer.dummy
+       ; authorization = Signature.dummy
+       }
+     in
+     { fee_payer
+     ; account_updates = Call_forest.cons account_update []
+     ; memo = Signed_command_memo.empty
+     } )
 
 module Make_update_group (Input : sig
   type global_state

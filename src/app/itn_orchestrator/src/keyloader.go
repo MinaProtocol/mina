@@ -61,9 +61,9 @@ type secretBox struct {
 }
 
 type KeyloaderParams struct {
-	Dir         string
-	Limit       int
-	PasswordEnv string `json:"password-env,omitempty"`
+	Dir         string `json:"dir"`
+	Limit       int    `json:"limit,omitempty"`
+	PasswordEnv string `json:"passwordEnv,omitempty"`
 }
 
 func LoadPrivateKeyFiles(log logging.StandardLogger, params KeyloaderParams, output func(itn_json_types.MinaPrivateKey)) error {
@@ -122,6 +122,7 @@ func LoadPrivateKeyFiles(log logging.StandardLogger, params KeyloaderParams, out
 
 type KeyloaderAction struct{}
 
+func (KeyloaderAction) Name() string { return "load-keys" }
 func (KeyloaderAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
 	var params KeyloaderParams
 	if err := json.Unmarshal(rawParams, &params); err != nil {
