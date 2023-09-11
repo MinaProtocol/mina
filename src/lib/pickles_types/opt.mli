@@ -22,6 +22,8 @@ val maybe : 'bool -> 'a -> ('a, 'bool) t
 
 val map : ('a, 'bool) t -> f:('a -> 'b) -> ('b, 'bool) t
 
+val iter : ('a, 'bool) t -> f:('a -> unit) -> unit
+
 (** {1 Accessors and convertors} *)
 
 (** [value_exn o] is v when [o] if [Some v] or [Maybe (_, v)].
