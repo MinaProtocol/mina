@@ -41,6 +41,7 @@ func init() {
 	addAction(actions, lib.SampleAction{})
 	addAction(actions, lib.ExceptAction{})
 	addAction(actions, lib.StopDaemonAction{})
+	addAction(actions, lib.RotateAction{})
 
 }
 
