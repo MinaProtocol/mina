@@ -29,7 +29,8 @@ in Pipeline.build Pipeline.Config::{
         S.strictlyStart (S.contains "automation/terraform/modules/kubernetes/testnet")
     ],
     path = "Test",
-    name = "TestnetIntegrationTests"
+    name = "TestnetIntegrationTests",
+    mode = PipelineMode.Type.Stable
   },
   steps = [
     TestExecutive.build "integration_tests",
