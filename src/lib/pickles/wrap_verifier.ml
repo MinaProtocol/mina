@@ -665,6 +665,22 @@ struct
     in
     let open Pickles_types in
     let g_opt = Opt.map ~f:g in
+
+    let print comm =
+      as_prover (fun () ->
+          let x = As_prover.read Digest.typ (Array.get comm 0) in
+          let y = As_prover.read Digest.typ (Array.get comm 1) in
+          let x' = Digest.Constant.to_tick_field x in
+          let y' = Digest.Constant.to_tick_field y in
+          Format.printf "x = %s\n" (Pasta_bindings.Fp.to_string x') ;
+          Format.printf "y = %s\n" (Pasta_bindings.Fp.to_string y') )
+    in
+
+    let lookup_table_comm_l = Vector.to_list lookup_table_comm in
+    List.iteri (List.map ~f:g_opt lookup_table_comm_l) ~f:(fun i x ->
+        Printf.printf "Commitment %d\n" i ;
+        Out_channel.flush stdout ;
+        Opt.iter x ~f:print ) ;
     List.map
       ( Vector.to_list sigma_comm
       @ Vector.to_list coefficients_comm
