@@ -36,11 +36,11 @@ export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=$HOME/.mina-config}"
 export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 
 # Test variables
-export ROSETTA_INT_TEST_ZKAPPS_VERSION=${ROSETTA_INT_TEST_ZKAPPS_VERSION:=fix-rosetta-int-tests}
+export ROSETTA_INT_TEST_ZKAPPS_VERSION=${ROSETTA_INT_TEST_ZKAPPS_VERSION:=rosetta-ci-tests}
 
 # Nodejs variables
 export NVM_VERSION=0.39.3
-export NODE_VERSION=18
+export NODE_VERSION=20.6.1
 
 # zkApps variables
 export ZKAPP_PATH=$HOME/zkapps
@@ -50,10 +50,16 @@ curl -so- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.s
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"                   # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
+
+nvm install $NODE_VERSION
+nvm use --delete-prefix $NODE_VERSION
+
 mkdir ~/.npm-global
 npm config set prefix '~/.npm-global'
 export PATH=~/.npm-global/bin:$PATH
-npm install --no-progress --global zkapp-cli
+
+# Install zkapp-cli
+npm install --no-progress --global zkapp-cli@0.11.0 typescript@latest
 
 # Rosetta CLI variables
 # Files from ROSETTA_CLI_CONFIG_FILES will be read from
@@ -245,6 +251,7 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
 EOF
   cd "$zkapp_path"
   npm ci
+  npm run build
   txn=$(zk deploy sandbox -y | sed -ne "s/https:\/\/berkeley.minaexplorer.com\/transaction\///p")
   deploy_txs+=txn
   cd -
@@ -268,7 +275,6 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
   echo "Interacting with ${zkapp}..."
 
   cd "$zkapp_path"
-  npm run build
   ./interact.sh sandbox
   cd -
   echo "Done."
