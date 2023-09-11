@@ -21,7 +21,6 @@ let profile_constraints = false
 
 let verify_promise = Verify.verify
 
-open Kimchi_backend
 module Proof_ = P.Base
 module Proof = P
 

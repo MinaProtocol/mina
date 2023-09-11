@@ -135,7 +135,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         "verifies(P)" must also take the index "i", compute the correct domain sizes correspond to rule "i"
         and use *that* in the "verifies" computation.
   *)
-  open Kimchi_backend
+
   module Proof = P
 
   module Statement_with_proof = struct
