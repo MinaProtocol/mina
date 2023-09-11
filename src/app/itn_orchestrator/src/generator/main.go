@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"sort"
+	"strings"
 
 	lib "itn_orchestrator"
 )
@@ -49,6 +50,10 @@ type Params struct {
 	Privkeys                                                                               []string
 	PaymentReceiver                                                                        itn_json_types.MinaPublicKey
 	PrivkeysPerFundCmd                                                                     int
+	GenerateFundKeys                                                                       int
+	RotationKeys, RotationServers                                                          []string
+	RotationPermutation                                                                    bool
+	RotationRatio                                                                          float64
 }
 
 type Command struct {
@@ -59,11 +64,15 @@ type Command struct {
 
 type GeneratedRound struct {
 	Commands     []Command
-	FundCommands []Command
+	FundCommands []lib.FundParams
 }
 
 func fund(p lib.FundParams) Command {
 	return Command{Action: lib.FundAction{}.Name(), Params: p}
+}
+
+func rotate(p lib.RotateParams) Command {
+	return Command{Action: lib.RotateAction{}.Name(), Params: p}
 }
 
 func loadKeys(p lib.KeyloaderParams) Command {
@@ -200,6 +209,25 @@ func (p *Params) Generate(round int) GeneratedRound {
 	}
 	cmds := []Command{}
 	roundStartMin := round * (p.RoundDurationMin + p.PauseMin)
+	if len(p.RotationKeys) > 0 {
+		var mapping []int
+		nKeys := len(p.RotationKeys)
+		if p.RotationPermutation {
+			mapping = rand.Perm(nKeys)
+		} else {
+			mapping = make([]int, nKeys)
+			for i := range mapping {
+				mapping[i] = rand.Intn(len(p.RotationKeys))
+			}
+		}
+		cmds = append(cmds, rotate(lib.RotateParams{
+			Pubkeys:     p.RotationKeys,
+			RestServers: p.RotationServers,
+			Mapping:     mapping,
+			Ratio:       p.RotationRatio,
+			PasswordEnv: p.PasswordEnv,
+		}))
+	}
 	cmds = append(cmds, withComment(fmt.Sprintf("Starting round %d, %d min since start", round, roundStartMin), discovery(lib.DiscoveryParams{
 		OffsetMin:        15,
 		NoBlockProducers: p.SendFromNonBpsOnly,
@@ -264,45 +292,29 @@ func (p *Params) Generate(round int) GeneratedRound {
 			withComment(fmt.Sprintf("Waiting for remainder of round %d and pause, %d min %d sec since start", round, roundStartMin+elapsed/60, elapsed%60),
 				wait((p.RoundDurationMin+p.PauseMin)*60-elapsed)))
 	}
-	fundCmdNum := 2
-	if onlyPayments || onlyZkapps {
-		fundCmdNum = 1
-	}
-	offset := (round * p.PrivkeysPerFundCmd * fundCmdNum) % len(p.Privkeys)
-	rem := p.Privkeys[offset:]
-	for len(rem) < p.PrivkeysPerFundCmd*fundCmdNum {
-		rem = append(rem, p.Privkeys...)
-	}
-	fundCmds := []Command{}
+	fundCmds := []lib.FundParams{}
 	if !onlyPayments {
 		zkappKeysNum, zkappAmount := lib.ZkappKeygenRequirements(zkappParams)
 		fundCmds = append(fundCmds,
-			fund(lib.FundParams{
+			lib.FundParams{
 				PasswordEnv: p.PasswordEnv,
-				Privkeys:    rem[:p.PrivkeysPerFundCmd],
 				Prefix:      zkappsKeysDir + "/key",
 				Amount:      zkappAmount,
 				Fee:         1e9,
 				Num:         zkappKeysNum,
-			}))
+			})
 	}
 	if !onlyZkapps {
 		paymentKeysNum, paymentAmount := lib.PaymentKeygenRequirements(p.Gap, paymentParams)
-		var privkeys []string
-		if onlyPayments {
-			privkeys = rem[:p.PrivkeysPerFundCmd]
-		} else {
-			privkeys = rem[p.PrivkeysPerFundCmd : p.PrivkeysPerFundCmd*2]
-		}
 		fundCmds = append(fundCmds,
-			fund(lib.FundParams{
+			lib.FundParams{
 				PasswordEnv: p.PasswordEnv,
-				Privkeys:    privkeys,
-				Prefix:      paymentsKeysDir + "/key-",
-				Amount:      paymentAmount,
-				Fee:         1e9,
-				Num:         paymentKeysNum,
-			}))
+				// Privkeys:    privkeys,
+				Prefix: paymentsKeysDir + "/key",
+				Amount: paymentAmount,
+				Fee:    1e9,
+				Num:    paymentKeysNum,
+			})
 	}
 	return GeneratedRound{
 		Commands:     cmds,
@@ -318,6 +330,7 @@ func checkRatio(ratio float64, msg string) {
 }
 
 func main() {
+	var rotateKeys, rotateServers string
 	var mode string
 	var p Params
 	flag.Float64Var(&p.BaseTps, "base-tps", 0.3, "Base tps rate for the whole network")
@@ -347,15 +360,34 @@ func main() {
 	flag.StringVar((*string)(&p.PaymentReceiver), "payment-receiver", "", "Mina PK receiving payments")
 	flag.StringVar(&p.ExperimentName, "experiment-name", "exp-0", "Name of experiment")
 	flag.IntVar(&p.PrivkeysPerFundCmd, "privkeys-per-fund", 1, "Number of private keys to use per fund command")
+	flag.IntVar(&p.GenerateFundKeys, "generate-privkeys", 0, "Number of funding keys to generate from the private key")
+	flag.StringVar(&rotateKeys, "rotate-keys", "", "Comma-separated list of public keys to rotate")
+	flag.StringVar(&rotateServers, "rotate-servers", "", "Comma-separated list of servers for rotation")
+	flag.Float64Var(&p.RotationRatio, "rotate-ratio", 0.3, "Ratio of balance to rotate")
+	flag.BoolVar(&p.RotationPermutation, "rotate-permutation", false, "Whether to generate only permutation mappings for rotation")
 	flag.Parse()
 	p.Privkeys = flag.Args()
 	if len(p.Privkeys) == 0 {
 		fmt.Fprintln(os.Stderr, "Specify funding private key files after all flags (separated by spaces)")
 		os.Exit(4)
 	}
-	if len(p.Privkeys) < p.PrivkeysPerFundCmd {
-		fmt.Fprintln(os.Stderr, "Number of private keys is less than --privkeys-per-fund")
+	if p.GenerateFundKeys > 0 && len(p.Privkeys) > 1 {
+		fmt.Fprintln(os.Stderr, "When option -generate-funding-keys is used, only a single private key should be provided")
 		os.Exit(4)
+	}
+	if (p.GenerateFundKeys > 0 && p.GenerateFundKeys < p.PrivkeysPerFundCmd) || (p.GenerateFundKeys == 0 && len(p.Privkeys) < p.PrivkeysPerFundCmd) {
+		fmt.Fprintln(os.Stderr, "Number of private keys is less than -privkeys-per-fund")
+		os.Exit(4)
+	}
+	if rotateKeys != "" {
+		p.RotationKeys = strings.Split(rotateKeys, ",")
+	}
+	if rotateServers != "" {
+		p.RotationServers = strings.Split(rotateServers, ",")
+	}
+	if len(p.RotationServers) != len(p.RotationKeys) || p.RotationRatio <= 0 || p.RotationRatio > 1 {
+		fmt.Fprintln(os.Stderr, "wrong rotation configuration")
+		os.Exit(5)
 	}
 	switch mode {
 	case "stop-ratio-distribution":
@@ -393,12 +425,51 @@ func main() {
 		}
 	}
 	cmds := []Command{}
+	fundCmds := []lib.FundParams{}
 	for r := 0; r < p.Rounds; r++ {
 		round := p.Generate(r)
 		cmds = append(cmds, round.Commands...)
-		for _, cmd := range round.FundCommands {
-			writeCommand(cmd)
+		fundCmds = append(fundCmds, round.FundCommands...)
+	}
+	privkeys := p.Privkeys
+	if p.GenerateFundKeys > 0 {
+		fundKeysDir := fmt.Sprintf("%s/funding", p.FundKeyPrefix)
+		privkeys = make([]string, p.GenerateFundKeys)
+		privkeyAmounts := make([]uint64, p.GenerateFundKeys)
+		for i := range privkeys {
+			privkeys[i] = fmt.Sprintf("%s/key-0-%d", fundKeysDir, i)
 		}
+		for i, f := range fundCmds {
+			i_ := (i * p.PrivkeysPerFundCmd) % p.GenerateFundKeys
+			itemsPerFundKey := f.Num/p.PrivkeysPerFundCmd + 1
+			perGeneratedKey := f.Amount / uint64(f.Num) * uint64(itemsPerFundKey)
+			for j := i_; j < (i_ + p.PrivkeysPerFundCmd); j++ {
+				j_ := j % p.GenerateFundKeys
+				privkeyAmounts[j_] += perGeneratedKey
+			}
+		}
+		perKeyAmount := privkeyAmounts[0]
+		for _, a := range privkeyAmounts[1:] {
+			if perKeyAmount < a {
+				perKeyAmount = a
+			}
+		}
+		// Generate funding keys
+		writeCommand(fund(lib.FundParams{
+			PasswordEnv: p.PasswordEnv,
+			Privkeys:    p.Privkeys,
+			Prefix:      fundKeysDir + "/key",
+			Amount:      perKeyAmount*uint64(p.GenerateFundKeys)*3/2 + 2e9,
+			Fee:         1e9,
+			Num:         p.GenerateFundKeys,
+		}))
+		writeCommand(wait(1))
+	}
+	privkeysExt := append(privkeys, privkeys...)
+	for i, cmd := range fundCmds {
+		i_ := (i * p.PrivkeysPerFundCmd) % len(privkeys)
+		cmd.Privkeys = privkeysExt[i_:(i_ + p.PrivkeysPerFundCmd)]
+		writeCommand(fund(cmd))
 	}
 	for _, cmd := range cmds {
 		writeCommand(cmd)
