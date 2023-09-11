@@ -201,7 +201,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
          , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
          , ( 'b
-           , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
+           , ( Backend.Tock.Proof.G.Affine.t
              , 'actual_proofs_verified )
              Pickles_types.Vector.t
            , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -229,7 +229,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , Composition_types.Digest.Limbs.n )
            Pickles_types.Vector.vec
          , ( 'b
-           , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
+           , ( Backend.Tock.Proof.G.Affine.t
              , 'actual_proofs_verified )
              Pickles_types.Vector.t
            , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -362,7 +362,7 @@ module Make_adversarial_test : functor
             Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
           , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
           , ( 'b
-            , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
+            , ( Backend.Tock.Proof.G.Affine.t
               , 'actual_proofs_verified )
               Pickles_types.Vector.t
             , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -390,7 +390,7 @@ module Make_adversarial_test : functor
             , Composition_types.Digest.Limbs.n )
             Pickles_types.Vector.vec
           , ( 'b
-            , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
+            , ( Backend.Tock.Proof.G.Affine.t
               , 'actual_proofs_verified )
               Pickles_types.Vector.t
             , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t

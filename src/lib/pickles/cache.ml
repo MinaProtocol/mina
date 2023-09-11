@@ -252,8 +252,7 @@ module Wrap = struct
              let pk = Keypair.pk kp in
              let vk : Vk.t =
                { index = vk
-               ; commitments =
-                   Kimchi_pasta.Pallas_based_plonk.Keypair.vk_commitments vk
+               ; commitments = Backend.Tock.Keypair.vk_commitments vk
                ; data =
                    (let open Kimchi_bindings.Protocol.Index.Fq in
                    { constraints = domain_d1_size pk.index })

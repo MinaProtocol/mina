@@ -26,8 +26,7 @@ open Impl
 (* Debug helper to convert wrap circuit field element to a hex string *)
 let read_wrap_circuit_field_element_as_hex fe =
   let prover_fe = As_prover.read Field.typ fe in
-  Kimchi_backend.Pasta.Pallas_based_plonk.(
-    Bigint.to_hex (Field.to_bigint prover_fe))
+  Backend.Tock.(Bigint.to_hex (Field.to_bigint prover_fe))
 
 module Other_field = struct
   type t = Impls.Step.Field.Constant.t [@@deriving sexp]
@@ -100,7 +99,7 @@ let%test_unit "sponge" =
    end *)
 
 module Inner_curve = struct
-  module C = Kimchi_pasta.Pasta.Vesta
+  module C = Backend.Tock.Inner_curve
 
   module Inputs = struct
     module Impl = Impl

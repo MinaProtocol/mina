@@ -2,7 +2,7 @@ module Padded_length = Pickles_types.Nat.N2
 
 val pad_accumulator :
      (Backend.Tock.Proof.Challenge_polynomial.t, 'a) Pickles_types.Vector.t
-  -> ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
+  -> ( Backend.Tock.Proof.G.Affine.Stable.V1.t
      , Backend.Tock.Field.t )
      Backend.Tock.Proof.Challenge_polynomial.t_
      list

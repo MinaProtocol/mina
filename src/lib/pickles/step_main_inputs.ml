@@ -24,8 +24,7 @@ open Impl
 (* Debug helper to convert step circuit field element to a hex string *)
 let read_step_circuit_field_element_as_hex fe =
   let prover_fe = As_prover.read Field.typ fe in
-  Kimchi_backend.Pasta.Vesta_based_plonk.(
-    Bigint.to_hex (Field.to_bigint prover_fe))
+  Backend.Tick.(Bigint.to_hex (Field.to_bigint prover_fe))
 
 module Other_field = struct
   type t = Tock.Field.t [@@deriving sexp]
@@ -109,7 +108,7 @@ let%test_unit "sponge" =
    end *)
 
 module Inner_curve = struct
-  module C = Kimchi_pasta.Pasta.Pallas
+  module C = Backend.Tick.Inner_curve
 
   module Inputs = struct
     module Impl = Impl
