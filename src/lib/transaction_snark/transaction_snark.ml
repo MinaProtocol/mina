@@ -4581,6 +4581,136 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       zkapp_command
 
+    (* This spec is intended to build a zkapp command with only one account update
+       with proof authorization. This is mainly for cross-network replay tests. We
+       want to test the condition that when a proof is generated in one network
+       and being rejected by another network.
+    *)
+    module Single_account_update_spec = struct
+      type t =
+        { fee : Currency.Fee.t
+        ; fee_payer : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+        ; zkapp_account_keypair : Signature_lib.Keypair.t
+        ; memo : Signed_command_memo.t
+        ; update : Account_update.Update.t
+        ; actions : Tick.Field.t array list
+        ; events : Tick.Field.t array list
+        ; call_data : Tick.Field.t
+        }
+
+      let spec_of_t ~vk
+          { fee
+          ; fee_payer
+          ; zkapp_account_keypair
+          ; memo
+          ; update = _
+          ; actions
+          ; events
+          ; call_data
+          } : Spec.t =
+        { fee
+        ; sender = fee_payer
+        ; fee_payer = None
+        ; receivers = []
+        ; amount = Currency.Amount.zero
+        ; zkapp_account_keypairs = [ zkapp_account_keypair ]
+        ; memo
+        ; new_zkapp_account = false
+        ; actions
+        ; events
+        ; call_data
+        ; preconditions = None
+        ; authorization_kind = Proof (With_hash.hash vk)
+        }
+    end
+
+    let single_account_update ?zkapp_prover_and_vk ~chain ~constraint_constants
+        (spec : Single_account_update_spec.t) : Zkapp_command.t Async.Deferred.t
+        =
+      let `VK vk, `Prover prover =
+        match zkapp_prover_and_vk with
+        | Some (prover, vk) ->
+            (`VK vk, `Prover prover)
+        | None ->
+            create_trivial_snapp ~constraint_constants ()
+      in
+      let ( `Zkapp_command { Zkapp_command.fee_payer; memo; _ }
+          , `Sender_account_update _
+          , `Proof_zkapp_command _
+          , `Txn_commitment _
+          , `Full_txn_commitment _ ) =
+        create_zkapp_command ~constraint_constants
+          (Single_account_update_spec.spec_of_t ~vk spec)
+          ~update:spec.update ~receiver_update:Account_update.Update.noop
+      in
+      let account_update_with_dummy_auth =
+        Account_update.
+          { body =
+              { public_key =
+                  Signature_lib.Public_key.compress
+                    spec.zkapp_account_keypair.public_key
+              ; update = spec.update
+              ; token_id = Token_id.default
+              ; balance_change = Amount.Signed.zero
+              ; increment_nonce = false
+              ; events = spec.events
+              ; actions = spec.events
+              ; call_data = spec.call_data
+              ; preconditions = Account_update.Preconditions.accept
+              ; use_full_commitment = true
+              ; implicit_account_creation_fee = false
+              ; may_use_token = No
+              ; authorization_kind = Proof (With_hash.hash vk)
+              }
+          ; authorization = Control.Proof Mina_base.Proof.blockchain_dummy
+          }
+      in
+      let account_update_digest_with_selected_chain =
+        Zkapp_command.Digest.Account_update.create ~chain
+          account_update_with_dummy_auth
+      in
+      let account_update_digest_with_current_chain =
+        Zkapp_command.Digest.Account_update.create
+          account_update_with_dummy_auth
+      in
+      let tree_with_dummy_auth =
+        Zkapp_command.Call_forest.Tree.
+          { account_update = account_update_with_dummy_auth
+          ; calls = []
+          ; account_update_digest = account_update_digest_with_selected_chain
+          }
+      in
+      let statement = Zkapp_statement.of_tree tree_with_dummy_auth in
+      let%map.Async.Deferred tree =
+        let handler (Snarky_backendless.Request.With { request; respond }) =
+          match request with _ -> respond Unhandled
+        in
+        let%map.Async.Deferred (), (), (pi : Pickles.Side_loaded.Proof.t) =
+          prover ~handler statement
+        in
+        { tree_with_dummy_auth with
+          account_update =
+            { account_update_with_dummy_auth with authorization = Proof pi }
+        ; account_update_digest = account_update_digest_with_current_chain
+        }
+      in
+      let forest =
+        [ With_stack_hash.
+            { elt = tree
+            ; stack_hash =
+                Zkapp_command.Digest.(
+                  Forest.cons
+                    (Tree.create
+                       { tree with
+                         account_update_digest =
+                           account_update_digest_with_current_chain
+                       } )
+                    Forest.empty)
+            }
+        ]
+      in
+      ({ fee_payer; memo; account_updates = forest } : Zkapp_command.t)
+
     module Update_states_spec = struct
       type t =
         { fee : Currency.Fee.t

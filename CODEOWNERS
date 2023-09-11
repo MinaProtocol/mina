@@ -30,8 +30,6 @@
 /src/lib/ @MinaProtocol/protocol-eng-reviewers
 
 /src/lib/blake2/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/cli_lib/ @MinaProtocol/product-eng-reviewers
-/src/lib/mina_commands @MinaProtocol/product-eng-reviewers
 /src/lib/mina_graphql @MinaProtocol/product-eng-reviewers
 /src/lib/mina_numbers/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/crs/ @MinaProtocol/crypto-eng-reviewers
@@ -53,7 +51,7 @@
 /src/lib/snarky_curves/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_field_extensions/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_group_map/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/snarkyjs/ @MinaProtocol/product-eng-reviewers
+/src/lib/snarkyjs @MinaProtocol/product-eng-reviewers
 /src/lib/snarky_log/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/unsigned_extended/ @MinaProtocol/crypto-eng-reviewers
 

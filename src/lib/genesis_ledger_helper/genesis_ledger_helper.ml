@@ -255,16 +255,17 @@ module Ledger = struct
             Genesis_constants.Proof_level.equal Full proof_level
       in
       if add_genesis_winner_account then
-        let pk, _ = Mina_state.Consensus_state_hooks.genesis_winner in
+        let genesis_winner_pk, _ =
+          Mina_state.Consensus_state_hooks.genesis_winner
+        in
         match accounts with
         | (_, account) :: _
-          when Public_key.Compressed.equal (Account.public_key account) pk ->
+          when Public_key.Compressed.equal
+                 (Account.public_key account)
+                 genesis_winner_pk ->
             accounts
         | _ ->
-            ( None
-            , Account.create
-                (Account_id.create pk Token_id.default)
-                (Currency.Balance.of_nanomina_int_exn 1000) )
+            (None, Mina_state.Consensus_state_hooks.genesis_winner_account)
             :: accounts
       else accounts
     in
@@ -460,7 +461,7 @@ module Epoch_data = struct
           Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
             ~ledger_name_prefix ledger
         in
-        let%bind staking, config' =
+        let%bind staking, staking_config =
           let%map staking_ledger, config', ledger_file =
             load_ledger config.staking.ledger
           in
@@ -472,7 +473,7 @@ module Epoch_data = struct
             }
           , { config.staking with ledger = config' } )
         in
-        let%map next, config'' =
+        let%map next, next_config =
           match config.next with
           | None ->
               [%log trace]
@@ -491,9 +492,19 @@ module Epoch_data = struct
               , Some { Runtime_config.Epoch_data.Data.ledger = config''; seed }
               )
         in
+        (* the staking ledger and the next ledger, if it exists,
+           should have the genesis winner account as the first account, under
+           the conditions where the genesis ledger has that account (proof level
+           is Full, or we've specified `add_genesis_winner = true`
+
+           because the ledger is lazy, we don't want to force it in order to
+           check that invariant
+        *)
         ( Some { Consensus.Genesis_epoch_data.staking; next }
-        , Some { Runtime_config.Epoch_data.staking = config'; next = config'' }
-        )
+        , Some
+            { Runtime_config.Epoch_data.staking = staking_config
+            ; next = next_config
+            } )
 end
 
 (* This hash encodes the data that determines a genesis proof:
@@ -815,24 +826,25 @@ let load_config_file filename =
       | Error err ->
           Or_error.error_string err )
 
-let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~proof_level (config : Runtime_config.t) =
+let print_config ~logger config =
   let ledger_name_json =
-    match
-      let open Option.Let_syntax in
-      let%bind ledger = config.ledger in
-      ledger.name
-    with
-    | Some name ->
-        `String name
-    | None ->
-        `Null
+    Option.value ~default:`Null
+    @@ let%bind.Option ledger = config.Runtime_config.ledger in
+       let%map.Option name = ledger.name in
+       `String name
   in
+  let json_config, accounts_omitted =
+    Runtime_config.to_yojson_without_accounts config
+  in
+  let f i = List.cons ("accounts_omitted", `Int i) in
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata:
-      [ ("name", ledger_name_json)
-      ; ("config", Runtime_config.to_yojson config)
-      ] ;
+      (Option.value_map ~f ~default:Fn.id accounts_omitted
+         [ ("name", ledger_name_json); ("config", json_config) ] )
+
+let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
+    ~proof_level (config : Runtime_config.t) =
+  print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
   let proof_level =

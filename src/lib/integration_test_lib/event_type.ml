@@ -207,12 +207,12 @@ module Block_produced = struct
       find int breadcrumb_consensus_state [ "blockchain_length" ]
     in
     let%bind global_slot =
-      (* the associated field looks like "slot_number":["Since_hard_fork", 1] *)
+      (* the associated field looks like "slot_number":1 *)
       let%map global_slot_since_hard_fork =
-        find (list string) breadcrumb_consensus_state
+        find string breadcrumb_consensus_state
           [ "curr_global_slot"; "slot_number" ]
       in
-      List.nth_exn global_slot_since_hard_fork 1 |> Int.of_string
+      Int.of_string global_slot_since_hard_fork
     in
     let%map epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
     { block_height; global_slot; epoch; snarked_ledger_generated; state_hash }
@@ -864,10 +864,7 @@ let%test_unit "parse breadcrumb functions properly" =
                     "block_creator": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
                     "curr_global_slot": {
                       "slots_per_epoch": "480",
-                      "slot_number": [
-                        "Since_hard_fork",
-                        "14"
-                      ]
+                      "slot_number": "14"
                     },
                     "staking_epoch_data": {
                       "lock_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
@@ -905,10 +902,7 @@ let%test_unit "parse breadcrumb functions properly" =
                       "2"
                     ],
                     "total_currency": "730300000001000",
-                    "global_slot_since_genesis": [
-                      "Since_genesis",
-                      "14"
-                    ],
+                    "global_slot_since_genesis": "14",
                     "epoch_count": "0",
                     "min_window_density": "22",
                     "has_ancestor_in_same_checkpoint_window": true,
