@@ -95,8 +95,10 @@ type SampleRefParams struct {
 }
 
 func sample(groupRef int, groupName string, ratios []float64) Command {
+	group := lib.LocalComplexValue(groupRef, groupName)
+	group.OnEmpty = emptyArrayRawMessage
 	return Command{Action: lib.SampleAction{}.Name(), Params: SampleRefParams{
-		Group:  lib.LocalComplexValue(groupRef, groupName),
+		Group:  group,
 		Ratios: ratios,
 	}}
 }
@@ -188,10 +190,20 @@ type ExceptRefParams struct {
 	Except lib.ComplexValue `json:"except"`
 }
 
+var emptyArrayRawMessage json.RawMessage
+
+func init() {
+	emptyArrayRawMessage, _ = json.Marshal([]string{})
+}
+
 func except(groupRef int, groupName string, exceptRef int, exceptName string) Command {
+	group := lib.LocalComplexValue(groupRef, groupName)
+	group.OnEmpty = emptyArrayRawMessage
+	except := lib.LocalComplexValue(exceptRef, exceptName)
+	except.OnEmpty = emptyArrayRawMessage
 	return Command{Action: lib.ExceptAction{}.Name(), Params: ExceptRefParams{
-		Group:  lib.LocalComplexValue(groupRef, groupName),
-		Except: lib.LocalComplexValue(exceptRef, exceptName),
+		Group:  group,
+		Except: except,
 	}}
 }
 
