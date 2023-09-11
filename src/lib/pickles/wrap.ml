@@ -329,7 +329,7 @@ let%test_module "gate finalization" =
     let run_recursive_proof_test
         (actual_feature_flags : Plonk_types.Features.flags)
         (feature_flags : Plonk_types.Features.options)
-        (public_input : Pasta_bindings.Fp.t list)
+        (public_input : Backend.Tick.Field.t list)
         (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
         (proof : Backend.Tick.Proof.t) : Impls.Step.Boolean.value =
       (* Constants helper - takes an OCaml value and converts it to a snarky value, where
@@ -463,9 +463,9 @@ let%test_module "gate finalization" =
     type example =
          Kimchi_bindings.Protocol.SRS.Fp.t
       -> Kimchi_bindings.Protocol.Index.Fp.t
-         * Pasta_bindings.Fp.t list
+         * Backend.Tick.Field.t list
          * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fp.t )
+           , Backend.Tick.Field.t )
            Kimchi_types.prover_proof
 
     module type SETUP = sig

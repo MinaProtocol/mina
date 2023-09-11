@@ -274,5 +274,5 @@ end
 module Ops : module type of Plonk_curve_ops.Make (Impls.Step) (Inner_curve)
 
 module Generators : sig
-  val h : (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t) lazy_t
+  val h : (Backend.Tick.Field.t * Backend.Tick.Field.t) lazy_t
 end

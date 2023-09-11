@@ -58,7 +58,7 @@ module Checked : sig
 
   val to_input :
        t
-    -> Pasta_bindings.Fp.t Snarky_backendless.Cvar.t
+    -> Backend.Tick.Field.t Snarky_backendless.Cvar.t
        Random_oracle_input.Chunked.t
 end
 

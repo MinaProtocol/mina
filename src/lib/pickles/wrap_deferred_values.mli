@@ -4,7 +4,9 @@ open Backend
 
 val expand_deferred :
      evals:
-       (Pasta_bindings.Fp.t, Pasta_bindings.Fp.t array) Plonk_types.All_evals.t
+       ( Backend.Tick.Field.t
+       , Backend.Tick.Field.t array )
+       Plonk_types.All_evals.t
   -> old_bulletproof_challenges:
        ( Challenge.Constant.t Import.Scalar_challenge.t Bulletproof_challenge.t
          Step_bp_vec.t
@@ -22,12 +24,12 @@ val expand_deferred :
        Types.Wrap.Proof_state.Minimal.t
   -> ( ( Challenge.Constant.t
        , Challenge.Constant.t Import.Scalar_challenge.t
-       , Pasta_bindings.Fp.t Shifted_value.Type1.t
+       , Backend.Tick.Field.t Shifted_value.Type1.t
        , Challenge.Constant.t Import.Scalar_challenge.t option
        , bool )
        Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
      , Challenge.Constant.t Import.Scalar_challenge.t
-     , Pasta_bindings.Fp.t Shifted_value.Type1.t
-     , (Pasta_bindings.Fp.t, Tick.Rounds.n) Vector.vec
+     , Backend.Tick.Field.t Shifted_value.Type1.t
+     , (Backend.Tick.Field.t, Tick.Rounds.n) Vector.vec
      , Branch_data.t )
      Types.Wrap.Proof_state.Deferred_values.t

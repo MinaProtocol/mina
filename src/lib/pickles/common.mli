@@ -19,7 +19,7 @@ val when_profiling : 'a -> 'a -> 'a
  *)
 val time : string -> (unit -> 'a) -> 'a
 
-val tick_shifts : log2_size:int -> Pasta_bindings.Fp.t array
+val tick_shifts : log2_size:int -> Backend.Tick.Field.t array
 
 val tock_shifts : log2_size:int -> Pasta_bindings.Fq.t array
 
@@ -116,7 +116,7 @@ module Ipa : sig
     val compute_challenges :
       'a challenge -> (Backend.Tock.Field.t, 'a) Pickles_types.Vector.t
 
-    val compute_sg : ('a, Pasta_bindings.Fp.t) compute_sg
+    val compute_sg : ('a, Backend.Tick.Field.t) compute_sg
   end
 
   module Step : sig
@@ -135,7 +135,7 @@ module Ipa : sig
 
     val accumulator_check :
          ( (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t)
-         * (Pasta_bindings.Fp.t, 'a) Pickles_types.Vector.t )
+         * (Backend.Tick.Field.t, 'a) Pickles_types.Vector.t )
          list
       -> bool Promise.t
   end

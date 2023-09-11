@@ -36,7 +36,7 @@ module Other_field : sig
 end
 
 val assert_n_bits :
-  n:int -> Pasta_bindings.Fp.t Snarky_backendless.Cvar.t -> unit
+  n:int -> Backend.Tick.Field.t Snarky_backendless.Cvar.t -> unit
 
 val finalize_other_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)

@@ -14,7 +14,7 @@ module Ipa : sig
       Pickles_types.Vector.t
       lazy_t
 
-    val sg : (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t) lazy_t
+    val sg : (Backend.Tick.Field.t * Backend.Tick.Field.t) lazy_t
   end
 
   module Step : sig
