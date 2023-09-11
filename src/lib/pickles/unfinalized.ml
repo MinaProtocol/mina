@@ -106,8 +106,7 @@ module Constant = struct
          Plonk_checks.derive_plonk (module Field) ~env ~shift chals evals
          |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
             .of_wrap
-              ~assert_none:(fun x ->
-                assert (Option.is_none (Plonk_types.Opt.to_option x)) )
+              ~assert_none:(fun x -> assert (Option.is_none (Opt.to_option x)))
               ~assert_false:(fun x -> assert (not x))
        in
        { deferred_values =

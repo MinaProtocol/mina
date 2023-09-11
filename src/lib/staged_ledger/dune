@@ -2,7 +2,7 @@
  (name staged_ledger)
  (public_name staged_ledger)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    ppx_inline_test.config
@@ -44,6 +44,7 @@
    verifier
    staged_ledger_diff
    signature_lib
+   mina_signature_kind
    currency
    genesis_constants
    one_or_two

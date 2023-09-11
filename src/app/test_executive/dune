@@ -28,6 +28,7 @@
    bash_colors
    integration_test_lib
    signature_lib
+   mina_signature_kind
    mina_base
    mina_stdlib
    mina_transaction

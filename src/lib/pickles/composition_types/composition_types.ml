@@ -4,7 +4,7 @@ module Bulletproof_challenge = Bulletproof_challenge
 module Branch_data = Branch_data
 module Digest = Digest
 module Spec = Spec
-module Opt = Plonk_types.Opt
+module Opt = Opt
 open Core_kernel
 
 type 'f impl = 'f Spec.impl
@@ -150,7 +150,7 @@ module Wrap = struct
               ; Plonk_types.Features.typ
                   ~feature_flags:(Plonk_types.Features.of_full feature_flags)
                   bool
-              ; Plonk_types.Opt.typ Impl.Boolean.typ uses_lookups
+              ; Opt.typ Impl.Boolean.typ uses_lookups
                   ~dummy:dummy_scalar_challenge
                   (Scalar_challenge.typ scalar_challenge)
               ]
@@ -766,11 +766,11 @@ module Wrap = struct
           in
           let maybe_constant flag =
             match flag with
-            | Plonk_types.Opt.Flag.Yes ->
+            | Opt.Flag.Yes ->
                 constant true
-            | Plonk_types.Opt.Flag.No ->
+            | Opt.Flag.No ->
                 constant false
-            | Plonk_types.Opt.Flag.Maybe ->
+            | Opt.Flag.Maybe ->
                 Spec.T.B Bool
           in
           Spec.T.Struct
@@ -1362,8 +1362,7 @@ module Step = struct
     let[@warning "-60"] typ (type n f)
         ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
         as impl ) zero ~assert_16_bits
-        (proofs_verified :
-          (Plonk_types.Opt.Flag.t Plonk_types.Features.t, n) Vector.t ) fq :
+        (proofs_verified : (Opt.Flag.t Plonk_types.Features.t, n) Vector.t) fq :
         ( ((_, _) Vector.t, _) t
         , ((_, _) Vector.t, _) t
         , _ )

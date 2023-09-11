@@ -217,9 +217,9 @@ let wrap_main
                      (Plonk_verification_key_evals.Step.map
                         ~f:Inner_curve.constant ~f_opt:(function
                        | None ->
-                           Opt.None
+                           Opt.nothing
                        | Some x ->
-                           Opt.Some (Inner_curve.constant x) ) ) ) )
+                           Opt.just (Inner_curve.constant x) ) ) ) )
         in
         let prev_step_accs =
           with_label __LOC__ (fun () ->

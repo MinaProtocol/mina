@@ -21,17 +21,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   (* TODO: test account creation fee *)
   let config =
     let open Test_config in
-    let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
-        ~vesting_increment : Mina_base.Account_timing.t =
-      let open Currency in
-      Timed
-        { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
-        ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
-        ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
-        ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
-        ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
-        }
-    in
     { default with
       requires_graphql = true
     ; genesis_ledger =

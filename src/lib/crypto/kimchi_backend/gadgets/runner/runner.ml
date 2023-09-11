@@ -24,10 +24,8 @@ let generate_and_verify_proof ?cs circuit =
         let proof =
           (* Only block_on_async for testing; do not do this in production!! *)
           Promise.block_on_async_exn (fun () ->
-              (* TODO(dw) pass runtime tables *)
-              Tick.Proof.create_and_verify_async ~primary:public_inputs
-                ~auxiliary:auxiliary_inputs ~runtime_tables:[||] ~message:[]
-                prover_index )
+              Tick.Proof.create_async ~primary:public_inputs
+                ~auxiliary:auxiliary_inputs ~message:[] prover_index )
         in
         (proof, next_statement_hashed) )
       ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
@@ -35,17 +33,10 @@ let generate_and_verify_proof ?cs circuit =
       ()
   in
 
-  (* TODO: Once verifier index changes are merged
-   *   - Switch above create_and_verify_async to create_async
-   *   - Remove create_and_verify_async
-   *   - Enable checks below *)
-
-  (*
-    (* Verify proof *)
-    let verifier_index = Tick.Keypair.vk proof_keypair in
-    (* We have an empty public input; create an empty vector. *)
-    let public_input = Kimchi_bindings.FieldVectors.Fp.create () in
-    (* Assert that the proof verifies. *)
-    assert (Tick.Proof.verify ~message:[] proof verifier_index public_input) ;
-  *)
+  (* Verify proof *)
+  let verifier_index = Tick.Keypair.vk proof_keypair in
+  (* We have an empty public input; create an empty vector. *)
+  let public_input = Kimchi_bindings.FieldVectors.Fp.create () in
+  (* Assert that the proof verifies. *)
+  assert (Tick.Proof.verify ~message:[] proof verifier_index public_input) ;
   (constraint_system, proof_keypair, proof)

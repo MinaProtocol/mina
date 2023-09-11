@@ -41,7 +41,8 @@ module type Full = sig
     -> (fp Snarky_backendless.Cvar.t, fp) Snarky_backendless.Constraint.basic
     -> unit
 
-  val compute_witness : t -> (int -> fp) -> fp array array
+  val compute_witness :
+    t -> (int -> fp) -> fp array array * fp Kimchi_types.runtime_table array
 
   val finalize : t -> unit
 
@@ -57,6 +58,12 @@ module type Full = sig
 
   (** Return the size of all the runtime lookup tables concatenated *)
   val get_concatenated_runtime_lookup_table_size : t -> int
+
+  (** Finalize the fixed lookup tables. The function can not be called twice *)
+  val finalize_fixed_lookup_tables : t -> unit
+
+  (** Finalize the runtime lookup table configurations. The function can not be called twice. *)
+  val finalize_runtime_lookup_tables : t -> unit
 
   val digest : t -> Md5.t
 

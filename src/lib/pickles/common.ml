@@ -255,11 +255,11 @@ let combined_evaluation (type f)
   let open Impl in
   let open Field in
   let mul_and_add ~(acc : Field.t) ~(xi : Field.t)
-      (fx : (Field.t, Boolean.var) Plonk_types.Opt.t) : Field.t =
+      (fx : (Field.t, Boolean.var) Opt.t) : Field.t =
     match fx with
-    | None ->
+    | Nothing ->
         acc
-    | Some fx ->
+    | Just fx ->
         fx + (xi * acc)
     | Maybe (b, fx) ->
         Field.if_ b ~then_:(fx + (xi * acc)) ~else_:acc
@@ -267,9 +267,9 @@ let combined_evaluation (type f)
   with_label __LOC__ (fun () ->
       Pcs_batch.combine_split_evaluations ~mul_and_add
         ~init:(function
-          | Some x ->
+          | Just x ->
               x
-          | None ->
+          | Nothing ->
               Field.zero
           | Maybe (b, x) ->
               (b :> Field.t) * x )

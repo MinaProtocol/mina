@@ -261,7 +261,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
           ; alpha = plonk0.alpha
           ; beta = chal plonk0.beta
           ; gamma = chal plonk0.gamma
-          ; joint_combiner = Plonk_types.Opt.of_option plonk0.joint_combiner
+          ; joint_combiner = Opt.of_option plonk0.joint_combiner
           }
       }
   ; x_hat_evals = x_hat
@@ -295,13 +295,13 @@ let%test_module "gate finalization" =
       (* Set up a helper to convert actual feature flags composed of booleans into
          feature flags composed of Yes/No/Maybe options.
          @param actual_feature_flags The actual feature flags in terms of true/false
-         @param true_opt  Plonk_types.Opt type to use for true/enabled features
-         @param false_opt Plonk_types.Opt type to use for false/disabled features
+         @param true_opt  Opt type to use for true/enabled features
+         @param false_opt Opt type to use for false/disabled features
          @return Corresponding feature flags composed of Yes/No/Maybe values *)
       let compute_feature_flags
           (actual_feature_flags : Plonk_types.Features.flags)
-          (true_opt : Plonk_types.Opt.Flag.t)
-          (false_opt : Plonk_types.Opt.Flag.t) : Plonk_types.Features.options =
+          (true_opt : Opt.Flag.t) (false_opt : Opt.Flag.t) :
+          Plonk_types.Features.options =
         Plonk_types.Features.map actual_feature_flags ~f:(function
           | true ->
               true_opt
@@ -311,7 +311,7 @@ let%test_module "gate finalization" =
 
       (* Generate the 3 configurations of the actual feature flags using
          helper *)
-      let open Plonk_types.Opt.Flag in
+      let open Opt.Flag in
       { true_is_yes = compute_feature_flags actual_feature_flags Yes No
       ; true_is_maybe = compute_feature_flags actual_feature_flags Maybe No
       ; all_maybes = compute_feature_flags actual_feature_flags Maybe Maybe
@@ -376,8 +376,7 @@ let%test_module "gate finalization" =
       in
 
       let full_features =
-        Plonk_types.Features.to_full ~or_:Plonk_types.Opt.Flag.( ||| )
-          feature_flags
+        Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
       in
 
       (* Define Typ.t for Deferred_values.t -- A Type.t defines how to convert a value of some type
@@ -860,10 +859,8 @@ let wrap
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             [%log internal] "Backend_tock_proof_create_async" ;
             let%map.Promise proof =
-              (* TODO(dw) pass runtime tables *)
               Backend.Tock.Proof.create_async ~primary:public_inputs
-                ~auxiliary:auxiliary_inputs ~runtime_tables:[||] pk
-                ~message:next_accumulator
+                ~auxiliary:auxiliary_inputs pk ~message:next_accumulator
             in
             [%log internal] "Backend_tock_proof_create_async_done" ;
             proof )
@@ -884,7 +881,7 @@ let wrap
                     plonk =
                       { next_statement.proof_state.deferred_values.plonk with
                         joint_combiner =
-                          Plonk_types.Opt.to_option
+                          Opt.to_option
                             next_statement.proof_state.deferred_values.plonk
                               .joint_combiner
                       }

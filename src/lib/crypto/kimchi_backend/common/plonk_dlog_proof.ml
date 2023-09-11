@@ -99,7 +99,6 @@ module type Inputs_intf = sig
          Index.t
       -> primary:Scalar_field.Vector.t
       -> auxiliary:Scalar_field.Vector.t
-      -> runtime_tables:Scalar_field.t Kimchi_types.runtime_table array
       -> prev_chals:Scalar_field.t array
       -> prev_comms:Curve.Affine.Backend.t array
       -> with_public_evals
@@ -108,16 +107,6 @@ module type Inputs_intf = sig
          Index.t
       -> primary:Scalar_field.Vector.t
       -> auxiliary:Scalar_field.Vector.t
-      -> runtime_tables:Scalar_field.t Kimchi_types.runtime_table array
-      -> prev_chals:Scalar_field.t array
-      -> prev_comms:Curve.Affine.Backend.t array
-      -> with_public_evals Promise.t
-
-    val create_and_verify_async :
-         Index.t
-      -> primary:Scalar_field.Vector.t
-      -> auxiliary:Scalar_field.Vector.t
-      -> runtime_tables:Scalar_field.t Kimchi_types.runtime_table array
       -> prev_chals:Scalar_field.t array
       -> prev_comms:Curve.Affine.Backend.t array
       -> with_public_evals Promise.t
@@ -514,7 +503,7 @@ module Make (Inputs : Inputs_intf) = struct
   let to_backend_with_public_evals chal_polys primary_input t =
     to_backend_with_public_evals' chal_polys (List.to_array primary_input) t
 
-  let create ?message pk ~primary ~auxiliary ~runtime_tables =
+  let create ?message pk ~primary ~auxiliary =
     let chal_polys =
       match (message : message option) with Some s -> s | None -> []
     in
@@ -529,12 +518,12 @@ module Make (Inputs : Inputs_intf) = struct
           G.Affine.to_backend (Finite commitment) )
     in
     let res =
-      Backend.create pk ~primary ~auxiliary ~runtime_tables
-        ~prev_chals:challenges ~prev_comms:commitments
+      Backend.create pk ~primary ~auxiliary ~prev_chals:challenges
+        ~prev_comms:commitments
     in
     of_backend_with_public_evals res
 
-  let create_async ?message pk ~primary ~auxiliary ~runtime_tables =
+  let create_async ?message pk ~primary ~auxiliary =
     let chal_polys =
       match (message : message option) with Some s -> s | None -> []
     in
@@ -549,28 +538,8 @@ module Make (Inputs : Inputs_intf) = struct
           G.Affine.to_backend (Finite commitment) )
     in
     let%map.Promise res =
-      Backend.create_async pk ~primary ~auxiliary ~runtime_tables
-        ~prev_chals:challenges ~prev_comms:commitments
-    in
-    of_backend_with_public_evals res
-
-  let create_and_verify_async ?message pk ~primary ~auxiliary ~runtime_tables =
-    let chal_polys =
-      match (message : message option) with Some s -> s | None -> []
-    in
-    let challenges =
-      List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
-          challenges )
-      |> Array.concat
-    in
-    let commitments =
-      Array.of_list_map chal_polys
-        ~f:(fun { Challenge_polynomial.commitment; _ } ->
-          G.Affine.to_backend (Finite commitment) )
-    in
-    let%map.Promise res =
-      Backend.create_and_verify_async pk ~primary ~auxiliary ~runtime_tables
-        ~prev_chals:challenges ~prev_comms:commitments
+      Backend.create_async pk ~primary ~auxiliary ~prev_chals:challenges
+        ~prev_comms:commitments
     in
     of_backend_with_public_evals res
 
