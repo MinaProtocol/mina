@@ -247,7 +247,7 @@ module Breadcrumb_added = struct
     in
     let%map transaction_hashes =
       get_metadata message "user_commands"
-      >>= parse valid_commands_with_statuses
+      >>= parse transaction_hashes_with_statuses
     in
     { state_hash; transaction_hashes }
 
