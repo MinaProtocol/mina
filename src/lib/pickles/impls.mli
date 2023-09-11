@@ -42,8 +42,7 @@ module Step : sig
     -> ( ( ( ( Impl.Field.t
              , Impl.Field.t Composition_types.Scalar_challenge.t
              , Other_field.t Pickles_types.Shifted_value.Type2.t
-             , ( Impl.field Snarky_backendless.Cvar.t
-                 Kimchi_backend_common.Scalar_challenge.t
+             , ( Impl.field Snarky_backendless.Cvar.t Import.Scalar_challenge.t
                  Composition_types.Bulletproof_challenge.t
                , 'b )
                Pickles_types.Vector.t
@@ -61,8 +60,7 @@ module Step : sig
        , ( ( ( Challenge.Constant.t
              , Challenge.Constant.t Composition_types.Scalar_challenge.t
              , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-             , ( Limb_vector.Challenge.Constant.t
-                 Kimchi_backend_common.Scalar_challenge.t
+             , ( Limb_vector.Challenge.Constant.t Import.Scalar_challenge.t
                  Composition_types.Bulletproof_challenge.t
                , 'b )
                Pickles_types.Vector.t
@@ -142,8 +140,7 @@ module Wrap : sig
          , Impl.field Snarky_backendless.Cvar.t
          , Impl.field Snarky_backendless.Cvar.t
          , Impl.field Snarky_backendless.Cvar.t
-         , ( Impl.field Snarky_backendless.Cvar.t
-             Kimchi_backend_common.Scalar_challenge.t
+         , ( Impl.field Snarky_backendless.Cvar.t Import.Scalar_challenge.t
              Composition_types.Bulletproof_challenge.t
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
@@ -165,8 +162,7 @@ module Wrap : sig
          , ( Limb_vector.Constant.Hex64.t
            , Composition_types.Digest.Limbs.n )
            Pickles_types.Vector.vec
-         , ( Limb_vector.Challenge.Constant.t
-             Kimchi_backend_common.Scalar_challenge.t
+         , ( Limb_vector.Challenge.Constant.t Import.Scalar_challenge.t
              Composition_types.Bulletproof_challenge.t
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t

@@ -160,8 +160,7 @@ val tick_public_input_of_statement :
   -> ( ( ( Impls.Step.Challenge.Constant.t
          , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
          , Impls.Step.Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-         , ( Limb_vector.Challenge.Constant.t
-             Kimchi_backend_common.Scalar_challenge.t
+         , ( Limb_vector.Challenge.Constant.t Import.Scalar_challenge.t
              Composition_types.Bulletproof_challenge.t
            , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
            Pickles_types.Vector.t
@@ -204,8 +203,7 @@ val tock_public_input_of_statement :
      , ( Limb_vector.Constant.Hex64.t
        , Composition_types.Digest.Limbs.n )
        Pickles_types.Vector.vec
-     , ( Limb_vector.Challenge.Constant.t
-         Kimchi_backend_common.Scalar_challenge.t
+     , ( Limb_vector.Challenge.Constant.t Import.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
        Pickles_types.Vector.t
@@ -232,8 +230,7 @@ val tock_unpadded_public_input_of_statement :
      , ( Limb_vector.Constant.Hex64.t
        , Composition_types.Digest.Limbs.n )
        Pickles_types.Vector.vec
-     , ( Limb_vector.Challenge.Constant.t
-         Kimchi_backend_common.Scalar_challenge.t
+     , ( Limb_vector.Challenge.Constant.t Import.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
        Pickles_types.Vector.t

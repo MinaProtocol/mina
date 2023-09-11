@@ -147,7 +147,7 @@ val verify :
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
      , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
-         Kimchi_backend_common.Scalar_challenge.t
+         Import.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
        Pickles_types.Vector.t
