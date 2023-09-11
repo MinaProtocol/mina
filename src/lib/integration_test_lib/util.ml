@@ -23,15 +23,28 @@ let drop_outer_quotes s =
   let s = drop_suffix s n in
   s
 
+(** Pulls [num_keypairs] unique keypairs from [path] *)
 let pull_keypairs path num_keypairs =
+  let random =
+    Random.State.make_self_init () |> Splittable_random.State.create
+  in
+  (* elem must be in list *)
+  let drop_elem list elem =
+    let open List in
+    let idx = findi list ~f:(fun _ x -> x = elem) |> Option.value_exn |> fst in
+    let left, right = split_n list idx in
+    match right with [] -> left | _ :: tl -> left @ tl
+  in
   let random_nums =
-    let random =
-      Random.State.make_self_init () |> Splittable_random.State.create
+    let rec aux rem acc n =
+      let open Quickcheck.Generator in
+      if n = 0 then acc
+      else
+        let next = of_list rem |> generate ~size:num_keypairs ~random in
+        let rem = drop_elem rem next in
+        aux rem (next :: acc) (n - 1)
     in
-    let open Quickcheck.Generator in
-    of_list (List.range ~stop:`inclusive 1 10_000)
-    |> list_with_length num_keypairs
-    |> generate ~size:num_keypairs ~random
+    aux (List.range ~stop:`inclusive 1 10_000) [] num_keypairs
   in
   (* network keypairs + private keys *)
   let keypair_name = sprintf "network-keypairs/network-keypair-%d" in

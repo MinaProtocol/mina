@@ -142,7 +142,7 @@ module Node = struct
     let args =
       [ ("network_id", `String t.network_id)
       ; ("node_id", `String t.node_id)
-      ; ("start_clot_since_genesis", `Int start_slot_since_genesis)
+      ; ("start_slot_since_genesis", `Int start_slot_since_genesis)
       ]
     in
     try
