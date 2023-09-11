@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 )
 
 type Output struct {
+	Time  time.Time       `json:"time,omitempty"`
 	Step  int             `json:"step"`
 	Name  string          `json:"name"`
 	Multi bool            `json:"multi,omitempty"`

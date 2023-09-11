@@ -122,7 +122,13 @@ func outputF(outCache outCacheT, log logging.StandardLogger, step int) func(stri
 			outCache[""][step][name] = lib.OutputCacheEntry{Multi: multiple, Values: []json.RawMessage{value}}
 		}
 		if !sensitive {
-			json, err := json.Marshal(lib.Output{Name: name, Multi: multiple, Value: value, Step: step})
+			json, err := json.Marshal(lib.Output{
+				Name:  name,
+				Multi: multiple,
+				Value: value,
+				Step:  step,
+				Time:  time.Now().UTC(),
+			})
 			if err != nil {
 				log.Errorf("Error marshalling output %s for step %d: %v", name, step, err)
 				os.Exit(8)
