@@ -46,7 +46,7 @@ let commands: Text -> Text -> List Cmd.Type  =  \(targetStage: Text) -> \(target
       let pipelineHandlers = {
         PullRequest = ''
           if [ "${targetMode}" == "PullRequest" ]; then
-            if [ "${jobStage}" == "${targetStage}" ];
+            if [ "${jobStage}" == "${targetStage}" ]; then
               if (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
                 echo "Triggering ${job.name} for reason:"
                 cat _computed_diff.txt | egrep '${dirtyWhen}'
@@ -63,7 +63,7 @@ let commands: Text -> Text -> List Cmd.Type  =  \(targetStage: Text) -> \(target
           if [ "${targetMode}" == "PullRequest" ]; then
             echo "Skipping ${job.name} because this is a PR buildkite run"
           else 
-            if [ "${jobStage}" == "${targetStage}" ];
+            if [ "${jobStage}" == "${targetStage}" ]; then
               echo "Triggering ${job.name} because this is a stable buildkite run"
               ${Cmd.format trigger}
             else
