@@ -464,7 +464,7 @@ let%test_module "gate finalization" =
          Kimchi_bindings.Protocol.SRS.Fp.t
       -> Kimchi_bindings.Protocol.Index.Fp.t
          * Backend.Tick.Field.t list
-         * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+         * ( Backend.Tock.Field.t Kimchi_types.or_infinity
            , Backend.Tick.Field.t )
            Kimchi_types.prover_proof
 

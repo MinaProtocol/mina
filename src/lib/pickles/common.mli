@@ -21,7 +21,7 @@ val time : string -> (unit -> 'a) -> 'a
 
 val tick_shifts : log2_size:int -> Backend.Tick.Field.t array
 
-val tock_shifts : log2_size:int -> Pasta_bindings.Fq.t array
+val tock_shifts : log2_size:int -> Backend.Tock.Field.t array
 
 val group_map :
      (module Group_map.Field_intf.S_unchecked with type t = 'a)
@@ -131,10 +131,10 @@ module Ipa : sig
     val compute_challenges :
       'a challenge -> (Backend.Tick.Field.t, 'a) Pickles_types.Vector.t
 
-    val compute_sg : ('a, Pasta_bindings.Fq.t) compute_sg
+    val compute_sg : ('a, Backend.Tock.Field.t) compute_sg
 
     val accumulator_check :
-         ( (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t)
+         ( (Backend.Tock.Field.t * Backend.Tock.Field.t)
          * (Backend.Tick.Field.t, 'a) Pickles_types.Vector.t )
          list
       -> bool Promise.t

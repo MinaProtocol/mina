@@ -31,7 +31,7 @@ module Ipa : sig
       Pickles_types.Vector.t
       lazy_t
 
-    val sg : (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t) lazy_t
+    val sg : (Backend.Tock.Field.t * Backend.Tock.Field.t) lazy_t
   end
 end
 

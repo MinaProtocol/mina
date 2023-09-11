@@ -262,7 +262,7 @@ end
 module Ops : module type of Plonk_curve_ops.Make (Impls.Wrap) (Inner_curve)
 
 module Generators : sig
-  val h : (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t) lazy_t
+  val h : (Backend.Tock.Field.t * Backend.Tock.Field.t) lazy_t
 end
 
 module Unsafe : sig
