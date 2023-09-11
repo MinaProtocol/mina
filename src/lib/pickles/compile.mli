@@ -163,7 +163,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
       -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
       -> ('max_proofs_verified, 'max_local_max_proofs_verifieds) Requests.Wrap.t
          * (   ( ( Impls.Wrap.Field.t
-                 , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
+                 , Wrap_verifier.Challenge.t Import.Scalar_challenge.t
                  , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                    , Impls.Wrap.Boolean.var )
@@ -172,7 +172,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                  .In_circuit
                  .t
-               , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
+               , Wrap_verifier.Challenge.t Import.Scalar_challenge.t
                , Wrap_verifier.Other_field.Packed.t
                  Pickles_types__Shifted_value.Type1.t
                , Impls.Wrap.Field.t
@@ -326,7 +326,7 @@ val wrap_main_dummy_override :
   -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
   -> ('max_proofs_verified, 'max_local_max_proofs_verifieds) Requests.Wrap.t
      * (   ( ( Impls.Wrap.Field.t
-             , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
+             , Wrap_verifier.Challenge.t Import.Scalar_challenge.t
              , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
              , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                , Impls.Wrap.Boolean.var )
@@ -334,7 +334,7 @@ val wrap_main_dummy_override :
              , Impls.Wrap.Boolean.var )
              Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
              .t
-           , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
+           , Wrap_verifier.Challenge.t Import.Scalar_challenge.t
            , Wrap_verifier.Other_field.Packed.t
              Pickles_types__Shifted_value.Type1.t
            , Impls.Wrap.Field.t
