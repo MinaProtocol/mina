@@ -1,9 +1,8 @@
 name: 'Performance test'
 
 on:
-  push:
-    branches:
-      - openmina-perftest-ga
+  schedule:
+    - cron:  '20 1 * * *'  # Will run every day at 1:20 UTC
 
 concurrency:
   group: performance-test
