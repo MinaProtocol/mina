@@ -327,7 +327,9 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
     List.map topology ~f:(function
       | Archive (name, archive_info) ->
           Test_config.Topology.Archive
-            (name, { archive_info with schema_file; zkapp_table })
+            ( name
+            , { archive_info with schema_files = mina_archive_schema_aux_files }
+            )
       | Node (name, node_info) -> (
           match node_info.role with
           | Test_config.Node_role.Block_producer ->

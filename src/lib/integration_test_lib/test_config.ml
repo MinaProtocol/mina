@@ -193,8 +193,7 @@ module Topology = struct
     ; role : Node_role.t
     ; docker_image : string option
     ; git_build : Git_build.t option
-    ; schema_file : string
-    ; zkapp_table : string
+    ; schema_files : string list
     }
   [@@deriving to_yojson]
 
@@ -405,8 +404,7 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         ; role = Archive_node
         ; docker_image
         ; git_build
-        ; schema_file = "instantiated in network_config.ml"
-        ; zkapp_table = "instantiated in network_config.ml"
+        ; schema_files = []
         } )
   in
   let topology_of_seed n

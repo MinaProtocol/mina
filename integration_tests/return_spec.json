@@ -35,7 +35,7 @@
       "network_id": "string",
       "node_id": "string"
     },
-    "dump_precomputed_block": {
+    "dump_precomputed_blocks": {
       "blocks": "string",
       "network_id": "string",
       "node_id": "string"
