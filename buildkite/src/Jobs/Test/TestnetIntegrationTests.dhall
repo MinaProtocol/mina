@@ -2,7 +2,7 @@ let S = ../../Lib/SelectFiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
-
+let PipelineMode = ../../Pipeline/Mode.dhall
 let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
