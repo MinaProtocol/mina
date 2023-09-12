@@ -945,8 +945,8 @@ end
 
 module Genesis = struct
   type t = Json_layout.Genesis.t =
-    { k : int option
-    ; delta : int option
+    { k : int option (* the depth of finality constant (in slots) *)
+    ; delta : int option (* max permissible delay of packets (in slots) *)
     ; slots_per_epoch : int option
     ; slots_per_sub_window : int option
     ; genesis_state_timestamp : string option
@@ -1147,9 +1147,10 @@ let gen =
       None (* Leave it empty until we know better what should go there. *)
   }
 
-let make_fork_config ~ledger ~global_slot ~protocol_state_hash
-    (runtime_config : t) =
+let make_fork_config ~ledger ~global_slot ~blockchain_length
+    ~protocol_state_hash (runtime_config : t) =
   let global_slot = Mina_numbers.Global_slot.to_int global_slot in
+  let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
   let accounts_or_error =
     Mina_base.Ledger.foldi ~init:[] ~f:(fun _ accum act -> act :: accum) ledger
     |> map_results ~f:Accounts.Single.of_account
@@ -1160,7 +1161,7 @@ let make_fork_config ~ledger ~global_slot ~protocol_state_hash
         let open Option.Let_syntax in
         let%bind proof = runtime_config.proof in
         let%map fork = proof.fork in
-        fork.previous_length + global_slot
+        fork.previous_length + blockchain_length
       in
       let fork =
         Fork_config.
