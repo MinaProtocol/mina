@@ -78,6 +78,12 @@ export PATH=~/.npm-global/bin:$PATH
 # Install zkapp-cli and Typescript compiler.
 npm install --no-progress --global "zkapp-cli@${ZKAPP_CLI_VERSION}" "typescript@latest"
 
+# Build o1js so that we can use it later.
+pushd /workdir/src/lib/snarkyjs
+npm ci
+npm run build
+popd
+
 # Rosetta CLI variables
 # Files from ROSETTA_CLI_CONFIG_FILES will be read from
 # ROSETTA_CONFIGURATION_INPUT_DIR and some placeholders will be
