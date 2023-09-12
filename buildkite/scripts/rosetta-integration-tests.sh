@@ -1,5 +1,17 @@
 #!/bin/bash
 
+# Deploy a sandboxed Mina daemon with an archive and a Rosetta instance.
+# Deploy 2 zkApps from https://github.com/MinaProtocol/rosetta-integration-test-zkapps
+# to the network, interact with them and add some regular transactions.
+# Then run full rosetta-cli tests against the Rosetta instance.
+
+# NPM and NodeJS are installed through NVM, versions are stored in environment
+# variables below. Zkapp-cli is installed globally through NPM, however, to
+# ensure compatibility with the daemon, we use o1js pinned in the Mina repo.
+# The repo is mounted into the container at /workdir, so we can build o1js from
+# that source. It is important to make sure that the zkapp-cli version installed
+# is compatible with o1js version used.
+
 # These tests use the mina-dev binary, as rosetta-cli assumes we use a testnet.
 # See https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L222
 
@@ -38,6 +50,11 @@ export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 # Test variables
 export ROSETTA_INT_TEST_ZKAPPS_VERSION=${ROSETTA_INT_TEST_ZKAPPS_VERSION:=rosetta-ci-tests}
 
+# We need a version which is compatible with o1js pinned to the Mina repo.
+# Should be set to 'latest' most of the time, but occasionally we might need
+# an older one.
+export ZKAPP_CLI_VERSION=0.11.0
+
 # Nodejs variables
 export NVM_VERSION=0.39.3
 export NODE_VERSION=20.6.1
@@ -58,8 +75,8 @@ mkdir ~/.npm-global
 npm config set prefix '~/.npm-global'
 export PATH=~/.npm-global/bin:$PATH
 
-# Install zkapp-cli
-npm install --no-progress --global zkapp-cli@0.11.0 typescript@latest
+# Install zkapp-cli and Typescript compiler.
+npm install --no-progress --global "zkapp-cli@${ZKAPP_CLI_VERSION}" "typescript@latest"
 
 # Rosetta CLI variables
 # Files from ROSETTA_CLI_CONFIG_FILES will be read from
@@ -223,6 +240,16 @@ echo -e "{\n    \"privateKey\": \"${zkapp_fee_payer_privkey}\",\n    \"publicKey
 
 # Deploy zkApps
 echo "==================== DEPLOYING ZKAPPS ======================"
+echo "If this fails, it's likely due to incompatibility between the
+o1js and zkapp-cli versions in use."
+echo "NOTE: At the moment the daemon still has an old version of
+      snarkyjs pinned to it, so we cannot use the latest version of
+      zkapp-cli, which requires o1js. Once the pinned snarkyjs version
+      gets updated, this build will most likely fail and we will then
+      need to update the zkapp-cli version used here. This is
+      unfortunate, but necessary. Please delete this warning once it's
+      done." > /dev/stderr
+
 deploy_txs=()
 for zkapp_path in ${ZKAPP_PATH}/*/; do
   zkapp_path=${zkapp_path%/}
