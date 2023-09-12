@@ -293,11 +293,12 @@ struct
                With_status.data )
       in
       [%log' info (Logger.create ())]
-        "Looking for a zkApp transaction match with txn_hash $txn_hash in \
-         block with state_hash $state_hash"
+        "Looking for a zkApp transaction match for txn $txn with hash \
+         $txn_hash in block with state_hash $state_hash"
         ~metadata:
           [ ("state_hash", State_hash.to_yojson breadcrumb_added.state_hash)
           ; ("txn_hash", Mina_transaction.Transaction_hash.to_yojson txn_hash)
+          ; ("txn", Zkapp_command.to_yojson zkapp_command)
           ] ;
       [%log' debug (Logger.create ())]
         "wait_condition check, zkapp_to_be_included_in_frontier, \
