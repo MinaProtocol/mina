@@ -32,7 +32,7 @@ type inputs =
   ; debug : bool
   ; config_path : string option
   ; keypairs_path : string option
-  ; mock_alias : (string * string) option
+  ; network_runner_alias : (string * string) option
   }
 
 let test_name (test : test)
@@ -58,13 +58,13 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
       inputs.test_inputs
     in
     if
-      String.(test_name inputs.test (module Inputs) = "mock")
-      && Option.is_none inputs.mock_alias
-      && (Option.is_none @@ Sys.getenv "MOCK_NETWORK")
+      String.(Inputs.Engine.name = "abstract")
+      && Option.is_none inputs.network_runner_alias
+      && (Option.is_none @@ Sys.getenv "MINA_NETWORK_RUNNER")
     then (
       [%log fatal]
-        "Must provide either --mock command line arg or set MOCK_NETWORK env \
-         var" ;
+        "Must provide either --alias command line arg or set the \
+         MINA_NETWORK_RUNNER env var to the path of your network runner binary" ;
       ignore @@ exit 1 ) ;
     match Inputs.Engine.name with
     | "abstract" -> (
@@ -79,6 +79,8 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
                 "Must provide a keypair file when using the abstract engine" ;
               exit 1
           | Some path ->
+              [%log info] "Using network runner: %s"
+                (Option.value_exn inputs.network_runner_alias |> snd) ;
               let keypairs_ls = Stdlib.Sys.readdir path in
               (* check network-keypairs *)
               if
@@ -408,7 +410,6 @@ let main inputs =
         else (
           [%log info] "starting the daemons within the pods" ;
           let start_print (node : Engine.Network.Node.t) =
-            let open Malleable_error.Let_syntax in
             [%log info] "starting %s..." (Engine.Network.Node.id node) ;
             let%bind res = Engine.Network.Node.start ~fresh_state:false node in
             [%log info] "%s started" (Engine.Network.Node.id node) ;
@@ -425,10 +426,11 @@ let main inputs =
           let%bind () =
             Dsl.(wait_for dsl @@ Wait_condition.nodes_to_initialize seed_nodes)
           in
+          [%log info] "all seed nodes started" ;
           let%bind () =
             Malleable_error.List.iter non_seed_pods ~f:start_print
           in
-          [%log info] "daemons started" ;
+          [%log info] "all nodes started" ;
           [%log trace] "executing test" ;
           T.run network dsl ) )
   in
@@ -466,13 +468,15 @@ let config_path_arg =
     & opt (some non_dir_file) None
     & info [ "config-path"; "config" ] ~env ~docv:"MINA_CI_CONFIG_PATH" ~doc)
 
-let mock_alias_arg =
-  let doc = "Alias to use for the mock network binary." in
-  let env = Arg.env_var "MOCK_NETWORK" ~doc in
+let network_runner_alias_arg =
+  let doc = "Alias for the network runner binary." in
+  let env = Arg.env_var "MINA_NETWORK_RUNNER" ~doc in
   Arg.(
     value
     & opt (some string) None
-    & info [ "mock-network"; "mock"; "alias" ] ~env ~docv:"MOCK_NETWORK" ~doc)
+    & info
+        [ "network-runner-alias"; "network-runner"; "alias" ]
+        ~env ~docv:"MINA_NETWORK_RUNNER" ~doc)
 
 let keypair_dir_path_arg =
   let doc = "Path to the pre-generated network and libp2p keypair directory." in
@@ -540,7 +544,7 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
   in
   let set_alias alias =
     let alias = Option.map alias ~f:(fun a -> ("MOCK_NETWORK", a)) in
-    Engine.Network.alias := alias ;
+    Engine.Network.network_runner_alias := alias ;
     alias
   in
   let test_inputs_with_cli_inputs_arg =
@@ -551,7 +555,7 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
   in
   let inputs_term =
     let cons_inputs test_inputs test debug archive_image mina_image config_path
-        keypairs_path mock_alias =
+        keypairs_path network_runner_alias =
       { test_inputs
       ; test
       ; mina_image
@@ -559,7 +563,7 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
       ; debug
       ; config_path
       ; keypairs_path
-      ; mock_alias
+      ; network_runner_alias
       }
     in
     Term.(
@@ -570,7 +574,7 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
       $ (const set_mina_image $ mina_image_arg)
       $ (const set_config $ config_path_arg)
       $ (const set_keypair $ keypair_dir_path_arg)
-      $ (const set_alias $ mock_alias_arg))
+      $ (const set_alias $ network_runner_alias_arg))
   in
   (Term.(const start $ inputs_term), info)
 

@@ -5,7 +5,7 @@ open Integration_test_lib
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
 
-let alias : (string * string) option ref = ref None
+let network_runner_alias : (string * string) option ref = ref None
 
 let archive_image : string option ref = ref None
 

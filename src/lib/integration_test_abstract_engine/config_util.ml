@@ -4,8 +4,8 @@ open Signature_lib
 open Integration_test_lib
 module Network_config = Network_config
 
-(* [alias] is instantiated when command line args are parsed *)
-let alias = ref None
+(* [network_runner_alias] is instantiated when command line args are parsed *)
+let network_runner_alias = ref None
 
 (* [archive_image] is instantiated when command line args are parsed *)
 let archive_image : string option ref = ref None
@@ -415,9 +415,10 @@ module Config_file = struct
     let cmd_list = interpolate_args ~args raw_cmd |> String.split ~on:' ' in
     (List.hd_exn cmd_list, List.tl_exn cmd_list)
 
-  let evaluate_alias prog =
-    match !alias with
-    | Some (alias, value) when String.(alias = prog) ->
+  let evaluate_network_runner_alias prog =
+    match !network_runner_alias with
+    | Some (network_runner_alias, value)
+      when String.(network_runner_alias = prog) ->
         value
     | _ ->
         prog
@@ -430,7 +431,7 @@ module Config_file = struct
     let action_args = args_of_action action in
     let () = assert (validate_args ~args ~action) in
     let prog, arg_values = prog_and_args ~args action in
-    let prog = evaluate_alias prog in
+    let prog = evaluate_network_runner_alias prog in
     let cmd = String.concat ~sep:" " (prog :: arg_values) in
     let%map output =
       Util.run_cmd_or_error_timeout ~suppress_logs ~timeout_seconds dir prog
