@@ -8,8 +8,9 @@
    base.caml
    base
    base64
-   sexplib0
+   integers
    result
+   sexplib0
    ;; local libraries
    currency
    data_hash_lib
