@@ -3354,6 +3354,12 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let genesis_winner = Vrf.Precomputed.genesis_winner
 
+      let genesis_winner_account =
+        Mina_base.Account.create
+          (Mina_base.Account_id.create (fst genesis_winner)
+             Mina_base.Token_id.default )
+          (Currency.Balance.of_nanomina_int_exn 1000)
+
       let check_block_data ~constants ~logger (block_data : Block_data.t)
           global_slot =
         if

@@ -162,17 +162,32 @@ module Block = struct
   let get_chain (module Conn : Caqti_async.CONNECTION) state_hash =
     Conn.collect_list chain_query state_hash
 
+  (* either the bonafide genesis block, or the most recent "linking" block
+     at a hard fork point that has the genesis winner, that's at or before the
+     start slot
+  *)
   let genesis_snarked_ledger_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.string
-      {sql| SELECT value
-          FROM blocks
-          INNER JOIN snarked_ledger_hashes
-          ON snarked_ledger_hashes.id = blocks.snarked_ledger_hash_id
-          WHERE blocks.height = 1
-    |sql}
+    let genesis_winner =
+      let pk, _ = Mina_state.Consensus_state_hooks.genesis_winner in
+      Signature_lib.Public_key.Compressed.to_base58_check pk
+    in
+    Caqti_request.find Caqti_type.int64 Caqti_type.string
+      (sprintf
+         {sql| SELECT snarked_ledger_hashes.value
+               FROM blocks
+               INNER JOIN snarked_ledger_hashes
+               ON snarked_ledger_hashes.id = blocks.snarked_ledger_hash_id
+               INNER JOIN public_keys
+               ON public_keys.id = blocks.block_winner_id
+               WHERE public_keys.value = '%s'
+               AND blocks.global_slot_since_genesis <= $1
+               ORDER BY blocks.height DESC
+               LIMIT 1
+         |sql}
+         genesis_winner )
 
-  let genesis_snarked_ledger (module Conn : Caqti_async.CONNECTION) =
-    Conn.find genesis_snarked_ledger_query
+  let genesis_snarked_ledger (module Conn : Caqti_async.CONNECTION) start_slot =
+    Conn.find genesis_snarked_ledger_query start_slot
 end
 
 module User_command_ids = struct

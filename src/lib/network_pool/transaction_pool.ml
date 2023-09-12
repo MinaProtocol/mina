@@ -1020,23 +1020,23 @@ struct
 
       (** DO NOT mutate any transaction pool state in this function, you may only mutate in the synchronous `apply` function. *)
       let verify (t : pool) (diff : t Envelope.Incoming.t) :
-          verified Envelope.Incoming.t Deferred.Or_error.t =
-        let open Deferred.Or_error.Let_syntax in
-        let ok_if_true cond ~error =
-          Deferred.return
-            (Result.ok_if_true cond ~error:(Error.of_string error))
-        in
+          ( verified Envelope.Incoming.t
+          , Intf.Verification_error.t )
+          Deferred.Result.t =
+        let open Deferred.Result.Let_syntax in
         let is_sender_local =
           Envelope.Sender.(equal Local) (Envelope.Incoming.sender diff)
         in
+        let open Intf.Verification_error in
         let%bind () =
           (* TODO: we should probably remove this -- the libp2p gossip cache should cover this already (#11704) *)
           let (`Already_mem already_mem) =
             Lru_cache.add t.recently_seen (Lru_cache.T.hash diff.data)
           in
-          ok_if_true
-            (not (already_mem && not is_sender_local))
-            ~error:"Recently seen"
+          Deferred.return
+          @@ Result.ok_if_true
+               (not (already_mem && not is_sender_local))
+               ~error:Recently_seen
         in
         let%bind () =
           let well_formedness_errors =
@@ -1070,16 +1070,18 @@ struct
               ~compare:User_command.Well_formedness_error.compare
           with
           | [] ->
-              Deferred.Or_error.return ()
+              return ()
           | errs ->
               let err_str =
                 List.map errs ~f:User_command.Well_formedness_error.to_string
                 |> String.concat ~sep:","
               in
-              Deferred.Or_error.fail
-              @@ Error.createf
-                   "Some commands have one or more well-formedness errors: %s "
-                   err_str
+              Deferred.Result.fail
+              @@ Invalid
+                   (Error.createf
+                      "Some commands have one or more well-formedness errors: \
+                       %s "
+                      err_str )
         in
         (* TODO: batch `to_verifiable` (#11705) *)
         let%bind ledger =
@@ -1087,9 +1089,11 @@ struct
           | Some ledger ->
               return ledger
           | None ->
-              Deferred.Or_error.error_string
-                "We don't have a transition frontier at the moment, so we're \
-                 unable to verify any transactions."
+              Deferred.Result.fail
+              @@ Failure
+                   (Error.of_string
+                      "We don't have a transition frontier at the moment, so \
+                       we're unable to verify any transactions." )
         in
 
         let%bind diff' =
@@ -1114,7 +1118,7 @@ struct
           |> Envelope.Incoming.lift_error
           |> Result.map
                ~f:(Envelope.Incoming.map ~f:(List.map ~f:With_status.data))
-          |> Result.map_error ~f:(Error.tag ~tag:"Verification_failed")
+          |> Result.map_error ~f:(fun e -> Invalid e)
           |> Deferred.return
         in
         match%bind.Deferred
@@ -1130,7 +1134,7 @@ struct
                 [ ( "transaction_pool_diff"
                   , Diff_versioned.to_yojson (Envelope.Incoming.data diff) )
                 ] ;
-            Deferred.return (Error (Error.tag e ~tag:"Internal_error"))
+            Deferred.Result.fail (Failure e)
         | Ok (Error invalid) ->
             let err = Verifier.invalid_to_error invalid in
             [%log' error t.logger]
@@ -1144,20 +1148,19 @@ struct
                     ( "rejecting command because had invalid signature or proof"
                     , [] ) )
             in
-            Error (Error.tag err ~tag:"Verification_failed")
+            Error (Invalid err)
         | Ok (Ok commands) ->
             (* TODO: avoid duplicate hashing (#11706) *)
             O1trace.sync_thread "hashing_transactions_after_verification"
               (fun () ->
-                Deferred.return
-                  (Ok
-                     { diff with
-                       data =
-                         List.map commands
-                           ~f:
-                             Transaction_hash.User_command_with_valid_signature
-                             .create
-                     } ) )
+                return
+                  { diff with
+                    data =
+                      List.map commands
+                        ~f:
+                          Transaction_hash.User_command_with_valid_signature
+                          .create
+                  } )
 
       let register_locally_generated t txn =
         Hashtbl.update t.locally_generated_uncommitted txn ~f:(function
@@ -1392,16 +1395,45 @@ struct
           register_event
             { msg = "Received transaction-pool diff $txns from $sender" }]
 
-      let update_metrics envelope valid_cb gossip_heard_logger_option =
+      let update_metrics ~logger ~log_gossip_heard envelope valid_cb =
         Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_received) ;
         let diff = Envelope.Incoming.data envelope in
-        Option.iter gossip_heard_logger_option ~f:(fun logger ->
-            [%str_log debug]
-              (Transactions_received
-                 { txns = diff; sender = Envelope.Incoming.sender envelope } ) ) ;
+        if log_gossip_heard then
+          [%str_log debug]
+            (Transactions_received
+               { txns = diff; sender = Envelope.Incoming.sender envelope } ) ;
         Mina_net2.Validation_callback.set_message_type valid_cb `Transaction ;
         Mina_metrics.(Counter.inc_one Network.Transaction.received)
+
+      let log_internal ?reason ~logger msg
+          { Envelope.Incoming.data = diff; sender; _ } =
+        let metadata =
+          [ ( "diff"
+            , `List
+                (List.map diff
+                   ~f:Mina_transaction.Transaction.yojson_summary_of_command )
+            )
+          ]
+        in
+        let metadata =
+          match sender with
+          | Remote addr ->
+              ("sender", `String (Core.Unix.Inet_addr.to_string @@ Peer.ip addr))
+              :: metadata
+          | Local ->
+              metadata
+        in
+        let metadata =
+          Option.value_map reason
+            ~f:(fun r -> List.cons ("reason", `String r))
+            ~default:ident metadata
+        in
+        if not (is_empty diff) then
+          [%log internal] "%s" ("Transaction_diff_" ^ msg) ~metadata
+
+      let t_of_verified =
+        List.map ~f:Transaction_hash.User_command_with_valid_signature.command
     end
 
     let get_rebroadcastable (t : t) ~has_timed_out =
@@ -1584,13 +1616,22 @@ let%test_module _ =
 
       type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
 
-      let create : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
+      let create ?permissions :
+          unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
        fun () ->
         let zkappify_account (account : Account.t) : Account.t =
           let zkapp =
             Some { Zkapp_account.default with verification_key = Some vk }
           in
-          { account with zkapp }
+          { account with
+            zkapp
+          ; permissions =
+              ( match permissions with
+              | Some p ->
+                  p
+              | None ->
+                  Permissions.user_default )
+          }
         in
         let pipe_r, pipe_w =
           Broadcast_pipe.create
@@ -1770,8 +1811,10 @@ let%test_module _ =
                 User_command.forget_check )
            txs )
 
-    let setup_test () =
-      let frontier, best_tip_diff_w = Mock_transition_frontier.create () in
+    let setup_test ?(verifier = verifier) ?permissions () =
+      let frontier, best_tip_diff_w =
+        Mock_transition_frontier.create ?permissions ()
+      in
       let _, best_tip_ref = frontier in
       let frontier_pipe_r, frontier_pipe_w =
         Broadcast_pipe.create @@ Some frontier
@@ -1821,6 +1864,35 @@ let%test_module _ =
                 { receiver_pk = get_pk receiver_idx
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
+
+    let mk_single_account_update ~chain ~fee_payer_idx ~zkapp_account_idx ~fee
+        ~nonce ~ledger =
+      let fee = Currency.Fee.of_nanomina_int_exn fee in
+      let fee_payer_kp = test_keys.(fee_payer_idx) in
+      let nonce = Account.Nonce.of_int nonce in
+      let spec : Transaction_snark.For_tests.Single_account_update_spec.t =
+        Transaction_snark.For_tests.Single_account_update_spec.
+          { fee_payer = (fee_payer_kp, nonce)
+          ; fee
+          ; memo = Signed_command_memo.create_from_string_exn "invalid proof"
+          ; zkapp_account_keypair = test_keys.(zkapp_account_idx)
+          ; update = { Account_update.Update.noop with zkapp_uri = Set "abcd" }
+          ; call_data = Snark_params.Tick.Field.zero
+          ; events = []
+          ; actions = []
+          }
+      in
+      let%map zkapp_command =
+        Transaction_snark.For_tests.single_account_update ~chain
+          ~constraint_constants spec
+      in
+      Or_error.ok_exn
+        (Zkapp_command.Verifiable.create ~status:Applied
+           ~find_vk:
+             (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                ~get:Mina_ledger.Ledger.get
+                ~location_of_account:Mina_ledger.Ledger.location_of_account )
+           zkapp_command )
 
     let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
         ~receiver_idx ~fee ~nonce ~amount () =
@@ -2026,7 +2098,8 @@ let%test_module _ =
           (Envelope.Incoming.wrap
              ~data:(List.map ~f:User_command.forget_check cs)
              ~sender )
-        >>| Or_error.ok_exn
+        >>| Fn.compose Or_error.ok_exn
+              (Result.map_error ~f:Intf.Verification_error.to_error)
       in
       let result =
         Test.Resource_pool.Diff.unsafe_apply test.txn_pool verified
@@ -2910,4 +2983,40 @@ let%test_module _ =
             run_test_cases send_command
           in
           return () )
+
+    let%test "account update with a different network id that uses proof \
+              authorization would be rejected" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind verifier_full =
+            Verifier.create ~logger ~proof_level:Full ~constraint_constants
+              ~conf_dir:None
+              ~pids:(Child_processes.Termination.create_pid_table ())
+              ()
+          in
+          let%bind test =
+            setup_test ~verifier:verifier_full
+              ~permissions:
+                { Permissions.user_default with set_zkapp_uri = Proof }
+              ()
+          in
+          let%bind zkapp_command =
+            mk_single_account_update
+              ~chain:Mina_signature_kind.(Other_network "invalid")
+              ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
+              ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
+          in
+          match%map
+            Test.Resource_pool.Diff.verify test.txn_pool
+              (Envelope.Incoming.wrap
+                 ~data:
+                   [ User_command.forget_check
+                     @@ Zkapp_command
+                          (Zkapp_command.Valid.of_verifiable zkapp_command)
+                   ]
+                 ~sender:Envelope.Sender.Local )
+          with
+          | Error (Intf.Verification_error.Invalid e) ->
+              String.is_substring (Error.to_string_hum e) ~substring:"proof"
+          | _ ->
+              false )
   end )
