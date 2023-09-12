@@ -849,7 +849,6 @@ struct
      Meaning it needs opt sponge. *)
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
-      ~(feature_flags : Plonk_types.Features.options)
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
       ~(* TODO: Add "actual proofs verified" so that proofs don't
@@ -1199,7 +1198,7 @@ struct
                (module Impl)
                lookup_parameters feature_flags )
             (Types.Wrap.Statement.In_circuit.to_data ~option_map:Opt.map
-               statement ~to_opt:Opt.to_option_unsafe ) )
+               statement ) )
       |> Array.map ~f:(function
            | `Field (Shifted_value.Type1.Shifted_value x) ->
                `Field x
