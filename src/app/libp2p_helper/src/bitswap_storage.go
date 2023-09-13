@@ -49,7 +49,7 @@ func OpenBitswapStorageLmdb(path string) (*BitswapStorageLmdb, error) {
 	}
 	statusDB, err := blockstore.OpenDB("status")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create/open lmdb status database: %w", err)
+		return nil, fmt.Errorf("failed to create/open lmdb status database: %s", err)
 	}
 	return &BitswapStorageLmdb{blockstore: blockstore, statusDB: statusDB}, nil
 }
