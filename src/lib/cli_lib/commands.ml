@@ -204,7 +204,8 @@ module Vrf = struct
             let open Consensus_vrf.Layout in
             let evaluation =
               Evaluation.of_message_and_sk ~constraint_constants
-                { global_slot = Mina_numbers.Global_slot.of_int global_slot
+                { global_slot =
+                    Mina_numbers.Global_slot_since_hard_fork.of_int global_slot
                 ; epoch_seed =
                     Mina_base.Epoch_seed.of_base58_check_exn epoch_seed
                 ; delegator_index
@@ -270,7 +271,7 @@ module Vrf = struct
             let lexbuf = Lexing.from_channel In_channel.stdin in
             let lexer = Yojson.init_lexer () in
             Deferred.repeat_until_finished () (fun () ->
-                Deferred.Or_error.try_with (fun () ->
+                Deferred.Or_error.try_with ~here:[%here] (fun () ->
                     try
                       let message_json =
                         Yojson.Safe.from_lexbuf ~stream:true lexer lexbuf
@@ -325,7 +326,7 @@ module Vrf = struct
       let lexer = Yojson.init_lexer () in
       let%bind () =
         Deferred.repeat_until_finished () (fun () ->
-            Deferred.Or_error.try_with (fun () ->
+            Deferred.Or_error.try_with ~here:[%here] (fun () ->
                 try
                   let evaluation_json =
                     Yojson.Safe.from_lexbuf ~stream:true lexer lexbuf

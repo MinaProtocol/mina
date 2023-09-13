@@ -1,7 +1,7 @@
 (library
  (name network_pool)
  (public_name network_pool)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (library_flags -linkall)
  (libraries
    ;; opam libraries
@@ -54,6 +54,7 @@
    block_time
    transition_frontier_extensions
    signature_lib
+   mina_signature_kind
    inline_test_quiet_logs
    pickles
    pickles_types

@@ -35,6 +35,8 @@ module Worker_state = struct
     val get_blockchain_verification_key : unit -> Pickles.Verification_key.t
 
     val toggle_internal_tracing : bool -> unit
+
+    val set_itn_logger_data : daemon_port:int -> unit
   end
 
   (* bin_io required by rpc_parallel *)
@@ -161,6 +163,9 @@ module Worker_state = struct
                don't_wait_for
                @@ Internal_tracing.toggle ~logger
                     (if enabled then `Enabled else `Disabled)
+
+             let set_itn_logger_data ~daemon_port =
+               Itn_logger.set_data ~process_kind:"verifier" ~daemon_port
            end in
           (module M : S) )
     | Check | None ->
@@ -210,6 +215,8 @@ module Worker_state = struct
              let get_blockchain_verification_key () = Lazy.force vk
 
              let toggle_internal_tracing _ = ()
+
+             let set_itn_logger_data ~daemon_port:_ = ()
            end : S )
 
   let get = Fn.id
@@ -238,6 +245,7 @@ module Worker = struct
       ; get_blockchain_verification_key :
           ('w, unit, Pickles.Verification_key.t) F.t
       ; toggle_internal_tracing : ('w, bool, unit) F.t
+      ; set_itn_logger_data : ('w, int, unit) F.t
       }
 
     module Worker_state = Worker_state
@@ -276,6 +284,11 @@ module Worker = struct
       let toggle_internal_tracing (w : Worker_state.t) enabled =
         let (module M) = Worker_state.get w in
         M.toggle_internal_tracing enabled ;
+        Deferred.unit
+
+      let set_itn_logger_data (w : Worker_state.t) daemon_port =
+        let (module M) = Worker_state.get w in
+        M.set_itn_logger_data ~daemon_port ;
         Deferred.unit
 
       let functions =
@@ -323,6 +336,11 @@ module Worker = struct
               ( [%bin_type_class: bool]
               , [%bin_type_class: unit]
               , toggle_internal_tracing )
+        ; set_itn_logger_data =
+            f
+              ( [%bin_type_class: int]
+              , [%bin_type_class: unit]
+              , set_itn_logger_data )
         }
 
       let init_worker_state
@@ -344,6 +362,8 @@ module Worker = struct
                  ~directory:(Option.value_exn conf_dir)
                  ~log_filename:"mina-verifier.log" ~max_size ~num_rotate ) ;
           Option.iter internal_trace_filename ~f:(fun log_filename ->
+              Itn_logger.set_message_postprocessor
+                Internal_tracing.For_itn_logger.post_process_message ;
               Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
                 ~processor:Internal_tracing.For_logger.processor
                 ~transport:
@@ -402,7 +422,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
          [rest] handler for the 'rest' of the errors after the value is
          determined, which logs the errors and then swallows them.
       *)
-      Monitor.try_with ~name:"Verifier RPC worker" ~here:[%here] ~run:`Now
+      Monitor.try_with ~here:[%here] ~name:"Verifier RPC worker" ~run:`Now
         ~rest:
           (`Call
             (fun exn ->
@@ -668,4 +688,11 @@ let toggle_internal_tracing { worker; logger } enabled =
       let%bind { connection; _ } = Ivar.read !worker in
       Worker.Connection.run connection
         ~f:Worker.functions.toggle_internal_tracing ~arg:enabled
+      |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
+
+let set_itn_logger_data { worker; logger } ~daemon_port =
+  with_retry ~logger (fun () ->
+      let%bind { connection; _ } = Ivar.read !worker in
+      Worker.Connection.run connection ~f:Worker.functions.set_itn_logger_data
+        ~arg:daemon_port
       |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )

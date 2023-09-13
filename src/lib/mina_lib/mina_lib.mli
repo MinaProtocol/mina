@@ -36,6 +36,8 @@ exception Snark_worker_signal_interrupt of Signal.t
 
 exception Offline_shutdown
 
+exception Bootstrap_stuck_shutdown
+
 val time_controller : t -> Block_time.Controller.t
 
 val subscription : t -> Mina_subscriptions.t
@@ -194,7 +196,7 @@ val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
 
-val get_ledger : t -> State_hash.t option -> Account.t list Or_error.t
+val get_ledger : t -> State_hash.t option -> Account.t list Deferred.Or_error.t
 
 val get_snarked_ledger :
   t -> State_hash.t option -> Account.t list Deferred.Or_error.t
@@ -216,6 +218,10 @@ val config : t -> Config.t
 val net : t -> Mina_networking.t
 
 val runtime_config : t -> Runtime_config.t
+
+val start_filtered_log : t -> string list -> unit Or_error.t
+
+val get_filtered_log_entries : t -> int -> string list * bool
 
 val verifier : t -> Verifier.t
 

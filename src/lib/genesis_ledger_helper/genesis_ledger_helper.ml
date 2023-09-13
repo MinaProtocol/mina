@@ -84,7 +84,8 @@ module Ledger = struct
         ; List.to_string balances ~f:(fun (i, balance) ->
               sprintf "%i %s" i (Currency.Balance.to_string balance) )
         ; (* Distinguish ledgers when the hash function is different. *)
-          Snark_params.Tick.Field.to_string Mina_base.Account.empty_digest
+          Snark_params.Tick.Field.to_string
+            (Lazy.force Mina_base.Account.empty_digest)
         ; (* Distinguish ledgers when the account record layout has changed. *)
           Bin_prot.Writer.to_string Mina_base.Account.Stable.Latest.bin_writer_t
             Mina_base.Account.empty
@@ -255,16 +256,17 @@ module Ledger = struct
             Genesis_constants.Proof_level.equal Full proof_level
       in
       if add_genesis_winner_account then
-        let pk, _ = Mina_state.Consensus_state_hooks.genesis_winner in
+        let genesis_winner_pk, _ =
+          Mina_state.Consensus_state_hooks.genesis_winner
+        in
         match accounts with
         | (_, account) :: _
-          when Public_key.Compressed.equal (Account.public_key account) pk ->
+          when Public_key.Compressed.equal
+                 (Account.public_key account)
+                 genesis_winner_pk ->
             accounts
         | _ ->
-            ( None
-            , Account.create
-                (Account_id.create pk Token_id.default)
-                (Currency.Balance.of_nanomina_int_exn 1000) )
+            (None, Mina_state.Consensus_state_hooks.genesis_winner_account)
             :: accounts
       else accounts
     in
@@ -460,7 +462,7 @@ module Epoch_data = struct
           Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
             ~ledger_name_prefix ledger
         in
-        let%bind staking, config' =
+        let%bind staking, staking_config =
           let%map staking_ledger, config', ledger_file =
             load_ledger config.staking.ledger
           in
@@ -472,7 +474,7 @@ module Epoch_data = struct
             }
           , { config.staking with ledger = config' } )
         in
-        let%map next, config'' =
+        let%map next, next_config =
           match config.next with
           | None ->
               [%log trace]
@@ -491,9 +493,19 @@ module Epoch_data = struct
               , Some { Runtime_config.Epoch_data.Data.ledger = config''; seed }
               )
         in
+        (* the staking ledger and the next ledger, if it exists,
+           should have the genesis winner account as the first account, under
+           the conditions where the genesis ledger has that account (proof level
+           is Full, or we've specified `add_genesis_winner = true`
+
+           because the ledger is lazy, we don't want to force it in order to
+           check that invariant
+        *)
         ( Some { Consensus.Genesis_epoch_data.staking; next }
-        , Some { Runtime_config.Epoch_data.staking = config'; next = config'' }
-        )
+        , Some
+            { Runtime_config.Epoch_data.staking = staking_config
+            ; next = next_config
+            } )
 end
 
 (* This hash encodes the data that determines a genesis proof:

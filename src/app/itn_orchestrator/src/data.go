@@ -2,6 +2,7 @@ package itn_orchestrator
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"time"
 
@@ -27,8 +28,6 @@ type Command struct {
 	Params RawParams
 }
 
-type Scenario = []Command
-
 type NodeAddress string
 
 type NodeEntry struct {
@@ -36,22 +35,36 @@ type NodeEntry struct {
 	Libp2pPort      uint16
 	PeerId          string
 	IsBlockProducer bool
+	LastStatusCode  *int
 }
 
 type Config struct {
-	Ctx              context.Context
-	UptimeBucket     *storage.BucketHandle
-	GetGqlClient     GetGqlClientF
-	Log              logging.StandardLogger
-	Daemon           string
-	MinaExec         string
-	NodeData         map[NodeAddress]NodeEntry
-	SlotDurationMs   int
-	GenesisTimestamp time.Time
+	Ctx                context.Context
+	UptimeBucket       *storage.BucketHandle
+	Sk                 ed25519.PrivateKey
+	Log                logging.StandardLogger
+	MinaExec           string
+	NodeData           map[NodeAddress]NodeEntry
+	SlotDurationMs     int
+	GenesisTimestamp   time.Time
+	ControlExec        string
+	StopDaemonDelaySec int
+	FundDaemonPorts    []string
 }
 
 type OutputF = func(name string, value any, multiple bool, sensitive bool)
 
+type ActionIO struct {
+	Params json.RawMessage
+	Output OutputF
+}
+
 type Action interface {
 	Run(config Config, params json.RawMessage, output OutputF) error
+	Name() string
+}
+
+type BatchAction interface {
+	Action
+	RunMany(config Config, actionIOs []ActionIO) error
 }

@@ -1,10 +1,11 @@
 (library
  (public_name integration_test_cloud_engine)
  (name integration_test_cloud_engine)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../graphql-ppx-config.inc ../../../graphql_schema.json)
  (preprocess (pps
+               ppx_here
                ppx_mina ppx_version ppx_let ppx_inline_test ppx_pipebang
                ppx_custom_printf ppx_deriving_yojson lens.ppx_deriving
                ppx_sexp_conv
@@ -40,6 +41,7 @@
    mina_version
    timeout_lib
    mina_numbers
+   mina_state
    mina_stdlib
    mina_transaction
    file_system
@@ -52,5 +54,6 @@
    data_hash_lib
    generated_graphql_queries
    mina_graphql
+   error_json
    )
 )
