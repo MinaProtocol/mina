@@ -15,6 +15,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
+  let num_extra_keys = 1000
+
+  (* let num_sender_nodes = 4 *)
+
   let config =
     let open Test_config in
     { default with
@@ -27,7 +31,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { account_name = "empty-bp-key"; balance = "0"; timing = Untimed }
         ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
         ]
-        @ List.init 1000 ~f:(fun i ->
+        @ List.init num_extra_keys ~f:(fun i ->
               let i_str = Int.to_string i in
               { Test_Account.account_name =
                   String.concat [ "sender-account"; i_str ]
@@ -45,10 +49,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key"
-          ; worker_nodes = 25
+          ; worker_nodes = 4
           }
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
+    ; proof_config =
+        { proof_config_default with
+          work_delay = Some 1
+        ; transaction_capacity =
+            Some Runtime_config.Proof_keys.Transaction_capacity.small
+        }
     }
 
   let fee = Currency.Fee.of_int 10_000_000
@@ -125,8 +135,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          Malleable_error.List.fold ~init:sender_priv_keys empty_bps
            ~f:(fun keys node ->
              let keys0, rest = List.split_n keys keys_per_sender in
-             Network.Node.must_send_test_payments ~repeat_count ~repeat_delay_ms
-               ~logger ~senders:keys0 ~receiver_pub_key ~amount ~fee node
+             Integration_test_lib.Graphql_requests.must_send_test_payments
+               ~repeat_count ~repeat_delay_ms ~logger ~senders:keys0
+               ~receiver_pub_key ~amount ~fee
+               (Network.Node.get_ingress_uri node)
              >>| const rest )
          >>| const () )
     in
@@ -140,8 +152,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "checked produced blocks"
         (let%bind blocks =
-           Network.Node.must_get_best_chain ~logger ~max_length:(2 * num_slots)
-             receiver
+           Integration_test_lib.Graphql_requests.must_get_best_chain ~logger
+             ~max_length:(2 * num_slots)
+             (Network.Node.get_ingress_uri receiver)
          in
          let%bind () =
            ok_if_true "not enough blocks"
@@ -177,7 +190,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let get_metrics node =
       Async_kernel.Deferred.bind
-        (Network.Node.get_metrics ~logger node)
+        (Integration_test_lib.Graphql_requests.get_metrics ~logger
+           (Network.Node.get_ingress_uri node) )
         ~f:Malleable_error.or_hard_error
     in
     let%bind () =

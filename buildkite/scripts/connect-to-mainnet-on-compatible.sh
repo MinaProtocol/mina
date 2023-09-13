@@ -2,10 +2,14 @@
 
 set -eo pipefail
 
-if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "compatible" ]; then
-  echo "Not pulling against compatible, not running the connect test"
-  exit 0
-fi
+case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
+    compatible|release/*)
+      ;;
+    *) 
+      echo "Not pulling against compatible or not in release branch. Therefore, not running the connect test"
+      exit 0
+      ;;
+esac
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
@@ -31,6 +35,7 @@ rm ~/.mina-config/.mina-lock ||:
 mina daemon \
   --peer-list-url "https://storage.googleapis.com/seed-lists/${TESTNET_NAME}_seeds.txt" \
 & # -background
+
 
 # Attempt to connect to the GraphQL client every 10s for up to 4 minutes
 num_status_retries=24

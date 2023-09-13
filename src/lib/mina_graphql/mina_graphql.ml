@@ -2800,6 +2800,19 @@ module Types = struct
               | None ->
                   t.threshold_met )
         ] )
+
+  let get_filtered_log_entries =
+    obj "GetFilteredLogEntries" ~fields:(fun _ ->
+        [ field "logMessages"
+            ~typ:(non_null (list (non_null string)))
+            ~doc:"Structured log messages since the given offset"
+            ~args:Arg.[]
+            ~resolve:(fun _ (logs, _) -> logs)
+        ; field "isCapturing" ~typ:(non_null bool)
+            ~doc:"Whether we are capturing structured log messages"
+            ~args:Arg.[]
+            ~resolve:(fun _ (_, is_started) -> is_started)
+        ] )
 end
 
 module Subscriptions = struct
@@ -2865,6 +2878,16 @@ module Mutations = struct
       ~args:
         Arg.[ arg "input" ~typ:(non_null Types.Input.AddAccountInput.arg_typ) ]
       ~resolve:create_account_resolver
+
+  let start_filtered_log =
+    field "startFilteredLog"
+      ~doc:
+        "TESTING ONLY: Start filtering and recording all structured events in \
+         memory"
+      ~typ:(non_null bool)
+      ~args:Arg.[ arg "filter" ~typ:(non_null (list (non_null string))) ]
+      ~resolve:(fun { ctx = t; _ } () filter ->
+        Result.is_ok @@ Mina_lib.start_filtered_log t filter )
 
   let create_account =
     io_field "createAccount"
@@ -3610,6 +3633,7 @@ module Mutations = struct
 
   let commands =
     [ add_wallet
+    ; start_filtered_log
     ; create_account
     ; create_hd_account
     ; unlock_account
@@ -3776,6 +3800,13 @@ module Queries = struct
       ~args:Arg.[]
       ~doc:"The version of the node (git commit hash)"
       ~resolve:(fun _ _ -> Some Mina_version.commit_id)
+
+  let get_filtered_log_entries =
+    field "getFilteredLogEntries"
+      ~typ:(non_null Types.get_filtered_log_entries)
+      ~args:Arg.[ arg "offset" ~typ:(non_null int) ]
+      ~doc:"TESTING ONLY: Retrieve all new structured events in memory"
+      ~resolve:(fun { ctx = t; _ } () i -> Mina_lib.get_filtered_log_entries t i)
 
   let tracked_accounts_resolver { ctx = coda; _ } () =
     let wallets = Mina_lib.wallets coda in
@@ -4255,6 +4286,83 @@ module Queries = struct
         Mina_lib.runtime_config mina
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
 
+  let fork_config =
+    let rec map_results ~f = function
+      | [] ->
+          Result.return []
+      | r :: rs ->
+          let open Result.Let_syntax in
+          let%bind r' = f r in
+          let%map rs = map_results ~f rs in
+          r' :: rs
+    in
+    field "fork_config"
+      ~doc:
+        "The runtime configuration for a blockchain fork intended to be a \
+         continuation of the current one."
+      ~typ:(non_null Types.json)
+      ~args:Arg.[]
+      ~resolve:(fun { ctx = mina; _ } () ->
+        match Mina_lib.best_tip mina with
+        | `Bootstrapping ->
+            `Assoc [ ("error", `String "Daemon is bootstrapping") ]
+        | `Active best_tip -> (
+            let block = Transition_frontier.Breadcrumb.(block best_tip) in
+            let global_slot =
+              Mina_block.blockchain_length block |> Unsigned.UInt32.to_int
+            in
+            let accounts_or_error =
+              Transition_frontier.Breadcrumb.staged_ledger best_tip
+              |> Staged_ledger.ledger
+              |> Ledger.foldi ~init:[] ~f:(fun _ accum act -> act :: accum)
+              |> map_results
+                   ~f:Runtime_config.Json_layout.Accounts.Single.of_account
+            in
+            let protocol_state =
+              Transition_frontier.Breadcrumb.protocol_state best_tip
+            in
+            match accounts_or_error with
+            | Error e ->
+                `Assoc [ ("error", `String e) ]
+            | Ok accounts ->
+                let runtime_config = Mina_lib.runtime_config mina in
+                let ledger = Option.value_exn runtime_config.ledger in
+                let previous_length =
+                  let open Option.Let_syntax in
+                  let%bind proof = runtime_config.proof in
+                  let%map fork = proof.fork in
+                  fork.previous_length + global_slot
+                in
+                let fork =
+                  Runtime_config.Fork_config.
+                    { previous_state_hash =
+                        State_hash.to_base58_check
+                          protocol_state.previous_state_hash
+                    ; previous_length =
+                        Option.value ~default:global_slot previous_length
+                    ; previous_global_slot = global_slot
+                    }
+                in
+                let update =
+                  Runtime_config.make
+                  (* add_genesis_winner must be set to false, because this
+                     config effectively creates a continuation of the current
+                     blockchain state and therefore the genesis ledger already
+                     contains the winner of the previous block. No need to
+                     artificially add it. In fact, it wouldn't work at all,
+                     because the new node would try to create this account at
+                     startup, even though it already exists, leading to an error.*)
+                    ~ledger:
+                      { ledger with
+                        base = Accounts accounts
+                      ; add_genesis_winner = Some false
+                      }
+                    ~proof:(Runtime_config.Proof_keys.make ~fork ())
+                    ()
+                in
+                let new_config = Runtime_config.combine runtime_config update in
+                Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic ) )
+
   let thread_graph =
     field "threadGraph"
       ~doc:
@@ -4330,6 +4438,7 @@ module Queries = struct
     [ sync_status
     ; daemon_status
     ; version
+    ; get_filtered_log_entries
     ; owned_wallets (* deprecated *)
     ; tracked_accounts
     ; wallet (* deprecated *)
@@ -4356,6 +4465,7 @@ module Queries = struct
     ; evaluate_vrf
     ; check_vrf
     ; runtime_config
+    ; fork_config
     ; thread_graph
     ]
 end

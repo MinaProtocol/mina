@@ -22,6 +22,9 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{- if $.Values.priorityClass }}
+      priorityClassName: {{ $.Values.priorityClass }}
+      {{- end }}
       containers:
       - name: mina
         resources:
@@ -61,6 +64,9 @@ spec:
           "-generate-genesis-proof", {{ $.Values.mina.generateGenesisProof | quote }},
           {{- if $.Values.mina.enableArchive }}
           "-archive-address", {{ $.Values.mina.archiveAddress }}
+          {{- end -}}
+          {{- if $.Values.mina.exposeGraphql }}
+          "-insecure-rest-server",
           {{- end -}}
         ]
         env:

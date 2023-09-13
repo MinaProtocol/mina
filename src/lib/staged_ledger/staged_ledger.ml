@@ -971,36 +971,6 @@ module T = struct
       =
     ((a :> Transaction.t With_status.t list), b, c, d)
 
-  [%%if feature_snapps]
-
-  let check_commands ledger ~verifier (cs : User_command.t list) =
-    match
-      Or_error.try_with (fun () ->
-          List.map cs
-            ~f:
-              (let open Ledger in
-              User_command.to_verifiable_exn ~ledger ~get ~location_of_account) )
-    with
-    | Error e ->
-        Deferred.return (Error e)
-    | Ok cs ->
-        let open Deferred.Or_error.Let_syntax in
-        let%map xs = Verifier.verify_commands verifier cs in
-        Result.all
-          (List.map xs ~f:(function
-            | `Valid x ->
-                Ok x
-            | `Invalid ->
-                Error
-                  (Verifier.Failure.Verification_failed
-                     (Error.of_string "verification failed on command") )
-            | `Valid_assuming _ ->
-                Error
-                  (Verifier.Failure.Verification_failed
-                     (Error.of_string "batch verification failed") ) ) )
-
-  [%%else]
-
   (* imeckler: added this version because the call to the verifier was
      causing super catchup to proceed more slowly than it could have otherwise.
 
@@ -1025,8 +995,6 @@ module T = struct
                   (Verifier.Failure.Verification_failed
                      (Error.of_string "signature failed to verify") ) ) ) )
     |> Deferred.Or_error.return
-
-  [%%endif]
 
   let apply ?skip_verification ~constraint_constants t
       (witness : Staged_ledger_diff.t) ~logger ~verifier ~current_state_view

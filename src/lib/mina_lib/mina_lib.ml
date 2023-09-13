@@ -108,6 +108,8 @@ type t =
       ([ `Path of string ] option * [ `Log ] option) ref
   ; block_production_status :
       [ `Producing | `Producing_in_ms of float | `Free ] ref
+  ; in_memory_reverse_structured_log_messages_for_integration_test :
+      (int * string list * bool) ref
   }
 [@@deriving fields]
 
@@ -519,40 +521,49 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 let best_ledger = compose_of_option best_ledger_opt
 
 let get_ledger t state_hash_opt =
-  let open Or_error.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   let%bind state_hash =
-    Option.value_map state_hash_opt ~f:Or_error.return
-      ~default:
-        ( match best_tip t with
-        | `Active bc ->
-            Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
-        | `Bootstrapping ->
-            Or_error.error_string
-              "get_ledger: can't get staged ledger hash while bootstrapping" )
+    Deferred.return
+    @@ Option.value_map state_hash_opt ~f:Or_error.return
+         ~default:
+           ( match best_tip t with
+           | `Active bc ->
+               Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
+           | `Bootstrapping ->
+               Or_error.error_string
+                 "get_ledger: can't get staged ledger hash while bootstrapping"
+           )
   in
-  let%bind frontier = t.components.transition_frontier |> peek_frontier in
+  let%bind frontier =
+    t.components.transition_frontier |> peek_frontier |> Deferred.return
+  in
   match Transition_frontier.find frontier state_hash with
   | Some b ->
       let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
-      Ok (Ledger.to_list (Staged_ledger.ledger staged_ledger))
+      let%map.Deferred accounts =
+        Ledger.to_list (Staged_ledger.ledger staged_ledger)
+      in
+      Ok accounts
   | None ->
-      Or_error.error_string
-        "get_ledger: state hash not found in transition frontier"
+      Deferred.return
+      @@ Or_error.error_string "state hash not found in transition frontier"
 
 let get_snarked_ledger t state_hash_opt =
-  let open Or_error.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   let%bind state_hash =
-    Option.value_map state_hash_opt ~f:Or_error.return
+    Option.value_map state_hash_opt ~f:Deferred.Or_error.return
       ~default:
         ( match best_tip t with
         | `Active bc ->
-            Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
+            Deferred.Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
         | `Bootstrapping ->
-            Or_error.error_string
+            Deferred.Or_error.error_string
               "get_snarked_ledger: can't get snarked ledger hash while \
                bootstrapping" )
   in
-  let%bind frontier = t.components.transition_frontier |> peek_frontier in
+  let%bind frontier =
+    t.components.transition_frontier |> peek_frontier |> Deferred.return
+  in
   match Transition_frontier.find frontier state_hash with
   | Some b ->
       let root_snarked_ledger =
@@ -560,7 +571,7 @@ let get_snarked_ledger t state_hash_opt =
       in
       let ledger = Ledger.of_database root_snarked_ledger in
       let path = Transition_frontier.path_map frontier b ~f:Fn.id in
-      let%bind _ =
+      let%bind () =
         List.fold_until ~init:(Ok ()) path
           ~f:(fun _acc b ->
             if Transition_frontier.Breadcrumb.just_emitted_a_proof b then
@@ -615,6 +626,7 @@ let get_snarked_ledger t state_hash_opt =
                       Stop e )
             else Continue (Ok ()) )
           ~finish:Fn.id
+        |> Deferred.return
       in
       let snarked_ledger_hash =
         Transition_frontier.Breadcrumb.block b
@@ -624,17 +636,17 @@ let get_snarked_ledger t state_hash_opt =
       in
       let merkle_root = Ledger.merkle_root ledger in
       if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then (
-        let res = Ledger.to_list ledger in
+        let%map.Deferred res = Ledger.to_list ledger in
         ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
         Ok res )
       else
-        Or_error.errorf
+        Deferred.Or_error.errorf
           "Expected snarked ledger hash %s but got %s for state hash %s"
           (Frozen_ledger_hash.to_base58_check snarked_ledger_hash)
           (Frozen_ledger_hash.to_base58_check merkle_root)
           (State_hash.to_base58_check state_hash)
   | None ->
-      Or_error.error_string
+      Deferred.Or_error.error_string
         "get_snarked_ledger: state hash not found in transition frontier"
 
 let get_account t aid =
@@ -1588,8 +1600,8 @@ let create ?wallets (config : Config.t) =
               ~trust_system:config.trust_system
               ~disk_location:config.snark_pool_disk_location
           in
-          let%bind snark_pool, snark_remote_sink, snark_local_sink =
-            Network_pool.Snark_pool.load ~config:snark_pool_config
+          let snark_pool, snark_remote_sink, snark_local_sink =
+            Network_pool.Snark_pool.create ~config:snark_pool_config
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -2020,9 +2032,54 @@ let create ?wallets (config : Config.t) =
             ; sync_status
             ; precomputed_block_writer
             ; block_production_status = ref `Free
+            ; in_memory_reverse_structured_log_messages_for_integration_test =
+                ref (0, [], false)
             } ) )
 
 let net { components = { net; _ }; _ } = net
 
 let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
+
+let start_filtered_log
+    ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
+    (structured_log_ids : string list) =
+  let handle str =
+    let idx, old_messages, started =
+      !in_memory_reverse_structured_log_messages_for_integration_test
+    in
+    in_memory_reverse_structured_log_messages_for_integration_test :=
+      (idx + 1, str :: old_messages, started)
+  in
+  let _, _, started =
+    !in_memory_reverse_structured_log_messages_for_integration_test
+  in
+  if started then Or_error.error_string "Already initialized"
+  else (
+    in_memory_reverse_structured_log_messages_for_integration_test :=
+      (0, [], true) ;
+    let event_set =
+      Structured_log_events.Set.of_list
+      @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
+    in
+    Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+      ~processor:(Logger.Processor.raw_structured_log_events event_set)
+      ~transport:(Logger.Transport.raw handle) ;
+    Ok () )
+
+let get_filtered_log_entries
+    ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
+    (idx : int) =
+  let rec get_from_idx curr_idx rev_messages output =
+    if idx < curr_idx then
+      match rev_messages with
+      | [] ->
+          output
+      | msg :: rev_messages ->
+          get_from_idx (curr_idx - 1) rev_messages (msg :: output)
+    else output
+  in
+  let curr_idx, messages, is_started =
+    !in_memory_reverse_structured_log_messages_for_integration_test
+  in
+  (get_from_idx curr_idx messages [], is_started)

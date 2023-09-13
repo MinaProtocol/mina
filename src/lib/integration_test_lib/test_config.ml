@@ -1,3 +1,5 @@
+open Core_kernel
+
 module Container_images = struct
   type t =
     { mina : string
@@ -65,7 +67,9 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   }
 
 let default =
-  { requires_graphql = false
+  { requires_graphql =
+      true
+      (* require_graphql maybe should just be phased out, because it always needs to be enable.  Now with the graphql polling engine, everything will definitely fail if graphql is not enabled.  But even before that, most tests relied on some sort of graphql interaction *)
   ; genesis_ledger = []
   ; block_producers = []
   ; snark_coordinator = None
@@ -79,3 +83,55 @@ let default =
   ; delta = 0
   ; txpool_max_size = 3000
   }
+
+let transaction_capacity_log_2 (config : t) =
+  match config.proof_config.transaction_capacity with
+  | None ->
+      Genesis_constants.Constraint_constants.compiled.transaction_capacity_log_2
+  | Some (Log_2 i) ->
+      i
+  | Some (Txns_per_second_x10 tps_goal_x10) ->
+      let max_coinbases = 2 in
+      let block_window_duration_ms =
+        Option.value
+          ~default:
+            Genesis_constants.Constraint_constants.compiled
+              .block_window_duration_ms
+          config.proof_config.block_window_duration_ms
+      in
+      let max_user_commands_per_block =
+        (* block_window_duration is in milliseconds, so divide by 1000 divide
+           by 10 again because we have tps * 10
+        *)
+        tps_goal_x10 * block_window_duration_ms / (1000 * 10)
+      in
+      (* Log of the capacity of transactions per transition.
+          - 1 will only work if we don't have prover fees.
+          - 2 will work with prover fees, but not if we want a transaction
+            included in every block.
+          - At least 3 ensures a transaction per block and the staged-ledger
+            unit tests pass.
+      *)
+      1 + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
+
+let transaction_capacity config =
+  let i = transaction_capacity_log_2 config in
+  Int.pow 2 i
+
+let blocks_for_first_ledger_proof (config : t) =
+  let work_delay =
+    Option.value
+      ~default:Genesis_constants.Constraint_constants.compiled.work_delay
+      config.proof_config.work_delay
+  in
+  let transaction_capacity_log_2 = transaction_capacity_log_2 config in
+  ((work_delay + 1) * (transaction_capacity_log_2 + 1)) + 1
+
+let slots_for_blocks blocks =
+  (*Given 0.75 slots are filled*)
+  Float.round_up (Float.of_int blocks *. 4.0 /. 3.0) |> Float.to_int
+
+let transactions_needed_for_ledger_proofs ?(num_proofs = 1) config =
+  let transactions_per_block = transaction_capacity config in
+  (blocks_for_first_ledger_proof config * transactions_per_block)
+  + (transactions_per_block * (num_proofs - 1))

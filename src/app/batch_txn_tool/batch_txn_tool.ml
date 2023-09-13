@@ -1,8 +1,9 @@
 open Core
 open Async
 open Signature_lib
-open Txn_tool_graphql
 open Unsigned
+open Mina_base
+open Integration_test_lib
 
 let gen_keys count =
   Quickcheck.random_value ~seed:`Nondeterministic
@@ -89,8 +90,63 @@ let output_cmds =
              (Public_key.Compressed.to_base58_check pk)
              sender_key ) )
 
-let pk_to_str pk =
-  pk |> Public_key.compress |> Public_key.Compressed.to_base58_check
+let pub_key_to_string pub_key =
+  pub_key |> Public_key.compress |> Public_key.Compressed.to_base58_check
+
+let ingress_uri ~graphql_target_node =
+  let target = Str.split (Str.regexp ":") graphql_target_node in
+  let host =
+    match List.nth target 0 with Some data -> data | None -> "127.0.0.1"
+  in
+  let port =
+    match List.nth target 1 with
+    | Some data ->
+        int_of_string data
+    | None ->
+        3085
+  in
+  let path = "/graphql" in
+  Uri.make ~scheme:"http" ~host ~path ~port ()
+
+(* helper function that uses graphql command to get the nonce of a node*)
+let get_nonce ~logger ~(ingress_uri : Uri.t) ~(pub_key : Account.key) =
+  [%log info] "txn burst tool: Getting account balance and nonce"
+    ~metadata:
+      [ ("pub_key", Signature_lib.Public_key.Compressed.to_yojson pub_key)
+      ; ("ingress_uri", `String (Uri.to_string ingress_uri))
+      ] ;
+  let%bind nonce =
+    let%bind querry_result =
+      Integration_test_lib.Graphql_requests.get_account_data ingress_uri ~logger
+        ~public_key:pub_key
+    in
+    match querry_result with
+    | Ok res ->
+        return res.nonce
+    | Error _ ->
+        [%log error] "txn burst tool: could not get nonce of pk"
+          ~metadata:
+            [ ("pub_key", Signature_lib.Public_key.Compressed.to_yojson pub_key)
+            ; ("ingress_uri", `String (Uri.to_string ingress_uri))
+            ] ;
+        exit 1
+  in
+  [%log info] "txn burst tool: nonce obtained, nonce= %d" (UInt32.to_int nonce) ;
+  return nonce
+
+(* helper function for getting a keypair from a local path *)
+let get_keypair ~logger path pw_option =
+  let%bind keypair =
+    match pw_option with
+    | Some s ->
+        Secrets.Keypair.read_exn ~privkey_path:path
+          ~password:(s |> Bytes.of_string |> Deferred.return |> Lazy.return)
+    | None ->
+        Secrets.Keypair.read_exn' path
+  in
+  [%log info] "txn burst tool: successfully got keypair.  pub_key= %s "
+    (pub_key_to_string keypair.public_key) ;
+  return keypair
 
 let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     ~txn_fee_option ~rate_limit ~rate_limit_level ~rate_limit_interval
@@ -100,6 +156,8 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     ~graphql_target_node_option () =
   let open Deferred.Let_syntax in
   (* define the rate limiting function *)
+  let open Logger in
+  let logger = Logger.create () in
   let limit_level =
     let slot_limit =
       Float.(
@@ -117,10 +175,14 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
       if !batch_count >= limit_level then
         let%bind () =
           Deferred.return
-            (Format.printf
-               "txn burst tool: rate limiting, pausing for %d milliseconds... \
-                @."
-               rate_limit_interval )
+            ([%log info]
+               "txn burst tool: rate limiting, pausing for %d milliseconds... "
+               rate_limit_interval
+               ~metadata:
+                 [ ( "rate_limit_interval"
+                   , rate_limit_interval |> Int.to_string
+                     |> Yojson.Safe.from_string )
+                 ] )
         in
         let%bind () =
           Async.after (Time.Span.create ~ms:rate_limit_interval ())
@@ -130,7 +192,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     else fun () -> Deferred.return ()
   in
 
-  (* contants regarding send amount and fees *)
+  (* constants regarding send amount and fees *)
   let base_send_amount = Currency.Amount.of_formatted_string "0" in
   let fee_amount =
     match txn_fee_option with
@@ -167,78 +229,46 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   let graphql_target_node =
     match graphql_target_node_option with Some s -> s | None -> "127.0.0.1"
   in
-
-  (* helper function for getting a keypair from a local path *)
-  let get_keypair path pw_option =
-    let%bind keypair =
-      match pw_option with
-      | Some s ->
-          Secrets.Keypair.read_exn ~privkey_path:path
-            ~password:(s |> Bytes.of_string |> Deferred.return |> Lazy.return)
-      | None ->
-          Secrets.Keypair.read_exn' path
-    in
-    let pk_str =
-      keypair.public_key |> Public_key.compress
-      |> Public_key.Compressed.to_base58_check
-    in
-    Format.printf "txn burst tool: successfully got keypair.  pk= %s@." pk_str ;
-    return keypair
-  in
+  let node_ingress_uri = ingress_uri ~graphql_target_node in
 
   (* get the keypairs from files *)
   let%bind origin_keypair =
-    get_keypair origin_sender_secret_key_path origin_sender_secret_key_pw_option
+    get_keypair ~logger origin_sender_secret_key_path
+      origin_sender_secret_key_pw_option
+  in
+  let origin_pub_key =
+    origin_keypair.public_key |> Signature_lib.Public_key.compress
   in
   let%bind returner_keypair =
-    get_keypair returner_secret_key_path returner_secret_key_pw_option
-  in
-
-  (* helper function that uses graphql command to get the nonce of a node*)
-  let get_nonce pk =
-    Format.printf
-      "txn burst tool: using graphql to get the nonce of the account= %s, \
-       using graphql target node= %s@."
-      (pk_to_str pk) graphql_target_node ;
-    let%bind nonce =
-      let%bind querry_result =
-        get_account_data ~graphql_target_node ~public_key:pk
-      in
-      match querry_result with
-      | Ok n ->
-          return (UInt32.of_int n)
-      | Error _ ->
-          Format.printf "txn burst tool: could not get nonce of pk= %s@."
-            (pk_to_str pk) ;
-          exit 1
-    in
-    Format.printf "txn burst tool: nonce obtained, nonce= %d@."
-      (UInt32.to_int nonce) ;
-    return nonce
+    get_keypair ~logger returner_secret_key_path returner_secret_key_pw_option
   in
 
   (* helper function that sends a transaction*)
   let do_txn ~(sender_kp : Keypair.t) ~(receiver_kp : Keypair.t) ~nonce =
-    Format.printf
+    let receiver_pub_key =
+      receiver_kp.public_key |> Signature_lib.Public_key.compress
+    in
+    [%log info]
       "txn burst tool: sending txn from sender= %s (nonce=%d) to receiver= %s \
-       with amount=%s and fee=%s@."
-      (pk_to_str sender_kp.public_key)
+       with amount=%s and fee=%s"
+      (pub_key_to_string sender_kp.public_key)
       (UInt32.to_int nonce)
-      (pk_to_str receiver_kp.public_key)
+      (pub_key_to_string receiver_kp.public_key)
       (Currency.Amount.to_string initial_send_amount)
       (Currency.Fee.to_string fee_amount) ;
     let%bind res =
-      send_signed_transaction ~sender_priv_key:sender_kp.private_key ~nonce
-        ~receiver_pub_key:receiver_kp.public_key ~amount:initial_send_amount
-        ~fee:fee_amount ~graphql_target_node
+      Graphql_requests.sign_and_send_payment ~logger node_ingress_uri
+        ~sender_keypair:sender_kp ~receiver_pub_key ~amount:base_send_amount
+        ~fee:fee_amount ~nonce ~memo:"" ~token:Token_id.default
+        ~valid_until:Mina_numbers.Global_slot.max_value
     in
     let%bind () =
       match res with
       | Ok _ ->
-          return (Format.printf "txn burst tool: txn sent successfully!@.")
+          return ([%log info] "txn burst tool: txn sent successfully!")
       | Error e ->
           return
-            (Format.printf "txn burst tool: txn failed with error %s@."
+            ([%log info] "txn burst tool: txn failed with error %s"
                (Error.to_string_hum e) )
     in
     limit ()
@@ -248,7 +278,10 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   let%bind () =
     (* in a previous version of the code there could be multiple returners, thus the iter.  keeping this structure in case we decide to change back later *)
     Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
-        let%bind origin_nonce = get_nonce origin_keypair.public_key in
+        let%bind origin_nonce =
+          get_nonce ~logger ~ingress_uri:node_ingress_uri
+            ~pub_key:origin_pub_key
+        in
         (* we could also get the origin nonce outside the iter and then just increment by 1 every iter *)
         do_txn ~sender_kp:origin_keypair ~receiver_kp:kp ~nonce:origin_nonce )
   in
@@ -256,7 +289,10 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   (* and back again... *)
   let%bind () =
     Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
-        let%bind returner_nonce = get_nonce kp.public_key in
+        let%bind returner_nonce =
+          get_nonce ~logger ~ingress_uri:node_ingress_uri
+            ~pub_key:(Signature_lib.Public_key.compress kp.public_key)
+        in
         let rec do_command n : unit Deferred.t =
           (* nce = returner_nonce + ( num_txn_per_acct - n ) *)
           let nce =
@@ -269,6 +305,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
         in
         do_command num_txn_per_acct )
   in
+
   return ()
 
 let output_there_and_back_cmds =

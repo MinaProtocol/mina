@@ -37,13 +37,10 @@ type output =
   }
 [@@deriving yojson]
 
-type command_type = [ `Internal_command | `User_command | `Snapp_command ]
-
 module type Get_command_ids = sig
   val run :
        Caqti_async.connection
     -> state_hash:string
-    -> start_slot:int64
     -> (int list, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
 end
 
@@ -64,20 +61,21 @@ let json_ledger_hash_of_ledger ledger =
   Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
 let create_ledger_as_list ledger =
-  List.map (Ledger.to_list ledger) ~f:(fun acc ->
+  let%map accounts = Ledger.to_list ledger in
+  List.map accounts ~f:(fun acc ->
       Genesis_ledger_helper.Accounts.Single.of_account acc None )
 
 let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
     ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
     (input_genesis_ledger : Runtime_config.Ledger.t) =
-  let genesis_ledger_as_list = create_ledger_as_list ledger in
+  let%bind genesis_ledger_as_list = create_ledger_as_list ledger in
   let target_genesis_ledger =
     { input_genesis_ledger with base = Accounts genesis_ledger_as_list }
   in
-  let staking_epoch_ledger_as_list =
+  let%bind staking_epoch_ledger_as_list =
     create_ledger_as_list staking_epoch_ledger
   in
-  let next_epoch_ledger_as_list = create_ledger_as_list next_epoch_ledger in
+  let%map next_epoch_ledger_as_list = create_ledger_as_list next_epoch_ledger in
   let target_staking_epoch_data : Runtime_config.Epoch_data.Data.t =
     let ledger =
       { input_genesis_ledger with base = Accounts staking_epoch_ledger_as_list }
@@ -99,8 +97,9 @@ let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
   ; target_epoch_data
   }
 
-let create_replayer_checkpoint ~ledger ~start_slot_since_genesis : input =
-  let accounts = create_ledger_as_list ledger in
+let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
+    input Deferred.t =
+  let%map accounts = create_ledger_as_list ledger in
   let genesis_ledger : Runtime_config.Ledger.t =
     { base = Accounts accounts
     ; num_accounts = None
@@ -119,31 +118,7 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis : input =
 let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t =
   Int64.Table.create ()
 
-(* the starting slot may not have a block, so there may not be an entry in the table
-    of hashes
-   look at the predecessor slots until we find an entry
-   this search should only happen on the start slot, all other slots
-    come from commands in blocks, for which we have an entry in the table
-*)
-let get_slot_hashes ~logger slot =
-  let rec go curr_slot =
-    if Int64.is_negative curr_slot then (
-      [%log fatal]
-        "Could not find state and ledger hashes for slot %Ld, despite trying \
-         all predecessor slots"
-        slot ;
-      Core.exit 1 ) ;
-    match Hashtbl.find global_slot_hashes_tbl curr_slot with
-    | None ->
-        [%log info]
-          "State and ledger hashes not available at slot since genesis %Ld, \
-           will try predecessor slot"
-          curr_slot ;
-        go (Int64.pred curr_slot)
-    | Some hashes ->
-        hashes
-  in
-  go slot
+let get_slot_hashes slot = Hashtbl.find global_slot_hashes_tbl slot
 
 (* cache of account keys *)
 let pk_tbl : (int, Account.key) Hashtbl.t = Int.Table.create ()
@@ -202,50 +177,11 @@ let user_command_to_balance_block_data (user_cmd : Sql.User_command.t) =
   ; secondary_sequence_no = 0
   }
 
-let epoch_staking_id_of_state_hash ~logger pool state_hash =
-  match%map
-    Caqti_async.Pool.use
-      (fun db -> Sql.Epoch_data.get_staking_epoch_data_id db state_hash)
-      pool
-  with
-  | Ok staking_epoch_data_id ->
-      [%log info] "Found staking epoch data id for state hash %s" state_hash ;
-      staking_epoch_data_id
-  | Error msg ->
-      failwithf
-        "Error retrieving staking epoch data id for state hash %s, error: %s"
-        state_hash (Caqti_error.show msg) ()
-
-let epoch_next_id_of_state_hash ~logger pool state_hash =
-  match%map
-    Caqti_async.Pool.use
-      (fun db -> Sql.Epoch_data.get_next_epoch_data_id db state_hash)
-      pool
-  with
-  | Ok next_epoch_data_id ->
-      [%log info] "Found next epoch data id for state hash %s" state_hash ;
-      next_epoch_data_id
-  | Error msg ->
-      failwithf
-        "Error retrieving next epoch data id for state hash %s, error: %s"
-        state_hash (Caqti_error.show msg) ()
-
-let epoch_data_of_id ~logger pool epoch_data_id =
-  match%map
-    Caqti_async.Pool.use
-      (fun db -> Sql.Epoch_data.get_epoch_data db epoch_data_id)
-      pool
-  with
-  | Ok { epoch_ledger_hash; epoch_data_seed } ->
-      [%log info] "Found epoch data for id %d" epoch_data_id ;
-      ({ epoch_ledger_hash; epoch_data_seed } : Sql.Epoch_data.epoch_data)
-  | Error msg ->
-      failwithf "Error retrieving epoch data for epoch data id %d, error: %s"
-        epoch_data_id (Caqti_error.show msg) ()
-
-let process_block_infos_of_state_hash ~logger pool state_hash ~f =
+let process_block_infos_of_state_hash ~logger pool ~state_hash ~start_slot ~f =
   match%bind
-    Caqti_async.Pool.use (fun db -> Sql.Block_info.run db state_hash) pool
+    Caqti_async.Pool.use
+      (fun db -> Sql.Block_info.run db ~state_hash ~start_slot)
+      pool
   with
   | Ok block_infos ->
       f block_infos
@@ -267,7 +203,7 @@ let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
       name
       (Ledger_hash.to_base58_check epoch_ledger_hash) ;
     (* Ledger.copy doesn't actually copy, roll our own here *)
-    let accounts = Ledger.to_list ledger in
+    let%map accounts = Ledger.to_list ledger in
     let epoch_ledger = Ledger.create ~depth:(Ledger.depth ledger) () in
     List.iter accounts ~f:(fun account ->
         let pk = Account.public_key account in
@@ -291,7 +227,7 @@ let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
                 * (string * Token_id.t)]
             |> Error.raise ) ;
     epoch_ledger )
-  else epoch_ledger
+  else return epoch_ledger
 
 let update_staking_epoch_data ~logger pool ~ledger ~last_block_id
     ~staking_epoch_ledger =
@@ -305,12 +241,12 @@ let update_staking_epoch_data ~logger pool ~ledger ~last_block_id
       ~f:(fun db -> Sql.Epoch_data.get_staking_epoch_data_id db state_hash)
       ~item:"staking epoch id"
   in
-  let%map { epoch_ledger_hash; epoch_data_seed } =
+  let%bind { epoch_ledger_hash; epoch_data_seed } =
     query_db pool
       ~f:(fun db -> Sql.Epoch_data.get_epoch_data db staking_epoch_id)
       ~item:"staking epoch data"
   in
-  let ledger =
+  let%map ledger =
     update_epoch_ledger ~logger ~name:"staking" ~ledger
       ~epoch_ledger:staking_epoch_ledger epoch_ledger_hash
   in
@@ -328,12 +264,12 @@ let update_next_epoch_data ~logger pool ~ledger ~last_block_id
       ~f:(fun db -> Sql.Epoch_data.get_next_epoch_data_id db state_hash)
       ~item:"next epoch id"
   in
-  let%map { epoch_ledger_hash; epoch_data_seed } =
+  let%bind { epoch_ledger_hash; epoch_data_seed } =
     query_db pool
       ~f:(fun db -> Sql.Epoch_data.get_epoch_data db next_epoch_id)
       ~item:"next epoch data"
   in
-  let ledger =
+  let%map ledger =
     update_epoch_ledger ~logger ~name:"next" ~ledger
       ~epoch_ledger:next_epoch_ledger epoch_ledger_hash
   in
@@ -971,24 +907,42 @@ let try_slot ~logger pool slot =
       Core_kernel.exit 1 ) ;
     match%bind find_canonical_chain ~logger pool slot with
     | None ->
-        go ~slot:(slot - 1) ~tries_left:(tries_left - 1)
+        go ~slot:(Int64.pred slot) ~tries_left:(tries_left - 1)
     | Some state_hash ->
         [%log info]
-          "Found possible canonical chain to target state hash %s at slot %d"
+          "Found possible canonical chain to target state hash %s at slot %Ld"
           state_hash slot ;
         return state_hash
   in
   go ~slot ~tries_left:num_tries
 
-let unquoted_string_of_yojson json =
-  (* Yojson.Safe.to_string produces double-quoted strings
-     remove those quotes for SQL queries
-  *)
-  let s = Yojson.Safe.to_string json in
-  String.sub s ~pos:1 ~len:(String.length s - 2)
+let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
+    ~max_canonical_slot =
+  if Int64.( <= ) last_global_slot_since_genesis max_canonical_slot then (
+    (* start replaying at the slot after the one we've just finished with *)
+    let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
+    let%map replayer_checkpoint =
+      let%map input =
+        create_replayer_checkpoint ~ledger ~start_slot_since_genesis
+      in
+      input_to_yojson input |> Yojson.Safe.pretty_to_string
+    in
+    let checkpoint_file =
+      sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
+    in
+    [%log info] "Writing checkpoint file"
+      ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
+    Out_channel.with_file checkpoint_file ~f:(fun oc ->
+        Out_channel.output_string oc replayer_checkpoint ) )
+  else (
+    [%log info] "Not writing checkpoint file at slot %Ld, because not canonical"
+      last_global_slot_since_genesis
+      ~metadata:
+        [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
+    Deferred.unit )
 
 let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
-    ~continue_on_error () =
+    ~checkpoint_interval ~continue_on_error () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1051,14 +1005,23 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                 ~f:(fun db -> Sql.Block.get_max_slot db ())
                 ~item:"max slot"
             in
-            [%log info] "Maximum global slot since genesis in blocks is %d"
+            [%log info] "Maximum global slot since genesis in blocks is %Ldd"
               max_slot ;
             try_slot ~logger pool max_slot
       in
-      [%log info] "Loading block information using target state hash" ;
-      let%bind block_ids =
-        process_block_infos_of_state_hash ~logger pool target_state_hash
-          ~f:(fun block_infos ->
+      [%log info]
+        "Loading block information using target state hash and start slot" ;
+      (* oldest block id is the id of the block with the earliest slot *)
+      let%bind block_ids, oldest_block_id =
+        process_block_infos_of_state_hash ~logger pool
+          ~state_hash:target_state_hash
+          ~start_slot:input.start_slot_since_genesis ~f:(fun block_infos ->
+            let ({ id = oldest_block_id; _ } : Sql.Block_info.t) =
+              Option.value_exn
+                (List.min_elt block_infos ~compare:(fun bi1 bi2 ->
+                     Int64.compare bi1.global_slot_since_genesis
+                       bi2.global_slot_since_genesis ) )
+            in
             let ids = List.map block_infos ~f:(fun { id; _ } -> id) in
             (* build mapping from global slots to state and ledger hashes *)
             List.iter block_infos
@@ -1069,27 +1032,33 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                   ~data:
                     ( State_hash.of_base58_check_exn state_hash
                     , Ledger_hash.of_base58_check_exn ledger_hash ) ) ;
-            return (Int.Set.of_list ids) )
+            return (Int.Set.of_list ids, oldest_block_id) )
       in
-      (* check that genesis block is in chain to target hash
-         assumption: genesis block occupies global slot 0
-      *)
-      if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
+      if Int64.equal input.start_slot_since_genesis 0L then
+        (* check that genesis block is in chain to target hash
+           assumption: genesis block occupies global slot 0
+
+           if nonzero start slot, can't assume there's a block at that slot
+        *)
+        if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
+          [%log info]
+            "Block chain leading to target state hash includes genesis block, \
+             length = %d"
+            (Int.Set.length block_ids)
+        else (
+          [%log fatal]
+            "Block chain leading to target state hash does not include genesis \
+             block" ;
+          Core_kernel.exit 1 )
+      else
         [%log info]
-          "Block chain leading to target state hash includes genesis block, \
+          "Block chain from non-genesis start slot to target state hash has \
            length = %d"
-          (Int.Set.length block_ids)
-      else (
-        [%log fatal]
-          "Block chain leading to target state hash does not include genesis \
-           block" ;
-        Core_kernel.exit 1 ) ;
+          (Int.Set.length block_ids) ;
       let get_command_ids (module Command_ids : Get_command_ids) name =
         match%bind
           Caqti_async.Pool.use
-            (fun db ->
-              Command_ids.run db ~state_hash:target_state_hash
-                ~start_slot:input.start_slot_since_genesis )
+            (fun db -> Command_ids.run db ~state_hash:target_state_hash)
             pool
         with
         | Ok ids ->
@@ -1116,12 +1085,12 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             let open Deferred.Let_syntax in
             match%map
               Caqti_async.Pool.use
-                (fun db -> Sql.Internal_command.run db id)
+                (fun db ->
+                  Sql.Internal_command.run db
+                    ~start_slot:input.start_slot_since_genesis
+                    ~internal_cmd_id:id )
                 pool
             with
-            | Ok [] ->
-                failwithf "Could not find any internal commands with id: %d" id
-                  ()
             | Ok internal_cmds ->
                 internal_cmds
             | Error msg ->
@@ -1151,11 +1120,14 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                   -1
               | "fee_transfer_via_coinbase", "coinbase" ->
                   1
-              | _ ->
-                  failwith
+              | s1, s2 ->
+                  failwithf
                     "Two internal commands have the same global slot since \
                      genesis %Ld, sequence no %d, and secondary sequence no \
-                     %d, but are not a coinbase and fee transfer via coinbase"
+                     %d, but are not a coinbase and fee transfer via coinbase \
+                     (%s and %s)"
+                    ic1.global_slot_since_genesis ic1.sequence_no
+                    ic1.secondary_sequence_no s1 s2 ()
             else cmp )
       in
       (* populate cache of fee transfer via coinbase items *)
@@ -1195,6 +1167,38 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             in
             [%compare: int64 * int] (tuple uc1) (tuple uc2) )
       in
+      let checkpoint_interval_i64 =
+        Option.map checkpoint_interval ~f:Int64.of_int
+      in
+      let checkpoint_target =
+        ref
+          (Option.map checkpoint_interval_i64 ~f:(fun interval ->
+               Int64.(input.start_slot_since_genesis + interval) ) )
+      in
+      let%bind max_canonical_slot =
+        query_db pool
+          ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
+          ~item:"max canonical slot"
+      in
+      let incr_checkpoint_target () =
+        Option.iter !checkpoint_target ~f:(fun target ->
+            match checkpoint_interval_i64 with
+            | Some interval ->
+                let new_target = Int64.(target + interval) in
+                if Int64.( <= ) new_target max_canonical_slot then (
+                  [%log info] "Checkpoint target was %Ld, setting to %Ld" target
+                    new_target ;
+                  checkpoint_target := Some new_target )
+                else (
+                  (* set target so it can't be reached *)
+                  [%log info]
+                    "Checkpoint target was %Ld, new target would be at \
+                     noncanonical slot, set target to unreachable value"
+                    target ;
+                  checkpoint_target := Some Int64.max_value )
+            | None ->
+                failwith "Expected a checkpoint interval" )
+      in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
           (user_cmds : Sql.User_command.t list) ~last_global_slot_since_genesis
@@ -1208,47 +1212,81 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             ~next_epoch_ledger
         in
         let log_ledger_hash_after_last_slot () =
-          let _state_hash, expected_ledger_hash =
-            get_slot_hashes ~logger last_global_slot_since_genesis
-          in
-          if Ledger_hash.equal (Ledger.merkle_root ledger) expected_ledger_hash
-          then
-            [%log info]
-              "Applied all commands at global slot since genesis %Ld, got \
-               expected ledger hash"
-              ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ]
-              last_global_slot_since_genesis
-          else (
-            [%log error]
-              "Applied all commands at global slot since genesis %Ld, ledger \
-               hash differs from expected ledger hash"
-              ~metadata:
-                [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
-                ; ( "expected_ledger_hash"
-                  , Ledger_hash.to_yojson expected_ledger_hash )
-                ]
-              last_global_slot_since_genesis ;
-            if continue_on_error then incr error_count else Core_kernel.exit 1 )
+          match get_slot_hashes last_global_slot_since_genesis with
+          | None ->
+              if
+                Int64.equal last_global_slot_since_genesis
+                  input.start_slot_since_genesis
+              then
+                [%log info]
+                  "No ledger hash information at start slot, not checking \
+                   against ledger"
+              else (
+                [%log fatal]
+                  "Missing ledger hash information for last global slot, which \
+                   is not the start slot" ;
+                Core.exit 1 )
+          | Some (_state_hash, expected_ledger_hash) ->
+              if
+                Ledger_hash.equal
+                  (Ledger.merkle_root ledger)
+                  expected_ledger_hash
+              then
+                [%log info]
+                  "Applied all commands at global slot since genesis %Ld, got \
+                   expected ledger hash"
+                  ~metadata:
+                    [ ("ledger_hash", json_ledger_hash_of_ledger ledger) ]
+                  last_global_slot_since_genesis
+              else (
+                [%log error]
+                  "Applied all commands at global slot since genesis %Ld, \
+                   ledger hash differs from expected ledger hash"
+                  ~metadata:
+                    [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
+                    ; ( "expected_ledger_hash"
+                      , Ledger_hash.to_yojson expected_ledger_hash )
+                    ]
+                  last_global_slot_since_genesis ;
+                if continue_on_error then incr error_count
+                else Core_kernel.exit 1 )
         in
         let log_state_hash_on_next_slot curr_global_slot_since_genesis =
-          let state_hash, _ledger_hash =
-            get_slot_hashes ~logger curr_global_slot_since_genesis
-          in
-          [%log info]
-            ~metadata:
-              [ ("state_hash", `String (State_hash.to_base58_check state_hash))
-              ]
-            "Starting processing of commands in block with state_hash \
-             $state_hash at global slot since genesis %Ld"
-            curr_global_slot_since_genesis
+          match get_slot_hashes curr_global_slot_since_genesis with
+          | None ->
+              [%log fatal]
+                "Missing state hash information for current global slot" ;
+              Core.exit 1
+          | Some (state_hash, _ledger_hash) ->
+              [%log info]
+                ~metadata:
+                  [ ( "state_hash"
+                    , `String (State_hash.to_base58_check state_hash) )
+                  ]
+                "Starting processing of commands in block with state_hash \
+                 $state_hash at global slot since genesis %Ld"
+                curr_global_slot_since_genesis
         in
-        let log_on_slot_change curr_global_slot_since_genesis =
+        let write_checkpoint_file () =
+          match !checkpoint_target with
+          | None ->
+              Deferred.unit
+          | Some target ->
+              if Int64.(last_global_slot_since_genesis >= target) then (
+                incr_checkpoint_target () ;
+                write_replayer_checkpoint ~logger ~ledger
+                  ~last_global_slot_since_genesis ~max_canonical_slot )
+              else Deferred.unit
+        in
+        let run_actions_on_slot_change curr_global_slot_since_genesis =
           if
             Int64.( > ) curr_global_slot_since_genesis
               last_global_slot_since_genesis
           then (
             log_ledger_hash_after_last_slot () ;
-            log_state_hash_on_next_slot curr_global_slot_since_genesis )
+            log_state_hash_on_next_slot curr_global_slot_since_genesis ;
+            write_checkpoint_file () )
+          else Deferred.unit
         in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
@@ -1262,7 +1300,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               (* combining situation 2
                  two fee transfer commands with same global slot since genesis, sequence number
               *)
-              log_on_slot_change ic.global_slot_since_genesis ;
+              let%bind () =
+                run_actions_on_slot_change ic.global_slot_since_genesis
+              in
               let%bind () =
                 apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces
                   ~repair_nonces ~continue_on_error ic ic2
@@ -1272,7 +1312,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                 ~last_block_id:ic.block_id ~staking_epoch_ledger
                 ~next_epoch_ledger
           | _ ->
-              log_on_slot_change ic.global_slot_since_genesis ;
+              let%bind () =
+                run_actions_on_slot_change ic.global_slot_since_genesis
+              in
               let%bind () =
                 run_internal_command ~logger ~pool ~ledger ~set_nonces
                   ~repair_nonces ~continue_on_error ic
@@ -1291,14 +1333,15 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
         match (internal_cmds, user_cmds) with
         | [], [] ->
             log_ledger_hash_after_last_slot () ;
-            Deferred.return
-              ( last_global_slot_since_genesis
-              , staking_epoch_ledger
-              , staking_seed
-              , next_epoch_ledger
-              , next_seed )
+            let%map () =
+              write_replayer_checkpoint ~logger ~ledger
+                ~last_global_slot_since_genesis ~max_canonical_slot
+            in
+            (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
         | [], uc :: ucs ->
-            log_on_slot_change uc.global_slot_since_genesis ;
+            let%bind () =
+              run_actions_on_slot_change uc.global_slot_since_genesis
+            in
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~set_nonces ~repair_nonces
                 ~continue_on_error uc
@@ -1308,7 +1351,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               ~last_block_id:uc.block_id ~staking_epoch_ledger
               ~next_epoch_ledger
         | ic :: _, uc :: ucs when cmp_ic_uc ic uc > 0 ->
-            log_on_slot_change uc.global_slot_since_genesis ;
+            let%bind () =
+              run_actions_on_slot_change uc.global_slot_since_genesis
+            in
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~set_nonces ~repair_nonces
                 ~continue_on_error uc
@@ -1327,24 +1372,12 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                slot since_genesis %Ld and sequence number %d"
               ic.global_slot_since_genesis ic.sequence_no ()
       in
-      let%bind unparented_ids =
-        query_db pool
-          ~f:(fun db -> Sql.Block.get_unparented db ())
-          ~item:"unparented ids"
-      in
-      let genesis_block_id =
-        match List.filter unparented_ids ~f:(Int.Set.mem block_ids) with
-        | [ id ] ->
-            id
-        | _ ->
-            failwith "Expected only the genesis block to have an unparented id"
-      in
       let%bind start_slot_since_genesis =
         let%map slot_opt =
           query_db pool
             ~f:(fun db ->
               Sql.Block.get_next_slot db input.start_slot_since_genesis )
-            ~item:"Next slot"
+            ~item:"Start slot"
         in
         match slot_opt with
         | Some slot ->
@@ -1370,34 +1403,17 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       [%log info] "At start global slot %Ld, ledger hash"
         start_slot_since_genesis
         ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ] ;
-      let%bind ( last_global_slot_since_genesis
-               , staking_epoch_ledger
-               , staking_seed
-               , next_epoch_ledger
-               , next_seed ) =
+      let%bind staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed
+          =
         apply_commands sorted_internal_cmds sorted_user_cmds
           ~last_global_slot_since_genesis:start_slot_since_genesis
-          ~last_block_id:genesis_block_id ~staking_epoch_ledger:ledger
+          ~last_block_id:oldest_block_id ~staking_epoch_ledger:ledger
           ~next_epoch_ledger:ledger
       in
       match input.target_epoch_ledgers_state_hash with
       | None ->
-          (* start replaying at the slot after the one we've just finished with *)
-          let start_slot_since_genesis =
-            Int64.succ last_global_slot_since_genesis
-          in
-          let replayer_checkpoint =
-            create_replayer_checkpoint ~ledger ~start_slot_since_genesis
-            |> input_to_yojson |> Yojson.Safe.pretty_to_string
-          in
-          let checkpoint_file =
-            sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
-          in
-          [%log info] "Writing checkpoint file"
-            ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
-          return
-          @@ Out_channel.with_file checkpoint_file ~f:(fun oc ->
-                 Out_channel.output_string oc replayer_checkpoint )
+          [%log info] "No target epoch ledger hash supplied, not writing output" ;
+          Deferred.unit
       | Some target_epoch_ledgers_state_hash -> (
           match output_file_opt with
           | None ->
@@ -1407,13 +1423,15 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               if Int.equal !error_count 0 then (
                 [%log info] "Writing output to $output_file"
                   ~metadata:[ ("output_file", `String output_file) ] ;
-                let output =
-                  create_output ~target_epoch_ledgers_state_hash
-                    ~target_fork_state_hash:
-                      (State_hash.of_base58_check_exn target_state_hash)
-                    ~ledger ~staking_epoch_ledger ~staking_seed
-                    ~next_epoch_ledger ~next_seed input.genesis_ledger
-                  |> output_to_yojson |> Yojson.Safe.pretty_to_string
+                let%bind output =
+                  let%map output =
+                    create_output ~target_epoch_ledgers_state_hash
+                      ~target_fork_state_hash:
+                        (State_hash.of_base58_check_exn target_state_hash)
+                      ~ledger ~staking_epoch_ledger ~staking_seed
+                      ~next_epoch_ledger ~next_seed input.genesis_ledger
+                  in
+                  output_to_yojson output |> Yojson.Safe.pretty_to_string
                 in
                 return
                 @@ Out_channel.with_file output_file ~f:(fun oc ->
@@ -1451,6 +1469,10 @@ let () =
          and continue_on_error =
            Param.flag "--continue-on-error"
              ~doc:"Continue processing after errors" Param.no_arg
+         and checkpoint_interval =
+           Param.flag "--checkpoint-interval"
+             ~doc:"NN Write checkpoint file every NN slots"
+             Param.(optional int)
          in
          main ~input_file ~output_file_opt ~archive_uri ~set_nonces
-           ~repair_nonces ~continue_on_error )))
+           ~repair_nonces ~checkpoint_interval ~continue_on_error )))
