@@ -1,7 +1,7 @@
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ .Values.leaderboard.name }}
+  name: { { .Values.leaderboard.name } }
 spec:
   schedule: "{{ .Values.leaderboard.schedule }}"
   jobTemplate:
@@ -10,20 +10,20 @@ spec:
         spec:
           restartPolicy: Never
           volumes:
-            - name: {{ .Values.volume.name }}
+            - name: { { .Values.volume.name } }
               secret:
-                secretName: {{ .Values.volume.secretName }}
+                secretName: { { .Values.volume.secretName } }
           containers:
-            - name: {{ .Values.leaderboard.containerName }}
-              image: {{ .Values.leaderboard.image }}
+            - name: { { .Values.leaderboard.containerName } }
+              image: { { .Values.leaderboard.image } }
               imagePullPolicy: Always
               env:
                 - name: PGCONN
                   value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB }}
                 - name: SPREADSHEET_ID
-                  value: {{ .Values.googleSheets.spreadsheetId }}
+                  value: { { .Values.googleSheets.spreadsheetId } }
               volumeMounts:
-                - name: {{ .Values.volume.name }}
-                  mountPath: {{ .Values.volume.mountPath }}
-                  subPath: {{ .Values.volume.subPath }}
+                - name: { { .Values.volume.name } }
+                  mountPath: { { .Values.volume.mountPath } }
+                  subPath: { { .Values.volume.subPath } }
                   readOnly: true
