@@ -32,7 +32,7 @@ func (m ValidationPush) handle(app *app) {
 	}
 	vid, err := ValidationPushT(m).ValidationId()
 	if err != nil {
-		app.P2p.Logger.Errorf("handleValidation: error %w", err)
+		app.P2p.Logger.Errorf("handleValidation: error %s", err)
 		return
 	}
 	seqno := vid.Id()
