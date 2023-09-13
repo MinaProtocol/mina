@@ -1,5 +1,5 @@
 (library
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (name kimchi_backend_common)
  (public_name kimchi_backend.common)
  (flags -warn-error -27)

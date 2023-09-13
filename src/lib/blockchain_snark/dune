@@ -37,7 +37,7 @@
    data_hash_lib
    ppx_version.runtime
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (preprocess
   (pps ppx_snarky ppx_mina ppx_version ppx_jane ppx_compare))
  (instrumentation (backend bisect_ppx))

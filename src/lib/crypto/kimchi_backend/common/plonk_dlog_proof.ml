@@ -23,7 +23,7 @@ module type Stable_v1 = sig
     module Latest = V1
   end
 
-  type t = Stable.V1.t [@@deriving sexp, compare, yojson]
+  type t = Stable.V1.t [@@deriving sexp, compare, yojson, hash, equal]
 end
 
 module type Inputs_intf = sig
@@ -94,18 +94,18 @@ module type Inputs_intf = sig
 
     val create :
          Index.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.t array
-      -> Curve.Affine.Backend.t array
+      -> primary:Scalar_field.Vector.t
+      -> auxiliary:Scalar_field.Vector.t
+      -> prev_chals:Scalar_field.t array
+      -> prev_comms:Curve.Affine.Backend.t array
       -> t
 
     val create_async :
          Index.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.t array
-      -> Curve.Affine.Backend.t array
+      -> primary:Scalar_field.Vector.t
+      -> auxiliary:Scalar_field.Vector.t
+      -> prev_chals:Scalar_field.t array
+      -> prev_comms:Curve.Affine.Backend.t array
       -> t Promise.t
 
     val verify : Verifier_index.t -> t -> bool
@@ -179,7 +179,7 @@ module Make (Inputs : Inputs_intf) = struct
         let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
 
         let create ~messages ~openings =
-          let open Pickles_types.Plonk_types.Proof in
+          let open Pickles_types.Plonk_types.Proof.Stable.Latest in
           { messages; openings }
       end
 
@@ -196,14 +196,49 @@ module Make (Inputs : Inputs_intf) = struct
     end
   end]
 
-  include (
-    Stable.Latest :
-      sig
-        type t [@@deriving compare, sexp, yojson, hash, equal, bin_io]
-      end
-      with type t := t )
+  module T = struct
+    type t = (G.Affine.t, Fq.t, Fq.t array) Pickles_types.Plonk_types.Proof.t
+    [@@deriving compare, sexp, yojson, hash, equal]
 
-  [%%define_locally Stable.Latest.(create)]
+    let id = "plong_dlog_proof_" ^ Inputs.id
+
+    type 'a creator =
+         messages:G.Affine.t Pickles_types.Plonk_types.Messages.t
+      -> openings:
+           (G.Affine.t, Fq.t, Fq.t array) Pickles_types.Plonk_types.Openings.t
+      -> 'a
+
+    let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
+
+    let create ~messages ~openings =
+      let open Pickles_types.Plonk_types.Proof in
+      { messages; openings }
+  end
+
+  include T
+
+  include (
+    struct
+      include Allocation_functor.Make.Basic (T)
+      include Allocation_functor.Make.Partial.Sexp (T)
+      include Allocation_functor.Make.Partial.Yojson (T)
+    end :
+      sig
+        include
+          Allocation_functor.Intf.Output.Basic_intf
+            with type t := t
+             and type 'a creator := 'a creator
+
+        include
+          Allocation_functor.Intf.Output.Sexp_intf
+            with type t := t
+             and type 'a creator := 'a creator
+
+        include
+          Allocation_functor.Intf.Output.Yojson_intf
+            with type t := t
+             and type 'a creator := 'a creator
+      end )
 
   let g t f = G.Affine.of_backend (f t)
 
@@ -212,7 +247,8 @@ module Make (Inputs : Inputs_intf) = struct
     Array.iter arr ~f:(fun fe -> Fq.Vector.emplace_back vec fe) ;
     vec
 
-  (** Note that this function will panic if any of the points are points at infinity *)
+  (** Note that this function will panic if any of the points are points at
+      infinity *)
   let opening_proof_of_backend_exn (t : Opening_proof_backend.t) =
     let g (x : G.Affine.Backend.t) : G.Affine.t =
       G.Affine.of_backend x |> Pickles_types.Or_infinity.finite_exn
@@ -313,7 +349,18 @@ module Make (Inputs : Inputs_intf) = struct
         ; lookup =
             Option.map t.commitments.lookup
               ~f:(fun l : _ Pickles_types.Plonk_types.Messages.Lookup.t ->
-                { sorted = Array.map ~f:wo l.sorted
+                { sorted =
+                    Vector.init
+                      Pickles_types.Plonk_types.Lookup_sorted_minus_1.n
+                      ~f:(fun i -> wo l.sorted.(i))
+                ; sorted_5th_column =
+                    (* TODO: This is ugly and error-prone *)
+                    Option.try_with (fun () ->
+                        wo
+                          l.sorted.(Nat.to_int
+                                      Pickles_types.Plonk_types
+                                      .Lookup_sorted_minus_1
+                                      .n) )
                 ; aggreg = wo l.aggreg
                 ; runtime = Option.map ~f:wo l.runtime
                 } )
@@ -400,7 +447,10 @@ module Make (Inputs : Inputs_intf) = struct
         ; t_comm = pcwo t_comm
         ; lookup =
             Option.map lookup ~f:(fun t : _ Kimchi_types.lookup_commitments ->
-                { sorted = Array.map ~f:pcwo t.sorted
+                { sorted =
+                    Array.map ~f:pcwo
+                      (Array.append (Vector.to_array t.sorted)
+                         (Option.to_array t.sorted_5th_column) )
                 ; aggreg = pcwo t.aggreg
                 ; runtime = Option.map ~f:pcwo t.runtime
                 } )
@@ -443,7 +493,10 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment) )
     in
-    let res = Backend.create pk primary auxiliary challenges commitments in
+    let res =
+      Backend.create pk ~primary ~auxiliary ~prev_chals:challenges
+        ~prev_comms:commitments
+    in
     of_backend res
 
   let create_async ?message pk ~primary ~auxiliary =
@@ -461,7 +514,8 @@ module Make (Inputs : Inputs_intf) = struct
           G.Affine.to_backend (Finite commitment) )
     in
     let%map.Promise res =
-      Backend.create_async pk primary auxiliary challenges commitments
+      Backend.create_async pk ~primary ~auxiliary ~prev_chals:challenges
+        ~prev_comms:commitments
     in
     of_backend res
 

@@ -119,9 +119,10 @@ end = struct
   let full = deriver @@ Fd.o ()
 
   let json_roundtrip_dummy () =
+    let dummy = Lazy.force dummy in
     [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
 
   let full_circuit () =
     Run_in_thread.block_on_async_exn
-    @@ fun () -> Fields_derivers_zkapps.Test.Loop.run full dummy
+    @@ fun () -> Fields_derivers_zkapps.Test.Loop.run full (Lazy.force dummy)
 end

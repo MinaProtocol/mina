@@ -91,7 +91,7 @@ module Proof = Plonk_dlog_proof.Make (struct
       in
 
       (* compute witness *)
-      let computed_witness =
+      let computed_witness, runtime_tables =
         R1CS_constraint_system.compute_witness pk.cs external_values
       in
       let num_rows = Array.length computed_witness.(0) in
@@ -105,15 +105,16 @@ module Proof = Plonk_dlog_proof.Make (struct
             done ;
             witness )
       in
-      create pk.index witness_cols prev_chals prev_comms
+      create pk.index witness_cols runtime_tables prev_chals prev_comms
 
-    let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
+    let create_async (pk : Keypair.t) ~primary ~auxiliary ~prev_chals
+        ~prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms
-        ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
+        ~f:(fun pk auxiliary_input runtime_tables prev_challenges prev_sgs ->
           Promise.run_in_thread (fun () ->
-              create pk auxiliary_input prev_challenges prev_sgs ) )
+              create pk auxiliary_input runtime_tables prev_challenges prev_sgs ) )
 
-    let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
+    let create (pk : Keypair.t) ~primary ~auxiliary ~prev_chals ~prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms ~f:create
   end
 
