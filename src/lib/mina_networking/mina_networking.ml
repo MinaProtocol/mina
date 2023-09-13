@@ -729,7 +729,7 @@ module Rpcs = struct
             ; k_block_hashes_and_timestamps :
                 (State_hash.Stable.V1.t * string) list
             ; git_commit : string
-            ; uptime_minutes : int64
+            ; uptime_minutes : int
             }
           [@@deriving to_yojson, of_yojson]
 
@@ -744,7 +744,7 @@ module Rpcs = struct
             ; k_block_hashes_and_timestamps =
                 status.k_block_hashes_and_timestamps
             ; git_commit = status.git_commit
-            ; uptime_minutes = 0
+            ; uptime_minutes = status.uptime_minutes
             ; block_height_opt = None
             }
         end
@@ -843,7 +843,7 @@ module Rpcs = struct
                 ; k_block_hashes_and_timestamps =
                     status.k_block_hashes_and_timestamps
                 ; git_commit = status.git_commit
-                ; uptime_minutes = Int64.zero
+                ; uptime_minutes = status.uptime_minutes
                 }
 
         let caller_model_of_response = function
