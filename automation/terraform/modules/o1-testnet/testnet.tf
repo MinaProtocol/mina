@@ -35,6 +35,7 @@ module "kubernetes_testnet" {
   mina_bots_image    = var.mina_bots_image
   mina_points_image  = var.mina_points_image
   watchdog_image     = var.watchdog_image
+  itn_orchestrator_image = var.itn_orchestrator_image
 
   mina_faucet_amount = var.mina_faucet_amount
   mina_faucet_fee    = var.mina_faucet_fee
