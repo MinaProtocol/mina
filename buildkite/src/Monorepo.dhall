@@ -56,7 +56,8 @@ let commands: Text -> Text -> List Cmd.Type  =  \(targetStage: Text) -> \(target
               echo "Skipping ${job.name} because this is a ${targetStage} stage"
             fi           
           else 
-            echo "Skipping ${job.name} because this is a ${targetMode} buildkite run"
+            echo "Triggering ${job.name} because this is a stable buildkite run"
+            ${Cmd.format trigger}
           fi
         '',
         Stable = ''
