@@ -178,7 +178,7 @@ psql -f "${MINA_ARCHIVE_SQL_SCHEMA_PATH}" "${PG_CONN}"
 echo "=========================== STARTING ROSETTA API ONLINE AND OFFLINE INSTANCES ==========================="
 ports=($MINA_ROSETTA_ONLINE_PORT $MINA_ROSETTA_OFFLINE_PORT)
 for port in ${ports[*]}; do
-  mina-rosetta \
+  mina-rosetta-dev \
     --archive-uri "${PG_CONN}" \
     --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
     --log-level ${LOG_LEVEL} \
