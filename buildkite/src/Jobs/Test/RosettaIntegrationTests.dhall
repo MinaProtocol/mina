@@ -38,9 +38,7 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [
-             Cmd.run ("export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}") ]
-            # RunInToolchain.runInToolchain ([] : List Text) "./buildkite/scripts/build-snarkyjs-bindings.sh"
-            # [
+            Cmd.run ("export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"),
             Cmd.runInDocker Cmd.Docker::{image="gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}", entrypoint=" --entrypoint buildkite/scripts/rosetta-integration-tests.sh"} "bash"
           ],
           label = "Rosetta integration tests Bullseye"
