@@ -90,6 +90,9 @@ module type Inputs_intf = sig
   end
 
   module Backend : sig
+    type with_public_evals =
+      (Curve.Affine.Backend.t, Scalar_field.t) Kimchi_types.proof_with_public
+
     type t = (Curve.Affine.Backend.t, Scalar_field.t) Kimchi_types.prover_proof
 
     val create :
@@ -98,7 +101,7 @@ module type Inputs_intf = sig
       -> auxiliary:Scalar_field.Vector.t
       -> prev_chals:Scalar_field.t array
       -> prev_comms:Curve.Affine.Backend.t array
-      -> t
+      -> with_public_evals
 
     val create_async :
          Index.t
@@ -106,11 +109,12 @@ module type Inputs_intf = sig
       -> auxiliary:Scalar_field.Vector.t
       -> prev_chals:Scalar_field.t array
       -> prev_comms:Curve.Affine.Backend.t array
-      -> t Promise.t
+      -> with_public_evals Promise.t
 
-    val verify : Verifier_index.t -> t -> bool
+    val verify : Verifier_index.t -> with_public_evals -> bool
 
-    val batch_verify : Verifier_index.t array -> t array -> bool Promise.t
+    val batch_verify :
+      Verifier_index.t array -> with_public_evals array -> bool Promise.t
   end
 end
 
@@ -240,6 +244,11 @@ module Make (Inputs : Inputs_intf) = struct
              and type 'a creator := 'a creator
       end )
 
+  type with_public_evals =
+    { proof : t
+    ; public_evals : (Scalar_field.t array * Scalar_field.t array) option
+    }
+
   let g t f = G.Affine.of_backend (f t)
 
   let fq_array_to_vec arr =
@@ -322,13 +331,12 @@ module Make (Inputs : Inputs_intf) = struct
     ; foreign_field_mul_lookup_selector
     }
 
+  let evals_to_tuple ({ zeta; zeta_omega } : _ Kimchi_types.point_evaluations) =
+    (zeta, zeta_omega)
+
   let of_backend (t : Backend.t) : t =
     let proof = opening_proof_of_backend_exn t.proof in
     let evals =
-      let evals_to_tuple
-          ({ zeta; zeta_omega } : _ Kimchi_types.point_evaluations) =
-        (zeta, zeta_omega)
-      in
       Plonk_types.Evals.map ~f:evals_to_tuple (eval_of_backend t.evals)
     in
     let wo x : Inputs.Curve.Affine.t array =
@@ -366,6 +374,12 @@ module Make (Inputs : Inputs_intf) = struct
                 } )
         }
       ~openings:{ proof; evals; ft_eval1 = t.ft_eval1 }
+
+  let of_backend_with_public_evals (t : Backend.with_public_evals) :
+      with_public_evals =
+    { proof = of_backend t.proof
+    ; public_evals = Option.map ~f:evals_to_tuple t.public_evals
+    }
 
   let eval_to_backend
       { Pickles_types.Plonk_types.Evals.w
@@ -426,6 +440,9 @@ module Make (Inputs : Inputs_intf) = struct
       (v : t) =
     Array.init (V.length v) ~f:(V.get v)
 
+  let evals_of_tuple (zeta, zeta_omega) : _ Kimchi_types.point_evaluations =
+    { zeta; zeta_omega }
+
   let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
       ({ messages = { w_comm; z_comm; t_comm; lookup }
        ; openings =
@@ -438,9 +455,6 @@ module Make (Inputs : Inputs_intf) = struct
     let g x = G.Affine.to_backend (Pickles_types.Or_infinity.Finite x) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr = Array.map lr ~f:(fun (x, y) -> (g x, g y)) in
-    let evals_of_tuple (zeta, zeta_omega) : _ Kimchi_types.point_evaluations =
-      { zeta; zeta_omega }
-    in
     { commitments =
         { w_comm = tuple15_of_vec (Pickles_types.Vector.map ~f:pcwo w_comm)
         ; z_comm = pcwo z_comm
@@ -479,6 +493,16 @@ module Make (Inputs : Inputs_intf) = struct
   let to_backend chal_polys primary_input t =
     to_backend' chal_polys (List.to_array primary_input) t
 
+  let to_backend_with_public_evals' (chal_polys : Challenge_polynomial.t list)
+      primary_input ({ proof; public_evals } : with_public_evals) :
+      Backend.with_public_evals =
+    { proof = to_backend' chal_polys primary_input proof
+    ; public_evals = Option.map ~f:evals_of_tuple public_evals
+    }
+
+  let to_backend_with_public_evals chal_polys primary_input t =
+    to_backend_with_public_evals' chal_polys (List.to_array primary_input) t
+
   let create ?message pk ~primary ~auxiliary =
     let chal_polys =
       match (message : message option) with Some s -> s | None -> []
@@ -497,7 +521,7 @@ module Make (Inputs : Inputs_intf) = struct
       Backend.create pk ~primary ~auxiliary ~prev_chals:challenges
         ~prev_comms:commitments
     in
-    of_backend res
+    of_backend_with_public_evals res
 
   let create_async ?message pk ~primary ~auxiliary =
     let chal_polys =
@@ -517,15 +541,19 @@ module Make (Inputs : Inputs_intf) = struct
       Backend.create_async pk ~primary ~auxiliary ~prev_chals:challenges
         ~prev_comms:commitments
     in
-    of_backend res
+    of_backend_with_public_evals res
 
   let batch_verify' (conv : 'a -> Fq.t array)
-      (ts : (Verifier_index.t * t * 'a * message option) list) =
+      (ts : (Verifier_index.t * with_public_evals * 'a * message option) list) =
     let logger = Internal_tracing_context_logger.get () in
     [%log internal] "Batch_verify_backend_convert_inputs" ;
     let vks_and_v =
       Array.of_list_map ts ~f:(fun (vk, t, xs, m) ->
-          let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
+          let p =
+            to_backend_with_public_evals'
+              (Option.value ~default:[] m)
+              (conv xs) t
+          in
           (vk, p) )
     in
     [%log internal] "Batch_verify_backend_convert_inputs_done" ;
@@ -542,7 +570,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let verify ?message t vk xs : bool =
     Backend.verify vk
-      (to_backend'
+      (to_backend_with_public_evals'
          (Option.value ~default:[] message)
          (vec_to_array (module Scalar_field.Vector) xs)
          t )

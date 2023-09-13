@@ -77,6 +77,11 @@ module Proof = Plonk_dlog_proof.Make (struct
       , Pasta_bindings.Fq.t )
       Kimchi_types.prover_proof
 
+    type with_public_evals =
+      ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
+      , Pasta_bindings.Fq.t )
+      Kimchi_types.proof_with_public
+
     include Kimchi_bindings.Protocol.Proof.Fq
 
     let batch_verify vks ts =
@@ -166,5 +171,7 @@ module Oracles = Plonk_dlog_oracles.Make (struct
     include Kimchi_bindings.Protocol.Oracles.Fq
 
     let create = with_lagrange create
+
+    let create_with_public_evals = with_lagrange create_with_public_evals
   end
 end)

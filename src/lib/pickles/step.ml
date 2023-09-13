@@ -784,7 +784,8 @@ struct
                } )
            |> to_list) )
     in
-    let%map.Promise (next_proof : Tick.Proof.t), _next_statement_hashed =
+    let%map.Promise ( (next_proof : Tick.Proof.with_public_evals)
+                    , _next_statement_hashed ) =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n
@@ -860,7 +861,7 @@ struct
       }
     in
     [%log internal] "Pickles_step_proof_done" ;
-    ( { Proof.Base.Step.proof = next_proof
+    ( { Proof.Base.Step.proof = next_proof.proof
       ; statement = next_statement
       ; index = branch_data.index
       ; prev_evals =
