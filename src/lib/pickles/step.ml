@@ -788,7 +788,7 @@ struct
                     , _next_statement_hashed ) =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-          ~wrap_rounds:Tock.Rounds.n ~feature_flags
+          ~wrap_rounds:Tock.Rounds.n
       in
       let { Domains.h } = Vector.nth_exn step_domains branch_data.index in
       ksprintf Common.time "step-prover %d (%d)" branch_data.index

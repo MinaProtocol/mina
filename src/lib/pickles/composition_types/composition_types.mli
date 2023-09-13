@@ -137,7 +137,6 @@ module Wrap : sig
 
           val typ :
                'f Spec.impl
-            -> dummy_scalar:'a
             -> dummy_scalar_challenge:'b Scalar_challenge.t
             -> challenge:
                  ( 'c
@@ -339,7 +338,6 @@ module Wrap : sig
 
         val typ :
              (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-          -> dummy_scalar:'a
           -> dummy_scalar_challenge:'b Scalar_challenge.t
           -> challenge:
                ( 'c
@@ -591,7 +589,6 @@ module Wrap : sig
 
       val typ :
            (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-        -> dummy_scalar:'a
         -> dummy_scalar_challenge:'b Scalar_challenge.t
         -> challenge:
              ( 'c
@@ -991,17 +988,13 @@ module Wrap : sig
            ('a, 'b, 'c, 'fp_opt, 'd, 'bool, 'e, 'e, 'e, 'f, 'g) t
         -> option_map:
              ('d -> f:('h -> ('h * unit) Hlist.HlistId.t) -> 'j Hlist0.Id.t)
-        -> to_opt:('fp_opt -> 'fp_opt2)
         -> ('c, 'a, 'b, 'e, 'f, 'g, 'j, 'fp_opt2, 'bool) flat_repr
 
       (** Construct a statement (as structured data) from the flat data-based representation. *)
       val of_data :
            ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp option, 'bool) flat_repr
-        -> feature_flags:
-             Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
         -> option_map:
              ('g Hlist0.Id.t -> f:(('h * unit) Hlist.HlistId.t -> 'h) -> 'j)
-        -> of_opt:(('fp, 'bool) Pickles_types.Opt.t -> 'fp_opt2)
         -> ('b, 'c, 'a, 'fp_opt2, 'j, 'bool, 'd, 'd, 'd, 'e, 'f) t
     end
 
@@ -1124,8 +1117,6 @@ module Step : sig
 
           val typ :
                'f Spec.impl
-            -> dummy_scalar:'a
-            -> dummy_scalar_challenge:'b Scalar_challenge.t
             -> challenge:
                  ( 'c
                  , 'd
@@ -1135,14 +1126,6 @@ module Step : sig
                    Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                  Snarky_backendless.Types.Typ.t
             -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
-            -> bool:
-                 ( ('f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
-                    as
-                    'boolean )
-                 , bool
-                 , 'f )
-                 Snarky_backendless.Typ.t
-            -> feature_flags:Opt.Flag.t Plonk_types.Features.t
             -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
             -> ( ('c, 'e Scalar_challenge.t, 'fp) t
                , ('d, 'b Scalar_challenge.t, 'a) t
@@ -1361,12 +1344,6 @@ module Step : sig
            )
            snarky_typ
         -> assert_16_bits:('a Snarky_backendless.Cvar.t -> unit)
-        -> zero:
-             ( Limb_vector.Challenge.Constant.t
-             , 'a Limb_vector.Challenge.t
-             , 'c Hlist0.Id.t
-             , 'b Hlist0.Id.t )
-             Zero_values.t
         -> ( ( 'a Limb_vector.Challenge.t
              , 'a Limb_vector.Challenge.t Scalar_challenge.t
              , 'b
@@ -1414,11 +1391,6 @@ module Step : sig
 
     val typ :
          'f Spec.impl
-      -> ( Limb_vector.Challenge.Constant.t
-         , 'f Limb_vector.Challenge.t
-         , 'a Hlist0.Id.t
-         , 'b Hlist0.Id.t )
-         Zero_values.t
       -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
       -> (Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
       -> ( 'b
