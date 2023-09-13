@@ -622,6 +622,8 @@ module Plonk_constraint = struct
             ; (* Coefficients *) two_to_rot
             }
       | AddFixedLookupTable { id; data } ->
+          (* TODO: see a possible better API -
+             https://github.com/MinaProtocol/mina/issues/13984 *)
           AddFixedLookupTable { id; data }
       | AddRuntimeTableCfg { id; first_column } ->
           AddRuntimeTableCfg { id; first_column }
@@ -727,6 +729,8 @@ type ('f, 'rust_gates) t =
        The finalized tag contains the digest of the circuit.
     *)
     mutable gates : ('f, 'rust_gates) circuit
+        (* Witnesses values corresponding to each runtime lookups *)
+  ; mutable runtime_lookups_rev : (V.t * (V.t * V.t)) list
         (* The user-provided lookup tables associated with this circuit. *)
   ; mutable fixed_lookup_tables : 'f fixed_lookup_tables
         (* The user-provided runtime table configurations associated with this
@@ -869,7 +873,10 @@ module Make
        Snarky_backendless.Constraint.basic
     -> unit
 
-  val compute_witness : t -> (int -> Fp.t) -> Fp.t array array
+  val compute_witness :
+       t
+    -> (int -> Fp.t)
+    -> Fp.t array array * Fp.t Kimchi_types.runtime_table array
 
   val finalize : t -> unit
 
@@ -887,6 +894,17 @@ module Make
 end = struct
   open Core_kernel
   open Pickles_types
+
+  (* Used by compute_witness to build the runtime tables from the Lookup
+     constraint *)
+  module MapRuntimeTable = struct
+    module T = struct
+      type t = int32 * Fp.t [@@deriving hash, sexp, compare]
+    end
+
+    include T
+    include Core_kernel.Hashable.Make (T)
+  end
 
   type nonrec t = (Fp.t, Gates.t) t
 
@@ -928,7 +946,7 @@ end = struct
       and a function that converts the indexed secret inputs to their concrete values.
    *)
   let compute_witness (sys : t) (external_values : int -> Fp.t) :
-      Fp.t array array =
+      Fp.t array array * Fp.t Kimchi_types.runtime_table array =
     let internal_values : Fp.t Internal_var.Table.t =
       Internal_var.Table.create ()
     in
@@ -975,8 +993,61 @@ end = struct
                 let value = compute lc in
                 res.(col_idx).(row_idx) <- value ;
                 Hashtbl.set internal_values ~key:var ~data:value ) ) ;
+
+    let map_runtime_tables = MapRuntimeTable.Table.create () in
+    let runtime_tables : Fp.t Kimchi_types.runtime_table array =
+      match sys.runtime_tables_cfg with
+      | Unfinalized_runtime_tables_cfg_rev _ ->
+          failwith
+            "Attempted to generate a witness for an unfinalized constraint \
+             system"
+      | Compiled_runtime_tables_cfg cfgs ->
+          Array.mapi cfgs ~f:(fun rt_idx { Kimchi_types.id; first_column } ->
+              let data =
+                Array.mapi first_column ~f:(fun i v ->
+                    ignore
+                    (* `add` leaves the value unchanged if the index has been
+                       already used. Therefore, it keeps the first value.
+                       This handles the case that the first column has
+                       duplicated index values.
+                    *)
+                    @@ MapRuntimeTable.Table.add map_runtime_tables ~key:(id, v)
+                         ~data:(i, rt_idx) ;
+                    (* default padding value for lookup *)
+                    Fp.zero )
+              in
+              let rt : Fp.t Kimchi_types.runtime_table = { id; data } in
+              rt )
+    in
+
+    (* Fill in the used entries of the runtime lookup tables. *)
+    List.iter (List.rev sys.runtime_lookups_rev) ~f:(fun (id, (idx, v)) ->
+        let compute_value x = compute ([ (Fp.one, x) ], None) in
+        let vid = compute_value id in
+        let vidx = compute_value idx in
+        let vv = compute_value v in
+        (* FIXME: we should have a int32 here. We are not sure the ID will be a
+           int32. We should enforce that.
+           See https://github.com/MinaProtocol/mina/issues/13955
+        *)
+        let id_int32 = Int32.of_string @@ Fp.to_string vid in
+        (* Using find allows to handle fixed lookup tables
+           As the map has been built from the runtime table configurations,
+           except in the case that a runtime table and a fixed table shares the
+           same ID, the lookups in fixed lookup tables will return None.
+           See https://github.com/MinaProtocol/mina/issues/14016
+        *)
+        let v =
+          MapRuntimeTable.Table.find map_runtime_tables (id_int32, vidx)
+        in
+        if Option.is_some v then
+          let i, rt_idx = Option.value_exn v in
+          let rt = runtime_tables.(rt_idx) in
+          (* Important note: we do not check if the value has been set before.
+             Therefore, it will always use the latest value *)
+          rt.data.(i) <- vv ) ;
     (* Return the witness. *)
-    res
+    (res, runtime_tables)
 
   let union_find sys v =
     Hashtbl.find_or_add sys.union_finds v ~default:(fun () ->
@@ -995,6 +1066,7 @@ end = struct
     ; prev_challenges = Set_once.create ()
     ; internal_vars = Internal_var.Table.create ()
     ; gates = Unfinalized_rev [] (* Gates.create () *)
+    ; runtime_lookups_rev = []
     ; fixed_lookup_tables = Unfinalized_fixed_lookup_tables_rev []
     ; runtime_tables_cfg = Unfinalized_runtime_tables_cfg_rev []
     ; rows_rev = []
@@ -1798,16 +1870,37 @@ end = struct
             (Fn.compose add_endoscale_scalar_round
                (Endoscale_scalar_round.map ~f:reduce_to_v) )
     | Plonk_constraint.T (Lookup { w0; w1; w2; w3; w4; w5; w6 }) ->
+        (* table ID *)
+        let red_w0 = reduce_to_v w0 in
+        (* idx1 *)
+        let red_w1 = reduce_to_v w1 in
+        (* v1 *)
+        let red_w2 = reduce_to_v w2 in
+        (* idx2 *)
+        let red_w3 = reduce_to_v w3 in
+        (* v2 *)
+        let red_w4 = reduce_to_v w4 in
+        (* idx3 *)
+        let red_w5 = reduce_to_v w5 in
+        (* v3 *)
+        let red_w6 = reduce_to_v w6 in
         let vars =
-          [| Some (reduce_to_v w0)
-           ; Some (reduce_to_v w1)
-           ; Some (reduce_to_v w2)
-           ; Some (reduce_to_v w3)
-           ; Some (reduce_to_v w4)
-           ; Some (reduce_to_v w5)
-           ; Some (reduce_to_v w6)
+          [| Some red_w0
+           ; Some red_w1
+           ; Some red_w2
+           ; Some red_w3
+           ; Some red_w4
+           ; Some red_w5
+           ; Some red_w6
           |]
         in
+        let lookup1 = (red_w0, (red_w1, red_w2)) in
+        let lookup2 = (red_w0, (red_w3, red_w4)) in
+        let lookup3 = (red_w0, (red_w5, red_w6)) in
+        (* We populate with the first lookup. In the case the user uses the same
+           index multiple times, the last value will be used *)
+        sys.runtime_lookups_rev <-
+          lookup3 :: lookup2 :: lookup1 :: sys.runtime_lookups_rev ;
         add_row sys vars Lookup [||]
     | Plonk_constraint.T
         (RangeCheck0

@@ -39,7 +39,6 @@ module Step : sig
   val input :
        proofs_verified:'a Pickles_types.Nat.t
     -> wrap_rounds:'b Pickles_types.Nat.t
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
     -> ( ( ( ( Impl.Field.t
              , Impl.Field.t Composition_types.Scalar_challenge.t
              , Other_field.t Pickles_types.Shifted_value.Type2.t
@@ -130,7 +129,7 @@ module Wrap : sig
   end
 
   val input :
-       feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t
+       feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
     -> unit
     -> ( ( Impl.Field.t
          , Impl.Field.t Composition_types.Scalar_challenge.t
@@ -138,11 +137,11 @@ module Wrap : sig
          , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
            , Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Plonk_types.Opt.t
+           Pickles_types.Opt.t
          , ( Impl.Field.t Composition_types.Scalar_challenge.t
            , Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Plonk_types.Opt.t
+           Pickles_types.Opt.t
          , Impl.Boolean.var
          , Impl.field Snarky_backendless.Cvar.t
          , Impl.field Snarky_backendless.Cvar.t

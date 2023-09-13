@@ -4,7 +4,7 @@ module Bulletproof_challenge = Bulletproof_challenge
 module Branch_data = Branch_data
 module Digest = Digest
 module Spec = Spec
-module Opt = Plonk_types.Opt
+module Opt = Opt
 open Core_kernel
 
 type 'f impl = 'f Spec.impl
@@ -134,8 +134,8 @@ module Wrap = struct
 
           let typ (type f fp)
               (module Impl : Snarky_backendless.Snark_intf.Run
-                with type field = f ) ~dummy_scalar ~dummy_scalar_challenge
-              ~challenge ~scalar_challenge ~bool
+                with type field = f ) ~dummy_scalar_challenge ~challenge
+              ~scalar_challenge ~bool
               ~feature_flags:
                 ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags)
               (fp : (fp, _, f) Snarky_backendless.Typ.t) =
@@ -150,7 +150,7 @@ module Wrap = struct
               ; Plonk_types.Features.typ
                   ~feature_flags:(Plonk_types.Features.of_full feature_flags)
                   bool
-              ; Plonk_types.Opt.typ Impl.Boolean.typ uses_lookups
+              ; Opt.typ Impl.Boolean.typ uses_lookups
                   ~dummy:dummy_scalar_challenge
                   (Scalar_challenge.typ scalar_challenge)
               ]
@@ -328,12 +328,11 @@ module Wrap = struct
         let typ (type f fp)
             ((module Impl) as impl :
               (module Snarky_backendless.Snark_intf.Run with type field = f) )
-            ~dummy_scalar ~dummy_scalar_challenge ~challenge ~scalar_challenge
-            ~feature_flags (fp : (fp, _, f) Snarky_backendless.Typ.t) index =
+            ~dummy_scalar_challenge ~challenge ~scalar_challenge ~feature_flags
+            (fp : (fp, _, f) Snarky_backendless.Typ.t) index =
           Snarky_backendless.Typ.of_hlistable
-            [ Plonk.In_circuit.typ impl ~dummy_scalar ~dummy_scalar_challenge
-                ~challenge ~scalar_challenge ~bool:Impl.Boolean.typ
-                ~feature_flags fp
+            [ Plonk.In_circuit.typ impl ~dummy_scalar_challenge ~challenge
+                ~scalar_challenge ~bool:Impl.Boolean.typ ~feature_flags fp
             ; fp
             ; fp
             ; Scalar_challenge.typ scalar_challenge
@@ -348,9 +347,9 @@ module Wrap = struct
 
       let to_minimal
           ({ plonk
-           ; combined_inner_product
-           ; b
-           ; xi
+           ; combined_inner_product = _
+           ; b = _
+           ; xi = _
            ; bulletproof_challenges
            ; branch_data
            } :
@@ -507,13 +506,12 @@ module Wrap = struct
 
       let typ (type f fp)
           (impl : (module Snarky_backendless.Snark_intf.Run with type field = f))
-          ~dummy_scalar ~dummy_scalar_challenge ~challenge ~scalar_challenge
-          ~feature_flags (fp : (fp, _, f) Snarky_backendless.Typ.t)
+          ~dummy_scalar_challenge ~challenge ~scalar_challenge ~feature_flags
+          (fp : (fp, _, f) Snarky_backendless.Typ.t)
           messages_for_next_wrap_proof digest index =
         Snarky_backendless.Typ.of_hlistable
-          [ Deferred_values.In_circuit.typ impl ~dummy_scalar
-              ~dummy_scalar_challenge ~challenge ~scalar_challenge
-              ~feature_flags fp index
+          [ Deferred_values.In_circuit.typ impl ~dummy_scalar_challenge
+              ~challenge ~scalar_challenge ~feature_flags fp index
           ; digest
           ; messages_for_next_wrap_proof
           ]
@@ -766,11 +764,11 @@ module Wrap = struct
           in
           let maybe_constant flag =
             match flag with
-            | Plonk_types.Opt.Flag.Yes ->
+            | Opt.Flag.Yes ->
                 constant true
-            | Plonk_types.Opt.Flag.No ->
+            | Opt.Flag.No ->
                 constant false
-            | Plonk_types.Opt.Flag.Maybe ->
+            | Opt.Flag.Maybe ->
                 Spec.T.B Bool
           in
           Spec.T.Struct
@@ -823,7 +821,7 @@ module Wrap = struct
            ; messages_for_next_step_proof
              (* messages_for_next_step_proof is represented as a digest inside the circuit *)
            } :
-            _ t ) ~option_map ~to_opt =
+            _ t ) ~option_map =
         let open Vector in
         let fp =
           [ combined_inner_product
@@ -864,7 +862,7 @@ module Wrap = struct
             ; index
             ; feature_flags
             ; joint_combiner
-            ] ~feature_flags:flags ~option_map ~of_opt : _ t =
+            ] ~option_map : _ t =
         let open Vector in
         let [ combined_inner_product
             ; b
@@ -1092,8 +1090,7 @@ module Step = struct
             ; perm = f t.perm
             }
 
-          let typ (type f fp) _ ~dummy_scalar ~dummy_scalar_challenge ~challenge
-              ~scalar_challenge ~bool ~feature_flags
+          let typ (type f fp) _ ~challenge ~scalar_challenge
               (fp : (fp, _, f) Snarky_backendless.Typ.t) =
             Snarky_backendless.Typ.of_hlistable
               [ Scalar_challenge.typ scalar_challenge
@@ -1324,7 +1321,7 @@ module Step = struct
           }
       end
 
-      let typ impl fq ~assert_16_bits ~zero =
+      let typ impl fq ~assert_16_bits =
         let open In_circuit in
         Spec.typ impl fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
         |> Snarky_backendless.Typ.transport ~there:to_data ~back:of_data
@@ -1361,16 +1358,13 @@ module Step = struct
 
     let[@warning "-60"] typ (type n f)
         ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-        as impl ) zero ~assert_16_bits
-        (proofs_verified :
-          (Plonk_types.Opt.Flag.t Plonk_types.Features.t, n) Vector.t ) fq :
+        as impl ) ~assert_16_bits
+        (proofs_verified : (Opt.Flag.t Plonk_types.Features.t, n) Vector.t) fq :
         ( ((_, _) Vector.t, _) t
         , ((_, _) Vector.t, _) t
         , _ )
         Snarky_backendless.Typ.t =
-      let per_proof feature_flags =
-        Per_proof.typ impl fq ~assert_16_bits ~zero
-      in
+      let per_proof _ = Per_proof.typ impl fq ~assert_16_bits in
       let unfinalized_proofs =
         Vector.typ' (Vector.map proofs_verified ~f:per_proof)
       in

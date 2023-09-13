@@ -42,7 +42,6 @@ let verify_one ~srs
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
-          ~feature_flags:(Plonk_types.Features.of_full d.feature_flags)
           ~sponge ~prev_challenges deferred_values prev_proof_evals )
   in
   let branch_data = deferred_values.branch_data in
@@ -198,7 +197,7 @@ let step_main :
         type pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> (pvars, br) Length.t
-        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t, br) Vector.t =
+        -> (Opt.Flag.t Plonk_types.Features.Full.t, br) Vector.t =
      fun ds ld ->
       match[@warning "-4"] (ds, ld) with
       | [], Z ->
@@ -221,7 +220,7 @@ let step_main :
         -> (pvars, br) Length.t
         -> (ns1, br) Length.t
         -> (ns2, br) Length.t
-        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.Full.t, br) Vector.t
+        -> (Opt.Flag.t Plonk_types.Features.Full.t, br) Vector.t
         -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
      fun ds ns1 ns2 ld ln1 ln2 feature_flagss ->
       match[@warning "-4"] (ds, ns1, ns2, ld, ln1, ln2, feature_flagss) with

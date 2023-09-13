@@ -216,12 +216,12 @@ let tock_unpadded_public_input_of_statement ~feature_flags prev_statement =
 let tock_public_input_of_statement ~feature_flags s =
   tock_unpadded_public_input_of_statement ~feature_flags s
 
-let tick_public_input_of_statement ~max_proofs_verified ~feature_flags
+let tick_public_input_of_statement ~max_proofs_verified
     (prev_statement : _ Types.Step.Statement.t) =
   let input =
     let (T (input, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Tock.Rounds.n ~feature_flags
+        ~wrap_rounds:Tock.Rounds.n
     in
     Impls.Step.generate_public_input input prev_statement
   in
@@ -255,11 +255,11 @@ let combined_evaluation (type f)
   let open Impl in
   let open Field in
   let mul_and_add ~(acc : Field.t) ~(xi : Field.t)
-      (fx : (Field.t, Boolean.var) Plonk_types.Opt.t) : Field.t =
+      (fx : (Field.t, Boolean.var) Opt.t) : Field.t =
     match fx with
-    | None ->
+    | Nothing ->
         acc
-    | Some fx ->
+    | Just fx ->
         fx + (xi * acc)
     | Maybe (b, fx) ->
         Field.if_ b ~then_:(fx + (xi * acc)) ~else_:acc
@@ -267,9 +267,9 @@ let combined_evaluation (type f)
   with_label __LOC__ (fun () ->
       Pcs_batch.combine_split_evaluations ~mul_and_add
         ~init:(function
-          | Some x ->
+          | Just x ->
               x
-          | None ->
+          | Nothing ->
               Field.zero
           | Maybe (b, x) ->
               (b :> Field.t) * x )

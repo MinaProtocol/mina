@@ -65,7 +65,7 @@ val incrementally_verify_proof :
        ( Wrap_main_inputs.Inner_curve.t
        , ( Wrap_main_inputs.Inner_curve.t
          , Impls.Wrap.Boolean.var )
-         Pickles_types.Plonk_types.Opt.t )
+         Pickles_types.Opt.t )
        Pickles_types.Plonk_verification_key_evals.Step.t
   -> xi:Scalar_challenge.t
   -> sponge:Opt.t
@@ -96,10 +96,10 @@ val incrementally_verify_proof :
        , Wrap_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
        , ( Wrap_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
          , Wrap_main_inputs.Impl.Boolean.var )
-         Pickles_types.Plonk_types.Opt.t
+         Pickles_types.Opt.t
        , ( Wrap_main_inputs.Impl.Field.t Import.Scalar_challenge.t
          , Wrap_main_inputs.Impl.Boolean.var )
-         Pickles_types.Plonk_types.Opt.t
+         Pickles_types.Opt.t
        , Wrap_main_inputs.Impl.Boolean.var )
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
   -> Wrap_main_inputs.Impl.Field.t
@@ -147,12 +147,12 @@ val choose_key :
   -> ( ( Wrap_main_inputs.Inner_curve.t
        , ( Wrap_main_inputs.Inner_curve.t
          , Impls.Wrap.Boolean.var )
-         Pickles_types.Plonk_types.Opt.t )
+         Pickles_types.Opt.t )
        index'
      , 'n )
      Pickles_types.Vector.t
   -> ( Wrap_main_inputs.Inner_curve.t
      , ( Wrap_main_inputs.Inner_curve.t
        , Impls.Wrap.Boolean.var )
-       Pickles_types.Plonk_types.Opt.t )
+       Pickles_types.Opt.t )
      index'

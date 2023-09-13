@@ -62,8 +62,8 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , Impl.Field.t Shifted_value.Type1.t
       , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
         , Impl.Boolean.var )
-        Plonk_types.Opt.t
-      , (scalar_challenge, Impl.Boolean.var) Plonk_types.Opt.t
+        Opt.t
+      , (scalar_challenge, Impl.Boolean.var) Opt.t
       , Impl.Boolean.var
       , unit
       , Digest.Make(Impl).t
@@ -149,7 +149,6 @@ let typ (type n avar aval) ~feature_flags
     ; Types.Wrap.Proof_state.In_circuit.typ
         (module Impl)
         ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ ~feature_flags
-        ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
         ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)
         (Snarky_backendless.Typ.unit ())

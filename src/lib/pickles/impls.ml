@@ -128,7 +128,7 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~proofs_verified ~wrap_rounds ~feature_flags =
+  let input ~proofs_verified ~wrap_rounds =
     let open Types.Step.Statement in
     let spec = spec proofs_verified wrap_rounds in
     let (T (typ, f, f_inv)) =
@@ -258,18 +258,11 @@ module Wrap = struct
     in
     let typ =
       Typ.transport typ
-        ~there:(In_circuit.to_data ~option_map:Option.map ~to_opt:Fn.id)
-        ~back:
-          (In_circuit.of_data ~feature_flags ~option_map:Option.map
-             ~of_opt:Plonk_types.Opt.to_option )
+        ~there:(In_circuit.to_data ~option_map:Option.map)
+        ~back:(In_circuit.of_data ~option_map:Option.map)
     in
     Spec.ETyp.T
       ( typ
-      , (fun x ->
-          In_circuit.of_data ~feature_flags ~option_map:Plonk_types.Opt.map
-            (f x) ~of_opt:Fn.id )
-      , fun x ->
-          f_inv
-            (In_circuit.to_data ~option_map:Plonk_types.Opt.map x
-               ~to_opt:Plonk_types.Opt.to_option_unsafe ) )
+      , (fun x -> In_circuit.of_data ~option_map:Opt.map (f x))
+      , fun x -> f_inv (In_circuit.to_data ~option_map:Opt.map x) )
 end

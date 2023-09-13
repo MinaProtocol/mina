@@ -81,8 +81,8 @@ module Proof = Plonk_dlog_proof.Make (struct
     let batch_verify vks ts =
       Promise.run_in_thread (fun () -> batch_verify vks ts)
 
-    let create_aux ~f:create (pk : Keypair.t) primary auxiliary runtime_tables
-        prev_chals prev_comms =
+    let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
+        prev_comms =
       (* external values contains [1, primary..., auxiliary ] *)
       let external_values i =
         let open Field.Vector in
@@ -91,7 +91,7 @@ module Proof = Plonk_dlog_proof.Make (struct
       in
 
       (* compute witness *)
-      let computed_witness =
+      let computed_witness, runtime_tables =
         R1CS_constraint_system.compute_witness pk.cs external_values
       in
       let num_rows = Array.length computed_witness.(0) in
@@ -107,17 +107,15 @@ module Proof = Plonk_dlog_proof.Make (struct
       in
       create pk.index witness_cols runtime_tables prev_chals prev_comms
 
-    let create_async (pk : Keypair.t) ~primary ~auxiliary ~runtime_tables
-        ~prev_chals ~prev_comms =
-      create_aux pk primary auxiliary runtime_tables prev_chals prev_comms
+    let create_async (pk : Keypair.t) ~primary ~auxiliary ~prev_chals
+        ~prev_comms =
+      create_aux pk primary auxiliary prev_chals prev_comms
         ~f:(fun pk auxiliary_input runtime_tables prev_challenges prev_sgs ->
           Promise.run_in_thread (fun () ->
               create pk auxiliary_input runtime_tables prev_challenges prev_sgs ) )
 
-    let create (pk : Keypair.t) ~primary ~auxiliary ~runtime_tables ~prev_chals
-        ~prev_comms =
-      create_aux pk primary auxiliary runtime_tables prev_chals prev_comms
-        ~f:create
+    let create (pk : Keypair.t) ~primary ~auxiliary ~prev_chals ~prev_comms =
+      create_aux pk primary auxiliary prev_chals prev_comms ~f:create
   end
 
   module Verifier_index = Kimchi_bindings.Protocol.VerifierIndex.Fp
