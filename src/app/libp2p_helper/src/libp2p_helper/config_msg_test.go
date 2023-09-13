@@ -12,8 +12,8 @@ import (
 	ipc "libp2p_ipc"
 
 	capnp "capnproto.org/go/capnp/v3"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/stretchr/testify/require"

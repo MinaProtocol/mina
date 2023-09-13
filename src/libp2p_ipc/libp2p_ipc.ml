@@ -340,4 +340,7 @@ let read_incoming_messages reader =
 
 let write_outgoing_message writer msg =
   msg |> Builder.Libp2pHelperInterface.Message.to_message
-  |> Capnp.Codecs.serialize_iter ~compression ~f:(Writer.write writer)
+  |> Capnp.Codecs.serialize_fold_copyless ~compression ~init:0
+       ~f:(fun total str len ->
+         Writer.write ~len writer str ;
+         total + len )
