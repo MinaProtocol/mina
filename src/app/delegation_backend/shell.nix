@@ -1,4 +1,4 @@
-with import <nixpkgs> {};
+with import <nixpkgs> { };
 let
   minaSigner = import ../../external/c-reference-signer;
 in
@@ -9,6 +9,6 @@ in
     shellHook = ''
       export LIB_MINA_SIGNER=${minaSigner}/lib/libmina_signer.so
       return
-      '';
+    '';
   };
 }
