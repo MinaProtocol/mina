@@ -190,7 +190,8 @@ spec:
             path: keyfile.json
       {{- end }}
       - name: actual-libp2p
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: pvc-{{ $config.name }}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
 ---
 apiVersion: v1
@@ -232,4 +233,17 @@ spec:
     targetPort: {{ $.Values.mina.ports.graphql }}
 {{- end }}
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-{{ $config.name }}
+spec:
+  accessModes:
+      - {{ $.Values.storage.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ $.Values.storage.size | quote }}
+  storageClassName: "{{ $.Values.storage.storageClass }}"
+---
 {{ end }}
+---
