@@ -275,6 +275,8 @@ module Libp2p_stream : sig
   val pipes : t -> string Pipe.Reader.t * string Pipe.Writer.t
 
   val remote_peer : t -> Peer.t
+
+  val max_chunk_size : int
 end
 
 (** Opens a stream with a peer on a particular protocol.
