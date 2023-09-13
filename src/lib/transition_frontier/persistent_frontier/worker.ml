@@ -91,79 +91,63 @@ module Worker = struct
     O1trace.thread "persistent_frontier_write_to_disk" (fun () ->
         [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
           (List.length input) ;
-        let all_root_transitioned =
-          List.rev_filter_map input ~f:(function
-            | Diff.Lite.E.E (Root_transitioned _ as r) ->
-                Some r
-            | _ ->
-                None )
+        (* OPTIMIZATION: Compress the best tip diffs and root transition diffs in order avoid unnecessary intermediate writes. *)
+        let best_tip_diffs, root_transition_diffs, other_diffs =
+          List.partition3_map input ~f:(function
+            | Diff.Lite.E.E (Best_tip_changed diff) ->
+                `Fst diff
+            | E (Root_transitioned diff) ->
+                `Snd diff
+            | diff ->
+                `Trd diff )
         in
-        (* We merge all Root_transitioned events into the last one *)
-        let last_root_transitioned =
-          match all_root_transitioned with
-          | Root_transitioned ({ garbage = Lite garbage; _ } as r) :: rest ->
-              (* Order of garbage is not fuilly preserved, but this doesn't matter for persistent frontier handling *)
-              let more_garbage =
-                List.concat_map rest ~f:(function
-                  | Root_transitioned { new_root; garbage = Lite garbage; _ } ->
-                      (Root_data.Limited.hashes new_root).state_hash :: garbage
-                  | _ ->
-                      [] )
-              in
-              Some
-                (Diff.Lite.E.E
-                   (Root_transitioned
-                      { r with garbage = Lite (more_garbage @ garbage) } ) )
-          | _ ->
-              None
+        (* We only care about the final best tip diff in the sequence, as all other best tip diffs get overwritten *)
+        let final_best_tip_diff = List.last best_tip_diffs in
+        (* We only care about the final root transition diff in the sequence, but we do want to retain garbage that is removed from prior root transitions. We do this by compressing all garbage into the final root transition. *)
+        let final_root_transition_diff = List.last root_transition_diffs in
+        let extra_garbage =
+          List.drop_last root_transition_diffs
+          |> Option.value ~default:[]
+          |> List.bind ~f:(fun { new_root; garbage = Lite garbage; _ } ->
+                 (Root_data.Limited.hashes new_root).state_hash :: garbage )
         in
-        let append_best_tip diff = function
-          | acc, `Best_tip false, root ->
-              (diff :: acc, `Best_tip true, root)
-          | x ->
-              x
+        let total_root_transition_diff =
+          Option.map final_root_transition_diff
+            ~f:(fun ({ garbage = Lite garbage; _ } as r) ->
+              { r with garbage = Lite (extra_garbage @ garbage) } )
         in
-        let append_root = function
-          | acc, bt, `Root false ->
-              ( Option.value_map ~default:ident ~f:List.cons
-                  last_root_transitioned acc
-              , bt
-              , `Root true )
-          | x ->
-              x
+        let diffs_to_apply =
+          List.concat
+            [ other_diffs
+            ; Option.value_map total_root_transition_diff ~default:[]
+                ~f:(fun diff -> [ Diff.Lite.E.E (Root_transitioned diff) ])
+            ; Option.value_map final_best_tip_diff ~default:[] ~f:(fun diff ->
+                  [ Diff.Lite.E.E (Best_tip_changed diff) ] )
+            ]
         in
-        let append diff (acc, bt, root) = (diff :: acc, bt, root) in
-        let input, _, _ =
-          List.fold_right
-            ~init:([], `Best_tip false, `Root false)
-            input
-            ~f:(function
-              | E (Best_tip_changed _) as diff ->
-                  append_best_tip diff
-              | E (Root_transitioned _) ->
-                  append_root
-              | diff ->
-                  append diff )
-        in
-        let parent_hashes =
-          List.filter_map input ~f:(function
-            | E (New_node (Lite transition)) ->
-                Mina_block.Validated.header transition
-                |> Header.protocol_state
-                |> Mina_state.Protocol_state.previous_state_hash |> Option.some
-            | _ ->
-                None )
-        in
-        let fs_res =
+        let apply_funcs =
+          let parent_hashes =
+            List.filter_map input ~f:(function
+              | E (New_node (Lite transition)) ->
+                  Mina_block.Validated.header transition
+                  |> Header.protocol_state
+                  |> Mina_state.Protocol_state.previous_state_hash
+                  |> Option.some
+              | _ ->
+                  None )
+          in
           let%map.Result old_root =
             Database.find_arcs_and_root t.db ~arcs_cache ~parent_hashes
           in
-          List.map
-            ~f:(fun (Diff.Lite.E.E diff) ->
+          List.map diffs_to_apply ~f:(fun (Diff.Lite.E.E diff) ->
               apply_diff ~old_root ~arcs_cache t diff )
-            input
         in
-        match fs_res with
+        match apply_funcs with
+        | Ok fs ->
+            let%map () = Scheduler.yield () in
+            Database.with_batch t.db ~f:(fun batch ->
+                List.iter fs ~f:(fun f -> f batch) )
+        (* TODO: log the diff that failed *)
         | Error (`Not_found (`Arcs h)) ->
             [%log' warn t.logger]
               "Did not add node to DB. Its $parent has already been thrown away"
@@ -172,10 +156,9 @@ module Worker = struct
         | Error (`Not_found `Old_root_transition) ->
             failwith
               "Failed to apply a diff to the persistent transition frontier"
-        | Ok fs ->
-            let%map () = Scheduler.yield () in
-            Database.with_batch t.db ~f:(fun batch ->
-                List.iter fs ~f:(fun f -> f batch) ) )
+        | Error (`Apply_diff _) ->
+            failwith
+              "Failed to apply a diff to the persistent transition frontier" )
 end
 
 include Worker_supervisor.Make (Worker)
