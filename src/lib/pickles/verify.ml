@@ -40,7 +40,7 @@ let verify_heterogenous (ts : Instance.t list) =
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
   [%log internal] "Compute_plonks_and_chals" ;
-  let computed_bp_chals, deferred_values =
+  let _computed_bp_chals, deferred_values =
     List.map ts
       ~f:(fun
            (T
@@ -92,7 +92,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         Timer.clock __LOC__ ;
         let { Deferred_values.Minimal.plonk = _
-            ; branch_data
+            ; branch_data = _
             ; bulletproof_challenges
             } =
           Deferred_values.Minimal.map_challenges

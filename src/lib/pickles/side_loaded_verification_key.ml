@@ -217,7 +217,7 @@ module Stable = struct
         in
         let log2_size = Import.Domain.log2_size d in
         let public =
-          let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
+          let (T (input, _conv, _conv_inv)) = Impls.Wrap.input () in
           let (Typ typ) = input in
           typ.size_in_field_elements
         in

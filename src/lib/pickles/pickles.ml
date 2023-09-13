@@ -1406,11 +1406,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         with type ns = Maxes.ns
                          and type length = Max_proofs_verified.n )
                       ~dlog_plonk_index wrap_main to_field_elements ~pairing_vk
-                      ~step_domains ~wrap_domains ~pairing_plonk_indices pk
+                      ~step_domains:_ ~wrap_domains:_ ~pairing_plonk_indices:_
+                      pk
                       ({ statement = prev_statement
-                       ; prev_evals
+                       ; prev_evals = _
                        ; proof
-                       ; index = which_index
+                       ; index = _
                        } :
                         ( _
                         , _

@@ -596,7 +596,7 @@ struct
                       (List.filter_map ~f:Fn.id constant_part)
                       ~init:correction ~f:Ops.add_fast
                   in
-                  List.foldi terms ~init ~f:(fun i acc term ->
+                  List.foldi terms ~init ~f:(fun _i acc term ->
                       match term with
                       | `Cond_add (b, g) ->
                           with_label __LOC__ (fun () ->

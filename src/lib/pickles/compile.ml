@@ -324,7 +324,7 @@ struct
     (* TODO Think this is right.. *)
   end
 
-  let log_step main typ name index =
+  let log_step main _typ name index =
     let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
     let log =
       let weight =
@@ -1390,7 +1390,7 @@ struct
             ~branches:(module Nat.N1)
             ~max_proofs_verified:(module Nat.N2)
             ~name:"recurse-on-bad" ~constraint_constants
-            ~choices:(fun ~self ->
+            ~choices:(fun ~self:_ ->
               [ { identifier = "main"
                 ; feature_flags = Plonk_types.Features.none_bool
                 ; prevs = [ tag; tag ]

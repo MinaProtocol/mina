@@ -158,7 +158,7 @@ struct
           |> List.fold ~init:None ~f:(fun acc x -> Some (add_opt acc x))
         in
         let correction, acc =
-          List.mapi non_constant_part ~f:(fun i (s, x) ->
+          List.mapi non_constant_part ~f:(fun _i (s, x) ->
               let rr, n =
                 match s with
                 | `Packed_bits (s, n) ->
@@ -195,7 +195,7 @@ struct
     with_label __LOC__ (fun () ->
         let absorb t = absorb sponge t in
         let prechallenges =
-          Array.mapi gammas ~f:(fun i gammas_i ->
+          Array.mapi gammas ~f:(fun _i gammas_i ->
               absorb (PC :: PC) gammas_i ;
               squeeze_scalar sponge )
         in
@@ -496,7 +496,7 @@ struct
     x_hat
 
   let incrementally_verify_proof (type b)
-      (module Proofs_verified : Nat.Add.Intf with type n = b) ~srs
+      (module Proofs_verified : Nat.Add.Intf with type n = b) ~srs:_
       ~(domain :
          [ `Known of Domain.t
          | `Side_loaded of
@@ -729,7 +729,7 @@ struct
         let open Side_loaded_verification_key in
         let domains = [ { Domains.h = 10 }; { h = 15 } ] in
         let pt = Field.Constant.random () in
-        List.iteri domains ~f:(fun i ds ->
+        List.iteri domains ~f:(fun _i ds ->
             let d_unchecked =
               Plonk_checks.domain
                 (module Field.Constant)
@@ -885,8 +885,7 @@ struct
   (* TODO: This needs to handle the fact of variable length evaluations.
      Meaning it needs opt sponge. *)
   let finalize_other_proof (type b branches)
-      (module Proofs_verified : Nat.Add.Intf with type n = b)
-      ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
+      (module Proofs_verified : Nat.Add.Intf with type n = b) ~feature_flags:_
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
       ~(* TODO: Add "actual proofs verified" so that proofs don't
@@ -1169,7 +1168,7 @@ struct
     let open Types.Step.Proof_state.Messages_for_next_step_proof in
     let after_index = sponge_after_index index in
     ( after_index
-    , stage (fun t ~widths ~max_width ~proofs_verified_mask ->
+    , stage (fun t ~widths:_ ~max_width:_ ~proofs_verified_mask ->
           (* TODO: Just get rid of the proofs verified mask and always absorb in full *)
           let sponge = Sponge.copy after_index in
           let t =
@@ -1213,8 +1212,8 @@ struct
               Opt_sponge.squeeze sponge ) )
 
   let accumulation_verifier
-      (accumulator_verification_key : _ Types_map.For_step.t) prev_accumulators
-      proof new_accumulator : Boolean.var =
+      (_accumulator_verification_key : _ Types_map.For_step.t)
+      _prev_accumulators _proof _new_accumulator : Boolean.var =
     Boolean.false_
 
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index

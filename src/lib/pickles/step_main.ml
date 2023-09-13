@@ -238,7 +238,7 @@ let step_main :
       match (ds, ns1, ns2, ld, ln1, ln2, feature_flagss) with
       | [], [], [], Z, Z, Z, [] ->
           []
-      | ( d :: ds
+      | ( _d :: ds
         , n1 :: ns1
         , n2 :: ns2
         , S ld

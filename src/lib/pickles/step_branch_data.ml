@@ -85,8 +85,8 @@ let create
        , a_value
        , ret_var
        , ret_value )
-       Inductive_rule.public_input ) ~auxiliary_typ var_to_field_elements
-    value_to_field_elements (rule : _ Inductive_rule.t) =
+       Inductive_rule.public_input ) ~auxiliary_typ _var_to_field_elements
+    _value_to_field_elements (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let (T (self_width, proofs_verified)) = HT.length rule.prevs in

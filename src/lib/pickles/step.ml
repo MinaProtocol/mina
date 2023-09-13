@@ -70,9 +70,7 @@ struct
          , A_value.t
          , ret_var
          , ret_value )
-         Inductive_rule.public_input )
-      ~(auxiliary_typ : (auxiliary_var, auxiliary_value) Impls.Step.Typ.t) pk
-      self_dlog_vk :
+         Inductive_rule.public_input ) ~auxiliary_typ:_ pk self_dlog_vk :
       ( ( value
         , (_, Max_proofs_verified.n) Vector.t
         , (_, prevs_length) Vector.t
@@ -280,7 +278,7 @@ struct
                      ; gamma = plonk0.gamma
                      ; lookup =
                          Option.map (Opt.to_option_unsafe plonk.lookup)
-                           ~f:(fun l ->
+                           ~f:(fun _l ->
                              { Composition_types.Wrap.Proof_state
                                .Deferred_values
                                .Plonk
@@ -332,7 +330,7 @@ struct
           |> Wrap_hack.pad_accumulator )
           public_input proof
       in
-      let ((x_hat_1, x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
+      let ((x_hat_1, _x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
       let scalar_chal f =
         Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
       in
@@ -711,11 +709,11 @@ struct
         match (xs, maxes, l) with
         | [], [], Z ->
             []
-        | x :: xs, [], Z ->
+        | _x :: _xs, [], Z ->
             assert false
         | x :: xs, _ :: ms, S n ->
             x :: pad xs ms n
-        | [], m :: ms, S n ->
+        | [], _m :: ms, S n ->
             let t : _ Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
               { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges =
@@ -800,7 +798,7 @@ struct
                } )
            |> to_list) )
     in
-    let%map.Promise (next_proof : Tick.Proof.t), next_statement_hashed =
+    let%map.Promise (next_proof : Tick.Proof.t), _next_statement_hashed =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n ~feature_flags

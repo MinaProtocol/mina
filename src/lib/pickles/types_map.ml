@@ -108,9 +108,9 @@ module Compiled = struct
     | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
 
   let to_basic
-      { branches
+      { branches = _
       ; max_proofs_verified
-      ; proofs_verifieds
+      ; proofs_verifieds = _
       ; public_input
       ; wrap_vk
       ; wrap_domains

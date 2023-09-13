@@ -13,7 +13,7 @@ module Make
     (Auxiliary_var : T0)
     (Auxiliary_value : T0) =
 struct
-  let f_debug full_signature num_choices choices_length ~feature_flags
+  let f_debug full_signature _num_choices choices_length ~feature_flags
       ~max_proofs_verified =
     let num_choices = Hlist.Length.to_nat choices_length in
     let dummy_step_domains =

@@ -235,8 +235,8 @@ let tick_public_input_of_statement ~max_proofs_verified ~feature_flags
     (Backend.Tick.Field.Vector.length input)
     ~f:(Backend.Tick.Field.Vector.get input)
 
-let ft_comm ~add:( + ) ~scale ~endoscale ~negate
-    ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha
+let ft_comm ~add:( + ) ~scale ~endoscale:_ ~negate
+    ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha:_
     ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
     ~t_comm =
   let ( * ) x g = scale g x in

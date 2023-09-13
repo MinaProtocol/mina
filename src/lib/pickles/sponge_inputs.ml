@@ -43,7 +43,7 @@ struct
   open Field
   module Field = Field
 
-  let block_cipher (params : _ Sponge.Params.t) init =
+  let block_cipher (_params : _ Sponge.Params.t) init =
     Impl.with_label __LOC__ (fun () ->
         let t =
           exists
