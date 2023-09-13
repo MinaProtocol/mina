@@ -759,12 +759,17 @@ let setup_daemon logger =
             | Ok (precomputed_values, _) ->
                 precomputed_values
             | Error err ->
+                let json_config, accounts_omitted =
+                  Runtime_config.to_yojson_without_accounts config
+                in
+                let f i = List.cons ("accounts_omitted", `Int i) in
                 [%log fatal]
                   "Failed initializing with configuration $config: $error"
                   ~metadata:
-                    [ ("config", Runtime_config.to_yojson config)
-                    ; ("error", Error_json.error_to_yojson err)
-                    ] ;
+                    (Option.value_map ~f ~default:Fn.id accounts_omitted
+                       [ ("config", json_config)
+                       ; ("error", Error_json.error_to_yojson err)
+                       ] ) ;
                 Error.raise err
           in
           let rev_daemon_configs =
