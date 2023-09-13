@@ -6,6 +6,21 @@ variable "deploy_graphql_ingress" {
   type = bool
 }
 
+variable "expose_itn_graphql" {
+  type    = bool
+  default = false
+}
+
+variable "itn_keys" {
+  type    = string
+  default = ""
+}
+
+variable "itn_orchestrator_image" {
+  type    = string
+  default = "gcr.io/o1labs-192920/itn_orchestrator_image:latest"
+}
+
 variable "aws_route53_zone_id" {
   type = string
 }

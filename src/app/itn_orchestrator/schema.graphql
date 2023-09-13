@@ -199,6 +199,12 @@ input ZkappCommandsDetails {
   """Minimum balance change"""
   minBalanceChange: CurrencyAmount!
 
+  """Minimum new zkapp balance"""
+  minNewZkappBalance: CurrencyAmount!
+
+  """Maximum new zkapp balance"""
+  maxNewZkappBalance: CurrencyAmount!
+
   """Disable the precondition in account updates"""
   noPrecondition: Boolean!
 

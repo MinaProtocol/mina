@@ -157,3 +157,22 @@ resource "helm_release" "zkapps-dashboard" {
   timeout    = 600
   depends_on = [helm_release.archive_node]
 }
+
+# itn orchestrator
+
+resource "helm_release" "itn-orchestrator" {
+  provider   = helm.testnet_deploy
+  count      = var.expose_itn_graphql ? 1 : 0
+
+  name       = "${var.testnet_name}-itn-orchestrator"
+  repository = var.use_local_charts ? "" : local.mina_helm_repo
+  chart      = var.use_local_charts ? "../../../../helm/itn-orchestrator" : "itn-orchestrator"
+  version    = "0.1.0"
+  namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+  values = [
+    yamlencode(local.itn_orchestrator_vars)
+  ]
+  wait       = false
+  timeout    = 600
+  depends_on = [helm_release.seeds]
+}
