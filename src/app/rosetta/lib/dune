@@ -35,6 +35,7 @@
    signature_lib
    rosetta_coding
    rosetta_lib
+   mina_runtime_config
    mina_caqti
    logger
    mina_compile_config
