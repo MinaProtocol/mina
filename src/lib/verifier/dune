@@ -21,7 +21,6 @@
    logger
    ledger_proof
    snark_params
-   memory_stats
    blockchain_snark
    mina_base
    mina_state
