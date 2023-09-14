@@ -7,7 +7,6 @@ import (
 	"io"
 	"itn_json_types"
 	"os"
-	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
 	logging "github.com/ipfs/go-log/v2"
@@ -61,16 +60,47 @@ type secretBox struct {
 }
 
 type KeyloaderParams struct {
-	Dir         string
-	Limit       int
-	PasswordEnv string `json:"password-env,omitempty"`
+	Dir         string `json:"dir"`
+	Limit       int    `json:"limit,omitempty"`
+	PasswordEnv string `json:"passwordEnv,omitempty"`
+}
+
+func LoadPrivateKey(fname string, password []byte) ([]byte, error) {
+	jsonFile, err := os.Open(fname)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open keyfile %s: %v", fname, err)
+	}
+	defer jsonFile.Close()
+	bs, err := io.ReadAll(jsonFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read keyfile %s: %v", fname, err)
+	}
+	sk, err := DecodePrivateKey(bs, password)
+	if err != nil {
+		return nil, errors.Join(err, fmt.Errorf("failed decoding private key from file %s", fname))
+	}
+	return sk, nil
+}
+
+func DecodePrivateKey(bs []byte, password []byte) ([]byte, error) {
+	var box secretBox
+	json.Unmarshal(bs, &box)
+	if box.Box_primitive != "xsalsa20poly1305" || box.Pw_primitive != "argon2i" {
+		return nil, errors.New("unknown primitive type")
+	}
+	k := argon2.Key(password, box.Pwsalt, box.Pwdiff.Ops, box.Pwdiff.Mem/1024, 1, 32)
+	var key [32]byte
+	copy(key[:], k)
+	var nonce [24]byte
+	copy(nonce[:], box.Nonce)
+	sk, opened := secretbox.Open(nil, box.Ciphertext, &nonce, &key)
+	if !opened {
+		return nil, errors.New("failed to unseal key")
+	}
+	return sk, nil
 }
 
 func LoadPrivateKeyFiles(log logging.StandardLogger, params KeyloaderParams, output func(itn_json_types.MinaPrivateKey)) error {
-	entries, err := os.ReadDir(params.Dir)
-	if err != nil {
-		return err
-	}
 	var password []byte
 	if params.PasswordEnv != "" {
 		pass, has := os.LookupEnv(params.PasswordEnv)
@@ -78,42 +108,18 @@ func LoadPrivateKeyFiles(log logging.StandardLogger, params KeyloaderParams, out
 			password = []byte(pass)
 		}
 	}
-	i := 0
-	for _, e := range entries {
-		fname := e.Name()
-		if strings.HasSuffix(fname, ".pub") {
-			continue
-		}
-		jsonFile, err := os.Open(params.Dir + string(os.PathSeparator) + fname)
+	keyfiles, err := listKeyfiles(params.Dir)
+	if err != nil {
+		return err
+	}
+	for i, keyfile := range keyfiles {
+		sk, err := LoadPrivateKey(keyfile, password)
 		if err != nil {
-			return fmt.Errorf("failed to open keyfile %s: %v", fname, err)
-		}
-		defer jsonFile.Close()
-		bs, err := io.ReadAll(jsonFile)
-		if err != nil {
-			return fmt.Errorf("failed to read keyfile %s: %v", fname, err)
-		}
-		var box secretBox
-		json.Unmarshal(bs, &box)
-		if box.Box_primitive != "xsalsa20poly1305" || box.Pw_primitive != "argon2i" {
-			return fmt.Errorf("unknown primitive type in %s", fname)
-		}
-		k := argon2.Key(password, box.Pwsalt, box.Pwdiff.Ops, box.Pwdiff.Mem/1024, 1, 32)
-		if err != nil {
-			return fmt.Errorf("failed to parse key %s: %v", fname, err)
-		}
-		var key [32]byte
-		copy(key[:], k)
-		var nonce [24]byte
-		copy(nonce[:], box.Nonce)
-		sk, opened := secretbox.Open(nil, box.Ciphertext, &nonce, &key)
-		if !opened {
-			return fmt.Errorf("failed to unseal key %s", fname)
+			return err
 		}
 		sender := base58.CheckEncode(sk, '\x5A')
 		output(itn_json_types.MinaPrivateKey(sender))
-		i++
-		if params.Limit > 0 && i >= params.Limit {
+		if params.Limit > 0 && i+1 >= params.Limit {
 			break
 		}
 	}

@@ -21,6 +21,7 @@
    kimchi_backend
    with_hash
    pickles
+   pickles_base
    consensus
    transaction_snark
    snark_params

@@ -116,6 +116,8 @@ val sexp_of_t :
   -> ('a, 'c) t
   -> Ppx_sexp_conv_lib.Sexp.t
 
+val nth : ('a, 'n) t -> int -> 'a option
+
 (** [zip v1 v2] combines together vectors [v1] and [v2] of length ['b].  *)
 val zip : ('a, 'b) t -> ('c, 'b) t -> ('a * 'c, 'b) t
 

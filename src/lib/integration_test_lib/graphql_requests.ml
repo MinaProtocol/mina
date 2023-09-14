@@ -109,6 +109,16 @@ module Graphql = struct
     }
   |}]
 
+  module Set_snark_work_fee =
+  [%graphql
+  {|
+    mutation ($fee: UInt64!) @encoders(module: "Encoders"){
+      setSnarkWorkFee(input: {fee: $fee}) {
+        lastFee
+      }
+    }
+  |}]
+
   module Get_account_data =
   [%graphql
   {|
@@ -142,7 +152,28 @@ module Graphql = struct
     }
   |}]
 
+  module Global_slot_since_hard_fork =
+  [%graphql
+  {|
+    query {
+      daemonStatus {
+        consensusTimeNow {
+          globalSlot @ppxCustom(module: "Scalars.GlobalSlotSinceHardFork")
+        }
+      }
+    }
+  |}]
+
   module Best_chain =
+  (* "slot" is serialized using Graphql_lib.Scalars.Slot
+     to use that, we'd need to add the 'consensus' library,
+     which seems an undesirable dependency
+
+     semantically, it's a slot since hard fork, so decode it as such
+
+     that benign mismatch could be avoided by changing the encoding type
+     in proof_of_stake.ml
+  *)
   [%graphql
   {|
     query ($max_length: Int) @encoders(module: "Encoders"){
@@ -151,6 +182,13 @@ module Graphql = struct
         commandTransactionCount
         creatorAccount {
           publicKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+        }
+        protocolState {
+          consensusState {
+            blockHeight
+            slotSinceGenesis @ppxCustom(module: "Scalars.GlobalSlotSinceGenesis")
+            slot @ppxCustom(module: "Scalars.GlobalSlotSinceHardFork")
+          }
         }
       }
     }
@@ -310,6 +348,29 @@ let get_peer_id ~logger node_uri =
 let must_get_peer_id ~logger node_uri =
   get_peer_id ~logger node_uri |> Deferred.bind ~f:Malleable_error.or_hard_error
 
+let get_global_slot_since_hard_fork ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting global slot since hard fork from daemon status"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj =
+    Graphql.Global_slot_since_hard_fork.(make @@ makeVariables ())
+  in
+  let%bind query_result_obj =
+    exec_graphql_request ~logger ~node_uri
+      ~query_name:"global_slot_since_hard_fork" query_obj
+  in
+  [%log info] "global_slot_since_hard_fork, finished exec_graphql_request" ;
+  let res : Mina_numbers.Global_slot_since_hard_fork.t =
+    query_result_obj.daemonStatus.consensusTimeNow.globalSlot
+  in
+  [%log info] "global_slot_since_hard_fork, result of graphql query = %s"
+    (Mina_numbers.Global_slot_since_hard_fork.to_string res) ;
+  return res
+
+let must_get_global_slot_since_hard_fork ~logger node_uri =
+  get_global_slot_since_hard_fork ~logger node_uri
+  |> Deferred.bind ~f:Malleable_error.or_hard_error
+
 let get_best_chain ?max_length ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
   let query = Graphql.Best_chain.(make @@ makeVariables ?max_length ()) in
@@ -332,6 +393,11 @@ let get_best_chain ?max_length ~logger node_uri =
                        pk
                    | _ ->
                        "unknown" )
+               ; height = block.protocolState.consensusState.blockHeight
+               ; global_slot_since_genesis =
+                   block.protocolState.consensusState.slotSinceGenesis
+               ; global_slot_since_hard_fork =
+                   block.protocolState.consensusState.slot
                } )
            (Array.to_list chain)
 
@@ -941,8 +1007,39 @@ let set_snark_worker ~logger node_uri ~new_snark_pub_key =
     ~metadata:[ ("lastSnarkWorker", `String last_snark_worker) ] ;
   ()
 
+let set_snark_work_fee ~logger node_uri ~new_snark_work_fee =
+  [%log info] "Changing snark work fee"
+    ~metadata:
+      [ ("new_snark_work_fee", `Int new_snark_work_fee)
+      ; ("node_uri", `String (Uri.to_string node_uri))
+      ] ;
+  let open Deferred.Or_error.Let_syntax in
+  let set_snark_work_fee_graphql () =
+    let set_snark_work_fee_obj =
+      Graphql.Set_snark_work_fee.(
+        make
+        @@ makeVariables ~fee:(Unsigned.UInt64.of_int new_snark_work_fee) ())
+    in
+    exec_graphql_request ~logger ~node_uri
+      ~query_name:"set_snark_work_fee_graphql" set_snark_work_fee_obj
+  in
+  let%map result_obj = set_snark_work_fee_graphql () in
+  let last_snark_work_fee =
+    Currency.Fee.to_string result_obj.setSnarkWorkFee.lastFee
+  in
+  [%log info] "snark work fee changed, lastSnarkWorkFee: %s" last_snark_work_fee
+    ~metadata:
+      [ ("lastSnarkWorkFee", `String last_snark_work_fee)
+      ; ("node_uri", `String (Uri.to_string node_uri))
+      ] ;
+  ()
+
 let must_set_snark_worker ~logger t ~new_snark_pub_key =
   set_snark_worker ~logger t ~new_snark_pub_key
+  |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+let must_set_snark_work_fee ~logger t ~new_snark_work_fee =
+  set_snark_work_fee ~logger t ~new_snark_work_fee
   |> Deferred.bind ~f:Malleable_error.or_hard_error
 
 let get_metrics ~logger node_uri =

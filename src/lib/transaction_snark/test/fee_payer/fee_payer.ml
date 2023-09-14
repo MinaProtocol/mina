@@ -182,10 +182,12 @@ let%test_module "Fee payer tests" =
               (*Sparse ledger application fails*)
               match
                 let sparse_ledger =
-                  Sparse_ledger.of_any_ledger
-                    (Ledger.Any_ledger.cast
-                       (module Ledger.Mask.Attached)
-                       ledger )
+                  Sparse_ledger.of_ledger_subset_exn ledger
+                    ( init_ledger |> Array.to_list
+                    |> List.map ~f:(fun (kp, _) ->
+                           Account_id.create
+                             (Public_key.compress kp.public_key)
+                             Token_id.default ) )
                 in
                 Sparse_ledger.apply_transaction_first_pass ~constraint_constants
                   ~global_slot ~txn_state_view sparse_ledger

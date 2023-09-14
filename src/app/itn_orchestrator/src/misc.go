@@ -1,19 +1,28 @@
 package itn_orchestrator
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
+	"os"
+	"os/exec"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
+
+	logging "github.com/ipfs/go-log/v2"
 )
 
 type WaitParams struct {
-	Minutes int
-	Slot    int
-	Seconds int
+	Minutes int `json:"min,omitempty"`
+	Slot    int `json:"slot,omitempty"`
+	Seconds int `json:"sec,omitempty"`
 }
 
 type WaitAction struct{}
@@ -85,15 +94,15 @@ func filterGt(s []int, n int) []int {
 }
 
 type JoinParams struct {
-	Group1 []json.RawMessage
-	Group2 []json.RawMessage
-	Group3 []json.RawMessage
-	Group4 []json.RawMessage
-	Group5 []json.RawMessage
-	Group6 []json.RawMessage
-	Group7 []json.RawMessage
-	Group8 []json.RawMessage
-	Group9 []json.RawMessage
+	Group1 []json.RawMessage `json:"group1"`
+	Group2 []json.RawMessage `json:"group2"`
+	Group3 []json.RawMessage `json:"group3,omitempty"`
+	Group4 []json.RawMessage `json:"group4,omitempty"`
+	Group5 []json.RawMessage `json:"group5,omitempty"`
+	Group6 []json.RawMessage `json:"group6,omitempty"`
+	Group7 []json.RawMessage `json:"group7,omitempty"`
+	Group8 []json.RawMessage `json:"group8,omitempty"`
+	Group9 []json.RawMessage `json:"group9,omitempty"`
 }
 
 type JoinAction struct{}
@@ -126,8 +135,8 @@ func (JoinAction) Name() string { return "join" }
 var _ Action = JoinAction{}
 
 type ExceptParams struct {
-	Group  []NodeAddress
-	Except []NodeAddress
+	Group  []NodeAddress `json:"group"`
+	Except []NodeAddress `json:"except"`
 }
 
 type ExceptAction struct{}
@@ -155,8 +164,8 @@ func (ExceptAction) Name() string { return "except" }
 var _ Action = ExceptAction{}
 
 type SampleParams struct {
-	Group  []NodeAddress
-	Ratios []float64
+	Group  []NodeAddress `json:"group"`
+	Ratios []float64     `json:"ratios"`
 }
 
 type SampleAction struct{}
@@ -206,15 +215,115 @@ func selectNodes(tps, minTps float64, nodes []NodeAddress) (float64, []NodeAddre
 	return tps / nodesF, nodes[:nodesMax]
 }
 
-// TODO change API and remove this function
-func formatMina(amount uint64) string {
-	i, rem := amount/1e9, int(amount%1e9)
-	is := fmt.Sprintf("%d", i)
-	if rem == 0 {
-		return is
+func retryOnMultipleServers(servers []string, serverIx int, commandName string, log logging.StandardLogger, try func(string) error) (err error) {
+	server := ""
+	if len(servers) > 0 {
+		server = servers[serverIx]
 	}
-	s := []byte(".000000000")
-	rs := fmt.Sprintf("%d", rem)
-	copy(s[(10-len(rs)):], rs)
-	return is + string(s)
+	for retryPause := 1; retryPause <= 16; retryPause = retryPause * 2 {
+		err = try(server)
+		if err == nil {
+			break
+		}
+		if retryPause <= 8 {
+			log.Warnf("Failed to run %s command, retrying in %d minutes: %s", commandName, retryPause, err)
+			time.Sleep(time.Duration(retryPause) * time.Minute)
+		}
+		if len(servers) > 0 {
+			serverIx = (serverIx + 1) % len(servers)
+			server = servers[serverIx]
+		}
+	}
+	return
+}
+
+func listKeyfiles(dir string) ([]string, error) {
+	keyFiles := []string{}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range entries {
+		fname := e.Name()
+		if strings.HasSuffix(fname, ".pub") {
+			continue
+		}
+		keyFiles = append(keyFiles, dir+string(os.PathSeparator)+fname)
+	}
+	return keyFiles, nil
+}
+
+var pow10s []uint64
+
+func init() {
+	pow10s = []uint64{1, 10, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8}
+}
+
+func parseMina(str string) (uint64, error) {
+	ix := strings.IndexRune(str, '.')
+	if ix == -1 {
+		u, err := strconv.ParseUint(str, 10, 64)
+		return u * 1e9, err
+	}
+	var base uint64
+	{
+		var err error
+		if base, err = strconv.ParseUint(str[:ix], 10, 64); err != nil {
+			return 0, err
+		}
+	}
+	base *= 1e9
+	remlen := len(str) - ix - 1
+	if remlen == 0 {
+		return base, nil
+	}
+	if remlen > 9 {
+		return 0, errors.New("too many digits after . in mina amount")
+	}
+	var rem uint64
+	{
+		var err error
+		if rem, err = strconv.ParseUint(str[ix+1:], 10, 64); err != nil {
+			return 0, err
+		}
+	}
+	rem *= pow10s[9-remlen]
+	return base + rem, nil
+}
+
+func execMina(ctx context.Context, minaExec string, args, env []string) error {
+	ctx, cancelF := context.WithCancel(ctx)
+	defer cancelF()
+	cmd := exec.CommandContext(ctx, minaExec, args...)
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	cmd.Env = env
+	return cmd.Run()
+}
+
+func execScanMina(ctx context.Context, minaExec string, args, env []string, scan func(*bufio.Scanner) error) error {
+	ctx, cancelF := context.WithCancel(ctx)
+	defer cancelF()
+	cmd := exec.CommandContext(ctx, minaExec, args...)
+	var stdout io.ReadCloser
+	{
+		var err error
+		if stdout, err = cmd.StdoutPipe(); err != nil {
+			return err
+		}
+	}
+	cmd.Stderr = os.Stderr
+	cmd.Env = env
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(stdout)
+	scanner.Split(bufio.ScanWords)
+	if err := scan(scanner); err != nil {
+		return err
+	}
+	if err := stdout.Close(); err != nil {
+		return err
+	}
+	return cmd.Wait()
 }

@@ -32,6 +32,7 @@
    snarky_integer
    pickles.backend
    signature_lib
+   mina_signature_kind
    genesis_constants
    currency
    random_oracle
@@ -45,6 +46,7 @@
    mina_state
    o1trace
    pickles
+   pickles_base
    random_oracle_input
    pickles_types
    coda_genesis_ledger
@@ -63,6 +65,7 @@
    mina_base.util
    ppx_version.runtime
    logger
+   zkapp_command_builder
  )
  (preprocess
   (pps ppx_snarky ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))

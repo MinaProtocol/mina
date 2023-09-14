@@ -10,14 +10,14 @@ import (
 )
 
 type AllocateSlotsParams struct {
-	Groups []int
+	Groups []int `json:"groups"`
 
-	SlotsWon []SlotsWonOutput
+	SlotsWon []SlotsWonOutput `json:"slotsWon"`
 
 	// Minimum number of slots to split equally among groups
-	MinSlots int
+	MinSlots int `json:"minSlots"`
 	// Maximum number of slots to split equally among groups
-	MaxSlots int
+	MaxSlots int `json:"maxSlots"`
 }
 
 type slotEntry struct {

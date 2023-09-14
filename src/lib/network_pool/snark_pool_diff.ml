@@ -32,6 +32,8 @@ module Make
 
   type verified = t [@@deriving compare, sexp, to_yojson]
 
+  let t_of_verified = ident
+
   type rejected = Rejected.t [@@deriving sexp, yojson]
 
   let label = Pool.label
@@ -89,58 +91,56 @@ module Make
         ; fee = { fee = res.spec.fee; prover = res.prover }
         } )
 
-  let has_lower_fee pool work ~fee ~sender =
+  (** Check whether there is a proof with lower fee in the pool.
+      Returns [Ok ()] is the [~fee] would be the lowest in pool.
+  *)
+  let has_no_lower_fee pool work ~fee ~sender =
     let reject_and_log_if_local reason =
       [%log' trace (Pool.get_logger pool)]
         "Rejecting snark work $work from $sender: $reason"
         ~metadata:
           [ ("work", Work.compact_json work)
           ; ("sender", Envelope.Sender.to_yojson sender)
-          ; ("reason", `String reason)
+          ; ( "reason"
+            , Error_json.error_to_yojson
+              @@ Intf.Verification_error.to_error reason )
           ] ;
-      Or_error.error_string reason
+      Result.fail reason
     in
     match Pool.request_proof pool work with
     | None ->
         Ok ()
-    | Some { fee = { fee = prev; _ }; _ } -> (
-        match Currency.Fee.compare fee prev with
-        | -1 ->
-            Ok ()
-        | 0 ->
-            reject_and_log_if_local "fee equal to cheapest work we have"
-        | 1 ->
-            reject_and_log_if_local "fee higher than cheapest work we have"
-        | _ ->
-            failwith "compare didn't return -1, 0, or 1!" )
+    | Some { fee = { fee = prev; _ }; _ } ->
+        let cmp_res = Currency.Fee.compare fee prev in
+        if cmp_res < 0 then Ok ()
+        else if cmp_res = 0 then
+          reject_and_log_if_local Intf.Verification_error.Fee_equal
+        else reject_and_log_if_local Intf.Verification_error.Fee_higher
 
   let verify pool ({ data; sender; _ } as t : t Envelope.Incoming.t) =
     match data with
     | Empty ->
-        Deferred.Or_error.error_string "cannot verify empty snark pool diff"
-    | Add_solved_work (work, ({ Priced_proof.fee; _ } as p)) -> (
+        Deferred.Result.fail
+        @@ Intf.Verification_error.Invalid
+             (Error.of_string "empty snark pool diff")
+    | Add_solved_work (work, ({ Priced_proof.fee; _ } as p)) ->
         let is_local = match sender with Local -> true | _ -> false in
+        let open Deferred.Result in
         let verify () =
-          if%map Pool.verify_and_act pool ~work:(work, p) ~sender then
-            Or_error.return t
-          else Or_error.error_string "failed to verify snark pool diff"
+          Pool.verify_and_act pool ~work:(work, p) ~sender >>| const t
         in
         (*reject higher priced gossiped proofs*)
         if is_local then verify ()
         else
-          match has_lower_fee pool work ~fee:fee.fee ~sender with
-          | Ok () ->
-              verify ()
-          | Error e ->
-              Deferred.return (Error e) )
+          Deferred.return (has_no_lower_fee pool work ~fee:fee.fee ~sender)
+          >>= verify
 
   (* This is called after verification has occurred.*)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
     let { Envelope.Incoming.data = diff; sender; _ } = t in
     match diff with
     | Empty ->
-        Deferred.return
-          (Error (`Other (Error.of_string "cannot apply empty snark pool diff")))
+        Error (`Other (Error.of_string "cannot apply empty snark pool diff"))
     | Add_solved_work (work, { Priced_proof.proof; fee }) -> (
         let is_local = match sender with Local -> true | _ -> false in
         let to_or_error = function
@@ -149,31 +149,55 @@ module Make
           | `Added ->
               Ok (diff, ())
         in
-        match has_lower_fee pool work ~fee:fee.fee ~sender with
+        match has_no_lower_fee pool work ~fee:fee.fee ~sender with
         | Ok () ->
-            let%map.Deferred.Result accepted, rejected =
-              Pool.add_snark ~is_local pool ~work ~proof ~fee >>| to_or_error
+            let%map.Result accepted, rejected =
+              Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
             in
             (`Accept, accepted, rejected)
         | Error e ->
-            Deferred.return
-              ( if is_local then Error (`Locally_generated (diff, ()))
-              else Error (`Other e) ) )
+            if is_local then Error (`Locally_generated (diff, ()))
+            else Error (`Other (Intf.Verification_error.to_error e)) )
 
   type Structured_log_events.t +=
     | Snark_work_received of { work : compact; sender : Envelope.Sender.t }
     [@@deriving
       register_event { msg = "Received Snark-pool diff $work from $sender" }]
 
-  let update_metrics envelope valid_cb gossip_heard_logger_option =
+  let update_metrics ~logger ~log_gossip_heard
+      (Envelope.Incoming.{ data = diff; sender; _ } : t Envelope.Incoming.t)
+      valid_cb =
     Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
     Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_received) ;
-    let diff = Envelope.Incoming.data envelope in
-    Option.iter gossip_heard_logger_option ~f:(fun logger ->
-        Option.iter (to_compact diff) ~f:(fun work ->
-            [%str_log debug]
-              (Snark_work_received
-                 { work; sender = Envelope.Incoming.sender envelope } ) ) ) ;
+    if log_gossip_heard then
+      Option.iter (to_compact diff) ~f:(fun work ->
+          [%str_log debug] (Snark_work_received { work; sender }) ) ;
     Mina_metrics.(Counter.inc_one Network.Snark_work.received) ;
     Mina_net2.Validation_callback.set_message_type valid_cb `Snark_work
+
+  let log_internal ?reason ~logger msg = function
+    | { Envelope.Incoming.data = Empty; _ } ->
+        ()
+    | { data = Add_solved_work (work, { fee = { fee; prover }; _ }); sender; _ }
+      ->
+        let metadata =
+          [ ("work_ids", Transaction_snark_work.Statement.compact_json work)
+          ; ("fee", Currency.Fee.to_yojson fee)
+          ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
+          ]
+        in
+        let metadata =
+          match sender with
+          | Remote addr ->
+              ("sender", `String (Core.Unix.Inet_addr.to_string @@ Peer.ip addr))
+              :: metadata
+          | Local ->
+              metadata
+        in
+        let metadata =
+          Option.value_map reason
+            ~f:(fun r -> List.cons ("reason", `String r))
+            ~default:ident metadata
+        in
+        [%log internal] "%s" ("Snark_work_" ^ msg) ~metadata
 end
