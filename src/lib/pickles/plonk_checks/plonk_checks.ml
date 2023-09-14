@@ -269,7 +269,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
   ; endo_coefficient = endo
   ; mds = (fun (row, col) -> mds.(row).(col))
   ; srs_length_log2
-  ; vanishes_on_last_4_rows =
+  ; vanishes_on_zero_knowledge_and_previous_rows =
       ( match joint_combiner with
       | None ->
           (* No need to compute anything when not using lookups *)

@@ -10,7 +10,7 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use kimchi::circuits::constraints::FeatureFlags;
 use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupPatterns};
 use kimchi::circuits::polynomials::permutation::Shifts;
-use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
+use kimchi::circuits::polynomials::permutation::{permutation_vanishing_polynomial, zk_w};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fq, Pallas, Vesta};
@@ -108,7 +108,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
         };
 
         // TODO dummy_lookup_value ?
-        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
+        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true, 3);
 
         VerifierIndex::<Pallas> {
             domain,
@@ -121,6 +121,8 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
                 res.set(index.srs.0).unwrap();
                 res
             },
+
+            zk_rows: 3,
 
             sigma_comm,
             coefficients_comm,
@@ -141,14 +143,14 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
             rot_comm: evals.rot_comm.map(Into::into),
 
             shift,
-            zkpm: {
+            permutation_vanishing_polynomial_m: {
                 let res = once_cell::sync::OnceCell::new();
-                res.set(zk_polynomial(domain)).unwrap();
+                res.set(permutation_vanishing_polynomial(domain, 3)).unwrap();
                 res
             },
             w: {
                 let res = once_cell::sync::OnceCell::new();
-                res.set(zk_w3(domain)).unwrap();
+                res.set(zk_w(domain, 3)).unwrap();
                 res
             },
             endo: endo_q,

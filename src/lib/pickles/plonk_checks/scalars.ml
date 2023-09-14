@@ -89,7 +89,7 @@ module Env = struct
     ; endo_coefficient : 'a
     ; mds : int * int -> 'a
     ; srs_length_log2 : int
-    ; vanishes_on_last_4_rows : 'a
+    ; vanishes_on_zero_knowledge_and_previous_rows : 'a
     ; joint_combiner : 'a
     ; beta : 'a
     ; gamma : 'a
@@ -123,7 +123,7 @@ module Tick : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
+       ; vanishes_on_zero_knowledge_and_previous_rows
        ; joint_combiner
        ; beta
        ; gamma
@@ -2761,7 +2761,7 @@ module Tick : S = struct
         ( LookupTables
         , (fun () ->
             alpha_pow 24
-            * ( vanishes_on_last_4_rows
+            * ( vanishes_on_zero_knowledge_and_previous_rows
               * ( cell (var (LookupAggreg, Next))
                   * ( if_feature
                         ( LookupsPerRow 0
@@ -3423,7 +3423,7 @@ module Tock : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows = _
+       ; vanishes_on_zero_knowledge_and_previous_rows = _
        ; joint_combiner = _
        ; beta = _
        ; gamma = _
