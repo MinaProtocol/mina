@@ -214,7 +214,6 @@ let%test_module "multisig_account" =
                   }
                 in
                 Pickles.compile () ~cache:Cache_dir.cache
-                  ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                   ~public_input:(Input Zkapp_statement.typ)
                   ~auxiliary_typ:Typ.unit
                   ~branches:(module Nat.N2)

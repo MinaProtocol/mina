@@ -2,7 +2,6 @@
 
 module Inner_curve = Snark_params.Tick.Inner_curve
 open Signature_lib
-open Core_kernel
 
 let nybble_bits = function
   | 0x0 ->
@@ -89,31 +88,11 @@ let%test_module "Sign_string tests" =
       let signature = sign ~signature_kind:Mainnet keypair.private_key s in
       verify ~signature_kind signature keypair.public_key s
 
-    let%test "Sign with legacy mainnet, verify with mainnet" =
-      let open Mina_signature_kind in
-      let s = "Legacy signature for mainnet" in
-      let signature =
-        "\"7mX3ZLNHk9CKtMd7hFLXYwEBXyiosDug9BLWDND1KJEdyfMWX9oWHscxGMT3q4P9DdYiXsXFynsfoLhooy3XJ5dgduPSHw5u\""
-        |> Yojson.Safe.from_string |> Mina_base.Signature.of_yojson
-        |> Core_kernel.Result.ok |> Option.value_exn
-      in
-      verify ~signature_kind:Mainnet signature keypair.public_key s
-
     let%test "Sign, verify with testnet" =
       let s = "In a galaxy far, far away" in
       let signature_kind = Mina_signature_kind.Testnet in
       let signature = sign ~signature_kind keypair.private_key s in
       verify ~signature_kind signature keypair.public_key s
-
-    let%test "Sign with legacy testnet, verify with testnet" =
-      let open Mina_signature_kind in
-      let s = "Legacy signature for testnet" in
-      let signature =
-        "\"7mXR8PX3MuDWa7vTWTy6NWE83nKkRQosU2NzcCohuP56qy5CmugUTEgVD14xRSPMD7DsdCsgD2Y6ehY6Dkh6hRTU28i6CF37\""
-        |> Yojson.Safe.from_string |> Mina_base.Signature.of_yojson
-        |> Core_kernel.Result.ok |> Option.value_exn
-      in
-      verify ~signature_kind:Testnet signature keypair.public_key s
 
     let%test "Sign, verify with other networks" =
       let s = "Sky is blue" in

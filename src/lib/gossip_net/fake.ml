@@ -270,17 +270,15 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
           M.Block_sink.push sink_block
             (`Transition env, `Time_received time, `Valid_cb vc) )
 
-    let broadcast_snark_pool_diff ?origin_topic ?nonce t diff =
+    let broadcast_snark_pool_diff ?origin_topic t diff =
       ignore origin_topic ;
-      ignore nonce ;
       Network.broadcast t.network ~sender:t.me diff
         (fun (Any_sinks (sinksM, (_, _, sink_snark_work))) ->
           let module M = (val sinksM) in
           M.Snark_sink.push sink_snark_work )
 
-    let broadcast_transaction_pool_diff ?origin_topic ?nonce t diff =
+    let broadcast_transaction_pool_diff ?origin_topic t diff =
       ignore origin_topic ;
-      ignore nonce ;
       Network.broadcast t.network ~sender:t.me diff
         (fun (Any_sinks (sinksM, (_, sink_tx, _))) ->
           let module M = (val sinksM) in

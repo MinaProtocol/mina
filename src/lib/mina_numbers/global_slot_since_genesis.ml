@@ -25,27 +25,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
     module Stable = struct
       module V1 = struct
         type t = Wire_types.global_slot = Since_genesis of T.Stable.V1.t
-        [@@unboxed] [@@deriving hash, sexp, compare, equal]
+        [@@unboxed] [@@deriving hash, sexp, compare, equal, yojson]
 
         let to_latest = Fn.id
-
-        let sexp_of_t (Since_genesis u32) = Sexp.Atom (T.to_string u32)
-
-        let t_of_sexp = function
-          | Sexp.Atom i ->
-              Since_genesis (T.of_string i)
-          | _ ->
-              failwith "Global_slot.of_sexp: Expected Atom"
-
-        let to_yojson (Since_genesis u32) = `String (T.to_string u32)
-
-        let of_yojson = function
-          | `String i ->
-              Ok (Since_genesis (T.of_string i))
-          | `List [ `String "Since_genesis"; `String i ] ->
-              Ok (Since_genesis (T.of_string i))
-          | _ ->
-              Error "Global_slot.of_yojson: Expected `String"
       end
     end]
 
@@ -54,14 +36,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let to_uint32 (Since_genesis u32) : uint32 = u32
 
     let of_uint32 u32 : t = Since_genesis u32
-
-    let sexp_of_t = Stable.Latest.sexp_of_t
-
-    let t_of_sexp = Stable.Latest.t_of_sexp
-
-    let to_yojson = Stable.Latest.to_yojson
-
-    let of_yojson = Stable.Latest.of_yojson
   end
 
   include M

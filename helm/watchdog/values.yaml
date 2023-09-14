@@ -10,7 +10,7 @@ mina:
     p2p: "10909"
   uploadBlocksToGCloud: false
 
-image: gcr.io/o1labs-192920/watchdog:0.4.13
+image: gcr.io/o1labs-192920/watchdog:0.3.7
 
 restartEveryMins: ""
 restartNodes: ""

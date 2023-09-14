@@ -73,16 +73,6 @@ let rec mapn :
   | [] ->
       failwith "mapn: Empty args"
 
-let rec nth : type a n. (a, n) t -> int -> a option =
- fun t idx ->
-  match t with
-  | [] ->
-      None
-  | x :: _ when idx = 0 ->
-      Some x
-  | _ :: t ->
-      nth t (idx - 1)
-
 let zip xs ys = map2 xs ys ~f:(fun x y -> (x, y))
 
 let rec to_list : type a n. (a, n) t -> a list =

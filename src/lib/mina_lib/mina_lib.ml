@@ -253,8 +253,6 @@ module Snark_worker = struct
     snark_worker_process
 
   let start t =
-    O1trace.thread "snark_worker"
-    @@ fun () ->
     match t.processes.snark_worker with
     | `On ({ process = process_ivar; kill_ivar; _ }, _) ->
         [%log' debug t.config.logger] !"Starting snark worker process" ;
@@ -444,8 +442,7 @@ let get_node_state t =
   }
 
 (* This is a hack put in place to deal with nodes getting stuck
-   in Offline states, that is, not receiving blocks for an extended period,
-   or stuck in Bootstrap for too long
+   in Offline states, that is, not receiving blocks for an extended period.
 
    To address this, we restart the libp2p helper when we become offline. *)
 let next_helper_restart = ref None
@@ -453,8 +450,6 @@ let next_helper_restart = ref None
 let offline_shutdown = ref None
 
 exception Offline_shutdown
-
-exception Bootstrap_stuck_shutdown
 
 let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
@@ -530,9 +525,6 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     let offline_timeout_duration = Time.Span.of_min offline_timeout_min in
     let offline_timeout = ref None in
     let offline_warned = ref false in
-    let bootstrap_timeout_min = 120.0 in
-    let bootstrap_timeout_duration = Time.Span.of_min bootstrap_timeout_min in
-    let bootstrap_timeout = ref None in
     let log_offline_warning _tm =
       [%log error]
         "Daemon has not received any gossip messages for %0.0f minutes; check \
@@ -562,46 +554,16 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
       | None ->
           ()
     in
-    let log_bootstrap_error_and_restart _tm =
-      [%log error] "Daemon has been in bootstrap for %0.0f minutes"
-        bootstrap_timeout_min ;
-      raise Bootstrap_stuck_shutdown
-    in
-    let start_bootstrap_timeout () =
-      match !bootstrap_timeout with
-      | Some _ ->
-          ()
-      | None ->
-          bootstrap_timeout :=
-            Some
-              (Timeout.create () bootstrap_timeout_duration
-                 ~f:log_bootstrap_error_and_restart )
-    in
-    let stop_bootstrap_timeout () =
-      match !bootstrap_timeout with
-      | Some timeout ->
-          Timeout.cancel () timeout () ;
-          bootstrap_timeout := None
-      | None ->
-          ()
-    in
-    let handle_status_change sync_status =
-      ( match sync_status with
-      | `Offline ->
-          start_offline_timeout ()
-      | _ ->
-          stop_offline_timeout () ) ;
-      match sync_status with
-      | `Bootstrap ->
-          start_bootstrap_timeout ()
-      | _ ->
-          stop_bootstrap_timeout ()
+    let handle_status_change status =
+      if match status with `Offline -> true | _ -> false then
+        start_offline_timeout ()
+      else stop_offline_timeout ()
     in
     Observer.on_update_exn observer ~f:(function
-      | Initialized sync_status ->
-          handle_status_change sync_status
-      | Changed (_old_sync_status, new_sync_status) ->
-          handle_status_change new_sync_status
+      | Initialized value ->
+          handle_status_change value
+      | Changed (_, value) ->
+          handle_status_change value
       | Invalidated ->
           () ) ) ;
   (* recompute Mina status on an interval *)
@@ -1380,7 +1342,7 @@ let start t =
       ~log_block_creation:t.config.log_block_creation
       ~block_reward_threshold:t.config.block_reward_threshold
       ~block_produced_bvar:t.components.block_produced_bvar
-      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net ;
+      ~vrf_evaluation_state:t.vrf_evaluation_state ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -1388,7 +1350,7 @@ let start t =
         Node_status_service.start ~logger:t.config.logger ~node_status_url
           ~network:t.components.net
           ~transition_frontier:t.components.transition_frontier
-          ~sync_status:t.sync_status ~chain_id:t.config.chain_id
+          ~sync_status:t.sync_status
           ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
           ~start_time:t.config.start_time
           ~slot_duration:
@@ -1397,17 +1359,13 @@ let start t =
     | None ->
         ()
   in
-  let built_with_commit_sha =
-    if t.config.uptime_send_node_commit then Some Mina_version.commit_id_short
-    else None
-  in
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
     ~transition_frontier:t.components.transition_frontier
     ~time_controller:t.config.time_controller
     ~block_produced_bvar:t.components.block_produced_bvar
     ~uptime_submitter_keypair:t.config.uptime_submitter_keypair
-    ~graphql_control_port:t.config.graphql_control_port ~built_with_commit_sha
+    ~graphql_control_port:t.config.graphql_control_port
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)
     ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;
@@ -1826,14 +1784,14 @@ let create ?wallets (config : Config.t) =
               ~trust_system:config.trust_system
               ~disk_location:config.snark_pool_disk_location
           in
-          let snark_pool, snark_remote_sink, snark_local_sink =
-            Network_pool.Snark_pool.create ~config:snark_pool_config
+          let%bind snark_pool, snark_remote_sink, snark_local_sink =
+            Network_pool.Snark_pool.load ~config:snark_pool_config
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~on_remote_push:notify_online
               ~log_gossip_heard:
-                config.net_config.log_gossip_heard.snark_pool_diff
+                config.net_config.log_gossip_heard.snark_pool_diff ()
           in
           let block_reader, block_sink =
             Transition_handler.Block_sink.create
@@ -2040,7 +1998,7 @@ let create ?wallets (config : Config.t) =
               log_rate_limiter_occasionally rl ~label:"broadcast_transactions" ;
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
-                ~f:(fun Network_pool.With_nonce.{ message; nonce } ->
+                ~f:(fun cmds ->
                   (* the commands had valid sizes when added to the transaction pool
                      don't need to check sizes again for broadcast
                   *)
@@ -2050,10 +2008,9 @@ let create ?wallets (config : Config.t) =
                         Network_pool.Transaction_pool.Resource_pool.Diff.score
                       ~max_per_15_seconds:
                         Network_pool.Transaction_pool.Resource_pool.Diff
-                        .max_per_15_seconds message
+                        .max_per_15_seconds cmds
                   in
-                  Mina_networking.broadcast_transaction_pool_diff ~nonce net
-                    message ) ) ;
+                  Mina_networking.broadcast_transaction_pool_diff net cmds ) ) ;
           O1trace.background_thread "broadcast_blocks" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
@@ -2097,6 +2054,9 @@ let create ?wallets (config : Config.t) =
                             valid_cb
                       | `Internal ->
                           (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
+                          don't_wait_for
+                            (Mina_networking.broadcast_state net
+                               (Mina_block.Validated.forget transition) ) ;
                           Option.iter
                             ~f:
                               (Fn.flip
@@ -2177,16 +2137,16 @@ let create ?wallets (config : Config.t) =
               let rl = Network_pool.Snark_pool.create_rate_limiter () in
               log_rate_limiter_occasionally rl ~label:"broadcast_snark_work" ;
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
-                ~f:(fun Network_pool.With_nonce.{ message; nonce } ->
+                ~f:(fun x ->
                   let%bind () =
                     send_resource_pool_diff_or_wait ~rl
                       ~diff_score:
                         Network_pool.Snark_pool.Resource_pool.Diff.score
                       ~max_per_15_seconds:
                         Network_pool.Snark_pool.Resource_pool.Diff
-                        .max_per_15_seconds message
+                        .max_per_15_seconds x
                   in
-                  Mina_networking.broadcast_snark_pool_diff ~nonce net message ) ) ;
+                  Mina_networking.broadcast_snark_pool_diff net x ) ) ;
           Option.iter config.archive_process_location
             ~f:(fun archive_process_port ->
               [%log' info config.logger]

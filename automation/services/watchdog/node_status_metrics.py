@@ -200,10 +200,10 @@ def collect_node_status(v1, namespace, seeds, pods, seed_nodes_responded, seed_n
 
     try:
       cmd = "mina advanced get-peers"
-      peers = util.exec_on_pod(v1, namespace, seed, 'mina', cmd).rstrip().split('\n')
+      peers = util.exec_on_pod(v1, namespace, seed, 'coda', cmd).rstrip().split('\n')
 
       cmd = "mina advanced node-status -daemon-port " + seed_daemon_port + " -peers " + ",".join(peers) + " -show-errors"
-      resp = util.exec_on_pod(v1, namespace, seed, 'mina', cmd)
+      resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
 
       if not 'Error: Unable to connect to Mina Daemon.' in resp:
         add_resp(resp, peers, seed, seed_nodes_responded, seed_nodes_queried)

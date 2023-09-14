@@ -811,14 +811,6 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                   *** Shutting down ***\n" ;
                handle_crash Mina_lib.Offline_shutdown ~time_controller ~conf_dir
                  ~child_pids ~top_logger coda_ref
-           | Mina_lib.Bootstrap_stuck_shutdown ->
-               Core.print_string
-                 "\n\
-                  [FATAL] *** Mina daemon has been stuck in bootstrap for too \
-                  long ***\n\
-                  *** Shutting down ***\n" ;
-               handle_crash Mina_lib.Bootstrap_stuck_shutdown ~time_controller
-                 ~conf_dir ~child_pids ~top_logger coda_ref
            | _exn ->
                let error = Error.of_exn ~backtrace:`Get exn in
                let%bind () =

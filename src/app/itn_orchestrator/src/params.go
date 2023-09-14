@@ -57,18 +57,10 @@ func loadOutputFile(filename string) (map[int]map[string]OutputCacheEntry, error
 }
 
 type ComplexValue struct {
-	Type string `json:"type"`
-	File string `json:"file,omitempty"`
-	Step int    `json:"step"`
-	Name string `json:"name"`
-}
-
-func LocalComplexValue(step int, name string) ComplexValue {
-	return ComplexValue{
-		Type: "output",
-		Step: step,
-		Name: name,
-	}
+	Type string
+	File string `json:",omitempty"`
+	Step int
+	Name string
 }
 
 func ResolveParam(config ResolutionConfig, step int, raw json.RawMessage) (json.RawMessage, error) {

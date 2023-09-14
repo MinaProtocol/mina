@@ -34,7 +34,7 @@ func main() {
 		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
 		libp2p.Ping(false),
 		libp2p.PrivateNetwork(pnetKey[:]),
-		libp2p.Muxer("/coda/yamux/1.0.0", libp2pmplex.DefaultTransport),
+		libp2p.Muxer("/coda/mplex/1.0.0", libp2pmplex.DefaultTransport),
 	)
 	if err != nil {
 		panic(err)

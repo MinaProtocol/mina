@@ -312,7 +312,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
       (Consensus.Data.Prover_state.handler state_for_handler ~pending_coinbase)
   in
   let res =
-    Or_error.try_with ~here:[%here] (fun () ->
+    Or_error.try_with (fun () ->
         let prev_proof =
           Tick.prove
             (Tick.Keypair.pk Keys.Step.keys)

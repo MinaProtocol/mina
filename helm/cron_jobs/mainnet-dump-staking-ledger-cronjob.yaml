@@ -1,6 +1,6 @@
 # kubectl apply -f helm/cron_jobs/mainnet-dump-staking-ledger-cronjob.yaml
 # the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
-apiVersion: batch/v1
+apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
   name: mainnet-dump-staking-ledger-cronjob-2

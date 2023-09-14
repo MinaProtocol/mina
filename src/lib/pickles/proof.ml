@@ -70,7 +70,7 @@ module Base = struct
               ( Tick.Field.Stable.V1.t
               , Tick.Field.Stable.V1.t array )
               Plonk_types.All_evals.Stable.V1.t
-          ; proof : Wrap_wire_proof.Stable.V1.t
+          ; proof : Tock.Proof.Stable.V2.t
           }
         [@@deriving compare, sexp, yojson, hash, equal]
       end
@@ -93,7 +93,7 @@ module Base = struct
           , Branch_data.t )
           Types.Wrap.Statement.Minimal.t
       ; prev_evals : (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
-      ; proof : Wrap_wire_proof.t
+      ; proof : Tock.Proof.t
       }
     [@@deriving compare, sexp, yojson, hash, equal]
   end
@@ -131,7 +131,10 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
     { statement =
         { proof_state =
             { deferred_values =
-                { branch_data =
+                { xi = scalar_chal ()
+                ; combined_inner_product = Shifted_value (tick ())
+                ; b = Shifted_value (tick ())
+                ; branch_data =
                     { proofs_verified =
                         ( match most_recent_width with
                         | Z ->
@@ -176,27 +179,27 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
             }
         }
     ; proof =
-        Wrap_wire_proof.of_kimchi_proof
-          { messages =
-              { w_comm = Vector.map lengths.w ~f:g
-              ; z_comm = g lengths.z
-              ; t_comm = g lengths.t
-              ; lookup = None
-              }
-          ; openings =
-              { proof =
-                  { lr =
-                      Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ ->
-                          (g0, g0) )
-                  ; z_1 = Ro.tock ()
-                  ; z_2 = Ro.tock ()
-                  ; delta = g0
-                  ; challenge_polynomial_commitment = g0
-                  }
-              ; evals = Dummy.evals.evals.evals
-              ; ft_eval1 = Dummy.evals.ft_eval1
-              }
-          }
+        { messages =
+            { w_comm = Vector.map lengths.w ~f:g
+            ; z_comm = g lengths.z
+            ; t_comm = g lengths.t
+            ; lookup = None
+            }
+        ; openings =
+            (let evals = Lazy.force Dummy.evals in
+             { proof =
+                 { lr =
+                     Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ ->
+                         (g0, g0) )
+                 ; z_1 = Ro.tock ()
+                 ; z_2 = Ro.tock ()
+                 ; delta = g0
+                 ; challenge_polynomial_commitment = g0
+                 }
+             ; evals = evals.evals.evals
+             ; ft_eval1 = evals.ft_eval1
+             } )
+        }
     ; prev_evals =
         (let e =
            Plonk_types.Evals.map (Evaluation_lengths.create ~of_int:Fn.id)

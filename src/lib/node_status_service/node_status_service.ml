@@ -61,7 +61,6 @@ type node_status_data =
   ; libp2p_cpu_usage : float
   ; commit_hash : string
   ; git_branch : string
-  ; chain_id : string
   ; peer_id : string
   ; ip_address : string
   ; timestamp : string
@@ -82,7 +81,7 @@ let send_node_status_data ~logger ~url node_status_data =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
   match%map
-    Async.try_with ~here:[%here] (fun () ->
+    Async.try_with (fun () ->
         Cohttp_async.Client.post ~headers
           ~body:(Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
           url )
@@ -151,8 +150,8 @@ let reset_gauges () =
   Queue.clear Transition_frontier.validated_blocks ;
   Queue.clear Transition_frontier.rejected_blocks
 
-let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
-    ~network ~addrs_and_ports ~start_time ~slot_duration =
+let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
+    ~addrs_and_ports ~start_time ~slot_duration =
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
   let five_slots = Time.Span.scale slot_duration 5. in
@@ -160,8 +159,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
   every ~start:(after five_slots) ~continue_on_error:true five_slots
   @@ fun () ->
   don't_wait_for
-  @@ O1trace.thread "node_status_service"
-  @@ fun () ->
+  @@
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       [%log info] "Transition frontier not available for node status service" ;
@@ -205,7 +203,6 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
             ; libp2p_cpu_usage
             ; commit_hash = Mina_version.commit_id
             ; git_branch = Mina_version.branch
-            ; chain_id
             ; peer_id =
                 (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
             ; ip_address =

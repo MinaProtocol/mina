@@ -169,10 +169,11 @@ module Constraint_constants = struct
 
       let fork =
         Some
-          { Fork_constants.previous_state_hash =
+          { Fork_constants.previous_length =
+              Mina_numbers.Length.of_int fork_previous_length
+          ; previous_state_hash =
               Data_hash_lib.State_hash.of_base58_check_exn
                 fork_previous_state_hash
-          ; previous_length = Mina_numbers.Length.of_int fork_previous_length
           ; previous_global_slot =
               Mina_numbers.Global_slot_since_genesis.of_int
                 fork_previous_global_slot

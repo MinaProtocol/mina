@@ -109,14 +109,9 @@ module Node_list = struct
 end
 
 module Root_transition = struct
-  type 'repr root_transition_scan_state =
-    | Lite : lite root_transition_scan_state
-    | Full : Staged_ledger.Scan_state.t -> full root_transition_scan_state
-
   type 'repr t =
     { new_root : Root_data.Limited.t
     ; garbage : 'repr Node_list.t
-    ; old_root_scan_state : 'repr root_transition_scan_state
     ; just_emitted_a_proof : bool
     }
 
@@ -168,11 +163,7 @@ module Root_transition = struct
           let of_binable
               ({ new_root; garbage; just_emitted_a_proof } :
                 Binable_arg.Stable.V4.t ) : t =
-            { new_root
-            ; garbage
-            ; old_root_scan_state = Lite
-            ; just_emitted_a_proof
-            }
+            { new_root; garbage; just_emitted_a_proof }
         end
 
         include Binable.Of_binable (Binable_arg.Stable.V4) (T_nonbinable)
@@ -247,15 +238,10 @@ let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
       let external_transition = Breadcrumb.validated_transition breadcrumb in
       New_node (Lite external_transition)
   | Root_transitioned
-      { new_root
-      ; garbage = Full garbage_nodes
-      ; old_root_scan_state = Full _
-      ; just_emitted_a_proof
-      } ->
+      { new_root; garbage = Full garbage_nodes; just_emitted_a_proof } ->
       Root_transitioned
         { new_root
         ; garbage = Lite (Node_list.to_lite garbage_nodes)
-        ; old_root_scan_state = Lite
         ; just_emitted_a_proof
         }
   | Best_tip_changed b ->

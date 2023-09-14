@@ -22,9 +22,6 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
-      {{- if $.Values.priorityClass }}
-      priorityClassName: {{ $.Values.priorityClass }}
-      {{- end }}
       initContainers:
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
@@ -67,7 +64,7 @@ spec:
           "-log-txn-pool-gossip", "true",
           {{- end -}}
           {{- if $.Values.mina.runtimeConfig }}
-          "-config-file", "/root/config/daemon.json",
+          "-config-file", "/config/daemon.json",
           {{- end }}
           {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
@@ -125,12 +122,10 @@ spec:
         volumeMounts:
         {{- if $.Values.mina.runtimeConfig }}
         - name: daemon-config
-          mountPath: "/root/config/"
+          mountPath: "/config/"
         {{- end }}
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
-        - name: config-dir
-          mountPath: /root/.mina-config/
       volumes:
       {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
@@ -139,27 +134,4 @@ spec:
       {{- end }}
       - name: actual-libp2p
         emptyDir: {}
-      - name: config-dir
-      {{- if $.Values.persist_working_dir }}
-        persistentVolumeClaim:
-           claimName: pvc-{{ $.Values.coordinatorName }}
-      {{- else }} 
-        emptyDir: {}
-      {{ end }}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
-
----
-{{- if $.Values.persist_working_dir }}
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: pvc-{{ $.Values.coordinatorName }}
-spec:
-  accessModes:
-    - {{ $.Values.storage.accessMode | quote }}
-  resources:
-    requests:
-      storage: {{ $.Values.storage.size | quote }}
-  storageClassName: "{{ $.Values.storage.storageClass }}"
----
-{{ end }}

@@ -28,12 +28,11 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(cmd_target : Size) ->
-  let key = "single-node-tests-${profile}" in
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchain ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"] "buildkite/scripts/single-node-tests.sh ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev",
+      commands = RunInToolchain.runInToolchain ([] : List Text) "buildkite/scripts/single-node-tests.sh ${path}",
       label = "${profile} single-node-tests",
-      key = key,
+      key = "single-node-tests",
       target = cmd_target,
       docker = None Docker.Type
     }

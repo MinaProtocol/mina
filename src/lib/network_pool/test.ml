@@ -69,9 +69,10 @@ let%test_module "network pool test" =
             Mock_snark_pool.Resource_pool.Diff.Add_solved_work
               (work, priced_proof)
           in
-          Mock_snark_pool.apply_and_broadcast network_pool
-            (Envelope.Incoming.local command)
-            (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) ;
+          don't_wait_for
+            (Mock_snark_pool.apply_and_broadcast network_pool
+               (Envelope.Incoming.local command)
+               (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) ) ;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
@@ -130,7 +131,7 @@ let%test_module "network pool test" =
         let%bind () = Mocks.Transition_frontier.refer_statements tf works in
         don't_wait_for
         @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
-             ~f:(fun With_nonce.{ message = work_command; _ } ->
+             ~f:(fun work_command ->
                let work =
                  match work_command with
                  | Mock_snark_pool.Resource_pool.Diff.Add_solved_work (work, _)

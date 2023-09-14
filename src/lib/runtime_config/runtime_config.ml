@@ -101,18 +101,6 @@ module Json_layout = struct
             | _ ->
                 Error
                   "Runtime_config.Json_Account.Single.Permissions.Auth_Required.t"
-
-          let of_account_perm = function
-            | Mina_base.Permissions.Auth_required.None ->
-                None
-            | Either ->
-                Either
-            | Proof ->
-                Proof
-            | Signature ->
-                Signature
-            | Impossible ->
-                Impossible
         end
 
         type t =
@@ -238,89 +226,6 @@ module Json_layout = struct
         ; permissions = None
         ; token_symbol = None
         }
-
-      let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
-        let open Result.Let_syntax in
-        let open Signature_lib in
-        return
-          { pk = Public_key.Compressed.to_base58_check a.public_key
-          ; sk = None
-          ; balance = a.balance
-          ; delegate =
-              Option.map a.delegate ~f:(fun pk ->
-                  Public_key.Compressed.to_base58_check pk )
-          ; timing =
-              ( match a.timing with
-              | Untimed ->
-                  None
-              | Timed t ->
-                  let open Timed in
-                  Some
-                    { initial_minimum_balance = t.initial_minimum_balance
-                    ; cliff_time = t.cliff_time
-                    ; cliff_amount = t.cliff_amount
-                    ; vesting_period = t.vesting_period
-                    ; vesting_increment = t.vesting_increment
-                    } )
-          ; token = Some (Mina_base.Token_id.to_string a.token_id)
-          ; token_symbol = Some a.token_symbol
-          ; zkapp =
-              Option.map a.zkapp ~f:(fun zkapp ->
-                  let open Zkapp_account in
-                  { app_state = Mina_base.Zkapp_state.V.to_list zkapp.app_state
-                  ; verification_key =
-                      Option.map zkapp.verification_key ~f:With_hash.data
-                  ; zkapp_version = zkapp.zkapp_version
-                  ; action_state =
-                      Pickles_types.Vector.Vector_5.to_list zkapp.action_state
-                  ; last_action_slot =
-                      Unsigned.UInt32.to_int
-                      @@ Mina_numbers.Global_slot_since_genesis.to_uint32
-                           zkapp.last_action_slot
-                  ; proved_state = zkapp.proved_state
-                  ; zkapp_uri = zkapp.zkapp_uri
-                  } )
-          ; nonce = a.nonce
-          ; receipt_chain_hash =
-              Some
-                (Mina_base.Receipt.Chain_hash.to_base58_check
-                   a.receipt_chain_hash )
-          ; voting_for =
-              Some (Mina_base.State_hash.to_base58_check a.voting_for)
-          ; permissions =
-              Some
-                Permissions.
-                  { edit_state =
-                      Auth_required.of_account_perm a.permissions.edit_state
-                  ; send = Auth_required.of_account_perm a.permissions.send
-                  ; receive =
-                      Auth_required.of_account_perm a.permissions.receive
-                  ; set_delegate =
-                      Auth_required.of_account_perm a.permissions.set_delegate
-                  ; set_permissions =
-                      Auth_required.of_account_perm
-                        a.permissions.set_permissions
-                  ; set_verification_key =
-                      Auth_required.of_account_perm
-                        a.permissions.set_verification_key
-                  ; set_token_symbol =
-                      Auth_required.of_account_perm
-                        a.permissions.set_token_symbol
-                  ; access = Auth_required.of_account_perm a.permissions.access
-                  ; edit_action_state =
-                      Auth_required.of_account_perm
-                        a.permissions.edit_action_state
-                  ; set_zkapp_uri =
-                      Auth_required.of_account_perm a.permissions.set_zkapp_uri
-                  ; increment_nonce =
-                      Auth_required.of_account_perm
-                        a.permissions.increment_nonce
-                  ; set_timing =
-                      Auth_required.of_account_perm a.permissions.set_timing
-                  ; set_voting_for =
-                      Auth_required.of_account_perm a.permissions.set_voting_for
-                  }
-          }
     end
 
     type t = Single.t list [@@deriving yojson, dhall_type]
@@ -525,9 +430,6 @@ module Accounts = struct
       ; token_symbol : string option
       }
     [@@deriving bin_io_unversioned, sexp]
-
-    let of_account : Mina_base.Account.t -> (t, string) Result.t =
-      Json_layout.Accounts.Single.of_account
 
     let to_json_layout : t -> Json_layout.Accounts.Single.t = Fn.id
 
@@ -746,21 +648,6 @@ module Proof_keys = struct
     ; fork : Fork_config.t option
     }
   [@@deriving bin_io_unversioned]
-
-  let make ?level ?sub_windows_per_window ?ledger_depth ?work_delay
-      ?block_window_duration_ms ?transaction_capacity ?coinbase_amount
-      ?supercharged_coinbase_factor ?account_creation_fee ?fork () =
-    { level
-    ; sub_windows_per_window
-    ; ledger_depth
-    ; work_delay
-    ; block_window_duration_ms
-    ; transaction_capacity
-    ; coinbase_amount
-    ; supercharged_coinbase_factor
-    ; account_creation_fee
-    ; fork
-    }
 
   let to_json_layout
       { level
@@ -983,9 +870,6 @@ type t =
   ; epoch_data : Epoch_data.t option
   }
 [@@deriving bin_io_unversioned]
-
-let make ?daemon ?genesis ?proof ?ledger ?epoch_data () =
-  { daemon; genesis; proof; ledger; epoch_data }
 
 let to_json_layout { daemon; genesis; proof; ledger; epoch_data } =
   { Json_layout.daemon = Option.map ~f:Daemon.to_json_layout daemon

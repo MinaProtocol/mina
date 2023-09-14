@@ -2,18 +2,14 @@ package itn_orchestrator
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
-	"math"
-	"math/rand"
 	"sort"
 	"time"
 )
 
 type WaitParams struct {
-	Minutes int `json:"min,omitempty"`
-	Slot    int `json:"slot,omitempty"`
-	Seconds int `json:"sec,omitempty"`
+	Minutes int
+	Slot    int
+	Seconds int
 }
 
 type WaitAction struct{}
@@ -35,8 +31,6 @@ func (WaitAction) Run(config Config, rawParams json.RawMessage, output OutputF) 
 	}
 	return nil
 }
-
-func (WaitAction) Name() string { return "wait" }
 
 var _ Action = WaitAction{}
 
@@ -82,126 +76,4 @@ func filterGt(s []int, n int) []int {
 		s = s[1:]
 	}
 	return s
-}
-
-type JoinParams struct {
-	Group1 []json.RawMessage `json:"group1"`
-	Group2 []json.RawMessage `json:"group2"`
-	Group3 []json.RawMessage `json:"group3,omitempty"`
-	Group4 []json.RawMessage `json:"group4,omitempty"`
-	Group5 []json.RawMessage `json:"group5,omitempty"`
-	Group6 []json.RawMessage `json:"group6,omitempty"`
-	Group7 []json.RawMessage `json:"group7,omitempty"`
-	Group8 []json.RawMessage `json:"group8,omitempty"`
-	Group9 []json.RawMessage `json:"group9,omitempty"`
-}
-
-type JoinAction struct{}
-
-func (JoinAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
-	var params JoinParams
-	if err := json.Unmarshal(rawParams, &params); err != nil {
-		return err
-	}
-	iterate := func(group []json.RawMessage) {
-		for _, n := range group {
-			output("group", n, true, false)
-		}
-	}
-	iterate(params.Group1)
-	iterate(params.Group2)
-	iterate(params.Group3)
-	iterate(params.Group4)
-	iterate(params.Group5)
-	iterate(params.Group5)
-	iterate(params.Group6)
-	iterate(params.Group7)
-	iterate(params.Group8)
-	iterate(params.Group9)
-	return nil
-}
-
-func (JoinAction) Name() string { return "join" }
-
-var _ Action = JoinAction{}
-
-type ExceptParams struct {
-	Group  []NodeAddress `json:"group"`
-	Except []NodeAddress `json:"except"`
-}
-
-type ExceptAction struct{}
-
-func (ExceptAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
-	var params ExceptParams
-	if err := json.Unmarshal(rawParams, &params); err != nil {
-		return err
-	}
-	exceptMap := map[NodeAddress]struct{}{}
-	for _, e := range params.Except {
-		exceptMap[e] = struct{}{}
-	}
-	for _, addr := range params.Group {
-		if _, has := exceptMap[addr]; has {
-			continue
-		}
-		output("group", addr, true, false)
-	}
-	return nil
-}
-
-func (ExceptAction) Name() string { return "except" }
-
-var _ Action = ExceptAction{}
-
-type SampleParams struct {
-	Group  []NodeAddress `json:"group"`
-	Ratios []float64     `json:"ratios"`
-}
-
-type SampleAction struct{}
-
-func (SampleAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
-	var params SampleParams
-	if err := json.Unmarshal(rawParams, &params); err != nil {
-		return err
-	}
-	s := 0.0
-	for _, r := range params.Ratios {
-		if r < 0 || r > 1 {
-			return errors.New("invalid ratios entry")
-		}
-		s += r
-	}
-	if s > 1 {
-		return errors.New("ratios' sum > 1")
-	}
-	group := params.Group
-	groupLen := len(group)
-	rand.Shuffle(groupLen, func(i, j int) {
-		group[i], group[j] = group[j], group[i]
-	})
-	for i, r := range params.Ratios {
-		take := int(math.Round(r * float64(groupLen)))
-		output(fmt.Sprintf("group%d", i+1), group[:take], false, false)
-		group = group[take:]
-	}
-	output("rest", group, false, false)
-	return nil
-}
-
-func (SampleAction) Name() string { return "sample" }
-
-var _ Action = SampleAction{}
-
-func selectNodes(tps, minTps float64, nodes []NodeAddress) (float64, []NodeAddress) {
-	nodesF := math.Floor(tps / minTps)
-	nodesMax := int(nodesF)
-	if nodesMax >= len(nodes) {
-		return tps / float64(len(nodes)), nodes
-	}
-	rand.Shuffle(len(nodes), func(i, j int) {
-		nodes[i], nodes[j] = nodes[j], nodes[i]
-	})
-	return tps / nodesF, nodes[:nodesMax]
 }

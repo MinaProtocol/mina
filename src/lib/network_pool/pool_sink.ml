@@ -8,7 +8,7 @@ module type BC_ext = sig
 
   val is_expired : t -> bool
 
-  val error : Error.t -> t -> unit
+  val error : Error.t -> t -> unit Deferred.t
 end
 
 module type Pool_sink = sig
@@ -83,8 +83,7 @@ module Base
         let diff = Envelope.Incoming.data env in
         [%log' warn logger] "Dropping verified diff $diff due to pipe overflow"
           ~metadata:[ ("diff", Diff.verified_to_yojson diff) ] ;
-        BC.drop Diff.empty (Diff.reject_overloaded_diff diff) cb ;
-        Deferred.unit
+        BC.drop Diff.empty (Diff.reject_overloaded_diff diff) cb
 
   let verify_impl ~logger ~trace_label resource_pool rl env cb :
       Diff.verified Envelope.Incoming.t option Deferred.t =
@@ -111,11 +110,11 @@ module Base
                   ; ("diff", summary)
                   ]
                 "exceeded capacity from $sender" ;
-              BC.error (Error.of_string "exceeded capacity") cb ;
-              Deferred.return None
+              BC.error (Error.of_string "exceeded capacity") cb
+              >>| fun _ -> None
           | `Within_capacity ->
               O1trace.thread verify_diffs_thread_label (fun () ->
-                  match%map Diff.verify resource_pool env with
+                  match%bind Diff.verify resource_pool env with
                   | Error err ->
                       [%log' debug logger]
                         "Refusing to rebroadcast $diff. Verification error: \
@@ -125,8 +124,7 @@ module Base
                           ; ("error", Error_json.error_to_yojson err)
                           ] ;
                       (*reject incoming messages*)
-                      BC.error err cb ;
-                      None
+                      BC.error err cb >>| fun _ -> None
                   | Ok verified_diff ->
                       [%log' debug logger] "Verified diff: $verified_diff"
                         ~metadata:
@@ -137,7 +135,7 @@ module Base
                             , Envelope.Sender.to_yojson
                               @@ Envelope.Incoming.sender verified_diff )
                           ] ;
-                      Some verified_diff ) )
+                      Deferred.return (Some verified_diff) ) )
 
   let push t (msg, cb) =
     match t with

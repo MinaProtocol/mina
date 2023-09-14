@@ -14,7 +14,6 @@
    async_unix
    ;;local libraries
    mina_graphql
-   mina_numbers
    currency
    cli_lib
    mina_base

@@ -1,5 +1,5 @@
-## Mina Protocol docs
+## Docs
 
-The docs for the Mina Protocol website are published on [docs.minaprotocol.com](https://docs.minaprotocol.com/).
+This folder contains some of the docs for codaprotocol.
 
-The docs repository is [https://github.com/o1-labs/docs2/)https://github.com/o1-labs/docs2/](https://github.com/o1-labs/docs2/)https://github.com/o1-labs/docs2/).
+The docs that are available to view on [the website](https://docs.minaprotocol.com/) can be edited/viewed [here](https://github.com/MinaProtocol/docs)

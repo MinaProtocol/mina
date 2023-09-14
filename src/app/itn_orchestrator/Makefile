@@ -7,11 +7,8 @@ src/graphql_generated.go: genqlient.graphql schema.graphql
 orchestrator: src/graphql_generated.go $(shell find src/ -type f)
 	cd src/itn_orchestrator/ && go build -o ../../orchestrator
 
-generator: src/graphql_generated.go $(shell find src/ -type f)
-	cd src/generator/ && go build -o ../../generator
-
 clean:
-	rm -f orchestrator src/graphql_generated.go generator
+	rm -f orchestrator src/graphql_generated.go
 
 test:
 	cd src && go test

@@ -116,7 +116,7 @@ def main():
           '-c',
           command,
         ]
-        result = stream.stream(v1.connect_get_namespaced_pod_exec, seed, args.namespace, command=exec_command, container='mina', stderr=True, stdout=True, stdin=False, tty=False, _request_timeout=timeout)
+        result = stream.stream(v1.connect_get_namespaced_pod_exec, seed, args.namespace, command=exec_command, container='coda', stderr=True, stdout=True, stdin=False, tty=False, _request_timeout=timeout)
         return result
 
       print('running command:', command)
@@ -298,7 +298,7 @@ def main():
       seed_daemon_port = [ v['value'] for v in seed_vars_dict if v['name'] == 'DAEMON_CLIENT_PORT'][0]
 
       cmd = "mina advanced node-status -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors"
-      resp = util.exec_on_pod(v1, namespace, seed, 'mina', cmd)
+      resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
 
       add_resp(resp)
 

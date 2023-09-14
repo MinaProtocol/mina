@@ -1,5 +1,4 @@
 (* extract_blocks.ml -- dump extensional blocks from archive db *)
-[@@@coverage exclude_file]
 
 open Core_kernel
 open Async

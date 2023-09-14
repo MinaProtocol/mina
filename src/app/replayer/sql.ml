@@ -8,34 +8,35 @@ module Block_info = struct
     ; global_slot_since_genesis : int64
     ; state_hash : string
     ; ledger_hash : string
-    ; snarked_ledger_hash_id : int
     }
   [@@deriving hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int64; string; string; int ]
+      Caqti_type.[ int; int64; string; string ]
 
   (* find all blocks, working back from block with given state hash *)
   let query =
-    Caqti_request.collect
-      Caqti_type.(tup2 string int64)
-      typ
+    Caqti_request.collect Caqti_type.string typ
       {sql| WITH RECURSIVE chain AS (
-              SELECT id,parent_id,global_slot_since_genesis,state_hash,ledger_hash, snarked_ledger_hash_id FROM blocks b                                                                                                                                                           WHERE b.state_hash = $1
+
+              SELECT id,parent_id,global_slot_since_genesis,state_hash,ledger_hash FROM blocks b WHERE b.state_hash = ?
 
               UNION ALL
 
-              SELECT b.id,b.parent_id,b.global_slot_since_genesis,b.state_hash,b.ledger_hash, b.snarked_ledger_hash_id FROM blocks b
+              SELECT b.id,b.parent_id,b.global_slot_since_genesis,b.state_hash,b.ledger_hash FROM blocks b
 
               INNER JOIN chain
 
-              ON b.id = chain.parent_id AND chain.id <> chain.parent_id                                                                                                                                                                                 )
+              ON b.id = chain.parent_id AND chain.id <> chain.parent_id
+           )
 
-           SELECT id,global_slot_since_genesis,state_hash,ledger_hash, snarked_ledger_hash_id FROM chain c                                                                                                                                                                      WHERE c.global_slot_since_genesis >= $2                                                                                                                                                                                                 |sql}
+           SELECT id,global_slot_since_genesis,state_hash,ledger_hash FROM chain c
 
-  let run (module Conn : Caqti_async.CONNECTION) ~state_hash ~start_slot =
-    Conn.collect_list query (state_hash, start_slot)
+      |sql}
+
+  let run (module Conn : Caqti_async.CONNECTION) state_hash =
+    Conn.collect_list query state_hash
 end
 
 (* build query to find all blocks back to genesis block, starting with the block containing the
@@ -105,26 +106,16 @@ module Block = struct
     Conn.find get_height_query block_id
 
   let max_slot_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int64
+    Caqti_request.find Caqti_type.unit Caqti_type.int
       {sql| SELECT MAX(global_slot_since_genesis) FROM blocks |sql}
 
   let get_max_slot (module Conn : Caqti_async.CONNECTION) () =
     Conn.find max_slot_query ()
 
-  let max_canonical_slot_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int64
-      {sql| SELECT MAX(global_slot_since_genesis) FROM blocks
-            WHERE chain_status = 'canonical'
-      |sql}
-
-  let get_max_canonical_slot (module Conn : Caqti_async.CONNECTION) () =
-    Conn.find max_canonical_slot_query ()
-
   let next_slot_query =
     Caqti_request.find_opt Caqti_type.int64 Caqti_type.int64
       {sql| SELECT global_slot_since_genesis FROM blocks
             WHERE global_slot_since_genesis >= $1
-            AND chain_status <> 'orphaned'
             ORDER BY global_slot_since_genesis ASC
             LIMIT 1
       |sql}
@@ -133,7 +124,7 @@ module Block = struct
     Conn.find_opt next_slot_query slot
 
   let state_hashes_by_slot_query =
-    Caqti_request.collect Caqti_type.int64 Caqti_type.string
+    Caqti_request.collect Caqti_type.int Caqti_type.string
       {sql| SELECT state_hash FROM blocks WHERE global_slot_since_genesis = $1 |sql}
 
   let get_state_hashes_by_slot (module Conn : Caqti_async.CONNECTION) slot =
@@ -161,33 +152,6 @@ module Block = struct
 
   let get_chain (module Conn : Caqti_async.CONNECTION) state_hash =
     Conn.collect_list chain_query state_hash
-
-  (* either the bonafide genesis block, or the most recent "linking" block
-     at a hard fork point that has the genesis winner, that's at or before the
-     start slot
-  *)
-  let genesis_snarked_ledger_query =
-    let genesis_winner =
-      let pk, _ = Mina_state.Consensus_state_hooks.genesis_winner in
-      Signature_lib.Public_key.Compressed.to_base58_check pk
-    in
-    Caqti_request.find Caqti_type.int64 Caqti_type.string
-      (sprintf
-         {sql| SELECT snarked_ledger_hashes.value
-               FROM blocks
-               INNER JOIN snarked_ledger_hashes
-               ON snarked_ledger_hashes.id = blocks.snarked_ledger_hash_id
-               INNER JOIN public_keys
-               ON public_keys.id = blocks.block_winner_id
-               WHERE public_keys.value = '%s'
-               AND blocks.global_slot_since_genesis <= $1
-               ORDER BY blocks.height DESC
-               LIMIT 1
-         |sql}
-         genesis_winner )
-
-  let genesis_snarked_ledger (module Conn : Caqti_async.CONNECTION) start_slot =
-    Conn.find genesis_snarked_ledger_query start_slot
 end
 
 module User_command_ids = struct
@@ -347,32 +311,27 @@ module Internal_command = struct
      the call to Staged_ledger.apply in Block_producer
   *)
   let query =
-    Caqti_request.collect
-      Caqti_type.(tup2 int64 int)
-      typ
+    Caqti_request.collect Caqti_type.int typ
       {sql| SELECT command_type,receiver_id,fee,
-                   b.id,b.height,b.global_slot_since_genesis,
+                   blocks.id,blocks.height,blocks.global_slot_since_genesis,
                    sequence_no,secondary_sequence_no
 
-            FROM (SELECT * FROM internal_commands WHERE id = $2) AS ic
+            FROM internal_commands AS ic
 
             INNER JOIN blocks_internal_commands AS bic
 
-            ON ic.id = bic.internal_command_id
+            ON  ic.id = bic.internal_command_id
 
-            INNER JOIN blocks AS b
+            INNER JOIN blocks
 
-            ON b.id = bic.block_id
+            ON blocks.id = bic.block_id
 
-            INNER JOIN blocks as parent
+            WHERE ic.id = $1
 
-            ON parent.id = b.parent_id
-
-            WHERE b.global_slot_since_genesis >= $1
        |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~start_slot ~internal_cmd_id =
-    Conn.collect_list query (start_slot, internal_cmd_id)
+  let run (module Conn : Caqti_async.CONNECTION) internal_cmd_id =
+    Conn.collect_list query internal_cmd_id
 end
 
 module Public_key = struct

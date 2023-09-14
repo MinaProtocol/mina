@@ -717,19 +717,6 @@ struct
       (r, disk_key_verifier)
     in
     Timer.clock __LOC__ ;
-    let wrap_vk =
-      Lazy.map wrap_vk ~f:(fun ((wrap_vk, _) as res) ->
-          let computed_domain_size = wrap_vk.index.domain.log_size_of_group in
-          let (Pow_2_roots_of_unity proposed_domain_size) = wrap_domains.h in
-          if computed_domain_size <> proposed_domain_size then
-            failwithf
-              "This circuit was compiled for proofs using the wrap domain of \
-               size %d, but the actual wrap domain size for the circuit has \
-               size %d. You should pass the ~override_wrap_domain argument to \
-               set the correct domain size."
-              proposed_domain_size computed_domain_size () ;
-          res )
-    in
     accum_dirty (Lazy.map wrap_pk ~f:snd) ;
     accum_dirty (Lazy.map wrap_vk ~f:snd) ;
     let wrap_vk = Lazy.map wrap_vk ~f:fst in

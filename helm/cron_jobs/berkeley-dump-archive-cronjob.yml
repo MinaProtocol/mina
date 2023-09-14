@@ -27,7 +27,7 @@ spec:
             DATE="$(date +%F_%H%M)";
             FILENAME=berkeley-archive-dump-"${DATE}".sql;
 
-            pg_dump --no-owner --create postgres://mina:$password@archive-1-postgresql:5432/archive > $FILENAME;
+            pg_dump --no-owner --create postgres://postgres:foobar@archive-1-postgresql:5432/archive > $FILENAME;
 
             tar -czvf $FILENAME.tar.gz $FILENAME;
 
@@ -38,13 +38,10 @@ spec:
             echo "archive database uploaded to bucket";
 
             '
-            envFrom:
-            - secretRef:
-                name: archive-1-postgresql
             env:
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: postgres:15-alpine
+            image: postgres:11-alpine
             imagePullPolicy: IfNotPresent
             name: berkeley-dump-archive-cronjob
             resources: {}

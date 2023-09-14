@@ -28,5 +28,3 @@ val background_thread : string -> (unit -> unit Deferred.t) -> unit
 val thread : string -> (unit -> 'a Deferred.t) -> 'a Deferred.t
 
 val sync_thread : string -> (unit -> 'a) -> 'a
-
-val local_storage_id : string list Type_equal.Id.t

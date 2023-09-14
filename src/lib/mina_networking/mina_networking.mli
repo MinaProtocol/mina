@@ -242,10 +242,10 @@ val broadcast_state :
   t -> Mina_block.t State_hash.With_state_hashes.t -> unit Deferred.t
 
 val broadcast_snark_pool_diff :
-  ?nonce:int -> t -> Snark_pool.Resource_pool.Diff.t -> unit Deferred.t
+  t -> Snark_pool.Resource_pool.Diff.t -> unit Deferred.t
 
 val broadcast_transaction_pool_diff :
-  ?nonce:int -> t -> Transaction_pool.Resource_pool.Diff.t -> unit Deferred.t
+  t -> Transaction_pool.Resource_pool.Diff.t -> unit Deferred.t
 
 val glue_sync_ledger :
      t

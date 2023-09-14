@@ -20,9 +20,7 @@
    async_unix
    base.base_internalhash_types
    ppx_hash.runtime-lib
-   integers
    ;; local libraries
-   ppx_version.runtime
    network_peer
    logger
    pipe_lib

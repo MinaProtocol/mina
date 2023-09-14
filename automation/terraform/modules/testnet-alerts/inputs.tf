@@ -22,18 +22,6 @@ variable "rule_filter" {
   description = "Filter to apply to monitoring search space for managing the scope of alert rule checks"
 }
 
-variable "berkeley_testnet" {
-  type        = string 
-  description = "Filter that selects out berkeley network"
-  default     = "testnet=\"berkeley\""
-}
-
-variable "synced_status_filter" {
-  type        = string
-  description = "Filter that only applies to berkeley network with syncStatus labels"
-  default     = "syncStatus=\"SYNCED\""
-}
-
 variable "alert_timeframe" {
   type        = string
   description = "Range of time to inspect for alert rule violations"

@@ -44,7 +44,6 @@
    verifier
    staged_ledger_diff
    signature_lib
-   mina_signature_kind
    currency
    genesis_constants
    one_or_two

@@ -48,15 +48,6 @@ let rec find_recursive_fiber thread_name parent_thread_name
     Option.bind fiber.parent
       ~f:(find_recursive_fiber thread_name parent_thread_name)
 
-let local_storage_id =
-  Type_equal.Id.create ~name:"o1trace" (sexp_of_list sexp_of_string)
-
-let with_o1trace ~name context =
-  Execution_context.find_local context local_storage_id
-  |> Option.value_map ~default:[ name ] ~f:(List.cons name)
-  |> Option.some
-  |> Execution_context.with_local context local_storage_id
-
 let exec_thread ~exec_same_thread ~exec_new_thread name =
   let sync_fiber = !current_sync_fiber in
   let parent = grab_parent_fiber () in
@@ -83,7 +74,6 @@ let thread name f =
   exec_thread name ~exec_same_thread:f ~exec_new_thread:(fun fiber ->
       let ctx = Scheduler.current_execution_context () in
       let ctx = Thread.Fiber.apply_to_context fiber ctx in
-      let ctx = with_o1trace ~name ctx in
       match Scheduler.within_context ctx f with
       | Error () ->
           failwithf
@@ -100,17 +90,10 @@ let sync_thread name f =
       current_sync_fiber := Some fiber ;
       on_job_enter' fiber ;
       let start_time = Time_ns.now () in
-      let ctx = Scheduler.current_execution_context () in
-      let ctx = with_o1trace ~name ctx in
-      match Scheduler.within_context ctx f with
-      | Error () ->
-          failwithf
-            "sync timing task `%s` failed, exception reported to parent monitor"
-            name ()
-      | Ok result ->
-          let elapsed_time = Time_ns.abs_diff (Time_ns.now ()) start_time in
-          on_job_exit' fiber elapsed_time ;
-          result )
+      let result = f () in
+      let elapsed_time = Time_ns.abs_diff (Time_ns.now ()) start_time in
+      on_job_exit' fiber elapsed_time ;
+      result )
 
 let () = Stdlib.(Async_kernel.Tracing.fns := { on_job_enter; on_job_exit })
 

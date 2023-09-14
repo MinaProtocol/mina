@@ -46,11 +46,6 @@ variable "mina_points_image" {
   type = string
 }
 
-variable "enable_working_dir_persitence" {
-  type = bool
-  default = false
-}
-
 variable "runtime_config" {
   type = string
 }
@@ -96,10 +91,6 @@ variable "cpu_request" {
 variable "mem_request" {
   type    = string
   default = "0Mi"
-}
-
-variable "pod_priority" {
-  type    = number
 }
 
 variable "archive_configs" {

@@ -53,9 +53,9 @@ let hash_messages_for_next_step_proof ~app_state
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
        ~app_state )
 
-let dlog_pcs_batch (type nat proofs_verified total)
+let dlog_pcs_batch (type proofs_verified total)
     ((without_degree_bound, _pi) :
-      total Nat.t * (proofs_verified, nat, total) Nat.Adds.t ) =
+      total Nat.t * (proofs_verified, Nat.N41.n, total) Nat.Adds.t ) =
   Pcs_batch.create ~without_degree_bound ~with_degree_bound:[]
 
 let when_profiling profiling default =
@@ -243,7 +243,15 @@ let ft_comm ~add:( + ) ~scale ~endoscale ~negate
   let _, [ sigma_comm_last ] =
     Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
-  let f_comm = List.reduce_exn ~f:( + ) [ plonk.perm * sigma_comm_last ] in
+  let f_comm =
+    List.reduce_exn ~f:( + )
+      [ plonk.perm * sigma_comm_last
+      ; plonk.vbmul * m.mul_comm
+      ; plonk.complete_add * m.complete_add_comm
+      ; plonk.endomul * m.emul_comm
+      ; plonk.endomul_scalar * m.endomul_scalar_comm
+      ]
+  in
   let chunked_t_comm =
     let n = Array.length t_comm in
     let res = ref t_comm.(n - 1) in

@@ -1208,6 +1208,7 @@ module Make (Inputs : Inputs_intf) = struct
       { local_state with stack_frame = remaining; call_stack }
     in
     let local_state = Local_state.add_new_failure_status_bucket local_state in
+    Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
     (* Register verification key, in case it needs to be 'side-loaded' to
        verify a zkapp proof.
     *)

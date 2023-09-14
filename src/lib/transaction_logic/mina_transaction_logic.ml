@@ -2006,22 +2006,19 @@ module Make (L : Ledger_intf.S) :
       (*get the original states of all the accounts in each pass.
         If an account updated in the first pass is referenced in account
         updates, then retain the value before first pass application*)
-      (* IMPORTANT: this account list must be sorted by Account_id in increasing order,
-         if this ordering changes the scan state hash will be affected and made
-         incompatible. *)
-      Account_id.Map.to_alist ~key_order:`Increasing
-      @@ List.fold ~init:Account_id.Map.empty
-           ~f:(fun account_states (id, acc_opt) ->
-             Account_id.Map.update account_states id
-               ~f:(Option.value ~default:acc_opt) )
-           ( c.original_first_pass_account_states
-           @ List.map (Zkapp_command.accounts_referenced c.command)
-               ~f:(fun id ->
-                 ( id
-                 , Option.Let_syntax.(
-                     let%bind loc = L.location_of_account ledger id in
-                     let%map a = L.get ledger loc in
-                     (loc, a)) ) ) )
+      let account_states = Account_id.Table.create () in
+      List.iter
+        ~f:(fun (id, acc_opt) ->
+          Account_id.Table.update account_states id
+            ~f:(Option.value ~default:acc_opt) )
+        ( c.original_first_pass_account_states
+        @ List.map (Zkapp_command.accounts_referenced c.command) ~f:(fun id ->
+              ( id
+              , Option.Let_syntax.(
+                  let%bind loc = L.location_of_account ledger id in
+                  let%map a = L.get ledger loc in
+                  (loc, a)) ) ) ) ;
+      Account_id.Table.to_alist account_states
     in
     let rec step_all (user_acc : user_acc)
         ( (g_state : Inputs.Global_state.t)

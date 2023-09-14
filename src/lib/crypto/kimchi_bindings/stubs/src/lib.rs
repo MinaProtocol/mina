@@ -60,7 +60,7 @@ pub use {
         scalars::caml::CamlRandomOracles,
         wires::caml::CamlWire,
     },
-    kimchi::proof::caml::CamlProofEvaluations,
+    kimchi::proof::caml::{CamlLookupEvaluations, CamlProofEvaluations},
     kimchi::prover::caml::{CamlLookupCommitments, CamlProverCommitments, CamlProverProof},
     mina_poseidon::sponge::caml::CamlScalarChallenge,
     poly_commitment::commitment::caml::{CamlOpeningProof, CamlPolyComm},

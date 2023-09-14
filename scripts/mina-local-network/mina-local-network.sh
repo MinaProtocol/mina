@@ -232,15 +232,15 @@ reset-genesis-ledger() {
 
 recreate-schema() {
   echo "Recreating database '${PG_DB}'..."
-
+  
   psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} -c "DROP DATABASE IF EXISTS ${PG_DB};"
-
+  
   psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} -c "CREATE DATABASE ${PG_DB};"
-
-  # We need to change our working directory as script has relation to others subscripts
+  
+  # We need to change our working directory as script has relation to others subscripts 
   # and calling them from local folder
-  cd ./src/app/archive
-  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB} < create_schema.sql
+  cd ./src/app/archive 
+  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} ${PG_DB} < create_schema.sql
   cd ../../../
 
   echo "Schema '${PG_DB}' created successfully."

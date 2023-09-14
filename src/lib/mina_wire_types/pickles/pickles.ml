@@ -11,62 +11,6 @@ module M = struct
     end
   end
 
-  module Wrap_wire_proof = struct
-    module Columns_vec = Pickles_types.Vector.Vector_15
-    module Coefficients_vec = Pickles_types.Vector.Vector_15
-    module Quotient_polynomial_vec = Pickles_types.Vector.Vector_7
-    module Permuts_minus_1_vec = Pickles_types.Vector.Vector_6
-
-    module Commitments = struct
-      module V1 = struct
-        type t =
-          { w_comm :
-              (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t)
-              Columns_vec.Stable.V1.t
-          ; z_comm : Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
-          ; t_comm :
-              (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t)
-              Quotient_polynomial_vec.Stable.V1.t
-          }
-      end
-    end
-
-    module Evaluations = struct
-      module V1 = struct
-        type t =
-          { w :
-              (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t)
-              Columns_vec.Stable.V1.t
-          ; coefficients :
-              (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t)
-              Columns_vec.Stable.V1.t
-          ; z : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          ; s :
-              (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t)
-              Permuts_minus_1_vec.Stable.V1.t
-          ; generic_selector : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          ; poseidon_selector : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          ; complete_add_selector : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          ; mul_selector : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          ; emul_selector : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          ; endomul_scalar_selector : Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
-          }
-      end
-    end
-
-    module V1 = struct
-      type t =
-        { commitments : Commitments.V1.t
-        ; evaluations : Evaluations.V1.t
-        ; ft_eval1 : Pasta_bindings.Fq.t
-        ; bulletproof :
-            ( Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
-            , Pasta_bindings.Fq.t )
-            Pickles_types.Plonk_types.Openings.Bulletproof.Stable.V1.t
-        }
-    end
-  end
-
   module Proof = struct
     type challenge_constant =
       Pickles_limb_vector.Constant.Make(Pickles_types.Nat.N2).t
@@ -80,6 +24,12 @@ module M = struct
         module V2 = struct
           type digest_constant =
             Pickles_limb_vector.Constant.Make(Pickles_types.Nat.N4).t
+
+          type tock_proof =
+            ( tock_affine
+            , Pasta_bindings.Fq.t
+            , Pasta_bindings.Fq.t array )
+            Pickles_types.Plonk_types.Proof.Stable.V2.t
 
           type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
             { statement :
@@ -99,7 +49,7 @@ module M = struct
                 ( Snark_params.Tick.Field.t
                 , Snark_params.Tick.Field.t array )
                 Pickles_types.Plonk_types.All_evals.t
-            ; proof : Wrap_wire_proof.V1.t
+            ; proof : tock_proof
             }
         end
       end

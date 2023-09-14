@@ -116,21 +116,21 @@ module Tick : S = struct
       ({ add = ( + )
        ; sub = ( - )
        ; mul = ( * )
-       ; square
+       ; square = _
        ; mds
-       ; endo_coefficient
+       ; endo_coefficient = _
        ; pow
        ; var
        ; field
        ; cell
        ; alpha_pow
-       ; double
+       ; double = _
        ; zk_polynomial = _
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
        ; vanishes_on_last_4_rows
-       ; joint_combiner
+       ; joint_combiner = _
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
@@ -150,7 +150,31 @@ let () =
   output_string
     {ocaml|
 
-  let index_terms (type a) (_ : a Env.t) =
+  let index_terms (type a)
+      ({ add = ( + )
+       ; sub = ( - )
+       ; mul = ( * )
+       ; square
+       ; pow
+       ; var
+       ; field
+       ; cell
+       ; alpha_pow
+       ; double
+       ; zk_polynomial = _
+       ; omega_to_minus_3 = _
+       ; zeta_to_n_minus_1 = _
+       ; mds = _
+       ; endo_coefficient
+       ; srs_length_log2 = _
+       ; vanishes_on_last_4_rows
+       ; joint_combiner
+       ; beta
+       ; gamma
+       ; unnormalized_lagrange_basis = _
+       ; if_feature
+       } :
+        a Env.t) =
     Column.Table.of_alist_exn
     [
 |ocaml}
@@ -179,25 +203,25 @@ module Tock : S = struct
       ({ add = ( + )
        ; sub = ( - )
        ; mul = ( * )
-       ; square
+       ; square = _
        ; mds
-       ; endo_coefficient
+       ; endo_coefficient = _
        ; pow
        ; var
        ; field
        ; cell
        ; alpha_pow
-       ; double
+       ; double = _
        ; zk_polynomial = _
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows = _
+       ; vanishes_on_last_4_rows
        ; joint_combiner = _
-       ; beta = _
-       ; gamma = _
-       ; unnormalized_lagrange_basis = _
-       ; if_feature = _
+       ; beta
+       ; gamma
+       ; unnormalized_lagrange_basis
+       ; if_feature
        } :
         a Env.t) =
 |ocaml}
@@ -213,7 +237,31 @@ let () =
   output_string
     {ocaml|
 
-  let index_terms (type a) (_ : a Env.t) =
+  let index_terms (type a)
+      ({ add = ( + )
+       ; sub = ( - )
+       ; mul = ( * )
+       ; square
+       ; pow
+       ; var
+       ; field
+       ; cell
+       ; alpha_pow
+       ; double
+       ; zk_polynomial = _
+       ; omega_to_minus_3 = _
+       ; zeta_to_n_minus_1 = _
+       ; mds = _
+       ; endo_coefficient
+       ; srs_length_log2 = _
+       ; vanishes_on_last_4_rows
+       ; joint_combiner
+       ; beta
+       ; gamma
+       ; unnormalized_lagrange_basis = _
+       ; if_feature
+       } :
+        a Env.t) =
     Column.Table.of_alist_exn
     [
 |ocaml}

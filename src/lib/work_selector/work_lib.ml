@@ -30,7 +30,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
           (Inputs.Transaction_witness.t, Inputs.Ledger_proof.t) Work_spec.t
           One_or_two.t
           list
-      ; mutable jobs_seen : Job_status.t Seen_key.Map.t
+      ; jobs_seen : (Seen_key.t, Job_status.t) Hashtbl.t
       ; reassignment_wait : int
       }
 
@@ -44,7 +44,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
      fun ~reassignment_wait ~frontier_broadcast_pipe ~logger ->
       let t =
         { available_jobs = []
-        ; jobs_seen = Seen_key.Map.empty
+        ; jobs_seen = Hashtbl.create (module Seen_key)
         ; reassignment_wait
         }
       in
@@ -88,38 +88,30 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       t
 
     let all_unseen_works t =
-      O1trace.sync_thread "work_lib_all_unseen_works" (fun () ->
-          List.filter t.available_jobs ~f:(fun js ->
-              not
-              @@ Map.mem t.jobs_seen (One_or_two.map ~f:Work_spec.statement js) ) )
+      List.filter t.available_jobs ~f:(fun js ->
+          not
+          @@ Hashtbl.mem t.jobs_seen (One_or_two.map ~f:Work_spec.statement js) )
 
     let remove_old_assignments t ~logger =
-      O1trace.sync_thread "work_lib_remove_old_assignments" (fun () ->
-          let now = Time.now () in
-          t.jobs_seen <-
-            Map.filteri t.jobs_seen ~f:(fun ~key:work ~data:status ->
-                if
-                  Job_status.is_old status ~now
-                    ~reassignment_wait:t.reassignment_wait
-                then (
-                  [%log info]
-                    ~metadata:[ ("work", Seen_key.to_yojson work) ]
-                    "Waited too long to get work for $work. Ready to be \
-                     reassigned" ;
-                  Mina_metrics.(
-                    Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
-                  false )
-                else true ) )
+      let now = Time.now () in
+      Hashtbl.filteri_inplace t.jobs_seen ~f:(fun ~key:work ~data:status ->
+          if
+            Job_status.is_old status ~now ~reassignment_wait:t.reassignment_wait
+          then (
+            [%log info]
+              ~metadata:[ ("work", Seen_key.to_yojson work) ]
+              "Waited too long to get work for $work. Ready to be reassigned" ;
+            Mina_metrics.(Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
+            false )
+          else true )
 
     let remove t x =
-      t.jobs_seen <-
-        Map.remove t.jobs_seen (One_or_two.map ~f:Work_spec.statement x)
+      Hashtbl.remove t.jobs_seen (One_or_two.map ~f:Work_spec.statement x)
 
     let set t x =
-      t.jobs_seen <-
-        Map.set t.jobs_seen
-          ~key:(One_or_two.map ~f:Work_spec.statement x)
-          ~data:(Job_status.Assigned (Time.now ()))
+      Hashtbl.set t.jobs_seen
+        ~key:(One_or_two.map ~f:Work_spec.statement x)
+        ~data:(Job_status.Assigned (Time.now ()))
   end
 
   let does_not_have_better_fee ~snark_pool ~fee
@@ -137,10 +129,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   let get_expensive_work ~snark_pool ~fee
       (jobs : ('a, 'b) Work_spec.t One_or_two.t list) :
       ('a, 'b) Work_spec.t One_or_two.t list =
-    O1trace.sync_thread "work_lib_get_expensive_work" (fun () ->
-        List.filter jobs ~f:(fun job ->
-            does_not_have_better_fee ~snark_pool ~fee
-              (One_or_two.map job ~f:Work_spec.statement) ) )
+    List.filter jobs ~f:(fun job ->
+        does_not_have_better_fee ~snark_pool ~fee
+          (One_or_two.map job ~f:Work_spec.statement) )
 
   let all_pending_work ~snark_pool statements =
     List.filter statements ~f:(fun st ->

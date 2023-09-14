@@ -168,6 +168,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       Location_binable.Table.find t.account_tbl location
 
+    let self_find_all_accounts t =
+      assert_is_attached t ;
+      Location_binable.Table.data t.account_tbl
+
     let self_set_account t location account =
       assert_is_attached t ;
       Location_binable.Table.set t.account_tbl ~key:location ~data:account ;

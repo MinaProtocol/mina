@@ -36,6 +36,7 @@
 (package (name dhall_types))
 (package (name direction))
 (package (name display_public_key))
+(package (name distributed_dsl))
 (package (name downloader))
 (package (name dummy_values))
 (package (name empty_hashes))

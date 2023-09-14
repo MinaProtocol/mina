@@ -139,7 +139,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
       in
       match%bind Sys.file_exists lockpath with
       | `Yes | `Unknown -> (
-          match%bind try_with ~here:[%here] (fun () -> Sys.remove lockpath) with
+          match%bind try_with (fun () -> Sys.remove lockpath) with
           | Ok () ->
               Deferred.unit
           | Error exn ->

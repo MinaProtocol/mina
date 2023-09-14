@@ -1,7 +1,7 @@
 # kubectl apply -f helm/cron_jobs/devnet-txn-burst-cronjob.yaml
 # the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
 # make sure you're in the devnet2 namespace
-apiVersion: batch/v1
+apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
   name: devnet-txn-burst-cronjob

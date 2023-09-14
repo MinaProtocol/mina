@@ -22,14 +22,11 @@
    ppx_deriving_yojson.runtime
    graphql_parser
    splittable_random
-   stdio
    ;; local libraries
    mina_generators
    mina_wire_types
    network_pool
    cli_lib
-   exit_handlers
-   file_system
    itn_crypto
    kimchi_backend.pasta
    kimchi_backend.pasta.basic

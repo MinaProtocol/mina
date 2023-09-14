@@ -25,23 +25,3 @@ val map_m : f:('a -> ('b, 's) t) -> 'a list -> ('b list, 's) t
 val filter_map_m : f:('a -> ('b option, 's) t) -> 'a list -> ('b list, 's) t
 
 val concat_map_m : f:('a -> ('b list, 's) t) -> 'a list -> ('b list, 's) t
-
-module Trans : functor (M : Monad.S) -> sig
-  include Monad.S2 with type ('a, 's) t = 's -> ('a * 's) M.t
-
-  val run_state : ('a, 's) t -> 's -> ('a * 's) M.t
-
-  val eval_state : ('a, 's) t -> 's -> 'a M.t
-
-  val exec_state : ('a, 's) t -> 's -> 's M.t
-
-  val get : ('s, 's) t
-
-  val getf : ('s -> 'a) -> ('a, 's) t
-
-  val put : 's -> (unit, 's) t
-
-  val modify : f:('s -> 's) -> (unit, 's) t
-
-  val lift : 'a M.t -> ('a, 's) t
-end
