@@ -55,7 +55,7 @@ let%test_module "Epoch ledger sync tests" =
     (* [instance] and [test_number] are used to make ports distinct
        among tests
     *)
-    let make_mina_network ~context:(module Context : CONTEXT) ~instance
+    let make_mina_network ~context:(module Context : CONTEXT) ~name ~instance
         ~test_number ~libp2p_keypair_str ~initial_peers ~genesis_ledger_hashes =
       let open Context in
       let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
@@ -84,12 +84,16 @@ let%test_module "Epoch ledger sync tests" =
           }
       in
       let pids = Child_processes.Termination.create_pid_table () in
+      let verifier_tm0 = Unix.gettimeofday () in
       let%bind verifier =
         Verifier.create ~logger ~proof_level:precomputed_values.proof_level
           ~constraint_constants:precomputed_values.constraint_constants ~pids
           ~conf_dir:(Some (make_dirname "verifier"))
           ()
       in
+      let verifier_tm1 = Unix.gettimeofday () in
+      [%log debug] "(%s) Time to create verifier: %0.02f" name
+        (verifier_tm1 -. verifier_tm0) ;
       let _transaction_pool, tx_remote_sink, _tx_local_sink =
         let config =
           Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
@@ -257,6 +261,7 @@ let%test_module "Epoch ledger sync tests" =
           ~get_transition_knowledge:(unimplemented "get_transition_knowledge")
       in
       (* create transition frontier *)
+      let tr_tm0 = Unix.gettimeofday () in
       let _valid_transitions, initialization_finish_signal =
         let notify_online () = Deferred.unit in
         let most_recent_valid_block =
@@ -283,6 +288,9 @@ let%test_module "Epoch ledger sync tests" =
           ~producer_transition_reader ~most_recent_valid_block ~notify_online ()
       in
       let%bind () = Ivar.read initialization_finish_signal in
+      let tr_tm1 = Unix.gettimeofday () in
+      [%log debug] "(%s) Time to start transition router: %0.02f" name
+        (tr_tm1 -. tr_tm0) ;
       let network_peer =
         let peer_id = Mina_net2.Keypair.to_peer_id libp2p_keypair in
         Peer.create Core.Unix.Inet_addr.localhost ~libp2p_port ~peer_id
@@ -336,8 +344,8 @@ let%test_module "Epoch ledger sync tests" =
       return (module Context : CONTEXT)
 
     let run_test ?(timeout_min = default_timeout_min) (module Context : CONTEXT)
-        ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts ~test_number
-        =
+        ~name ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts
+        ~test_number =
       let module Context2 = struct
         include Context
 
@@ -368,14 +376,18 @@ let%test_module "Epoch ledger sync tests" =
         | Ledger_db _, Ledger_db _ ->
             []
       in
+      let net_info1_tm0 = Unix.gettimeofday () in
       let%bind network_info1 =
-        make_mina_network
+        make_mina_network ~name
           ~context:(module Context)
           ~instance:0 ~test_number
           ~libp2p_keypair_str:
             "CAESQFzI5/57gycQ1qumCq00OFo60LArXgbrgV0b5P8tNiSujUZT5Psc+74luHmSSf7kVIZ7w0YObC//UVXPCOgeh4o=,CAESII1GU+T7HPu+Jbh5kkn+5FSGe8NGDmwv/1FVzwjoHoeK,12D3KooWKKqrPfHi4PNkWms5Z9oANjRftE5vueTmkt4rpz9sXM69"
           ~initial_peers:[] ~genesis_ledger_hashes
       in
+      let net_info1_tm1 = Unix.gettimeofday () in
+      [%log debug] "(%s) Time to create network 1: %0.02f" name
+        (net_info1_tm1 -. net_info1_tm0) ;
       let staking_epoch_snapshot =
         Consensus.Data.Local_state.For_tests.snapshot_of_ledger
           staking_epoch_ledger
@@ -391,8 +403,9 @@ let%test_module "Epoch ledger sync tests" =
       Consensus.Data.Local_state.For_tests.set_snapshot
         network_info1.consensus_local_state Next_epoch_snapshot
         next_epoch_snapshot ;
+      let net_info2_tm0 = Unix.gettimeofday () in
       let%bind network_info2 =
-        make_mina_network ~instance:1 ~test_number
+        make_mina_network ~name ~instance:1 ~test_number
           ~context:(module Context2)
           ~libp2p_keypair_str:
             "CAESQMHCQMQDqPKTFLAjZWwA3vvbkzMJZiVrjvte+bDfUvEeRhjvhsa9IfuFDEmJ721drMJ5cEWAmVmrQYfretz9MUQ=,CAESIEYY74bGvSH7hQxJie9tXazCeXBFgJlZq0GH63rc/TFE,12D3KooWEXzm5pMj1DQqNz6bpMRdJa55bytbawkuHVNhGR3XuTpw"
@@ -400,6 +413,9 @@ let%test_module "Epoch ledger sync tests" =
             [ Mina_net2.Multiaddr.of_peer network_info1.network_peer ]
           ~genesis_ledger_hashes
       in
+      let net_info2_tm1 = Unix.gettimeofday () in
+      [%log debug] "(%s) Time to create network 2: %0.02f" name
+        (net_info2_tm1 -. net_info2_tm0) ;
       let make_sync_ledger () =
         let db_ledger = make_empty_db_ledger (module Context) in
         List.iter starting_accounts ~f:(fun (acct : Account.t) ->
@@ -431,6 +447,7 @@ let%test_module "Epoch ledger sync tests" =
         (let%bind () = Ivar.read network_info1.no_answer_ivar in
          cleanup () ; raise No_sync_answer ) ;
       (* sync current staking ledger *)
+      let sync_ledger1_tm0 = Unix.gettimeofday () in
       let sync_ledger1 = make_sync_ledger () in
       let%bind () =
         match%map
@@ -438,6 +455,9 @@ let%test_module "Epoch ledger sync tests" =
             ~data:() ~equal:(fun () () -> true)
         with
         | `Ok ledger ->
+            let sync_ledger1_tm1 = Unix.gettimeofday () in
+            [%log debug] "(%s) Time to sync ledger 1: %0.02f" name
+              (sync_ledger1_tm1 -. sync_ledger1_tm0) ;
             let ledger_root = Mina_ledger.Ledger.Db.merkle_root ledger in
             assert (Ledger_hash.equal ledger_root staking_ledger_root) ;
             [%log debug] "Synced current epoch ledger successfully"
@@ -445,12 +465,16 @@ let%test_module "Epoch ledger sync tests" =
             failwith "Target changed when getting staking ledger"
       in
       (* sync next staking ledger *)
+      let sync_ledger2_tm0 = Unix.gettimeofday () in
       let sync_ledger2 = make_sync_ledger () in
       match%bind
         Mina_ledger.Sync_ledger.Db.fetch sync_ledger2 next_epoch_ledger_root
           ~data:() ~equal:(fun () () -> true)
       with
       | `Ok ledger ->
+          let sync_ledger2_tm1 = Unix.gettimeofday () in
+          [%log debug] "(%s) Time to sync ledger 2: %0.02f" name
+            (sync_ledger2_tm1 -. sync_ledger2_tm0) ;
           cleanup () ;
           let ledger_root = Mina_ledger.Ledger.Db.merkle_root ledger in
           assert (Ledger_hash.equal ledger_root next_epoch_ledger_root) ;
@@ -500,7 +524,7 @@ let%test_module "Epoch ledger sync tests" =
           let next_epoch_ledger =
             make_db_ledger (module Context) (List.take test_accounts 20)
           in
-          run_test ~timeout_min:6.0 ~test_number:1
+          run_test ~name:"sync to empty ledgers" ~timeout_min:6.0 ~test_number:1
             (module Context)
             ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts:[] )
 
@@ -519,7 +543,7 @@ let%test_module "Epoch ledger sync tests" =
              the ledger to sync to, see issue #12170
           *)
           let starting_accounts = List.take test_accounts 8 in
-          run_test ~test_number:2
+          run_test ~name:"sync to nonempty ledgers" ~test_number:2
             (module Context)
             ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts )
 
@@ -543,7 +567,7 @@ let%test_module "Epoch ledger sync tests" =
               make_genesis_ledger (module Context) (List.take test_accounts 10)
             in
             let next_epoch_ledger = staking_epoch_ledger in
-            run_test ~test_number:3
+            run_test ~name:"fail to sync genesis ledgers" ~test_number:3
               (module Context)
               ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts:[] )
       in
