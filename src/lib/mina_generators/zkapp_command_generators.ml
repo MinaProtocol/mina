@@ -4,6 +4,13 @@ open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 
+type balance_change_range_t =
+  { min_balance_change : Currency.Amount.t
+  ; max_balance_change : Currency.Amount.t
+  ; min_new_zkapp_balance : Currency.Amount.t
+  ; max_new_zkapp_balance : Currency.Amount.t
+  }
+
 type failure =
   | Invalid_account_precondition
   | Invalid_protocol_state_precondition
@@ -303,10 +310,13 @@ let gen_balance_change ?permissions_auth (account : Account.t) ?failure
         else
           Currency.Amount.gen_incl Currency.Amount.zero
             (Currency.Balance.to_amount small_balance_change) )
-      ~f:(fun (min_balance_change, max_balance_change) ->
+      ~f:(fun { min_balance_change
+              ; max_balance_change
+              ; min_new_zkapp_balance
+              ; max_new_zkapp_balance
+              } ->
         if new_account then
-          Currency.Amount.(
-            gen_incl (of_mina_string_exn "50.0") (of_mina_string_exn "100.0"))
+          Currency.Amount.(gen_incl min_new_zkapp_balance max_new_zkapp_balance)
         else Currency.Amount.(gen_incl min_balance_change max_balance_change) )
   in
   match sgn with
@@ -1806,7 +1816,11 @@ let%test_module _ =
                     Currency.Fee.(of_mina_string_exn "2", of_mina_string_exn "4")
                   ~balance_change_range:
                     Currency.Amount.
-                      (of_mina_string_exn "0", of_mina_string_exn "0.00001")
+                      { min_balance_change = of_mina_string_exn "0"
+                      ; max_balance_change = of_mina_string_exn "0.00001"
+                      ; min_new_zkapp_balance = of_mina_string_exn "50"
+                      ; max_new_zkapp_balance = of_mina_string_exn "100"
+                      }
                   ~account_state_tbl:(Account_id.Table.create ())
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100

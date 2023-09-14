@@ -1,6 +1,13 @@
 open Mina_base
 open Core_kernel
 
+type balance_change_range_t =
+  { min_balance_change : Currency.Amount.t
+  ; max_balance_change : Currency.Amount.t
+  ; min_new_zkapp_balance : Currency.Amount.t
+  ; max_new_zkapp_balance : Currency.Amount.t
+  }
+
 type failure =
   | Invalid_account_precondition
   | Invalid_protocol_state_precondition
@@ -51,7 +58,7 @@ val gen_zkapp_command_from :
   -> ?memo:string
   -> ?no_account_precondition:bool
   -> ?fee_range:Currency.Fee.t * Currency.Fee.t
-  -> ?balance_change_range:Currency.Amount.t * Currency.Amount.t
+  -> ?balance_change_range:balance_change_range_t
   -> ?ignore_sequence_events_precond:bool
   -> ?no_token_accounts:bool
   -> ?limited:bool
