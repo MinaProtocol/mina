@@ -227,22 +227,21 @@ let () =
   Command.(
     run
       (let open Let_syntax in
-       async
-         ~summary:
-           "Run Mina PoS on a set of precomputed blocks and output the longest \
-            chain"
-         (let%map blocks_dir =
-            Param.flag "--precomputed-dir" ~aliases:[ "-precomputed-dir" ]
-              ~doc:"PATH Path of the blocks JSON data"
-              Param.(required string)
-          and output_dir =
-            Param.flag "--output-dir" ~aliases:[ "-output-dir" ]
-              ~doc:"PATH Path of the output directory"
-              Param.(required string)
-          and runtime_config_file =
-            Param.flag "--config-file" ~aliases:[ "-config-file" ]
-              Param.(optional string)
-              ~doc:
-                "PATH to the configuration file containing the genesis ledger"
-          in
-          main ~blocks_dir ~output_dir ~runtime_config_file ) ) )
+      async
+        ~summary:
+          "Run Mina PoS on a set of precomputed blocks and output the longest \
+           chain"
+        (let%map blocks_dir =
+           Param.flag "--precomputed-dir" ~aliases:[ "-precomputed-dir" ]
+             ~doc:"PATH Path of the blocks JSON data"
+             Param.(required string)
+         and output_dir =
+           Param.flag "--output-dir" ~aliases:[ "-output-dir" ]
+             ~doc:"PATH Path of the output directory"
+             Param.(required string)
+         and runtime_config_file =
+           Param.flag "--config-file" ~aliases:[ "-config-file" ]
+             Param.(optional string)
+             ~doc:"PATH to the configuration file containing the genesis ledger"
+         in
+         main ~blocks_dir ~output_dir ~runtime_config_file )))
