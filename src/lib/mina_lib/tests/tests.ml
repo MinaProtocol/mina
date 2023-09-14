@@ -32,6 +32,67 @@ let%test_module "Epoch ledger sync tests" =
 
     let default_timeout_min = 5.0
 
+    let dir_prefix = "sync_test_data"
+
+    let make_dirname s =
+      let open Core in
+      let uuid = Uuid_unix.create () |> Uuid.to_string in
+      dir_prefix ^/ sprintf "%s_%s" s uuid
+
+    let make_context () : (module CONTEXT) Deferred.t =
+      let%bind precomputed_values =
+        let runtime_config : Runtime_config.t =
+          { daemon = None
+          ; genesis = None
+          ; proof = None
+          ; ledger = None
+          ; epoch_data = None
+          }
+        in
+        match%map
+          Genesis_ledger_helper.init_from_config_file
+            ~genesis_dir:(make_dirname "genesis_dir")
+            ~logger ~proof_level:None runtime_config
+        with
+        | Ok (precomputed_values, _) ->
+            precomputed_values
+        | Error err ->
+            failwithf "Could not create precomputed values: %s"
+              (Error.to_string_hum err) ()
+      in
+      let constraint_constants = precomputed_values.constraint_constants in
+      let consensus_constants =
+        let genesis_constants = Genesis_constants.for_unit_tests in
+        Consensus.Constants.create ~constraint_constants
+          ~protocol_constants:genesis_constants.protocol
+      in
+      let trust_system = Trust_system.create (make_dirname "trust_system") in
+      let module Context = struct
+        let logger = logger
+
+        let constraint_constants = constraint_constants
+
+        let consensus_constants = consensus_constants
+
+        let precomputed_values = precomputed_values
+
+        let trust_system = trust_system
+      end in
+      return (module Context : CONTEXT)
+
+    let pids = Child_processes.Termination.create_pid_table ()
+
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let%bind precomputed_values =
+            let%map (module Context) = make_context () in
+            Context.precomputed_values
+          in
+          Verifier.create ~logger ~proof_level:precomputed_values.proof_level
+            ~constraint_constants:precomputed_values.constraint_constants ~pids
+            ~conf_dir:(Some (make_dirname "verifier"))
+            () )
+
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
         ~depth:Context.precomputed_values.constraint_constants.ledger_depth ()
@@ -39,13 +100,6 @@ let%test_module "Epoch ledger sync tests" =
     let make_empty_db_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.Db.create
         ~depth:Context.precomputed_values.constraint_constants.ledger_depth ()
-
-    let dir_prefix = "sync_test_data"
-
-    let make_dirname s =
-      let open Core in
-      let uuid = Uuid_unix.create () |> Uuid.to_string in
-      dir_prefix ^/ sprintf "%s_%s" s uuid
 
     let peek_frontier frontier_broadcast_pipe =
       Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -83,17 +137,6 @@ let%test_module "Epoch ledger sync tests" =
           ; constraint_constants
           }
       in
-      let pids = Child_processes.Termination.create_pid_table () in
-      let verifier_tm0 = Unix.gettimeofday () in
-      let%bind verifier =
-        Verifier.create ~logger ~proof_level:precomputed_values.proof_level
-          ~constraint_constants:precomputed_values.constraint_constants ~pids
-          ~conf_dir:(Some (make_dirname "verifier"))
-          ()
-      in
-      let verifier_tm1 = Unix.gettimeofday () in
-      [%log debug] "(%s) Time to create verifier: %0.02f" name
-        (verifier_tm1 -. verifier_tm0) ;
       let _transaction_pool, tx_remote_sink, _tx_local_sink =
         let config =
           Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
@@ -302,47 +345,6 @@ let%test_module "Epoch ledger sync tests" =
         ; no_answer_ivar
         }
 
-    let make_context () : (module CONTEXT) Deferred.t =
-      let%bind precomputed_values =
-        let runtime_config : Runtime_config.t =
-          { daemon = None
-          ; genesis = None
-          ; proof = None
-          ; ledger = None
-          ; epoch_data = None
-          }
-        in
-        match%map
-          Genesis_ledger_helper.init_from_config_file
-            ~genesis_dir:(make_dirname "genesis_dir")
-            ~logger ~proof_level:None runtime_config
-        with
-        | Ok (precomputed_values, _) ->
-            precomputed_values
-        | Error err ->
-            failwithf "Could not create precomputed values: %s"
-              (Error.to_string_hum err) ()
-      in
-      let constraint_constants = precomputed_values.constraint_constants in
-      let consensus_constants =
-        let genesis_constants = Genesis_constants.for_unit_tests in
-        Consensus.Constants.create ~constraint_constants
-          ~protocol_constants:genesis_constants.protocol
-      in
-      let trust_system = Trust_system.create (make_dirname "trust_system") in
-      let module Context = struct
-        let logger = logger
-
-        let constraint_constants = constraint_constants
-
-        let consensus_constants = consensus_constants
-
-        let precomputed_values = precomputed_values
-
-        let trust_system = trust_system
-      end in
-      return (module Context : CONTEXT)
-
     let run_test ?(timeout_min = default_timeout_min) (module Context : CONTEXT)
         ~name ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts
         ~test_number =
@@ -524,7 +526,7 @@ let%test_module "Epoch ledger sync tests" =
           let next_epoch_ledger =
             make_db_ledger (module Context) (List.take test_accounts 20)
           in
-          run_test ~name:"sync to empty ledgers" ~timeout_min:6.0 ~test_number:1
+          run_test ~name:"sync to empty ledgers" ~test_number:1
             (module Context)
             ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts:[] )
 
