@@ -18,6 +18,15 @@ module Test_Account = struct
     }
 end
 
+module Epoch_data = struct
+  module Data = struct
+    (* the seed is a field value in Base58Check format *)
+    type t = { epoch_ledger : Test_Account.t list; epoch_seed : string }
+  end
+
+  type t = { staking : Data.t; next : Data.t option }
+end
+
 module Block_producer_node = struct
   type t = { node_name : string; account_name : string }
 end
@@ -38,6 +47,7 @@ type t =
         (* temporary flag to enable/disable graphql ingress deployments *)
         (* testnet topography *)
   ; genesis_ledger : Test_Account.t list
+  ; epoch_data : Epoch_data.t option
   ; block_producers : Block_producer_node.t list
   ; snark_coordinator : Snark_coordinator_node.t option
   ; snark_worker_fee : string
@@ -67,8 +77,11 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   }
 
 let default =
-  { requires_graphql = false
+  { requires_graphql =
+      true
+      (* require_graphql maybe should just be phased out, because it always needs to be enable.  Now with the graphql polling engine, everything will definitely fail if graphql is not enabled.  But even before that, most tests relied on some sort of graphql interaction *)
   ; genesis_ledger = []
+  ; epoch_data = None
   ; block_producers = []
   ; snark_coordinator = None
   ; snark_worker_fee = "0.025"

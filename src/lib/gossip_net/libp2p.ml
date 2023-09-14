@@ -462,10 +462,12 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                             (Envelope.Incoming.map ~f:(const state) env)
                         , `Time_received (Block_time.now config.time_controller)
                         , `Valid_cb vc )
-                  | Message.Latest.T.Transaction_pool_diff diff ->
+                  | Message.Latest.T.Transaction_pool_diff
+                      Network_pool.With_nonce.{ message = diff; _ } ->
                       Sinks.Tx_sink.push sink_tx
                         (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc)
-                  | Message.Latest.T.Snark_pool_diff diff ->
+                  | Message.Latest.T.Snark_pool_diff
+                      Network_pool.With_nonce.{ message = diff; _ } ->
                       Sinks.Snark_sink.push sink_snark_work
                         (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc) )
                 v0_topic Message.Latest.T.bin_msg
@@ -923,22 +925,24 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       in
       guard_topic ?origin_topic v0_topic pfs.publish_v0 (Message.New_state state)
 
-    let broadcast_transaction_pool_diff ?origin_topic t diff =
+    let broadcast_transaction_pool_diff ?origin_topic ?(nonce = 0) t diff =
       let pfs = !(t.publish_functions) in
       let%bind () =
         guard_topic ?origin_topic v1_topic_tx pfs.publish_v1_tx diff
       in
       guard_topic ?origin_topic v0_topic pfs.publish_v0
-        (Message.Transaction_pool_diff diff)
+        (Message.Transaction_pool_diff
+           { Network_pool.With_nonce.nonce; message = diff } )
 
-    let broadcast_snark_pool_diff ?origin_topic t diff =
+    let broadcast_snark_pool_diff ?origin_topic ?(nonce = 0) t diff =
       let pfs = !(t.publish_functions) in
       let%bind () =
         guard_topic ?origin_topic v1_topic_snark_work pfs.publish_v1_snark_work
           diff
       in
       guard_topic ?origin_topic v0_topic pfs.publish_v0
-        (Message.Snark_pool_diff diff)
+        (Message.Snark_pool_diff
+           { Network_pool.With_nonce.nonce; message = diff } )
 
     let on_first_connect t ~f = Deferred.map (Ivar.read t.first_peer_ivar) ~f
 
