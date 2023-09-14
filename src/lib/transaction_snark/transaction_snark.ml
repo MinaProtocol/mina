@@ -3281,34 +3281,26 @@ module Make_str (A : Wire_types.Concrete) = struct
     , Nat.N5.n )
     Pickles.Tag.t
 
-  let time lab f =
-    let start = Time.now () in
-    let x = f () in
-    let stop = Time.now () in
-    printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
-    x
-
   let system ~proof_level ~constraint_constants =
-    time "Transaction_snark.system" (fun () ->
-        Pickles.compile () ~cache:Cache_dir.cache
-          ~override_wrap_domain:Pickles_base.Proofs_verified.N1
-          ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
-          ~branches:(module Nat.N5)
-          ~max_proofs_verified:(module Nat.N2)
-          ~name:"transaction-snark"
-          ~constraint_constants:
-            (Genesis_constants.Constraint_constants.to_snark_keys_header
-               constraint_constants )
-          ~choices:(fun ~self ->
-            let zkapp_command x =
-              Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
-            in
-            [ Base.rule ~constraint_constants
-            ; Merge.rule ~proof_level self
-            ; zkapp_command Opt_signed_opt_signed
-            ; zkapp_command Opt_signed
-            ; zkapp_command Proved
-            ] ) )
+    Pickles.compile () ~cache:Cache_dir.cache
+      ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+      ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
+      ~branches:(module Nat.N5)
+      ~max_proofs_verified:(module Nat.N2)
+      ~name:"transaction-snark"
+      ~constraint_constants:
+        (Genesis_constants.Constraint_constants.to_snark_keys_header
+           constraint_constants )
+      ~choices:(fun ~self ->
+        let zkapp_command x =
+          Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
+        in
+        [ Base.rule ~constraint_constants
+        ; Merge.rule ~proof_level self
+        ; zkapp_command Opt_signed_opt_signed
+        ; zkapp_command Opt_signed
+        ; zkapp_command Proved
+        ] )
 
   module Verification = struct
     module type S = sig
@@ -4691,6 +4683,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         { tree_with_dummy_auth with
           account_update =
             { account_update_with_dummy_auth with authorization = Proof pi }
+        ; account_update_digest = account_update_digest_with_current_chain
         }
       in
       let forest =
