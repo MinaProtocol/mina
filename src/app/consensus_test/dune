@@ -1,0 +1,34 @@
+(executable
+ (package consensus_test)
+ (name consensus_test)
+ (public_name consensus_test)
+ (libraries
+  async
+  async.async_command
+  async_kernel
+  async_unix
+  base
+  block_time
+  consensus
+  core
+  core_kernel
+  error_json
+  genesis_constants
+  genesis_ledger_helper
+  integers
+  logger
+  mina_base
+  mina_block
+  mina_numbers
+  mina_runtime_config
+  mina_state
+  mina_wire_types
+  precomputed_values
+  result
+  stdio
+  with_hash)
+ (preprocessor_deps %{env:CONFIG_PATH=../../config/devnet.mlh})
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_let ppx_version)))
