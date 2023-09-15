@@ -193,13 +193,17 @@ module Network_manager = struct
       |> Fn.compose (String.concat ~sep:", ")
            (List.map ~f:Abstract_network.Node.id)
     in
+    let report_nodes nodes kind =
+      [%log info] "%s: %s" kind
+        ( if not @@ String.Map.is_empty nodes then nodes_to_string nodes
+        else sprintf "No %s" kind )
+    in
     [%log info] "Network deployed" ;
     [%log info] "network id: %s" t.network_id ;
-    [%log info] "snark coordinators: %s"
-      (nodes_to_string network.snark_coordinators) ;
-    [%log info] "snark workers: %s" (nodes_to_string network.snark_workers) ;
-    [%log info] "block producers: %s" (nodes_to_string network.block_producers) ;
-    [%log info] "archive nodes: %s" (nodes_to_string network.archive_nodes) ;
+    report_nodes network.snark_coordinators "snark coordinator" ;
+    report_nodes network.snark_workers "snark workers" ;
+    report_nodes network.block_producers "block producers" ;
+    report_nodes network.archive_nodes "archive nodes" ;
     Malleable_error.return network
 
   let destroy t =

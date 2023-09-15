@@ -431,16 +431,14 @@ module Config_file = struct
     let prog, arg_values = prog_and_args ~args action in
     let prog = evaluate_network_runner prog in
     let cmd = String.concat ~sep:" " (prog :: arg_values) in
-    [%log trace] "Running config command: %s" cmd ;
+    if not suppress_logs then [%log trace] "Running config command: %s" cmd ;
     let%map output =
       Util.run_cmd_or_error_timeout ~suppress_logs ~timeout_seconds dir prog
         arg_values
     in
     match output with
     | Ok output ->
-        if not suppress_logs then
-          [%log spam] "Successful command execution\n Command: %s\n Output: %s"
-            cmd output ;
+        if not suppress_logs then [%log trace] "Output: %s" output ;
         Ok output
     | Error err ->
         if not suppress_logs then [%log error] "Failed to run command: %s" cmd ;
