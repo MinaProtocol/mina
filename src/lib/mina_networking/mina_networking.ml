@@ -35,7 +35,7 @@ type Structured_log_events.t +=
  *   - add an entry to the Rpcs.rpc GADT definition for the new module (type ('query, 'response) rpc, below)
  *   - add the new constructor for Rpcs.rpc to Rpcs.all_of_type_erased_rpc
  *   - add a pattern matching case to Rpcs.implementation_of_rpc mapping the
- *      new constructor to the new module for your RPC 
+ *      new constructor to the new module for your RPC
  *   - add a match case to `match_handler`, below
  *)
 module Rpcs = struct
