@@ -25,19 +25,19 @@ module Block = struct
     type t =
       { provider : string
       ; region : string
-      ; network_runner_alias : string option
+      ; alias : string option
       ; project : string option
       ; zone : string option
       }
     [@@deriving to_yojson]
 
-    let to_yojson { provider; region; network_runner_alias; project; zone } =
+    let to_yojson { provider; region; alias; project; zone } =
       cons provider () (fun () ->
           let open Option.Let_syntax in
           let field k v = (k, `String v) in
           let fields =
             [ Some (field "region" region)
-            ; network_runner_alias >>| field "network_runner_alias"
+            ; alias >>| field "alias"
             ; project >>| field "project"
             ; zone >>| field "zone"
             ]

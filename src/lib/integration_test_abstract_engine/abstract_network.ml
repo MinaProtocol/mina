@@ -12,7 +12,7 @@ let keypairs_path = keypairs_path
 
 let mina_image = mina_image
 
-let network_runner_alias = network_runner_alias
+let network_runner = network_runner
 
 let archive_image = archive_image
 

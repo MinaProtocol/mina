@@ -97,8 +97,8 @@ module Engine = struct
 
     val id : t -> string
 
-    (*** [network_runner_alias] is instantiated when command line args are parsed *)
-    val network_runner_alias : (string * string) option ref
+    (*** [network_runner] is instantiated when command line args are parsed *)
+    val network_runner : string option ref
 
     (*** [archive_image] is instantiated when command line args are parsed *)
     val archive_image : string option ref

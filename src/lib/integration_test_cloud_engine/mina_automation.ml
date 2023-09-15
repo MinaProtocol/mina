@@ -472,7 +472,7 @@ module Network_config = struct
         ; region = cluster_region
         ; zone = Some cluster_zone
         ; project = Some project_id
-        ; network_runner_alias = None
+        ; alias = None
         }
     ; Block.Module
         { Block.Module.local_name = "integration_testnet"

@@ -4,8 +4,8 @@ open Signature_lib
 open Integration_test_lib
 module Network_config = Network_config
 
-(* [network_runner_alias] is instantiated when command line args are parsed *)
-let network_runner_alias = ref None
+(* [network_runner] is instantiated when command line args are parsed *)
+let network_runner = ref None
 
 (* [archive_image] is instantiated when command line args are parsed *)
 let archive_image : string option ref = ref None
@@ -43,7 +43,10 @@ module Node_type = struct
         match nt with
         | "Archive_node" | "ArchiveNode" | "Archive" ->
             Ok Archive_node
-        | "Block_producer_node" | "BlockProducerNode" | "BlockProducer" ->
+        | "Block_producer"
+        | "Block_producer_node"
+        | "BlockProducerNode"
+        | "BlockProducer" ->
             Ok Block_producer_node
         | "Seed_node" | "SeedNode" | "Seed" ->
             Ok Seed_node
@@ -160,8 +163,8 @@ module Network_deployed = struct
       | ( node_id
         , `Assoc
             [ ("graphql_uri", graphql_uri)
-            ; ("node_type", `String nt)
             ; ("private_key", private_key)
+            ; ("node_type", `String nt)
             ] ) ->
           Core.String.Map.set accum ~key:node_id
             ~data:
@@ -415,29 +418,24 @@ module Config_file = struct
     let cmd_list = interpolate_args ~args raw_cmd |> String.split ~on:' ' in
     (List.hd_exn cmd_list, List.tl_exn cmd_list)
 
-  let evaluate_network_runner_alias prog =
-    match !network_runner_alias with
-    | Some (network_runner_alias, value)
-      when String.(network_runner_alias = prog) ->
-        value
-    | _ ->
-        prog
+  let evaluate_network_runner prog = Option.value !network_runner ~default:prog
 
-  let run_command ?(suppress_logs = false) ?(timeout_seconds = 1) ?(dir = ".")
+  let run_command ?(suppress_logs = false) ?(timeout_seconds = 420) ?(dir = ".")
       ~config ~args cmd_name =
+    let logger = Logger.create () in
     let config = Yojson.Safe.from_file config in
     let version = version config in
     let action = action cmd_name config in
     let action_args = args_of_action action in
     let () = assert (validate_args ~args ~action) in
     let prog, arg_values = prog_and_args ~args action in
-    let prog = evaluate_network_runner_alias prog in
+    let prog = evaluate_network_runner prog in
     let cmd = String.concat ~sep:" " (prog :: arg_values) in
+    [%log trace] "Running config command: %s" cmd ;
     let%map output =
       Util.run_cmd_or_error_timeout ~suppress_logs ~timeout_seconds dir prog
         arg_values
     in
-    let logger = Logger.create () in
     match output with
     | Ok output ->
         if not suppress_logs then
