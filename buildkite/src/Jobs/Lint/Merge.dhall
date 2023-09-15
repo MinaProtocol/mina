@@ -27,7 +27,7 @@ Pipeline.build
           , key = "clean-merge-compatible"
           , target = Size.Small
           , docker = Some Docker::{
-              image = (../../Constants/ContainerImages.dhall).toolchainBase
+              image = (../../Constants/ContainerImages.dhall).minaToolchain
             }
         },
       Command.build
@@ -37,7 +37,7 @@ Pipeline.build
           , key = "clean-merge-develop"
           , target = Size.Small
           , docker = Some Docker::{
-              image = (../../Constants/ContainerImages.dhall).toolchainBase
+              image = (../../Constants/ContainerImages.dhall).minaToolchain
             }
         },
       Command.build
@@ -47,7 +47,7 @@ Pipeline.build
           , key = "clean-merge-berkeley"
           , target = Size.Small
           , docker = Some Docker::{
-              image = (../../Constants/ContainerImages.dhall).toolchainBase
+              image = (../../Constants/ContainerImages.dhall).minaToolchain
             }
         }
     ]
