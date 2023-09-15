@@ -37,6 +37,7 @@ RUN apt-get update --yes \
     awscli \
     cmake \
     fakeroot \
+    gawk \
     gnupg2 \
     jq \
     libboost-dev \
