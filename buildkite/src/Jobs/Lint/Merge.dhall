@@ -31,7 +31,7 @@ Pipeline.build
           , soft_fail = Some (B/SoftFail.Boolean True)
           , target = Size.Small
           , docker = Some Docker::{
-              image = (../../Constants/ContainerImages.dhall).toolchainBase
+              image = (../../Constants/ContainerImages.dhall).minaToolchain
             }
         },
       Command.build
@@ -41,7 +41,7 @@ Pipeline.build
           , key = "clean-merge-develop"
           , target = Size.Small
           , docker = Some Docker::{
-              image = (../../Constants/ContainerImages.dhall).toolchainBase
+              image = (../../Constants/ContainerImages.dhall).minaToolchain
             }
         },
       Command.build
@@ -51,7 +51,7 @@ Pipeline.build
           , key = "clean-merge-berkeley"
           , target = Size.Small
           , docker = Some Docker::{
-              image = (../../Constants/ContainerImages.dhall).toolchainBase
+              image = (../../Constants/ContainerImages.dhall).minaToolchain
             }
         },
       Command.build
