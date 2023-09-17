@@ -83,6 +83,7 @@
    graphql_basic_scalars
    signature_lib_unix
    internal_tracing
+   o1trace
  )
  (preprocessor_deps "../../config.mlh")
  (preprocess
