@@ -16,18 +16,33 @@ import (
 	sheets "google.golang.org/api/sheets/v4"
 )
 
-type Identity map[string]string
+// The graphQLPort parameter should be optional but Golang doesn't permit that
+// As a workaround we use a pointer that can be defined as nil
+type Identity struct {
+	id, publicKey, publicIp string
+	graphQLPort             *string
+}
+
+// Custom function to check if identity is in array
+func IsIdentityInArray(id string, identities []Identity) bool {
+	for _, identity := range identities {
+		if identity.id == id {
+			return true
+		}
+	}
+	return false
+}
 
 // Goes through each submission and adds an identity type to a map
 // Identity is constructed based on the payload that the BP sends which may hold pubkey, ip address and graphqlport
-func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, executionInterval int) map[string]Identity {
+func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, executionInterval int) []Identity {
 
 	currentDate := currentTime.Format("2006-01-02")
 	lastExecutionTime := GetLastExecutionTime(config, sheet, log, sheetTitle, currentTime, executionInterval)
 
 	prefixCurrent := strings.Join([]string{ctx.Prefix, "submissions", currentDate}, "/")
 
-	identities := make(map[string]Identity) // Create a map for unique identities
+	var identities []Identity // Create an empty array of Identity types
 
 	var submissionData dg.MetaToBeSaved
 
@@ -47,7 +62,7 @@ func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext
 		}
 
 		for _, obj := range page.Contents {
-			submissionTime, err := time.Parse(time.RFC3339, (*obj.Key)[32:52])
+			submissionTime, err := time.Parse(time.RFC3339, (*obj.Key)[32:52]) // Between characters 32 and 52 lies the timestamp of a submission
 			if err != nil {
 				log.Fatalf("Error parsing time: %v\n", err)
 			}
@@ -83,8 +98,8 @@ func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext
 					identity = GetPartialIdentity(submissionData.Submitter.String(), submissionData.RemoteAddr)
 				}
 
-				if _, inMap := identities[identity["id"]]; !inMap {
-					AddIdentity(identity, identities)
+				if IsIdentityInArray(identity.id, identities) {
+					identities.AddIdentity(identity)
 				}
 			}
 		}
@@ -98,11 +113,11 @@ func GetFullIdentity(pubKey string, ip string, graphqlPort string) Identity {
 	s := strings.Join([]string{pubKey, ip, graphqlPort}, "-")
 	id := md5.Sum([]byte(s)) // Create a hash value and use it as id
 
-	identity := map[string]string{
-		"id":           hex.EncodeToString(id[:]),
-		"public-key":   pubKey,
-		"public-ip":    ip,
-		"graphql-port": graphqlPort,
+	identity := Identity{
+		id:          hex.EncodeToString(id[:]),
+		publicKey:   pubKey,
+		publicIp:    ip,
+		graphQLPort: graphqlPort,
 	}
 
 	return identity
@@ -114,16 +129,16 @@ func GetPartialIdentity(pubKey string, ip string) Identity {
 	s := strings.Join([]string{pubKey, ip}, "-")
 	id := md5.Sum([]byte(s)) // Create a hash value and use it as id
 
-	identity := map[string]string{
-		"id":         hex.EncodeToString(id[:]),
-		"public-key": pubKey,
-		"public-ip":  ip,
+	identity := Identity{
+		id:        hex.EncodeToString(id[:]),
+		publicKey: pubKey,
+		publicIp:  ip,
 	}
 
 	return identity
 }
 
 // Adds an identity to the map
-func AddIdentity(identity Identity, identities map[string]Identity) {
-	identities[identity["id"]] = identity
+func (identities []Identity) AddIdentity(identity Identity) {
+	identities = append(identities, identity)
 }

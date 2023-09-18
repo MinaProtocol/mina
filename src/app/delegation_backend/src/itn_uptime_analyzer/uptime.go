@@ -75,7 +75,7 @@ func (identity Identity) GetUptimeOfToday(config AppConfig, sheet *sheets.Servic
 
 				// Check if graphql port is present in the submission and verifiy the submission based on that
 				if submissionDataToday.GraphqlControlPort != 0 {
-					if (identity["public-key"] == submissionDataToday.Submitter.String()) && (identity["public-ip"] == submissionDataToday.RemoteAddr) && (identity["graphql-port"] == strconv.Itoa(submissionDataToday.GraphqlControlPort)) {
+					if (identity.publicKey == submissionDataToday.Submitter.String()) && (identity.publicIp == submissionDataToday.RemoteAddr) && (identity.graphQLPort == strconv.Itoa(submissionDataToday.GraphqlControlPort)) {
 						if lastSubmissionTimeString != "" {
 							lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
 							if err != nil {
@@ -98,7 +98,7 @@ func (identity Identity) GetUptimeOfToday(config AppConfig, sheet *sheets.Servic
 
 					}
 				} else {
-					if (identity["public-key"] == submissionDataToday.Submitter.String()) && (identity["public-ip"] == submissionDataToday.RemoteAddr) {
+					if (identity.publicKey == submissionDataToday.Submitter.String()) && (identity.publicIp == submissionDataToday.RemoteAddr) {
 						if lastSubmissionTimeString != "" {
 							lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
 							if err != nil {
@@ -203,7 +203,7 @@ func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Serv
 				}
 
 				if submissionDataYesterday.GraphqlControlPort != 0 {
-					if (identity["public-key"] == submissionDataYesterday.Submitter.String()) && (identity["public-ip"] == submissionDataYesterday.RemoteAddr) && (identity["graphql-port"] == strconv.Itoa(submissionDataYesterday.GraphqlControlPort)) {
+					if (identity.publicKey == submissionDataYesterday.Submitter.String()) && (identity.publicIp == submissionDataYesterday.RemoteAddr) && (identity.graphQLPort == strconv.Itoa(submissionDataYesterday.GraphqlControlPort)) {
 						if lastSubmissionTimeString != "" {
 							lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
 							if err != nil {
@@ -225,7 +225,7 @@ func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Serv
 						}
 					}
 				} else {
-					if (identity["public-key"] == submissionDataYesterday.Submitter.String()) && (identity["public-ip"] == submissionDataYesterday.RemoteAddr) {
+					if (identity.publicKey == submissionDataYesterday.Submitter.String()) && (identity.publicIp == submissionDataYesterday.RemoteAddr) {
 						if lastSubmissionTimeString != "" {
 							lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
 							if err != nil {
@@ -287,7 +287,7 @@ func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Serv
 					}
 
 					if submissionDataToday.GraphqlControlPort != 0 {
-						if (identity["public-key"] == submissionDataToday.Submitter.String()) && (identity["public-ip"] == submissionDataToday.RemoteAddr) && (identity["graphql-port"] == strconv.Itoa(submissionDataToday.GraphqlControlPort)) {
+						if (identity.publicKey == submissionDataToday.Submitter.String()) && (identity.publicIp == submissionDataToday.RemoteAddr) && (identity.graphQLPort == strconv.Itoa(submissionDataToday.GraphqlControlPort)) {
 							if lastSubmissionTimeString != "" {
 								lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
 								if err != nil {
@@ -310,7 +310,7 @@ func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Serv
 
 						}
 					} else {
-						if (identity["public-key"] == submissionDataToday.Submitter.String()) && (identity["public-ip"] == submissionDataToday.RemoteAddr) {
+						if (identity.publicKey == submissionDataToday.Submitter.String()) && (identity.publicIp == submissionDataToday.RemoteAddr) {
 							if lastSubmissionTimeString != "" {
 								lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
 								if err != nil {

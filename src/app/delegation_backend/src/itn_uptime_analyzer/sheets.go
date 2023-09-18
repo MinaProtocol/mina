@@ -26,10 +26,10 @@ func (identity Identity) GetCell(config AppConfig, client *sheets.Service, log *
 		log.Fatalf("Unable to retrieve data from sheet: %v", err)
 	}
 
-	if identity["graphql-port"] != "" {
-		identityString = strings.Join([]string{identity["public-key"], identity["public-ip"], identity["graphql-port"]}, "-")
+	if identity.graphQLPort != "" {
+		identityString = strings.Join([]string{identity.publicKey, identity.publicIp, identity.graphQLPort}, "-")
 	} else {
-		identityString = strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
+		identityString = strings.Join([]string{identity.publicKey, identity.publicIp}, "-")
 	}
 	for index, row := range resp.Values {
 		if row[0] == identityString {
@@ -43,7 +43,7 @@ func (identity Identity) GetCell(config AppConfig, client *sheets.Service, log *
 	if !exactMatch {
 		for index, row := range resp.Values {
 			str := fmt.Sprintf("%v\n", row[0])
-			if strings.Split(str, "-")[0] == identity["public-key"] {
+			if strings.Split(str, "-")[0] == identity.publicKey {
 				rowIndex = index + 1
 				exactMatch = false
 			}
@@ -60,10 +60,10 @@ func (identity Identity) AppendNext(config AppConfig, client *sheets.Service, lo
 	spId := config.AnalyzerOutputGsheetId
 	var identityString string
 
-	if identity["graphql-port"] != "" {
-		identityString = strings.Join([]string{identity["public-key"], identity["public-ip"], identity["graphql-port"]}, "-")
+	if identity.graphQLPort != "" {
+		identityString = strings.Join([]string{identity.publicKey, identity.publicIp, identity.graphQLPort}, "-")
 	} else {
-		identityString = strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
+		identityString = strings.Join([]string{identity.publicKey, identity.publicIp}, "-")
 	}
 
 	cellValue := []interface{}{identityString}
@@ -85,10 +85,10 @@ func (identity Identity) InsertBelow(config AppConfig, client *sheets.Service, l
 	spId := config.AnalyzerOutputGsheetId
 	var identityString string
 
-	if identity["graphql-port"] != "" {
-		identityString = strings.Join([]string{identity["public-key"], identity["public-ip"], identity["graphql-port"]}, "-")
+	if identity.graphQLPort != "" {
+		identityString = strings.Join([]string{identity.publicKey, identity.publicIp, identity.graphQLPort}, "-")
 	} else {
-		identityString = strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
+		identityString = strings.Join([]string{identity.publicKey, identity.publicIp}, "-")
 	}
 
 	cellValue := []interface{}{identityString}
