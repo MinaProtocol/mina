@@ -61,7 +61,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node_c =
       Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
-
     let%bind () =
       section "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))

@@ -57,7 +57,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node_c =
       Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
-
     let%bind initial_connectivity_data =
       fetch_connectivity_data ~logger (Core.String.Map.data all_nodes)
     in

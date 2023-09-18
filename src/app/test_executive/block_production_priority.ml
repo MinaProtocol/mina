@@ -82,7 +82,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Core.String.Map.remove (Network.block_producers network) "receiver"
       |> Core.String.Map.data
     in
-
     let rec map_remove_keys map ~(keys : string list) =
       match keys with
       | [] ->

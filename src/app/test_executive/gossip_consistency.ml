@@ -46,7 +46,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let sender_bp =
       Core.String.Map.find_exn (Network.block_producers network) "node-b"
     in
-
     let%bind sender_pub_key = pub_key_of_node sender_bp in
     let num_payments = 3 in
     let fee = Currency.Fee.of_int 10_000_000 in

@@ -44,21 +44,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node_b =
       Core.String.Map.find_exn (Network.block_producers network) "node-b"
     in
-
-    section "delegate all mina currency from node_b to node_a"
-      (let delegation_receiver = node_a in
-       let%bind delegation_receiver_pub_key =
-         pub_key_of_node delegation_receiver
-       in
-       let delegation_sender = node_b in
-       let%bind delegation_sender_pub_key = pub_key_of_node delegation_sender in
-       let%bind { hash; _ } =
-         Integration_test_lib.Graphql_requests.must_send_delegation ~logger
-           (Network.Node.get_ingress_uri delegation_sender)
-           ~sender_pub_key:delegation_sender_pub_key
-           ~receiver_pub_key:delegation_receiver_pub_key ~fee
-       in
-       wait_for t
-         (Wait_condition.signed_command_to_be_included_in_frontier
-            ~txn_hash:hash ~node_included_in:`Any_node ) )
+    let%bind () =
+      section "delegate all mina currency from node_b to node_a"
+        (let delegation_receiver = node_a in
+         let%bind delegation_receiver_pub_key =
+           pub_key_of_node delegation_receiver
+         in
+         let delegation_sender = node_b in
+         let%bind delegation_sender_pub_key =
+           pub_key_of_node delegation_sender
+         in
+         let%bind { hash; _ } =
+           Integration_test_lib.Graphql_requests.must_send_delegation ~logger
+             (Network.Node.get_ingress_uri delegation_sender)
+             ~sender_pub_key:delegation_sender_pub_key
+             ~receiver_pub_key:delegation_receiver_pub_key ~fee
+         in
+         wait_for t
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~txn_hash:hash ~node_included_in:`Any_node ) )
+    in
+    Malleable_error.return ()
 end
