@@ -70,7 +70,7 @@ func IdentifyWeek(config AppConfig, client *sheets.Service, log *logging.ZapEven
 	}
 
 	lastSheet := outputSheets[len(outputSheets)-1]
-	lastSheetSplit := strings.SplitAfter(fmt.Sprint(lastSheet), " - ")
+	lastSheetSplit := strings.SplitAfter(lastSheet.Properties.Title, " - ")
 	lastSheetEndTime, err := time.Parse(lastSheetSplit[len(lastSheetSplit)-1], time.RFC3339)
 	if err != nil {
 		log.Fatalf("Error parsing time: %v\n", err)
