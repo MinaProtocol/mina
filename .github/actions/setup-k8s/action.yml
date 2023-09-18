@@ -1,0 +1,26 @@
+name: 'Setup Kubernetes access'
+description: 'Set up kubectl, helm and k8s context'
+
+inputs:
+  kubeconfig:
+    description: 'Kubeconfig secret'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.26.1'
+
+    - name: Set up helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'v3.11.1'
+
+    - name: Set up Kubernetes context
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ inputs.kubeconfig }}

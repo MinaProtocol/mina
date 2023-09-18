@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "job-name" . }}
+spec:
+  parallelism: {{ $.Values.workers | default 1 }}
+  template:
+    metadata:
+      labels:
+        app:  {{ include "job-name" . }}
+    spec:
+      restartPolicy: OnFailure
+      runtimeClassName: kata-clh
+      containers:
+      - name: worker
+        image: {{ $.Values.repository }}:{{ $.Values.tag | default "latest" }}
+        imagePullPolicy: {{ $.Values.pullPolicy }}
+        command:
+        - node
+        - build/src/main.js
+        args:
+        - -v
+        - send
+        - --remote=http://{{ include "server-name" . }}/
+        - --count={{ .Values.count }}
+        {{- if $.Values.continuous }}
+        - --continuous
+        {{- end }}
+        resources:
+          requests:
+            {{ if $.Values.cpu }}
+            cpu: {{ $.Values.cpu }}
+            {{ end }}
+            {{ if $.Values.mem }}
+            memory: {{ $.Values.mem }}
+            {{ end }}
+          limits:
+            {{ if $.Values.cpu }}
+            cpu: {{ $.Values.cpu }}
+            {{ end }}
+            {{ if $.Values.mem }}
+            memory: {{ $.Values.mem }}
+            {{ end }}
+  backoffLimit: {{ $.Values.workers }}

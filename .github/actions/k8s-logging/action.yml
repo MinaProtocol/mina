@@ -1,0 +1,37 @@
+name: 'Kubernetes resource log'
+description: 'Displays log from a Kubernetes resource'
+
+inputs:
+  resource:
+    description: 'Kubernetes resource'
+    required: true
+  container:
+    description: 'Container'
+    required: false
+  timeout:
+    description: 'Timeout in seconds'
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Log
+      shell: bash
+      run: |
+        CONTAINER_OPTION=""
+        TIMEOUT_OPTION="${{ inputs.timeout }}"
+        if [[ -n "${{ inputs.container }}" ]]; then
+          CONTAINER_OPTION="--container ${{ inputs.container }}"
+        fi
+
+        START_TIME=$SECONDS
+        while ! kubectl logs ${{ inputs.resource }} $CONTAINER_OPTION --follow
+        do 
+          ELAPSED_TIME=$(($SECONDS - $START_TIME))
+          if [[ -n "$TIMEOUT_OPTION" && "$ELAPSED_TIME" -ge "$TIMEOUT_OPTION" ]]; then
+            echo "Timeout after waiting for $TIMEOUT_OPTION seconds"
+            break
+          fi
+          echo "Waiting for ${{ inputs.resource }} to start..."
+          sleep 10
+        done

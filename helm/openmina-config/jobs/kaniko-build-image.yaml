@@ -1,0 +1,81 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kaniko
+spec:
+  template:
+    spec:
+      initContainers:
+      - name: git-clone
+        image: alpine/git
+        command:
+        - /bin/sh
+        - -c
+        - |
+          git clone --single-branch --branch=$MINA_BRANCH $MINA_REPO /workspace
+        env:
+        - name: MINA_BRANCH
+          valueFrom:
+            configMapKeyRef:
+              name: aggregator-gha-current-test-status
+              key: ref_name
+        - name: MINA_REPO
+          valueFrom:
+            configMapKeyRef:
+              name: aggregator-gha-current-test-status
+              key: repository_url
+        volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+      - name: prepare-dockerfile
+        image: alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          sed -i -e "s/zlib1g-dev/zlib1g-dev jq/" /workspace/dockerfiles/stages/1-build-deps
+          for f in 1-build-deps 2-opam-deps 3-builder 99-openmina-tail; do cat /workspace/dockerfiles/stages/$f; done > /workspace/dockerfiles/stages/merged
+          echo "!dockerfiles/scripts/healthcheck-utilities.sh" >> /workspace/.dockerignore
+        volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+      containers:
+      - name: kaniko
+        image: gcr.io/kaniko-project/executor:latest
+        args: ["--dockerfile=/workspace/dockerfiles/stages/merged",
+                "--context=dir:///workspace",
+                "--destination=openmina/mina:minaprotocol-mina-gha-develop-$(TAG)",
+                "--build-arg=MINA_BRANCH=$(MINA_BRANCH)",
+                "--build-arg=MINA_REPO=$(MINA_REPO)"]
+        env:
+        - name: MINA_BRANCH
+          valueFrom:
+            configMapKeyRef:
+              name: aggregator-gha-current-test-status
+              key: ref_name
+        - name: MINA_REPO
+          valueFrom:
+            configMapKeyRef:
+              name: aggregator-gha-current-test-status
+              key: repository_url
+        - name: TAG
+          valueFrom:
+            configMapKeyRef:
+              name: aggregator-gha-current-test-status
+              key: run_number
+        volumeMounts:
+        - name: kaniko-secret
+          mountPath: /kaniko/.docker
+        - name: workspace
+          mountPath: /workspace
+      restartPolicy: Never
+      volumes:
+      - name: kaniko-secret
+        secret:
+          secretName: regcred
+          items:
+          - key: .dockerconfigjson
+            path: config.json
+      - name: workspace
+        emptyDir: {}
+  backoffLimit: 1

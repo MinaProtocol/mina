@@ -1,0 +1,25 @@
+name: 'Report status to cluster'
+description: 'Patch the test status ConfigMap'
+
+inputs:
+  namespace:
+    description: 'Kubernetes namespace'
+    required: true
+  status:
+    description: 'Status to patch into ConfigMap'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Patch ConfigMap
+      shell: bash
+      run: |
+        timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        kubectl patch configmap aggregator-gha-current-test-status -n ${{ inputs.namespace }} -p "
+        {
+          \"data\":{
+            \"status\":\"${{ inputs.status }}\",
+            \"patch_timestamp\":\"${timestamp}\"
+          }
+        }"

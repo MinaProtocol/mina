@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "server-name" . }}
+  labels:
+    app: {{ include "server-name" . }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "server-name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "server-name" . }}
+    spec:
+      containers:
+      - name: server
+        image: {{ $.Values.repository }}:{{ $.Values.tag | default "latest" }}
+        imagePullPolicy: {{ $.Values.pullPolicy }}
+        command:
+        - node
+        # - --inspect
+        - build/src/main.js
+        args:
+        - -v
+        - -v
+        - server
+        - --port=80
+        - --host=0.0.0.0
+        - --accounts-file=/testnet/accounts.json
+        - --nodes-file=/testnet/nodes.json
+        ports:
+        - containerPort: 80
+          name: http
+        - containerPort: 9229
+          name: debug
+        volumeMounts:
+        - name: testnet
+          mountPath: /testnet
+        readinessProbe:
+          httpGet:
+            path: /healthcheck
+            port: 80
+      volumes:
+      - name: testnet
+        configMap:
+          name: testnet-{{ include "server-name" . }}
+          items:
+          - key: accounts
+            path: accounts.json
+          - key: nodes
+            path: nodes.json
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "server-name" . }}
+spec:
+  selector:
+    app: {{ include "server-name" . }}
+  ports:
+  - protocol: TCP
+    name: http
+    port: 80
+    targetPort: http
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: testnet-{{ include "server-name" . }}
+data:
+  accounts: |
+    {{- .Files.Get $.Values.accounts | nindent 6 }}
+  nodes: |
+    {{- .Files.Get $.Values.nodes | nindent 6 }}

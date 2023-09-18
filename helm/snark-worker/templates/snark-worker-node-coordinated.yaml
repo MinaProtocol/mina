@@ -1,0 +1,201 @@
+{{ range until ($.Values.httpCoordinatedSnarkersConfig.count | int) }}
+{{ $name := printf "%s%03d" $.Values.httpCoordinatedSnarkersConfig.namePrefix (add . 1) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        testnet: {{ $.Values.testnetName }}
+        role: snark-worker
+        version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
+        syncStatus: INIT
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
+        prometheus.io/path: '/metrics'
+    spec:
+      {{ include "sideCar.podAttrs" (dict "resources" $.Values.resources "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
+      initContainers:
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $.Values.mina.privkeyPass | quote }}
+        resources:
+          limits:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+          requests:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+        image: {{ $.Values.mina.image }}
+      containers:
+      {{ include "sideCar.resources.containerSpec" (dict "resources" $.Values.resources) | nindent 6 }}
+      {{ include "sideCar.bpfDebugger.containerSpec" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
+      {{ include "sideCar.logs.containerSpec" (dict "logs" $.Values.logs "name" $name) | nindent 6 }}
+      {{ include "sideCar.internalTrace.containerSpec" (dict "internalTrace" $.Values.internalTrace "name" $name) | nindent 6 }}
+      - name: mina
+        resources:
+          limits:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+          requests:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+        image: {{ $.Values.mina.image }}
+        {{ if $.Values.mina.useCustomEntrypoint -}}
+        command: [{{ $.Values.mina.customEntrypoint }}]
+        {{- end }}
+        args: [ "daemon",
+          "-log-level", "Debug",
+          "-log-json",
+          "-config-directory", "/root/.mina-config",
+          "-log-snark-work-gossip", "true",
+          "-client-port", "$(DAEMON_CLIENT_PORT)",
+          "-rest-port", "$(DAEMON_REST_PORT)",
+          {{- if $.Values.internalTrace.enable}}
+          "-internal-tracing",
+          {{- end -}}
+          {{- if $.Values.mina.exposeGraphql }}
+          "-insecure-rest-server",
+          {{- end -}}
+          {{- if $.Values.mina.usePodIp }}
+          "-external-ip", "$(DAEMON_POD_IP)",
+          {{- end }}
+          "-external-port", "$(DAEMON_EXTERNAL_PORT)",
+          "-metrics-port", "$(DAEMON_METRICS_PORT)",
+          "-run-snark-worker", "$(CODA_SNARK_KEY)",
+          "-snark-worker-fee", "$(CODA_SNARK_FEE)",
+          "-work-selection", "$(WORK_SELECTION)",
+          "-enable-peer-exchange", "true",
+          "-libp2p-keypair", "/root/libp2p-keys/key",
+          {{- if $.Values.mina.logTxnPoolGossip }}
+          "-log-txn-pool-gossip", "true",
+          {{- end -}}
+          {{- if $.Values.mina.runtimeConfig }}
+          "-config-file", "/config/daemon.json",
+          {{- end }}
+          {{- range $.Values.mina.seedPeers }}
+          "-peer", {{ . | quote }},
+          {{- end }}
+          {{- if $.Values.mina.seedPeersURL }}
+          "-peer-list-url", {{ $.Values.mina.seedPeersURL | quote }},
+          {{- end }}
+          "-generate-genesis-proof", {{ $.Values.mina.generateGenesisProof | quote }},
+          {{- if $.Values.mina.enableArchive }}
+          "-archive-address", {{ $.Values.mina.archiveAddress }}
+          {{- end -}}
+        ]
+        env:
+        - name: "RAYON_NUM_THREADS"
+          value: "4"
+        - name: DAEMON_REST_PORT
+          value: {{ $.Values.mina.ports.graphql | quote }}
+        - name: DAEMON_CLIENT_PORT
+          value: {{ $.Values.mina.ports.client | quote }}
+        - name: DAEMON_METRICS_PORT
+          value: {{ $.Values.mina.ports.metrics | quote }}
+        - name: MINA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        - name: CODA_SNARK_KEY
+          value: {{ $.Values.publicKey | trim | quote }}
+        - name: CODA_SNARK_FEE
+          value: {{ $.Values.snarkFee | quote }}
+        - name: DAEMON_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: DAEMON_EXTERNAL_PORT
+          value: {{ $.Values.mina.ports.p2p | quote }}
+        - name: WORK_SELECTION
+          value: {{$.Values.workSelectionAlgorithm | quote }}
+        - name: MINA_LIBP2P_PASS
+          value: {{ $.Values.mina.privkeyPass | quote }}
+        {{ if $.Values.mina.optimized }}
+        - name: MINA_SKIP_REDUNDANT_SNARK_VERIFICATIONS
+          value: "1"
+        - name: MINA_PARTIAL_STATEMENT_HASH
+          value: "1"
+        {{ end -}}
+        {{ include "sideCar.bpfDebugger.envVar" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 8 }}
+        - name: MINA_SNARK_COORDINATOR_URL
+          value: http://snarker-http-coordinator
+        ports:
+        - name: client-port
+          protocol: TCP
+          containerPort: {{ $.Values.mina.ports.client }}
+        - name: graphql-port
+          protocol: TCP
+          containerPort: {{ $.Values.mina.ports.graphql }}
+        - name: metrics-port
+          protocol: TCP
+          containerPort: {{ $.Values.mina.ports.metrics }}
+        - name: external-port
+          protocol: TCP
+          containerPort: {{ $.Values.mina.ports.p2p }}
+          #hostPort: {{ $.Values.mina.ports.p2p }}
+{{ $data := dict "name" $name "healthcheck" $.Values.healthcheck }}
+{{- include "healthcheck.snarkCoordinator.allChecks" $data | indent 8 }}
+        imagePullPolicy: Always
+        volumeMounts:
+        {{- if $.Values.mina.runtimeConfig }}
+        - name: daemon-config
+          mountPath: "/config/"
+        {{- end }}
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        - name: scripts
+          mountPath: "/scripts"
+        {{- if $.Values.logs.enable }}
+        - name: config-dir
+          mountPath: "/root/.mina-config"
+        {{- end }}
+      volumes:
+      {{- if $.Values.mina.runtimeConfig }}
+      - name: daemon-config
+        configMap:
+          name: {{$.Values.coordinatorName }}-daemon-config
+      {{- end }}
+      - name: actual-libp2p
+        emptyDir: {}
+      - name: config-dir
+      {{- if $.Values.persist_working_dir }}
+        persistentVolumeClaim:
+          claimName: pvc-{{ $name }}
+      {{- else}}
+        emptyDir: {}
+      {{- end }}
+      {{ include "sideCar.bpfDebugger.volume" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
+      - name: scripts
+        configMap:
+          defaultMode: 0755
+          name: scripts
+          items:
+          - key: "unset-k8s-env.sh"
+            path: "unset-k8s-env.sh"
+{{- include "nodeSelector.preemptible" $.Values | indent 6 }}
+
+---
+{{ include "sideCar.resources.service" (dict "name" $name "resources" $.Values.resources) }}
+{{ include "sideCar.bpfDebugger.service" (dict "name" $name "bpfDebugger" $.Values.bpfDebugger) }}
+{{ include "sideCar.logs.service" (dict "name" $name "logs" $.Values.logs) }}
+{{ include "sideCar.internalTrace.service" (dict "name" $name "internalTrace" $.Values.internalTrace) }}
+---
+{{ end }}

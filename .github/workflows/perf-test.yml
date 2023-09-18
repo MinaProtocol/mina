@@ -1,0 +1,397 @@
+name: 'Performance test'
+
+on:
+  schedule:
+    - cron:  '20 1 * * *'  # Will run every day at 1:20 UTC
+
+concurrency:
+  group: performance-test
+  cancel-in-progress: true
+
+env:
+  RUN_NUMBER: ${{ github.run_number }}
+  NAMESPACE: minaprotocol-ci-perftest
+
+jobs:
+  build-mina-image:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k8s
+      uses: ./.github/actions/setup-k8s
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Send report to cluster
+      run: |
+        timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        commit_message=$(git log -1 --pretty=format:"%s")
+        repository_url="https://github.com/${{ github.repository }}"
+        kubectl patch configmap aggregator-gha-current-test-status -n ${NAMESPACE} -p "
+        {
+          \"data\":{
+            \"status\":\"setup\",
+            \"run_id\":\"${{ github.run_id }}\",
+            \"run_number\":\"${{ github.run_number }}\",
+            \"workflow\":\"${{ github.workflow }}\",
+            \"job\":\"${{ github.job }}\",
+            \"sha\":\"${{ github.sha }}\",
+            \"ref_name\":\"${{ github.ref_name }}\",
+            \"actor\":\"${{ github.actor }}\",
+            \"repository\":\"${{ github.repository }}\",
+            \"event_name\":\"${{ github.event_name }}\",
+            \"patch_timestamp\":\"${timestamp}\",
+            \"commit_message\":\"${commit_message}\",
+            \"repository_url\":\"${repository_url}\"
+          }
+        }"
+
+    - name: Build and push from Kubernetes cluster
+      run: |
+        kubectl apply -f ./helm/openmina-config/jobs/kaniko-build-image.yaml
+
+    - name: Wait for job to complete
+      run: |
+        kubectl wait --for=condition=complete --timeout=1h job/kaniko
+
+    - name: Cleanup building job
+      if: always()
+      run: |
+        kubectl delete job/kaniko || true
+
+  build-mina-image-log:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k8s
+      uses: ./.github/actions/setup-k8s
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Log image building job
+      uses: ./.github/actions/k8s-logging
+      with:
+        resource: job/kaniko
+        timeout: 600
+
+  deploy-to-cluster:
+    runs-on: ubuntu-latest
+    needs: [ build-mina-image ]
+    env:
+      OM: helm/openmina-config
+      TARGET_HEIGHT: 8
+      SEEDS_WAIT_RESOURCE: deployment/seed1
+      SEEDS_WAIT_TIMEOUT: 10m
+      NODES_WAIT_RESOURCE: deployment/node1
+      NODES_WAIT_TIMEOUT: 15m
+      HEIGHT_WAIT_RETRIES: 20
+      HEIGHT_WAIT_PERIOD: 15
+      SLOT_DURATION: 180
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k8s
+      uses: ./.github/actions/setup-k8s
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Delete old testnet
+      run: |
+        ${OM}/deploy.sh delete --all --force
+        sleep 10
+        PODS="$(${OM}/kube-utils.sh mina-pods)"
+        if [ -n "${PODS}" ]; then
+          echo "Workaround for pods left running, force-delete pods $PODS"
+          kubectl delete --force pods ${PODS} || true
+        fi
+        helm delete zkapp-server-continuous --wait --timeout=1m || true
+        helm delete zkapp-send-continuous --wait --timeout=5m || true
+
+    - name: Prepare Daemon JSON
+      run: |
+        ${{ env.OM }}/generate-conf-file.sh --slot-duration=${{ env.SLOT_DURATION }} > ${{ env.OM }}/resources/daemon.json
+
+    - name: Deploy testnet nodes
+      run: |
+        export MINA_IMAGE="openmina/mina:minaprotocol-mina-gha-develop-${{ github.run_number }}"
+        HELM_ARGS="--set=healthcheck.failureThreshold=1800 ${HELM_ARGS}"
+        ${OM}/deploy.sh deploy --seeds --force -- ${HELM_ARGS}
+        sleep 30
+        ${OM}/deploy.sh deploy --producers --nodes --force -- ${HELM_ARGS}
+        ${OM}/deploy.sh deploy --snark-workers --force -- ${HELM_ARGS}
+        ${OM}/update-frontend.sh -- --set=isVanilla=true
+
+    - name: Report running
+      uses: ./.github/actions/report-to-cluster
+      with:
+        namespace: minaprotocol-ci-perftest
+        status: running
+
+    - name: Wait for testnet to be ready
+      run: |
+         ${OM}/kube-utils.sh mina-testnet-available ${NODES_WAIT_TIMEOUT}
+         ${OM}/kube-utils.sh mina-testnet-same-height ${HEIGHT_WAIT_RETRIES} ${HEIGHT_WAIT_PERIOD}
+
+    - name: Deployment info
+      run: |
+        PORT="$(${OM}/kube-utils.sh frontend-port ${NAMESPACE})"
+        echo "Frontend: http://1.k8.openmina.com:$PORT"
+        echo "Namespace: ${NAMESPACE}"
+        echo
+        echo "Seed nodes: $(kubectl get pods -l role=seed -o name | wc -l)"
+        echo "Producer nodes: $(kubectl get pods -l role=block-producer -o name | wc -l)"
+        echo "Snark coordinator nodes: $(kubectl get pods -l role=snark-coordinator -o name | wc -l)"
+        echo "Snark worker nodes: $(kubectl get pods -l role=snark-worker -o name | wc -l)"
+        echo "Plain nodes: $(kubectl get pods -l role=plain-node -o name | wc -l)"
+
+  split-load:
+    runs-on: ubuntu-latest
+    needs: [ deploy-to-cluster ]
+    env:
+      RUN_NUMBER: ${{ github.run_number }}
+      NODES: "--nodes=8 --snarkers=4 --prods=3 --prod0s=3 --seeds=2"
+      OM: helm/openmina-config
+      URL: http://1.k8.openmina.com:31410
+      ZK_JOB: sign-x4
+      ZK_WORKERS: 8
+      ZK_COUNT: 128
+      SAME_CHAIN_WAIT_PERIOD: 60
+      SAME_CHAIN_WAIT_RETRIES: 20
+      ZKAPP_IMAGE: "akoptelov/mina-load-generator"
+      ZKAPP_TAG: "develop-snarkyjs"
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k8s
+      uses: ./.github/actions/setup-k8s
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: single-component
+      uses: docker://openmina/mina-network-debugger:latest
+      with:
+        entrypoint: /bin/sh
+        args: -c "sleep 10 && topology-tool --url=$URL $NODES show-graph --expected-components 1 > /dev/null"
+
+    - name: enable-firewall
+      uses: docker://openmina/mina-network-debugger:latest
+      with:
+        entrypoint: /bin/sh
+        args: |
+          -c "
+            sleep 10 && topology-tool --url=$URL $NODES enable-firewall &&
+            sleep 240 && topology-tool --url=$URL $NODES show-graph --expected-components 2 > /dev/null
+          "
+
+    - name: send-zkapp-txs
+      run: |
+        helm install zkapp-server-${RUN_NUMBER} helm/zkapps/server --set=suffix=${RUN_NUMBER} --set=repository=${ZKAPP_IMAGE} --set=tag=${ZKAPP_TAG}
+        kubectl wait deploy/zkapp-server-${RUN_NUMBER} --for=condition=available --timeout=1m
+        helm install zkapp-generate-${RUN_NUMBER} helm/zkapps/generate --set=loadKind=${ZK_JOB} --set=workers=${ZK_WORKERS} --set=suffix=${RUN_NUMBER} --set=repository=${ZKAPP_IMAGE} --set=tag=${ZKAPP_TAG}
+        kubectl wait job/zkapp-generate-${RUN_NUMBER} --for=condition=complete --timeout=30m
+        helm install zkapp-send-${RUN_NUMBER} helm/zkapps/send --set=count=${ZK_COUNT} --set=workers=${ZK_WORKERS} --set=suffix=${RUN_NUMBER} --set=repository=${ZKAPP_IMAGE} --set=tag=${ZKAPP_TAG}
+        kubectl wait job/zkapp-send-${RUN_NUMBER} --for=condition=complete --timeout=30m
+
+    - name: wait-slot-0-10
+      run: |
+        ${OM}/kube-utils.sh mina-node-wait-for-epoch-slot deploy/prod2 ${NAMESPACE} 0 10
+
+    - name: blockchain-split
+      run: |
+        ${OM}/kube-utils.sh assert-different-history deploy/prod2 ${NAMESPACE} deploy/prod3 ${NAMESPACE}
+
+    - name: disable-firewall
+      uses: docker://openmina/mina-network-debugger:latest
+      with:
+        entrypoint: /bin/sh
+        args: |
+          -c "
+            topology-tool --url=$URL $NODES show-graph --expected-components 2 > /dev/null &&
+            topology-tool --url=$URL $NODES disable-firewall &&
+            sleep 240 && topology-tool --url=$URL $NODES show-graph --expected-components 1 > /dev/null
+          "
+
+    - name: blockchain-merged
+      run: |
+        ${OM}/kube-utils.sh mina-testnet-same-chain ${SAME_CHAIN_WAIT_RETRIES} ${SAME_CHAIN_WAIT_PERIOD} ${NAMESPACE}
+
+    - name: wait-zkapp-txs
+      run: |
+        helm install zkapp-wait-${RUN_NUMBER} helm/zkapps/wait --set=suffix=${RUN_NUMBER} --set=repository=${ZKAPP_IMAGE} --set=tag=${ZKAPP_TAG}
+        kubectl wait job/zkapp-wait-${RUN_NUMBER} --for=condition=complete --timeout=180m
+        sleep 5m
+
+    - name: cleanup-zkapp
+      if: always()
+      run: |
+        helm delete zkapp-server-${RUN_NUMBER} || true
+        helm delete zkapp-generate-${RUN_NUMBER} || true
+        helm delete zkapp-send-${RUN_NUMBER} || true
+        helm delete zkapp-wait-${RUN_NUMBER} || true
+
+  split-load-zkapp-server-log:
+    runs-on: ubuntu-latest
+    needs: [ deploy-to-cluster ]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k8s
+      uses: ./.github/actions/setup-k8s
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Log zkapp-server deployment
+      uses: ./.github/actions/k8s-logging
+      with:
+        resource: deploy/zkapp-server-${RUN_NUMBER}
+        timeout: 600
+
+  split-load-zkapp-generate-log:
+    runs-on: ubuntu-latest
+    needs: [ deploy-to-cluster ]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k8s
+      uses: ./.github/actions/setup-k8s
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Log zkapp-generate job
+      uses: ./.github/actions/k8s-logging
+      with:
+        resource: job/zkapp-generate-${RUN_NUMBER}
+        timeout: 600
+
+  split-load-zkapp-send-log:
+    runs-on: ubuntu-latest
+    needs: [ deploy-to-cluster, split-load-zkapp-generate-log]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k8s
+      uses: ./.github/actions/setup-k8s
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Log zkapp-send job
+      uses: ./.github/actions/k8s-logging
+      with:
+        resource: job/zkapp-send-${RUN_NUMBER}
+        timeout: 900
+
+  split-load-zkapp-wait-log:
+    runs-on: ubuntu-latest
+    needs: [ deploy-to-cluster, split-load-zkapp-send-log ]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k8s
+      uses: ./.github/actions/setup-k8s
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Log zkapp-wait job
+      uses: ./.github/actions/k8s-logging
+      with:
+        resource: job/zkapp-wait-${RUN_NUMBER}
+        timeout: 1800
+
+  continuous-load:
+    runs-on: ubuntu-latest
+    needs: [ split-load ]
+    env:
+      ZK_JOB: sign-x4
+      ZK_WORKERS: 8
+      ZKAPP_IMAGE: "akoptelov/mina-load-generator"
+      ZKAPP_TAG: "develop-snarkyjs"
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k8s
+      uses: ./.github/actions/setup-k8s
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: send-zkapp-txs
+      run: |
+        helm install zkapp-server-continuous helm/zkapps/server --set=suffix=continuous --set=repository=${ZKAPP_IMAGE} --set=tag=${ZKAPP_TAG}
+        kubectl wait deploy/zkapp-server-continuous --for=condition=available --timeout=1m
+        helm install zkapp-generate-continuous helm/zkapps/generate --set=loadKind=${ZK_JOB} --set=workers=${ZK_WORKERS} --set=suffix=continuous --set=repository=${ZKAPP_IMAGE} --set=tag=${ZKAPP_TAG}
+        kubectl wait job/zkapp-generate-continuous --for=condition=complete --timeout=30m
+        helm delete zkapp-generate-continuous --wait --timeout=5m
+        helm install zkapp-send-continuous helm/zkapps/send --set=count=0 --set=workers=${ZK_WORKERS} --set=suffix=continuous --set=continuous=true --set=repository=${ZKAPP_IMAGE} --set=tag=${ZKAPP_TAG}
+
+  report-failure:
+    runs-on: ubuntu-latest
+    needs: ["build-mina-image", "deploy-to-cluster", "split-load", "continuous-load"]
+    if: failure()
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k8s
+      uses: ./.github/actions/setup-k8s
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Report failure
+      uses: ./.github/actions/report-to-cluster
+      with:
+        namespace: minaprotocol-ci-perftest
+        status: failure
+
+  report-success:
+    runs-on: ubuntu-latest
+    needs: ["build-mina-image", "deploy-to-cluster", "split-load", "continuous-load"]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k8s
+      uses: ./.github/actions/setup-k8s
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Report success
+      uses: ./.github/actions/report-to-cluster
+      with:
+        namespace: minaprotocol-ci-perftest
+        status: success
+
+  report-cancelled:
+    runs-on: ubuntu-latest
+    needs: ["build-mina-image", "deploy-to-cluster", "split-load", "continuous-load"]
+    if: cancelled()
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k8s
+      uses: ./.github/actions/setup-k8s
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Report cancelled
+      uses: ./.github/actions/report-to-cluster
+      with:
+        namespace: minaprotocol-ci-perftest
+        status: cancelled

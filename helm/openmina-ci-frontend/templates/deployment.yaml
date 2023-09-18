@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ci-frontend
+  labels:
+    app: ci-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ci-frontend
+  template:
+    metadata:
+      labels:
+        app: ci-frontend
+        component: ci-frontend
+    spec:
+      containers:
+        - name: main
+          image: {{ .Values.ciFrontend.image }}
+          command: ["sh", "-ce"]
+          args:
+            - |
+              envsubst < /usr/share/nginx/html/assets/env.template.js > /usr/share/nginx/html/assets/env.js
+              exec nginx -c /nginx-conf/nginx.conf -g 'daemon off;'
+          env:
+            - name: AGGREGATOR_URL
+              value: /aggregator
+            - name: DRONE_URL
+              value: https://ci.o1.openmina.com/{{ .Values.aggregator.ciRepo | default "openmina/mina-daily-testnet" }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /nginx-conf
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: ci-frontend-nginx-conf
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ci-frontend-nginx-conf
+data:
+  nginx.conf: |
+    {{ include "ci-frontend-nginx-conf" (dict "namespace" $.Release.Namespace) | nindent 4 }}

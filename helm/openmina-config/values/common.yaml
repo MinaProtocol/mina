@@ -1,0 +1,128 @@
+testnetName: testnet
+mina:
+  image: tizoc/mina-daemon:5462a59380
+  snarkCoordinatorImage: binier/mina-snark-worker-rs:latest
+  privkeyPass:
+  exposeGraphql: true
+  usePodIp: true
+  seedPeers:
+    # see resources/seed1.peerid
+    - /dns4/seed1/tcp/10001/p2p/12D3KooWBT8pyJAfWJhdeGYAtKvcaUmm78ExyZ6uo6BEimYNVat1
+    # see resources/seed2.peerid
+    - /dns4/seed2/tcp/10001/p2p/12D3KooWQ2gQb1uoDGymuxtoA8jPdb6SykyP94tEP6FVyXHcM9Ye
+  # memRequest: 4Gi
+  # cpuRequest: 4
+  # optimized: false
+  useCustomEntrypoint: true
+  customEntrypoint: /scripts/unset-k8s-env.sh
+
+healthcheck:
+  enabled: false
+  failureThreshold: 60
+  periodSeconds: 10
+  initialDelaySeconds: 60
+
+plainNodesConfig:
+  # the number of plain nodes
+  count: 8
+  namePrefix: node
+
+seedConfigs:
+  - name: seed1
+    # see resources/seed1
+    libp2pSecret: seed1-libp2p-secret
+  - name: seed2
+    # see resources/seed2
+    libp2pSecret: seed2-libp2p-secret
+
+blockProducerConfigs:
+  - name: prod01
+    # see resources/key-01
+    keypairName: prod1-privkey-secret
+    isolated: false
+  - name: prod02
+    # see resources/key-01
+    keypairName: prod1-privkey-secret
+    isolated: false
+  - name: prod03
+    # see resources/key-01
+    keypairName: prod1-privkey-secret
+    isolated: false
+  - name: prod2
+    # see resources/key-02
+    keypairName: prod2-privkey-secret
+    isolated: false
+  - name: prod3
+    # see resources/key-03
+    keypairName: prod3-privkey-secret
+    isolated: false
+
+httpCoordinatedSnarkersConfig:
+  # the number of snark workers
+  count: 0
+  namePrefix: snarker
+
+minaSnarkCoordinatorsConfig:
+- name: snarker001
+  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+  workSelectionAlgorithm: seq
+  workers: 20
+- name: snarker002
+  publicKey: B62qos2NxSras7juEwPVnkoV23YTFvWawyko8pgcf8S5nccTFCzVpdy
+  workSelectionAlgorithm: rand
+  workers: 20
+- name: snarker003
+  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+  workSelectionAlgorithm: rand
+  workers: 20
+- name: snarker004
+  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+  workSelectionAlgorithm: rand
+  workers: 10
+- name: snarker005
+  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+  workSelectionAlgorithm: rand
+  workers: 10
+- name: snarker006
+  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+  workSelectionAlgorithm: rand
+  workers: 10
+- name: snarker007
+  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+  workSelectionAlgorithm: rand
+  workers: 10
+
+resources:
+  enable: true
+  image: adrnagy/mina-node-monitoring:17c9127
+  args: ["--executable-name=mina"]
+  cpu: "100m"
+  memory: "100Mi"
+
+bpfDebugger:
+  enable: true
+  image: openmina/mina-network-debugger:ec4dd2dd
+  cpu: "1500m"
+  memory: "4Gi"
+  restartMina: false
+  runtime: kata-clh
+
+logs:
+  enable: true
+  image: openmina/mina-logs-service:b5d32468
+
+internalTrace:
+  enable: true
+  image: openmina/mina-internal-trace-consumer:fec6545
+
+aggregator:
+  image: openmina/mina-aggregator:18495f3c
+  ciRepo: MinaProtocol/mina
+  ciApiUrl: https://ci.o1.openmina.com/api
+
+ciFrontend:
+  image: directcuteo/mina-ci-frontend:reports40
+  nodePort: 31412
+
+nodeSelector:
+  preemptible: false
