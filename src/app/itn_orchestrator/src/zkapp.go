@@ -54,19 +54,30 @@ func ZkappBalanceRequirements(tps float64, p ZkappSubParams) (int, uint64, uint6
 	return newAccounts, minNewZkappBalance, maxNewZkappBalance, initBalance
 }
 
+func tpsGap(tps float64, gapSec int) int {
+	return int(math.Ceil(tps * float64(gapSec)))
+}
+
 func ZkappKeygenRequirements(initZkappBalance uint64, params ZkappSubParams) (int, uint64) {
 	maxParticipants := int(math.Ceil(params.Tps / params.MinTps))
+	minTpsGap := tpsGap(params.MinTps, params.Gap)
+	// Minimal number of keys allocated per node
+	minKeysPerNode := minTpsGap * 2
+	minTpsZkappsToDeploy, _ := zkappParams(params, params.MinTps)
+	zkappsToDeployPerKey := uint64(minTpsZkappsToDeploy / minKeysPerNode)
+	if minKeysPerNode%minTpsZkappsToDeploy > 0 {
+		zkappsToDeployPerKey++
+	}
+	tpsGap := tpsGap(params.Tps, params.Gap)
+	keys := maxParticipants + tpsGap*2
 	txCost := params.MaxBalanceChange + params.MaxFee
-	tpsGap := uint64(math.Round(params.Tps * float64(params.Gap)))
 	totalTxs := uint64(math.Ceil(float64(params.DurationMin) * 60 * params.Tps))
-	totalZkappsToDeploy := params.Gap * 4
-	balance := 3 * ((initZkappBalance+params.DeploymentFee)*uint64(totalZkappsToDeploy) + txCost*totalTxs)
-	keys := maxParticipants + int(tpsGap)*2
+	balance := uint64(keys)*zkappsToDeployPerKey*(initZkappBalance+params.DeploymentFee)*2 + 3*txCost*totalTxs
 	return keys, balance
 }
 
 func scheduleZkappCommandsDo(config Config, params ZkappCommandParams, nodeAddress NodeAddress, batchIx int, tps float64, feePayers []itn_json_types.MinaPrivateKey) (string, error) {
-	zkappsToDeploy, accountQueueSize := zkappParams(params, tps)
+	zkappsToDeploy, accountQueueSize := zkappParams(params.ZkappSubParams, tps)
 	newAccounts, minNewZkappBalance, maxNewZkappBalance, initBalance := ZkappBalanceRequirements(tps, params.ZkappSubParams)
 	paymentInput := ZkappCommandsDetails{
 		MemoPrefix:         fmt.Sprintf("%s-%d", params.ExperimentName, batchIx),
@@ -94,10 +105,10 @@ func scheduleZkappCommandsDo(config Config, params ZkappCommandParams, nodeAddre
 	return handle, err
 }
 
-func zkappParams(params ZkappCommandParams, tps float64) (zkappsToDeploy int, accountQueueSize int) {
+func zkappParams(params ZkappSubParams, tps float64) (zkappsToDeploy int, accountQueueSize int) {
 	zkappsToDeploy, accountQueueSize = params.ZkappsToDeploy, params.AccountQueueSize
 	if zkappsToDeploy == 0 {
-		tpsGap := int(math.Round(tps * float64(params.Gap)))
+		tpsGap := tpsGap(tps, params.Gap)
 		zkappsToDeploy, accountQueueSize = tpsGap*4, tpsGap*3
 	}
 	return

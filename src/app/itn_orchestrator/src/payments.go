@@ -32,7 +32,7 @@ type ScheduledPaymentsReceipt struct {
 func PaymentKeygenRequirements(gap int, params PaymentSubParams) (int, uint64) {
 	maxParticipants := int(math.Ceil(params.Tps / params.MinTps))
 	txCost := params.MaxFee + params.Amount
-	tpsGap := uint64(math.Round(params.Tps * float64(gap)))
+	tpsGap := uint64(math.Ceil(params.Tps * float64(gap)))
 	totalTxs := uint64(math.Ceil(float64(params.DurationMin) * 60 * params.Tps))
 	balance := 3 * txCost * totalTxs
 	keys := maxParticipants + int(tpsGap)*2
