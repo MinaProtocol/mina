@@ -19,8 +19,8 @@ import (
 // The graphQLPort parameter should be optional but Golang doesn't permit that
 // As a workaround we use a pointer that can be defined as nil
 type Identity struct {
-	id, publicKey, publicIp string
-	graphQLPort             *string
+	id, publicKey, publicIp, uptime string
+	graphQLPort                     *string
 }
 
 // Custom function to check if identity is in array
@@ -117,6 +117,7 @@ func GetFullIdentity(pubKey string, ip string, graphqlPort string) Identity {
 		id:          hex.EncodeToString(id[:]),
 		publicKey:   pubKey,
 		publicIp:    ip,
+		uptime:      "",
 		graphQLPort: graphqlPort,
 	}
 
@@ -133,6 +134,7 @@ func GetPartialIdentity(pubKey string, ip string) Identity {
 		id:        hex.EncodeToString(id[:]),
 		publicKey: pubKey,
 		publicIp:  ip,
+		uptime:    "",
 	}
 
 	return identity

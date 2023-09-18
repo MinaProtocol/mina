@@ -110,7 +110,7 @@ func IdentifyWeek(config AppConfig, client *sheets.Service, log *logging.ZapEven
 }
 
 // Decides if the application should check one or multiple buckets
-func IsExecutionIntervalEnough(currentTime time.Time, executionInterval int) bool {
+func SubmissionsInMultipleBuckets(currentTime time.Time, executionInterval int) bool {
 	if currentTime.Hour() < executionInterval {
 		return true
 	} else if currentTime.Hour() >= executionInterval {
