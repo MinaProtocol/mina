@@ -13,9 +13,13 @@ let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 let DebianVersions = ../../Constants/DebianVersions.dhall
+
 let dirtyWhen = [ 
-  S.strictlyStart (S.contains "src/app/rosetta")
-  , S.strictlyStart (S.contains "buildkite/src/Jobs/Test/RosettaIntegrationTests")
+  S.strictlyStart (S.contains "src/app/rosetta"),
+  S.strictlyStart (S.contains "src/lib"),
+  S.strictlyStart (S.contains "src/app/archive"),
+  S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall",
+  S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
 ]
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
@@ -41,7 +45,6 @@ Pipeline.build
           , key = "rosetta-integration-tests-bullseye"
           , target = Size.Small
           , depends_on = [ { name = "MinaArtifactBullseye", key = "rosetta-bullseye-docker-image" } ]
-          , soft_fail = Some (B/SoftFail.Boolean True)
         }
     ]
   }
