@@ -2933,14 +2933,14 @@ module Input = struct
         ; duration_min : int
         ; memo_prefix : string
         ; no_precondition : bool
-        ; min_balance_change : Currency.Amount.t
-        ; max_balance_change : Currency.Amount.t
         ; init_balance : Currency.Amount.t
         ; min_fee : Currency.Fee.t
         ; max_fee : Currency.Fee.t
         ; deployment_fee : Currency.Fee.t
         ; account_queue_size : int
         ; max_cost : bool
+        ; balance_change_range :
+            Mina_generators.Zkapp_command_generators.balance_change_range_t
         }
 
       let arg_typ : ((input, string) result option, input option) arg_typ =
@@ -2948,7 +2948,8 @@ module Input = struct
           ~doc:"Keys and other information for scheduling zkapp commands"
           ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts tps
                        duration_min memo_prefix no_precondition
-                       min_balance_change max_balance_change init_balance
+                       min_balance_change max_balance_change
+                       min_new_zkapp_balance max_new_zkapp_balance init_balance
                        min_fee max_fee deployment_fee account_queue_size
                        max_cost ->
             Result.return
@@ -2959,20 +2960,28 @@ module Input = struct
               ; duration_min
               ; memo_prefix
               ; no_precondition
-              ; min_balance_change
-              ; max_balance_change
               ; init_balance
               ; min_fee
               ; max_fee
               ; deployment_fee
               ; account_queue_size
               ; max_cost
+              ; balance_change_range =
+                  { min_balance_change
+                  ; max_balance_change
+                  ; min_new_zkapp_balance
+                  ; max_new_zkapp_balance
+                  }
               } )
           ~split:(fun f (t : input) ->
             f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts t.tps
               t.duration_min t.memo_prefix t.no_precondition
-              t.min_balance_change t.max_balance_change t.init_balance t.min_fee
-              t.max_fee t.deployment_fee t.account_queue_size t.max_cost )
+              t.balance_change_range.min_balance_change
+              t.balance_change_range.max_balance_change
+              t.balance_change_range.min_new_zkapp_balance
+              t.balance_change_range.max_new_zkapp_balance t.init_balance
+              t.min_fee t.max_fee t.deployment_fee t.account_queue_size
+              t.max_cost )
           ~fields:
             Arg.
               [ arg "feePayers"
@@ -2999,6 +3008,10 @@ module Input = struct
               ; arg "minBalanceChange" ~doc:"Minimum balance change"
                   ~typ:(non_null CurrencyAmount.arg_typ)
               ; arg "maxBalanceChange" ~doc:"Maximum balance change"
+                  ~typ:(non_null CurrencyAmount.arg_typ)
+              ; arg "minNewZkappBalance" ~doc:"Minimum new zkapp balance"
+                  ~typ:(non_null CurrencyAmount.arg_typ)
+              ; arg "maxNewZkappBalance" ~doc:"Maximum new zkapp balance"
                   ~typ:(non_null CurrencyAmount.arg_typ)
               ; arg "initBalance"
                   ~typ:(non_null CurrencyAmount.arg_typ)
