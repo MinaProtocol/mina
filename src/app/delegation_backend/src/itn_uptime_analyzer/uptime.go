@@ -249,98 +249,100 @@ func (identity Identity) GetUptimeOfTwoDays(config AppConfig, sheet *sheets.Serv
 				}
 			}
 		}
+	}
 
-		for paginatorToday.HasMorePages() {
-			page, err := paginatorToday.NextPage(ctx.Context)
+	for paginatorToday.HasMorePages() {
+		page, err := paginatorToday.NextPage(ctx.Context)
+		if err != nil {
+			log.Fatalf("Getting next page of paginatorToday (BPU bucket): %v\n", err)
+		}
+
+		for _, obj := range page.Contents {
+
+			submissionTime, err := time.Parse(time.RFC3339, (*obj.Key)[32:52])
 			if err != nil {
-				log.Fatalf("Getting next page of paginatorToday (BPU bucket): %v\n", err)
+				log.Fatalf("Error parsing time: %v\n", err)
 			}
 
-			for _, obj := range page.Contents {
+			if (submissionTime.After(lastExecutionTime)) && (submissionTime.Before(currentTime)) {
 
-				submissionTime, err := time.Parse(time.RFC3339, (*obj.Key)[32:52])
+				objHandle, err := ctx.Client.GetObject(ctx.Context, &s3.GetObjectInput{
+					Bucket: ctx.BucketName,
+					Key:    obj.Key,
+				})
+
 				if err != nil {
-					log.Fatalf("Error parsing time: %v\n", err)
+					log.Fatalf("Error getting object from bucket: %v\n", err)
 				}
 
-				if (submissionTime.After(lastExecutionTime)) && (submissionTime.Before(currentTime)) {
+				defer objHandle.Body.Close()
 
-					objHandle, err := ctx.Client.GetObject(ctx.Context, &s3.GetObjectInput{
-						Bucket: ctx.BucketName,
-						Key:    obj.Key,
-					})
+				objContents, err := io.ReadAll(objHandle.Body)
+				if err != nil {
+					log.Fatalf("Error getting creating reader for json: %v\n", err)
+				}
 
-					if err != nil {
-						log.Fatalf("Error getting object from bucket: %v\n", err)
-					}
+				err = json.Unmarshal(objContents, &submissionDataToday)
+				if err != nil {
+					log.Fatalf("Error unmarshaling bucket content: %v\n", err)
+				}
 
-					defer objHandle.Body.Close()
+				defer objHandle.Body.Close()
 
-					objContents, err := io.ReadAll(objHandle.Body)
-					if err != nil {
-						log.Fatalf("Error getting creating reader for json: %v\n", err)
-					}
+				objContents, err := io.ReadAll(objHandle.Body)
+				if err != nil {
+					log.Fatalf("Error getting creating reader for json: %v\n", err)
+				}
 
-					err = json.Unmarshal(objContents, &submissionDataToday)
-					if err != nil {
-						log.Fatalf("Error unmarshaling bucket content: %v\n", err)
-					}
+				err = json.Unmarshal(objContents, &submissionDataToday)
+				if err != nil {
+					log.Fatalf("Error unmarshaling bucket content: %v\n", err)
+				}
 
-					if submissionDataToday.GraphqlControlPort != 0 {
-						if (identity.publicKey == submissionDataToday.Submitter.String()) && (identity.publicIp == submissionDataToday.RemoteAddr) && (identity.graphQLPort == strconv.Itoa(submissionDataToday.GraphqlControlPort)) {
-							if lastSubmissionTimeString != "" {
-								lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
-								if err != nil {
-									log.Fatalf("Error parsing time: %v\n", err)
-								}
-							}
-
-							currentSubmissionTime, err := time.Parse(time.RFC3339, submissionDataToday.CreatedAt)
+				if submissionDataToday.GraphqlControlPort != 0 {
+					if (identity.publicKey == submissionDataToday.Submitter.String()) && (identity.publicIp == submissionDataToday.RemoteAddr) && (identity.graphQLPort == strconv.Itoa(submissionDataToday.GraphqlControlPort)) {
+						if lastSubmissionTimeString != "" {
+							lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
 							if err != nil {
 								log.Fatalf("Error parsing time: %v\n", err)
 							}
-
-							if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(time.Duration(syncPeriod-5) * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(time.Duration(syncPeriod+5) * time.Minute))) {
-								uptimeToday = append(uptimeToday, true)
-								lastSubmissionTimeString = submissionDataToday.CreatedAt
-							} else if lastSubmissionTimeString == "" {
-								uptimeToday = append(uptimeToday, true)
-								lastSubmissionTimeString = submissionDataToday.CreatedAt
-							}
-
 						}
-					} else {
-						if (identity.publicKey == submissionDataToday.Submitter.String()) && (identity.publicIp == submissionDataToday.RemoteAddr) {
-							if lastSubmissionTimeString != "" {
-								lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
-								if err != nil {
-									log.Fatalf("Error parsing time: %v\n", err)
-								}
-							}
 
-							currentSubmissionTime, err := time.Parse(time.RFC3339, submissionDataToday.CreatedAt)
+						currentSubmissionTime, err := time.Parse(time.RFC3339, submissionDataToday.CreatedAt)
+						if err != nil {
+							log.Fatalf("Error parsing time: %v\n", err)
+						}
+					}
+				} else {
+					if (identity.publicKey == submissionDataToday.Submitter.String()) && (identity.publicIp == submissionDataToday.RemoteAddr) {
+						if lastSubmissionTimeString != "" {
+							lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
 							if err != nil {
 								log.Fatalf("Error parsing time: %v\n", err)
 							}
+						}
 
-							if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(time.Duration(syncPeriod-5) * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(time.Duration(syncPeriod+5) * time.Minute))) {
-								uptimeToday = append(uptimeToday, true)
-								lastSubmissionTimeString = submissionDataToday.CreatedAt
-							} else if lastSubmissionTimeString == "" {
-								uptimeToday = append(uptimeToday, true)
-								lastSubmissionTimeString = submissionDataToday.CreatedAt
-							}
+						currentSubmissionTime, err := time.Parse(time.RFC3339, submissionDataToday.CreatedAt)
+						if err != nil {
+							log.Fatalf("Error parsing time: %v\n", err)
+						}
 
+						if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(time.Duration(syncPeriod-5) * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(time.Duration(syncPeriod+5) * time.Minute))) {
+							uptimeToday = append(uptimeToday, true)
+							lastSubmissionTimeString = submissionDataToday.CreatedAt
+						} else if lastSubmissionTimeString == "" {
+							uptimeToday = append(uptimeToday, true)
+							lastSubmissionTimeString = submissionDataToday.CreatedAt
 						}
 					}
 				}
 			}
-
-			uptimePercent := (float64(len(uptimeToday)+len(uptimeYesterday)) / float64(numberOfSubmissionsNeeded)) * 100
-			if uptimePercent > 100.00 {
-				uptimePercent = 100.00
-			}
-			identity["uptime"] = fmt.Sprintf("%.2f%%", uptimePercent)
 		}
 	}
+	uptimePercent := (float64(len(uptimeToday)+len(uptimeYesterday)) / float64(numberOfSubmissionsNeeded)) * 100
+	if uptimePercent > 100.00 {
+		uptimePercent = 100.00
+	}
+	identity["uptime"] = fmt.Sprintf("%.2f%%", uptimePercent)
+
 }
