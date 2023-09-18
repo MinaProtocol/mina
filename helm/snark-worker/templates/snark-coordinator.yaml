@@ -95,7 +95,7 @@ spec:
           "-external-ip", "$(DAEMON_POD_IP)",
           {{- end }}
           {{- if $.Values.itn.enable }}
-          "-itn-keys", {{ $.Values.itn.keys }},
+          "-itn-keys", "{{ join "," $.Values.itn.keys }}",
           "-itn-graphql-port", "$(MINA_ITN_GRAPHQL_PORT)",
           "-uptime-submitter-key", "/root/uptime-keys/key",
           "-uptime-url", "http://65.21.195.80:6000/v1/submit",
