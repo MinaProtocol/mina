@@ -45,35 +45,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Core.String.Map.find_exn (Network.block_producers network) "node-b"
     in
 
-    let online_monitor, online_monitor_subscription =
-      Wait_condition.monitor_online_nodes ~logger (event_router t)
-    in
-    (* The node that we send GraphQL requests to needs to stay online. *)
-    Wait_condition.require_online online_monitor node_b ;
-    (* The archive node needs to be online to run the final replayer test. *)
-    Core_kernel.Map.iter
-      ~f:(Wait_condition.require_online online_monitor)
-      (Network.archive_nodes network) ;
-
-    let%bind () =
-      section "delegate all mina currency from node_b to node_a"
-        (let delegation_receiver = node_a in
-         let%bind delegation_receiver_pub_key =
-           pub_key_of_node delegation_receiver
-         in
-         let delegation_sender = node_b in
-         let%bind delegation_sender_pub_key =
-           pub_key_of_node delegation_sender
-         in
-         let%bind { hash; _ } =
-           Integration_test_lib.Graphql_requests.must_send_delegation ~logger
-             (Network.Node.get_ingress_uri delegation_sender)
-             ~sender_pub_key:delegation_sender_pub_key
-             ~receiver_pub_key:delegation_receiver_pub_key ~fee
-         in
-         wait_for t
-           (Wait_condition.signed_command_to_be_included_in_frontier
-              ~txn_hash:hash ~node_included_in:`Any_node ) )
-    in
-    return (Event_router.cancel (event_router t) online_monitor_subscription ())
+    section "delegate all mina currency from node_b to node_a"
+      (let delegation_receiver = node_a in
+       let%bind delegation_receiver_pub_key =
+         pub_key_of_node delegation_receiver
+       in
+       let delegation_sender = node_b in
+       let%bind delegation_sender_pub_key = pub_key_of_node delegation_sender in
+       let%bind { hash; _ } =
+         Integration_test_lib.Graphql_requests.must_send_delegation ~logger
+           (Network.Node.get_ingress_uri delegation_sender)
+           ~sender_pub_key:delegation_sender_pub_key
+           ~receiver_pub_key:delegation_receiver_pub_key ~fee
+       in
+       wait_for t
+         (Wait_condition.signed_command_to_be_included_in_frontier
+            ~txn_hash:hash ~node_included_in:`Any_node ) )
 end

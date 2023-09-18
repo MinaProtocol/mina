@@ -86,16 +86,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
 
-    let online_monitor, online_monitor_subscription =
-      Wait_condition.monitor_online_nodes ~logger (event_router t)
-    in
-    (* The node that we send GraphQL requests to needs to stay online. *)
-    Map.iter ~f:(Wait_condition.require_online online_monitor) all_nodes ;
-    (* We need snark work for this test. *)
-    Core_kernel.Map.iter
-      ~f:(Wait_condition.require_online online_monitor)
-      (Network.snark_coordinators network) ;
-
     let untimed_node_a =
       Core.String.Map.find_exn
         (Network.block_producers network)
@@ -558,7 +548,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Currency.Balance.to_formatted_string key_2_balance_actual)
              (Currency.Amount.to_formatted_string new_snark_work_fee) )
     in
-    Event_router.cancel (event_router t) online_monitor_subscription () ;
     section_hard "running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger

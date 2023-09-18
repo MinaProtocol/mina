@@ -83,18 +83,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       |> Core.String.Map.data
     in
 
-    let online_monitor, online_monitor_subscription =
-      Wait_condition.monitor_online_nodes ~logger (event_router t)
-    in
-    (* The nodes that we send GraphQL requests to needs to stay online. *)
-    List.iter ~f:(Wait_condition.require_online online_monitor) empty_bps ;
-    (* The receiver needs to be online to synchronize to. *)
-    Wait_condition.require_online online_monitor receiver ;
-    (* We need snark work for this test. *)
-    Core_kernel.Map.iter
-      ~f:(Wait_condition.require_online online_monitor)
-      (Network.snark_coordinators network) ;
-
     let rec map_remove_keys map ~(keys : string list) =
       match keys with
       | [] ->
@@ -218,14 +206,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          (* First two slots might be delayed because of test's bootstrap, so we have 2 as a threshold *)
          ok_if_true "block production was delayed" (rcv_delay_rest <= 2) )
     in
-    let%bind () =
-      section "retrieve metrics of tx sender nodes"
-        (* We omit the result because we just want to query the txn sending nodes to see some useful
-            output in test logs *)
-        (Malleable_error.List.iter empty_bps
-           ~f:
-             (Fn.compose Malleable_error.soften_error
-                (Fn.compose Malleable_error.ignore_m get_metrics) ) )
-    in
-    return (Event_router.cancel (event_router t) online_monitor_subscription ())
+    section "retrieve metrics of tx sender nodes"
+      (* We omit the result because we just want to query the txn sending nodes to see some useful
+          output in test logs *)
+      (Malleable_error.List.iter empty_bps
+         ~f:
+           (Fn.compose Malleable_error.soften_error
+              (Fn.compose Malleable_error.ignore_m get_metrics) ) )
 end
