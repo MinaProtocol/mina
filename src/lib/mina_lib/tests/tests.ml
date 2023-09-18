@@ -100,7 +100,7 @@ let%test_module "Epoch ledger sync tests" =
         Network_pool.Transaction_pool.create ~config ~constraint_constants
           ~consensus_constants ~time_controller ~logger
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
-          ~log_gossip_heard:false
+          ~log_gossip_heard:false ~slot_tx_end:None
       in
       let snark_remote_sink =
         let config =
@@ -112,7 +112,7 @@ let%test_module "Epoch ledger sync tests" =
           Network_pool.Snark_pool.create ~config ~constraint_constants
             ~consensus_constants ~time_controller ~logger
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
-            ~log_gossip_heard:false
+            ~log_gossip_heard:false ~slot_tx_end:None
         in
         snark_remote_sink
       in
