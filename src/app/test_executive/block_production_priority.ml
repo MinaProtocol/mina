@@ -195,7 +195,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~f:Malleable_error.or_hard_error
     in
     let%bind () =
-      section "ensure \not\exists more than \epsilon block production delays of greater 60s from start slot where we should have produced"
+      section "ensure \\not\\exists more than \\epsilon block production delays of greater 60s from start slot where we should have produced"
         (let%bind { block_production_delay = block_production_delay_histogram_buckets_60s_min; _ } =
            get_metrics receiver
          in
