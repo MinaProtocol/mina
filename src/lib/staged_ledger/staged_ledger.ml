@@ -1,7 +1,7 @@
 [%%import "/src/config.mlh"]
 
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
+
 open Core_kernel
 open Async
 open Mina_base
@@ -2163,7 +2163,7 @@ let%test_module "staged ledger tests" =
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
 
-    let logger = Logger.null ()
+    let logger = Logger.create ()
 
     let `VK vk, `Prover zkapp_prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
@@ -4254,20 +4254,29 @@ let%test_module "staged ledger tests" =
         let open Quickcheck.Generator.Let_syntax in
         let%bind spec_keypair_and_slot = gen_spec_keypair_and_global_slot in
         let%map signed_commands_or_zkapps =
+        (*
+          return [false;true;false;true;true]
+        *)
           List.gen_with_length 5 Bool.quickcheck_generator
+
         in
 
         (spec_keypair_and_slot, signed_commands_or_zkapps |> List.to_array)
       in
       Async.Thread_safe.block_on_async_exn @@ fun () ->
-          Async.Quickcheck.async_test ~trials:2 gen
+          Async.Quickcheck.async_test ~trials:10 gen
             ~f:(fun
                  ( ({ init_ledger; _ }, new_kp, global_slot)
                  , signed_commands_or_zkapps )
                ->
               let open Transaction_snark.For_tests in
-              let fee = Fee.of_nanomina_int_exn 1_000_000 in
-              let amount = Amount.of_mina_int_exn 10 in
+              [%log info]
+                "signed commands or zkapps"
+                ~metadata:[
+                  ("signed_commands_or_zkapps", `List (List.map (Array.to_list signed_commands_or_zkapps) ~f:(fun b -> `Bool b)))
+                ] ;
+              let fee = Fee.of_nanomina_int_exn 2_000_000 in
+              let amount = Amount.of_mina_int_exn 2 in
               let mk_signed_command ~(fee_payer : Keypair.t)
                   ~(receiver : Keypair.t) ~(nonce : Account.Nonce.t) =
                 let body =
@@ -4344,7 +4353,7 @@ let%test_module "staged ledger tests" =
               in
               let fee_payer, _ = init_ledger.(0) in
               let receiver, _ = init_ledger.(1) in
-              let%map valid_command_1 =
+              let%bind valid_command_1 =
                 mk_user_command
                   ~signed_command_or_zkapp:signed_commands_or_zkapps.(0)
                   ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 0)
@@ -4368,8 +4377,15 @@ let%test_module "staged ledger tests" =
               let global_slot =
                 Mina_numbers.Global_slot_since_genesis.of_int global_slot
               in
-              let _current_state, current_state_view =
+              let current_state, current_state_view =
                 dummy_state_and_view ~global_slot ()
+              in
+              let _state_and_body_hash =
+                let state_hashes =
+                  Mina_state.Protocol_state.hashes current_state
+                in
+                ( state_hashes.state_hash
+                , state_hashes.state_body_hash |> Option.value_exn )
               in
               match
                 Sl.create_diff ~constraint_constants ~global_slot sl ~logger
@@ -4391,8 +4407,17 @@ let%test_module "staged ledger tests" =
                   let valid_commands = Staged_ledger_diff.With_valid_signatures_and_proofs.commands diff in
                   assert (
                     List.length valid_commands
-                    = 3 ) ;
-                  assert (List.length invalid_txns = 2) )
+                    =  3) ;
+                  assert (List.length invalid_txns = 2) ;
+                  Deferred.unit
+                  (*
+                  match%map Sl.apply ~constraint_constants ~global_slot sl (Staged_ledger_diff.forget diff) 
+                  ~logger ~verifier ~current_state_view ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase:false 
+              with 
+              | Ok _x -> () 
+              | Error e ->
+                [%log info] "Error %s" (Staged_ledger_error.to_string e) ; ()
+                 *) )
 
     let%test_unit "Mismatched verification keys in zkApp accounts and \
                    transactions" =
