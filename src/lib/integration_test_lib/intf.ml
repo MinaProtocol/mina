@@ -50,6 +50,11 @@ module Engine = struct
 
       val stop : t -> unit Malleable_error.t
 
+      (** Returns true when [start] was most recently called, or false if
+          [stop] was more recent.
+      *)
+      val should_be_running : t -> bool
+
       val get_ingress_uri : t -> Uri.t
 
       val dump_archive_data :
