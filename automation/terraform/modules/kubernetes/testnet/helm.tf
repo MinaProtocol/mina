@@ -26,7 +26,7 @@ resource "helm_release" "seeds" {
   name       = "${var.testnet_name}-seeds"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
-  version    = "1.0.10"
+  version    = "1.0.11"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.seed_vars)
@@ -47,7 +47,7 @@ resource "helm_release" "block_producers" {
   name       = "${var.testnet_name}-block-producers"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
-  version    = "1.0.9"
+  version    = "1.0.10"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.block_producer_vars)
@@ -65,7 +65,7 @@ resource "helm_release" "plain_nodes" {
   name       = "${var.testnet_name}-plain-node-${count.index + 1}"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/plain-node" : "plain-node"
-  version    = "1.0.5"
+  version    = "1.0.6"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.plain_node_vars[count.index])
@@ -83,7 +83,7 @@ resource "helm_release" "snark_workers" {
   name       = "${var.testnet_name}-snark-set-${count.index + 1}"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
-  version    = "1.0.7"
+  version    = "1.0.9"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.snark_vars[count.index])
@@ -102,7 +102,7 @@ resource "helm_release" "archive_node" {
   name       = "archive-${count.index + 1}"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
-  version    = "1.0.23"
+  version    = "1.1.7"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.archive_vars[count.index])
@@ -132,3 +132,47 @@ resource "helm_release" "watchdog" {
   depends_on = [helm_release.seeds]
 }
 
+# zkApps Dashboard
+
+resource "helm_release" "zkapps-dashboard" {
+  provider   = helm.testnet_deploy
+
+  name       = "zkapps-dashboard"
+  repository = var.use_local_charts ? "" : local.mina_helm_repo
+  chart      = var.use_local_charts ? "../../../../helm/zkapps-dashboard" : "zkapps-dashboard"
+  version    = "0.1.2"
+  namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+
+  set {
+    name  = "postgresql.primary.initdb.password"
+    value = var.zkapps_dashboard_key
+  }
+
+  set {
+    name  = "postgresql.auth.password"
+    value = var.zkapps_dashboard_key
+  }
+
+  wait       = false
+  timeout    = 600
+  depends_on = [helm_release.archive_node]
+}
+
+# itn orchestrator
+
+resource "helm_release" "itn-orchestrator" {
+  provider   = helm.testnet_deploy
+  count      = var.expose_itn_graphql ? 1 : 0
+
+  name       = "${var.testnet_name}-itn-orchestrator"
+  repository = var.use_local_charts ? "" : local.mina_helm_repo
+  chart      = var.use_local_charts ? "../../../../helm/itn-orchestrator" : "itn-orchestrator"
+  version    = "0.1.0"
+  namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+  values = [
+    yamlencode(local.itn_orchestrator_vars)
+  ]
+  wait       = false
+  timeout    = 600
+  depends_on = [helm_release.seeds]
+}

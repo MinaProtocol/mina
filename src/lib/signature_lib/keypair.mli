@@ -4,7 +4,7 @@ module Stable : sig
   module V1 : sig
     type t =
       { public_key : Public_key.Stable.V1.t
-      ; private_key : Private_key.Stable.V1.t [@sexp.opaque]
+      ; private_key : (Private_key.Stable.V1.t[@sexp.opaque])
       }
     [@@deriving sexp, bin_io, version, to_yojson]
   end

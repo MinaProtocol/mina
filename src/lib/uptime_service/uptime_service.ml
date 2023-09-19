@@ -3,21 +3,12 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_block
 open Pipe_lib
 open Signature_lib
 
 module Blake2 = Blake2.Make ()
 
 module Uptime_snark_worker = Uptime_snark_worker
-
-type block_data =
-  { block : string
-  ; created_at : string
-  ; peer_id : string
-  ; snark_work : string option [@default None]
-  }
-[@@deriving to_yojson]
 
 module Proof_data = struct
   (* NB: this type is unversioned, so the verifier on the backend
@@ -31,36 +22,12 @@ module Proof_data = struct
   [@@deriving bin_io_unversioned]
 end
 
-let sign_blake2_hash ~private_key s =
-  let module Field = Snark_params.Tick.Field in
-  let blake2 = Blake2.digest_string s in
-  let field_elements = [||] in
-  let bitstrings =
-    [| Blake2.to_raw_string blake2 |> Blake2.string_to_bits |> Array.to_list |]
-  in
-  let input : (Field.t, bool) Random_oracle.Input.t =
-    { field_elements; bitstrings }
-  in
-  Schnorr.sign private_key input
-
 let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     ~state_hash ~produced block_data =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
-  let block_data_json = block_data_to_yojson block_data in
-  let block_data_string = Yojson.Safe.to_string block_data_json in
-  let signature =
-    sign_blake2_hash ~private_key:submitter_keypair.private_key
-      block_data_string
-  in
-  let json =
-    (* JSON structure in issue #9110 *)
-    `Assoc
-      [ ("data", block_data_json)
-      ; ("signature", Signature.to_yojson signature)
-      ; ("submitter", Public_key.to_yojson submitter_keypair.public_key)
-      ]
-  in
+  let request = Payload.create_request block_data submitter_keypair in
+  let json = Payload.request_to_yojson request in
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
@@ -192,18 +159,16 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
 let block_base64_of_breadcrumb breadcrumb =
   let external_transition =
     breadcrumb |> Transition_frontier.Breadcrumb.block
-    |> External_transition.compose
   in
   let block_string =
-    Binable.to_string
-      (module External_transition.Raw.Stable.Latest)
-      external_transition
+    Binable.to_string (module Mina_block.Stable.Latest) external_transition
   in
   (* raises only on errors from invalid optional arguments *)
   Base64.encode_exn block_string
 
 let send_produced_block_at ~logger ~interruptor ~url ~peer_id
-    ~(submitter_keypair : Keypair.t) ~block_produced_bvar tm =
+    ~(submitter_keypair : Keypair.t) ~graphql_control_port ~block_produced_bvar
+    ~built_with_commit_sha tm =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
   let timeout_min = 3.0 in
@@ -224,10 +189,12 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
       let block_base64 = block_base64_of_breadcrumb breadcrumb in
       let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
       let block_data =
-        { block = block_base64
+        { Payload.block = block_base64
         ; created_at = Rfc3339_time.get_rfc3339_time ()
         ; peer_id
         ; snark_work = None
+        ; graphql_control_port
+        ; built_with_commit_sha
         }
       in
       send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
@@ -235,7 +202,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
 
 let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
     ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
-    ~snark_work_fee =
+    ~snark_work_fee ~graphql_control_port ~built_with_commit_sha =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
@@ -264,10 +231,12 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
            uptime service" ;
         let state_hash = Transition_frontier.Breadcrumb.state_hash best_tip in
         let block_data =
-          { block = block_base64
+          { Payload.block = block_base64
           ; created_at = Rfc3339_time.get_rfc3339_time ()
           ; peer_id
           ; snark_work = None
+          ; graphql_control_port
+          ; built_with_commit_sha
           }
         in
         send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
@@ -303,10 +272,12 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
               Transition_frontier.Breadcrumb.state_hash best_tip
             in
             let block_data =
-              { block = block_base64
+              { Payload.block = block_base64
               ; created_at = Rfc3339_time.get_rfc3339_time ()
               ; peer_id
               ; snark_work = None
+              ; graphql_control_port
+              ; built_with_commit_sha
               }
             in
             send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
@@ -329,9 +300,9 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
             match
               List.find transitions ~f:(fun transition ->
                   match transition with
-                  | Snark_work_lib.Work.Single.Spec.Transition
-                      ({ target; _ }, _, _) ->
-                      Marlin_plonk_bindings_pasta_fp.equal target
+                  | Snark_work_lib.Work.Single.Spec.Transition ({ target; _ }, _)
+                    ->
+                      Pasta_bindings.Fp.equal target.second_pass_ledger
                         (Staged_ledger_hash.ledger_hash staged_ledger_hash)
                   | Merge _ ->
                       (* unreachable *)
@@ -345,10 +316,12 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                   Transition_frontier.Breadcrumb.state_hash best_tip
                 in
                 let block_data =
-                  { block = block_base64
+                  { Payload.block = block_base64
                   ; created_at = Rfc3339_time.get_rfc3339_time ()
                   ; peer_id
                   ; snark_work = None
+                  ; graphql_control_port
+                  ; built_with_commit_sha
                   }
                 in
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
@@ -384,10 +357,12 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                       Transition_frontier.Breadcrumb.state_hash best_tip
                     in
                     let block_data =
-                      { block = block_base64
+                      { Payload.block = block_base64
                       ; created_at = Rfc3339_time.get_rfc3339_time ()
                       ; peer_id
                       ; snark_work = Some snark_work_base64
+                      ; graphql_control_port
+                      ; built_with_commit_sha
                       }
                     in
                     send_uptime_data ~logger ~interruptor ~submitter_keypair
@@ -395,7 +370,8 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
 
 let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
     ~time_controller ~block_produced_bvar ~uptime_submitter_keypair
-    ~get_next_producer_timing ~get_snark_work_fee ~get_peer =
+    ~get_next_producer_timing ~get_snark_work_fee ~get_peer
+    ~graphql_control_port ~built_with_commit_sha =
   match uptime_url with
   | None ->
       [%log info] "Not running uptime service, no URL given" ;
@@ -419,7 +395,8 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
       let four_slots_span = make_slots_span 4.0 in
       let wait_until_iteration_start block_tm =
         let now = Block_time.now time_controller in
-        if Block_time.( < ) now block_tm then at (Block_time.to_time block_tm)
+        if Block_time.( < ) now block_tm then
+          at (Block_time.to_time_exn block_tm)
         else (
           [%log warn]
             "In uptime service, current block time is past desired start of \
@@ -434,6 +411,8 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
           Deferred.create (fun ivar -> interrupt_ivar := ivar)
       in
       let run_iteration next_block_tm : Block_time.t Deferred.t =
+        O1trace.thread "uptime_service"
+        @@ fun () ->
         let get_next_producer_time_opt () =
           match get_next_producer_timing () with
           | None ->
@@ -452,14 +431,15 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                      uptime service" ;
                   None
               | Produce prod_tm | Produce_now prod_tm ->
-                  Some (Block_time.to_time prod_tm.time) )
+                  Some (Block_time.to_time_exn prod_tm.time) )
         in
         [%log trace]
           "Waiting for next 5-slot boundary to start work in uptime service"
           ~metadata:
             [ ("boundary_block_time", Block_time.to_yojson next_block_tm)
             ; ( "boundary_time"
-              , `String (Block_time.to_time next_block_tm |> Time.to_string) )
+              , `String (Block_time.to_time_exn next_block_tm |> Time.to_string)
+              )
             ] ;
         (* wait in Deferred monad *)
         let%bind () = wait_until_iteration_start next_block_tm in
@@ -484,7 +464,9 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                     "Uptime service will attempt to send the next produced \
                      block" ;
                   send_produced_block_at ~logger ~interruptor ~url ~peer_id
-                    ~submitter_keypair ~block_produced_bvar next_producer_time
+                    ~submitter_keypair ~graphql_control_port
+                    ~built_with_commit_sha ~block_produced_bvar
+                    next_producer_time
                 in
                 let send_block_and_snark_work () =
                   [%log info]
@@ -492,7 +474,8 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                   let snark_work_fee = get_snark_work_fee () in
                   send_block_and_transaction_snark ~logger ~interruptor ~url
                     ~snark_worker ~transition_frontier ~peer_id
-                    ~submitter_keypair ~snark_work_fee
+                    ~submitter_keypair ~snark_work_fee ~graphql_control_port
+                    ~built_with_commit_sha
                 in
                 match get_next_producer_time_opt () with
                 | None ->
@@ -505,7 +488,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                     *)
                     let four_slots_from_start =
                       Block_time.add next_block_tm four_slots_span
-                      |> Block_time.to_time
+                      |> Block_time.to_time_exn
                     in
                     if Time.( <= ) next_producer_time four_slots_from_start then
                       (* send a block w/ SNARK work, then the produced block *)

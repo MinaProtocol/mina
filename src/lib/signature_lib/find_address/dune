@@ -1,0 +1,16 @@
+(executable
+ (name find_address)
+ (libraries
+   ;; opam libraries
+   base
+   core_kernel
+   ;; local libraries
+   pickles.backend
+   pickles
+   kimchi_pasta
+   kimchi_backend.pasta.basic
+   kimchi_backend
+   signature_lib
+   snark_params)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))

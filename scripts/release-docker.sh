@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'mina-test-executive')
+VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -89,8 +89,16 @@ mina-test-executive)
   DOCKER_CONTEXT="dockerfiles/"
   VERSION="${VERSION}-${NETWORK##*=}"
   ;;
+mina-batch-txn)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-txn-burst"
+  DOCKER_CONTEXT="dockerfiles/"
+  VERSION="${VERSION}-${NETWORK##*=}"
+  ;;
 mina-rosetta)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-production"
+  ;;
+mina-zkapp-test-transaction)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
   ;;
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
@@ -104,6 +112,11 @@ delegation-backend-toolchain)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
   DOCKER_CONTEXT="src/app/delegation_backend"
   ;;
+itn-orchestrator)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-itn-orchestrator"
+  DOCKER_CONTEXT="src/app/itn_orchestrator"
+  ;;
+
 esac
 
 

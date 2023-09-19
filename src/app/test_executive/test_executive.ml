@@ -58,8 +58,16 @@ let tests : test list =
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
   ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
+  ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))
+  ; ("zkapps-timing", (module Zkapps_timing.Make : Intf.Test.Functor_intf))
+  ; ("zkapps-nonce", (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf))
+  ; ( "verification-key"
+    , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
   ; ( "block-prod-prio"
     , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
+  ; ("snarkyjs", (module Snarkyjs.Make : Intf.Test.Functor_intf))
+  ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
+  ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
@@ -129,62 +137,65 @@ let report_test_errors ~log_error_set ~internal_error_set =
         Print.eprintf "\n" )
   in
   (* check invariants *)
-  if List.length log_errors.from_current_context > 0 then
-    failwith "all error logs should be contextualized by node id" ;
-  (* report log errors *)
-  Print.eprintf "\n" ;
-  ( match log_errors_severity with
-  | `None ->
-      ()
-  | `Soft ->
-      report_log_errors "Warning"
-  | `Hard ->
-      report_log_errors "Error" ) ;
-  (* report contextualized internal errors *)
-  color_eprintf Bash_colors.magenta "=== Test Results ===\n" ;
-  Error_accumulator.iter_contexts internal_errors ~f:(fun context errors ->
-      print_category_header
-        (max_severity_of_list (List.map errors ~f:fst))
-        "%s" context ;
-      List.iter errors ~f:(fun (severity, { occurrence_time; error }) ->
+  match log_errors.from_current_context with
+  | _ :: _ ->
+      failwith "all error logs should be contextualized by node id"
+  | [] ->
+      (* report log errors *)
+      Print.eprintf "\n" ;
+      ( match log_errors_severity with
+      | `None ->
+          ()
+      | `Soft ->
+          report_log_errors "Warning"
+      | `Hard ->
+          report_log_errors "Error" ) ;
+      (* report contextualized internal errors *)
+      color_eprintf Bash_colors.magenta "=== Test Results ===\n" ;
+      Error_accumulator.iter_contexts internal_errors ~f:(fun context errors ->
+          print_category_header
+            (max_severity_of_list (List.map errors ~f:fst))
+            "%s" context ;
+          List.iter errors ~f:(fun (severity, { occurrence_time; error }) ->
+              color_eprintf
+                (color_of_severity severity)
+                "    [%s] %s\n"
+                (Time.to_string occurrence_time)
+                (Error.to_string_hum error) ) ) ;
+      (* report non-contextualized internal errors *)
+      List.iter internal_errors.from_current_context
+        ~f:(fun (severity, { occurrence_time; error }) ->
           color_eprintf
             (color_of_severity severity)
-            "    [%s] %s\n"
+            "[%s] %s\n"
             (Time.to_string occurrence_time)
-            (Error.to_string_hum error) ) ) ;
-  (* report non-contextualized internal errors *)
-  List.iter internal_errors.from_current_context
-    ~f:(fun (severity, { occurrence_time; error }) ->
-      color_eprintf
-        (color_of_severity severity)
-        "[%s] %s\n"
-        (Time.to_string occurrence_time)
-        (Error.to_string_hum error) ) ;
-  (* determine if test is passed/failed and exit accordingly *)
-  let test_failed =
-    match (log_errors_severity, internal_errors_severity) with
-    | _, `Hard | _, `Soft ->
-        true
-    (* TODO: re-enable log error checks after libp2p logs are cleaned up *)
-    | `Hard, _ | `Soft, _ | `None, `None ->
-        false
-  in
-  Print.eprintf "\n" ;
-  let exit_code =
-    if test_failed then (
-      color_eprintf Bash_colors.red
-        "The test has failed. See the above errors for details.\n\n" ;
-      match (internal_error_set.exit_code, log_error_set.exit_code) with
-      | None, None ->
-          Some 1
-      | Some exit_code, _ | None, Some exit_code ->
-          Some exit_code )
-    else (
-      color_eprintf Bash_colors.green "The test has completed successfully.\n\n" ;
-      None )
-  in
-  let%bind () = Writer.(flushed (Lazy.force stderr)) in
-  return exit_code
+            (Error.to_string_hum error) ) ;
+      (* determine if test is passed/failed and exit accordingly *)
+      let test_failed =
+        match (log_errors_severity, internal_errors_severity) with
+        | _, `Hard | _, `Soft ->
+            true
+        (* TODO: re-enable log error checks after libp2p logs are cleaned up *)
+        | `Hard, _ | `Soft, _ | `None, `None ->
+            false
+      in
+      Print.eprintf "\n" ;
+      let exit_code =
+        if test_failed then (
+          color_eprintf Bash_colors.red
+            "The test has failed. See the above errors for details.\n\n" ;
+          match (internal_error_set.exit_code, log_error_set.exit_code) with
+          | None, None ->
+              Some 1
+          | Some exit_code, _ | None, Some exit_code ->
+              Some exit_code )
+        else (
+          color_eprintf Bash_colors.green
+            "The test has completed successfully.\n\n" ;
+          None )
+      in
+      let%bind () = Writer.(flushed (Lazy.force stderr)) in
+      return exit_code
 
 (* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
 
@@ -364,6 +375,21 @@ let main inputs =
         in
         let non_seed_pods =
           network |> Engine.Network.all_non_seed_pods |> Core.String.Map.data
+        in
+        let _offline_node_event_subscription =
+          (* Monitor for offline nodes; abort the test if a node goes down
+             unexpectedly.
+          *)
+          Dsl.Event_router.on (Dsl.event_router dsl) Node_offline
+            ~f:(fun offline_node () ->
+              let node_name = Engine.Network.Node.app_id offline_node in
+              [%log info] "Detected node offline $node"
+                ~metadata:[ ("node", `String node_name) ] ;
+              if Engine.Network.Node.should_be_running offline_node then (
+                [%log fatal] "Offline $node is required for this test"
+                  ~metadata:[ ("node", `String node_name) ] ;
+                failwith "Aborted because of required offline node" ) ;
+              Async_kernel.Deferred.return `Continue )
         in
         (* TODO: parallelize (requires accumlative hard errors) *)
         let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in

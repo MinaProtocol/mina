@@ -4,7 +4,7 @@ open Signature_lib
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t =
+    type t = Mina_wire_types.Mina_base.Fee_with_prover.V1.t =
       { fee : Currency.Fee.Stable.V1.t
       ; prover : Public_key.Compressed.Stable.V1.t
       }

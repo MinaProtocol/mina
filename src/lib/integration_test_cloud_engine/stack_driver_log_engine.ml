@@ -233,7 +233,7 @@ module Subscription = struct
         ; subscription_id
         ; "--auto-ack"
         ; "--limit"
-        ; string_of_int 5
+        ; string_of_int 10
         ; "--format"
         ; "table(DATA)"
         ]
@@ -309,10 +309,12 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
     let%bind log_entries =
       Deferred.map (Subscription.pull ~logger subscription) ~f:Or_error.ok_exn
     in
-    if List.length log_entries > 0 then
-      [%log spam] "Parsing events from $n logs"
-        ~metadata:[ ("n", `Int (List.length log_entries)) ]
-    else [%log spam] "No logs were pulled" ;
+    ( match log_entries with
+    | [] ->
+        [%log spam] "No logs were pulled"
+    | log_entries ->
+        [%log spam] "Parsing events from $n logs"
+          ~metadata:[ ("n", `Int (List.length log_entries)) ] ) ;
     let%bind () =
       Deferred.List.iter ~how:`Sequential log_entries ~f:(fun log_entry ->
           ( match log_entry |> parse_event_from_log_entry ~logger ~network with
@@ -323,7 +325,7 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
                 ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
           Deferred.unit )
     in
-    let%bind () = after (Time.Span.of_ms 10000.0) in
+    let%bind () = after (Time.Span.of_ms 5000.0) in
     pull_subscription_in_background ~logger ~network ~event_writer ~subscription
     )
   else Deferred.unit
@@ -338,6 +340,7 @@ let create ~logger ~(network : Kubernetes_network.t) =
     in
     String.concat filters ~sep:"\n"
   in
+  [%log debug] "log_filter: %s" log_filter ;
   let%map subscription =
     Subscription.create_with_retry ~logger ~name:network.namespace
       ~filter:log_filter
