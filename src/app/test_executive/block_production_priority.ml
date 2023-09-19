@@ -208,15 +208,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~f:Malleable_error.or_hard_error
     in
     let%bind () =
-      section "check metrics of tx receiver node"
-        (let%bind { block_production_delay = rcv_delay; _ } =
+      section
+        "ensure \\not\\exists more than \\epsilon block production delays of \
+         greater 60s from start slot where we should have produced"
+        (let%bind { block_production_delay =
+                      block_production_delay_histogram_buckets_60s_min
+                  ; _
+                  } =
            get_metrics receiver
          in
-         let rcv_delay_rest =
-           List.fold ~init:0 ~f:( + ) @@ List.drop rcv_delay 1
+         let blocks_delayed_over_60s =
+           List.fold ~init:0 ~f:( + )
+           @@ List.drop block_production_delay_histogram_buckets_60s_min 1
          in
          (* First two slots might be delayed because of test's bootstrap, so we have 2 as a threshold *)
-         ok_if_true "block production was delayed" (rcv_delay_rest <= 2) )
+         ok_if_true "block production was delayed" (blocks_delayed_over_60s <= 2)
+        )
     in
     let%bind () =
       section "retrieve metrics of tx sender nodes"
