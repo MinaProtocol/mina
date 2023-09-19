@@ -9,6 +9,8 @@ open Currency
 open Pickles_types
 module Wire_types = Mina_wire_types.Transaction_snark
 
+let proof_cache = ref None
+
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S = Transaction_snark_intf.Full with type Stable.V2.t = A.V2.t
 end
@@ -3282,7 +3284,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     Pickles.Tag.t
 
   let system ~proof_level ~constraint_constants =
-    Pickles.compile () ~cache:Cache_dir.cache
+    Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N5)
@@ -4120,6 +4122,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       [@@deriving sexp]
     end
 
+    let set_proof_cache x = proof_cache := Some x
+
     let create_trivial_snapp ~constraint_constants () =
       let tag, _, (module P), Pickles.Provers.[ trivial_prover ] =
         let trivial_rule : _ Pickles.Inductive_rule.t =
@@ -4142,7 +4146,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
           }
         in
-        Pickles.compile () ~cache:Cache_dir.cache
+        Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
           ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
           ~branches:(module Nat.N1)
           ~max_proofs_verified:(module Nat.N0)
