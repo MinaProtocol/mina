@@ -49,7 +49,7 @@
    pasta_bindings
    ppx_version.runtime
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps

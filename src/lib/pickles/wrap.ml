@@ -2,10 +2,7 @@ module SC = Scalar_challenge
 module P = Proof
 open Pickles_types
 open Hlist
-open Tuple_lib
 open Common
-open Core_kernel
-open Async_kernel
 open Import
 open Types
 open Backend
@@ -13,8 +10,7 @@ open Backend
 (* This contains the "wrap" prover *)
 
 let challenge_polynomial =
-  let open Backend.Tick.Field in
-  Wrap_verifier.challenge_polynomial ~add ~mul ~one
+  Wrap_verifier.challenge_polynomial (module Backend.Tick.Field)
 
 module Type1 =
   Plonk_checks.Make
@@ -25,7 +21,7 @@ module Type1 =
       let index_terms = Plonk_checks.Scalars.Tick.index_terms
     end)
 
-let vector_of_list (type a t)
+let _vector_of_list (type a t)
     (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
     (xs : a list) : t =
   let r = V.create () in
@@ -88,9 +84,7 @@ type deferred_values_and_hints =
         , scalar_challenge_constant
         , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
         , (Tick.Field.t Shifted_value.Type1.t, bool) Opt.t
-        , ( scalar_challenge_constant Deferred_values.Plonk.In_circuit.Lookup.t
-          , bool )
-          Opt.t
+        , (scalar_challenge_constant, bool) Opt.t
         , bool )
         Deferred_values.Plonk.In_circuit.t
       , scalar_challenge_constant
@@ -209,8 +203,6 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
   let plonk =
     let module Field = struct
       include Tick.Field
-
-      type nonrec bool = bool
     end in
     Type1.derive_plonk
       (module Field)
@@ -257,7 +249,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
                   N1
               | S (S Z) ->
                   N2
-              | _ ->
+              | S _ ->
                   assert false )
           ; domain_log2 =
               Branch_data.Domain_log2.of_int_exn
@@ -269,13 +261,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
           ; alpha = plonk0.alpha
           ; beta = chal plonk0.beta
           ; gamma = chal plonk0.gamma
-          ; lookup =
-              Opt.map plonk.lookup ~f:(fun l ->
-                  { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                    .In_circuit
-                    .Lookup
-                    .joint_combiner = Option.value_exn plonk0.joint_combiner
-                  } )
+          ; joint_combiner = Opt.of_option plonk0.joint_combiner
           }
       }
   ; x_hat_evals = x_hat
@@ -309,13 +295,13 @@ let%test_module "gate finalization" =
       (* Set up a helper to convert actual feature flags composed of booleans into
          feature flags composed of Yes/No/Maybe options.
          @param actual_feature_flags The actual feature flags in terms of true/false
-         @param true_opt  Plonk_types.Opt type to use for true/enabled features
-         @param false_opt Plonk_types.Opt type to use for false/disabled features
+         @param true_opt  Opt type to use for true/enabled features
+         @param false_opt Opt type to use for false/disabled features
          @return Corresponding feature flags composed of Yes/No/Maybe values *)
       let compute_feature_flags
           (actual_feature_flags : Plonk_types.Features.flags)
-          (true_opt : Plonk_types.Opt.Flag.t)
-          (false_opt : Plonk_types.Opt.Flag.t) : Plonk_types.Features.options =
+          (true_opt : Opt.Flag.t) (false_opt : Opt.Flag.t) :
+          Plonk_types.Features.options =
         Plonk_types.Features.map actual_feature_flags ~f:(function
           | true ->
               true_opt
@@ -325,7 +311,7 @@ let%test_module "gate finalization" =
 
       (* Generate the 3 configurations of the actual feature flags using
          helper *)
-      let open Plonk_types.Opt.Flag in
+      let open Opt.Flag in
       { true_is_yes = compute_feature_flags actual_feature_flags Yes No
       ; true_is_maybe = compute_feature_flags actual_feature_flags Maybe No
       ; all_maybes = compute_feature_flags actual_feature_flags Maybe Maybe
@@ -389,6 +375,10 @@ let%test_module "gate finalization" =
           ~step_vk:vk ~public_input ~proof ~actual_proofs_verified:Nat.N0.n
       in
 
+      let full_features =
+        Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
+      in
+
       (* Define Typ.t for Deferred_values.t -- A Type.t defines how to convert a value of some type
                                               in OCaml into a var in circuit/Snarky.
 
@@ -400,9 +390,8 @@ let%test_module "gate finalization" =
         let open Step_verifier in
         Wrap.Proof_state.Deferred_values.In_circuit.typ
           (module Impls.Step)
-          ~feature_flags ~challenge:Challenge.typ
+          ~feature_flags:full_features ~challenge:Challenge.typ
           ~scalar_challenge:Challenge.typ
-          ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
           ~dummy_scalar_challenge:
             (Kimchi_backend_common.Scalar_challenge.create
                Limb_vector.Challenge.Constant.zero )
@@ -420,14 +409,15 @@ let%test_module "gate finalization" =
           { deferred_values with
             plonk =
               { deferred_values.plonk with
-                lookup = Opt.to_option_unsafe deferred_values.plonk.lookup
+                joint_combiner =
+                  Opt.to_option_unsafe deferred_values.plonk.joint_combiner
               }
           }
       (* Prepare all of the evaluations (i.e. all of the columns in the proof that we open)
          for use in the circuit *)
       and evals =
         constant
-          (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
+          (Plonk_types.All_evals.typ (module Impls.Step) full_features)
           { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
           ; ft_eval1 = proof.openings.ft_eval1
           }
@@ -455,7 +445,6 @@ let%test_module "gate finalization" =
             (* Call finalisation with all of the required details *)
             Step_verifier.finalize_other_proof
               (module Nat.N0)
-              ~feature_flags
               ~step_domains:
                 (`Known
                   [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ]
@@ -478,7 +467,7 @@ let%test_module "gate finalization" =
          * Pasta_bindings.Fp.t list
          * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
            , Pasta_bindings.Fp.t )
-           Kimchi_types.prover_proof
+           Kimchi_types.proof_with_public
 
     module type SETUP = sig
       val example : example
@@ -503,14 +492,14 @@ let%test_module "gate finalization" =
          snarky proof *)
       let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index
 
-      let proof = Backend.Tick.Proof.of_backend proof
+      let proof = Backend.Tick.Proof.of_backend_with_public_evals proof
 
       let test_feature_flags_configs =
         generate_test_feature_flag_configs S.actual_feature_flags
 
       let runtest feature_flags =
         run_recursive_proof_test S.actual_feature_flags feature_flags
-          public_input vk proof
+          public_input vk proof.proof
 
       let%test "true -> yes" = runtest test_feature_flags_configs.true_is_yes
 
@@ -541,7 +530,7 @@ let%test_module "gate finalization" =
       ( module Make (struct
         let example =
           public_input_1 (fun srs ->
-              Kimchi_bindings.Protocol.Proof.Fp.example_with_lookup srs true )
+              Kimchi_bindings.Protocol.Proof.Fp.example_with_lookup srs )
 
         let actual_feature_flags =
           { Plonk_types.Features.none_bool with
@@ -550,7 +539,8 @@ let%test_module "gate finalization" =
           }
       end) )
 
-    (*let%test_module "foreign field multiplication" =
+    (*
+    let%test_module "foreign field multiplication" =
       ( module Make (struct
         let example =
           no_public_input
@@ -563,7 +553,8 @@ let%test_module "gate finalization" =
           ; foreign_field_add = true
           ; foreign_field_mul = true
           }
-      end) )*)
+      end) )
+      *)
 
     let%test_module "range check" =
       ( module Make (struct
@@ -637,7 +628,7 @@ let wrap
       Req ) :
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
-    ~actual_wrap_domains ~step_plonk_indices ~feature_flags
+    ~actual_wrap_domains ~step_plonk_indices:_ ~feature_flags
     ~actual_feature_flags ?tweak_statement pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
@@ -767,10 +758,10 @@ let wrap
     | _ ->
         Snarky_backendless.Request.unhandled
   in
-  let module O = Tick.Oracles in
+
   let public_input =
     tick_public_input_of_statement ~max_proofs_verified
-      prev_statement_with_hashes ~feature_flags
+      prev_statement_with_hashes
   in
   let prev_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges
@@ -859,7 +850,7 @@ let wrap
     |> Wrap_hack.pad_accumulator
   in
   let%map.Promise next_proof =
-    let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
+    let (T (input, conv, _conv_inv)) = Impls.Wrap.input ~feature_flags () in
     Common.time "wrap proof" (fun () ->
         [%log internal] "Wrap_generate_witness_conv" ;
         Impls.Wrap.generate_witness_conv
@@ -887,16 +878,17 @@ let wrap
                   { next_statement.proof_state.deferred_values with
                     plonk =
                       { next_statement.proof_state.deferred_values.plonk with
-                        lookup =
-                          (* TODO: This assumes wrap circuits do not use lookup *)
-                          None
+                        joint_combiner =
+                          Opt.to_option
+                            next_statement.proof_state.deferred_values.plonk
+                              .joint_combiner
                       }
                   }
               }
           } )
   in
   [%log internal] "Pickles_wrap_proof_done" ;
-  ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof
+  ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof.proof
     ; statement =
         Types.Wrap.Statement.to_minimal next_statement
           ~to_option:Opt.to_option_unsafe

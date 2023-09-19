@@ -2,7 +2,7 @@
  (name rosetta_lib)
  (public_name rosetta_lib_nonconsensus)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;;opam libraries
    ppx_inline_test.config
