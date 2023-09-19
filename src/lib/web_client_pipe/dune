@@ -2,7 +2,7 @@
  (name web_client_pipe)
  (public_name web_client_pipe)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    core
