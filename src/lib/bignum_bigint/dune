@@ -2,7 +2,7 @@
  (name bignum_bigint)
  (public_name bignum_bigint)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    core_kernel
