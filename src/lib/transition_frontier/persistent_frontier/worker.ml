@@ -66,29 +66,14 @@ module Worker = struct
     match diff with
     | New_node (Lite transition) ->
         Database.add ~arcs_cache ~transition
-    | Root_transitioned
-        { new_root; garbage = Lite garbage; just_emitted_a_proof } ->
-        if just_emitted_a_proof then (
-          [%log' info t.logger] "Dequeued a snarked ledger" ;
-          Persistent_root.Instance.dequeue_snarked_ledger
-            t.persistent_root_instance ) ;
+    | Root_transitioned { new_root; garbage = Lite garbage; _ } ->
         Database.move_root ~old_root ~new_root ~garbage
     | Best_tip_changed best_tip_hash ->
         Database.set_best_tip best_tip_hash
 
-  (* result equivalent of Deferred.Or_error.List.fold *)
-  let rec deferred_result_list_fold ls ~init ~f =
-    let open Deferred.Result.Let_syntax in
-    match ls with
-    | [] ->
-        return init
-    | h :: t ->
-        let%bind init = f init h in
-        deferred_result_list_fold t ~init ~f
-
   let perform t input =
     let arcs_cache = State_hash.Table.create () in
-    O1trace.thread "persistent_frontier_write_to_disk" (fun () ->
+    O1trace.sync_thread "persistent_frontier_write_to_disk" (fun () ->
         [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
           (List.length input) ;
         (* OPTIMIZATION: Compress the best tip diffs and root transition diffs in order avoid unnecessary intermediate writes. *)
@@ -142,20 +127,25 @@ module Worker = struct
           List.map diffs_to_apply ~f:(fun (Diff.Lite.E.E diff) ->
               apply_diff ~old_root ~arcs_cache t diff )
         in
+        List.iter root_transition_diffs ~f:(fun { just_emitted_a_proof; _ } ->
+            if just_emitted_a_proof then (
+              [%log' info t.logger] "Dequeued a snarked ledger" ;
+              Persistent_root.Instance.dequeue_snarked_ledger
+                t.persistent_root_instance ) ) ;
         match apply_funcs with
         | Ok fs ->
             let%map () = Scheduler.yield () in
             Database.with_batch t.db ~f:(fun batch ->
                 List.iter fs ~f:(fun f -> f batch) )
-        (* TODO: log the diff that failed *)
         | Error (`Not_found (`Arcs h)) ->
-            [%log' warn t.logger]
-              "Did not add node to DB. Its $parent has already been thrown away"
-              ~metadata:[ ("parent", `String (State_hash.to_base58_check h)) ] ;
-            Deferred.unit
+            Deferred.return
+            @@ [%log' warn t.logger]
+                 "Did not add node to DB. Its $parent has already been thrown \
+                  away"
+                 ~metadata:
+                   [ ("parent", `String (State_hash.to_base58_check h)) ]
         | Error (`Not_found `Old_root_transition) ->
-            failwith
-              "Failed to apply a diff to the persistent transition frontier"
+            failwith "Old root transition not found"
         | Error (`Apply_diff _) ->
             failwith
               "Failed to apply a diff to the persistent transition frontier" )
