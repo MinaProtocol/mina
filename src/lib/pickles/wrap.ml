@@ -619,7 +619,7 @@ module Step_acc = Tock.Inner_curve.Affine
 (* The prover for wrapping a proof *)
 let wrap
     (type actual_proofs_verified max_proofs_verified
-    max_local_max_proofs_verifieds )
+    max_local_max_proofs_verifieds ) ~proof_cache
     ~(max_proofs_verified : max_proofs_verified Nat.t)
     (module Max_local_max_proof_verifieds : Hlist.Maxes.S
       with type ns = max_local_max_proofs_verifieds
@@ -856,9 +856,28 @@ let wrap
         Impls.Wrap.generate_witness_conv
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             [%log internal] "Backend_tock_proof_create_async" ;
-            let%map.Promise proof =
+            let create_proof () =
               Backend.Tock.Proof.create_async ~primary:public_inputs
                 ~auxiliary:auxiliary_inputs pk ~message:next_accumulator
+            in
+            let%map.Promise proof =
+              match proof_cache with
+              | None ->
+                  create_proof ()
+              | Some proof_cache -> (
+                  match
+                    Proof_cache.get_wrap_proof proof_cache ~keypair:pk
+                      ~public_input:public_inputs
+                  with
+                  | None ->
+                      let%map.Promise proof = create_proof () in
+                      Proof_cache.set_wrap_proof proof_cache ~keypair:pk
+                        ~public_input:public_inputs proof.proof ;
+                      proof
+                  | Some proof ->
+                      Promise.return
+                        ( { proof; public_evals = None }
+                          : Tock.Proof.with_public_evals ) )
             in
             [%log internal] "Backend_tock_proof_create_async_done" ;
             proof )

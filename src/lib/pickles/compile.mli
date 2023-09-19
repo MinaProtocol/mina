@@ -268,6 +268,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
 val compile_with_wrap_main_override_promise :
      ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
+  -> ?proof_cache:Proof_cache.t
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
        * Cache.Wrap.Key.Verification.t

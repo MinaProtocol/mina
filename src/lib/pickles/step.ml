@@ -39,7 +39,7 @@ struct
             *)
       max_local_max_proof_verifieds self_branches prev_vars prev_values
       local_widths local_heights prevs_length var value ret_var ret_value
-      auxiliary_var auxiliary_value ) ?handler
+      auxiliary_var auxiliary_value ) ?handler ~proof_cache
       (T branch_data :
         ( A.t
         , A_value.t
@@ -809,12 +809,31 @@ struct
                           ; public_inputs
                           } next_statement_hashed ->
                     [%log internal] "Backend_tick_proof_create_async" ;
-                    let%map.Promise proof =
+                    let create_proof () =
                       Backend.Tick.Proof.create_async ~primary:public_inputs
                         ~auxiliary:auxiliary_inputs
                         ~message:
                           (Lazy.force prev_challenge_polynomial_commitments)
                         pk
+                    in
+                    let%map.Promise proof =
+                      match proof_cache with
+                      | None ->
+                          create_proof ()
+                      | Some proof_cache -> (
+                          match
+                            Proof_cache.get_step_proof proof_cache ~keypair:pk
+                              ~public_input:public_inputs
+                          with
+                          | None ->
+                              let%map.Promise proof = create_proof () in
+                              Proof_cache.set_step_proof proof_cache ~keypair:pk
+                                ~public_input:public_inputs proof.proof ;
+                              proof
+                          | Some proof ->
+                              Promise.return
+                                ( { proof; public_evals = None }
+                                  : Tick.Proof.with_public_evals ) )
                     in
                     [%log internal] "Backend_tick_proof_create_async_done" ;
                     (proof, next_statement_hashed) )
