@@ -13,6 +13,12 @@ open Mina_base
    accounts always yield the same results. *)
 let%test_module "account timing check" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     open Mina_ledger.Ledger.For_tests
 
     let account_with_default_vesting_schedule ?(token = Token_id.default)
@@ -2443,4 +2449,8 @@ let%test_module "account timing check" =
                       , Pass_2 )
                     ledger
                     [ update_timing_zkapp_command ] ) ) )
+
+    (*let () =
+      Yojson.Safe.to_file "proof_cache.json.out"
+      @@ Pickles.Proof_cache.to_yojson proof_cache*)
   end )
