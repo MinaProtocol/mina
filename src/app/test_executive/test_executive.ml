@@ -385,6 +385,14 @@ let main inputs =
               [%log info] "Detected node offline $node"
                 ~metadata:[ ("node", `String node_name) ] ;
               if Engine.Network.Node.should_be_running offline_node then
+                (* This [don't_wait_for] isn't ideal, but at some point we will
+                   need a bind point anyway. In particular:
+                   * we have an async call in order to query the engine,
+                   * we don't want to tear down the network before this,
+                     because then we cant query the engine at all,
+                   and so this just becomes a bind point in the exception
+                   handler instead.
+                *)
                 Async.don't_wait_for
                   ( [%log fatal] "Offline $node is required for this test"
                       ~metadata:[ ("node", `String node_name) ] ;
