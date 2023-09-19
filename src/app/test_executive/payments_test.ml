@@ -34,7 +34,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
     ; block_producers =
         [ bp "untimed-node-a" (); bp "untimed-node-b" (); bp "timed-node-c" () ]
-    ; snark_coordinator = snark "snark-node" 4
+    ; snark_coordinator = snark "snark-node" ~account_name:"snark-node-key1" 4
     ; snark_worker_fee = "0.0002"
     ; archive_nodes = [ archive "archive-node" () ]
     ; proof_config =
