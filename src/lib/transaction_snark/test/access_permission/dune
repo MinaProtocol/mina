@@ -11,6 +11,8 @@
    ppx_inline_test.config
    sexplib0
    yojson
+   ppx_deriving_yojson.runtime
+   result
    ;; local libraries
    cache_dir
    currency
@@ -43,7 +45,7 @@
    zkapps_examples
    )
   (library_flags -linkall)
-  (inline_tests (flags -verbose -show-counts))
+  (inline_tests (flags -verbose -show-counts) (deps proof_cache.json))
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane ppx_sexp_conv))
   (instrumentation (backend bisect_ppx)))

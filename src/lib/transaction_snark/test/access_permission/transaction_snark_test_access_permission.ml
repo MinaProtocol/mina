@@ -10,6 +10,12 @@ module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
 let%test_module "Access permission tests" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let () = Backtrace.elide := false
 
     let sk = Private_key.create ()
@@ -221,4 +227,8 @@ let%test_module "Access permission tests" =
         (Proof vk_hash) Signature
 
     let%test_unit "Signature with Signature" = run_test Signature Signature
+
+    (*let () =
+      Yojson.Safe.to_file "proof_cache.json.out"
+      @@ Pickles.Proof_cache.to_yojson proof_cache*)
   end )
