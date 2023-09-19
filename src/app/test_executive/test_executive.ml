@@ -304,6 +304,14 @@ let main inputs =
       don't_wait_for
         (f_dispatch_cleanup ~exit_reason:"signal received"
            ~test_result:(Malleable_error.hard_error error) ) ) ;
+  let module Offline_exn = struct
+    exception Node_is_offline of string
+
+    exception Node_moved_id of string * string * string
+
+    exception
+      Node_offline_with_query_error of string * Malleable_error.Hard_fail.t
+  end in
   let%bind monitor_test_result =
     let on_fatal_error message =
       don't_wait_for
@@ -366,6 +374,39 @@ let main inputs =
         let non_seed_pods =
           network |> Engine.Network.all_non_seed_pods |> Core.String.Map.data
         in
+        let _offline_node_event_subscription =
+          (* Monitor for offline nodes; abort the test if a node goes down
+             unexpectedly.
+          *)
+          Dsl.Event_router.on (Dsl.event_router dsl) Node_offline
+            ~f:(fun offline_node () ->
+              let node_name = Engine.Network.Node.app_id offline_node in
+              [%log info] "Detected node offline $node"
+                ~metadata:[ ("node", `String node_name) ] ;
+              if Engine.Network.Node.should_be_running offline_node then
+                Async.don't_wait_for
+                  ( [%log fatal] "Offline $node is required for this test"
+                      ~metadata:[ ("node", `String node_name) ] ;
+                    let open Async.Deferred.Let_syntax in
+                    let prev_id = Engine.Network.Node.id offline_node in
+                    match%map
+                      Engine.Network.Node.get_id_nocache offline_node
+                    with
+                    | Ok
+                        { Malleable_error.Result_accumulator.computation_result =
+                            id
+                        ; _
+                        } ->
+                        if String.equal prev_id id then
+                          raise
+                            (Offline_exn.Node_moved_id (node_name, prev_id, id))
+                        else raise (Offline_exn.Node_is_offline node_name)
+                    | Error e ->
+                        raise
+                          (Offline_exn.Node_offline_with_query_error
+                             (node_name, e) ) ) ;
+              Async_kernel.Deferred.return `Continue )
+        in
         (* TODO: parallelize (requires accumlative hard errors) *)
         let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
         let%bind () =
@@ -386,9 +427,9 @@ let main inputs =
         (exit_reason, Deferred.return malleable_error)
     | Error exn -> (
         match Monitor.extract_exn exn with
-        | Dsl.Wait_condition.Required_node_moved_id (node_name, prev_id, id) ->
+        | Offline_exn.Node_moved_id (node_name, prev_id, id) ->
             [%log fatal]
-              "Required node $node changed ID from $old_id to $new_id"
+              "Node $node unexpectedly changed ID from $old_id to $new_id"
               ~metadata:
                 [ ("node", `String node_name)
                 ; ("old_id", `String prev_id)
@@ -396,16 +437,15 @@ let main inputs =
                 ] ;
             ( "node ID reassigned"
             , Malleable_error.hard_error ~exit_code:18 (Error.of_exn exn) )
-        | Dsl.Wait_condition.Required_node_is_offline node_name ->
-            [%log fatal] "Required node $node is offline"
+        | Offline_exn.Node_is_offline node_name ->
+            [%log fatal] "Node $node is offline unexpectedly"
               ~metadata:[ ("node", `String node_name) ] ;
             ( "node offline"
             , Malleable_error.hard_error ~exit_code:19 (Error.of_exn exn) )
-        | Dsl.Wait_condition.Required_node_offline_with_query_error
-            (node_name, hard_fail) ->
+        | Offline_exn.Node_offline_with_query_error (node_name, hard_fail) ->
             [%log fatal]
-              "Required node $node is offline, but could not determine whether \
-               its ID changed"
+              "Node $node is offline unexpectedly, but could not determine \
+               whether its ID changed"
               ~metadata:[ ("node", `String node_name) ] ;
             ( " node offline"
             , Deferred.return (Error { hard_fail with exit_code = Some 20 }) )

@@ -50,6 +50,11 @@ module Engine = struct
 
       val stop : t -> unit Malleable_error.t
 
+      (** Returns true when [start] was most recently called, or false if
+          [stop] was more recent.
+      *)
+      val should_be_running : t -> bool
+
       val get_ingress_uri : t -> Uri.t
 
       val dump_archive_data :
@@ -241,26 +246,6 @@ module Dsl = struct
 
     val ledger_proofs_emitted_since_genesis :
       test_config:Test_config.t -> num_proofs:int -> t
-
-    type online_nodes_monitor
-
-    exception Required_node_is_offline of string
-
-    exception Required_node_moved_id of string * string * string
-
-    exception
-      Required_node_offline_with_query_error of
-        string * Malleable_error.Hard_fail.t
-
-    val require_online : online_nodes_monitor -> Engine.Network.Node.t -> unit
-
-    val not_require_online :
-      online_nodes_monitor -> Engine.Network.Node.t -> unit
-
-    val monitor_online_nodes :
-         logger:Logger.t
-      -> Event_router.t
-      -> online_nodes_monitor * unit Event_router.event_subscription
   end
 
   module type S = sig

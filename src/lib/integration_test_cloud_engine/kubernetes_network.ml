@@ -39,11 +39,14 @@ module Node = struct
     ; pod_ids : string list
     ; pod_info : pod_info
     ; config : config
+    ; mutable should_be_running : bool
     }
 
   let id { pod_ids; _ } = List.hd_exn pod_ids
 
   let app_id { app_id; _ } = app_id
+
+  let should_be_running { should_be_running; _ } = should_be_running
 
   let network_keypair { pod_info = { network_keypair; _ }; _ } = network_keypair
 
@@ -104,6 +107,7 @@ module Node = struct
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
+    node.should_be_running <- true ;
     let%bind () =
       if fresh_state then
         run_in_container node ~cmd:[ "sh"; "-c"; "rm -rf .mina-config/*" ]
@@ -114,6 +118,7 @@ module Node = struct
 
   let stop node =
     let open Malleable_error.Let_syntax in
+    node.should_be_running <- false ;
     run_in_container ~exit_code:12 node ~cmd:[ "/stop.sh" ] >>| ignore
 
   let logger_infra_metadata node =
@@ -322,12 +327,16 @@ module Workload_to_deploy = struct
              ; "jsonpath={.spec.selector.matchLabels.app}"
              ] ) )
     in
-    let%map pod_ids = Node.get_pod_ids_helper ~cwd ~config app_id in
-    (* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
-    (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
-    (* TODO fix this^ and have a more elegant solution *)
-    let pod_info = t.pod_info in
-    { Node.app_id; pod_ids; pod_info; config }
+    let%bind pod_ids = Node.get_pod_ids_helper ~cwd ~config app_id in
+    if List.is_empty pod_ids then
+      Malleable_error.hard_error_format "no pods found for app %s" app_id
+    else
+      (* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
+      (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
+      (* TODO fix this^ and have a more elegant solution *)
+      let pod_info = t.pod_info in
+      return
+        { Node.app_id; pod_ids; pod_info; config; should_be_running = false }
 end
 
 type t =
@@ -412,7 +421,7 @@ let all_pod_ids t =
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
-  let max_polls = 40 (* 10 mins *) in
+  let max_polls = 1080 (* 6 hours *) in
   let all_pods_set = all_pod_ids network |> String.Set.of_list in
   let kube_get_pods () =
     Integration_test_lib.Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/"
@@ -439,6 +448,7 @@ let initialize_infra ~logger network =
   let rec poll n =
     [%log debug] "Checking kubernetes pod statuses, n=%d" n ;
     let is_successful_pod_status status = String.equal "Running" status in
+    let is_failed_pod_status status = String.equal "Failure" status in
     match%bind Deferred.bind ~f:Malleable_error.return (kube_get_pods ()) with
     | Ok str ->
         let pod_statuses = parse_pod_statuses str in
@@ -451,6 +461,11 @@ let initialize_infra ~logger network =
         let all_pods_are_present =
           List.for_all (String.Set.elements all_pods_set) ~f:(fun pod_id ->
               String.Map.mem pod_statuses pod_id )
+        in
+        let failed_pods =
+          List.filter_map (String.Map.to_alist pod_statuses)
+            ~f:(fun (pod_id, status) ->
+              Option.some_if (is_failed_pod_status status) pod_id )
         in
         let any_pods_are_not_running =
           (* there could be duplicate keys... *)
@@ -469,6 +484,15 @@ let initialize_infra ~logger network =
             (present_pods |> String.concat ~sep:"; ") ;
           Malleable_error.hard_error_string ~exit_code:5
             "Some pods were not found in namespace." )
+        else if not (List.is_empty failed_pods) then (
+          [%log fatal]
+            "At least one pod had an error while deploying. \n\
+             Expected pods: [%s].   \n\
+             Failed pos: [%s]."
+            (String.Set.elements all_pods_set |> String.concat ~sep:"; ")
+            (failed_pods |> String.concat ~sep:"; ") ;
+          Malleable_error.hard_error_string ~exit_code:14
+            "Some pods failed to deploy." )
         else if any_pods_are_not_running then
           let failed_pod_statuses =
             List.filter (String.Map.to_alist pod_statuses)
