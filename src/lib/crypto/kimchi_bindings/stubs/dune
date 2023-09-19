@@ -96,7 +96,7 @@
  (modules kimchi_types)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test)))
 
@@ -107,7 +107,7 @@
  (libraries kimchi_types pasta_bindings.backend)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test)))
 
@@ -118,7 +118,7 @@
  (libraries pasta_bindings kimchi_types)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test)))
 
@@ -130,7 +130,7 @@
  (c_library_flags :standard "-lpthread")
  (instrumentation
   (backend bisect_ppx))
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test))
  (implements pasta_bindings.backend))

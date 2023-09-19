@@ -2,7 +2,7 @@
  (name currency)
  (public_name currency_nonconsensus)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;;opam libraries
    result
