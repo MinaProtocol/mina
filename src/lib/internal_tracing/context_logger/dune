@@ -2,7 +2,7 @@
  (name internal_tracing_context_logger)
  (public_name internal_tracing.context_logger)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
   base.base_internalhash_types

@@ -51,7 +51,7 @@
    block_time
    )
   (library_flags -linkall)
-  (inline_tests)
+  (inline_tests (flags -verbose -show-counts))
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane ppx_sexp_conv))
   (instrumentation (backend bisect_ppx)))
