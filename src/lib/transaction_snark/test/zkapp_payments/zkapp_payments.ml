@@ -296,7 +296,7 @@ let%test_module "Zkapp payments tests" =
                       (Transaction_status.Failure.Overflow, Pass_2)
                     ledger [ zkapp_command ] ) ) )
 
-    let () =
+    (*let () =
       Yojson.Safe.to_file "proof_cache.json.out"
-      @@ Pickles.Proof_cache.to_yojson proof_cache
+      @@ Pickles.Proof_cache.to_yojson proof_cache*)
   end )
