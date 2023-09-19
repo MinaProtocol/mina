@@ -4254,10 +4254,7 @@ let%test_module "staged ledger tests" =
         let open Quickcheck.Generator.Let_syntax in
         let%bind spec_keypair_and_slot = gen_spec_keypair_and_global_slot in
         let%map signed_commands_or_zkapps =
-          (*
-          return [false;true;false;true;true]
-        *)
-          List.gen_with_length 5 Bool.quickcheck_generator
+          List.gen_with_length 6 Bool.quickcheck_generator
         in
 
         (spec_keypair_and_slot, signed_commands_or_zkapps |> List.to_array)
@@ -4277,10 +4274,10 @@ let%test_module "staged ledger tests" =
                     (List.map (Array.to_list signed_commands_or_zkapps)
                        ~f:(fun b -> `Bool b) ) )
               ] ;
-          let fee = Fee.of_nanomina_int_exn 2_000_000 in
-          let amount = Amount.of_mina_int_exn 2 in
+          let default_fee = Fee.of_nanomina_int_exn 2_000_000 in
+          let default_amount = Amount.of_mina_int_exn 1 in
           let mk_signed_command ~(fee_payer : Keypair.t) ~(receiver : Keypair.t)
-              ~(nonce : Account.Nonce.t) =
+              ?(amount = default_amount) ~(nonce : Account.Nonce.t) () =
             let body =
               Signed_command_payload.Body.Payment
                 Payment_payload.Poly.
@@ -4289,7 +4286,7 @@ let%test_module "staged ledger tests" =
                   }
             in
             let payload =
-              Signed_command.Payload.create ~fee
+              Signed_command.Payload.create ~fee:default_fee
                 ~fee_payer_pk:Public_key.(compress fee_payer.public_key)
                 ~nonce ~memo:Signed_command_memo.dummy ~valid_until:None ~body
             in
@@ -4305,14 +4302,14 @@ let%test_module "staged ledger tests" =
           Transaction_snark.For_tests.create_trivial_zkapp_account
             ~permissions:Permissions.user_default ~vk ~ledger zkapp_pk ;
           let sl = Sl.create_exn ~constraint_constants ~ledger in
-          let mk_zkapp_command ~(fee_payer : Keypair.t)
-              ~(nonce : Account.Nonce.t) =
+          let mk_zkapp_command ~(fee_payer : Keypair.t) ?(fee = default_fee)
+              ~(nonce : Account.Nonce.t) () =
             let spec : Update_states_spec.t =
               { sender = (new_kp, Account.Nonce.zero)
               ; fee
               ; fee_payer = Some (fee_payer, nonce)
               ; receivers = []
-              ; amount
+              ; amount = default_amount
               ; zkapp_account_keypairs = [ new_kp ]
               ; memo = Signed_command_memo.dummy
               ; new_zkapp_account = false
@@ -4344,35 +4341,44 @@ let%test_module "staged ledger tests" =
             User_command.Zkapp_command valid_zkapp_command
           in
           let mk_user_command ~signed_command_or_zkapp ~fee_payer ~receiver
-              ~nonce =
+              ?amount ~nonce () =
             match signed_command_or_zkapp with
             | true ->
-                return @@ mk_signed_command ~fee_payer ~receiver ~nonce
+                return
+                @@ mk_signed_command ~fee_payer ~receiver ?amount ~nonce ()
             | false ->
-                mk_zkapp_command ~fee_payer ~nonce
+                mk_zkapp_command ~fee_payer
+                  ?fee:
+                    (Option.map amount ~f:(fun amount -> Amount.to_fee amount))
+                  ~nonce ()
           in
           let fee_payer, _ = init_ledger.(0) in
           let receiver, _ = init_ledger.(1) in
           let%bind valid_command_1 =
             mk_user_command
               ~signed_command_or_zkapp:signed_commands_or_zkapps.(0)
-              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 0)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 0) ()
           and valid_command_2 =
             mk_user_command
               ~signed_command_or_zkapp:signed_commands_or_zkapps.(1)
-              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 1)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 1) ()
           and invalid_command_3 =
             mk_user_command
               ~signed_command_or_zkapp:signed_commands_or_zkapps.(2)
-              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 99)
-          and valid_command_4 =
+              ~fee_payer ~receiver ~amount:Amount.max_int
+              ~nonce:(Account.Nonce.of_int 2) ()
+          and invalid_command_4 =
             mk_user_command
               ~signed_command_or_zkapp:signed_commands_or_zkapps.(3)
-              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 2)
-          and invalid_command_5 =
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 3) ()
+          and valid_command_5 =
             mk_user_command
               ~signed_command_or_zkapp:signed_commands_or_zkapps.(4)
-              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 98)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 2) ()
+          and invalid_command_6 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(5)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 4) ()
           in
           let global_slot =
             Mina_numbers.Global_slot_since_genesis.of_int global_slot
@@ -4393,8 +4399,9 @@ let%test_module "staged ledger tests" =
                    [ valid_command_1
                    ; valid_command_2
                    ; invalid_command_3
-                   ; valid_command_4
-                   ; invalid_command_5
+                   ; invalid_command_4
+                   ; valid_command_5
+                   ; invalid_command_6
                    ] )
               ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
               ~coinbase_receiver ~supercharge_coinbase:false
@@ -4410,16 +4417,13 @@ let%test_module "staged ledger tests" =
               in
               assert (
                 List.equal User_command.equal valid_commands
-                  ( [ valid_command_1; valid_command_2; valid_command_4 ]
+                  ( [ valid_command_1; valid_command_2; valid_command_5 ]
                   |> List.map ~f:(fun cmd -> User_command.forget_check cmd) ) ) ;
               let invalid_commands =
                 List.map invalid_txns ~f:(fun (cmd, _) ->
                     User_command.forget_check cmd )
               in
-              assert (
-                List.equal User_command.equal invalid_commands
-                  ( [ invalid_command_3; invalid_command_5 ]
-                  |> List.map ~f:(fun cmd -> User_command.forget_check cmd) ) ) ;
+              assert (List.length invalid_commands = 3) ;
 
               match%map
                 Sl.apply ~constraint_constants ~global_slot sl
