@@ -4256,7 +4256,6 @@ let%test_module "staged ledger tests" =
         let%map signed_commands_or_zkapps =
           List.gen_with_length 6 Bool.quickcheck_generator
         in
-
         (spec_keypair_and_slot, signed_commands_or_zkapps |> List.to_array)
       in
       Async.Thread_safe.block_on_async_exn
@@ -4267,6 +4266,16 @@ let%test_module "staged ledger tests" =
              , signed_commands_or_zkapps )
            ->
           let open Transaction_snark.For_tests in
+          let zkapp_pk = Public_key.compress new_kp.public_key in
+          let ledger =
+            Ledger.create ~depth:constraint_constants.ledger_depth ()
+          in
+          Mina_transaction_logic.For_tests.Init_ledger.init
+            (module Ledger.Ledger_inner)
+            init_ledger ledger ;
+          Transaction_snark.For_tests.create_trivial_zkapp_account
+            ~permissions:Permissions.user_default ~vk ~ledger zkapp_pk ;
+          let sl = Sl.create_exn ~constraint_constants ~ledger in
           [%log info] "signed commands or zkapps"
             ~metadata:
               [ ( "signed_commands_or_zkapps"
@@ -4292,16 +4301,6 @@ let%test_module "staged ledger tests" =
             in
             User_command.Signed_command (Signed_command.sign fee_payer payload)
           in
-          let zkapp_pk = Public_key.compress new_kp.public_key in
-          let ledger =
-            Ledger.create ~depth:constraint_constants.ledger_depth ()
-          in
-          Mina_transaction_logic.For_tests.Init_ledger.init
-            (module Ledger.Ledger_inner)
-            init_ledger ledger ;
-          Transaction_snark.For_tests.create_trivial_zkapp_account
-            ~permissions:Permissions.user_default ~vk ~ledger zkapp_pk ;
-          let sl = Sl.create_exn ~constraint_constants ~ledger in
           let mk_zkapp_command ~(fee_payer : Keypair.t) ?(fee = default_fee)
               ~(nonce : Account.Nonce.t) () =
             let spec : Update_states_spec.t =
