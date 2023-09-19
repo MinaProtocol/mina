@@ -37,14 +37,14 @@ let zkapp_command_with_ledger ?ledger_init_state ?num_keypairs
     Option.value num_keypairs
       ~default:((max_account_updates * 2) + (max_token_updates * 3) + 2)
   in
-  let existing_keypairs =
-    ref
-    @@ Option.value_map ledger_init_state ~default:Keypair.Set.empty
-         ~f:(fun l ->
-           Array.map l ~f:(fun (kp, _balance, _nonce, _timing) -> kp)
-           |> Keypair.Set.of_array )
-  in
-  let keypairs =
+  let new_keypairs =
+    let existing_keypairs =
+      ref
+      @@ Option.value_map ledger_init_state ~default:Keypair.Set.empty
+           ~f:(fun l ->
+             Array.map l ~f:(fun (kp, _balance, _nonce, _timing) -> kp)
+             |> Keypair.Set.of_array )
+    in    
     List.init num_keypairs ~f:(fun _ ->
         let keypair = ref (Keypair.create ()) in
         while Set.mem !existing_keypairs !keypair do
@@ -54,13 +54,13 @@ let zkapp_command_with_ledger ?ledger_init_state ?num_keypairs
         !keypair )
   in
   let keymap =
-    List.fold keypairs ~init:Public_key.Compressed.Map.empty
+    List.fold new_keypairs ~init:Public_key.Compressed.Map.empty
       ~f:(fun map { public_key; private_key } ->
         let key = Public_key.compress public_key in
         Public_key.Compressed.Map.add_exn map ~key ~data:private_key )
   in
   let num_keypairs_in_ledger = num_keypairs / 2 in
-  let keypairs_in_ledger = List.take keypairs num_keypairs_in_ledger in
+  let keypairs_in_ledger = List.take new_keypairs num_keypairs_in_ledger in
   let account_ids =
     List.map keypairs_in_ledger ~f:(fun { public_key; _ } ->
         Account_id.create (Public_key.compress public_key) Token_id.default )
