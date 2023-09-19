@@ -756,12 +756,17 @@ let setup_daemon logger =
             | Ok (precomputed_values, _) ->
                 precomputed_values
             | Error err ->
+                let json_config, accounts_omitted =
+                  Runtime_config.to_yojson_without_accounts config
+                in
+                let f i = List.cons ("accounts_omitted", `Int i) in
                 [%log fatal]
                   "Failed initializing with configuration $config: $error"
                   ~metadata:
-                    [ ("config", Runtime_config.to_yojson config)
-                    ; ("error", Error_json.error_to_yojson err)
-                    ] ;
+                    (Option.value_map ~f ~default:Fn.id accounts_omitted
+                       [ ("config", json_config)
+                       ; ("error", Error_json.error_to_yojson err)
+                       ] ) ;
                 Error.raise err
           in
           let rev_daemon_configs =
@@ -1031,11 +1036,15 @@ let setup_daemon logger =
             ~f:(fun (span, context) ->
               let secs = Time_ns.Span.to_sec span in
               let monitor_infos = get_monitor_infos context.monitor in
+              let o1trace = o1trace context in
+              [%log internal] "Long_async_cycle"
+                ~metadata:
+                  [ ("duration", `Float secs); ("trace", `List o1trace) ] ;
               [%log debug]
                 ~metadata:
                   [ ("long_async_cycle", `Float secs)
                   ; ("monitors", `List monitor_infos)
-                  ; ("o1trace", `List (o1trace context))
+                  ; ("o1trace", `List o1trace)
                   ]
                 "Long async cycle, $long_async_cycle seconds, $monitors, \
                  $o1trace" ;
@@ -1046,11 +1055,15 @@ let setup_daemon logger =
             ~f:(fun (context, span) ->
               let secs = Time_ns.Span.to_sec span in
               let monitor_infos = get_monitor_infos context.monitor in
+              let o1trace = o1trace context in
+              [%log internal] "Long_async_job"
+                ~metadata:
+                  [ ("duration", `Float secs); ("trace", `List o1trace) ] ;
               [%log debug]
                 ~metadata:
                   [ ("long_async_job", `Float secs)
                   ; ("monitors", `List monitor_infos)
-                  ; ("o1trace", `List (o1trace context))
+                  ; ("o1trace", `List o1trace)
                   ; ( "most_recent_2_backtrace"
                     , `String
                         (String.concat ~sep:"␤"
