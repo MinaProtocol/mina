@@ -1,5 +1,7 @@
 open Core_kernel
 
+[@@@warning "-4-27"]
+
 module Yojson_map = Map.Make (struct
   type t =
     [ `Null
@@ -14,6 +16,8 @@ module Yojson_map = Map.Make (struct
     | `Variant of string * t option ]
   [@@deriving compare, sexp]
 end)
+
+[@@@warning "+4+27"]
 
 type t = Yojson.Safe.t Yojson_map.t Yojson_map.t ref
 
@@ -136,6 +140,12 @@ module Json = struct
     ; mul_comm : 'poly_comm
     ; emul_comm : 'poly_comm
     ; endomul_scalar_comm : 'poly_comm
+    ; xor_comm : 'poly_comm option [@default None]
+    ; range_check0_comm : 'poly_comm option [@default None]
+    ; range_check1_comm : 'poly_comm option [@default None]
+    ; foreign_field_add_comm : 'poly_comm option [@default None]
+    ; foreign_field_mul_comm : 'poly_comm option [@default None]
+    ; rot_comm : 'poly_comm option [@default None]
     }
   [@@deriving to_yojson]
 
@@ -215,7 +225,6 @@ let set_proof t ~verification_key ~public_input proof =
           Map.set for_vk ~key:public_input ~data:proof )
 
 let set_step_proof t ~keypair ~public_input proof =
-  let open Option.Let_syntax in
   let public_input =
     let len = Kimchi_bindings.FieldVectors.Fp.length public_input in
     Array.init len ~f:(fun i ->
@@ -229,7 +238,6 @@ let set_step_proof t ~keypair ~public_input proof =
   set_proof t ~verification_key ~public_input proof_json
 
 let set_wrap_proof t ~keypair ~public_input proof =
-  let open Option.Let_syntax in
   let public_input =
     let len = Kimchi_bindings.FieldVectors.Fq.length public_input in
     Array.init len ~f:(fun i ->

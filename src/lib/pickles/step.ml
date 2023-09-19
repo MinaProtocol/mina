@@ -828,10 +828,12 @@ struct
                           | None ->
                               let%map.Promise proof = create_proof () in
                               Proof_cache.set_step_proof proof_cache ~keypair:pk
-                                ~public_input:public_inputs proof ;
+                                ~public_input:public_inputs proof.proof ;
                               proof
                           | Some proof ->
-                              Promise.return proof )
+                              Promise.return
+                                ( { proof; public_evals = None }
+                                  : Tick.Proof.with_public_evals ) )
                     in
                     [%log internal] "Backend_tick_proof_create_async_done" ;
                     (proof, next_statement_hashed) )
