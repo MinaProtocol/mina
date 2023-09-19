@@ -11,6 +11,9 @@ let Pipeline = ./Pipeline/Dsl.dhall
 let Size = ./Command/Size.dhall
 let triggerCommand = ./Pipeline/TriggerCommand.dhall
 
+let mode = env:BUILDKITE_PIPELINE_MODE as Text ? "PullRequest"
+let stage = env:BUILDKITE_PIPELINE_STAGE as Text ? "Test"
+
 let config : Pipeline.Config.Type = Pipeline.Config::{
   spec = JobSpec::{
     name = "prepare",
@@ -20,12 +23,13 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
   steps = [
     Command.build Command.Config::{
       commands = [
-        Cmd.run "export BUILDKITE_PIPELINE_MODE=${env:BUILDKITE_PIPELINE_MODE as Text ? "PullRequest"}",
+        Cmd.run "export BUILDKITE_PIPELINE_MODE=${mode}",
+        Cmd.run "export BUILDKITE_PIPELINE_STAGE=${stage}",
         Cmd.run "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall",
         triggerCommand "src/Monorepo.dhall"
       ],
       label = "Prepare monorepo triage",
-      key = "monorepo",
+      key = "monorepo-${stage}",
       target = Size.Small,
       docker = Some Docker::{
         image = (./Constants/ContainerImages.dhall).toolchainBase,
