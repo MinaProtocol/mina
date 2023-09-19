@@ -648,7 +648,6 @@ let setup_daemon logger =
                   ] ;
               make_version ()
         in
-        Memory_stats.log_memory_stats logger ~process:"daemon" ;
         Parallel.init_master () ;
         let monitor = Async.Monitor.create ~name:"coda" () in
         let time_controller =
