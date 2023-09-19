@@ -358,13 +358,15 @@ let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
     ~catchup_mode () =
   let open Context in
-  let max_length =
-    global_max_length (Precomputed_values.genesis_constants precomputed_values)
-  in
-  load_with_max_length
-    ~context:(module Context)
-    ~max_length ~retry_with_fresh_db ~verifier ~consensus_local_state
-    ~persistent_root ~persistent_frontier ~catchup_mode ()
+  O1trace.thread "transition_frontier_load" (fun () ->
+      let max_length =
+        global_max_length
+          (Precomputed_values.genesis_constants precomputed_values)
+      in
+      load_with_max_length
+        ~context:(module Context)
+        ~max_length ~retry_with_fresh_db ~verifier ~consensus_local_state
+        ~persistent_root ~persistent_frontier ~catchup_mode () )
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)

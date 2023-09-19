@@ -4,6 +4,8 @@ module "kubernetes_testnet" {
 
   use_local_charts    = true
   expose_graphql      = var.deploy_graphql_ingress
+  expose_itn_graphql  = var.expose_itn_graphql
+  itn_keys            = var.itn_keys
   healthcheck_enabled = false
   deploy_watchdog     = false
 
@@ -12,7 +14,8 @@ module "kubernetes_testnet" {
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
   priority_class = kubernetes_priority_class.testnet_priority_class.metadata[0].name
-
+  
+  itn_orchestrator_image        = var.itn_orchestrator_image
   mina_image                    = var.mina_image
   use_custom_entrypoint         = true
   custom_entrypoint             = "/mina_daemon_puppeteer.py"

@@ -2,7 +2,7 @@
  (name hash_prefix_states)
  (public_name hash_prefix_states_nonconsensus)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;;opam libraries
    core_kernel

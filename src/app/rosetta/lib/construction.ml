@@ -615,8 +615,7 @@ module Parse = struct
     module T (M : Monad_fail.S) = struct
       type t =
         { verify_payment_signature :
-               network_identifier:Rosetta_models.Network_identifier.t
-            -> payment:Transaction.Unsigned.Rendered.Payment.t
+               payment:Transaction.Unsigned.Rendered.Payment.t
             -> signature:Mina_base.Signature.t
             -> unit
             -> (bool, Errors.t) M.t
@@ -629,7 +628,7 @@ module Parse = struct
 
     let real : Real.t =
       { verify_payment_signature =
-          (fun ~network_identifier ~payment ~signature () ->
+          (fun ~payment ~signature () ->
             let open Deferred.Result in
             let open Deferred.Result.Let_syntax in
             let parse_pk ~which s =
@@ -675,18 +674,8 @@ module Parse = struct
               Signed_command_payload.create ~fee ~fee_payer_pk ~nonce
                 ~valid_until ~memo ~body
             in
-            (* choose signature verification based on network *)
-            let signature_kind : Mina_signature_kind.t =
-              if String.equal network_identifier.network "mainnet" then
-                Mainnet
-              else if String.equal network_identifier.network "testnet" then
-                Testnet
-              else
-                Other_network network_identifier.network
-            in
             Option.is_some @@
-              Signed_command.create_with_signature_checked ~signature_kind
-                signature signer payload )
+              Signed_command.create_with_signature_checked signature signer payload )
       ; lift = Deferred.return
       }
   end
@@ -730,8 +719,7 @@ module Parse = struct
               | Some payment ->
                   (* Only perform signature validation on payments. *)
                   let%bind res =
-                    env.verify_payment_signature
-                      ~network_identifier:req.network_identifier ~payment
+                    env.verify_payment_signature ~payment
                       ~signature:signed_transaction.signature ()
                   in
                   if res then M.return ()

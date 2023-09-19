@@ -49,11 +49,18 @@ module Engine = struct
 
       val id : t -> string
 
+      val app_id : t -> string
+
       val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t
 
       val stop : t -> unit Malleable_error.t
+
+      (** Returns true when [start] was most recently called, or false if
+          [stop] was more recent.
+      *)
+      val should_be_running : t -> bool
 
       val get_ingress_uri : t -> Uri.t
 
