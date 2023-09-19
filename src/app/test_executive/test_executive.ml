@@ -231,6 +231,15 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       cleanup_deferred_ref := Some deferred ;
       deferred
 
+module Offline_exn = struct
+  exception Node_is_offline of string
+
+  exception Node_moved_id of string * string * string
+
+  exception
+    Node_offline_with_query_error of string * Malleable_error.Hard_fail.t
+end
+
 let main inputs =
   (* TODO: abstract over which engine is in use, allow engine to be set form CLI *)
   let (Test_inputs_with_cli_inputs ((module Test_inputs), cli_inputs)) =
@@ -304,14 +313,6 @@ let main inputs =
       don't_wait_for
         (f_dispatch_cleanup ~exit_reason:"signal received"
            ~test_result:(Malleable_error.hard_error error) ) ) ;
-  let module Offline_exn = struct
-    exception Node_is_offline of string
-
-    exception Node_moved_id of string * string * string
-
-    exception
-      Node_offline_with_query_error of string * Malleable_error.Hard_fail.t
-  end in
   let%bind monitor_test_result =
     let on_fatal_error message =
       don't_wait_for
