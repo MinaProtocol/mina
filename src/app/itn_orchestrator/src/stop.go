@@ -45,17 +45,13 @@ type StopDaemonParams struct {
 }
 
 func StopDaemon(config Config, params StopDaemonParams) error {
-	errs := []error{}
 	for _, addr := range params.Nodes {
 		resp, err := StopDaemonGql(config, addr, params.Clean, config.StopDaemonDelaySec)
 		if err == nil {
 			config.Log.Infof("stopped daemon on %s: %s", addr, resp)
 		} else {
-			errs = append(errs, err)
+			config.Log.Warnf("failed to stop daemon on %s: %s", addr, err)
 		}
-	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
 	}
 	return nil
 }

@@ -18,7 +18,7 @@ func fromAddResourcePush(m ipcPushMessage) (pushMessage, error) {
 func (m AddResourcePush) handle(app *app) {
 	d, err := AddResourcePushT(m).Data()
 	if err != nil {
-		app.P2p.Logger.Errorf("AddResourcePush.handle: error %w", err)
+		app.P2p.Logger.Errorf("AddResourcePush.handle: error %s", err)
 		return
 	}
 	app.bitswapCtx.addCmds <- bitswapAddCmd{
@@ -59,7 +59,7 @@ func (m DeleteResourcePush) handle(app *app) {
 		links, err = extractRootBlockList(idsM)
 	}
 	if err != nil {
-		app.P2p.Logger.Errorf("DeleteResourcePush.handle: error %w", err)
+		app.P2p.Logger.Errorf("DeleteResourcePush.handle: error %s", err)
 		return
 	}
 	app.bitswapCtx.deleteCmds <- bitswapDeleteCmd{links}
@@ -80,7 +80,7 @@ func (m DownloadResourcePush) handle(app *app) {
 		links, err = extractRootBlockList(idsM)
 	}
 	if err != nil {
-		app.P2p.Logger.Errorf("DownloadResourcePush.handle: error %w", err)
+		app.P2p.Logger.Errorf("DownloadResourcePush.handle: error %s", err)
 		return
 	}
 	app.bitswapCtx.downloadCmds <- bitswapDownloadCmd{
