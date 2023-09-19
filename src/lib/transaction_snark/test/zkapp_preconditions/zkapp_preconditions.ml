@@ -7,6 +7,12 @@ open Mina_base
 
 let%test_module "Valid_while precondition tests" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let constraint_constants = U.constraint_constants
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
@@ -95,10 +101,20 @@ let%test_module "Valid_while precondition tests" =
                       (Valid_while_precondition_unsatisfied, U.Pass_2)
                     ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
                     ledger [ zkapp_command ] ) ) )
+
+    (*let () =
+      Yojson.Safe.to_file "proof_cache.json.out"
+      @@ Pickles.Proof_cache.to_yojson proof_cache*)
   end )
 
 let%test_module "Protocol state precondition tests" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
@@ -397,10 +413,20 @@ let%test_module "Protocol state precondition tests" =
                       , U.Pass_2 )
                     ~state_body ledger
                     [ zkapp_command_with_valid_fee_payer ] ) ) )
+
+    (*let () =
+      Yojson.Safe.to_file "proof_cache.json.out"
+      @@ Pickles.Proof_cache.to_yojson proof_cache*)
   end )
 
 let%test_module "Account precondition tests" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let zkapp_prover_and_vk = (zkapp_prover, vk)
@@ -991,4 +1017,8 @@ let%test_module "Account precondition tests" =
                   failwith
                     "Expected transaction to fail due to invalid account \
                      precondition in the fee payer" ) )
+
+    (*let () =
+      Yojson.Safe.to_file "proof_cache.json.out"
+      @@ Pickles.Proof_cache.to_yojson proof_cache*)
   end )
