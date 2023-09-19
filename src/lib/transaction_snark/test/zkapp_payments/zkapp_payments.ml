@@ -9,6 +9,12 @@ open Mina_base
 
 let%test_module "Zkapp payments tests" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let memo = Signed_command_memo.create_from_string_exn "Zkapp payments tests"
 
     [@@@warning "-32"]
@@ -289,4 +295,8 @@ let%test_module "Zkapp payments tests" =
                     ~expected_failure:
                       (Transaction_status.Failure.Overflow, Pass_2)
                     ledger [ zkapp_command ] ) ) )
+
+    let () =
+      Yojson.Safe.to_file "proof_cache.json.out"
+      @@ Pickles.Proof_cache.to_yojson proof_cache
   end )
