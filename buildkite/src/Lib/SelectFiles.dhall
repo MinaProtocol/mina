@@ -44,6 +44,15 @@ let exactly : Text -> Text -> FilePattern.Type =
       strictEnd = True
     }
 
+let exactly_noext : Text -> FilePattern.Type =
+  \(dir : Text) ->
+    FilePattern::{
+      dir = Some [PathPattern.Lit dir],
+      exts = None,
+      strictStart = True,
+      strictEnd = True
+    }
+
 -- compile things
 let any : List Text -> Text =
   P.Text.concatSep "|"
