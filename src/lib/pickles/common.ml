@@ -10,7 +10,7 @@ module Max_degree = struct
 
   let wrap_log2 = Nat.to_int Backend.Tock.Rounds.n
 
-  let wrap = 1 lsl wrap_log2
+  let _wrap = 1 lsl wrap_log2
 end
 
 let tick_shifts, tock_shifts =
@@ -28,7 +28,7 @@ let wrap_domains ~proofs_verified =
   let h =
     match proofs_verified with 0 -> 13 | 1 -> 14 | 2 -> 15 | _ -> assert false
   in
-  { Domains.h = Pow_2_roots_of_unity h }
+  { Domains.h = Domain.Pow_2_roots_of_unity h }
 
 let actual_wrap_domain_size ~log_2_domain_size =
   let d =
@@ -47,7 +47,6 @@ let actual_wrap_domain_size ~log_2_domain_size =
 let hash_messages_for_next_step_proof ~app_state
     (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
   let g (x, y) = [ x; y ] in
-  let open Backend in
   Tick_field_sponge.digest Tick_field_sponge.params
     (Types.Step.Proof_state.Messages_for_next_step_proof.to_field_elements t ~g
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
@@ -89,51 +88,47 @@ let group_map m ~a ~b =
   stage (fun x -> Group_map.to_group m ~params x)
 
 module Shifts = struct
-  let tock1 : Tock.Field.t Shifted_value.Type1.Shift.t =
-    Shifted_value.Type1.Shift.create (module Tock.Field)
+  let tock2 : Backend.Tock.Field.t Shifted_value.Type2.Shift.t =
+    Shifted_value.Type2.Shift.create (module Backend.Tock.Field)
 
-  let tock2 : Tock.Field.t Shifted_value.Type2.Shift.t =
-    Shifted_value.Type2.Shift.create (module Tock.Field)
-
-  let tick1 : Tick.Field.t Shifted_value.Type1.Shift.t =
-    Shifted_value.Type1.Shift.create (module Tick.Field)
-
-  let tick2 : Tick.Field.t Shifted_value.Type2.Shift.t =
-    Shifted_value.Type2.Shift.create (module Tick.Field)
+  let tick1 : Backend.Tick.Field.t Shifted_value.Type1.Shift.t =
+    Shifted_value.Type1.Shift.create (module Backend.Tick.Field)
 end
 
 module Lookup_parameters = struct
   let tick_zero : _ Composition_types.Zero_values.t =
-    { value =
-        { challenge = Challenge.Constant.zero
-        ; scalar =
-            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
-        }
-    ; var =
-        { challenge = Impls.Step.Field.zero
-        ; scalar =
-            Shifted_value.Type2.Shifted_value
-              (Impls.Step.Field.zero, Impls.Step.Boolean.false_)
-        }
-    }
+    Composition_types.Zero_values.
+      { value =
+          { challenge = Challenge.Constant.zero
+          ; scalar =
+              Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+          }
+      ; var =
+          { challenge = Impls.Step.Field.zero
+          ; scalar =
+              Shifted_value.Type2.Shifted_value
+                (Impls.Step.Field.zero, Impls.Step.Boolean.false_)
+          }
+      }
 
   let tock_zero : _ Composition_types.Zero_values.t =
-    { value =
-        { challenge = Challenge.Constant.zero
-        ; scalar =
-            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
-        }
-    ; var =
-        { challenge = Impls.Wrap.Field.zero
-        ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
-        }
-    }
+    Composition_types.Zero_values.
+      { value =
+          { challenge = Challenge.Constant.zero
+          ; scalar =
+              Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+          }
+      ; var =
+          { challenge = Impls.Wrap.Field.zero
+          ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
+          }
+      }
 end
 
 let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
-  | Finite (x, y) ->
+  | Kimchi_types.Finite (x, y) ->
       (x, y)
-  | Infinity ->
+  | Kimchi_types.Infinity ->
       invalid_arg "finite_exn"
 
 let or_infinite_conv : ('a * 'a) Or_infinity.t -> 'a Kimchi_types.or_infinity =
@@ -148,9 +143,7 @@ module Ipa = struct
 
   (* TODO: Make all this completely generic over backend *)
 
-  let compute_challenge (type f) ~endo_to_field
-      (module Field : Kimchi_backend.Field.S with type t = f) c =
-    endo_to_field c
+  let compute_challenge ~endo_to_field _ c = endo_to_field c
 
   let compute_challenges ~endo_to_field field chals =
     Vector.map chals ~f:(fun prechallenge ->
@@ -211,23 +204,24 @@ module Ipa = struct
   end
 end
 
-let tock_unpadded_public_input_of_statement prev_statement =
+let tock_unpadded_public_input_of_statement ~feature_flags prev_statement =
   let input =
-    let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input () in
+    let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input ~feature_flags () in
     Impls.Wrap.generate_public_input typ prev_statement
   in
   List.init
     (Backend.Tock.Field.Vector.length input)
     ~f:(Backend.Tock.Field.Vector.get input)
 
-let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
+let tock_public_input_of_statement ~feature_flags s =
+  tock_unpadded_public_input_of_statement ~feature_flags s
 
-let tick_public_input_of_statement ~max_proofs_verified ~feature_flags
+let tick_public_input_of_statement ~max_proofs_verified
     (prev_statement : _ Types.Step.Statement.t) =
   let input =
     let (T (input, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Tock.Rounds.n ~feature_flags
+        ~wrap_rounds:Tock.Rounds.n
     in
     Impls.Step.generate_public_input input prev_statement
   in
@@ -235,8 +229,8 @@ let tick_public_input_of_statement ~max_proofs_verified ~feature_flags
     (Backend.Tick.Field.Vector.length input)
     ~f:(Backend.Tick.Field.Vector.get input)
 
-let ft_comm ~add:( + ) ~scale ~endoscale ~negate
-    ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha
+let ft_comm ~add:( + ) ~scale ~endoscale:_ ~negate
+    ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha:_
     ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
     ~t_comm =
   let ( * ) x g = scale g x in
@@ -261,11 +255,11 @@ let combined_evaluation (type f)
   let open Impl in
   let open Field in
   let mul_and_add ~(acc : Field.t) ~(xi : Field.t)
-      (fx : (Field.t, Boolean.var) Plonk_types.Opt.t) : Field.t =
+      (fx : (Field.t, Boolean.var) Opt.t) : Field.t =
     match fx with
-    | None ->
+    | Nothing ->
         acc
-    | Some fx ->
+    | Just fx ->
         fx + (xi * acc)
     | Maybe (b, fx) ->
         Field.if_ b ~then_:(fx + (xi * acc)) ~else_:acc
@@ -273,9 +267,9 @@ let combined_evaluation (type f)
   with_label __LOC__ (fun () ->
       Pcs_batch.combine_split_evaluations ~mul_and_add
         ~init:(function
-          | Some x ->
+          | Just x ->
               x
-          | None ->
+          | Nothing ->
               Field.zero
           | Maybe (b, x) ->
               (b :> Field.t) * x )

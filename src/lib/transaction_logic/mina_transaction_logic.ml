@@ -2769,7 +2769,7 @@ module For_tests = struct
                 }
             ; authorization =
                 ( if use_full_commitment then Signature Signature.dummy
-                else Proof Mina_base.Proof.transaction_dummy )
+                else Proof (Lazy.force Mina_base.Proof.transaction_dummy) )
             }
           ; { body =
                 { public_key = receiver

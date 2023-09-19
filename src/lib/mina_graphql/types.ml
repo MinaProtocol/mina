@@ -1599,7 +1599,15 @@ module User_command = struct
           | Applied | Enqueued ->
               None
           | Included_but_failed failures ->
-              List.concat failures |> List.hd )
+              let rec first_failure = function
+                | (failure :: _) :: _ ->
+                    Some failure
+                | [] :: others ->
+                    first_failure others
+                | [] ->
+                    None
+              in
+              first_failure failures )
     ]
 
   let payment =
