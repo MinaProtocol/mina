@@ -44,7 +44,7 @@ let zkapp_command_with_ledger ?ledger_init_state ?num_keypairs
            ~f:(fun l ->
              Array.map l ~f:(fun (kp, _balance, _nonce, _timing) -> kp)
              |> Keypair.Set.of_array )
-    in    
+    in
     List.init num_keypairs ~f:(fun _ ->
         let keypair = ref (Keypair.create ()) in
         while Set.mem !existing_keypairs !keypair do
