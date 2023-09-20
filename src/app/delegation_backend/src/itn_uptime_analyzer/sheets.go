@@ -42,8 +42,7 @@ func (identity Identity) GetCell(config AppConfig, client *sheets.Service, log *
 
 	if !exactMatch {
 		for index, row := range resp.Values {
-			str := fmt.Sprintf("%v\n", row[0])
-			if strings.Split(str, "-")[0] == identity.publicKey {
+			if strings.Split(row[0], "-")[0] == identity.publicKey {
 				rowIndex = index + 1
 				exactMatch = false
 			}
@@ -117,7 +116,7 @@ func (identity Identity) AppendUptime(config AppConfig, client *sheets.Service, 
 
 	updateRange := fmt.Sprintf("%s!%s%d", sheetTitle, string(nextEmptyColumn+65), rowIndex)
 
-	cellValue := []interface{}{identity["uptime"]}
+	cellValue := []interface{}{strings.Join([]string{identity.uptime, "%"})}
 
 	valueRange := sheets.ValueRange{
 		Values: [][]interface{}{cellValue},

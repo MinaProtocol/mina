@@ -3,7 +3,6 @@ package itn_uptime_analyzer
 import (
 	dg "block_producers_uptime/delegation_backend"
 	"encoding/json"
-	"fmt"
 	"io"
 	"regexp"
 	"strconv"
@@ -228,5 +227,5 @@ func (identity Identity) GetUptime(config AppConfig, sheet *sheets.Service, ctx 
 	if uptimePercent > 100.00 {
 		uptimePercent = 100.00
 	}
-	identity.uptime = fmt.Sprintf("%.2f%%", uptimePercent)
+	identity.uptime = strconv.FormatFloat(uptimePercent, "f", 2, 64)
 }

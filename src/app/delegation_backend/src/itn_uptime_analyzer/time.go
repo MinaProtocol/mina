@@ -29,6 +29,7 @@ func GetLastExecutionTime(config AppConfig, client *sheets.Service, log *logging
 	var lastFilledColumn int = len(resp.Values[0]) - 1
 	var lastExecutionBasedOnSheetsAsTime time.Time
 
+	// 65 is the ascii code for letter A
 	readRange = fmt.Sprintf("%s!%s%d", sheetTitle, string(lastFilledColumn+65), 1)
 
 	lastTimeWindow := resp.Values[0][lastFilledColumn]
