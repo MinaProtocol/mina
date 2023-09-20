@@ -21,11 +21,11 @@ git merge --no-commit --no-ff origin/$BRANCH
 RET=$?
 
 if [ $RET -eq 0 ]; then
+  echo "No conflicts found against upstream branch ${BRANCH}"
+  exit 0
+else
   # Found a conflict
   echo "[ERROR] This pull request conflicts with $BRANCH, please open a new pull request against $BRANCH at this link:"
   echo "https://github.com/MinaProtocol/mina/compare/${BRANCH}...${BUILDKITE_BRANCH}"
   exit 1
-else
-  echo "No conflicts found against upstream branch ${BRANCH}"
-  exit 0
 fi
