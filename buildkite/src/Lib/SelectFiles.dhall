@@ -122,6 +122,7 @@ in
   everything = everything,
   contains = contains,
   exactly = exactly,
+  exactlyNoext = exactlyNoext,
   strictlyStart = strictlyStart,
   strictlyEnd = strictlyEnd,
   strictly = strictly,
