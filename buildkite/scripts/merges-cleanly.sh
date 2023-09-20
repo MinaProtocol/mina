@@ -12,8 +12,11 @@ echo 'Testing for conflicts between the current branch `'"${CURRENT}"'` and `'"$
 git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt
 # Fetch a fresh copy of the repo
 git fetch origin
-# Check mergeability
-git merge-tree `git merge-base origin/$BRANCH HEAD` HEAD origin/$BRANCH | grep -A 25 "^+<<<<<<<"
+# Check mergeability. We use flags so that
+# * `--no-commit` stops us from updating the index with a merge commit,
+# * `--no-ff` stops us from updating the index to the HEAD, if the merge is a
+#   straightforward fast-forward
+git merge --no-commit --no-ff origin/$BRANCH
 
 RET=$?
 
