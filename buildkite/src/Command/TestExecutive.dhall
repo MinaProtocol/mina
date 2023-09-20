@@ -1,4 +1,5 @@
 let Prelude = ../External/Prelude.dhall
+let B = ../External/Buildkite.dhall
 
 let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
@@ -9,6 +10,8 @@ let RunInToolchain = ../Command/RunInToolchain.dhall
 let Cmd = ../Lib/Cmds.dhall
 let SelectFiles = ../Lib/SelectFiles.dhall
 
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
 in
 
 {
@@ -17,7 +20,7 @@ in
       Command.Config::{
         commands =
             -- Build test executive binary
-            RunInToolchain.runInToolchainStretch [
+            RunInToolchain.runInToolchain [
               "DUNE_PROFILE=${duneProfile}"
             ] "./buildkite/scripts/build-test-executive.sh"
             
