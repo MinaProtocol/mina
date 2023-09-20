@@ -1,0 +1,24 @@
+name: "Build nix"
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - compatible
+      - berkeley
+      - releases/**
+      - main
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - uses: cachix/install-nix-action@v20
+    - uses: DeterminateSystems/magic-nix-cache-action@v2
+    - run: nix/pin.sh 
+    - run: nix build mina
+      env:
+        GIT_LFS_SKIP_SMUDGE: 1
+    - run: nix develop mina
