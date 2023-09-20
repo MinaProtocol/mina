@@ -162,8 +162,9 @@ module Status = struct
 
   module Next_producer_timing = struct
     type slot =
-      { slot : Mina_numbers.Global_slot.Stable.Latest.t
-      ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.Latest.t
+      { slot : Mina_numbers.Global_slot_since_hard_fork.Stable.Latest.t
+      ; global_slot_since_genesis :
+          Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
       }
     [@@deriving to_yojson, fields, bin_io_unversioned]
 
@@ -175,7 +176,8 @@ module Status = struct
       | Check_again of Block_time.Stable.Latest.t
       | Produce of producing_time
       | Produce_now of producing_time
-      | Evaluating_vrf of Mina_numbers.Global_slot.Stable.Latest.t
+      | Evaluating_vrf of
+          Mina_numbers.Global_slot_since_hard_fork.Stable.Latest.t
     [@@deriving to_yojson, bin_io_unversioned]
 
     type t = { generated_from_consensus_at : slot; timing : timing }
@@ -293,8 +295,9 @@ module Status = struct
           in
           let slot_str (slot : Next_producer_timing.slot) =
             sprintf "slot: %s slot-since-genesis: %s"
-              (Mina_numbers.Global_slot.to_string slot.slot)
-              (Mina_numbers.Global_slot.to_string slot.global_slot_since_genesis)
+              (Mina_numbers.Global_slot_since_hard_fork.to_string slot.slot)
+              (Mina_numbers.Global_slot_since_genesis.to_string
+                 slot.global_slot_since_genesis )
           in
           let generated_from =
             sprintf "Generated from consensus at %s"
@@ -306,7 +309,8 @@ module Status = struct
                 generated_from
           | Evaluating_vrf last_checked_slot ->
               sprintf "Evaluating VRF… Last checked global slot %s (%s)"
-                (Mina_numbers.Global_slot.to_string last_checked_slot)
+                (Mina_numbers.Global_slot_since_hard_fork.to_string
+                   last_checked_slot )
                 generated_from
           | Produce { time; for_slot } ->
               sprintf "%s for %s (%s)" (str time) (slot_str for_slot)
@@ -332,7 +336,7 @@ module Status = struct
         float_of_int i |> Time.Span.of_ms |> Time.Span.to_string
       in
       (* Time.to_string is safe here because this is for display. *)
-      let time_to_string = Fn.compose Time.to_string Block_time.to_time in
+      let time_to_string = Fn.compose Time.to_string Block_time.to_time_exn in
       let render conf =
         let fmt_field name op field = (name, op (Field.get field conf)) in
         Consensus.Configuration.Fields.to_list

@@ -3,7 +3,7 @@
  (public_name currency)
  (library_flags -linkall)
  (flags -w -22) ; Silence ppx_version's warnings
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    base.base_internalhash_types
@@ -24,6 +24,7 @@
    codable
    test_util
    unsigned_extended
+   mina_compile_config
    mina_numbers
    snark_bits
    sgn
@@ -32,12 +33,14 @@
    random_oracle_input
    pickles
    snarky.backendless
-   crypto_params
+   kimchi_backend.common
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps
-   ppx_coda
+   ppx_annot
+   ppx_mina
    ppx_version
    ppx_let
    ppx_assert
@@ -49,6 +52,7 @@
    ppx_custom_printf
    ppx_deriving.std
    ppx_deriving_yojson
+   ppx_fields_conv
    h_list.ppx
    ppx_inline_test))
  (instrumentation

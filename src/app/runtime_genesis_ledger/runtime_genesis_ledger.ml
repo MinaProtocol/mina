@@ -1,6 +1,6 @@
 open Core
 open Async
-open Mina_base
+module Ledger = Mina_ledger.Ledger
 
 type t = Ledger.t
 

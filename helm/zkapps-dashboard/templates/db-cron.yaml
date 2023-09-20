@@ -1,0 +1,114 @@
+# this configuration creates a cron job which queries a target archive DB for zkapps data and places that data into its local db
+
+# kubectl apply -f helm/cron_jobs/devnet-dump-archive-cronjob.yaml
+# the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+    name: {{ include "zkapps-dashboard.fullname" . }}-queries
+spec:
+    schedule: "*/5 * * * *"
+    jobTemplate:
+        spec:
+            template:
+                spec:
+                    containers:
+                    - name: postgres-12-alpine
+                      image: postgres:12-alpine
+                      imagePullPolicy: IfNotPresent
+                      command:
+                      - /bin/bash
+                      - -c
+                      - '
+                        # source: https://www.notion.so/minaprotocol/Berkeley-Testnet-Product-Metrics-Requirements-0618d055eb9a4c12a27900effcfd273a
+
+                        ################################
+                        # DB CONNECTIONS
+                        ################################
+
+                        ARHCIVE_DB_CONNECTION="postgresql://{{ $.Values.archive.auth.username }}:{{ $.Values.archive.auth.password }}@{{ $.Values.archive.name }}-postgresql:5432/{{ $.Values.archive.database }}";
+                        LOCAL_DB_CONNECTION="postgresql://{{ $.Values.postgresql.auth.username }}:{{ $.Values.postgresql.auth.password }}@{{ include "zkapps-dashboard.fullname" . }}-postgresql:5432/{{ $.Values.postgresql.primary.name }}";
+
+                        ################################
+                        # RECURSIVE CHAIN
+                        ################################
+
+                        RECURSIVE_CHAIN="WITH RECURSIVE chain AS (
+                        SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,
+                        staking_epoch_data_id,next_epoch_data_id,
+                        min_window_density,total_currency,
+                        ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,
+                        timestamp,chain_status
+                        FROM blocks b WHERE b.id =(select id from blocks where height = (select MAX(height) from blocks) LIMIT 1)
+                        UNION ALL
+                        SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,b.snarked_ledger_hash_id,
+                        b.staking_epoch_data_id,b.next_epoch_data_id,
+                        b.min_window_density,b.total_currency,
+                        b.ledger_hash,b.height,b.global_slot_since_hard_fork,b.global_slot_since_genesis,
+                        b.timestamp,b.chain_status
+                        FROM blocks b
+                        INNER JOIN chain
+                        ON b.id = chain.parent_id AND (chain.id <> 1 OR b.id = 1)
+                        )";
+
+                        ################################
+                        # PAYMENT QUERIES
+                        ################################
+
+                        TOTAL_PAYMENTS_QUERY="select count(*) from chain b left join blocks_user_commands bc on b.id = bc.block_id where bc.user_command_id is not null ;";
+                        FAILED_PAYMENTS_QUERY="select count(*) from chain b left join blocks_user_commands bc on b.id = bc.block_id where bc.status=''failed'' and bc.user_command_id is not null";
+                        SUCCESSFUL_PAYMENTS_QUERY="select count(*) from chain b left join blocks_user_commands bc on b.id = bc.block_id where bc.status=''applied'' and bc.user_command_id is not null ;";
+
+                        ################################
+                        # TRANSACTION QUERIES
+                        ################################
+
+                        TOTAL_ZKAPP_TXNS_QUERY="select count(*) from chain b left join blocks_zkapp_commands zc on b.id = zc.block_id where zc.zkapp_command_id is not null ;";
+                        FAILED_ZKAPP_TXNS_QUERY="select count(*) from chain b left join blocks_zkapp_commands zc on b.id = zc.block_id where zc.status=''failed'' ;";
+                        SUCCESSFUL_ZKAPP_TXNS_QUERY="select count(*) from chain b left join blocks_zkapp_commands zc on b.id = zc.block_id  where zc.status=''applied'' ;";
+
+                        ################################
+                        # ACCOUNT UPDATE QUERIES
+                        ################################
+
+                        TOTAL_ACCT_UPDATES_QUERY="select count(*)  from chain b left join blocks_zkapp_commands zc on b.id = zc.block_id left join zkapp_commands zk on zc.zkapp_command_id = zk.id left join zkapp_account_update za on za.id = ANY(zk.zkapp_account_updates_ids) left join zkapp_account_update_body zb on za.body_id = zb.id left join zkapp_updates zu on zu.id = zb.update_id  where zc.status=''applied'' and zu.verification_key_id is null ;";
+
+                        ################################
+                        # ZKAPPS DEPLOYMENT QUERIES
+                        ################################
+
+                        TOTAL_ZKAPP_DEPLOYS_QUERY="select count(zu.verification_key_id) from chain b left join blocks_zkapp_commands zc on b.id = zc.block_id left join zkapp_commands zk on zc.zkapp_command_id = zk.id left join zkapp_account_update za on za.id = ANY(zk.zkapp_account_updates_ids) left join zkapp_account_update_body zb on za.body_id = zb.id left join zkapp_updates zu on zu.id = zb.update_id where zc.status=''applied'' and zu.verification_key_id is not null ;";
+                        UNIQUE_ZKAPP_DEPLOYS_QUERY="select count(distinct zu.verification_key_id) from chain b left join blocks_zkapp_commands zc on b.id = zc.block_id left join zkapp_commands zk on zc.zkapp_command_id = zk.id left join zkapp_account_update za on za.id = ANY(zk.zkapp_account_updates_ids) left join zkapp_account_update_body zb on za.body_id = zb.id left join zkapp_updates zu on zu.id = zb.update_id  where zc.status=''applied'' and zu.verification_key_id is not null ;";
+
+                        ################################
+                        # QUERY EXECUTION
+                        ################################
+
+                        timestamp=`psql $ARHCIVE_DB_CONNECTION -c "SELECT CURRENT_TIMESTAMP";`;
+
+                        total_payments=`psql $ARHCIVE_DB_CONNECTION -Atc "$RECURSIVE_CHAIN $TOTAL_PAYMENTS_QUERY";`;
+                        failed_payments=`psql $ARHCIVE_DB_CONNECTION -Atc "$RECURSIVE_CHAIN $FAILED_PAYMENTS_QUERY";`;
+                        successful_payments=`psql $ARHCIVE_DB_CONNECTION -Atc "$RECURSIVE_CHAIN $SUCCESSFUL_PAYMENTS_QUERY";`;
+
+                        total_zkapp_txns=`psql $ARHCIVE_DB_CONNECTION -Atc "$RECURSIVE_CHAIN $TOTAL_ZKAPP_TXNS_QUERY";`;
+                        failed_zkapp_txns=`psql $ARHCIVE_DB_CONNECTION -Atc "$RECURSIVE_CHAIN $FAILED_ZKAPP_TXNS_QUERY";`;
+                        successful_zkapp_txns=`psql $ARHCIVE_DB_CONNECTION -Atc "$RECURSIVE_CHAIN $SUCCESSFUL_ZKAPP_TXNS_QUERY";`;
+
+                        total_acct_updates=`psql $ARHCIVE_DB_CONNECTION -Atc "$RECURSIVE_CHAIN $TOTAL_ACCT_UPDATES_QUERY";`;
+
+                        total_zkapp_deploys=`psql $ARHCIVE_DB_CONNECTION -Atc "$RECURSIVE_CHAIN $TOTAL_ZKAPP_DEPLOYS_QUERY";`;
+                        unique_zkapp_deploys=`psql $ARHCIVE_DB_CONNECTION -Atc "$RECURSIVE_CHAIN $UNIQUE_ZKAPP_DEPLOYS_QUERY";`;
+
+                        ################################
+                        # FINAL DB STORAGE
+                        ################################
+
+                        psql $LOCAL_DB_CONNECTION -c "INSERT INTO public.zkapps VALUES (current_timestamp, $unique_zkapp_deploys, $total_zkapp_deploys, $successful_zkapp_txns, $failed_zkapp_txns, $total_zkapp_txns, $successful_payments, $failed_payments, $total_payments, $total_acct_updates)";
+
+                        '
+                    restartPolicy: Never
+    suspend: false
+    startingDeadlineSeconds: 100
+    concurrencyPolicy: Replace
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 1

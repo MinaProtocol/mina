@@ -7,7 +7,13 @@ let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
     { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "MinaArtifactBullseye", key = "daemon-devnet-bullseye-docker-image" },
+    { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
+    { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
+]
+let dependsOnJs = [
+    { name = "TestnetIntegrationTests", key = "build-test-executive" },
+    { name = "TestnetIntegrationTests", key = "build-js-tests" },
+    { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
     { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
 ]
 
@@ -27,14 +33,18 @@ in Pipeline.build Pipeline.Config::{
   },
   steps = [
     TestExecutive.build "integration_tests",
+    TestExecutive.buildJs "integration_tests",
     TestExecutive.execute "peers-reliability" dependsOn,
     TestExecutive.execute "chain-reliability" dependsOn,
     TestExecutive.execute "payment" dependsOn,
-    TestExecutive.execute "delegation" dependsOn,
     TestExecutive.execute "gossip-consis" dependsOn,
     TestExecutive.execute "block-prod-prio" dependsOn,
     TestExecutive.execute "medium-bootstrap" dependsOn,
-    TestExecutive.execute "archive-node" dependsOn
-
+    TestExecutive.execute "block-reward" dependsOn,
+    TestExecutive.execute "zkapps" dependsOn,
+    TestExecutive.execute "zkapps-timing" dependsOn,
+    TestExecutive.execute "zkapps-nonce" dependsOn,
+    TestExecutive.execute "verification-key" dependsOn,
+    TestExecutive.executeWithJs "snarkyjs" dependsOnJs
   ]
 }

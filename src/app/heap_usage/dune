@@ -1,0 +1,58 @@
+(executable
+ (package heap_usage)
+ (name heap_usage)
+ (public_name heap_usage)
+ (libraries
+   ;; opam libraries
+   async_unix
+   core
+   result
+   async_kernel
+   stdio
+   async
+   core_kernel
+   base
+   base.caml
+   base.base_internalhash_types
+   async.async_command
+   yojson
+   sexplib0
+   ;; local libraries
+   mina_block ; temp
+   mina_base
+   mina_base.import
+   mina_numbers
+   currency
+   data_hash_lib
+   signature_lib
+   merkle_ledger
+   mina_compile_config
+   mina_ledger
+   mina_state
+   mina_transaction_logic
+   genesis_constants
+   staged_ledger_diff
+   parallel_scan
+   pickles
+   pickles.backend
+   pickles_types
+   transaction_snark
+   transaction_snark_scan_state
+   ledger_proof
+   blake2
+   mina_generators
+   with_hash
+   random_oracle
+   snark_params
+   crypto_params
+   kimchi_bindings
+   kimchi_backend
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   pasta_bindings
+   zkapp_command_builder
+   transaction_snark_tests
+   snark_profiler_lib
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv)))

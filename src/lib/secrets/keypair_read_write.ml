@@ -7,9 +7,6 @@ open Signature_lib
 module Make (Env : sig
   val env : string
 
-  (* TODO: remove eventually *)
-  val env_deprecated : string option
-
   val which : string
 end) =
 struct
@@ -21,8 +18,6 @@ struct
   type t = Keypair.t
 
   let env = env
-
-  let env_deprecated = env_deprecated
 
   (** Writes a keypair to [privkey_path] and [privkey_path ^ ".pub"] using [Secret_file] *)
   let write_exn { Keypair.private_key; public_key } ~(privkey_path : string)
@@ -84,11 +79,10 @@ struct
   let read_exn' path =
     let password =
       let env_value = Sys.getenv env in
-      let env_deprecated_value = Option.bind env_deprecated ~f:Sys.getenv in
-      match (env_value, env_deprecated_value) with
-      | Some v, _ | None, Some v ->
+      match env_value with
+      | Some v ->
           lazy (return @@ Bytes.of_string v)
-      | None, None ->
+      | None ->
           let error_help_message =
             sprintf "Set the %s environment variable to the password" env
           in
