@@ -90,7 +90,7 @@ in
         label = "${testName} integration test",
         key = "integration-test-${testName}",
         target = Size.Integration,
-        depends_on = dependsOn
+        depends_on = dependsOn,
         soft_fail = Some (B/SoftFail.Boolean True)
       }
 }
