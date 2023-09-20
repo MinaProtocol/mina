@@ -3,7 +3,7 @@
  (public_name snarky_blake2)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    core_kernel
@@ -13,4 +13,5 @@
    ;; local libraries
    blake2
    snarky.backendless
+   mina_stdlib
 ))

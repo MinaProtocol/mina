@@ -5,18 +5,22 @@
    async_kernel
    async
    core
+   uri
    yojson
    core_kernel
    cmdliner
    base.base_internalhash_types
    base.caml
    async_unix
-   integers
    unsigned_extended
    stdio
    ;; local libraries
+   mina_wire_types
    with_hash
    data_hash_lib
+   kimchi_backend
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles
    pickles_types
    random_oracle_input
@@ -24,12 +28,16 @@
    bash_colors
    integration_test_lib
    signature_lib
+   mina_signature_kind
    mina_base
+   mina_stdlib
+   mina_transaction
    file_system
    currency
-   coda_runtime_config
+   mina_runtime_config
    secrets
    integration_test_cloud_engine
+   mina_generators
    logger
    random_oracle
    mina_numbers
@@ -37,10 +45,19 @@
    snark_params
    pickles.backend
    pipe_lib
+   mina_base.import
+   key_gen
+   integers
    user_command_input
    participating_state
    graph_algorithms
    visualization
+   sgn
+   zkapp_command_builder
+   network_pool
+   zkapps_examples
+   cache_dir
+   snarky.backendless
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_jane ppx_deriving_yojson ppx_coda ppx_version)))
+ (preprocess (pps ppx_mina ppx_jane ppx_deriving_yojson ppx_mina ppx_version)))

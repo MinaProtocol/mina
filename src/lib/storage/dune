@@ -1,7 +1,7 @@
 (library
  (name storage)
  (public_name storage)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (library_flags -linkall)
  (libraries
    ;; opam libraries
@@ -17,7 +17,8 @@
    base.caml
    ;; local libraries
    logger
-   )
+   ppx_version.runtime
+ )
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation (backend bisect_ppx))
