@@ -39,6 +39,6 @@
    libp2p_ipc
    staged_ledger_diff
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_mina)))

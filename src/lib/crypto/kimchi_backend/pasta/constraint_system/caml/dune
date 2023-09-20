@@ -1,5 +1,5 @@
 (library
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (name kimchi_pasta_constraint_system_caml)
  (public_name kimchi_backend.pasta.constraint_system.caml)
  (flags -warn-error -27)

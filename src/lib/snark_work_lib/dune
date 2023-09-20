@@ -2,7 +2,7 @@
  (name snark_work_lib)
  (public_name snark_work_lib)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    bin_prot.shape

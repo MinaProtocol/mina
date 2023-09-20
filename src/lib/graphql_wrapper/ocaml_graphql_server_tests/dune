@@ -22,6 +22,6 @@
   graphql_parser)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (preprocess
   (pps ppx_inline_test ppx_assert ppx_version)))
