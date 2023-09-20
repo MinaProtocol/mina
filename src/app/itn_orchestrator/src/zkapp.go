@@ -37,15 +37,19 @@ type ScheduledZkappCommandsReceipt struct {
 	Handle  string      `json:"handle"`
 }
 
+func tpsGap(tps float64, gapSec int) int {
+	return int(math.Ceil(tps * float64(gapSec)))
+}
+
 func ZkappBalanceRequirements(tps float64, p ZkappSubParams) (int, uint64, uint64, uint64) {
-	totalZkappsToDeploy := p.Gap * 4
-	// new accounts are set to ration multplied by (number of txs minus zkapp deploying txs)
+	totalZkappsToDeploy, _ := zkappParams(p, tps)
+	// new accounts are set to ratio multplied by (number of txs minus zkapp deploying txs)
 	newAccounts := int(tps * float64(p.DurationMin*60-totalZkappsToDeploy) * p.NewAccountRatio)
 	// not accounting for Birthday paradox, we multiply by three at a later stage for this reason
 	maxExpectedUsagesPerNewAccount := float64(p.DurationMin*60) / float64(p.Gap)
 	//We multiply by three because by matter of chance some zkapps may generate more new accounts
 	newAccountsPerZkapp := int(float64(newAccounts) / float64(totalZkappsToDeploy) * 3)
-	balanceDeductedPerUsage := p.MaxBalanceChange * 5
+	balanceDeductedPerUsage := p.MaxBalanceChange * 8
 	// We add 1e9 because of account creation fee
 	minNewZkappBalance := uint64(maxExpectedUsagesPerNewAccount*float64(balanceDeductedPerUsage))*3 + 1e9
 	maxNewZkappBalance := minNewZkappBalance * 3
@@ -54,32 +58,25 @@ func ZkappBalanceRequirements(tps float64, p ZkappSubParams) (int, uint64, uint6
 	return newAccounts, minNewZkappBalance, maxNewZkappBalance, initBalance
 }
 
-func tpsGap(tps float64, gapSec int) int {
-	return int(math.Ceil(tps * float64(gapSec)))
-}
-
 func ZkappKeygenRequirements(initZkappBalance uint64, params ZkappSubParams) (int, uint64) {
 	maxParticipants := int(math.Ceil(params.Tps / params.MinTps))
 	minTpsGap := tpsGap(params.MinTps, params.Gap)
 	// Minimal number of keys allocated per node
 	minKeysPerNode := minTpsGap * 2
 	minTpsZkappsToDeploy, _ := zkappParams(params, params.MinTps)
-	zkappsToDeployPerKey := uint64(minTpsZkappsToDeploy / minKeysPerNode)
-	if minKeysPerNode%minTpsZkappsToDeploy > 0 {
-		zkappsToDeployPerKey++
-	}
+	zkappsToDeployPerKey := uint64(minTpsZkappsToDeploy/minKeysPerNode) + 1
 	tpsGap := tpsGap(params.Tps, params.Gap)
 	keys := maxParticipants + tpsGap*2
-	txCost := params.MaxBalanceChange + params.MaxFee
+	txCost := params.MaxBalanceChange*8 + params.MaxFee
 	totalTxs := uint64(math.Ceil(float64(params.DurationMin) * 60 * params.Tps))
 	balance := uint64(keys)*zkappsToDeployPerKey*(initZkappBalance+params.DeploymentFee)*2 + 3*txCost*totalTxs
 	return keys, balance
 }
 
-func scheduleZkappCommandsDo(config Config, params ZkappCommandParams, nodeAddress NodeAddress, batchIx int, tps float64, feePayers []itn_json_types.MinaPrivateKey) (string, error) {
+func zkappPaymentsInput(params ZkappCommandParams, batchIx int, tps float64, feePayers []itn_json_types.MinaPrivateKey) ZkappCommandsDetails {
 	zkappsToDeploy, accountQueueSize := zkappParams(params.ZkappSubParams, tps)
 	newAccounts, minNewZkappBalance, maxNewZkappBalance, initBalance := ZkappBalanceRequirements(tps, params.ZkappSubParams)
-	paymentInput := ZkappCommandsDetails{
+	return ZkappCommandsDetails{
 		MemoPrefix:         fmt.Sprintf("%s-%d", params.ExperimentName, batchIx),
 		DurationMin:        params.DurationMin,
 		Tps:                tps,
@@ -98,6 +95,10 @@ func scheduleZkappCommandsDo(config Config, params ZkappCommandParams, nodeAddre
 		AccountQueueSize:   accountQueueSize,
 		MaxCost:            params.MaxCost,
 	}
+}
+
+func scheduleZkappCommandsDo(config Config, params ZkappCommandParams, nodeAddress NodeAddress, batchIx int, tps float64, feePayers []itn_json_types.MinaPrivateKey) (string, error) {
+	paymentInput := zkappPaymentsInput(params, batchIx, tps, feePayers)
 	handle, err := ScheduleZkappCommands(config, nodeAddress, paymentInput)
 	if err == nil {
 		config.Log.Infof("scheduled zkapp batch %d with tps %f for %s: %s", batchIx, tps, nodeAddress, handle)
