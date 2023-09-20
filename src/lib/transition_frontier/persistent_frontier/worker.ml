@@ -73,7 +73,7 @@ module Worker = struct
 
   let perform t input =
     let arcs_cache = State_hash.Table.create () in
-    O1trace.sync_thread "persistent_frontier_write_to_disk" (fun () ->
+    O1trace.thread "persistent_frontier_write_to_disk" (fun () ->
         [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
           (List.length input) ;
         (* OPTIMIZATION: Compress the best tip diffs and root transition diffs in order avoid unnecessary intermediate writes. *)
@@ -111,13 +111,25 @@ module Worker = struct
             ]
         in
         let apply_funcs =
+          let state_hashes =
+            List.filter_map input ~f:(function
+              | E (New_node (Lite transition)) ->
+                  Mina_block.Validated.state_hash transition |> Option.some
+              | _ ->
+                  None )
+            |> State_hash.Set.of_list
+          in
           let parent_hashes =
             List.filter_map input ~f:(function
               | E (New_node (Lite transition)) ->
-                  Mina_block.Validated.header transition
-                  |> Header.protocol_state
-                  |> Mina_state.Protocol_state.previous_state_hash
-                  |> Option.some
+                  let parent_hash =
+                    Mina_block.Validated.header transition
+                    |> Header.protocol_state
+                    |> Mina_state.Protocol_state.previous_state_hash
+                  in
+                  Option.some_if
+                    (not @@ State_hash.Set.mem state_hashes parent_hash)
+                    parent_hash
               | _ ->
                   None )
           in
@@ -127,28 +139,30 @@ module Worker = struct
           List.map diffs_to_apply ~f:(fun (Diff.Lite.E.E diff) ->
               apply_diff ~old_root ~arcs_cache t diff )
         in
-        List.iter root_transition_diffs ~f:(fun { just_emitted_a_proof; _ } ->
-            if just_emitted_a_proof then (
+        let handle_emitted_proof = function
+          | { Diff.Root_transition.just_emitted_a_proof = true; _ } ->
               [%log' info t.logger] "Dequeued a snarked ledger" ;
               Persistent_root.Instance.dequeue_snarked_ledger
-                t.persistent_root_instance ) ) ;
+                t.persistent_root_instance
+          | _ ->
+              ()
+        in
         match apply_funcs with
         | Ok fs ->
             let%map () = Scheduler.yield () in
+            List.iter root_transition_diffs ~f:handle_emitted_proof ;
             Database.with_batch t.db ~f:(fun batch ->
                 List.iter fs ~f:(fun f -> f batch) )
-        | Error (`Not_found (`Arcs h)) ->
-            Deferred.return
-            @@ [%log' warn t.logger]
-                 "Did not add node to DB. Its $parent has already been thrown \
-                  away"
-                 ~metadata:
-                   [ ("parent", `String (State_hash.to_base58_check h)) ]
         | Error (`Not_found `Old_root_transition) ->
             failwith "Old root transition not found"
         | Error (`Apply_diff _) ->
             failwith
-              "Failed to apply a diff to the persistent transition frontier" )
+              "Failed to apply a diff to the persistent transition frontier"
+        | Error (`Not_found (`Arcs h)) ->
+            [%log' warn t.logger]
+              "Did not add node to DB. Its $parent has already been thrown away"
+              ~metadata:[ ("parent", `String (State_hash.to_base58_check h)) ] ;
+            Deferred.unit )
 end
 
 include Worker_supervisor.Make (Worker)

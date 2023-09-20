@@ -359,11 +359,7 @@ let add ~arcs_cache ~transition =
 
 let move_root ~old_root ~new_root ~garbage =
   let open Root_data.Limited in
-  (* let%map old_root =
-       get t.db ~key:Root ~error:(`Not_found `Old_root_transition)
-     in *)
   let old_root_hash = Root_data.Minimal.hash old_root in
-  (* TODO: Result compatible rocksdb batch transaction *)
   fun batch ->
     Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
     Batch.set batch ~key:Protocol_states_for_root_scan_state
