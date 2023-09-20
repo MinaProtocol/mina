@@ -96,7 +96,7 @@ in Pipeline.build Pipeline.Config::{
       target = Size.Small,
       docker = Some Docker::{
         image = (./Constants/ContainerImages.dhall).toolchainBase,
-        environment = ["BUILDKITE_AGENT_ACCESS_TOKEN", "BUILDKITE_INCREMENTAL"]
+        environment = ["BUILDKITE_AGENT_ACCESS_TOKEN", "BUILDKITE_PULL_REQUEST_BASE_BRANCH"]
       }
     }
   ]
