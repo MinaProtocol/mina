@@ -20,6 +20,7 @@ function usage() {
   echo "  -s, --service             The Service being released to Dockerhub"
   echo "  -v, --version             The version to be used in the docker image tag"
   echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=devnet"
+  echo "  -t, --additional-tag      The additional tag for docker image"
   echo "  -b, --branch              The branch of the mina repository to use for staged docker builds. Default=compatible"
   echo "      --deb-codename        The debian codename (stretch or buster) to build the docker image from. Default=stretch"
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
@@ -36,6 +37,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -v|--version) VERSION="$2"; shift;;
   -n|--network) NETWORK="--build-arg network=$2"; shift;;
   -b|--branch) BRANCH="--build-arg MINA_BRANCH=$2"; shift;;
+  -t|--additional-tag) ADDITIONAL_TAG=${@:2}; shift $((${#}-1));;
   -c|--cache-from) CACHE="--cache-from $2"; shift;;
   --deb-codename) DEB_CODENAME="--build-arg deb_codename=$2"; shift;;
   --deb-release) DEB_RELEASE="--build-arg deb_release=$2"; shift;;
@@ -144,8 +146,13 @@ if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
   # push to GCR
   docker push "${TAG}"
 
+  if [[ ! -z "$ADDITIONAL_TAG" ]]; then
+     docker tag "${TAG}" ${ADDITIONAL_TAG}
+  fi
+
   # retag and push again to GCR
-  docker tag "${TAG}" "${HASHTAG}"
+  docker tag "${TAG}" "${HASHTAG}" ${ADDITIONAL_TAG}
+ 
   docker push "${HASHTAG}"
 
   echo "Release Env Var: ${DEB_RELEASE}"

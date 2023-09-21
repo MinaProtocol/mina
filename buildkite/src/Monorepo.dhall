@@ -57,19 +57,19 @@ let commands: Text -> Text -> List Cmd.Type  =  \(targetStage: Text) -> \(target
             fi
           else 
             if [ "${jobStage}" == "${targetStage}" ]; then
-              echo "Triggering ${job.name} because this is a stable buildkite run"
+              echo "Triggering ${job.name} because this is a nightly buildkite run"
               ${Cmd.format trigger}
             else 
               echo "Skipping ${job.name} because this is a ${targetStage} stage"
             fi
           fi
         '',
-        Stable = ''
+        Nightly = ''
           if [ "${targetMode}" == "PullRequest" ]; then
             echo "Skipping ${job.name} because this is a PR buildkite run"
           else 
             if [ "${jobStage}" == "${targetStage}" ]; then
-              echo "Triggering ${job.name} because this is a stable buildkite run"
+              echo "Triggering ${job.name} because this is a nightly buildkite run"
               ${Cmd.format trigger}
             else
               echo "Skipping ${job.name} because this is a ${targetStage} stage"

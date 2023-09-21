@@ -30,7 +30,7 @@ in Pipeline.build Pipeline.Config::{
     ],
     path = "Test",
     name = "TestnetIntegrationTests",
-    mode = PipelineMode.Type.Stable
+    mode = PipelineMode.Type.Nightly
   },
   steps = [
     TestExecutive.build "integration_tests",

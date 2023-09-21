@@ -46,7 +46,7 @@ Pipeline.build
         dirtyWhen = unitDirtyWhen,
         path = "Test",
         name = "FuzzyZkappTest",
-        mode = PipelineMode.Type.Stable
+        mode = PipelineMode.Type.Nightly
       },
     steps = [
       buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" 3600 150 Size.Small
