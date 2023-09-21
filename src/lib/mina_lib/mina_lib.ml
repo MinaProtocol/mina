@@ -2020,6 +2020,8 @@ let create ?wallets (config : Config.t) =
                 (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
               ~catchup_mode ~network_transition_reader:block_reader
               ~producer_transition_reader ~most_recent_valid_block
+              ~get_completed_work:
+                (Network_pool.Snark_pool.get_completed_work snark_pool)
               ~notify_online ()
           in
           let ( valid_transitions_for_network
