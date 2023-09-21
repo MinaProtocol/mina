@@ -523,6 +523,19 @@ module Account = struct
 
   let is_accept : t -> bool = equal accept
 
+  let nonce (n : Account.Nonce.t) =
+    let nonce : _ Numeric.t = Check { lower = n; upper = n } in
+    { accept with nonce }
+
+  let is_nonce (t : t) =
+    match t.nonce with
+    | Ignore ->
+        false
+    | Check { lower; upper } ->
+        (* nonce is exact, all other fields are Ignore *)
+        Mina_numbers.Account_nonce.equal lower upper
+        && is_accept { t with nonce = Ignore }
+
   let deriver obj =
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
