@@ -532,6 +532,7 @@ module Account = struct
     | Ignore ->
         false
     | Check { lower; upper } ->
+        (* nonce is exact, all other fields are Ignore *)
         Mina_numbers.Account_nonce.equal lower upper
         && is_accept { t with nonce = Ignore }
 
