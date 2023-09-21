@@ -49,7 +49,7 @@ func ZkappBalanceRequirements(tps float64, p ZkappSubParams) (int, uint64, uint6
 	maxExpectedUsagesPerNewAccount := float64(p.DurationMin*60) / float64(p.Gap)
 	//We multiply by three because by matter of chance some zkapps may generate more new accounts
 	newAccountsPerZkapp := int(float64(newAccounts) / float64(totalZkappsToDeploy) * 3)
-	balanceDeductedPerUsage := p.MaxBalanceChange * 8
+	balanceDeductedPerUsage := p.MaxBalanceChange * 2
 	// We add 1e9 because of account creation fee
 	minNewZkappBalance := uint64(maxExpectedUsagesPerNewAccount*float64(balanceDeductedPerUsage))*3 + 1e9
 	maxNewZkappBalance := minNewZkappBalance * 3
@@ -73,16 +73,15 @@ func ZkappKeygenRequirements(initZkappBalance uint64, params ZkappSubParams) (in
 	return keys, balance
 }
 
-func zkappPaymentsInput(params ZkappCommandParams, batchIx int, tps float64, feePayers []itn_json_types.MinaPrivateKey) ZkappCommandsDetails {
-	zkappsToDeploy, accountQueueSize := zkappParams(params.ZkappSubParams, tps)
-	newAccounts, minNewZkappBalance, maxNewZkappBalance, initBalance := ZkappBalanceRequirements(tps, params.ZkappSubParams)
+func ZkappPaymentsInput(params ZkappSubParams, batchIx int, tps float64) ZkappCommandsDetails {
+	zkappsToDeploy, accountQueueSize := zkappParams(params, tps)
+	newAccounts, minNewZkappBalance, maxNewZkappBalance, initBalance := ZkappBalanceRequirements(tps, params)
 	return ZkappCommandsDetails{
 		MemoPrefix:         fmt.Sprintf("%s-%d", params.ExperimentName, batchIx),
 		DurationMin:        params.DurationMin,
 		Tps:                tps,
 		NumZkappsToDeploy:  zkappsToDeploy,
 		NumNewAccounts:     newAccounts,
-		FeePayers:          feePayers,
 		NoPrecondition:     params.NoPrecondition,
 		MinBalanceChange:   params.MinBalanceChange,
 		MaxBalanceChange:   params.MaxBalanceChange,
@@ -98,7 +97,8 @@ func zkappPaymentsInput(params ZkappCommandParams, batchIx int, tps float64, fee
 }
 
 func scheduleZkappCommandsDo(config Config, params ZkappCommandParams, nodeAddress NodeAddress, batchIx int, tps float64, feePayers []itn_json_types.MinaPrivateKey) (string, error) {
-	paymentInput := zkappPaymentsInput(params, batchIx, tps, feePayers)
+	paymentInput := ZkappPaymentsInput(params.ZkappSubParams, batchIx, tps)
+	paymentInput.FeePayers = feePayers
 	handle, err := ScheduleZkappCommands(config, nodeAddress, paymentInput)
 	if err == nil {
 		config.Log.Infof("scheduled zkapp batch %d with tps %f for %s: %s", batchIx, tps, nodeAddress, handle)

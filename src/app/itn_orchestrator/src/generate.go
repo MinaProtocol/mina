@@ -41,8 +41,9 @@ func (cmd *GeneratedCommand) Comment() string {
 }
 
 type GeneratedRound struct {
-	Commands     []GeneratedCommand
-	FundCommands []FundParams
+	Commands           []GeneratedCommand
+	PaymentFundCommand *FundParams
+	ZkappFundCommand   *FundParams
 }
 
 func withComment(comment string, cmd GeneratedCommand) GeneratedCommand {
@@ -381,32 +382,27 @@ func (p *GenParams) Generate(round int) GeneratedRound {
 			cmds = append(cmds, withComment(comment3, waitMin(p.LargePauseMin)))
 		}
 	}
-	fundCmds := []FundParams{}
+	res := GeneratedRound{Commands: cmds}
 	if !onlyPayments {
 		_, _, _, initBalance := ZkappBalanceRequirements(zkappTps, zkappParams)
 		zkappKeysNum, zkappAmount := ZkappKeygenRequirements(initBalance, zkappParams)
-		fundCmds = append(fundCmds,
-			FundParams{
-				PasswordEnv: p.PasswordEnv,
-				Prefix:      zkappsKeysDir + "/key",
-				Amount:      zkappAmount,
-				Fee:         p.FundFee,
-				Num:         zkappKeysNum,
-			})
+		res.ZkappFundCommand = &FundParams{
+			PasswordEnv: p.PasswordEnv,
+			Prefix:      zkappsKeysDir + "/key",
+			Amount:      zkappAmount,
+			Fee:         p.FundFee,
+			Num:         zkappKeysNum,
+		}
 	}
 	if !onlyZkapps {
 		paymentKeysNum, paymentAmount := PaymentKeygenRequirements(p.Gap, paymentParams)
-		fundCmds = append(fundCmds,
-			FundParams{
-				PasswordEnv: p.PasswordEnv,
-				Prefix:      paymentsKeysDir + "/key",
-				Amount:      paymentAmount,
-				Fee:         p.FundFee,
-				Num:         paymentKeysNum,
-			})
+		res.PaymentFundCommand = &FundParams{
+			PasswordEnv: p.PasswordEnv,
+			Prefix:      paymentsKeysDir + "/key",
+			Amount:      paymentAmount,
+			Fee:         p.FundFee,
+			Num:         paymentKeysNum,
+		}
 	}
-	return GeneratedRound{
-		Commands:     cmds,
-		FundCommands: fundCmds,
-	}
+	return res
 }

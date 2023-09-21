@@ -158,7 +158,12 @@ func main() {
 	for r := 0; r < p.Rounds; r++ {
 		round := p.Generate(r)
 		cmds = append(cmds, round.Commands...)
-		fundCmds = append(fundCmds, round.FundCommands...)
+		if round.PaymentFundCommand != nil {
+			fundCmds = append(fundCmds, *round.PaymentFundCommand)
+		}
+		if round.ZkappFundCommand != nil {
+			fundCmds = append(fundCmds, *round.ZkappFundCommand)
+		}
 	}
 	privkeys := p.Privkeys
 	if p.GenerateFundKeys > 0 {
