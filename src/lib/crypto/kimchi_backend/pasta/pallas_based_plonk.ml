@@ -77,13 +77,18 @@ module Proof = Plonk_dlog_proof.Make (struct
       , Pasta_bindings.Fq.t )
       Kimchi_types.prover_proof
 
+    type with_public_evals =
+      ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
+      , Pasta_bindings.Fq.t )
+      Kimchi_types.proof_with_public
+
     include Kimchi_bindings.Protocol.Proof.Fq
 
     let batch_verify vks ts =
       Promise.run_in_thread (fun () -> batch_verify vks ts)
 
-    let create_aux ~f:create (pk : Keypair.t) ~primary ~auxiliary
-        ~runtime_tables ~prev_chals ~prev_comms =
+    let create_aux ~f:create (pk : Keypair.t) ~primary ~auxiliary ~prev_chals
+        ~prev_comms =
       (* external values contains [1, primary..., auxiliary ] *)
       let external_values i =
         let open Field.Vector in
@@ -92,7 +97,7 @@ module Proof = Plonk_dlog_proof.Make (struct
       in
 
       (* compute witness *)
-      let computed_witness =
+      let computed_witness, runtime_tables =
         R1CS_constraint_system.compute_witness pk.cs external_values
       in
       let num_rows = Array.length computed_witness.(0) in
@@ -108,22 +113,15 @@ module Proof = Plonk_dlog_proof.Make (struct
       in
       create pk.index witness_cols runtime_tables prev_chals prev_comms
 
-    let create_async (pk : Keypair.t) ~primary ~auxiliary ~runtime_tables
-        ~prev_chals ~prev_comms =
-      create_aux pk ~primary ~auxiliary ~runtime_tables ~prev_chals ~prev_comms
+    let create_async (pk : Keypair.t) ~primary ~auxiliary ~prev_chals
+        ~prev_comms =
+      create_aux pk ~primary ~auxiliary ~prev_chals ~prev_comms
         ~f:(fun pk auxiliary_input runtime_tables prev_challenges prev_sgs ->
           Promise.run_in_thread (fun () ->
               create pk auxiliary_input runtime_tables prev_challenges prev_sgs ) )
 
-    let create_and_verify_async (pk : Keypair.t) ~primary ~auxiliary
-        ~runtime_tables ~prev_chals ~prev_comms =
-      failwith "not implemented"
-    (* TODO: Remove this function when vesta_based_plonk.create_and_verify_async is removed *)
-
-    let create (pk : Keypair.t) ~primary ~auxiliary ~runtime_tables ~prev_chals
-        ~prev_comms =
-      create_aux pk ~primary ~auxiliary ~runtime_tables ~prev_chals ~prev_comms
-        ~f:create
+    let create (pk : Keypair.t) ~primary ~auxiliary ~prev_chals ~prev_comms =
+      create_aux pk ~primary ~auxiliary ~prev_chals ~prev_comms ~f:create
   end
 
   module Verifier_index = Kimchi_bindings.Protocol.VerifierIndex.Fq
@@ -173,5 +171,7 @@ module Oracles = Plonk_dlog_oracles.Make (struct
     include Kimchi_bindings.Protocol.Oracles.Fq
 
     let create = with_lagrange create
+
+    let create_with_public_evals = with_lagrange create_with_public_evals
   end
 end)

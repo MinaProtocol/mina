@@ -39,9 +39,14 @@ module Node = struct
     ; pod_ids : string list
     ; pod_info : pod_info
     ; config : config
+    ; mutable should_be_running : bool
     }
 
   let id { pod_ids; _ } = List.hd_exn pod_ids
+
+  let app_id { app_id; _ } = app_id
+
+  let should_be_running { should_be_running; _ } = should_be_running
 
   let network_keypair { pod_info = { network_keypair; _ }; _ } = network_keypair
 
@@ -102,6 +107,7 @@ module Node = struct
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
+    node.should_be_running <- true ;
     let%bind () =
       if fresh_state then
         run_in_container node ~cmd:[ "sh"; "-c"; "rm -rf .mina-config/*" ]
@@ -112,6 +118,7 @@ module Node = struct
 
   let stop node =
     let open Malleable_error.Let_syntax in
+    node.should_be_running <- false ;
     run_in_container ~exit_code:12 node ~cmd:[ "/stop.sh" ] >>| ignore
 
   let logger_infra_metadata node =
@@ -160,7 +167,7 @@ module Node = struct
     Out_channel.with_file data_file ~f:(fun out_ch ->
         Out_channel.output_string out_ch data )
 
-  let run_replayer ~logger (t : t) =
+  let run_replayer ?(start_slot_since_genesis = 0) ~logger (t : t) =
     [%log info] "Running replayer on archived data (node: %s, container: %s)"
       (List.hd_exn t.pod_ids) mina_archive_container_id ;
     let open Malleable_error.Let_syntax in
@@ -170,8 +177,9 @@ module Node = struct
     in
     let replayer_input =
       sprintf
-        {| { "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }} |}
-        accounts
+        {| { "start_slot_since_genesis": %d,
+             "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }} |}
+        start_slot_since_genesis accounts
     in
     let dest = "replayer-input.json" in
     let%bind _res =
@@ -319,7 +327,8 @@ module Workload_to_deploy = struct
       (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
       (* TODO fix this^ and have a more elegant solution *)
       let pod_info = t.pod_info in
-      return { Node.app_id; pod_ids; pod_info; config }
+      return
+        { Node.app_id; pod_ids; pod_info; config; should_be_running = false }
 end
 
 type t =

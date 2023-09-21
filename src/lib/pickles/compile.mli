@@ -117,7 +117,7 @@ module Side_loaded : sig
   val create :
        name:string
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    -> feature_flags:Opt.Flag.t Plonk_types.Features.t
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
@@ -152,7 +152,9 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , 'max_local_max_proofs_verifieds )
          Full_signature.t
       -> ('prev_varss, 'branches) Hlist.Length.t
-      -> ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+      -> ( ( Wrap_main_inputs.Inner_curve.Constant.t
+           , Wrap_main_inputs.Inner_curve.Constant.t option )
+           Wrap_verifier.index'
          , 'branches )
          Vector.t
          Lazy.t
@@ -165,14 +167,10 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                  , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                  , ( Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                    , Impls.Wrap.Boolean.var )
-                   Plonk_types.Opt.t
+                   Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-                     Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                     .In_circuit
-                     .Lookup
-                     .t
                    , Impls.Wrap.Boolean.var )
-                   Pickles_types__Plonk_types.Opt.t
+                   Pickles_types__Opt.t
                  , Impls.Wrap.Boolean.var )
                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                  .In_circuit
@@ -202,9 +200,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -234,9 +229,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -276,6 +268,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
 val compile_with_wrap_main_override_promise :
      ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
+  -> ?proof_cache:Proof_cache.t
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
        * Cache.Wrap.Key.Verification.t
@@ -332,7 +325,9 @@ val wrap_main_dummy_override :
      , 'max_local_max_proofs_verifieds )
      Full_signature.t
   -> ('prev_varss, 'branches) Hlist.Length.t
-  -> ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+  -> ( ( Wrap_main_inputs.Inner_curve.Constant.t
+       , Wrap_main_inputs.Inner_curve.Constant.t option )
+       Wrap_verifier.index'
      , 'branches )
      Vector.t
      Lazy.t
@@ -345,14 +340,10 @@ val wrap_main_dummy_override :
              , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
              , ( Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                , Impls.Wrap.Boolean.var )
-               Plonk_types.Opt.t
+               Opt.t
              , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-                 Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                 .In_circuit
-                 .Lookup
-                 .t
                , Impls.Wrap.Boolean.var )
-               Pickles_types__Plonk_types.Opt.t
+               Pickles_types__Opt.t
              , Impls.Wrap.Boolean.var )
              Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
              .t
@@ -380,10 +371,6 @@ module Make_adversarial_test : functor
             , bool )
             Import.Types.Opt.t
           , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-              .In_circuit
-              .Lookup
-              .t
             , bool )
             Import.Types.Opt.t
           , bool
@@ -413,10 +400,6 @@ module Make_adversarial_test : functor
             , bool )
             Import.Types.Opt.t
           , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-              .In_circuit
-              .Lookup
-              .t
             , bool )
             Import.Types.Opt.t
           , bool

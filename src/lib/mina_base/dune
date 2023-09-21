@@ -1,7 +1,7 @@
 (library
  (name mina_base)
  (public_name mina_base)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (library_flags -linkall)
  (flags -w -22)
  (libraries
@@ -40,6 +40,7 @@
    rosetta_coding
    random_oracle
    hash_prefix_states
+   hash_prefix_create
    dummy_values
    currency
    mina_numbers

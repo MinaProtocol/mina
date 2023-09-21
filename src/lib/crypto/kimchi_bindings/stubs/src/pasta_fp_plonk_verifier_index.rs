@@ -10,7 +10,7 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use kimchi::circuits::constraints::FeatureFlags;
 use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupPatterns};
 use kimchi::circuits::polynomials::permutation::Shifts;
-use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
+use kimchi::circuits::polynomials::permutation::{permutation_vanishing_polynomial, zk_w};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fp, Pallas, Vesta};
@@ -47,6 +47,13 @@ impl From<VerifierIndex<Vesta>> for CamlPastaFpPlonkVerifierIndex {
                 mul_comm: vi.mul_comm.into(),
                 emul_comm: vi.emul_comm.into(),
                 endomul_scalar_comm: vi.endomul_scalar_comm.into(),
+
+                xor_comm: vi.xor_comm.map(Into::into),
+                range_check0_comm: vi.range_check0_comm.map(Into::into),
+                range_check1_comm: vi.range_check1_comm.map(Into::into),
+                foreign_field_add_comm: vi.foreign_field_add_comm.map(Into::into),
+                foreign_field_mul_comm: vi.foreign_field_mul_comm.map(Into::into),
+                rot_comm: vi.rot_comm.map(Into::into),
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
             lookup_index: vi.lookup_index.map(Into::into),
@@ -76,26 +83,32 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
         let shift: [Fp; PERMUTS] = shifts.try_into().expect("wrong size");
 
         let feature_flags = FeatureFlags {
-            range_check0: false,
-            range_check1: false,
-            foreign_field_add: false,
-            foreign_field_mul: false,
-            rot: false,
-            xor: false,
-            lookup_features: LookupFeatures {
-                patterns: LookupPatterns {
-                    xor: false,
-                    lookup: false,
-                    range_check: false,
-                    foreign_field_mul: false,
-                },
-                joint_lookup_used: false,
-                uses_runtime_tables: false,
+            range_check0: evals.range_check0_comm.is_some(),
+            range_check1: evals.range_check1_comm.is_some(),
+            foreign_field_add: evals.foreign_field_add_comm.is_some(),
+            foreign_field_mul: evals.foreign_field_mul_comm.is_some(),
+            rot: evals.rot_comm.is_some(),
+            xor: evals.xor_comm.is_some(),
+            lookup_features: {
+                if let Some(li) = index.lookup_index.as_ref() {
+                    li.lookup_info.features
+                } else {
+                    LookupFeatures {
+                        patterns: LookupPatterns {
+                            xor: false,
+                            lookup: false,
+                            range_check: false,
+                            foreign_field_mul: false,
+                        },
+                        joint_lookup_used: false,
+                        uses_runtime_tables: false,
+                    }
+                }
             },
         };
 
         // TODO dummy_lookup_value ?
-        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
+        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true, 3);
 
         VerifierIndex::<Vesta> {
             domain,
@@ -109,6 +122,8 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
                 res
             },
 
+            zk_rows: 3,
+
             sigma_comm,
             coefficients_comm,
             generic_comm: evals.generic_comm.into(),
@@ -120,23 +135,22 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
             emul_comm: evals.emul_comm.into(),
             endomul_scalar_comm: evals.endomul_scalar_comm.into(),
 
-            xor_comm: None,
-
-            range_check0_comm: None,
-            range_check1_comm: None,
-            foreign_field_add_comm: None,
-            foreign_field_mul_comm: None,
-            rot_comm: None,
+            xor_comm: evals.xor_comm.map(Into::into),
+            range_check0_comm: evals.range_check0_comm.map(Into::into),
+            range_check1_comm: evals.range_check1_comm.map(Into::into),
+            foreign_field_add_comm: evals.foreign_field_add_comm.map(Into::into),
+            foreign_field_mul_comm: evals.foreign_field_mul_comm.map(Into::into),
+            rot_comm: evals.rot_comm.map(Into::into),
 
             shift,
-            zkpm: {
+            permutation_vanishing_polynomial_m: {
                 let res = once_cell::sync::OnceCell::new();
-                res.set(zk_polynomial(domain)).unwrap();
+                res.set(permutation_vanishing_polynomial(domain, 3)).unwrap();
                 res
             },
             w: {
                 let res = once_cell::sync::OnceCell::new();
-                res.set(zk_w3(domain)).unwrap();
+                res.set(zk_w(domain, 3)).unwrap();
                 res
             },
             endo: endo_q,
@@ -248,6 +262,12 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
             mul_comm: comm(),
             emul_comm: comm(),
             endomul_scalar_comm: comm(),
+            xor_comm: None,
+            range_check0_comm: None,
+            range_check1_comm: None,
+            foreign_field_add_comm: None,
+            foreign_field_mul_comm: None,
+            rot_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
         lookup_index: None,

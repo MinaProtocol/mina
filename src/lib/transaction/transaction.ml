@@ -150,3 +150,37 @@ let check_well_formedness ~genesis_constants (t : t) =
       User_command.check_well_formedness ~genesis_constants cmd
   | Fee_transfer _ | Coinbase _ ->
       Ok ()
+
+let yojson_summary_of_command =
+  let mk_record type_ memo signature =
+    `List
+      [ `String type_
+      ; `String (Signature.to_base58_check signature)
+      ; `String (Signed_command_memo.to_string_hum memo)
+      ]
+  in
+  function
+  | User_command.Zkapp_command cmd ->
+      mk_record "zkapp" (Zkapp_command.memo cmd)
+        ( Zkapp_command.fee_payer_account_update cmd
+        |> Account_update.Fee_payer.authorization )
+  | Signed_command cmd ->
+      mk_record "payment" (Signed_command.memo cmd)
+        (Signed_command.signature cmd)
+
+let yojson_summary = function
+  | Command cmd ->
+      yojson_summary_of_command cmd
+  | Fee_transfer _ ->
+      `List [ `String "fee_transfer" ]
+  | Coinbase cb ->
+      let amount = Currency.Amount.to_yojson @@ Coinbase.amount cb in
+      `List [ `String "coinbase"; amount ]
+
+let yojson_summary_with_status cmd_with_status =
+  let status =
+    Transaction_status.to_yojson (With_status.status cmd_with_status)
+  in
+  match yojson_summary (With_status.data cmd_with_status) with
+  | `List lst ->
+      `List (lst @ [ status ])

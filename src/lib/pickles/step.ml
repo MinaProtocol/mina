@@ -39,7 +39,7 @@ struct
             *)
       max_local_max_proof_verifieds self_branches prev_vars prev_values
       local_widths local_heights prevs_length var value ret_var ret_value
-      auxiliary_var auxiliary_value ) ?handler
+      auxiliary_var auxiliary_value ) ?handler ~proof_cache
       (T branch_data :
         ( A.t
         , A_value.t
@@ -105,9 +105,7 @@ struct
         , Challenge.Constant.t Scalar_challenge.t
         , Tick.Field.t Shifted_value.Type1.t
         , Tick.Field.t Shifted_value.Type1.t option
-        , Challenge.Constant.t Scalar_challenge.t
-          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
-          option
+        , Challenge.Constant.t Scalar_challenge.t option
         , bool
         , Digest.Constant.t
         , Digest.Constant.t
@@ -274,17 +272,7 @@ struct
                      ; alpha = plonk0.alpha
                      ; beta = plonk0.beta
                      ; gamma = plonk0.gamma
-                     ; lookup =
-                         Option.map (Opt.to_option_unsafe plonk.lookup)
-                           ~f:(fun _ ->
-                             { Composition_types.Wrap.Proof_state
-                               .Deferred_values
-                               .Plonk
-                               .In_circuit
-                               .Lookup
-                               .joint_combiner =
-                                 Option.value_exn plonk0.joint_combiner
-                             } )
+                     ; joint_combiner = plonk0.joint_combiner
                      }
                  ; combined_inner_product =
                      deferred_values.combined_inner_product
@@ -311,7 +299,8 @@ struct
       let module O = Tock.Oracles in
       let o =
         let public_input =
-          tock_public_input_of_statement prev_statement_with_hashes
+          tock_public_input_of_statement ~feature_flags
+            prev_statement_with_hashes
         in
         O.create dlog_vk
           ( Vector.map2
@@ -412,7 +401,8 @@ struct
               (Vector.map
                  t.statement.messages_for_next_step_proof
                    .old_bulletproof_challenges ~f:Ipa.Step.compute_challenges )
-              Local_max_proofs_verified.n Dummy.Ipa.Step.challenges_computed
+              Local_max_proofs_verified.n
+              (Lazy.force Dummy.Ipa.Step.challenges_computed)
         ; wrap_proof =
             { opening =
                 { proof.openings.proof with challenge_polynomial_commitment }
@@ -714,7 +704,7 @@ struct
               { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges =
                   Vector.init Max_proofs_verified.n ~f:(fun _ ->
-                      Dummy.Ipa.Wrap.challenges_computed )
+                      Lazy.force Dummy.Ipa.Wrap.challenges_computed )
               }
             in
             Wrap_hack.hash_messages_for_next_wrap_proof Max_proofs_verified.n t
@@ -794,10 +784,11 @@ struct
                } )
            |> to_list) )
     in
-    let%map.Promise (next_proof : Tick.Proof.t), _next_statement_hashed =
+    let%map.Promise ( (next_proof : Tick.Proof.with_public_evals)
+                    , _next_statement_hashed ) =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-          ~wrap_rounds:Tock.Rounds.n ~feature_flags
+          ~wrap_rounds:Tock.Rounds.n
       in
       let { Domains.h } = Vector.nth_exn step_domains branch_data.index in
       ksprintf Common.time "step-prover %d (%d)" branch_data.index
@@ -818,13 +809,31 @@ struct
                           ; public_inputs
                           } next_statement_hashed ->
                     [%log internal] "Backend_tick_proof_create_async" ;
-                    let%map.Promise proof =
-                      (* TODO(dw) pass runtime tables *)
+                    let create_proof () =
                       Backend.Tick.Proof.create_async ~primary:public_inputs
-                        ~auxiliary:auxiliary_inputs ~runtime_tables:[||]
+                        ~auxiliary:auxiliary_inputs
                         ~message:
                           (Lazy.force prev_challenge_polynomial_commitments)
                         pk
+                    in
+                    let%map.Promise proof =
+                      match proof_cache with
+                      | None ->
+                          create_proof ()
+                      | Some proof_cache -> (
+                          match
+                            Proof_cache.get_step_proof proof_cache ~keypair:pk
+                              ~public_input:public_inputs
+                          with
+                          | None ->
+                              let%map.Promise proof = create_proof () in
+                              Proof_cache.set_step_proof proof_cache ~keypair:pk
+                                ~public_input:public_inputs proof.proof ;
+                              proof
+                          | Some proof ->
+                              Promise.return
+                                ( { proof; public_evals = None }
+                                  : Tick.Proof.with_public_evals ) )
                     in
                     [%log internal] "Backend_tick_proof_create_async_done" ;
                     (proof, next_statement_hashed) )
@@ -871,7 +880,7 @@ struct
       }
     in
     [%log internal] "Pickles_step_proof_done" ;
-    ( { Proof.Base.Step.proof = next_proof
+    ( { Proof.Base.Step.proof = next_proof.proof
       ; statement = next_statement
       ; index = branch_data.index
       ; prev_evals =
@@ -883,7 +892,7 @@ struct
                    ; evals =
                        { With_public_input.evals = es; public_input = x_hat }
                    } ) )
-            lte Max_proofs_verified.n Dummy.evals
+            lte Max_proofs_verified.n (Lazy.force Dummy.evals)
       }
     , Option.value_exn !return_value
     , Option.value_exn !auxiliary_value

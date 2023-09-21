@@ -15,6 +15,7 @@ module type S = sig
   module Types_map = Types_map
   module Step_verifier = Step_verifier
   module Common = Common
+  module Proof_cache = Proof_cache
 
   exception Return_digest of Md5.t
 
@@ -333,7 +334,7 @@ module type S = sig
     val create :
          name:string
       -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
-      -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+      -> feature_flags:Opt.Flag.t Plonk_types.Features.t
       -> typ:('var, 'value) Impls.Step.Typ.t
       -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
@@ -365,6 +366,7 @@ module type S = sig
   val compile_promise :
        ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
+    -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
@@ -419,6 +421,7 @@ module type S = sig
   val compile :
        ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
+    -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t

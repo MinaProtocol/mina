@@ -13,7 +13,13 @@ type metrics_t =
   }
 
 type best_chain_block =
-  { state_hash : string; command_transaction_count : int; creator_pk : string }
+  { state_hash : string
+  ; command_transaction_count : int
+  ; creator_pk : string
+  ; height : Mina_numbers.Length.t
+  ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+  ; global_slot_since_hard_fork : Mina_numbers.Global_slot_since_hard_fork.t
+  }
 
 (* TODO: malleable error -> or error *)
 
@@ -43,18 +49,29 @@ module Engine = struct
 
       val id : t -> string
 
+      val app_id : t -> string
+
       val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t
 
       val stop : t -> unit Malleable_error.t
 
+      (** Returns true when [start] was most recently called, or false if
+          [stop] was more recent.
+      *)
+      val should_be_running : t -> bool
+
       val get_ingress_uri : t -> Uri.t
 
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
 
-      val run_replayer : logger:Logger.t -> t -> string Malleable_error.t
+      val run_replayer :
+           ?start_slot_since_genesis:int
+        -> logger:Logger.t
+        -> t
+        -> string Malleable_error.t
 
       val dump_mina_logs :
         logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t

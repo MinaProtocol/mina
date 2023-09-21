@@ -182,7 +182,8 @@ let verify_heterogenous (ts : Instance.t list) =
           }
         in
         let input =
-          tock_unpadded_public_input_of_statement prepared_statement
+          tock_unpadded_public_input_of_statement
+            ~feature_flags:Plonk_types.Features.Full.maybe prepared_statement
         in
         let message =
           Wrap_hack.pad_accumulator
@@ -199,7 +200,12 @@ let verify_heterogenous (ts : Instance.t list) =
                t.statement.proof_state.messages_for_next_wrap_proof
                  .old_bulletproof_challenges )
         in
-        (key.index, Wrap_wire_proof.to_kimchi_proof t.proof, input, Some message) )
+        ( key.index
+        , { proof = Wrap_wire_proof.to_kimchi_proof t.proof
+          ; public_evals = None
+          }
+        , input
+        , Some message ) )
   in
   [%log internal] "Compute_batch_verify_inputs_done" ;
   [%log internal] "Dlog_check_batch_verify" ;

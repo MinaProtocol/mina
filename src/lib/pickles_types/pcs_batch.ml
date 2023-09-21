@@ -7,20 +7,6 @@ let map t ~f = { t with with_degree_bound = Vector.map t.with_degree_bound ~f }
 
 let num_bits n = Int.floor_log2 n + 1
 
-let%test_unit "num_bits" =
-  let naive n =
-    let rec go k =
-      (* [Invalid_argument] represents an overflow, which is certainly bigger
-         than any given value.
-      *)
-      let n_lt_2k = try n < Int.pow 2 k with Invalid_argument _ -> true in
-      if n_lt_2k then k else go (k + 1)
-    in
-    go 0
-  in
-  Quickcheck.test (Int.gen_uniform_incl 0 Int.max_value) ~f:(fun n ->
-      [%test_eq: int] (num_bits n) (naive n) )
-
 let pow ~one ~mul x n =
   assert (n >= 0) ;
   let k = num_bits n in
@@ -89,12 +75,18 @@ let combine_split_commitments _t ~scale_and_add ~init:i ~xi (type n)
         ~f:(fun { With_degree_bound.unshifted; shifted } ->
           Array.to_list unshifted @ [ shifted ] )
   in
-  match List.rev flat with
-  | [] ->
-      failwith "combine_split_commitments: empty"
-  | init :: comms ->
-      List.fold_left comms ~init:(i init) ~f:(fun acc p ->
-          scale_and_add ~acc ~xi p )
+  let rec go = function
+    | [] ->
+        failwith "combine_split_commitments: empty"
+    | init :: comms -> (
+        match i init with
+        | None ->
+            go comms
+        | Some init ->
+            List.fold_left comms ~init ~f:(fun acc p ->
+                scale_and_add ~acc ~xi p ) )
+  in
+  go (List.rev flat)
 
 let combine_split_evaluations (type f f')
     ~(mul_and_add : acc:f' -> xi:f' -> f -> f') ~init:(i : f -> f') ~(xi : f')
