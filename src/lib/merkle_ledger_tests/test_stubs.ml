@@ -110,11 +110,7 @@ struct
     { uuid = Uuid_unix.create (); table = Bigstring_frozen.Table.create () }
 
   let create_checkpoint t _ =
-    { uuid = Uuid_unix.create ()
-    ; table =
-        Bigstring_frozen.Table.of_alist_exn
-        @@ Bigstring_frozen.Table.to_alist t.table
-    }
+    { uuid = Uuid_unix.create (); table = Bigstring_frozen.Table.copy t.table }
 
   let close _ = ()
 
