@@ -1939,10 +1939,12 @@ let%test_module _ =
               { Account_update.Preconditions.network =
                   protocol_state_precondition
               ; account =
-                  Account_update.Account_precondition.Nonce
-                    ( if Option.is_none fee_payer then
-                      Account.Nonce.succ sender_nonce
-                    else sender_nonce )
+                  (let nonce =
+                     if Option.is_none fee_payer then
+                       Account.Nonce.succ sender_nonce
+                     else sender_nonce
+                   in
+                   Zkapp_precondition.Account.nonce nonce )
               ; valid_while = Ignore
               }
         }
@@ -2019,21 +2021,13 @@ let%test_module _ =
                             preconditions =
                               { p.body.preconditions with
                                 account =
-                                  ( match p.body.preconditions.account with
-                                  | Account_update.Account_precondition.Full
-                                      { nonce =
-                                          Zkapp_basic.Or_ignore.Check n as c
-                                      ; _
-                                      }
+                                  ( match p.body.preconditions.account.nonce with
+                                  | Zkapp_basic.Or_ignore.Check n as c
                                     when Zkapp_precondition.Numeric.(
                                            is_constant Tc.nonce c) ->
-                                      Account_update.Account_precondition.Nonce
-                                        n.lower
-                                  | Account_update.Account_precondition.Full _
-                                    ->
-                                      Account_update.Account_precondition.Accept
-                                  | pre ->
-                                      pre )
+                                      Zkapp_precondition.Account.nonce n.lower
+                                  | _ ->
+                                      Zkapp_precondition.Account.accept )
                               }
                           }
                       } )
@@ -2808,7 +2802,7 @@ let%test_module _ =
           ~default:
             Account_update.Preconditions.
               { network = Zkapp_precondition.Protocol_state.accept
-              ; account = Account_update.Account_precondition.Accept
+              ; account = Zkapp_precondition.Account.accept
               ; valid_while = Ignore
               }
       in

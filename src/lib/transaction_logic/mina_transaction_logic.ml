@@ -1865,23 +1865,14 @@ module Make (L : Ledger_intf.S) :
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
       | Check_account_precondition
-          (account_update, account, new_account, local_state) -> (
-          match account_update.body.preconditions.account with
-          | Accept ->
-              local_state
-          | Nonce n ->
-              let nonce_matches = Account.Nonce.equal account.nonce n in
-              Inputs.Local_state.add_check local_state
-                Account_nonce_precondition_unsatisfied nonce_matches
-          | Full precondition_account ->
-              let local_state = ref local_state in
-              let check failure b =
-                local_state :=
-                  Inputs.Local_state.add_check !local_state failure b
-              in
-              Zkapp_precondition.Account.check ~new_account ~check
-                precondition_account account ;
-              !local_state )
+          (account_update, account, new_account, local_state) ->
+          let local_state = ref local_state in
+          let check failure b =
+            local_state := Inputs.Local_state.add_check !local_state failure b
+          in
+          Zkapp_precondition.Account.check ~new_account ~check
+            account_update.body.preconditions.account account ;
+          !local_state
       | Init_account { account_update = _; account = a } ->
           a
   end
@@ -2757,7 +2748,7 @@ module For_tests = struct
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account = Accept
+                    ; account = Zkapp_precondition.Account.accept
                     ; valid_while = Ignore
                     }
                 ; may_use_token = No
@@ -2784,7 +2775,7 @@ module For_tests = struct
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account = Accept
+                    ; account = Zkapp_precondition.Account.accept
                     ; valid_while = Ignore
                     }
                 ; may_use_token = No
