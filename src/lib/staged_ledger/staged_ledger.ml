@@ -4490,8 +4490,9 @@ let%test_module "staged ledger tests" =
               match%bind
                 Sl.apply ~constraint_constants ~global_slot sl
                   (Staged_ledger_diff.forget diff)
-                  ~logger ~verifier ~current_state_view ~state_and_body_hash
-                  ~coinbase_receiver ~supercharge_coinbase:false
+                  ~logger ~verifier ~get_completed_work:(Fn.const None)
+                  ~current_state_view ~state_and_body_hash ~coinbase_receiver
+                  ~supercharge_coinbase:false
               with
               | Ok _x -> (
                   let valid_command_1_with_status =
@@ -4535,7 +4536,8 @@ let%test_module "staged ledger tests" =
                   match%map
                     Sl.apply ~constraint_constants ~global_slot sl
                       (Staged_ledger_diff.forget diff)
-                      ~logger ~verifier ~current_state_view ~state_and_body_hash
+                      ~logger ~verifier ~get_completed_work:(Fn.const None)
+                      ~current_state_view ~state_and_body_hash
                       ~coinbase_receiver ~supercharge_coinbase:false
                   with
                   | Ok _x ->
