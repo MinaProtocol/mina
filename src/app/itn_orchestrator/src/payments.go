@@ -39,8 +39,8 @@ func PaymentKeygenRequirements(gap int, params PaymentSubParams) (int, uint64) {
 	return keys, balance
 }
 
-func schedulePaymentsDo(config Config, params PaymentParams, nodeAddress NodeAddress, batchIx int, tps float64, feePayers []itn_json_types.MinaPrivateKey) (string, error) {
-	paymentInput := PaymentsDetails{
+func paymentInput(params PaymentSubParams, batchIx int, tps float64) PaymentsDetails {
+	return PaymentsDetails{
 		DurationMin: params.DurationMin,
 		Tps:         tps,
 		MemoPrefix:  fmt.Sprintf("%s-%d", params.ExperimentName, batchIx),
@@ -48,8 +48,12 @@ func schedulePaymentsDo(config Config, params PaymentParams, nodeAddress NodeAdd
 		MinFee:      params.MinFee,
 		Amount:      params.Amount,
 		Receiver:    params.Receiver,
-		Senders:     feePayers,
 	}
+}
+
+func schedulePaymentsDo(config Config, params PaymentSubParams, nodeAddress NodeAddress, batchIx int, tps float64, feePayers []itn_json_types.MinaPrivateKey) (string, error) {
+	paymentInput := paymentInput(params, batchIx, tps)
+	paymentInput.Senders = feePayers
 	handle, err := SchedulePaymentsGql(config, nodeAddress, paymentInput)
 	if err == nil {
 		config.Log.Infof("scheduled payment batch %d with tps %f for %s: %s", batchIx, tps, nodeAddress, handle)
@@ -67,7 +71,7 @@ func SchedulePayments(config Config, params PaymentParams, output func(Scheduled
 	for nodeIx, nodeAddress := range nodes {
 		feePayers := remFeePayers[:feePayersPerNode]
 		var handle string
-		handle, err = schedulePaymentsDo(config, params, nodeAddress, len(successfulNodes), tps, feePayers)
+		handle, err = schedulePaymentsDo(config, params.PaymentSubParams, nodeAddress, len(successfulNodes), tps, feePayers)
 		if err != nil {
 			config.Log.Warnf("error scheduling payments for %s: %v", nodeAddress, err)
 			n := len(nodes) - nodeIx - 1
@@ -88,7 +92,7 @@ func SchedulePayments(config Config, params PaymentParams, output func(Scheduled
 	if err != nil {
 		// last schedule payment request didn't work well
 		for _, nodeAddress := range successfulNodes {
-			handle, err2 := schedulePaymentsDo(config, params, nodeAddress, len(successfulNodes), tps, remFeePayers)
+			handle, err2 := schedulePaymentsDo(config, params.PaymentSubParams, nodeAddress, len(successfulNodes), tps, remFeePayers)
 			if err2 != nil {
 				config.Log.Warnf("error scheduling second batch of payments for %s: %v", nodeAddress, err2)
 				continue
