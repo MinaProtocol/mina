@@ -4254,7 +4254,7 @@ let%test_module "staged ledger tests" =
         let open Quickcheck.Generator.Let_syntax in
         let%bind spec_keypair_and_slot = gen_spec_keypair_and_global_slot in
         let%map signed_commands_or_zkapps =
-          List.gen_with_length 6 Bool.quickcheck_generator
+          List.gen_with_length 7 Bool.quickcheck_generator
         in
         (spec_keypair_and_slot, signed_commands_or_zkapps |> List.to_array)
       in
@@ -4352,6 +4352,7 @@ let%test_module "staged ledger tests" =
                   ~nonce ()
           in
           let fee_payer, _ = init_ledger.(0) in
+          let fee_payer1, _ = init_ledger.(2) in
           let receiver, _ = init_ledger.(1) in
           let%bind valid_command_1 =
             mk_user_command
@@ -4378,6 +4379,10 @@ let%test_module "staged ledger tests" =
             mk_user_command
               ~signed_command_or_zkapp:signed_commands_or_zkapps.(5)
               ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 4) ()
+          and valid_command_7 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(6)
+              ~fee_payer:fee_payer1 ~receiver ~nonce:(Account.Nonce.of_int 0) ()
           in
           let global_slot =
             Mina_numbers.Global_slot_since_genesis.of_int global_slot
@@ -4401,6 +4406,7 @@ let%test_module "staged ledger tests" =
                    ; invalid_command_4
                    ; valid_command_5
                    ; invalid_command_6
+                   ; valid_command_7
                    ] )
               ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
               ~coinbase_receiver ~supercharge_coinbase:false
@@ -4416,25 +4422,71 @@ let%test_module "staged ledger tests" =
               in
               assert (
                 List.equal User_command.equal valid_commands
-                  ( [ valid_command_1; valid_command_2; valid_command_5 ]
+                  ( [ valid_command_1
+                    ; valid_command_2
+                    ; valid_command_5
+                    ; valid_command_7
+                    ]
                   |> List.map ~f:(fun cmd -> User_command.forget_check cmd) ) ) ;
-              let invalid_commands =
-                List.map invalid_txns ~f:(fun (cmd, _) ->
-                    User_command.forget_check cmd )
-              in
-              assert (List.length invalid_commands = 3) ;
-
-              match%map
+              assert (List.length invalid_txns = 3) ;
+              match%bind
                 Sl.apply ~constraint_constants ~global_slot sl
                   (Staged_ledger_diff.forget diff)
                   ~logger ~verifier ~current_state_view ~state_and_body_hash
                   ~coinbase_receiver ~supercharge_coinbase:false
               with
-              | Ok _x ->
-                  ()
+              | Ok _x -> (
+                  let valid_command_1_with_status =
+                    With_status.
+                      { data = valid_command_1
+                      ; status = Transaction_status.Applied
+                      }
+                  in
+                  let invalid_command_3_with_status =
+                    With_status.
+                      { data = invalid_command_3
+                      ; status = Transaction_status.Applied
+                      }
+                  in
+                  let invalid_command_4_with_status =
+                    With_status.
+                      { data = invalid_command_4
+                      ; status = Transaction_status.Applied
+                      }
+                  in
+                  let valid_command_7_with_status =
+                    With_status.
+                      { data = valid_command_7
+                      ; status = Transaction_status.Applied
+                      }
+                  in
+                  let f, s = diff.diff in
+                  let diff =
+                    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff =
+                        ( { f with
+                            commands =
+                              [ valid_command_1_with_status
+                              ; invalid_command_3_with_status
+                              ; invalid_command_4_with_status
+                              ; valid_command_7_with_status
+                              ]
+                          }
+                        , s )
+                    }
+                  in
+                  match%map
+                    Sl.apply ~constraint_constants ~global_slot sl
+                      (Staged_ledger_diff.forget diff)
+                      ~logger ~verifier ~current_state_view ~state_and_body_hash
+                      ~coinbase_receiver ~supercharge_coinbase:false
+                  with
+                  | Ok _x ->
+                      assert false
+                  | Error _e ->
+                      assert true )
               | Error e ->
                   [%log info] "Error %s" (Staged_ledger_error.to_string e) ;
-                  () ) )
+                  assert false ) )
 
     let%test_unit "Mismatched verification keys in zkApp accounts and \
                    transactions" =
