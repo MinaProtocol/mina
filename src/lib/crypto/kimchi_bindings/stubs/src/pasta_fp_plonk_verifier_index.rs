@@ -19,6 +19,7 @@ use poly_commitment::evaluation_proof::OpeningProof;
 use poly_commitment::{commitment::PolyComm, srs::SRS};
 use std::convert::TryInto;
 use std::path::Path;
+use std::sync::Arc;
 
 pub type CamlPastaFpPlonkVerifierIndex =
     CamlPlonkVerifierIndex<CamlFp, CamlFpSrs, CamlPolyComm<CamlGVesta>>;
@@ -33,7 +34,7 @@ impl From<VerifierIndex<Vesta, OpeningProof<Vesta>>> for CamlPastaFpPlonkVerifie
             max_poly_size: vi.max_poly_size as isize,
             public: vi.public as isize,
             prev_challenges: vi.prev_challenges as isize,
-            srs: CamlFpSrs(vi.srs.get().expect("have an srs").clone()),
+            srs: CamlFpSrs(vi.srs.clone()),
             evals: CamlPlonkVerificationEvals {
                 sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
                 coefficients_comm: vi
@@ -117,14 +118,8 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<V
             public: index.public as usize,
             prev_challenges: index.prev_challenges as usize,
             powers_of_alpha,
-            srs: {
-                let res = once_cell::sync::OnceCell::new();
-                res.set(index.srs.0).unwrap();
-                res
-            },
-
+            srs: { Arc::clone(&index.srs.0) },
             zk_rows: 3,
-
             sigma_comm,
             coefficients_comm,
             generic_comm: evals.generic_comm.into(),

@@ -15,6 +15,7 @@ use mina_poseidon::{
 use paste::paste;
 use poly_commitment::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
 use poly_commitment::evaluation_proof::OpeningProof;
+use poly_commitment::SRS;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlOracles<F> {
