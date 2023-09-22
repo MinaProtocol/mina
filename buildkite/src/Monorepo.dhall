@@ -45,9 +45,8 @@ let commands: Text -> Text -> List Cmd.Type  =  \(targetStage: Text) -> \(target
       let trigger = triggerCommand "src/Jobs/${job.path}/${job.name}.dhall"
       let pipelineHandlers = {
         PullRequest = ''
-          "export BUILDKITE_PIPELINE_MODE=${jobMode}"
-          "export BUILDKITE_PIPELINE_STAGE=${jobStage}"
-
+          export BUILDKITE_PIPELINE_MODE=${jobMode}
+          export BUILDKITE_PIPELINE_STAGE=${jobStage}
           if [ "${targetMode}" == "PullRequest" ]; then
             if [ "${jobStage}" == "${targetStage}" ]; then
               if (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
@@ -68,8 +67,8 @@ let commands: Text -> Text -> List Cmd.Type  =  \(targetStage: Text) -> \(target
           fi
         '',
         Nightly = ''
-          "export BUILDKITE_PIPELINE_MODE=${jobMode}"
-          "export BUILDKITE_PIPELINE_STAGE=${jobStage}"
+          export BUILDKITE_PIPELINE_MODE=${jobMode}
+          export BUILDKITE_PIPELINE_STAGE=${jobStage}
   
           if [ "${targetMode}" == "PullRequest" ]; then
             echo "Skipping ${job.name} because this is a PR buildkite run"
