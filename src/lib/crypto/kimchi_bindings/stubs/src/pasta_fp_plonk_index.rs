@@ -9,6 +9,7 @@ use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{Fp, Pallas, Vesta, VestaParameters};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
+use poly_commitment::evaluation_proof::OpeningProof;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -17,7 +18,7 @@ use std::{
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[derive(ocaml_gen::CustomType)]
-pub struct CamlPastaFpPlonkIndex(pub Box<ProverIndex<Vesta>>);
+pub struct CamlPastaFpPlonkIndex(pub Box<ProverIndex<Vesta, OpeningProof<Vesta>>>);
 pub type CamlPastaFpPlonkIndexPtr<'a> = ocaml::Pointer<'a, CamlPastaFpPlonkIndex>;
 
 extern "C" fn caml_pasta_fp_plonk_index_finalize(v: ocaml::Raw) {
@@ -98,7 +99,7 @@ pub fn caml_pasta_fp_plonk_index_create(
     }
 
     // create index
-    let mut index = ProverIndex::<Vesta>::create(cs, endo_q, srs.clone());
+    let mut index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.clone());
     // Compute and cache the verifier index digest
     index.compute_verifier_index_digest::<DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>>();
 
@@ -161,7 +162,9 @@ pub fn caml_pasta_fp_plonk_index_read(
     }
 
     // deserialize the index
-    let mut t = ProverIndex::<Vesta>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
+    let mut t = ProverIndex::<Vesta, OpeningProof<Vesta>>::deserialize(
+        &mut rmp_serde::Deserializer::new(r),
+    )?;
     t.srs = srs.clone();
 
     let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true);

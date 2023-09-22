@@ -14,6 +14,7 @@ use mina_poseidon::{
 };
 use paste::paste;
 use poly_commitment::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
+use poly_commitment::evaluation_proof::OpeningProof;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlOracles<F> {
@@ -34,7 +35,7 @@ macro_rules! impl_oracles {
                 index: $index,
                 proof: CamlProofWithPublic<$CamlG, $CamlF>,
             ) -> Result<CamlOracles<$CamlF>, ocaml::Error> {
-                let index: VerifierIndex<$G> = index.into();
+                let index: VerifierIndex<$G, OpeningProof<$G>> = index.into();
 
                 let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
                     .into_iter()
@@ -65,7 +66,7 @@ macro_rules! impl_oracles {
                         .commitment
                 };
 
-                let (proof, public_input): (ProverProof<$G>, Vec<$F>) = proof.into();
+                let (proof, public_input): (ProverProof<$G, OpeningProof<$G>>, Vec<$F>) = proof.into();
 
                 let oracles_result =
                     proof.oracles::<
@@ -110,7 +111,7 @@ macro_rules! impl_oracles {
                     public_evals: None,
                 };
 
-                let index: VerifierIndex<$G> = index.into();
+                let index: VerifierIndex<$G, OpeningProof<$G>> = index.into();
 
                 let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
                     .into_iter()
@@ -141,7 +142,7 @@ macro_rules! impl_oracles {
                         .commitment
                 };
 
-                let (proof, public_input): (ProverProof<$G>, Vec<$F>) = proof.into();
+                let (proof, public_input): (ProverProof<$G, OpeningProof<$G>>, Vec<$F>) = proof.into();
 
                 let oracles_result =
                     proof.oracles::<

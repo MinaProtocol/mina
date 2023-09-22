@@ -15,6 +15,7 @@ use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fp, Pallas, Vesta};
 use poly_commitment::commitment::caml::CamlPolyComm;
+use poly_commitment::evaluation_proof::OpeningProof;
 use poly_commitment::{commitment::PolyComm, srs::SRS};
 use std::convert::TryInto;
 use std::path::Path;
@@ -22,8 +23,8 @@ use std::path::Path;
 pub type CamlPastaFpPlonkVerifierIndex =
     CamlPlonkVerifierIndex<CamlFp, CamlFpSrs, CamlPolyComm<CamlGVesta>>;
 
-impl From<VerifierIndex<Vesta>> for CamlPastaFpPlonkVerifierIndex {
-    fn from(vi: VerifierIndex<Vesta>) -> Self {
+impl From<VerifierIndex<Vesta, OpeningProof<Vesta>>> for CamlPastaFpPlonkVerifierIndex {
+    fn from(vi: VerifierIndex<Vesta, OpeningProof<Vesta>>) -> Self {
         Self {
             domain: CamlPlonkDomain {
                 log_size_of_group: vi.domain.log_size_of_group as isize,
@@ -62,7 +63,7 @@ impl From<VerifierIndex<Vesta>> for CamlPastaFpPlonkVerifierIndex {
 }
 
 // TODO: This should really be a TryFrom or TryInto
-impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
+impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<Vesta>> {
     fn from(index: CamlPastaFpPlonkVerifierIndex) -> Self {
         let evals = index.evals;
         let shifts = index.shifts;
@@ -110,7 +111,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
         // TODO dummy_lookup_value ?
         let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
-        VerifierIndex::<Vesta> {
+        VerifierIndex::<Vesta, OpeningProof<Vesta>> {
             domain,
             max_poly_size: index.max_poly_size as usize,
             public: index.public as usize,
@@ -165,16 +166,20 @@ pub fn read_raw(
     offset: Option<ocaml::Int>,
     srs: CamlFpSrs,
     path: String,
-) -> Result<VerifierIndex<Vesta>, ocaml::Error> {
+) -> Result<VerifierIndex<Vesta, OpeningProof<Vesta>>, ocaml::Error> {
     let path = Path::new(&path);
     let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
-    VerifierIndex::<Vesta>::from_file(Some(srs.0), path, offset.map(|x| x as u64), endo_q).map_err(
-        |_e| {
-            ocaml::Error::invalid_argument("caml_pasta_fp_plonk_verifier_index_raw_read")
-                .err()
-                .unwrap()
-        },
+    VerifierIndex::<Vesta, OpeningProof<Vesta>>::from_file(
+        srs.0,
+        path,
+        offset.map(|x| x as u64),
+        endo_q,
     )
+    .map_err(|_e| {
+        ocaml::Error::invalid_argument("caml_pasta_fp_plonk_verifier_index_raw_read")
+            .err()
+            .unwrap()
+    })
 }
 
 //
@@ -199,7 +204,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_write(
     index: CamlPastaFpPlonkVerifierIndex,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    let index: VerifierIndex<Vesta> = index.into();
+    let index: VerifierIndex<Vesta, OpeningProof<Vesta>> = index.into();
     let path = Path::new(&path);
     index.to_file(path, append).map_err(|_e| {
         ocaml::Error::invalid_argument("caml_pasta_fp_plonk_verifier_index_raw_read")
