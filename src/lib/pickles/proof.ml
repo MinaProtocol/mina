@@ -184,18 +184,19 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
               ; lookup = None
               }
           ; openings =
-              { proof =
-                  { lr =
-                      Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ ->
-                          (g0, g0) )
-                  ; z_1 = Ro.tock ()
-                  ; z_2 = Ro.tock ()
-                  ; delta = g0
-                  ; challenge_polynomial_commitment = g0
-                  }
-              ; evals = Dummy.evals.evals.evals
-              ; ft_eval1 = Dummy.evals.ft_eval1
-              }
+              (let evals = Lazy.force Dummy.evals in
+               { proof =
+                   { lr =
+                       Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ ->
+                           (g0, g0) )
+                   ; z_1 = Ro.tock ()
+                   ; z_2 = Ro.tock ()
+                   ; delta = g0
+                   ; challenge_polynomial_commitment = g0
+                   }
+               ; evals = evals.evals.evals
+               ; ft_eval1 = evals.ft_eval1
+               } )
           }
     ; prev_evals =
         (let e =
