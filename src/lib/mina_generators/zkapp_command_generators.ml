@@ -256,8 +256,7 @@ let gen_fee ?fee_range ~num_updates (account : Account.t) =
     Currency.(
       Fee.(hi_fee <= (Balance.to_amount balance |> Currency.Amount.to_fee))) ) ;
   Option.value_map fee_range ~default:(Currency.Fee.gen_incl lo_fee hi_fee)
-    ~f:(fun (lo, hi) ->
-      Currency.Fee.(gen_incl (of_mina_string_exn lo) (of_mina_string_exn hi)) )
+    ~f:(fun (lo, hi) -> Currency.Fee.(gen_incl lo hi))
 
 (*Fee payer balance change is Neg*)
 let fee_to_amt fee =
@@ -308,11 +307,7 @@ let gen_balance_change ?permissions_auth (account : Account.t) ?failure
         if new_account then
           Currency.Amount.(
             gen_incl (of_mina_string_exn "50.0") (of_mina_string_exn "100.0"))
-        else
-          Currency.Amount.(
-            gen_incl
-              (of_mina_string_exn min_balance_change)
-              (of_mina_string_exn max_balance_change)) )
+        else Currency.Amount.(gen_incl min_balance_change max_balance_change) )
   in
   match sgn with
   | Pos ->
@@ -713,16 +708,17 @@ let gen_account_update_body_components (type a b c d) ?global_slot
       | Some available_pks ->
           let available_pk =
             match
-              Signature_lib.Public_key.Compressed.Table.choose available_pks
+              Hash_set.fold_until ~init:None
+                ~f:(fun _ x -> Stop (Some x))
+                ~finish:ident available_pks
             with
             | None ->
                 failwith "gen_account_update_body: no available public keys"
-            | Some (pk, ()) ->
+            | Some pk ->
                 pk
           in
           (* available public key no longer available *)
-          Signature_lib.Public_key.Compressed.Table.remove available_pks
-            available_pk ;
+          Hash_set.remove available_pks available_pk ;
           let account_id =
             match token_id with
             | Some custom_token_id ->
@@ -1127,13 +1123,14 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
-    ?account_state_tbl ~ledger ?protocol_state_view ?vk () =
+    ?account_state_tbl ~ledger ?protocol_state_view ?vk ?available_public_keys
+    () =
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
   let fee_payer_acct_id = Account_id.create fee_payer_pk Token_id.default in
-  let ledger_accounts = Ledger.to_list_sequential ledger in
+  let ledger_accounts = lazy (Ledger.to_list_sequential ledger) in
   (* table of public keys to accounts, updated when generating each account_update
 
      a Map would be more principled, but threading that map through the code
@@ -1142,11 +1139,11 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   let account_state_tbl =
     Option.value account_state_tbl ~default:(Account_id.Table.create ())
   in
-  (* make sure all ledger keys are in the keymap *)
-  List.iter ledger_accounts ~f:(fun acct ->
-      let acct_id = Account.identifier acct in
-      (*Initialize account states*)
-      if not limited then
+  if not limited then
+    (* make sure all ledger keys are in the keymap *)
+    List.iter (Lazy.force ledger_accounts) ~f:(fun acct ->
+        let acct_id = Account.identifier acct in
+        (*Initialize account states*)
         Account_id.Table.update account_state_tbl acct_id ~f:(function
           | None ->
               if Account_id.equal acct_id fee_payer_acct_id then
@@ -1165,28 +1162,35 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   (* table of public keys not in the ledger, to be used for new zkapp_command
      we have the corresponding private keys, so we can create signatures for those new zkapp_command
   *)
-  let ledger_account_ids =
-    List.map ledger_accounts ~f:Account.identifier |> Account_id.Set.of_list
-  in
-  let ledger_account_list =
-    Account_id.Set.union_list
-      [ ledger_account_ids; Account_id.Set.of_hashtbl_keys account_state_tbl ]
-    |> Account_id.Set.to_list
-  in
-  let ledger_pk_list =
-    List.map ledger_account_list ~f:(fun account_id ->
-        Account_id.public_key account_id )
-  in
-  let ledger_pk_set =
-    Signature_lib.Public_key.Compressed.Set.of_list ledger_pk_list
-  in
   let available_public_keys =
-    let tbl = Signature_lib.Public_key.Compressed.Table.create () in
-    Signature_lib.Public_key.Compressed.Map.iter_keys keymap ~f:(fun pk ->
-        if not (Signature_lib.Public_key.Compressed.Set.mem ledger_pk_set pk)
-        then
-          Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:() ) ;
-    tbl
+    match available_public_keys with
+    | Some pks ->
+        pks
+    | None ->
+        let ledger_account_ids =
+          List.map (Lazy.force ledger_accounts) ~f:Account.identifier
+          |> Account_id.Set.of_list
+        in
+        let ledger_account_list =
+          Account_id.Set.union_list
+            [ ledger_account_ids
+            ; Account_id.Set.of_hashtbl_keys account_state_tbl
+            ]
+          |> Account_id.Set.to_list
+        in
+        let ledger_pk_list =
+          List.map ledger_account_list ~f:(fun account_id ->
+              Account_id.public_key account_id )
+        in
+        let ledger_pk_set =
+          Signature_lib.Public_key.Compressed.Set.of_list ledger_pk_list
+        in
+        let tbl = Signature_lib.Public_key.Compressed.Hash_set.create () in
+        Signature_lib.Public_key.Compressed.Map.iter_keys keymap ~f:(fun pk ->
+            if
+              not (Signature_lib.Public_key.Compressed.Set.mem ledger_pk_set pk)
+            then Hash_set.strict_add_exn tbl pk ) ;
+        tbl
   in
   (* account ids seen, to generate receipt chain hash precondition only if
      a account_update with a given account id has not been encountered before
@@ -1798,7 +1802,11 @@ let%test_module _ =
             (list_with_length 100
                (gen_zkapp_command_from ~no_account_precondition:true
                   ~fee_payer_keypair ~keymap ~no_token_accounts:true
-                  ~fee_range:("2", "4") ~balance_change_range:("0", "0.00001")
+                  ~fee_range:
+                    Currency.Fee.(of_mina_string_exn "2", of_mina_string_exn "4")
+                  ~balance_change_range:
+                    Currency.Amount.
+                      (of_mina_string_exn "0", of_mina_string_exn "0.00001")
                   ~account_state_tbl:(Account_id.Table.create ())
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100

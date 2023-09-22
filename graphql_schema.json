@@ -6352,6 +6352,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "genesisTimestamp",
+              "description": "The genesis timestamp in ISO 8601 format",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -14446,6 +14462,23 @@
               "name": "runtimeConfig",
               "description":
                 "The runtime configuration passed to the daemon at start-up",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "JSON",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "fork_config",
+              "description":
+                "The runtime configuration for a blockchain fork intended to be a continuation of the current one.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
