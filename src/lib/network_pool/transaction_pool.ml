@@ -175,7 +175,12 @@ module Diff_versioned = struct
   type verified = Transaction_hash.User_command_with_valid_signature.t list
   [@@deriving sexp, to_yojson]
 
-  let summary t = Printf.sprintf "Transaction diff of length %d" (List.length t)
+  let summary t =
+    Printf.sprintf
+      !"Transaction_pool_diff of length %d with fee payer summary %s"
+      (List.length t)
+      ( String.concat ~sep:","
+      @@ List.map ~f:User_command.fee_payer_summary_string t )
 
   let is_empty t = List.is_empty t
 end
@@ -530,9 +535,7 @@ struct
       List.iter new_commands ~f:(vk_table_lift Vk_refcount_table.inc) ;
       List.iter removed_commands ~f:(vk_table_lift Vk_refcount_table.dec) ;
       let compact_json =
-        Fn.compose
-          (Fn.compose Signature.to_yojson User_command.fee_payer_signature)
-          User_command.forget_check
+        Fn.compose User_command.fee_payer_summary_json User_command.forget_check
       in
       [%log' trace t.logger]
         ~metadata:
@@ -968,14 +971,10 @@ struct
 
       let summary t =
         Printf.sprintf
-          !"Transaction_pool_diff of length %d with fee payer signatures %s"
+          !"Transaction_pool_diff of length %d with fee payer summary %s"
           (List.length t)
           ( String.concat ~sep:","
-          @@ List.map
-               ~f:
-                 (Fn.compose Signature.to_base58_check
-                    User_command.fee_payer_signature )
-               t )
+          @@ List.map ~f:User_command.fee_payer_summary_string t )
 
       let is_empty t = List.is_empty t
 
@@ -1404,22 +1403,28 @@ struct
 
       type Structured_log_events.t +=
         | Transactions_received of
-            { fee_payer_sigs : Signature.t list; sender : Envelope.Sender.t }
+            { fee_payer_summaries : User_command.fee_payer_summary_t list
+            ; sender : Envelope.Sender.t
+            }
         [@@deriving
           register_event
-            { msg = "Received transaction-pool $fee_payer_sigs from $sender" }]
+            { msg =
+                "Received transaction-pool $fee_payer_summaries from $sender"
+            }]
 
       let update_metrics ~logger ~log_gossip_heard envelope valid_cb =
         Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_received) ;
         let diff = Envelope.Incoming.data envelope in
         if log_gossip_heard then (
-          let fee_payer_sigs =
-            List.map ~f:User_command.fee_payer_signature diff
+          let fee_payer_summaries =
+            List.map ~f:User_command.fee_payer_summary diff
           in
           [%str_log debug]
             (Transactions_received
-               { fee_payer_sigs; sender = Envelope.Incoming.sender envelope } ) ;
+               { fee_payer_summaries
+               ; sender = Envelope.Incoming.sender envelope
+               } ) ;
           Mina_net2.Validation_callback.set_message_type valid_cb `Transaction ;
           Mina_metrics.(Counter.inc_one Network.Transaction.received) )
 

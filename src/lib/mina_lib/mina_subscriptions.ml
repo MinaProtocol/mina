@@ -258,6 +258,10 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                      ~metadata:
                        [ ( "state_hash"
                          , `String (State_hash.to_base58_check hash) )
+                       ; ( "protocol_state"
+                         , Mina_block.header new_block_no_hash
+                           |> Mina_block.Header.protocol_state
+                           |> Mina_state.Protocol_state.value_to_yojson )
                        ] ) ) ;
           match
             Filtered_external_transition.validate_transactions

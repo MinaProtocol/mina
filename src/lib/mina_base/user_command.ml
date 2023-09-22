@@ -423,9 +423,29 @@ let check_well_formedness ~genesis_constants t :
   in
   if List.is_empty errs then Ok () else Error errs
 
-let fee_payer_signature = function
+type fee_payer_summary_t = Signature.t * Account.key * int
+[@@deriving yojson, hash]
+
+let fee_payer_summary : t -> fee_payer_summary_t = function
   | Zkapp_command cmd ->
-      Zkapp_command.fee_payer_account_update cmd
-      |> Account_update.Fee_payer.authorization
+      let fp = Zkapp_command.fee_payer_account_update cmd in
+      let open Account_update in
+      let body = Fee_payer.body fp in
+      ( Fee_payer.authorization fp
+      , Body.Fee_payer.public_key body
+      , Body.Fee_payer.nonce body |> Unsigned.UInt32.to_int )
   | Signed_command cmd ->
-      Signed_command.signature cmd
+      Signed_command.
+        (signature cmd, fee_payer_pk cmd, nonce cmd |> Unsigned.UInt32.to_int)
+
+let fee_payer_summary_json =
+  Fn.compose fee_payer_summary_t_to_yojson fee_payer_summary
+
+let fee_payer_summary_string =
+  let to_string (signature, pk, nonce) =
+    sprintf "%s (%s %d)"
+      (Signature.to_base58_check signature)
+      (Signature_lib.Public_key.Compressed.to_base58_check pk)
+      nonce
+  in
+  Fn.compose to_string fee_payer_summary

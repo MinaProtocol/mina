@@ -700,6 +700,9 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
               ~metadata:
                 [ ( "parent_hash"
                   , Breadcrumb.parent_hash crumb |> State_hash.to_yojson )
+                ; ( "protocol_state"
+                  , Breadcrumb.protocol_state crumb
+                    |> Protocol_state.value_to_yojson )
                 ]
               "Producing new block with parent $parent_hash%!" ;
             let previous_transition = Breadcrumb.block_with_hash crumb in

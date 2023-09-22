@@ -137,7 +137,8 @@ module Gossip : sig
   end
 
   module Transactions : sig
-    type r = { fee_payer_sigs : Signature.t list } [@@deriving hash, yojson]
+    type r = { fee_payer_summaries : User_command.fee_payer_summary_t list }
+    [@@deriving hash, yojson]
 
     type t = r With_direction.t
 

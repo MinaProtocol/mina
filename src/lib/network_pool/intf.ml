@@ -367,7 +367,9 @@ module type Transaction_pool_diff_intf = sig
 
   type Structured_log_events.t +=
     | Transactions_received of
-        { fee_payer_sigs : Signature.t list; sender : Envelope.Sender.t }
+        { fee_payer_summaries : User_command.fee_payer_summary_t list
+        ; sender : Envelope.Sender.t
+        }
     [@@deriving register_event]
 
   include

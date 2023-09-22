@@ -16,11 +16,13 @@ type Structured_log_events.t +=
   [@@deriving register_event { msg = "Broadcasting new state over gossip net" }]
 
 type Structured_log_events.t +=
-  | Gossip_transaction_pool_diff of { fee_payer_sigs : Signature.t list }
+  | Gossip_transaction_pool_diff of
+      { fee_payer_summaries : User_command.fee_payer_summary_t list }
   [@@deriving
     register_event
       { msg =
-          "Broadcasting transaction pool diff $fee_payer_sigs over gossip net"
+          "Broadcasting transaction pool diff $fee_payer_summaries over gossip \
+           net"
       }]
 
 type Structured_log_events.t +=
@@ -1479,7 +1481,8 @@ let broadcast_state t state =
 let broadcast_transaction_pool_diff ?nonce t diff =
   [%str_log' trace t.logger]
     (Gossip_transaction_pool_diff
-       { fee_payer_sigs = List.map ~f:User_command.fee_payer_signature diff } ) ;
+       { fee_payer_summaries = List.map ~f:User_command.fee_payer_summary diff }
+    ) ;
   Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
   Gossip_net.Any.broadcast_transaction_pool_diff ?nonce t.gossip_net diff
 

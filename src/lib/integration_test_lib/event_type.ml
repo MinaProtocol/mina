@@ -379,7 +379,8 @@ module Gossip = struct
   end
 
   module Transactions = struct
-    type r = { fee_payer_sigs : Signature.t list } [@@deriving yojson, hash]
+    type r = { fee_payer_summaries : User_command.fee_payer_summary_t list }
+    [@@deriving yojson, hash]
 
     type t = r With_direction.t [@@deriving yojson]
 
@@ -392,10 +393,10 @@ module Gossip = struct
     let parse_func message =
       match%bind parse id message with
       | Network_pool.Transaction_pool.Resource_pool.Diff.Transactions_received
-          { fee_payer_sigs; sender = _ } ->
-          Ok ({ fee_payer_sigs }, Direction.Received)
-      | Mina_networking.Gossip_transaction_pool_diff { fee_payer_sigs } ->
-          Ok ({ fee_payer_sigs }, Sent)
+          { fee_payer_summaries; sender = _ } ->
+          Ok ({ fee_payer_summaries }, Direction.Received)
+      | Mina_networking.Gossip_transaction_pool_diff { fee_payer_summaries } ->
+          Ok ({ fee_payer_summaries }, Sent)
       | _ ->
           bad_parse
 
