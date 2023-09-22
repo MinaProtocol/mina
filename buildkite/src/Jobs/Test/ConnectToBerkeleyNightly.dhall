@@ -21,12 +21,11 @@ in Pipeline.build Pipeline.Config::{
     JobSpec::{
     dirtyWhen = [
       S.strictlyStart (S.contains "src"),
-      S.exactly "buildkite/scripts/connect-to-berkeley" "sh",
-      S.exactly "buildkite/src/Jobs/Test/ConnectToBerkeley" "dhall",
-      S.exactly "buildkite/src/Command/ConnectToTestnet" "dhall"
+      S.exactly "buildkite/scripts/check-berkeley-compatibility" "sh",
+      S.exactly "buildkite/src/Jobs/Test/ConnectToBerkeleyNightly" "dhall"
     ],
     path = "Test",
-    name = "ConnectToBerkeley"
+    name = "ConnectToBerkeleyNightly"
   },
   steps = [
     Command.build Command.Config::{
