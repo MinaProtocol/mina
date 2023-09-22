@@ -945,7 +945,7 @@ pub fn caml_pasta_fp_plonk_proof_batch_verify(
             (verifier_index, proof, public_input)
         })
         .collect();
-    let ts_ref: Vec<_> = ts
+    let ts_ref: Vec<Context<Vesta, OpeningProof<Vesta>>> = ts
         .iter()
         .map(|(verifier_index, proof, public_input)| Context {
             verifier_index,

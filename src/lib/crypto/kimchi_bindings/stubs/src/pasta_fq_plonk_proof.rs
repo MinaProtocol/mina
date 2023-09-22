@@ -136,7 +136,7 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
             (verifier_index, proof, public_input)
         })
         .collect();
-    let ts_ref: Vec<Context<_, Pallas, OpeningProof<Pallas>>> = ts
+    let ts_ref: Vec<Context<Pallas, OpeningProof<Pallas>>> = ts
         .iter()
         .map(|(verifier_index, proof, public_input)| Context {
             verifier_index,
