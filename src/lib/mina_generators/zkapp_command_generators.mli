@@ -50,8 +50,8 @@ val gen_zkapp_command_from :
      ?global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> ?memo:string
   -> ?no_account_precondition:bool
-  -> ?fee_range:string * string
-  -> ?balance_change_range:string * string
+  -> ?fee_range:Currency.Fee.t * Currency.Fee.t
+  -> ?balance_change_range:Currency.Amount.t * Currency.Amount.t
   -> ?ignore_sequence_events_precond:bool
   -> ?no_token_accounts:bool
   -> ?limited:bool
@@ -66,6 +66,7 @@ val gen_zkapp_command_from :
   -> ledger:Mina_ledger.Ledger.t
   -> ?protocol_state_view:Zkapp_precondition.Protocol_state.View.t
   -> ?vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
+  -> ?available_public_keys:Signature_lib.Public_key.Compressed.Hash_set.t
   -> unit
   -> Zkapp_command.t Quickcheck.Generator.t
 

@@ -3,13 +3,19 @@
  (name integration_test_lib)
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_base ppx_fields_conv ppx_mina ppx_version ppx_optcomp ppx_let ppx_inline_test ppx_custom_printf ppx_deriving.std ppx_sexp_conv ppx_compare ppx_assert lens.ppx_deriving ppx_pipebang))
+ (preprocessor_deps ../../graphql-ppx-config.inc ../../../graphql_schema.json)
+ (preprocess (pps
+    ppx_base ppx_fields_conv ppx_mina ppx_version ppx_let
+    ppx_inline_test ppx_custom_printf ppx_deriving.std ppx_sexp_conv ppx_compare
+    ppx_assert lens.ppx_deriving ppx_pipebang
+    graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}))
  (libraries
    ;; opam libraries
    result
    base.base_internalhash_types
    base.caml
    base
+   uri
    sexplib0
    cmdliner
    async
@@ -44,7 +50,13 @@
    mina_base.import
    mina_numbers
    mina_transaction
+   pickles
+   pickles_types
+   with_hash
    data_hash_lib
+   generated_graphql_queries
+   mina_graphql
+   graphql_lib
    integers
    transition_handler
    snark_worker
