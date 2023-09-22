@@ -194,6 +194,7 @@ spec:
           {{- if $.Values.mina.logSnarkWorkGossip }}
           "-log-snark-work-gossip", "true",
           {{- end -}}
+          "-internal-tracing",
           {{- if $.Values.mina.logPrecomputedBlocks }}
           "-log-precomputed-blocks", "true",
           {{- end -}}

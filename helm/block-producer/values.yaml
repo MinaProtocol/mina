@@ -19,7 +19,7 @@ mina:
     graphql: "3085"
     metrics: "10001"
     p2p: "10909"
-  exposeGraphql: false
+  exposeGraphql: true
   cpuRequest: 6
   memRequest: "12.0Gi"
 
