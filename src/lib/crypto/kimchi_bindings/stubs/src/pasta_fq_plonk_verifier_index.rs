@@ -108,7 +108,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
         };
 
         // TODO dummy_lookup_value ?
-        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true, 3);
+        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
         VerifierIndex::<Pallas> {
             domain,
