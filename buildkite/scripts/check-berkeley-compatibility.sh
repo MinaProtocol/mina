@@ -37,8 +37,8 @@ function try_docker_shas {
 }
 
 function image_id {
-    IMAGE_TAG=$1
-    IMAGE_ID=$(docker images | grep $IMAGE_TAG | awk '{print $3}')
+    TAG=$1
+    IMAGE_ID=$(docker images | grep $TAG | head -n 1 | awk '{print $3}')
 }
 
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
@@ -101,5 +101,38 @@ echo "PR image id:" $PR_IMAGE_ID
 
 ### Run docker images
 
-# just to see if this runs at all
-docker run  --entrypoint mina $BERKELEY_IMAGE_ID daemon
+# generate libp2p keypair, commit container
+BERKELEY_CONTAINER=$(docker run -d -e MINA_LIBP2P_PASS='' --entrypoint mina $BERKELEY_IMAGE_ID libp2p generate-keypair --privkey-path libp2p)
+
+# allow time for mina to start, key to be written
+sleep 10
+
+BERKELEY_DOCKER="berkeley_docker"
+
+docker commit $BERKELEY_CONTAINER "mina_ci":$BERKELEY_DOCKER
+
+image_id $BERKELEY_DOCKER
+BERKELEY_COMMITTED_IMAGE_ID=$IMAGE_ID
+
+echo "Berkeley committed image id:" $BERKELEY_COMMITTED_IMAGE_ID
+
+BERKELEY_LIBP2P_PEER_ID=$(docker run -e MINA_LIBP2P_PASS='' --entrypoint mina $BERKELEY_COMMITTED_IMAGE_ID libp2p dump-keypair --privkey-path libp2p | awk -F , '(NR==2){print $3}')
+
+echo "Berkeley libp2p peer id:" $BERKELEY_LIBP2P_PEER_ID
+
+BERKELEY_SEED_CONTAINER=$(docker run --entrypoint mina -d -e MINA_LIBP2P_PASS='' $BERKELEY_COMMITTED_IMAGE_ID daemon --libp2p-keypair ./libp2p --seed)
+
+# allow time for berkeley seed daemon to boot
+sleep 20
+
+BERKELEY_SYNCED=0
+BERKELEY_REST_SERVER="http://127.0.0.1:3085/graphql"
+
+while [ $BERKELEY_SYNCED -eq 0 ]; do
+    SYNC_STATUS=$(docker container exec -it $BERKELEY_SEED_CONTAINER \
+                  curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${BERKELEY_REST_SERVER})
+    BERKELEY_SYNCED=$(echo ${SYNC_STATUS} | grep -c "SYNCED")
+    sleep 5
+done
+
+echo "Berkeley seed done bootstrapping"
