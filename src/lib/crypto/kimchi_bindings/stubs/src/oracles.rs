@@ -27,7 +27,6 @@ pub struct CamlOracles<F> {
 
 macro_rules! impl_oracles {
     ($CamlF: ty, $F: ty, $CamlG: ty, $G: ty, $index: ty, $curve_params: ty) => {
-
         paste! {
             #[ocaml_gen::func]
             #[ocaml::func]
