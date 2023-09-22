@@ -139,8 +139,7 @@ module Make
     let { Envelope.Incoming.data = diff; sender; _ } = t in
     match diff with
     | Empty ->
-        Deferred.return
-          (Error (`Other (Error.of_string "cannot apply empty snark pool diff")))
+        Error (`Other (Error.of_string "cannot apply empty snark pool diff"))
     | Add_solved_work (work, { Priced_proof.proof; fee }) -> (
         let is_local = match sender with Local -> true | _ -> false in
         let to_or_error = function
@@ -151,14 +150,13 @@ module Make
         in
         match has_lower_fee pool work ~fee:fee.fee ~sender with
         | Ok () ->
-            let%map.Deferred.Result accepted, rejected =
-              Pool.add_snark ~is_local pool ~work ~proof ~fee >>| to_or_error
+            let%map.Result accepted, rejected =
+              Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
             in
             (`Accept, accepted, rejected)
         | Error e ->
-            Deferred.return
-              ( if is_local then Error (`Locally_generated (diff, ()))
-              else Error (`Other e) ) )
+            if is_local then Error (`Locally_generated (diff, ()))
+            else Error (`Other e) )
 
   type Structured_log_events.t +=
     | Snark_work_received of { work : compact; sender : Envelope.Sender.t }

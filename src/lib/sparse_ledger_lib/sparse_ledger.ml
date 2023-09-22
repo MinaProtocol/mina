@@ -221,8 +221,8 @@ end = struct
           in
           failwithf
             !"Sparse_ledger.get: Bad index %i. Expected a%s, but got a%s at \
-              depth %i. Tree = %{sexp:t}"
-            idx expected_kind kind (depth - i) t ()
+              depth %i. Tree = %{sexp:t}, tree_depth = %d"
+            idx expected_kind kind (depth - i) t depth ()
     in
     go (depth - 1) tree
 
