@@ -1,5 +1,3 @@
-(* could be encoded as an alias to ('a, 'n) Vector.t but we want to keep the
-   constructors [[]] and [::] to use it in functions *)
 type ('a, _) t =
   | [] : ('a, 'n) t
   | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n Nat.s) t

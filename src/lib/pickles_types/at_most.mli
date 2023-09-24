@@ -1,7 +1,5 @@
 (** Implementing vectors with pre-defined length. For a fixed length version, see
     {!Vector} *)
-(* TODO: Check if that's adequate/useful. The module does not provide type level
-   encoded theories enforcing properties on the length *)
 
 (** {2 Type definitions} *)
 
