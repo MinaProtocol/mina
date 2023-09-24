@@ -60,7 +60,6 @@ let verify_one ~srs
   let statement =
     let prev_messages_for_next_step_proof =
       with_label __LOC__ (fun () ->
-          (* Fiat shamir - interactive -> non interactive *)
           hash_messages_for_next_step_proof ~widths:d.proofs_verifieds
             ~max_width:(Nat.Add.n d.max_proofs_verified)
             ~proofs_verified_mask:
