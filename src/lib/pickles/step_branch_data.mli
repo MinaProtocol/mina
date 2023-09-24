@@ -76,7 +76,7 @@ type ( 'a_var
 
 (** Compile one rule into a value of type [t]
     [create idx self wrap_domains feature_flags actual_feature_flags
-    max_proof_verifieds branches public_input aux_typ var_to_field_elem
+    max_proofs_verified branches public_input aux_typ var_to_field_elem
     val_to_field_elem rule]
 *)
 val create :

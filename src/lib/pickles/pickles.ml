@@ -76,7 +76,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
      where f is a snarky function defined over an Impl with Field.t = Fp
      and each Ai is itself an inductive rule (possibly equal to A itself).
 
-     a1, ..., an can be seen as previous statement, i.e.
+     a1, ..., an can be seen as previous statements, i.e.
 
              prev_statement_1 ∈ A1, ..., prev_statement_n ∈ An
      f [ prev_statement_1; ...; prev_statement_n ] new_statement = true
