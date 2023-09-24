@@ -1,5 +1,3 @@
-open Pickles_types
-
 module Challenge : module type of Import.Challenge.Make (Step_main_inputs.Impl)
 
 module Digest : module type of Import.Digest.Make (Step_main_inputs.Impl)
@@ -133,7 +131,7 @@ val verify :
          Pickles_types.Hlist0.Id.t )
        Composition_types.Wrap.Lookup_parameters.t
        (* lookup arguments parameters *)
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> feature_flags:Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
   -> proof:Wrap_proof.Checked.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fq.t
   -> wrap_domain:
