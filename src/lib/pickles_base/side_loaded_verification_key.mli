@@ -1,4 +1,4 @@
-(* Module Side_loaded_verification_key. On chain verification key *)
+(** Homogeneous verification key representation, for use when the key is chosen dynamically according to some external logic *)
 
 module Poly : sig
   module Stable : sig
