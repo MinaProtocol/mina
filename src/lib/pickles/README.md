@@ -8,8 +8,7 @@ It is currently implemented to work with the polynomial IOP
 [PLONK](https://eprint.iacr.org/2019/953.pdf) and the recursion layer
 [Halo](https://eprint.iacr.org/2019/1021.pdf), generally called
 [Halo2](https://electriccoin.co/blog/explaining-halo-2/).
-It also provides an abstraction to deal with lookup arguments compatible with
-PLONK and might provide in the future custom gates operations.
+It also provides an abstraction to deal with lookup arguments and custom gates compatible with PLONK.
 
 Pickles aims to be modular using the OCaml module system. Ideally, an inductive proof
 system can be parametrized by any finite field and 2-cycle of curves (called
