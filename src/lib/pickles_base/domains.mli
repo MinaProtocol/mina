@@ -1,4 +1,4 @@
-(** Artefact when Marlin was used as Marlin requires multiple domains. It should
+(** Artifact when Marlin was used as Marlin requires multiple domains. It should
     not be used anymore. *)
 
 module Stable : sig
