@@ -82,7 +82,6 @@ module rec T : sig
     | Constant : 'a * ('a -> 'a -> unit) * ('a, 'b, 'env) t -> ('a, 'b, 'env) t
 end
 
-(** [typ impl *)
 val typ :
      assert_16_bits:('a Snarky_backendless.Cvar.t -> unit)
   -> 'a impl
