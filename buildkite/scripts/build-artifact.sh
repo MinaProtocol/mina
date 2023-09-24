@@ -39,9 +39,3 @@ echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
 echo " Includes mina daemon, archive-node, rosetta, generate keypair for berkeley"
 [[ ${MINA_BUILD_MAINNET} ]] && echo " MINA_BUILD_MAINNET is true so this includes the mainnet and devnet packages for mina-daemon as well"
 make deb
-
-echo "--- Upload debs to amazon s3 repo"
-make publish_debs
-
-echo "--- Git diff after build is complete:"
-git diff --exit-code

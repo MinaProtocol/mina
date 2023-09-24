@@ -5,6 +5,7 @@ let S = ../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
 let Pipeline = ../Pipeline/Dsl.dhall
+let PipelineMode = ../Pipeline/Mode.dhall
 let JobSpec = ../Pipeline/JobSpec.dhall
 
 let Command = ./Base.dhall
@@ -16,13 +17,14 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 in
 
-let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion : DebianVersions.DebVersion) ->
+let pipeline : DebianVersions.DebVersion -> PipelineMode.Type -> Pipeline.Config.Type = \(debVersion : DebianVersions.DebVersion) -> \(mode: PipelineMode.Type)->
     Pipeline.Config::{
       spec =
         JobSpec::{
           dirtyWhen = DebianVersions.dirtyWhen debVersion,
           path = "Release",
-          name = "MinaArtifact${DebianVersions.capitalName debVersion}"
+          name = "MinaArtifact${DebianVersions.capitalName debVersion}",
+          mode = mode
         },
       steps = [
         Libp2p.step debVersion,
@@ -46,7 +48,21 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
                 limit = Some 2
               } ] -- libp2p error
           },
-
+        Command.build
+          Command.Config::{
+            commands = 
+              DebianVersions.toolchainRunner debVersion [
+                "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
+              ] "./buildkite/scripts/publish-debs.sh",
+            label = "Publish Mina debs for ${DebianVersions.capitalName debVersion}",
+            key = "build-deb-pkg",
+            target = Size.XLarge,
+            retries = [
+              Command.Retry::{
+                exit_status = Command.ExitStatus.Code +2,
+                limit = Some 2
+              } ] -- libp2p error
+          },
         -- daemon berkeley image
         let daemonBerkeleySpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
