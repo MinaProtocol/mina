@@ -74,11 +74,6 @@ val finalize_other_proof :
        , 'c )
        Pickles_types.Vector.t
 
-(** [hash_messages_for_next_step_proof idx state_to_field_element] computes a
-    challenge for the next proof using a random oracle simulated by a sponge
-    hash function (i.e. Fiat Shamir transformation). It takes the index of the proof
-    [idx] and a function which converts the communication transcript (i.e. the
-    state) to field elements to be used by the random oracle *)
 val hash_messages_for_next_step_proof :
      index:
        Step_main_inputs.Inner_curve.t
