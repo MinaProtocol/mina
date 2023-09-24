@@ -30,10 +30,10 @@ module type Field_intf = sig
       where [p] is the order of the field *)
   val inv : t -> t
 
-  (** The neutral element for the addition *)
+  (** The identity element for the addition *)
   val zero : t
 
-  (** The neutral element for the multiplication *)
+  (** The identity element for the multiplication *)
   val one : t
 
   (** [of_int x] builds an element of type [t]. [x] is supposed to be the
