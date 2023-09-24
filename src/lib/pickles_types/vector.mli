@@ -113,8 +113,8 @@ module With_length (N : Nat.Intf) : S with type 'a t = ('a, N.n) vec
 
 (** {1 Snarky related functions } *)
 
-(** [typ v t_n] builds a Snarky type of length [t_n] and set the contents of
-    each cell to [v] *)
+(** [typ v t_n] creates a snarky [Typ.t] for a vector of the length [t_n] and
+    sets the contents of each cell to [v] *)
 val typ :
      ('a, 'b, 'c) Snarky_backendless.Typ.t
   -> 'd Nat.nat
