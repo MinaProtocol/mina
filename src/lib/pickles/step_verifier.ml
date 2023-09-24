@@ -462,7 +462,6 @@ struct
     in
     x_hat
 
-  (* arguments verifications (lookups, plonk, etc) *)
   let incrementally_verify_proof (type b)
       (module Proofs_verified : Nat.Add.Intf with type n = b) ~srs:_
       ~(domain :
