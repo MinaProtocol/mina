@@ -20,6 +20,7 @@ def set_error():
 
 def branch_commit(branch):
   print ('Retrieving', branch, 'head commit...')
+  subprocess.run(['git','fetch'],capture_output=False)
   result=subprocess.run(['git','log','-n','1','--format="%h"','--abbrev=7','--no-merges',f'{branch}'],
                         capture_output=True)
   output=result.stdout.decode('ascii')
