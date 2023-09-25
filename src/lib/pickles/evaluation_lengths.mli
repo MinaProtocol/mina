@@ -9,7 +9,7 @@
     evaluations happen in.
 
     For the different versions, refer to the module
-    [Pickles_types.Plonk_types.Evals]. When a new custom gate is added, the
+    {!module:Pickles_types.Plonk_types.Evals}. When a new custom gate is added, the
     corresponding selectors must be added.
 
     As for the return type of {!Commitment_lengths.create}, an encoding of the
