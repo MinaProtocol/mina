@@ -25,7 +25,7 @@ Some types are parametrized by type-level defined naturals.
 
 ## Coding guidelines
 
-Functions related to computations are parametrised by at least two types,
+Functions related to computations are parametrized by at least two types,
 suffixed respectively with `var` and `val`, which represent `in circuit` values
 and `out circuit` values. The type `[('var, 'val) t]` describes a mapping from
 the OCaml type `['val]` to a type representing the value using PlonK variables
