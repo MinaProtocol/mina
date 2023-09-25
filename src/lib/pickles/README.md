@@ -17,7 +17,7 @@ Pasta and Vesta curves. The code refers to the algebraic parameters as `Impls`
 and are passed to generic functions as a first class module.
 
 A particularity of Pickles is to use the power of the OCaml type system to
-encode runtime invariants like vector sizes, heteregenous list and others at
+encode runtime invariants like vector sizes, heterogeneous lists and others at
 the type level to avoid constructing some statements that might be wrong at
 compile time. Some encoded theories can be found in
 [`Pickles_types`](pickles_types).
