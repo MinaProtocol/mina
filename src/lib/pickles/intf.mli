@@ -136,7 +136,7 @@ end
 
 (** Generic interface over a concrete implementation [Impl] of an elliptic
     curve in Weierstrass form with [a] and [b]. In affine, the curve has the
-    equation form [y² = x³ + ax + b] *)
+    equation form [y² = x³ + ax + b]. *)
 module Group (Impl : Snarky_backendless.Snark_intf.Run) : sig
   module type S = sig
     type t
