@@ -1,4 +1,4 @@
-(** Implements an interface simulating a {{ https://en.wikipedia.org/wiki/Random_oracle } random oracle } *)
+(** Implements an interface simulating a {{ https://en.wikipedia.org/wiki/Random_oracle } random oracle }. *)
 
 (** Bits alias *)
 type bits := bool list
