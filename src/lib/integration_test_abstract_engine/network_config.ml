@@ -328,8 +328,10 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       | Archive (name, archive_info) ->
           Test_config.Topology.Archive
             ( name
-            , { archive_info with schema_files = mina_archive_schema_aux_files }
-            )
+            , { archive_info with
+                schema_files = mina_archive_schema_aux_files
+              ; libp2p_keyfile = libp2p_keyfile name
+              } )
       | Node (name, node_info) -> (
           match node_info.role with
           | Test_config.Node_role.Block_producer ->
