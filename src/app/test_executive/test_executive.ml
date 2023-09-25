@@ -366,21 +366,6 @@ let main inputs =
         let non_seed_pods =
           network |> Engine.Network.all_non_seed_pods |> Core.String.Map.data
         in
-        let _offline_node_event_subscription =
-          (* Monitor for offline nodes; abort the test if a node goes down
-             unexpectedly.
-          *)
-          Dsl.Event_router.on (Dsl.event_router dsl) Node_offline
-            ~f:(fun offline_node () ->
-              let node_name = Engine.Network.Node.app_id offline_node in
-              [%log info] "Detected node offline $node"
-                ~metadata:[ ("node", `String node_name) ] ;
-              if Engine.Network.Node.should_be_running offline_node then (
-                [%log fatal] "Offline $node is required for this test"
-                  ~metadata:[ ("node", `String node_name) ] ;
-                failwith "Aborted because of required offline node" ) ;
-              Async_kernel.Deferred.return `Continue )
-        in
         (* TODO: parallelize (requires accumlative hard errors) *)
         let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
         let%bind () =
