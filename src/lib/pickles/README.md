@@ -30,7 +30,7 @@ suffixed respectively with `var` and `val`, which represent `in circuit` values
 and `out circuit` values. The type `[('var, 'val) t]` describes a mapping from
 the OCaml type `['val]` to a type representing the value using PlonK variables
 (`['var]`).
-Each in-circuit encoded values have a corresponding `'a Typ.t` value, which
+Each in-circuit encoded value has a corresponding `'a Typ.t` value, which
 carries the in-circuit values, out-circuit values and the related circuit
 constraints.
 A nested module `Constant` should be defined to encode the out-circuit values
