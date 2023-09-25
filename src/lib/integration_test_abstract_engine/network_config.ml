@@ -50,6 +50,7 @@ type config =
   ; block_producer_configs : block_producer_config list
   ; seed_node_configs : seed_node_config list
   ; log_precomputed_blocks : bool
+  ; archive_node_configs : seed_node_config list
   ; archive_node_count : int
   ; mina_archive_schema : string
   ; mina_archive_schema_aux_files : string list
@@ -299,6 +300,23 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
             |> Util.drop_outer_quotes
         } )
   in
+  let archive_node_configs =
+    List.map archive_nodes ~f:(fun node ->
+        let[@warning "-8"] (Test_config.Topology.Archive (_, node_info)) =
+          List.find_exn topology ~f:(function
+            | Archive (name, _) ->
+                String.equal name node.node_name
+            | _ ->
+                false )
+        in
+        { name = node.node_name
+        ; libp2p_pass = "naughty blue worm"
+        ; libp2p_keypair = node_info.libp2p_keypair
+        ; libp2p_peerid =
+            Yojson.Safe.to_string node_info.libp2p_peerid
+            |> Util.drop_outer_quotes
+        } )
+  in
   let mina_archive_schema = "create_schema.sql" in
   let long_commit_id =
     let open String in
@@ -411,6 +429,7 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ; runtime_config = Runtime_config.to_yojson runtime_config
       ; block_producer_configs
       ; seed_node_configs
+      ; archive_node_configs
       ; log_precomputed_blocks
       ; archive_node_count = List.length archive_nodes
       ; mina_archive_schema

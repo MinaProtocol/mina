@@ -136,6 +136,18 @@ module Network_manager = struct
             ~data:config.libp2p_peerid )
       |> Deferred.return
     in
+    [%log info] "Writing archive node libp2p keypairs to %s"
+      libp2p_kps_base_path ;
+    let%bind () =
+      List.iter network_config.config.archive_node_configs ~f:(fun config ->
+          let keypair_file =
+            sprintf "%s/%s.json" libp2p_kps_base_path config.name
+          in
+          Yojson.Safe.to_file keypair_file config.libp2p_keypair ;
+          Out_channel.write_all (keypair_file ^ ".peerid")
+            ~data:config.libp2p_peerid )
+      |> Deferred.return
+    in
     let%bind () =
       [%log info] "Writing snark coordinator libp2p keypair to %s"
         libp2p_kps_base_path ;

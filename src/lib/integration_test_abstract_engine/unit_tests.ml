@@ -85,6 +85,7 @@ module Test_values = struct
     let block_producer_configs = [] in
     let seed_node_configs = [] in
     let log_precomputed_blocks = false in
+    let archive_node_configs = [] in
     let archive_node_count = 0 in
     let mina_archive_schema = "schema" in
     let mina_archive_schema_aux_files = [] in
@@ -103,6 +104,7 @@ module Test_values = struct
     ; block_producer_configs
     ; seed_node_configs
     ; log_precomputed_blocks
+    ; archive_node_configs
     ; archive_node_count
     ; mina_archive_schema
     ; mina_archive_schema_aux_files
