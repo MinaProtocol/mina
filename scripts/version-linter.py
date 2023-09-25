@@ -20,7 +20,6 @@ def set_error():
 
 def branch_commit(branch):
   print ('Retrieving', branch, 'head commit...')
-  subprocess.run(['git','fetch'],capture_output=False)
   result=subprocess.run(['git','log','-n','1','--format="%h"','--abbrev=7','--no-merges',f'{branch}'],
                         capture_output=True)
   output=result.stdout.decode('ascii')
@@ -188,6 +187,8 @@ if __name__ == "__main__":
   pr_branch=sys.argv[1]
   base_branch=sys.argv[2]
   release_branch=sys.argv[3]
+
+  subprocess.run(['git','fetch'],capture_output=False)
 
   base_branch_commit=branch_commit(base_branch)
   download_type_shapes('base',base_branch,base_branch_commit)
