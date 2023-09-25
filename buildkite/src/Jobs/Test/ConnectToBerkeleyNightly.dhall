@@ -29,7 +29,9 @@ in Pipeline.build Pipeline.Config::{
   },
   steps = [
     Command.build Command.Config::{
-      commands = RunInToolchain.runInToolchain ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"] "buildkite/scripts/check-berkeley-compatibility.sh",
+      commands = [
+        Cmd.run "buildkite/scripts/check-berkeley-compatibility.sh" 
+      ],
       label = "Test: connect to berkeley nightly",
       key = "connect-to-berkeley-nightly",
       target = Size.XLarge,
