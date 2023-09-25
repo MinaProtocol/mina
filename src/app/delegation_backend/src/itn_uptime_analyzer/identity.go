@@ -98,7 +98,7 @@ func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext
 					identity = GetPartialIdentity(submissionData.Submitter.String(), submissionData.RemoteAddr)
 				}
 
-				if IsIdentityInArray(identity.id, identities) {
+				if !IsIdentityInArray(identity.id, identities) {
 					identities.AddIdentity(identity)
 				}
 			}
