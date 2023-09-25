@@ -19,7 +19,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   type dsl = Dsl.t
 
   module Balance = struct
-    open Currency
+    module Balance = Currency.Balance
 
     type balance = { liquid : Balance.t; locked : Balance.t } [@@deriving equal]
 
