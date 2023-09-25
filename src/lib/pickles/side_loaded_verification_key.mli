@@ -1,4 +1,4 @@
-(** A homogenised verification key type, used to 'side load' and verify any
+(** A homogenized verification key type, used to 'side load' and verify any
     pickles proof regardless of its original structure.
 *)
 
