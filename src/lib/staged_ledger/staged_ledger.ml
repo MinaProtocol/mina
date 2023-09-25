@@ -2058,13 +2058,11 @@ module T = struct
                   | None ->
                       [%log debug]
                         ~metadata:
-                          [ ( "statement"
-                            , Transaction_snark_work.Statement.to_yojson w )
-                          ; ( "work_ids"
+                          [ ( "work_ids"
                             , Transaction_snark_work.Statement.compact_json w )
                           ]
                         !"Staged_ledger_diff creation: No snark work found for \
-                          $statement" ;
+                          $work_ids" ;
                       [%log internal] "@block_metadata"
                         ~metadata:
                           [ ("interrupt_get_completed_work_at", `Int count)

@@ -128,9 +128,11 @@ let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
   txn_count := !txn_count + num_zkapps ;
   match result with
   | Ok (`Broadcasted, commands, []) ->
-      let zkapp_jsons = List.map commands ~f:User_command.to_yojson in
+      let zkapp_jsons =
+        List.map commands ~f:User_command.fee_payer_summary_json
+      in
       [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:[ ("zkapp_commands", `List zkapp_jsons) ]
+        ~metadata:[ ("summaries", `List zkapp_jsons) ]
         "Scheduled %d zkApps" num_zkapps ;
       Ok zkapp_commands
   | Ok (decision, valid_commands, invalid_commands) ->
@@ -144,7 +146,9 @@ let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
                 | `Not_broadcasted ->
                     "not_broadcasted" ) )
           ; ( "valid_zkapp_commands"
-            , `List (List.map ~f:User_command.to_yojson valid_commands) )
+            , `List
+                (List.map ~f:User_command.fee_payer_summary_json valid_commands)
+            )
           ; ( "invalid_zkapp_commands"
             , `List
                 (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
