@@ -36,8 +36,8 @@ module type Field_intf = sig
   (** The identity element for the multiplication *)
   val one : t
 
-  (** [of_int x] builds an element of type [t]. [x] is supposed to be the
-      canonical representation of the field element. *)
+  (** [of_int x] builds an element of type [t]. [x] is the canonical
+      representation of the field element. *)
   val of_int : int -> t
 end
 
