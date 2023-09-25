@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-testworld-2-0.tfstate"
+    key     = "terraform-testworld-v2.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -36,17 +36,15 @@ provider "google" {
 
 
 variable "whale_count" {
-  type = number
-
+  type        = number
   description = "Number of online whales for the network to run"
-  default     = 16
+  default     = 5
 }
 
 variable "fish_count" {
-  type = number
-
+  type        = number
   description = "Number of online fish for the network to run"
-  default     = 2
+  default     = 0
 }
 
 variable "seed_count" {
@@ -55,24 +53,16 @@ variable "seed_count" {
 
 variable "plain_node_count" {
   default = 0
-  # default     = 10
 }
 
 locals {
-  testnet_name       = "testwold-2-0"
-  mina_image         = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup1-rampup-b1facec-focal-berkeley" #"minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
-  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup1-rampup-b1facec-focal"         #"minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-6f9d956-focal"
-  seed_region        = "us-central1"
-  seed_zone          = "us-central1-b"
-
-  # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
+  testnet_name                    = "testworld-2-0"
+  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-berkeley-f611438-focal-berkeley"
+  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-berkeley-f611438-focal"
+  seed_region                     = "us-central1"
+  seed_zone                       = "us-central1-b"
   make_report_discord_webhook_url = ""
-
-  # replace with `make_report_accounts = ""` if not in use (will fail if file not present)
-  # make_report_accounts = <<EOT
-  #   ${file("../../../${local.testnet_name}-accounts.csv")}
-  # EOT
-  make_report_accounts = ""
+  make_report_accounts            = ""
 }
 
 module "testworld-2-0" {
@@ -92,11 +82,11 @@ module "testworld-2-0" {
   mina_bots_image             = "codaprotocol/coda-bots:0.0.13-beta-1"
   mina_points_image           = "codaprotocol/coda-points-hack:32b.4"
   watchdog_image              = "gcr.io/o1labs-192920/watchdog:0.4.13"
-  use_embedded_runtime_config = true
+  use_embedded_runtime_config = false
 
   archive_node_count            = 3
   mina_archive_schema           = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/b1facecde934ce3969771c34962b878d75321ca7/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/b1facecde934ce3969771c34962b878d75321ca7/src/app/archive/zkapp_tables.sql"]
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/f6114385cbe8ce695da41af55602bb9ee5d90a88/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/f6114385cbe8ce695da41af55602bb9ee5d90a88/src/app/archive/zkapp_tables.sql"]
 
   archive_configs = [
     {

@@ -1,3 +1,4 @@
 .terraform/
 terraform.tfstate*
 *gcloud-keyfile.json*
+*keys-original*
