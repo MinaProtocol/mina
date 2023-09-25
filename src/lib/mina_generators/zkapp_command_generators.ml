@@ -32,8 +32,7 @@ let gen_account_precondition_from_account ?failure
     ?(ignore_sequence_events_precond = false) ?(no_account_precondition = false)
     ?(is_nonce_precondition = false) ~first_use_of_account account =
   let open Quickcheck.Let_syntax in
-  if no_account_precondition then
-    return Account_update.Account_precondition.Accept
+  if no_account_precondition then return Zkapp_precondition.Account.accept
   else
     let { Account.Poly.balance; nonce; delegate; receipt_chain_hash; zkapp; _ }
         =
@@ -237,20 +236,17 @@ let gen_account_precondition_from_account ?failure
                 in
                 return { predicate_account with proved_state }
           in
-          return
-            (Account_update.Account_precondition.Full faulty_predicate_account)
+          return faulty_predicate_account
       | _ ->
-          return (Account_update.Account_precondition.Full predicate_account)
+          return predicate_account
     else
       (* Nonce *)
       let { Account.Poly.nonce; _ } = account in
       match failure with
       | Some Invalid_account_precondition ->
-          return
-            (Account_update.Account_precondition.Nonce
-               (Account.Nonce.succ nonce) )
+          return @@ Zkapp_precondition.Account.nonce (Account.Nonce.succ nonce)
       | _ ->
-          return (Account_update.Account_precondition.Nonce nonce)
+          return @@ Zkapp_precondition.Account.nonce nonce
 
 let gen_fee ?fee_range ~num_updates (account : Account.t) =
   let balance = account.balance in
@@ -332,8 +328,7 @@ let gen_use_full_commitment ~increment_nonce ~account_precondition
     increment_nonce
     && Zkapp_precondition.Numeric.is_constant
          Zkapp_precondition.Numeric.Tc.nonce
-         (Account_update.Account_precondition.to_full account_precondition)
-           .Zkapp_precondition.Account.nonce
+         account_precondition.Zkapp_precondition.Account.nonce
   in
   let does_not_use_a_signature =
     Control.(not (Tag.equal (tag authorization) Tag.Signature))
@@ -1091,7 +1086,8 @@ let gen_account_update_body_fee_payer ?global_slot ?fee_range ?failure
         () )
       ~f_account_precondition:(fun ~first_use_of_account:_ acct ->
         account_precondition_gen acct )
-      ~f_account_update_account_precondition:(fun nonce -> Nonce nonce)
+      ~f_account_update_account_precondition:(fun nonce ->
+        Zkapp_precondition.Account.nonce nonce )
       ~gen_use_full_commitment:(fun ~account_precondition:_ -> return ())
       ?protocol_state_view ~authorization_tag:Control.Tag.Signature ()
   in

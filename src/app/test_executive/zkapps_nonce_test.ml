@@ -158,7 +158,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
-                     ; account = Nonce (Account.Nonce.of_int 1)
+                     ; account =
+                         Zkapp_precondition.Account.nonce
+                           (Account.Nonce.of_int 1)
                      ; valid_while = Ignore
                      } )
                 []
@@ -183,7 +185,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
-                     ; account = Nonce (Account.Nonce.of_int 2)
+                     ; account =
+                         Zkapp_precondition.Account.nonce
+                           (Account.Nonce.of_int 2)
                      ; valid_while = Ignore
                      } )
                 []
