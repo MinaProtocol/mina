@@ -14,8 +14,9 @@ include User_command.Gen
 (* using Precomputed_values depth introduces a cyclic dependency *)
 [%%inject "ledger_depth", ledger_depth]
 
-let zkapp_command_with_ledger ?ledger_init_state ?num_keypairs
-    ?max_account_updates ?max_token_updates ?account_state_tbl ?vk ?failure () =
+let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
+    ?num_keypairs ?max_account_updates ?max_token_updates ?account_state_tbl ?vk
+    ?failure () =
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
   (* Need a fee payer keypair, a keypair for the "balancing" account (so that the balance changes
@@ -37,21 +38,27 @@ let zkapp_command_with_ledger ?ledger_init_state ?num_keypairs
     Option.value num_keypairs
       ~default:((max_account_updates * 2) + (max_token_updates * 3) + 2)
   in
-  let new_keypairs =
+  let%bind new_keypairs =
     let existing_keypairs =
-      ref
-      @@ Option.value_map ledger_init_state ~default:Keypair.Set.empty
-           ~f:(fun l ->
-             Array.map l ~f:(fun (kp, _balance, _nonce, _timing) -> kp)
-             |> Keypair.Set.of_array )
+      let tbl = Public_key.Compressed.Hash_set.create () in
+      Option.iter ledger_init_state ~f:(fun l ->
+          Array.iter l ~f:(fun (kp, _balance, _nonce, _timing) ->
+              Hash_set.add tbl (Public_key.compress kp.public_key) ) ) ;
+      tbl
     in
-    List.init num_keypairs ~f:(fun _ ->
-        let keypair = ref (Keypair.create ()) in
-        while Set.mem !existing_keypairs !keypair do
-          keypair := Keypair.create ()
-        done ;
-        existing_keypairs := Set.add !existing_keypairs !keypair ;
-        !keypair )
+    let rec go acc n =
+      if n = 0 then return acc
+      else
+        let%bind kp =
+          Quickcheck.Generator.filter Keypair.gen ~f:(fun kp ->
+              not
+                (Hash_set.mem existing_keypairs
+                   (Public_key.compress kp.public_key) ) )
+        in
+        Hash_set.add existing_keypairs (Public_key.compress kp.public_key) ;
+        go (kp :: acc) (n - 1)
+    in
+    go [] num_keypairs
   in
   let keymap =
     List.fold new_keypairs ~init:Public_key.Compressed.Map.empty
