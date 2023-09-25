@@ -58,7 +58,7 @@ module E04 : functor (T : T0) -> sig
 end
 
 (** Map arity 0 to 6: [let e06 t = fun _ _ _ _ _ _ -> t] *)
-module E06 : functor (T : T0) -> sig
+module E06 (T : T0) : sig
   type (_, _, _, _, _, _) t = T.t
 end
 
