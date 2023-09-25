@@ -1,4 +1,4 @@
-(** The information required to recursively verify a pickles proof. *)
+(** The information required to recursively verify a Pickles proof. *)
 
 open Pickles_types
 module Impl = Impls.Step
