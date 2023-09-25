@@ -1,5 +1,5 @@
 (** This module provides functions for time profiling. It must only be used for
-    debugging *)
+    debugging. *)
 
 val start : string -> unit
 
