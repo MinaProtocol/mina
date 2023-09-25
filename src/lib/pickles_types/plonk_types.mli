@@ -65,7 +65,7 @@ module Features : sig
 
   type flags = bool t
 
-  (** [to_data flags] takes the record define above and deconstructs it in a
+  (** [to_data flags] takes the record defined above and deconstructs it in a
       list, in the field order *)
   val to_data :
        'a t
