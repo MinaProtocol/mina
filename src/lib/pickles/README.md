@@ -33,7 +33,7 @@ the OCaml type `['val]` to a type representing the value using PlonK variables
 Each in-circuit encoded value has a corresponding `'a Typ.t` value, which
 carries the in-circuit values, out-circuit values and the related circuit
 constraints.
-A nested module `Constant` should be defined to encode the out-circuit values
+A nested module `Constant` must be defined to encode the out-circuit values
 and operations.
 The reader can find more information in [Snarky
 documentation](https://github.com/o1-labs/snarky/blob/master/src/base/snark_intf.ml#L140-L153).
