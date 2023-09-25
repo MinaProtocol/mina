@@ -2,3 +2,4 @@
 
 [%%undef consensus_mechanism]
 [%%undef compaction_interval]
+[%%undef slot_tx_end]

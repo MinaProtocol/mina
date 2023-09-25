@@ -34,3 +34,4 @@
 [%%import "/src/config/features/dev.mlh"]
 [%%undef compaction_interval]
 [%%define vrf_poll_interval 5000]
+[%%undef slot_tx_end]

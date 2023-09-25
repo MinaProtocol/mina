@@ -48,3 +48,15 @@ let rpc_heartbeat_timeout_sec = 60.0
 let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
 
 [%%inject "generate_genesis_proof", generate_genesis_proof]
+
+[%%ifndef slot_tx_end]
+
+let slot_tx_end = None
+
+[%%else]
+
+[%%inject "slot_tx_end", slot_tx_end]
+
+let slot_tx_end = Some slot_tx_end
+
+[%%endif]
