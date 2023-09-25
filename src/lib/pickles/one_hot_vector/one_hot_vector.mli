@@ -14,7 +14,7 @@ module Constant : sig
 end
 
 (** Represents a one-hot vector of length ['n]. The type parameter ['f] is used
-    to encoded the field the vector lives in. For instance, if we want to
+    to encod the field the vector lives in. For instance, if we want to
     represent the one-hot vector [0; 0; 1; 0; 0] in the finite field [F13], we
     would use the type [(F13.t, Nat.N5) t]. To activate the third bit, we would
     use the function [of_index] provided below.
