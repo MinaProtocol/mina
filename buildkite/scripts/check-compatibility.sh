@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# start berkeley daemon as seed, see if PR branch daemon can sync to it
+# start mainline branch daemon as seed, see if PR branch daemon can sync to it
 
 # don't exit if docker download fails
 set +e
@@ -111,33 +111,40 @@ function rm_docker_container {
 
 ### start of code
 
+if [[ $# -ne 1 ]]; then
+    echo "Usage: $0 <mainline-branch>"
+    exit 1
+fi
+
+MAINLINE_BRANCH=$1
+
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
   develop) ;;
   *)
-      echo "PR is not against develop, not running the berkeley compatibility test"
+      echo "PR is not against develop, not running the $MAINLINE_BRANCH compatibility test"
       exit 0
 esac
 
 ### Download docker images
 
-echo "Current branch is $CURR_BRANCH"
+echo "Current branch is $BUILDKITE_BRANCH"
 
-echo "Checking out berkeley branch"
-git checkout berkeley
+echo "Checking out $MAINLINE_BRANCH branch"
+git checkout $MAINLINE_BRANCH
 git pull
 
-echo "Getting berkeley docker"
+echo "Getting $MAINLINE_BRANCH docker"
 get_shas
 try_docker_shas "$SHAS"
 
 if [ $GOT_DOCKER -eq 1 ] ; then
-    echo "Got berkeley docker"
+    echo "Got $MAINLINE_BRANCH docker"
 else
-    echo "Could not find berkeley docker"
+    echo "Could not find $MAINLINE_BRANCH docker"
     exit 1
 fi
 
-BERKELEY_IMAGE_TAG=$IMAGE_TAG
+MAIN_BRANCH_IMAGE_TAG=$IMAGE_TAG
 
 CURR_BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 
@@ -157,13 +164,13 @@ fi
 
 PR_IMAGE_TAG=$IMAGE_TAG
 
-echo "Berkeley image tag:" $BERKELEY_IMAGE_TAG
+echo "${MAINLINE_BRANCH} image tag:" $MAIN_BRANCH_IMAGE_TAG
 echo "PR image tag:" $PR_IMAGE_TAG
 
-image_id $BERKELEY_IMAGE_TAG
-BERKELEY_IMAGE_ID=$IMAGE_ID
+image_id $MAIN_BRANCH_IMAGE_TAG
+MAIN_BRANCH_IMAGE_ID=$IMAGE_ID
 
-echo "Berkeley image id:" $BERKELEY_IMAGE_ID
+echo "${MAINLINE_BRANCH} image id:" $MAIN_BRANCH_IMAGE_ID
 
 image_id $PR_IMAGE_TAG
 PR_IMAGE_ID=$IMAGE_ID
@@ -172,19 +179,19 @@ echo "PR image id:" $PR_IMAGE_ID
 
 ### Run docker images
 
-# generate libp2p keypair for berkeley
-gen_libp2p_keypair $BERKELEY_IMAGE_ID "berkeley_docker"
+# generate libp2p keypair for mainline branch
+gen_libp2p_keypair $MAIN_BRANCH_IMAGE_ID "${MAINLINE_BRANCH}_docker"
 
-BERKELEY_COMMITTED_IMAGE_ID=$COMMITTED_IMAGE_ID
-BERKELEY_LIBP2P_PEER_ID=$(docker run -e MINA_LIBP2P_PASS='' --entrypoint mina $BERKELEY_COMMITTED_IMAGE_ID \
+MAIN_BRANCH_COMMITTED_IMAGE_ID=$COMMITTED_IMAGE_ID
+MAIN_BRANCH_LIBP2P_PEER_ID=$(docker run -e MINA_LIBP2P_PASS='' --entrypoint mina $MAIN_BRANCH_COMMITTED_IMAGE_ID \
 			  libp2p dump-keypair --privkey-path libp2p | awk -F , '(NR==2){print $3}')
 
-echo "Berkeley libp2p peer id:" $BERKELEY_LIBP2P_PEER_ID
+echo "${MAINLINE_BRANCH} libp2p peer id:" $MAIN_BRANCH_LIBP2P_PEER_ID
 
-echo "Booting berkeley daemon"
-boot_and_sync $BERKELEY_COMMITTED_IMAGE_ID 8302 3085
+echo "Booting ${MAINLINE_BRANCH} daemon"
+boot_and_sync $MAIN_BRANCH_COMMITTED_IMAGE_ID 8302 3085
 
-echo "Berkeley seed done bootstrapping"
+echo "${MAINLINE_BRANCH} seed done bootstrapping"
 
 # generate PR libp2p keypair
 gen_libp2p_keypair $PR_IMAGE_ID "pr_docker"
@@ -193,11 +200,11 @@ PR_COMMITTED_IMAGE_ID=$COMMITTED_IMAGE_ID
 
 echo "Booting PR daemon"
 
-boot_and_sync $PR_COMMITTED_IMAGE_ID 8305 3086 $BERKELEY_LIBP2P_PEER_ID 8302
+boot_and_sync $PR_COMMITTED_IMAGE_ID 8305 3086 $MAIN_BRANCH_LIBP2P_PEER_ID 8302
 
-echo "PR daemon synced to berkeley daemon!"
+echo "PR daemon synced to ${MAINLINE_BRANCH} daemon!"
 
 echo "Removing docker containers"
 
-rm_docker_container $BERKELEY_COMMITTED_IMAGE_ID
+rm_docker_container $MAIN_BRANCH_COMMITTED_IMAGE_ID
 rm_docker_container $PR_COMMITTED_IMAGE_ID
