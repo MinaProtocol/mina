@@ -1,4 +1,4 @@
-(** A type capturing the padding that's required to homogenise proofs consumed
+(** A type capturing the padding that's required to homogenize proofs consumed
     by each of the inductive rules' ancestor proofs.
 *)
 
