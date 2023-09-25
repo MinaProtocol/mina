@@ -112,7 +112,7 @@ val hash_messages_for_next_step_proof_opt :
        Core_kernel.Staged.t
 
 (** Actual verification using cryptographic tools. Returns [true] (encoded as a
-    in-circuit boolean variable) if the verification is successfull *)
+    in-circuit Boolean variable) if the verification is successful *)
 val verify :
      proofs_verified:(module Pickles_types.Nat.Add.Intf with type n = 'a)
   -> is_base_case:Step_main_inputs.Impl.Boolean.var
