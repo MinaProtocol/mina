@@ -93,6 +93,7 @@ func ZkappPaymentsInput(params ZkappSubParams, batchIx int, tps float64) ZkappCo
 		DeploymentFee:      params.DeploymentFee,
 		AccountQueueSize:   accountQueueSize,
 		MaxCost:            params.MaxCost,
+		MaxAccountUpdates:  2,
 	}
 }
 

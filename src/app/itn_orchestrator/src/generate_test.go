@@ -152,13 +152,9 @@ func testZkapp(t *testing.T, numFeePayers int, feePayerBalance int64, pi ZkappCo
 			balances[j%numFeePayers] -= int64(pi.MaxFee)
 		}
 	} else {
-		// TODO: move maxAccountUpdates to config, find a better name
-		// Transaction will be structured as:
-		// fee payer + balancing tx + (permission_setter + actual update) × maxAccountUpdates
-		maxAccountUpdates := 2
 		state := newZkappGenState(pi, numFeePayers, balances)
 		for j := pi.NumZkappsToDeploy; j < numTxs; j++ {
-			accUpdates := rand.Intn(maxAccountUpdates) + 1
+			accUpdates := rand.Intn(pi.MaxAccountUpdates) + 1
 			newAccs := 0
 			if state.numNewAccounts > 0 {
 				newAccs = rand.Intn(accUpdates + 1)
