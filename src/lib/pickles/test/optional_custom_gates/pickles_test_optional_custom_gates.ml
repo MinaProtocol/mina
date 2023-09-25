@@ -284,7 +284,7 @@ let main_fixed_lookup_tables_multiple_tables_multiple_lookups () =
 (* Parameters *)
 let main_runtime_table_cfg () =
   (* let num = 1 in *)
-  let table_id = Int32.of_int_exn 0 in
+  let table_id = Int32.of_int_exn 1 in
   let table_ids = [| table_id |] in
   let size = 5 in
   let first_column = Array.init size ~f:Field.Constant.of_int in
@@ -296,7 +296,7 @@ let main_runtime_table_cfg () =
   let rec make_lookup i n =
     if i = n then ()
     else
-      let table_id = 0 in
+      let table_id = 1 in
       Printf.printf "Doing lookup in table %d\n" table_id ;
       add_plonk_constraint
         (Lookup
@@ -421,11 +421,12 @@ let () =
       (*   , Plonk_types.Features.{ none_bool with foreign_field_add = true } ) *)
       (* ; ( "foreign field multiplication" *)
       (*   , Plonk_types.Features.{ none_bool with foreign_field_mul = true } ) *)
-      (* ; ( "Fixed lookup tables" *)
-      (*   , Plonk_types.Features.{ none_bool with lookup = true } ) *)
-      ( "Runtime lookup tables"
-      , Plonk_types.Features.
-          { none_bool with lookup = true; runtime_tables = true } )
+      (*
+      ( "Fixed lookup tables"
+         , Plonk_types.Features.{ none_bool with lookup = true } ), *)
+       ( "Runtime lookup tables"
+       , Plonk_types.Features.
+           { none_bool with lookup = true; runtime_tables = true } )
     ]
   in
   List.iter ~f:register_feature_test configurations ;
