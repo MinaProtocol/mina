@@ -1,5 +1,5 @@
 (** The snarky request types that the step and wrap circuits use to get
-    non-deterministic witness data from the prover
+    non-deterministic witness data from the prover.
 *)
 
 open Pickles_types
