@@ -57,8 +57,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name                    = "testworld-2-0"
-  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-berkeley-f611438-focal-berkeley"
-  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-berkeley-f611438-focal"
+  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-berkeley-itn-ledger-bake-20a2b3a-focal-berkeley"
+  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-berkeley-itn-ledger-bake-20a2b3a-focal"
   seed_region                     = "us-central1"
   seed_zone                       = "us-central1-b"
   make_report_discord_webhook_url = ""
@@ -82,11 +82,11 @@ module "testworld-2-0" {
   mina_bots_image             = "codaprotocol/coda-bots:0.0.13-beta-1"
   mina_points_image           = "codaprotocol/coda-points-hack:32b.4"
   watchdog_image              = "gcr.io/o1labs-192920/watchdog:0.4.13"
-  use_embedded_runtime_config = false
+  use_embedded_runtime_config = true
 
   archive_node_count            = 3
   mina_archive_schema           = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/f6114385cbe8ce695da41af55602bb9ee5d90a88/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/f6114385cbe8ce695da41af55602bb9ee5d90a88/src/app/archive/zkapp_tables.sql"]
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/20a2b3ab80546d06a69996e6ad76e112b727b79b/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/20a2b3ab80546d06a69996e6ad76e112b727b79b/src/app/archive/zkapp_tables.sql"]
 
   archive_configs = [
     {
