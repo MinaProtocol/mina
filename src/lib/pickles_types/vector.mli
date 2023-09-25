@@ -1,6 +1,6 @@
 (** Typed size vectors for Pickles. The size of the vector is encoded at the
     type level.
-    The module also provides common methods available for standard list ['a
+    The module also provides common methods available for built-in lists ['a
     list] like [map], [iter], etc.
 *)
 
