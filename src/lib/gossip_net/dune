@@ -2,7 +2,7 @@
  (name gossip_net)
  (public_name gossip_net)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    uri

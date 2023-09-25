@@ -2,7 +2,6 @@ open Async_kernel
 open Core_kernel
 open Mina_base
 open Pipe_lib
-open Mina_transaction
 
 type metrics_t =
   { block_production_delay : int list
@@ -49,11 +48,18 @@ module Engine = struct
 
       val id : t -> string
 
+      val app_id : t -> string
+
       val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t
 
       val stop : t -> unit Malleable_error.t
+
+      (** Returns true when [start] was most recently called, or false if
+          [stop] was more recent.
+      *)
+      val should_be_running : t -> bool
 
       val get_ingress_uri : t -> Uri.t
 
@@ -199,7 +205,8 @@ module Dsl = struct
       ; best_tips_by_node : State_hash.t String.Map.t
       ; blocks_produced_by_node : State_hash.t list String.Map.t
       ; blocks_seen_by_node : State_hash.Set.t String.Map.t
-      ; blocks_including_txn : State_hash.Set.t Transaction_hash.Map.t
+      ; blocks_including_txn :
+          State_hash.Set.t Mina_transaction.Transaction_hash.Map.t
       }
 
     val listen :
@@ -250,7 +257,7 @@ module Dsl = struct
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
     val signed_command_to_be_included_in_frontier :
-         txn_hash:Transaction_hash.t
+         txn_hash:Mina_transaction.Transaction_hash.t
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
 
