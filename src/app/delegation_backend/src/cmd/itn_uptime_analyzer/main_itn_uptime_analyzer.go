@@ -78,10 +78,10 @@ func main() {
 		// Decide where to insert the calculated uptime
 		if exactMatch {
 			identity.AppendUptime(appCfg, sheetsService, log, sheetTitle, rowIndex)
-		} else if (!exactMatch) && (rowIndex == 0) {
+		} else if rowIndex == 0 {
 			identity.AppendNext(appCfg, sheetsService, log, sheetTitle)
 			identity.AppendUptime(appCfg, sheetsService, log, sheetTitle, firstEmptyRow)
-		} else if (!exactMatch) && (rowIndex != 0) {
+		} else {
 			identity.InsertBelow(appCfg, sheetsService, log, sheetTitle, rowIndex)
 			identity.AppendUptime(appCfg, sheetsService, log, sheetTitle, rowIndex+1)
 		}
