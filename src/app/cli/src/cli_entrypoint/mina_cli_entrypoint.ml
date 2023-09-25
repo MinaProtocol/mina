@@ -430,6 +430,15 @@ let setup_daemon logger =
          for the associated private key that is being tracked by this daemon. \
          You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
+  and slot_tx_end =
+    flag "--slot-tx-end" ~aliases:[ "slot-tx-end" ]
+      ~doc:
+        (sprintf
+           "SLOT Slot after which the node will stop accepting transactions. \
+            (default: %s)"
+           (Option.value_map Mina_compile_config.slot_tx_end ~default:"none"
+              ~f:string_of_int ) )
+      (optional int)
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -1270,6 +1279,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   "Cannot provide both uptime submitter public key and uptime \
                    submitter keyfile"
           in
+          let slot_tx_end =
+            Option.value_map slot_tx_end
+              ~default:Mina_compile_config.slot_tx_end ~f:(fun slot ->
+                Some (Mina_numbers.Global_slot.of_int slot) )
+          in
           let start_time = Time.now () in
           let%map coda =
             Mina_lib.create ~wallets
@@ -1300,7 +1314,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~log_block_creation ~precomputed_values ~start_time
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~stop_time ~node_status_url () )
+                 ~uptime_submitter_keypair ~stop_time ~node_status_url
+                 ~slot_tx_end () )
           in
           { Coda_initialization.coda
           ; client_trustlist

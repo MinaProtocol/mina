@@ -63,6 +63,7 @@
    blockchain_snark
    snarky.backendless
    o1trace
+   mina_numbers
  )
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))
