@@ -298,14 +298,11 @@ module Make
                         (Option.value block_set ~default:State_hash.Set.empty)
                         breadcrumb.state_hash )
                 in
-                let txn_hash_list =
-                  List.map breadcrumb.user_commands ~f:(fun cmd_with_status ->
-                      cmd_with_status.With_status.data
-                      |> User_command.forget_check
-                      |> Transaction_hash.hash_command )
+                let transaction_hashes =
+                  List.map breadcrumb.transaction_hashes ~f:With_status.data
                 in
                 let blocks_including_txn' =
-                  List.fold txn_hash_list ~init:state.blocks_including_txn
+                  List.fold transaction_hashes ~init:state.blocks_including_txn
                     ~f:(fun accum hash ->
                       let block_set' =
                         State_hash.Set.add
