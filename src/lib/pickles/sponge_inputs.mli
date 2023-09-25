@@ -20,7 +20,7 @@ module Make
       (** Internal operations of the permutation *)
       module Operations : sig
         (** [apply_affine_map (mds, rc) state] computes the linear layer of the
-            permutation using the matrix [MDS] and the round constants [rc] with the
+            permutation using the matrix [mds] and the round constants [rc] with the
             state [state] *)
         val apply_affine_map :
              Impl.field array array * Impl.field array
