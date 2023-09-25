@@ -135,9 +135,6 @@ let%test_module "all-ipc test" =
         | Connected, false, true ->
             status := Disconnected ;
             true
-        | Disconnected, true, true ->
-            status := Connected ;
-            true
         | _, _, _ ->
             false
       in
