@@ -18,6 +18,7 @@ func GetCurrentTime() time.Time {
 // Checks the spreadsheet for a possible value for the last execution date
 // If there is no date, or the date is between the +/- one hour range of the chosen execution interval then the function returns current time minus the execution interval
 func GetLastExecutionTime(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, sheetTitle string, currentTime time.Time, executionInterval int) time.Time {
+
 	readRange := fmt.Sprintf("%s!A%d:Z%d", sheetTitle, 1, 1)
 	spId := config.AnalyzerOutputGsheetId
 
@@ -29,8 +30,7 @@ func GetLastExecutionTime(config AppConfig, client *sheets.Service, log *logging
 	var lastFilledColumn int = len(resp.Values[0]) - 1
 	var lastExecutionBasedOnSheetsAsTime time.Time
 
-	// 65 is the ascii code for letter A
-	readRange = fmt.Sprintf("%s!%s%d", sheetTitle, string(lastFilledColumn+65), 1)
+	readRange = fmt.Sprintf("%s!%s%d", sheetTitle, string(lastFilledColumn+LETTER_A_ASCII_CODE), 1)
 
 	lastTimeWindow := resp.Values[0][lastFilledColumn]
 
@@ -88,7 +88,7 @@ func IdentifyWeek(config AppConfig, client *sheets.Service, log *logging.ZapEven
 	var lastFilledColumn int = len(resp.Values[0]) - 1
 
 	currentDate := currentTime.Format("2006-01-02")
-	oneWeekLater := currentTime.Add(7 * 24 * time.Hour).Format("2006-01-02")
+	oneWeekLater := currentTime.Add(6 * 24 * time.Hour).Format("2006-01-02")
 	sheetTitle := strings.Join([]string{currentDate, oneWeekLater}, " - ")
 
 	if lastSheetEndTime.Before(currentTime) {
@@ -98,13 +98,7 @@ func IdentifyWeek(config AppConfig, client *sheets.Service, log *logging.ZapEven
 		}
 
 		return sheetTitle, nil
-	} else if lastFilledColumn >= 14 {
-		err := CreateSheet(config, client, log, sheetTitle)
-		if err != nil {
-			log.Fatalf("Unable to create new sheet for spreadsheet: %v\n", err)
-		}
 
-		return sheetTitle, nil
 	} else {
 		return lastSheet.Properties.Title, nil
 	}
