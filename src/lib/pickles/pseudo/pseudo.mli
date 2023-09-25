@@ -4,7 +4,7 @@
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) : sig
   (** The type parameter ['n] is the size of the vector, and ['a] is the domains
-      of the vector elements *)
+      of the vector elements. *)
   type ('a, 'n) t =
     'n One_hot_vector.T(Impl).t * ('a, 'n) Pickles_types.Vector.t
 
