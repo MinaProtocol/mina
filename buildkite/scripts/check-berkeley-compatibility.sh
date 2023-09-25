@@ -5,6 +5,9 @@
 # don't exit if docker download fails
 set +e
 
+
+source buildkite/scripts/export-git-env-vars.sh
+
 function get_shas {
   SHAS=$(git log -n 10 --format="%h" --abbrev=7 --no-merges)
 }
@@ -120,8 +123,7 @@ esac
 
 ### Download docker images
 
-CURR_BRANCH=$(git branch --show-current)
-echo "Current branch is $CURR_BRANCH"
+echo "Current branch is $GITBRANCH"
 
 echo "Checking out berkeley branch"
 git checkout berkeley
@@ -141,7 +143,7 @@ fi
 BERKELEY_IMAGE_TAG=$IMAGE_TAG
 
 echo "Checking out PR branch"
-git checkout $CURR_BRANCH
+git checkout $GITBRANCH
 
 echo "Getting PR docker"
 get_shas
