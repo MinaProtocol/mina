@@ -152,6 +152,14 @@ let check_well_formedness ~genesis_constants (t : t) =
       Ok ()
 
 let yojson_summary_of_command =
+  let is_proof upd =
+    match Account_update.authorization upd with Proof _ -> true | _ -> false
+  in
+  let zkapp_type cmd =
+    let updates = Zkapp_command.account_updates_list cmd in
+    Printf.sprintf "zkapp:%d:%d" (List.length updates)
+      (List.count updates ~f:is_proof)
+  in
   let mk_record type_ memo signature =
     `List
       [ `String type_
@@ -161,7 +169,7 @@ let yojson_summary_of_command =
   in
   function
   | User_command.Zkapp_command cmd ->
-      mk_record "zkapp" (Zkapp_command.memo cmd)
+      mk_record (zkapp_type cmd) (Zkapp_command.memo cmd)
         ( Zkapp_command.fee_payer_account_update cmd
         |> Account_update.Fee_payer.authorization )
   | Signed_command cmd ->

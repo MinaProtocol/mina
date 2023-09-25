@@ -2933,6 +2933,7 @@ module Input = struct
         ; max_cost : bool
         ; balance_change_range :
             Mina_generators.Zkapp_command_generators.balance_change_range_t
+        ; max_account_updates : int option
         }
 
       let arg_typ : ((input, string) result option, input option) arg_typ =
@@ -2943,7 +2944,7 @@ module Input = struct
                        min_balance_change max_balance_change
                        min_new_zkapp_balance max_new_zkapp_balance init_balance
                        min_fee max_fee deployment_fee account_queue_size
-                       max_cost ->
+                       max_cost max_account_updates ->
             Result.return
               { fee_payers
               ; num_zkapps_to_deploy
@@ -2958,6 +2959,7 @@ module Input = struct
               ; deployment_fee
               ; account_queue_size
               ; max_cost
+              ; max_account_updates
               ; balance_change_range =
                   { min_balance_change
                   ; max_balance_change
@@ -2973,7 +2975,7 @@ module Input = struct
               t.balance_change_range.min_new_zkapp_balance
               t.balance_change_range.max_new_zkapp_balance t.init_balance
               t.min_fee t.max_fee t.deployment_fee t.account_queue_size
-              t.max_cost )
+              t.max_cost t.max_account_updates )
           ~fields:
             Arg.
               [ arg "feePayers"
@@ -3020,6 +3022,12 @@ module Input = struct
                   ~typ:(non_null int)
               ; arg "maxCost" ~doc:"Generate max cost zkApp command"
                   ~typ:(non_null bool)
+              ; arg "maxAccountUpdates"
+                  ~doc:
+                    "Parameter of zkapp generation, each generated zkapp tx \
+                     will have (2*maxAccountUpdates+2) account updates \
+                     (including balancing and fee payer)"
+                  ~typ:int
               ]
     end
 
