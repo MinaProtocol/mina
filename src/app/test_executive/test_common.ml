@@ -454,13 +454,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     open Inputs.Engine.Network
 
     let archive node_name ?(account_name = node_name ^ "-key")
-        ?(docker_image = !archive_image) ?git_build () =
+        ?(docker_image = !mina_image) ?(archive_image = !archive_image)
+        ?git_build () =
       let docker_image =
-        if Option.is_some git_build then None else docker_image
+        if Option.is_some git_build then None else Some docker_image
       in
       { Test_config.Archive_node.node_name
       ; account_name
       ; docker_image
+      ; archive_image
       ; git_build
       }
 

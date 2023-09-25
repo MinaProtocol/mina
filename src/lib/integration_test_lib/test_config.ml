@@ -78,6 +78,7 @@ module Archive_node = struct
     { node_name : string
     ; account_name : string
     ; docker_image : string option
+    ; archive_image : string option
     ; git_build : Git_build.t option
     }
   [@@deriving to_yojson]
@@ -192,8 +193,13 @@ module Topology = struct
     ; sk : string
     ; role : Node_role.t
     ; docker_image : string option
+    ; archive_image : string option
     ; git_build : Git_build.t option
     ; schema_files : string list
+    ; libp2p_pass : string
+    ; libp2p_keyfile : string
+    ; libp2p_keypair : Yojson.Safe.t
+    ; libp2p_peerid : Yojson.Safe.t
     }
   [@@deriving to_yojson]
 
@@ -393,8 +399,12 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         [ sc ]
   in
   let topology_of_archive n
-      { Archive_node.account_name; node_name; docker_image; git_build } :
-      Topology.top_info =
+      { Archive_node.account_name
+      ; node_name
+      ; docker_image
+      ; archive_image
+      ; git_build
+      } : Topology.top_info =
     let n = n + num_bp_sc in
     let pk, sk = pk_sk account_name n in
     Archive
@@ -403,8 +413,13 @@ let topology_of_test_config t private_keys libp2p_keypairs libp2p_peerids :
         ; sk
         ; role = Archive_node
         ; docker_image
+        ; archive_image
         ; git_build
         ; schema_files = []
+        ; libp2p_pass
+        ; libp2p_keyfile = "instantiated in network_config.ml"
+        ; libp2p_keypair = List.nth_exn libp2p_keypairs n
+        ; libp2p_peerid = `String List.(nth_exn libp2p_peerids n)
         } )
   in
   let topology_of_seed n
