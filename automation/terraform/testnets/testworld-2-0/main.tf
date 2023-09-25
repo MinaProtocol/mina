@@ -125,7 +125,7 @@ module "testworld-2-0" {
   log_level           = "Info"
   log_txn_pool_gossip = false
 
-  block_producer_key_pass           = "naughty blue worm"
+  block_producer_key_pass           = ""
   block_producer_starting_host_port = 10501
 
   worker_cpu_request = 4
