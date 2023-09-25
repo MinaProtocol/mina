@@ -430,8 +430,8 @@ let setup_daemon logger =
          for the associated private key that is being tracked by this daemon. \
          You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
-  and slot_tx_end =
-    flag "--slot-tx-end" ~aliases:[ "slot-tx-end" ]
+  and enable_slot_tx_end =
+    flag "--enable-slot-tx-end" ~aliases:[ "enable-slot-tx-end" ]
       ~doc:
         (sprintf
            "SLOT Slot after which the node will stop accepting transactions. \
@@ -439,6 +439,14 @@ let setup_daemon logger =
            (Option.value_map Mina_compile_config.slot_tx_end ~default:"none"
               ~f:string_of_int ) )
       (optional int)
+  and disable_slot_tx_end =
+    flag "--slot-tx-end" ~aliases:[ "slot-tx-end" ] no_arg
+      ~doc:
+        (sprintf
+           "Disable feature to stop accepting transactions. (this feature is \
+            %s by default)"
+           (Option.value_map Mina_compile_config.slot_tx_end ~default:"disable"
+              ~f:(fun slot -> "enabled at slot " ^ string_of_int slot) ) )
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -1280,9 +1288,17 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                    submitter keyfile"
           in
           let slot_tx_end =
-            Option.value_map slot_tx_end
-              ~default:Mina_compile_config.slot_tx_end ~f:(fun slot ->
-                Some (Mina_numbers.Global_slot.of_int slot) )
+            match (enable_slot_tx_end, disable_slot_tx_end) with
+            | Some slot, false ->
+                Some (Mina_numbers.Global_slot.of_int slot)
+            | None, true ->
+                None
+            | None, false ->
+                Mina_compile_config.slot_tx_end
+            | Some _, true ->
+                failwith
+                  "Cannot provide both --enable-slot-tx-end and \
+                   --disable-slot-tx-end"
           in
           let start_time = Time.now () in
           let%map coda =
