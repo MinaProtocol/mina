@@ -56,6 +56,7 @@ let verify_one ~srs
     in
     (sponge_after_index, unstage hash_messages_for_next_step_proof)
   in
+  (* prepare the statement to be verified below *)
   let statement =
     let prev_messages_for_next_step_proof =
       with_label __LOC__ (fun () ->
@@ -74,11 +75,15 @@ let verify_one ~srs
             ; old_bulletproof_challenges = prev_challenges
             } )
     in
+    (* Returns messages for the next step proof and messages for the next
+       wrap proof *)
     { Types.Wrap.Statement.messages_for_next_step_proof =
         prev_messages_for_next_step_proof
     ; proof_state = { proof_state with messages_for_next_wrap_proof }
     }
   in
+  (* and when the statement is prepared, we call the step verifier with this
+     statement *)
   let verified =
     with_label __LOC__ (fun () ->
         verify ~srs

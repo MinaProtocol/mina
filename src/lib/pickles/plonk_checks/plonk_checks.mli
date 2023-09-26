@@ -1,5 +1,6 @@
 open Pickles_types
 
+(* TODO: why do we use objects?*)
 type 'field vanishing_polynomial_domain =
   < vanishing_polynomial : 'field -> 'field >
 
