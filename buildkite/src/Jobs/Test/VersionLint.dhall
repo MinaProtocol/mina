@@ -38,6 +38,7 @@ let buildTestCmd : Text -> Size -> List Command.TaggedKey.Type -> Command.Type =
       key = "version-linter",
       target = cmd_target,
       docker = None Docker.Type,
+      tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
       depends_on = dependsOn,
       artifact_paths = [ S.contains "core_dumps/*" ]
     }
