@@ -753,7 +753,7 @@ struct
                     ~f:(fun j acc (Pow_2_roots_of_unity domain) ->
                       if Int.equal domain domain_size then j else acc )
                 in
-                Pickles_base.Proofs_verified.of_int domain_index )
+                Pickles_base.Proofs_verified.of_int_exn domain_index )
           in
           k wrap_domain_indices
       | _ -> (
