@@ -27,7 +27,8 @@ type GenParams struct {
 	MixMaxCostTpsRatio                                                   float64
 	LargePauseEveryNRounds, LargePauseMin                                int
 	MinBalanceChange, MaxBalanceChange, DeploymentFee                    uint64
-	PaymentAmount, MinFee, MaxFee, FundFee                               uint64
+	PaymentAmount, MinZkappFee, MaxZkappFee, FundFee                     uint64
+	MinPaymentFee, MaxPaymentFee                                         uint64
 }
 
 type GeneratedCommand struct {
@@ -258,8 +259,8 @@ func (p *GenParams) Generate(round int) GeneratedRound {
 		Gap:              p.Gap,
 		MinBalanceChange: p.MinBalanceChange,
 		MaxBalanceChange: p.MaxBalanceChange,
-		MinFee:           p.MinFee,
-		MaxFee:           p.MaxFee,
+		MinFee:           p.MinZkappFee,
+		MaxFee:           p.MaxZkappFee,
 		DeploymentFee:    p.DeploymentFee,
 		MaxCost:          maxCost,
 		NewAccountRatio:  p.NewAccountRatio,
@@ -277,8 +278,8 @@ func (p *GenParams) Generate(round int) GeneratedRound {
 		Tps:            tps - zkappTps,
 		MinTps:         p.MinTps,
 		DurationMin:    p.RoundDurationMin,
-		MinFee:         p.MinFee,
-		MaxFee:         p.MaxFee,
+		MinFee:         p.MinPaymentFee,
+		MaxFee:         p.MaxPaymentFee,
 		Amount:         p.PaymentAmount,
 		Receiver:       p.PaymentReceiver,
 	}

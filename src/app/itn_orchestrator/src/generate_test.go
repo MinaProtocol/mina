@@ -33,8 +33,10 @@ func someParams() GenParams {
 		MaxBalanceChange:       3e3,
 		DeploymentFee:          1e9,
 		PaymentAmount:          1e5,
-		MinFee:                 1e9,
-		MaxFee:                 3e9,
+		MinZkappFee:            1e9,
+		MaxZkappFee:            3e9,
+		MinPaymentFee:          1e8,
+		MaxPaymentFee:          3e8,
 		FundFee:                1e9,
 	}
 }
