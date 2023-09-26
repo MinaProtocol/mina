@@ -188,6 +188,8 @@ if __name__ == "__main__":
   base_branch=sys.argv[2]
   release_branch=sys.argv[3]
 
+  subprocess.run(['git','fetch'],capture_output=False)
+
   base_branch_commit=branch_commit(base_branch)
   download_type_shapes('base',base_branch,base_branch_commit)
 

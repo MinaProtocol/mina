@@ -169,7 +169,11 @@ Now, whenever you start vim from `nix develop mina#with-lsp`, it should just wor
 ##### Emacs
 
 You need to install [tuareg](https://github.com/ocaml/tuareg) and  a LSP client, like  [lsp-mode](https://github.com/emacs-lsp/lsp-mode) or [eglot](https://github.com/joaotavora/eglot).
+You do not need to use [merlin](https://github.com/ocaml/merlin) directly (through `merlin-mode`), as `ocaml-lsp-server` that LSP client will use uses `merlin` backend.
+Note that LSP with flycheck and similar tools will not provide the global project compilation functionality, they will focus on individual buffers instead.
+To compile the whole project you can still use `M-x compile` or anything else; compilation results will be then seen by the LSP/flycheck.
 This should just work without any configuration, as long as you start it from `nix develop mina#with-lsp`.
+If you prefer to have just one instance of `emacs` running, consider installing `direnv` as explained in the sections below: emacs packages [envrc](https://github.com/purcell/envrc) and [emacs-direnv](https://github.com/wbolster/emacs-direnv) (just `direnv` in MELPA) provide integration with the tool, allowing emacs to use nix-defined sandbox variables when the open buffer is a repository file.
 
 ### "Pure" build
 
