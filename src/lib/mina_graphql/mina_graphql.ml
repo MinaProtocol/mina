@@ -2347,7 +2347,7 @@ module Queries = struct
                           protocol_state.previous_state_hash
                     ; previous_length =
                         Option.value ~default:global_slot previous_length
-                    ; previous_global_slot = global_slot
+                    ; genesis_slot = global_slot
                     }
                 in
                 let update =
