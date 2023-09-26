@@ -6,6 +6,8 @@ let D = S.PathPattern
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -46,6 +48,7 @@ Pipeline.build
         dirtyWhen = unitDirtyWhen,
         path = "Test",
         name = "FuzzyZkappTest",
+        tags = [ PipelineTag.Type.VeryLong, PipelineTag.Type.Test ],
         mode = PipelineMode.Type.Stable
       },
     steps = [
