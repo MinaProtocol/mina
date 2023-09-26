@@ -1,4 +1,6 @@
-(* Definition of local namespace for imported module *)
+(** Provides common aliases to provide a single entrypoint to open in Pickles
+    libraries
+*)
 
 (** [B] is [Bignum.Bigint] *)
 module B = Bigint

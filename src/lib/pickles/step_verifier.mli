@@ -1,5 +1,3 @@
-open Pickles_types
-
 module Challenge : module type of Import.Challenge.Make (Step_main_inputs.Impl)
 
 module Digest : module type of Import.Digest.Make (Step_main_inputs.Impl)
@@ -113,6 +111,8 @@ val hash_messages_for_next_step_proof_opt :
         -> Step_main_inputs.Impl.Field.t )
        Core_kernel.Staged.t
 
+(** Actual verification using cryptographic tools. Returns [true] (encoded as a
+    in-circuit Boolean variable) if the verification is successful *)
 val verify :
      proofs_verified:(module Pickles_types.Nat.Add.Intf with type n = 'a)
   -> is_base_case:Step_main_inputs.Impl.Boolean.var
@@ -125,7 +125,8 @@ val verify :
        , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
          Pickles_types.Hlist0.Id.t )
        Composition_types.Wrap.Lookup_parameters.t
-  -> feature_flags:Opt.Flag.t Plonk_types.Features.t
+       (* lookup arguments parameters *)
+  -> feature_flags:Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
   -> proof:Wrap_proof.Checked.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fq.t
   -> wrap_domain:
@@ -160,6 +161,7 @@ val verify :
        Pickles_types.Hlist0.Id.t
      , Step_main_inputs.Impl.field Composition_types.Branch_data.Checked.t )
      Import.Types.Wrap.Statement.In_circuit.t
+     (* statement *)
   -> ( Step_main_inputs.Impl.Field.t
      , Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
      , Other_field.t Pickles_types.Shifted_value.Type2.t
@@ -170,4 +172,5 @@ val verify :
      , Step_main_inputs.Impl.Field.t
      , Step_main_inputs.Impl.Boolean.var )
      Import.Types.Step.Proof_state.Per_proof.In_circuit.t
+     (* unfinalized *)
   -> Step_main_inputs.Impl.Boolean.var
