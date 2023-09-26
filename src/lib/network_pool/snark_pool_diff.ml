@@ -41,7 +41,7 @@ module Make
   let reject_overloaded_diff _ = ()
 
   type compact =
-    { work : Work.t
+    { work_ids : int One_or_two.t
     ; fee : Currency.Fee.t
     ; prover : Signature_lib.Public_key.Compressed.t
     }
@@ -49,7 +49,11 @@ module Make
 
   let to_compact = function
     | Add_solved_work (work, { proof = _; fee = { fee; prover } }) ->
-        Some { work; fee; prover }
+        Some
+          { work_ids = Transaction_snark_work.Statement.work_ids work
+          ; fee
+          ; prover
+          }
     | Empty ->
         None
 
@@ -66,7 +70,8 @@ module Make
     | Empty ->
         1
 
-  let max_per_15_seconds = 20
+  (* Effectively disable rate limitting *)
+  let max_per_15_seconds = 100000
 
   let summary = function
     | Add_solved_work (work, { proof = _; fee }) ->

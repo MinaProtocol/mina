@@ -66,16 +66,20 @@ module Make (Engine : Intf.Engine.S) () :
       (Event_type.type_of_event event)
       ids_to_remove
 
-  let create ~logger ~event_reader =
+  let create ~logger ~event_readers =
     let handlers = ref Event_type.Map.empty in
-    don't_wait_for
-      (Pipe.iter event_reader ~f:(fun (node, event) ->
-           [%log debug] "Dispatching event $event for $node"
-             ~metadata:
-               [ ("event", Event_type.event_to_yojson event)
-               ; ("node", `String (Node.id node))
-               ] ;
-           dispatch_event handlers node event ) ) ;
+    let () =
+      List.iter event_readers ~f:(fun reader ->
+          don't_wait_for
+            (Pipe.iter reader ~f:(fun (node, event) ->
+                 [%log debug] "Dispatching event $event for $node"
+                   ~metadata:
+                     [ ("event", Event_type.event_to_yojson event)
+                     ; ("node", `String (Node.id node))
+                     ] ;
+                 dispatch_event handlers node event ) ) )
+    in
+
     { logger; handlers }
 
   let on t event_type ~f =

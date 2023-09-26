@@ -2,7 +2,6 @@ open Async_kernel
 open Core_kernel
 open Mina_base
 open Pipe_lib
-open Mina_transaction
 
 type metrics_t =
   { block_production_delay : int list
@@ -49,18 +48,15 @@ module Engine = struct
 
       val id : t -> string
 
-      val app_id : t -> string
+      val infra_id : t -> string
+
+      val check_OOM_failure : t -> bool Deferred.t
 
       val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t
 
       val stop : t -> unit Malleable_error.t
-
-      (** Returns true when [start] was most recently called, or false if
-          [stop] was more recent.
-      *)
-      val should_be_running : t -> bool
 
       val get_ingress_uri : t -> Uri.t
 
@@ -82,6 +78,8 @@ module Engine = struct
 
     type t
 
+    val event_reader : t -> (Node.t * Event_type.event) Pipe.Reader.t
+
     val constants : t -> Test_config.constants
 
     val constraint_constants : t -> Genesis_constants.Constraint_constants.t
@@ -90,13 +88,15 @@ module Engine = struct
 
     val seeds : t -> Node.t Core.String.Map.t
 
-    val all_non_seed_pods : t -> Node.t Core.String.Map.t
+    val all_non_seed_nodes : t -> Node.t Core.String.Map.t
 
     val block_producers : t -> Node.t Core.String.Map.t
 
     val snark_coordinators : t -> Node.t Core.String.Map.t
 
     val archive_nodes : t -> Node.t Core.String.Map.t
+
+    val all_mina_nodes : t -> Node.t Core.String.Map.t
 
     val all_nodes : t -> Node.t Core.String.Map.t
 
@@ -167,7 +167,8 @@ module Dsl = struct
 
     val create :
          logger:Logger.t
-      -> event_reader:(Engine.Network.Node.t * Event_type.event) Pipe.Reader.t
+      -> event_readers:
+           (Engine.Network.Node.t * Event_type.event) Pipe.Reader.t list
       -> t
 
     val on :
@@ -201,12 +202,14 @@ module Dsl = struct
       ; num_persisted_frontier_fresh_boot : int
       ; num_bootstrap_required : int
       ; num_persisted_frontier_dropped : int
+      ; node_on : bool String.Map.t
       ; node_initialization : bool String.Map.t
       ; gossip_received : Gossip_state.t String.Map.t
       ; best_tips_by_node : State_hash.t String.Map.t
       ; blocks_produced_by_node : State_hash.t list String.Map.t
       ; blocks_seen_by_node : State_hash.Set.t String.Map.t
-      ; blocks_including_txn : State_hash.Set.t Transaction_hash.Map.t
+      ; blocks_including_txn :
+          State_hash.Set.t Mina_transaction.Transaction_hash.Map.t
       }
 
     val listen :
@@ -257,7 +260,7 @@ module Dsl = struct
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
     val signed_command_to_be_included_in_frontier :
-         txn_hash:Transaction_hash.t
+         txn_hash:Mina_transaction.Transaction_hash.t
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
 
