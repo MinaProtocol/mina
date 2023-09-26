@@ -18,7 +18,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  module Balance = struct
+  module Balances = struct
     module Balance = Currency.Balance
 
     type balance = { liquid : Balance.t; locked : Balance.t } [@@deriving equal]
@@ -308,14 +308,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (Network.Node.get_ingress_uri node_a)
           ~logger ~account_id
       in
-      Balance.of_graphql account_data
+      Balances.of_graphql account_data
     in
     let%bind () =
       section "Check that timed1 account is fully vested"
         (let%bind balance = get_account_balances timed1 in
-         Balance.log logger ~name:"timed1" balance ;
-         let expected = Balance.(make_unlocked @@ mina 10_000) in
-         Balance.assert_equal ~expected balance )
+         Balances.log logger ~name:"timed1" balance ;
+         let expected = Balances.(make_unlocked @@ mina 10_000) in
+         Balances.assert_equal ~expected balance )
     in
     let%bind () =
       section "Check that timed2 account is partially vested"
@@ -325,7 +325,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.get_ingress_uri node_b)
          in
          let%bind balance = get_account_balances timed2 in
-         Balance.log logger ~name:"timed2"
+         Balances.log logger ~name:"timed2"
            ~global_slot:global_slot_since_hard_fork balance ;
          let total = 10_000_000_000_000 in
          let locked =
@@ -343,9 +343,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            in
            max calc_balance 0
          in
-         let liquid = Balance.nanomina (total - locked) in
-         let locked = Balance.nanomina locked in
-         Balance.(assert_equal ~expected:(make ~liquid ~locked) balance) )
+         let liquid = Balances.nanomina (total - locked) in
+         let locked = Balances.nanomina locked in
+         Balances.(assert_equal ~expected:(make ~liquid ~locked) balance) )
     in
     let%bind () =
       section "send a single signed payment between 2 fish accounts"
@@ -397,7 +397,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.get_ingress_uri node_b)
          in
          let%bind balance = get_account_balances timed3 in
-         Balance.log logger ~name:"timed3"
+         Balances.log logger ~name:"timed3"
            ~global_slot:global_slot_since_hard_fork balance ;
          let num_slots_since_fork_genesis =
            Mina_numbers.Global_slot_since_hard_fork.to_int
@@ -412,9 +412,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            in
            max calc_balance 0
          in
-         let liquid = Balance.nanomina (total - locked) in
-         let locked = Balance.nanomina locked in
-         Balance.(assert_equal ~expected:(make ~liquid ~locked) balance) )
+         let liquid = Balances.nanomina (total - locked) in
+         let locked = Balances.nanomina locked in
+         Balances.(assert_equal ~expected:(make ~liquid ~locked) balance) )
     in
     let%bind () =
       section_hard "checking height, global slot since genesis in best chain"
