@@ -1,3 +1,3 @@
 [%%undef fork_previous_length]
 [%%undef fork_previous_state_hash]
-[%%undef fork_previous_global_slot]
+[%%undef fork_genesis_slot]

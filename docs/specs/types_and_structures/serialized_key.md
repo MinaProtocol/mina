@@ -130,7 +130,7 @@ To help ensure no download errors have occurred, the `length` field should match
 | - | - | - |
 | `previous_state_hash`  | `String` | State hash in hex |
 | `previous_length`      | `Number` | Height |
-| `previous_global_slot` | `Number` | Slot |
+| `genesis_slot` | `Number` | Slot |
 
 ### `commits`
 
