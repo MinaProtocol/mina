@@ -90,7 +90,7 @@ in
 (\(args : { filter : PipelineFilter.Type, mode: PipelineMode.Type }) -> 
   let pipelineType = Pipeline.build Pipeline.Config::{
     spec = JobSpec::{
-      name = "monorepo-triage-${PipelineFilter.show filter}",
+      name = "monorepo-triage-${PipelineFilter.show args.filter}",
       -- TODO: Clean up this code so we don't need an unused dirtyWhen here
       dirtyWhen = [ SelectFiles.everything ]
     },
