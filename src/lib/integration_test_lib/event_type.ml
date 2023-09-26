@@ -61,16 +61,45 @@ module Node_initialization = struct
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
 
-module Node_offline = struct
-  let name = "Node_offline"
+module Node_down = struct
+  let name = "Node_down"
 
   type t = unit [@@deriving to_yojson]
 
-  let puppeteer_event_type = "node_offline"
+  let structured_event_id =
+    Lucy_structured_events.node_down_structured_events_id
 
   let parse_func = Fn.const (Or_error.return ())
 
-  let parse = From_puppeteer_log (puppeteer_event_type, parse_func)
+  let parse = From_daemon_log (structured_event_id, parse_func)
+
+  (* this event is emitted, as of now, from graphql_polling_log_enginge.ml.  it's not from the daemon log per se, but it is a structured event, emitted from code, rather than emitted from the puppeteer script *)
+end
+
+module Node_started = struct
+  let name = "Node_started"
+
+  type t = unit [@@deriving to_yojson]
+
+  let structured_event_id =
+    Lucy_structured_events.node_started_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
+module Node_stopped = struct
+  let name = "Node_stopped"
+
+  type t = unit [@@deriving to_yojson]
+
+  let structured_event_id =
+    Lucy_structured_events.node_stopped_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
 end
 
 module Transition_frontier_diff_application = struct
@@ -425,7 +454,9 @@ end
 type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
-  | Node_offline : Node_offline.t t
+  | Node_down : Node_down.t t
+  | Node_started : Node_started.t t
+  | Node_stopped : Node_stopped.t t
   | Transition_frontier_diff_application
       : Transition_frontier_diff_application.t t
   | Block_produced : Block_produced.t t
@@ -448,8 +479,12 @@ let existential_to_string = function
       "Log_error"
   | Event_type Node_initialization ->
       "Node_initialization"
-  | Event_type Node_offline ->
-      "Node_offline"
+  | Event_type Node_down ->
+      "Node_down"
+  | Event_type Node_started ->
+      "Node_started"
+  | Event_type Node_stopped ->
+      "Node_stopped"
   | Event_type Transition_frontier_diff_application ->
       "Transition_frontier_diff_application"
   | Event_type Block_produced ->
@@ -482,8 +517,12 @@ let existential_of_string_exn = function
       Event_type Log_error
   | "Node_initialization" ->
       Event_type Node_initialization
-  | "Node_offline" ->
-      Event_type Node_offline
+  | "Node_down" ->
+      Event_type Node_down
+  | "Node_started" ->
+      Event_type Node_started
+  | "Node_stopped" ->
+      Event_type Node_stopped
   | "Transition_frontier_diff_application" ->
       Event_type Transition_frontier_diff_application
   | "Block_produced" ->
@@ -541,7 +580,9 @@ let type_of_event (Event (t, _)) = Event_type t
 let all_event_types =
   [ Event_type Log_error
   ; Event_type Node_initialization
-  ; Event_type Node_offline
+  ; Event_type Node_down
+  ; Event_type Node_started
+  ; Event_type Node_stopped
   ; Event_type Transition_frontier_diff_application
   ; Event_type Block_produced
   ; Event_type Breadcrumb_added
@@ -562,8 +603,12 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
       (module Log_error)
   | Node_initialization ->
       (module Node_initialization)
-  | Node_offline ->
-      (module Node_offline)
+  | Node_down ->
+      (module Node_down)
+  | Node_started ->
+      (module Node_started)
+  | Node_stopped ->
+      (module Node_stopped)
   | Transition_frontier_diff_application ->
       (module Transition_frontier_diff_application)
   | Block_produced ->
@@ -691,7 +736,11 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
       h e
   | Node_initialization, Node_initialization ->
       h e
-  | Node_offline, Node_offline ->
+  | Node_down, Node_down ->
+      h e
+  | Node_started, Node_started ->
+      h e
+  | Node_stopped, Node_stopped ->
       h e
   | Transition_frontier_diff_application, Transition_frontier_diff_application
     ->

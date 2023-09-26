@@ -36,7 +36,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       wait_for t
         (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data (Network.all_nodes network)) )
+           (Core.String.Map.data (Network.all_mina_nodes network)) )
     in
     [%log info] "gossip_consistency test: done waiting for initializations" ;
     let receiver_bp =

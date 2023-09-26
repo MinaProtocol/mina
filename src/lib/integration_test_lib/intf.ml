@@ -48,18 +48,15 @@ module Engine = struct
 
       val id : t -> string
 
-      val app_id : t -> string
+      val infra_id : t -> string
+
+      val check_OOM_failure : t -> bool Deferred.t
 
       val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t
 
       val stop : t -> unit Malleable_error.t
-
-      (** Returns true when [start] was most recently called, or false if
-          [stop] was more recent.
-      *)
-      val should_be_running : t -> bool
 
       val get_ingress_uri : t -> Uri.t
 
@@ -81,6 +78,8 @@ module Engine = struct
 
     type t
 
+    val event_reader : t -> (Node.t * Event_type.event) Pipe.Reader.t
+
     val constants : t -> Test_config.constants
 
     val constraint_constants : t -> Genesis_constants.Constraint_constants.t
@@ -89,13 +88,15 @@ module Engine = struct
 
     val seeds : t -> Node.t Core.String.Map.t
 
-    val all_non_seed_pods : t -> Node.t Core.String.Map.t
+    val all_non_seed_nodes : t -> Node.t Core.String.Map.t
 
     val block_producers : t -> Node.t Core.String.Map.t
 
     val snark_coordinators : t -> Node.t Core.String.Map.t
 
     val archive_nodes : t -> Node.t Core.String.Map.t
+
+    val all_mina_nodes : t -> Node.t Core.String.Map.t
 
     val all_nodes : t -> Node.t Core.String.Map.t
 
@@ -166,7 +167,8 @@ module Dsl = struct
 
     val create :
          logger:Logger.t
-      -> event_reader:(Engine.Network.Node.t * Event_type.event) Pipe.Reader.t
+      -> event_readers:
+           (Engine.Network.Node.t * Event_type.event) Pipe.Reader.t list
       -> t
 
     val on :
@@ -200,6 +202,7 @@ module Dsl = struct
       ; num_persisted_frontier_fresh_boot : int
       ; num_bootstrap_required : int
       ; num_persisted_frontier_dropped : int
+      ; node_on : bool String.Map.t
       ; node_initialization : bool String.Map.t
       ; gossip_received : Gossip_state.t String.Map.t
       ; best_tips_by_node : State_hash.t String.Map.t

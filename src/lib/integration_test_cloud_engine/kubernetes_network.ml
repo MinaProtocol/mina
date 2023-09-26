@@ -36,17 +36,72 @@ module Node = struct
 
   type t =
     { app_id : string
-    ; pod_ids : string list
+    ; mutable pod_ids : string list
+          (* even though pod_ids is a list, there will only be 1 pod per node, except snark workers. *)
     ; pod_info : pod_info
     ; config : config
-    ; mutable should_be_running : bool
+    ; event_writer : (t * Event_type.event) Pipe.Writer.t
     }
 
-  let id { pod_ids; _ } = List.hd_exn pod_ids
+  let id { app_id; _ } = app_id
 
-  let app_id { app_id; _ } = app_id
+  let infra_id { pod_ids; _ } = List.hd_exn pod_ids
 
-  let should_be_running { should_be_running; _ } = should_be_running
+  (* most container orchestration tools, kubernetes included, will have memory limits in place for the nodes. *)
+  (* TODO THIS IS A STUB *)
+  let check_OOM_failure _ = Deferred.return false
+  (* let%bind cwd = Unix.getcwd () in
+     let open Deferred.Let_syntax in
+     let%bind pod_exit_codes_str =
+       (*example output: mina:1;user-agent:%!d(<nil>); *)
+       Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
+         ( base_kube_args t.config
+         @ [ "get"
+           ; "pod"
+           ; "-l"
+           ; "app=" ^ t.app_id
+           ; "-o gotemplate"
+           ; "'{{range .status.containerStatuses}}{{printf \"%s:%d;\" .name \
+              .lastState.terminated.exitCode}}{{end}}'"
+           ] )
+     in
+     let pod_exit_codes_list_unprocessed =
+       String.split pod_exit_codes_str ~on:';'
+     in
+     let pod_exit_codes =
+       List.map pod_exit_codes_list_unprocessed ~f:(fun s ->
+           let x = String.split s ~on:':' in
+           let exit_code = List.nth_exn x 1 |> int_of_string_opt in
+           exit_code )
+     in
+     Deferred.List.fold pod_exit_codes ~init:false ~f:(fun accum exit_code_opt ->
+         match exit_code_opt with
+         | None ->
+             return accum
+         | Some exit_code ->
+             (* kubernetes pod's exit code 139 means a SEGFAULT happened
+                https://komodor.com/learn/exit-codes-in-containers-and-kubernetes-the-complete-guide/
+             *)
+             if Int.equal exit_code 139 then return true else return accum ) *)
+
+  let refresh_pod_ids_of_node t =
+    let%bind cwd = Unix.getcwd () in
+    let open Deferred.Or_error.Let_syntax in
+    let%bind pod_ids_str =
+      Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
+        ( base_kube_args t.config
+        @ [ "get"; "pod"; "-l"; "app=" ^ t.app_id; "-o"; "name" ] )
+    in
+    let pod_ids =
+      String.split pod_ids_str ~on:'\n'
+      |> List.filter ~f:(Fn.compose not String.is_empty)
+      |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
+    in
+    t.pod_ids <- pod_ids ;
+    return pod_ids
+
+  let refresh_pod_ids_of_node_hard_error t =
+    Deferred.bind ~f:Malleable_error.or_hard_error (refresh_pod_ids_of_node t)
 
   let network_keypair { pod_info = { network_keypair; _ }; _ } = network_keypair
 
@@ -59,36 +114,43 @@ module Node = struct
     let path = Printf.sprintf "/%s/graphql" node.app_id in
     Uri.make ~scheme:"http" ~host ~path ~port:80 ()
 
-  let get_logs_in_container ?container_id { pod_ids; config; pod_info; _ } =
+  let get_logs_in_container ?container_id t =
     let container_id =
-      Option.value container_id ~default:pod_info.primary_container_id
+      Option.value container_id ~default:t.pod_info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
+    let open Malleable_error.Let_syntax in
+    let%bind pod_ids = refresh_pod_ids_of_node_hard_error t in
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "kubectl"
-      ( base_kube_args config
+      ( base_kube_args t.config
       @ [ "logs"; "-c"; container_id; List.hd_exn pod_ids ] )
 
   let run_in_container ?(exit_code = 10) ?container_id ?override_with_pod_id
       ~cmd t =
     let { config; pod_info; _ } = t in
+    let%bind cwd = Unix.getcwd () in
+    let open Malleable_error.Let_syntax in
+    let%bind pod_ids = refresh_pod_ids_of_node_hard_error t in
     let pod_id =
       match override_with_pod_id with
       | Some pid ->
           pid
       | None ->
-          List.hd_exn t.pod_ids
+          List.hd_exn pod_ids
     in
     let container_id =
       Option.value container_id ~default:pod_info.primary_container_id
     in
-    let%bind cwd = Unix.getcwd () in
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code cwd "kubectl"
       ( base_kube_args config
       @ [ "exec"; "-c"; container_id; "-i"; pod_id; "--" ]
       @ cmd )
 
   let cp_string_to_container_file ?container_id ~str ~dest t =
-    let { pod_ids; config; pod_info; _ } = t in
+    let { config; pod_info; _ } = t in
+    let%bind cwd = Unix.getcwd () in
+    let open Malleable_error.Let_syntax in
+    let%bind pod_ids = refresh_pod_ids_of_node_hard_error t in
     let container_id =
       Option.value container_id ~default:pod_info.primary_container_id
     in
@@ -98,27 +160,32 @@ module Node = struct
     in
     Out_channel.output_string oc str ;
     Out_channel.close oc ;
-    let%bind cwd = Unix.getcwd () in
     let dest_file =
       sprintf "%s/%s:%s" config.namespace (List.hd_exn pod_ids) dest
     in
-    Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
-      (base_kube_args config @ [ "cp"; "-c"; container_id; tmp_file; dest_file ])
+    return
+      (Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
+         ( base_kube_args config
+         @ [ "cp"; "-c"; container_id; tmp_file; dest_file ] ) )
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
-    node.should_be_running <- true ;
     let%bind () =
       if fresh_state then
         run_in_container node ~cmd:[ "sh"; "-c"; "rm -rf .mina-config/*" ]
         >>| ignore
       else Malleable_error.return ()
     in
+    (* Emit an event that declares the node to be started *)
+    Pipe.write_without_pushback_if_open node.event_writer
+      (node, Event (Node_started, ())) ;
     run_in_container ~exit_code:11 node ~cmd:[ "/start.sh" ] >>| ignore
 
   let stop node =
     let open Malleable_error.Let_syntax in
-    node.should_be_running <- false ;
+    (* Emit an event that declares the node to be stopped, ie deliberately stopped. *)
+    Pipe.write_without_pushback_if_open node.event_writer
+      (node, Event (Node_stopped, ())) ;
     run_in_container ~exit_code:12 node ~cmd:[ "/stop.sh" ] >>| ignore
 
   let logger_infra_metadata node =
@@ -169,7 +236,7 @@ module Node = struct
 
   let run_replayer ?(start_slot_since_genesis = 0) ~logger (t : t) =
     [%log info] "Running replayer on archived data (node: %s, container: %s)"
-      (List.hd_exn t.pod_ids) mina_archive_container_id ;
+      t.app_id mina_archive_container_id ;
     let open Malleable_error.Let_syntax in
     let%bind accounts =
       run_in_container t
@@ -201,8 +268,8 @@ module Node = struct
 
   let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
-    [%log info] "Dumping container logs from (node: %s, container: %s)"
-      (List.hd_exn t.pod_ids) t.pod_info.primary_container_id ;
+    [%log info] "Dumping container logs from (node: %s, container: %s)" t.app_id
+      t.pod_info.primary_container_id ;
     let%map logs = get_logs_in_container t in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
@@ -212,7 +279,7 @@ module Node = struct
     let open Malleable_error.Let_syntax in
     [%log info]
       "Dumping precomputed blocks from logs for (node: %s, container: %s)"
-      (List.hd_exn t.pod_ids) t.pod_info.primary_container_id ;
+      t.app_id t.pod_info.primary_container_id ;
     let%bind logs = get_logs_in_container t in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
@@ -296,39 +363,23 @@ module Workload_to_deploy = struct
       primary_container_id : Node.pod_info =
     { network_keypair; has_archive_container; primary_container_id }
 
-  let get_nodes_from_workload t ~config =
-    let%bind cwd = Unix.getcwd () in
+  let get_nodes_from_workload t ~config ~event_writer =
     let open Malleable_error.Let_syntax in
-    let%bind app_id =
-      Deferred.bind ~f:Malleable_error.or_hard_error
-        (Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
-           ( base_kube_args config
-           @ [ "get"
-             ; "deployment"
-             ; t.workload_id
-             ; "-o"
-             ; "jsonpath={.spec.selector.matchLabels.app}"
-             ] ) )
+    let pod_info = t.pod_info in
+    let result =
+      { Node.app_id = t.workload_id
+      ; pod_ids = []
+      ; pod_info
+      ; config
+      ; event_writer
+      }
     in
-    let%bind pod_ids_str =
-      Integration_test_lib.Util.run_cmd_or_hard_error cwd "kubectl"
-        ( base_kube_args config
-        @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
+    let%bind (_ : string list) =
+      Node.refresh_pod_ids_of_node_hard_error result
     in
-    let pod_ids =
-      String.split pod_ids_str ~on:'\n'
-      |> List.filter ~f:(Fn.compose not String.is_empty)
-      |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
-    in
-    if List.is_empty pod_ids then
-      Malleable_error.hard_error_format "no pods found for app %s" app_id
-    else
-      (* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
-      (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
-      (* TODO fix this^ and have a more elegant solution *)
-      let pod_info = t.pod_info in
-      return
-        { Node.app_id; pod_ids; pod_info; config; should_be_running = false }
+    if List.is_empty result.pod_ids then
+      Malleable_error.hard_error_format "no pods found for app %s" t.workload_id
+    else return result
 end
 
 type t =
@@ -342,7 +393,11 @@ type t =
         (* ; nodes_by_pod_id : Node.t Core.String.Map.t *)
   ; testnet_log_filter : string
   ; genesis_keypairs : Network_keypair.t Core.String.Map.t
+        (* ; event_writer : (Node.t * Event_type.event) Pipe.Writer.t *)
+  ; event_reader : (Node.t * Event_type.event) Pipe.Reader.t
   }
+
+let event_reader { event_reader; _ } = event_reader
 
 let constants { constants; _ } = constants
 
@@ -360,8 +415,9 @@ let snark_workers { snark_workers; _ } = snark_workers
 
 let archive_nodes { archive_nodes; _ } = archive_nodes
 
-(* all_nodes returns all *actual* mina nodes; note that a snark_worker is a pod within the network but not technically a mina node, therefore not included here.  snark coordinators on the other hand ARE mina nodes *)
-let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
+(* all_mina_nodes returns all *actual* mina nodes; that is, any node running an actual mina daemon.  note that a snark_worker is a node within the network but not technically a *mina* node because it runs no mina daemon, therefore not included here.  snark coordinators on the other hand are mina nodes running actual mina daemons *)
+let all_mina_nodes
+    { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
   List.concat
     [ Core.String.Map.to_alist seeds
     ; Core.String.Map.to_alist block_producers
@@ -370,9 +426,9 @@ let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
     ]
   |> Core.String.Map.of_alist_exn
 
-(* all_pods returns everything in the network.  remember that snark_workers will never initialize and will never sync, and aren't supposed to *)
+(* all_nodes returns everything in the network.  remember that snark_workers will never initialize and will never sync, and aren't supposed to *)
 (* TODO snark workers and snark coordinators have the same key name, but different workload ids*)
-let all_pods t =
+let all_nodes t =
   List.concat
     [ Core.String.Map.to_alist t.seeds
     ; Core.String.Map.to_alist t.block_producers
@@ -382,8 +438,8 @@ let all_pods t =
     ]
   |> Core.String.Map.of_alist_exn
 
-(* all_non_seed_pods returns everything in the network except seed nodes *)
-let all_non_seed_pods t =
+(* all_non_seed_nodes returns everything in the network except seed nodes *)
+let all_non_seed_nodes t =
   List.concat
     [ Core.String.Map.to_alist t.block_producers
     ; Core.String.Map.to_alist t.snark_coordinators
@@ -394,27 +450,45 @@ let all_non_seed_pods t =
 
 let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
 
+let all_ids t =
+  let deployments = all_nodes t |> Core.Map.to_alist in
+  List.fold deployments ~init:[] ~f:(fun acc (_, node) ->
+      List.cons node.app_id acc )
+
+(* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
+let all_pod_ids t =
+  (* please note that this function is pure, but it's accessing n.pod_ids, which is a mutable field *)
+  (* also note that there is a small chance that n.pod_ids might not be accurate if there was the pod died and kube automatically started a new pod*)
+  let node_list = Core.String.Map.data (all_nodes t) in
+  let pod_ids = List.map node_list ~f:(fun n -> n.pod_ids) in
+  List.concat pod_ids
+
+let all_pod_ids_refreshed t =
+  let open Malleable_error.Let_syntax in
+  let node_list = Core.String.Map.data (all_nodes t) in
+  let%bind pod_ids =
+    Malleable_error.List.map node_list ~f:(fun n ->
+        Node.refresh_pod_ids_of_node_hard_error n )
+  in
+  return (List.concat pod_ids)
+
 let lookup_node_by_pod_id t id =
-  let pods = all_pods t |> Core.Map.to_alist in
-  List.fold pods ~init:None ~f:(fun acc (node_name, node) ->
+  let nodes = all_nodes t |> Map.to_alist in
+  List.fold nodes ~init:None ~f:(fun acc (node_name, node) ->
       match acc with
       | Some acc ->
           Some acc
       | None ->
-          if String.equal id (List.hd_exn node.pod_ids) then
-            Some (node_name, node)
+          let pod_ids = node.pod_ids in
+          if String.equal id (List.hd_exn pod_ids) then Some (node_name, node)
           else None )
-
-let all_pod_ids t =
-  let pods = all_pods t |> Core.Map.to_alist in
-  List.fold pods ~init:[] ~f:(fun acc (_, node) ->
-      List.cons (List.hd_exn node.pod_ids) acc )
 
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
   let max_polls = 1080 (* 6 hours *) in
-  let all_pods_set = all_pod_ids network |> String.Set.of_list in
+  let%bind all_pod_ids_list = all_pod_ids_refreshed network in
+  let all_pods_set = all_pod_ids_list |> String.Set.of_list in
   let kube_get_pods () =
     Integration_test_lib.Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/"
       "kubectl"

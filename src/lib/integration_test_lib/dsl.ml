@@ -48,7 +48,7 @@ module Make (Engine : Intf.Engine.S) () :
   let network_state t = Broadcast_pipe.Reader.peek t.network_state_reader
 
   let event_router t = t.event_router
-
+  
   let create ~logger ~network ~event_router ~network_state_reader =
     let t = { logger; network; event_router; network_state_reader } in
     `Don't_call_in_tests t
@@ -85,7 +85,7 @@ module Make (Engine : Intf.Engine.S) () :
           ~timeout_duration:hard_timeout ~timeout_result:`Hard_timeout
           ~init:init_predicate_state ~f:handle_network_state
 
-  let hard_wait_for_event_predicate ~logger ~hard_timeout ~event_router
+  let hard_wait_for_event_predicate ~logger ~hard_timeout ~ev_router
       ~event_type ~init ~f =
     let open Wait_condition in
     let state = ref init in
@@ -101,8 +101,8 @@ module Make (Engine : Intf.Engine.S) () :
             state := new_state ;
             `Continue )
     in
-    Event_router.on event_router event_type ~f:handle_event
-    |> Event_router.await_with_timeout event_router
+    Event_router.on ev_router event_type ~f:handle_event
+    |> Event_router.await_with_timeout ev_router
          ~timeout_duration:hard_timeout ~timeout_cancellation:`Hard_timeout
 
   let wait_for t condition =
@@ -135,7 +135,7 @@ module Make (Engine : Intf.Engine.S) () :
             ~check
       | Event_predicate (event_type, init, f) ->
           hard_wait_for_event_predicate ~logger:t.logger
-            ~event_router:t.event_router ~hard_timeout ~event_type ~init ~f
+            ~ev_router:t.event_router ~hard_timeout ~event_type ~init ~f
     in
     match result with
     | `Hard_timeout ->

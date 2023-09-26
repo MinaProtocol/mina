@@ -95,12 +95,13 @@ def start_daemon():
   log("touching /root/daemon-active" )
   Path('daemon-active').touch()
   log("daemon fully started" )
-  # log_event("node_initialized", "node has been initialized")
+  log_event("node_started", "node has been started")
 
 def stop_daemon():
   log("stop_daemon called" )
   global mina_process
   mina_process.send_signal(signal.SIGTERM)
+  log_event("node_stopped", "daemon is being stopped by puppeteer script and is going offline")
 
   child_pids = get_child_processes(mina_process.pid)
   log("stop_daemon, child_pids: %s" % ', '.join([str(i) for i in child_pids]))
@@ -113,7 +114,6 @@ def stop_daemon():
   Path('daemon-active').unlink()
   mina_process = None
   log("daemon fully stopped" )
-  log_event("node_offline", "daemon is being stopped by puppeteer script and is going offline")
 
 # technically, doing the loops like this will eventually result in a stack overflow
 # however, you would need to do a lot of starts and stops to hit this condition
