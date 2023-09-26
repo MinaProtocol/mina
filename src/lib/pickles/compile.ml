@@ -849,7 +849,8 @@ module Side_loaded = struct
       { wrap_vk = Some (Lazy.force d.wrap_vk)
       ; wrap_index = Lazy.force d.wrap_key
       ; max_proofs_verified =
-          Pickles_base.Proofs_verified.of_nat (Nat.Add.n d.max_proofs_verified)
+          Pickles_base.Proofs_verified.of_nat_exn
+            (Nat.Add.n d.max_proofs_verified)
       ; actual_wrap_domain_size
       }
 
