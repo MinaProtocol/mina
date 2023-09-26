@@ -21,7 +21,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { previous_state_hash =
         "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
     ; previous_length = 300000
-    ; previous_global_slot = 500000
+    ; genesis_slot = 500000
     }
 
   let config =
@@ -116,10 +116,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
     in
     let node_a =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
@@ -448,7 +449,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                let bad_slot =
                  Mina_numbers.Global_slot_since_genesis.to_int
                    global_slot_since_genesis
-                 < fork_config.previous_global_slot
+                 < fork_config.genesis_slot
                in
                if bad_height && bad_slot then
                  Malleable_error.hard_error
@@ -472,7 +473,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "running replayer"
       (let%bind logs =
          Network.Node.run_replayer
-           ~start_slot_since_genesis:fork_config.previous_global_slot ~logger
+           ~start_slot_since_genesis:fork_config.genesis_slot ~logger
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )
