@@ -2,6 +2,7 @@ let S = ../../Lib/SelectFiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 
 let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 
@@ -19,7 +20,8 @@ in Pipeline.build Pipeline.Config::{
       S.exactly "buildkite/src/Command/ConnectToTestnet" "dhall"
     ],
     path = "Test",
-    name = "ConnectToBerkeley"
+    name = "ConnectToBerkeley",
+    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
   },
   steps = [
     ConnectToTestnet.step dependsOn
