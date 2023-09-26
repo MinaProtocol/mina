@@ -1034,14 +1034,14 @@ let pending_snark_work =
                  (Array.map
                     ~f:(fun bundle ->
                       Array.map bundle.workBundle ~f:(fun w ->
-                          let f = w.fee_excess in
+                          let fee_excess_left = w.fee_excess.feeExcessLeft in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w.work_id
                           ; fee_excess =
                               Currency.Amount.Signed.of_fee
-                                (to_signed_fee_exn f.sign
-                                   (Currency.Amount.to_fee f.fee_magnitude) )
-                          ; supply_increase = w.supply_change.fee_magnitude
+                                (to_signed_fee_exn fee_excess_left.sign
+                                   fee_excess_left.feeMagnitude )
+                          ; supply_increase = w.supply_increase
                           ; source_first_pass_ledger_hash =
                               w.source_first_pass_ledger_hash
                           ; target_first_pass_ledger_hash =
