@@ -287,11 +287,16 @@ let main_runtime_table_cfg () =
   let table_id = Int32.of_int_exn 1 in
   let table_ids = [| table_id |] in
   let size = 5 in
-  let first_column = Array.init size ~f:Field.Constant.of_int in
+  let first_column =
+    Array.init size ~f:(fun i -> Field.Constant.of_int (100 + i))
+  in
   (* let table_ids = Array.init num ~f:Int32.of_int_exn in *)
   Array.iter table_ids ~f:(fun table_id ->
       Printf.printf "Initializing table %d\n" (Int32.to_int_exn table_id) ;
       add_plonk_constraint (AddRuntimeTableCfg { id = table_id; first_column }) ) ;
+  add_plonk_constraint
+    (AddFixedLookupTable
+       { id = Int32.of_int_exn 3; data = [| first_column; first_column |] } ) ;
   let num_lookup = 1 in
   let rec make_lookup i n =
     if i = n then ()
@@ -301,12 +306,12 @@ let main_runtime_table_cfg () =
       add_plonk_constraint
         (Lookup
            { w0 = fresh_int table_id
-           ; w1 = fresh_int 1
-           ; w2 = fresh_int 1
-           ; w3 = fresh_int 2
-           ; w4 = fresh_int 2
-           ; w5 = fresh_int 3
-           ; w6 = fresh_int 3
+           ; w1 = fresh_int 101
+           ; w2 = fresh_int 11
+           ; w3 = fresh_int 102
+           ; w4 = fresh_int 12
+           ; w5 = fresh_int 103
+           ; w6 = fresh_int 13
            } ) ;
       make_lookup (i + 1) n
   in
@@ -424,9 +429,9 @@ let () =
       (*
       ( "Fixed lookup tables"
          , Plonk_types.Features.{ none_bool with lookup = true } ), *)
-       ( "Runtime lookup tables"
-       , Plonk_types.Features.
-           { none_bool with lookup = true; runtime_tables = true } )
+      ( "Runtime lookup tables"
+      , Plonk_types.Features.
+          { none_bool with lookup = true; runtime_tables = true } )
     ]
   in
   List.iter ~f:register_feature_test configurations ;

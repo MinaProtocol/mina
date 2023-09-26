@@ -608,6 +608,7 @@ struct
               (fst @@ var_to_fields j0)
               (fst @@ var_to_fields j1)
         | Just j0, Just j1 ->
+            print_endline "Hello" ;
             let (Typ { var_to_fields; _ }) = Scalar_challenge.typ in
             Array.iter2_exn ~f:Field.Assert.equal
               (fst @@ var_to_fields j0)
@@ -676,6 +677,10 @@ struct
           Format.printf "y = %s\n" (Pasta_bindings.Fp.to_string y') )
     in
 
+    Printf.printf
+      "Pickles: printing lookup table commitments (size = %d). Each commitment \
+       represents a column in the final joint lookup table "
+      (Nat.to_int @@ Vector.length lookup_table_comm) ;
     let lookup_table_comm_l = Vector.to_list lookup_table_comm in
     List.iteri (List.map ~f:g_opt lookup_table_comm_l) ~f:(fun i x ->
         Printf.printf "Commitment %d\n" i ;
