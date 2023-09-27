@@ -22,6 +22,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
+  let create = Fields.create
+
   let of_string_exn s =
     let is_digit_string s = String.for_all s ~f:Char.is_digit in
     match String.split s ~on:'.' with

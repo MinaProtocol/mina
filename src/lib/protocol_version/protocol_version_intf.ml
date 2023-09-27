@@ -10,6 +10,8 @@ module type Full = sig
 
   val network : t -> int
 
+  val create : transaction:int -> network:int -> t
+
   val current : t
 
   val get_proposed_opt : unit -> t option
