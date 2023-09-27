@@ -5,7 +5,7 @@ open Mina_block
 
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~collected_transitions ~frontier ~network_transition_reader
-    ~producer_transition_reader ~clear_reader ~precomputed_values =
+    ~producer_transition_reader ~clear_reader ~precomputed_values ~slot_tx_end =
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
   let f_drop_head name head valid_cb =
@@ -102,7 +102,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       (Precomputed_values.consensus_constants precomputed_values)
     ~logger ~trust_system ~time_controller ~frontier
     ~transition_reader:network_transition_reader ~valid_transition_writer
-    ~unprocessed_transition_cache ;
+    ~unprocessed_transition_cache ~slot_tx_end ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
     ~f:(fun (`Block b, `Valid_cb vc) ->
       Strict_pipe.Writer.write primary_transition_writer (`Block b, `Valid_cb vc) )
@@ -115,7 +115,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~processed_transition_writer ;
   Ledger_catchup.run ~logger ~precomputed_values ~trust_system ~verifier
     ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache ;
+    ~unprocessed_transition_cache ~slot_tx_end ;
   Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;

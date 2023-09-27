@@ -46,7 +46,7 @@ open Network_peer
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
 let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
-    ~unprocessed_transition_cache enveloped_transition =
+    ~unprocessed_transition_cache ~slot_tx_end enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
@@ -66,7 +66,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
         ~f:(Fn.const initially_validated_transition)
     in
     Transition_handler.Validator.validate_transition ~logger ~frontier
-      ~consensus_constants ~unprocessed_transition_cache
+      ~consensus_constants ~unprocessed_transition_cache ~slot_tx_end
       enveloped_initially_validated_transition
   in
   let open Deferred.Let_syntax in
@@ -155,6 +155,8 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       Error (Error.of_string "mismatched protocol version")
   | Error `Disconnected ->
       Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
+  | Error `Non_empty_staged_ledger_diff_after_stop_slot ->
+      Deferred.Or_error.fail @@ Error.of_string "non empty staged ledger diff"
 
 let rec fold_until ~(init : 'accum)
     ~(f :
@@ -465,7 +467,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
 let verify_transitions_and_build_breadcrumbs ~logger
     ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
     ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
-    =
+    ~slot_tx_end =
   let open Deferred.Or_error.Let_syntax in
   let verification_start_time = Core.Time.now () in
   let%bind transitions_with_initial_validation, initial_hash =
@@ -517,7 +519,8 @@ let verify_transitions_and_build_breadcrumbs ~logger
         match%bind
           verify_transition ~logger
             ~consensus_constants:precomputed_values.consensus_constants
-            ~trust_system ~frontier ~unprocessed_transition_cache transition
+            ~trust_system ~frontier ~unprocessed_transition_cache ~slot_tx_end
+            transition
         with
         | Error e ->
             List.iter acc ~f:(fun (node, vc) ->
@@ -619,7 +622,7 @@ let garbage_collect_subtrees ~logger ~subtrees =
 
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_job_reader ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache : unit =
+    ~unprocessed_transition_cache ~slot_tx_end : unit =
   let hash_tree =
     match Transition_frontier.catchup_tree frontier with
     | Hash t ->
@@ -787,7 +790,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                verify_transitions_and_build_breadcrumbs ~logger
                  ~precomputed_values ~trust_system ~verifier ~frontier
                  ~unprocessed_transition_cache ~transitions ~target_hash
-                 ~subtrees
+                 ~subtrees ~slot_tx_end
              with
              | Ok trees_of_breadcrumbs ->
                  [%log trace]
@@ -901,7 +904,7 @@ let%test_module "Ledger_catchup tests" =
           Strict_pipe.Reader.t
       }
 
-    let run_catchup ~network ~frontier =
+    let run_catchup ~network ~frontier ~slot_tx_end =
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
           (Buffered (`Capacity 10, `Overflow Crash))
@@ -915,14 +918,15 @@ let%test_module "Ledger_catchup tests" =
       in
       run ~logger ~precomputed_values ~verifier ~trust_system ~network ~frontier
         ~catchup_breadcrumbs_writer ~catchup_job_reader
-        ~unprocessed_transition_cache ;
+        ~unprocessed_transition_cache ~slot_tx_end ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader
       }
 
-    let run_catchup_with_target ~network ~frontier ~target_breadcrumb =
-      let test = run_catchup ~network ~frontier in
+    let run_catchup_with_target ~network ~frontier ~target_breadcrumb
+        ~slot_tx_end =
+      let test = run_catchup ~network ~frontier ~slot_tx_end in
       let parent_hash =
         Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
       in
@@ -934,12 +938,12 @@ let%test_module "Ledger_catchup tests" =
         (parent_hash, [ Rose_tree.T ((target_transition, None), []) ]) ;
       (`Test test, `Cached_transition target_transition)
 
-    let test_successful_catchup ~my_net ~target_best_tip_path =
+    let test_successful_catchup ~my_net ~target_best_tip_path ~slot_tx_end =
       let open Fake_network in
       let target_breadcrumb = List.last_exn target_best_tip_path in
       let `Test { breadcrumbs_reader; _ }, _ =
         run_catchup_with_target ~network:my_net.network
-          ~frontier:my_net.state.frontier ~target_breadcrumb
+          ~frontier:my_net.state.frontier ~target_breadcrumb ~slot_tx_end
       in
       (* TODO: expose Strict_pipe.read *)
       let%map cached_catchup_breadcrumbs =
@@ -999,7 +1003,8 @@ let%test_module "Ledger_catchup tests" =
                 (best_tip peer_net.state.frontier))
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path ) )
+              test_successful_catchup ~my_net ~target_best_tip_path
+                ~slot_tx_end:None ) )
 
     let%test_unit "catchup succeeds even if the parent transition is already \
                    in the frontier" =
@@ -1015,7 +1020,8 @@ let%test_module "Ledger_catchup tests" =
             [ Transition_frontier.best_tip peer_net.state.frontier ]
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path ) )
+              test_successful_catchup ~my_net ~target_best_tip_path
+                ~slot_tx_end:None ) )
 
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
@@ -1050,6 +1056,7 @@ let%test_module "Ledger_catchup tests" =
               let `Test { cache; _ }, `Cached_transition cached_transition =
                 run_catchup_with_target ~network:my_net.network
                   ~frontier:my_net.state.frontier ~target_breadcrumb
+                  ~slot_tx_end:None
               in
               let cached_failing_transition =
                 Transition_handler.Unprocessed_transition_cache.register_exn

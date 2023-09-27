@@ -336,6 +336,7 @@ module type Transition_router_intf = sig
     -> precomputed_values:Precomputed_values.t
     -> catchup_mode:[ `Normal | `Super ]
     -> notify_online:(unit -> unit Deferred.t)
+    -> slot_tx_end:Mina_numbers.Global_slot.t option
     -> ( [ `Transition of Mina_block.Validated.t ]
        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]
        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )

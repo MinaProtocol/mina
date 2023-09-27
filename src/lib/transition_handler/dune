@@ -45,6 +45,7 @@
    mina_net2
    result
    mina_numbers
+   staged_ledger_diff
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane)))

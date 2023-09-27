@@ -36,4 +36,5 @@ val run :
        Strict_pipe.Writer.t
   -> unprocessed_transition_cache:
        Transition_handler.Unprocessed_transition_cache.t
+  -> slot_tx_end:Mina_numbers.Global_slot.t option
   -> unit

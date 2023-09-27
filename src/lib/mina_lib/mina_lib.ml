@@ -1777,6 +1777,7 @@ let create ?wallets (config : Config.t) =
               ~catchup_mode ~network_transition_reader:block_reader
               ~producer_transition_reader ~most_recent_valid_block
               ~precomputed_values:config.precomputed_values ~notify_online
+              ~slot_tx_end:config.slot_tx_end
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

@@ -58,7 +58,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
     ~network ~time_controller ~producer_transition_reader_ref
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ~collected_transitions ~transition_reader_ref ~transition_writer_ref
-    ~frontier_w ~precomputed_values frontier =
+    ~frontier_w ~precomputed_values ~slot_tx_end frontier =
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
       , transition_frontier_controller_writer ) =
@@ -87,7 +87,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
     Transition_frontier_controller.run ~logger ~trust_system ~verifier ~network
       ~time_controller ~collected_transitions ~frontier
       ~network_transition_reader:!transition_reader_ref
-      ~producer_transition_reader ~clear_reader ~precomputed_values
+      ~producer_transition_reader ~clear_reader ~precomputed_values ~slot_tx_end
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -100,7 +100,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ~transition_reader_ref ~transition_writer_ref ~consensus_local_state
     ~frontier_w ~initial_root_transition ~persistent_root ~persistent_frontier
-    ~best_seen_transition ~precomputed_values ~catchup_mode =
+    ~best_seen_transition ~precomputed_values ~catchup_mode ~slot_tx_end =
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
@@ -138,7 +138,8 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
         ~network ~time_controller ~producer_transition_reader_ref
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~transition_reader_ref
-        ~transition_writer_ref ~frontier_w ~precomputed_values new_frontier )
+        ~transition_writer_ref ~frontier_w ~precomputed_values ~slot_tx_end
+        new_frontier )
 
 let download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values =
@@ -307,7 +308,8 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
     ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
     ~transition_reader_ref ~transition_writer_ref
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~precomputed_values ~catchup_mode ~notify_online =
+    ~consensus_local_state ~precomputed_values ~catchup_mode ~notify_online
+    ~slot_tx_end =
   let%bind () =
     if is_demo_mode then return ()
     else wait_for_high_connectivity ~logger ~network ~is_seed
@@ -335,7 +337,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         ~clear_reader ~transition_reader_ref ~consensus_local_state
         ~transition_writer_ref ~frontier_w ~persistent_root ~persistent_frontier
         ~initial_root_transition ~catchup_mode ~best_seen_transition:best_tip
-        ~precomputed_values
+        ~precomputed_values ~slot_tx_end
   | best_tip, Some frontier -> (
       match best_tip with
       | Some best_tip
@@ -364,6 +366,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
             ~transition_writer_ref ~frontier_w ~persistent_root
             ~persistent_frontier ~initial_root_transition ~catchup_mode
             ~best_seen_transition:(Some best_tip) ~precomputed_values
+            ~slot_tx_end
       | _ ->
           if Option.is_some best_tip then
             [%log info]
@@ -420,7 +423,8 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
             ~network ~time_controller ~producer_transition_reader_ref
             ~producer_transition_writer_ref ~verified_transition_writer
             ~clear_reader ~collected_transitions ~transition_reader_ref
-            ~transition_writer_ref ~frontier_w ~precomputed_values frontier )
+            ~transition_writer_ref ~frontier_w ~precomputed_values ~slot_tx_end
+            frontier )
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -468,7 +472,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     ~producer_transition_reader
     ~most_recent_valid_block:
       (most_recent_valid_block_reader, most_recent_valid_block_writer)
-    ~precomputed_values ~catchup_mode ~notify_online =
+    ~precomputed_values ~catchup_mode ~notify_online ~slot_tx_end =
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
     Strict_pipe.create ~name:"clear" Synchronous
@@ -544,7 +548,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
           ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~transition_reader_ref
           ~transition_writer_ref ~most_recent_valid_block_writer
-          ~consensus_local_state ~precomputed_values ~notify_online
+          ~consensus_local_state ~precomputed_values ~notify_online ~slot_tx_end
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
       let valid_transition_reader1, valid_transition_reader2 =
@@ -610,7 +614,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                           ~consensus_local_state ~frontier_w ~persistent_root
                           ~persistent_frontier ~initial_root_transition
                           ~best_seen_transition:(Some enveloped_transition)
-                          ~precomputed_values ~catchup_mode )
+                          ~precomputed_values ~catchup_mode ~slot_tx_end )
                       else Deferred.unit
                   | None ->
                       Deferred.unit
