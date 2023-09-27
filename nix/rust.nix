@@ -10,8 +10,9 @@ let
   toolchainHashes = {
     "1.71" = "sha256-R0F0Risbr74xg9mEYydyebx/z0Wu6HI0/KWwrV30vZo=";
     "1.72" = "sha256-dxE7lmCFWlq0nl/wKcmYvpP9zqQbBitAQgZ1zx9Ooik=";
-    "nightly-2023-08-24" = "sha256-nfYc8EgbYl75yIIHmEEmpux4ZpwaIyuC+g6Hf4y1Hyk=";
-
+    "nightly-2023-08-25" = "sha256-nfYc8EgbYl75yIIHmEEmpux4ZpwaIyuC+g6Hf4y1Hyk=";
+    "nightly-2023-09-01" = "sha256-nfYc8EgbYl75yIIHmEEmpux4ZpwaIyuC+g6Hf4y1Hyk=";
+    "nightly-2023-06-01" = "sha256-+LaR+muOMguIl6Cz3UdLspvwgyG8s5t1lcNnQyyJOgA=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
@@ -158,8 +159,9 @@ in
 
         checkInputs = [ final.nodejs ];
 
-        # other tests require it to be ran in the wasm-bindgen monorepo
-        cargoTestFlags = [ "--test=interface-types" ];
+        # other tests, like --test=wasm-bindgen, require it to be ran in the
+        # wasm-bindgen monorepo
+        cargoTestFlags = [ "--test=interface-types --test=reference" ];
       };
     in
     rustPlatform.buildRustPackage {
