@@ -1,0 +1,1 @@
+./rosetta-integration-tests.sh 1
