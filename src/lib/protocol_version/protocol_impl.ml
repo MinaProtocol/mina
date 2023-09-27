@@ -6,8 +6,7 @@ open Core_kernel
 module Wire_types = Mina_wire_types.Protocol_impl
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S =
-    Protocol_impl_intf.Full with type Stable.V1.t = A.V1.t
+  module type S = Protocol_impl_intf.Full with type Stable.V1.t = A.V1.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -30,9 +29,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             failwith "Unexpected nondigits in input" ;
           (Int.of_string api, Int.of_string patch)
       | _ ->
-          failwith
-            "Protocol_impl.of_string_exn: expected string of form \
-             nn.nn"
+          failwith "Protocol_impl.of_string_exn: expected string of form nn.nn"
     in
     match String.index s '-' with
     | None ->
