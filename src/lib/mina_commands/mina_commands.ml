@@ -69,49 +69,87 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
   (* hack to get types to work out *)
   let%map () = return () in
   let open Deferred.Let_syntax in
-  let%map result = Mina_lib.add_transactions t [ user_command_input ] in
-  txn_count := !txn_count + 1 ;
-  match result with
-  | Ok ([], [ failed_txn ]) ->
-      Error
-        (Error.of_string
-           (sprintf !"%s"
-              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
-                .to_yojson (snd failed_txn)
-              |> Yojson.Safe.to_string ) ) )
-  | Ok ([ Signed_command txn ], []) ->
-      [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:[ ("command", User_command.to_yojson (Signed_command txn)) ]
-        "Scheduled payment $command" ;
-      Ok txn
-  | Ok (valid_commands, invalid_commands) ->
-      [%log' info (Mina_lib.top_level_logger t)]
+  let config = Mina_lib.config t in
+  let current_global_slot =
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:config.precomputed_values.consensus_constants
+           (Block_time.now (Mina_lib.time_controller t)) ))
+  in
+  match config.slot_tx_end with
+  | Some slot when Global_slot.(current_global_slot >= slot) ->
+      [%log' error (Mina_lib.top_level_logger t)]
         ~metadata:
-          [ ( "valid_commands"
-            , `List (List.map ~f:User_command.to_yojson valid_commands) )
-          ; ( "invalid_commands"
-            , `List
-                (List.map
-                   ~f:
-                     (Fn.compose
-                        Network_pool.Transaction_pool.Resource_pool.Diff
-                        .Diff_error
-                        .to_yojson snd )
-                   invalid_commands ) )
+          [ ("slot_tx_end", Global_slot.to_yojson slot)
+          ; ("current_global_slot", Global_slot.to_yojson current_global_slot)
           ]
-        "Invalid result from scheduling a payment" ;
-      Error (Error.of_string "Internal error while scheduling a payment")
-  | Error e ->
-      Error e
+        "Cannot send transaction after stop slot $slot_tx_end" ;
+      Deferred.Or_error.error_string "Cannot send transaction after stop slot"
+  | None | Some _ -> (
+      let%map result = Mina_lib.add_transactions t [ user_command_input ] in
+      txn_count := !txn_count + 1 ;
+      match result with
+      | Ok ([], [ failed_txn ]) ->
+          Error
+            (Error.of_string
+               (sprintf !"%s"
+                  ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                    .to_yojson (snd failed_txn)
+                  |> Yojson.Safe.to_string ) ) )
+      | Ok ([ Signed_command txn ], []) ->
+          [%log' info (Mina_lib.top_level_logger t)]
+            ~metadata:
+              [ ("command", User_command.to_yojson (Signed_command txn)) ]
+            "Scheduled payment $command" ;
+          Ok txn
+      | Ok (valid_commands, invalid_commands) ->
+          [%log' info (Mina_lib.top_level_logger t)]
+            ~metadata:
+              [ ( "valid_commands"
+                , `List (List.map ~f:User_command.to_yojson valid_commands) )
+              ; ( "invalid_commands"
+                , `List
+                    (List.map
+                       ~f:
+                         (Fn.compose
+                            Network_pool.Transaction_pool.Resource_pool.Diff
+                            .Diff_error
+                            .to_yojson snd )
+                       invalid_commands ) )
+              ]
+            "Invalid result from scheduling a payment" ;
+          Error (Error.of_string "Internal error while scheduling a payment")
+      | Error e ->
+          Error e )
 
 let setup_and_submit_user_commands t user_command_list =
   let open Participating_state.Let_syntax in
-  let%map _is_active = Mina_lib.active_or_bootstrapping t in
-  [%log' warn (Mina_lib.top_level_logger t)]
-    "batch-send-payments does not yet report errors"
-    ~metadata:
-      [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
-  Mina_lib.add_transactions t user_command_list
+  let config = Mina_lib.config t in
+  let current_global_slot =
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:config.precomputed_values.consensus_constants
+           (Block_time.now (Mina_lib.time_controller t)) ))
+  in
+  match config.slot_tx_end with
+  | Some slot when Global_slot.(current_global_slot >= slot) ->
+      [%log' error (Mina_lib.top_level_logger t)]
+        ~metadata:
+          [ ("slot_tx_end", Global_slot.to_yojson slot)
+          ; ("current_global_slot", Global_slot.to_yojson current_global_slot)
+          ]
+        "Cannot send transaction after stop slot $slot_tx_end" ;
+      Participating_state.return
+      @@ Deferred.Or_error.error_string
+           "Cannot send transaction after stop slot"
+  | None | Some _ ->
+      let%map _is_active = Mina_lib.active_or_bootstrapping t in
+      [%log' warn (Mina_lib.top_level_logger t)]
+        "batch-send-payments does not yet report errors"
+        ~metadata:
+          [ ("mina_command", `String "scheduling a batch of user transactions")
+          ] ;
+      Mina_lib.add_transactions t user_command_list
 
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
   type proof_elem = User_command.t
