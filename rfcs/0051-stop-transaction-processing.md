@@ -42,8 +42,8 @@ blocks after a certain slot will be as follows:
   the configured slot.
 * After the configured slot, the block producer will stop including transactions
   in blocks, and all fees are set to 0.
-* The block validator will reject blocks that include any transaction or that
-  have any non-zero fee.
+* The block validator will reject blocks produced after the stop slot that
+  contain any transaction or any non-zero fee.
 * The node should notify the user at each slot when transaction processing halts
   in less than TBD slots.
 
@@ -91,11 +91,11 @@ no completed snark work, and a coinbase fee of 0.
 ### Block validator
 
 When the block validator is validating a block, it will check if the stop slot
-configuration is set. If so, and the current global slot is less than the
-configured stop slot the block validator will validate the block as usual.
-If the current global slot is equal or greater than the configured stop slot,
-the block validator will reject blocks that define a staged ledger diff
-different than the empty one.
+configuration is set. If so, and the global slot at which the block was produces
+is less than the configured stop slot, the block validator will validate the
+block as usual. If the global slot of the block is equal or greater than the
+configured stop slot, the block validator will reject blocks that define a
+staged ledger diff different than the empty one.
 
 ## Test plan and functional requirements
 
@@ -115,11 +115,11 @@ block validator. The following requirements should be tested:
   * The block validator validates blocks as usual when the stop slot
     configuration is set to `None`.
   * The block validator validates blocks as usual when the stop slot
-    configuration is set to `<slot>` and the current global slot is less than
-    `<slot>`.
+    configuration is set to `<slot>` and the global slot of the block is less
+    than `<slot>`.
   * The block validator rejects blocks that define a staged ledger diff
-    different than the empty one when the stop slot configuration is set to
-    `<slot>` and the current global slot is greater or equal to `<slot>`.
+    differently than the empty one when the stop slot configuration is set to
+    `<slot>` and the global slot of the block is greater or equal to `<slot>`.
 * Node/client
   * The node processes transactions from clients as usual when the stop
     slot configuration is set to `None`.
