@@ -379,10 +379,16 @@ module Ledger_proof = struct
   include Assert_equal0V2 (O.Stable) (W)
 end
 
+module Protocol_impl = struct
+  module O = Protocol_version.Protocol_impl
+  module W = WT.Protocol_impl
+  include Assert_equal0V1 (O.Stable) (W)
+end
+
 module Protocol_version = struct
   module O = Protocol_version
   module W = WT.Protocol_version
-  include Assert_equal0V1 (O.Stable) (W)
+  include Assert_equal0V2 (O.Stable) (W)
 end
 
 module Network_pool = struct
