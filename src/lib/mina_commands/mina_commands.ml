@@ -223,9 +223,7 @@ let chain_id_inputs (t : Mina_lib.t) =
   let protocol_transaction_version =
     Protocol_version.transaction protocol_version
   in
-  let protocol_network_version =
-    Protocol_version.transaction protocol_version
-  in
+  let protocol_network_version = Protocol_version.network protocol_version in
   ( genesis_state_hash
   , genesis_constants
   , snark_keys
