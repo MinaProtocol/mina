@@ -1,18 +1,18 @@
 open Utils
 
 module Types = struct
-  module type S = V2S0
+  module type S = V1S0
 end
 
 module type Concrete = sig
-  module V2 : sig
-    type t = { transaction : int; network : int }
+  module V1 : sig
+    type t = { api : int; patch : int; tag : string option }
   end
 end
 
 module M = struct
-  module V2 = struct
-    type t = { transaction : int; network : int }
+  module V1 = struct
+    type t = { api : int; patch : int; tag : string option }
   end
 end
 

@@ -2641,16 +2641,15 @@ module Accounts_created = struct
 end
 
 module Protocol_versions = struct
-  type t = { major : int; minor : int; patch : int } [@@deriving hlist, fields]
+  type t = { transaction : int; network : int } [@@deriving hlist, fields]
 
   let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int ]
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist Caqti_type.[ int; int ]
 
   let table_name = "protocol_versions"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) ~major ~minor ~patch =
-    let t = { major; minor; patch } in
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~transaction ~network =
+    let t = { transaction; network } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -2811,23 +2810,21 @@ module Block = struct
           |> Unsigned.UInt32.to_int64
         in
         let%bind protocol_version_id =
-          let major = Protocol_version.major protocol_version in
-          let minor = Protocol_version.minor protocol_version in
-          let patch = Protocol_version.patch protocol_version in
+          let transaction = Protocol_version.transaction protocol_version in
+          let network = Protocol_version.network protocol_version in
           Protocol_versions.add_if_doesn't_exist
             (module Conn)
-            ~major ~minor ~patch
+            ~transaction ~network
         in
         let%bind proposed_protocol_version_id =
           Option.value_map proposed_protocol_version ~default:(return None)
             ~f:(fun ppv ->
-              let major = Protocol_version.major ppv in
-              let minor = Protocol_version.minor ppv in
-              let patch = Protocol_version.patch ppv in
+              let transaction = Protocol_version.transaction ppv in
+              let network = Protocol_version.network ppv in
               let%map id =
                 Protocol_versions.add_if_doesn't_exist
                   (module Conn)
-                  ~major ~minor ~patch
+                  ~transaction ~network
               in
               Some id )
         in
@@ -3188,23 +3185,23 @@ module Block = struct
             Epoch_data.add_if_doesn't_exist (module Conn) block.next_epoch_data
           in
           let%bind protocol_version_id =
-            let major = Protocol_version.major block.protocol_version in
-            let minor = Protocol_version.minor block.protocol_version in
-            let patch = Protocol_version.patch block.protocol_version in
+            let transaction =
+              Protocol_version.transaction block.protocol_version
+            in
+            let network = Protocol_version.network block.protocol_version in
             Protocol_versions.add_if_doesn't_exist
               (module Conn)
-              ~major ~minor ~patch
+              ~transaction ~network
           in
           let%bind proposed_protocol_version_id =
             Option.value_map block.proposed_protocol_version
               ~default:(return None) ~f:(fun ppv ->
-                let major = Protocol_version.major ppv in
-                let minor = Protocol_version.minor ppv in
-                let patch = Protocol_version.patch ppv in
+                let transaction = Protocol_version.transaction ppv in
+                let network = Protocol_version.network ppv in
                 let%map id =
                   Protocol_versions.add_if_doesn't_exist
                     (module Conn)
-                    ~major ~minor ~patch
+                    ~transaction ~network
                 in
                 Some id )
           in
@@ -3808,13 +3805,6 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
             "Runtime config does not contain a ledger, could not add genesis \
              accounts"
       | Some runtime_config_ledger -> (
-          (* blocks depend on having the protocol version set, which the daemon does on startup;
-             the actual value doesn't affect the block state hash, which is how we
-             identify a block in the archive db
-
-             here, we just set the protocol version to a dummy value
-          *)
-          Protocol_version.(set_current zero) ;
           let proof_level = Genesis_constants.Proof_level.compiled in
           let%bind precomputed_values =
             match%map

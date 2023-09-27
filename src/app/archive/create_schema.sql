@@ -132,10 +132,9 @@ CREATE TABLE epoch_data
 
 CREATE TABLE protocol_versions
 ( id               serial PRIMARY KEY
-, major            int    NOT NULL
-, minor            int    NOT NULL
-, patch            int    NOT NULL
-, UNIQUE (major,minor,patch)
+, transaction      int    NOT NULL
+, network          int    NOT NULL
+, UNIQUE (transction,network)
 );
 
 CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');

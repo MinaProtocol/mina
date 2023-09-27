@@ -161,7 +161,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
                           (Mina_block.header transition)
                       |> Protocol_version.to_string ) )
                 ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(get_current () |> to_string) )
+                  , `String Protocol_version.(current |> to_string) )
                 ] ) )
       in
       Error (Error.of_string "mismatched protocol version")

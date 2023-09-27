@@ -1,1 +1,5 @@
-[%%define current_protocol_version "3.0.0"]
+(* transaction . network *)
+[%%define current_protocol_version "3.0"]
+
+(* api . patch [ - tag ] *)
+[%%define current_protocol_implementation "2.0"]
