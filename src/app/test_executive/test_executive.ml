@@ -364,7 +364,7 @@ let main inputs =
           network |> Engine.Network.seeds |> Core.String.Map.data
         in
         let non_seed_pods =
-          network |> Engine.Network.all_non_seed_pods |> Core.String.Map.data
+          network |> Engine.Network.all_non_seed_nodes |> Core.String.Map.data
         in
         let _offline_node_event_subscription =
           (* Monitor for offline nodes; abort the test if a node goes down
@@ -372,7 +372,7 @@ let main inputs =
           *)
           Dsl.Event_router.on (Dsl.event_router dsl) Node_offline
             ~f:(fun offline_node () ->
-              let node_name = Engine.Network.Node.app_id offline_node in
+              let node_name = Engine.Network.Node.id offline_node in
               [%log info] "Detected node offline $node"
                 ~metadata:[ ("node", `String node_name) ] ;
               if Engine.Network.Node.should_be_running offline_node then (
