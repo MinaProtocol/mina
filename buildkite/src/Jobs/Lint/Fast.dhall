@@ -19,8 +19,6 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Size = ../../Command/Size.dhall
 
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-
 let commands =
       [ Cmd.run "./scripts/lint_codeowners.sh"
       , Cmd.run "./scripts/lint_rfcs.sh"
@@ -49,7 +47,6 @@ in  Pipeline.build
                 "Fast lint steps; CODEOWNERs, RFCs, Check Snarky & Proof-Systems submodules, Preprocessor Deps"
             , key = "lint"
             , target = Size.Small
-            , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
