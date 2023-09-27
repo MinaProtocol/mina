@@ -191,15 +191,7 @@ module Messages : sig
           , 'bool )
           Opt.t
       }
-
-    (** Field accessors *)
-
-    val w_comm :
-      ('g, 'bool) t -> 'g Poly_comm.Without_degree_bound.t Columns_vec.t
-
-    val z_comm : ('g, 'bool) t -> 'g Poly_comm.Without_degree_bound.t
-
-    val t_comm : ('g, 'bool) t -> 'g Poly_comm.Without_degree_bound.t
+    [@@deriving fields]
   end
 
   val typ :
