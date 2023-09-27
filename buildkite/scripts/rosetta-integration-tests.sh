@@ -17,6 +17,19 @@
 
 set -eo pipefail
 
+if [[ $# -ne 1 ]]; then
+    echo "Usage: $0 <test-stages-to-run>"
+    echo "  test-stages-to-run (int): Number of test stages to run"
+    echo "    1 - VALIDATE CONF FILE"
+    echo "    2 - CHECK:SPEC"
+    echo "    3 - CHECK:CONSTRUCTION and above"
+    echo "    4 - CHECK:DATA and above"
+    echo "    5 - CHECK:PERF and above"
+    exit 1
+fi
+
+STAGES_TO_RUN=$1
+
 export MINA_NETWORK=${MINA_NETWORK:=sandbox}
 export LOG_LEVEL="${LOG_LEVEL:=Info}"
 
@@ -320,18 +333,29 @@ sleep_time=$((($next_block_time - $curr_time) / 1000))
 echo "Sleeping for ${sleep_time}s until next block is created..."
 sleep ${sleep_time}
 
-# Mina Rosetta Checks (spec construction data perf)
-echo "============ ROSETTA CLI: VALIDATE CONF FILE ${ROSETTA_CONFIGURATION_FILE} =============="
-rosetta-cli configuration:validate ${ROSETTA_CONFIGURATION_FILE}
 
-echo "========================= ROSETTA CLI: CHECK:SPEC ==========================="
-rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+if [[ $STAGES_TO_RUN -gt 0 ]]; then
+  # Mina Rosetta Checks (spec construction data perf)
+  echo "============ ROSETTA CLI: VALIDATE CONF FILE ${ROSETTA_CONFIGURATION_FILE} =============="
+  rosetta-cli configuration:validate ${ROSETTA_CONFIGURATION_FILE}
+fi
 
-echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
-rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+if [[ $STAGES_TO_RUN -gt 1 ]]; then
+  echo "========================= ROSETTA CLI: CHECK:SPEC ==========================="
+  rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+fi
 
-echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
-rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+if [[ $STAGES_TO_RUN -gt 2 ]]; then
+  echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
+  rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+fi
 
-echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
-echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
+if [[ $STAGES_TO_RUN -gt 3 ]]; then
+  echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
+  rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+fi
+
+if [[ $STAGES_TO_RUN -gt 4 ]]; then
+  echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
+  echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
+fi
