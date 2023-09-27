@@ -49,7 +49,7 @@ spec:
           mountPath: /root/libp2p-keys
         env:
           - name: MINA_LIBP2P_PASS
-            value: {{ $.Values.mina.privkeyPass | quote }}
+            value: "naughty blue worm"
       {{- end }}
       containers:
       - name: mina
@@ -123,7 +123,7 @@ spec:
         - name: DAEMON_EXTERNAL_PORT
           value: {{ default $.Values.mina.ports.p2p $config.externalPort | quote }}
         - name: MINA_LIBP2P_PASS
-          value: {{ $.Values.mina.privkeyPass | quote }}
+          value: "naughty blue worm"
         ports:
         - name: client-port
           protocol: TCP
