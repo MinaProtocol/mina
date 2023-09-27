@@ -4,7 +4,7 @@ healthcheck:
     failureThreshold: 30
     periodSeconds: 10
   failureThreshold: 60
-  periodSeconds: 5
+  periodSeconds: 60
   initialDelaySeconds: 30
 
 nodeSelector:

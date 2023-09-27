@@ -20,34 +20,34 @@ locals {
     logLevel             = var.log_level
     logSnarkWorkGossip   = var.log_snark_work_gossip
     logPrecomputedBlocks = var.log_precomputed_blocks
-    logTxnPoolGossip = var.log_txn_pool_gossip
+    logTxnPoolGossip     = var.log_txn_pool_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     seedPeersURL         = var.seed_peers_url
     exposeGraphql        = var.expose_graphql
-    cpuRequest = var.cpu_request
-    memRequest= var.mem_request
+    cpuRequest           = var.cpu_request
+    memRequest           = var.mem_request
   }
 
   healthcheck_vars = {
     enabled             = var.healthcheck_enabled
     failureThreshold    = 60
-    periodSeconds       = 5
+    periodSeconds       = 60
     initialDelaySeconds = 30
   }
 
   seed_vars = {
     testnetName = var.testnet_name
     mina = {
-      runtimeConfig = local.daemon.runtimeConfig
-      image         = var.mina_image
-      useCustomEntrypoint  = var.use_custom_entrypoint
-      customEntrypoint     = var.custom_entrypoint
-      privkeyPass   = var.block_producer_key_pass
+      runtimeConfig       = local.daemon.runtimeConfig
+      image               = var.mina_image
+      useCustomEntrypoint = var.use_custom_entrypoint
+      customEntrypoint    = var.custom_entrypoint
+      privkeyPass         = var.block_producer_key_pass
       // TODO: Change this to a better name
       seedPeers          = local.peers
       logLevel           = var.log_level
       logSnarkWorkGossip = var.log_snark_work_gossip
-      logTxnPoolGossip = var.log_txn_pool_gossip
+      logTxnPoolGossip   = var.log_txn_pool_gossip
       ports = {
         client  = "8301"
         graphql = "3085"
@@ -63,14 +63,14 @@ locals {
 
     seedConfigs = [
       for index, config in var.seed_configs : {
-        name             = config.name
-        class            = config.class
-        libp2pSecret     = config.libp2p_secret
+        name         = config.name
+        class        = config.class
+        libp2pSecret = config.libp2p_secret
         # privateKeySecret = config.private_key_secret
-        externalPort     = config.external_port
-        externalIp       = config.external_ip
-        enableArchive    = config.enableArchive
-        archiveAddress   = config.archiveAddress
+        externalPort   = config.external_port
+        externalIp     = config.external_ip
+        enableArchive  = config.enableArchive
+        archiveAddress = config.archiveAddress
       }
     ]
   }
@@ -111,82 +111,82 @@ locals {
         enableGossipFlooding = config.enable_gossip_flooding
         privateKeySecret     = config.private_key_secret
         # libp2pSecret         = config.libp2p_secret
-        enablePeerExchange   = config.enable_peer_exchange
-        isolated             = config.isolated
-        enableArchive        = config.enableArchive
-        archiveAddress       = config.archiveAddress
+        enablePeerExchange = config.enable_peer_exchange
+        isolated           = config.isolated
+        enableArchive      = config.enableArchive
+        archiveAddress     = config.archiveAddress
       }
     ]
   }
 
   archive_vars = [for item in var.archive_configs : {
-      testnetName = var.testnet_name
-      mina        = {
-        image         = var.mina_image
-        useCustomEntrypoint  = var.use_custom_entrypoint
-        customEntrypoint     = var.custom_entrypoint
-        seedPeers     = local.peers
-        runtimeConfig = local.daemon.runtimeConfig
-        seedPeersURL  = var.seed_peers_url
-      }
-      healthcheck = local.healthcheck_vars
-      archive     = item
-      postgresql = {
-        primary = {
-          persistence = {
+    testnetName = var.testnet_name
+    mina = {
+      image               = var.mina_image
+      useCustomEntrypoint = var.use_custom_entrypoint
+      customEntrypoint    = var.custom_entrypoint
+      seedPeers           = local.peers
+      runtimeConfig       = local.daemon.runtimeConfig
+      seedPeersURL        = var.seed_peers_url
+    }
+    healthcheck = local.healthcheck_vars
+    archive     = item
+    postgresql = {
+      primary = {
+        persistence = {
           enabled      = item["persistenceEnabled"]
           size         = item["persistenceSize"]
           storageClass = item["persistenceStorageClass"]
           accessModes  = item["persistenceAccessModes"]
-          }
-          affinity = {
-            nodeAffinity = {
-              requiredDuringSchedulingIgnoredDuringExecution = {
-                nodeSelectorTerms = [
-                  {
-                    matchExpressions = [
-                      {
-                        key = "cloud.google.com/gke-spot"
-                        operator = item["spotAllowed"] ? "In" : "NotIn"
-                        values = ["true"]
-                      }
-                    ]
-                  }
-                ]
-              }
+        }
+        affinity = {
+          nodeAffinity = {
+            requiredDuringSchedulingIgnoredDuringExecution = {
+              nodeSelectorTerms = [
+                {
+                  matchExpressions = [
+                    {
+                      key      = "cloud.google.com/gke-spot"
+                      operator = item["spotAllowed"] ? "In" : "NotIn"
+                      values   = ["true"]
+                    }
+                  ]
+                }
+              ]
             }
           }
         }
       }
-    }]
+    }
+  }]
 
   snark_vars = [
-    for i, snark in var.snark_coordinators: {
+    for i, snark in var.snark_coordinators : {
       testnetName = var.testnet_name
       mina        = local.daemon
       healthcheck = local.healthcheck_vars
 
-      coordinatorName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,-6,-1))}"
-      workerName = "snark-worker-${lower(substr(snark.snark_worker_public_key,-6,-1))}"
-      workerReplicas = snark.snark_worker_replicas
-      coordinatorHostName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,-6,-1))}.${var.testnet_name}"
-      coordinatorRpcPort = 8301
-      coordinatorHostPort = snark.snark_coordinators_host_port
-      publicKey =snark.snark_worker_public_key
-      snarkFee = snark.snark_worker_fee
+      coordinatorName        = "snark-coordinator-${lower(substr(snark.snark_worker_public_key, -6, -1))}"
+      workerName             = "snark-worker-${lower(substr(snark.snark_worker_public_key, -6, -1))}"
+      workerReplicas         = snark.snark_worker_replicas
+      coordinatorHostName    = "snark-coordinator-${lower(substr(snark.snark_worker_public_key, -6, -1))}.${var.testnet_name}"
+      coordinatorRpcPort     = 8301
+      coordinatorHostPort    = snark.snark_coordinators_host_port
+      publicKey              = snark.snark_worker_public_key
+      snarkFee               = snark.snark_worker_fee
       workSelectionAlgorithm = "seq"
 
       workerCpuRequest = var.worker_cpu_request
-      workerMemRequest= var.worker_mem_request
+      workerMemRequest = var.worker_mem_request
     }
   ]
 
   plain_node_vars = [
-    for i, node in var.plain_node_configs: {
+    for i, node in var.plain_node_configs : {
       testnetName = var.testnet_name
       mina        = local.daemon
       healthcheck = local.healthcheck_vars
-      name = node.name
+      name        = node.name
     }
   ]
 

@@ -57,5 +57,5 @@ nodeSelector:
 healthcheck:
   enabled: false
   failureThreshold: 60
-  periodSeconds: 5
+  periodSeconds: 60
   initialDelaySeconds: 30

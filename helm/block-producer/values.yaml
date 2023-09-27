@@ -86,7 +86,7 @@ blockProducerConfigs:
 healthcheck:
   enabled: true
   failureThreshold: 60
-  periodSeconds: 5
+  periodSeconds: 60
   initialDelaySeconds: 30
 
 nodeSelector:
