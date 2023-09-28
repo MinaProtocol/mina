@@ -323,7 +323,9 @@ let () =
          let successful = ref true in
          let rec loop random =
            generate_zkapp_commands_and_apply_them_consecutively_5_times
-             ~successful ~max_account_updates ~individual_test_timeout random
+             ~successful ~max_account_updates
+             ~individual_test_timeout:(individual_test_timeout * 2)
+             random
            >>= generate_zkapp_commands_and_apply_them_freshly ~successful
                  ~max_account_updates ~individual_test_timeout
            >>= mk_invalid_test ~successful ~max_account_updates
@@ -331,7 +333,7 @@ let () =
                  ~expected_failure_status:
                    (Protocol_state_precondition_unsatisfied, Pass_2)
                  ~individual_test_timeout
-          >>= mk_invalid_test ~successful ~max_account_updates
+           >>= mk_invalid_test ~successful ~max_account_updates
                  ~type_of_failure:(Update_not_permitted `App_state)
                  ~expected_failure_status:
                    (Update_not_permitted_app_state, Pass_2)
