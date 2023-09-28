@@ -56,7 +56,7 @@ let parse_event_from_log_entry ~logger log_entry =
       in
       event )
 
-let rec get_filtered_log_entries_poll node ~logger ~event_writer
+let rec filtered_log_entries_poll node ~logger ~event_writer
     ~last_log_index_seen =
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then (
@@ -77,7 +77,7 @@ let rec get_filtered_log_entries_poll node ~logger ~event_writer
         let last_log_index_seen =
           Array.length log_entries + last_log_index_seen
         in
-        get_filtered_log_entries_poll node ~logger ~event_writer
+        filtered_log_entries_poll node ~logger ~event_writer
           ~last_log_index_seen
     | Error err ->
         [%log error] "Encountered an error while polling $node for logs: $err"
@@ -115,8 +115,7 @@ let rec poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
   [%log info] "$node has started its filtered logs. Beginning polling"
     ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
   let%bind () =
-    get_filtered_log_entries_poll node ~last_log_index_seen:0 ~logger
-      ~event_writer
+    filtered_log_entries_poll node ~last_log_index_seen:0 ~logger ~event_writer
   in
   poll_node_for_logs_in_background ~log_filter ~logger ~event_writer node
 
