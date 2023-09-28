@@ -33,8 +33,7 @@ in
             ],
         label = "Build test-executive",
         key = "build-test-executive",
-        target = Size.XLarge,
-        `if` = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'"
+        target = Size.XLarge
       },
 
   execute = \(testName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
@@ -53,8 +52,7 @@ in
         label = "${testName} integration test",
         key = "integration-test-${testName}",
         target = Size.Integration,
-        depends_on = dependsOn,
-        `if` = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'"
+        depends_on = dependsOn
       },
 
   buildJs = \(duneProfile : Text) -> 
@@ -72,8 +70,7 @@ in
             ],
         label = "Build JS integration tests",
         key = "build-js-tests",
-        target = Size.XLarge,
-        `if` = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'"
+        target = Size.XLarge
       },
 
   executeWithJs = \(testName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
@@ -94,7 +91,6 @@ in
         key = "integration-test-${testName}",
         target = Size.Integration,
         depends_on = dependsOn,
-        `if` = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'",
         soft_fail = Some (B/SoftFail.Boolean True)
       }
 }

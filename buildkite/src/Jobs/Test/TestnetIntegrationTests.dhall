@@ -2,7 +2,7 @@ let S = ../../Lib/SelectFiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
-
+let PipelineMode = ../../Pipeline/Mode.dhall
 let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
@@ -29,7 +29,8 @@ in Pipeline.build Pipeline.Config::{
         S.strictlyStart (S.contains "automation/terraform/modules/kubernetes/testnet")
     ],
     path = "Test",
-    name = "TestnetIntegrationTests"
+    name = "TestnetIntegrationTests",
+    mode = PipelineMode.Type.Stable
   },
   steps = [
     TestExecutive.build "integration_tests",
