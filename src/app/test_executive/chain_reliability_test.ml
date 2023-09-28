@@ -111,7 +111,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Integration_test_lib.Graphql_requests.must_get_best_chain ~logger
                  (Node.get_ingress_uri node)
              in
-             (Node.infra_id node, List.map ~f:(fun b -> b.state_hash) chain) )
+             (Node.id node, List.map ~f:(fun b -> b.state_hash) chain) )
        in
        let (chains : string list list) =
          List.map labeled_chains ~f:(fun (_, chain) -> chain)

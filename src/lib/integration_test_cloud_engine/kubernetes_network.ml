@@ -169,7 +169,7 @@ module Node = struct
 
   let run_replayer ~logger (t : t) =
     [%log info] "Running replayer on archived data (node: %s, container: %s)"
-      t.app_id mina_archive_container_id ;
+      (List.hd_exn t.pod_ids) mina_archive_container_id ;
     let open Malleable_error.Let_syntax in
     let%bind accounts =
       run_in_container t
@@ -200,8 +200,8 @@ module Node = struct
 
   let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
-    [%log info] "Dumping container logs from (node: %s, container: %s)" t.app_id
-      t.pod_info.primary_container_id ;
+    [%log info] "Dumping container logs from (node: %s, container: %s)"
+      (List.hd_exn t.pod_ids) t.pod_info.primary_container_id ;
     let%map logs = get_logs_in_container t in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
@@ -211,7 +211,7 @@ module Node = struct
     let open Malleable_error.Let_syntax in
     [%log info]
       "Dumping precomputed blocks from logs for (node: %s, container: %s)"
-      t.app_id t.pod_info.primary_container_id ;
+      (List.hd_exn t.pod_ids) t.pod_info.primary_container_id ;
     let%bind logs = get_logs_in_container t in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
