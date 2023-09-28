@@ -38,7 +38,7 @@ provider "google" {
 variable "whale_count" {
   type        = number
   description = "Number of online whales for the network to run"
-  default     = 5
+  default     = 2
 }
 
 variable "fish_count" {
@@ -57,8 +57,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name                    = "testworld-2-0"
-  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-berkeley-itn-ledger-bake-20a2b3a-focal-berkeley"
-  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-berkeley-itn-ledger-bake-20a2b3a-focal"
+  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-berkeley-itn3-ledger-validate-25f9de2-focal-berkeley"
+  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-berkeley-itn3-ledger-validate-25f9de2-focal"
   seed_region                     = "us-central1"
   seed_zone                       = "us-central1-b"
   make_report_discord_webhook_url = ""
@@ -97,15 +97,9 @@ module "testworld-2-0" {
     },
     {
       name              = "archive-2"
-      enableLocalDaemon = false
-      enablePostgresDB  = false
-      postgresHost      = "archive-1-postgresql"
-    },
-    {
-      name              = "archive-3"
-      enableLocalDaemon = false
+      enableLocalDaemon = true
       enablePostgresDB  = true
-      postgresHost      = "archive-3-postgresql"
+      postgresHost      = "archive-2-postgresql"
     }
   ]
 
