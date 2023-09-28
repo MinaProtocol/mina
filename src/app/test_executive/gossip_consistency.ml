@@ -94,7 +94,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let `Seen_by_all inter, `Seen_by_some union =
       Gossip_state.stats Transactions_gossip
         (Map.data (network_state t).gossip_received)
-        ~exclusion_list:[ Network.Node.id sender_bp ]
+        ~exclusion_list:[ Network.Node.infra_id sender_bp ]
     in
     [%log info] "gossip_consistency test: inter = %d; union = %d " inter union ;
     let ratio =

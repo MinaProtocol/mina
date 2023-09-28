@@ -82,7 +82,7 @@ let rec get_filtered_log_entries_poll node ~logger ~event_writer
     | Error err ->
         [%log error] "Encountered an error while polling $node for logs: $err"
           ~metadata:
-            [ ("node", `String (Node.id node))
+            [ ("node", `String (Node.infra_id node))
             ; ("err", Error_json.error_to_yojson err)
             ] ;
         (* Declare the node to be offline. *)
@@ -110,10 +110,10 @@ let rec poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
     (node : Node.t) =
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Requesting for $node to start its filtered logs"
-    ~metadata:[ ("node", `String (Node.id node)) ] ;
+    ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
   let%bind () = start_filtered_log ~logger ~log_filter ~event_writer node in
   [%log info] "$node has started its filtered logs. Beginning polling"
-    ~metadata:[ ("node", `String (Node.id node)) ] ;
+    ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
   let%bind () =
     get_filtered_log_entries_poll node ~last_log_index_seen:0 ~logger
       ~event_writer
