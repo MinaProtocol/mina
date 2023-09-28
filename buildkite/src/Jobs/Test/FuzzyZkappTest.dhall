@@ -9,7 +9,6 @@ let PipelineMode = ../../Pipeline/Mode.dhall
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
-
 let Command = ../../Command/Base.dhall
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
