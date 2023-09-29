@@ -4304,17 +4304,58 @@ module Queries = struct
               Mina_block.consensus_state block
               |> Consensus.Data.Consensus_state.curr_global_slot
             in
-            let ledger =
+            let staged_ledger =
               Transition_frontier.Breadcrumb.staged_ledger best_tip
               |> Staged_ledger.ledger
             in
             let protocol_state =
               Transition_frontier.Breadcrumb.protocol_state best_tip
             in
+            let consensus =
+              Mina_state.Protocol_state.consensus_state protocol_state
+            in
+            let staking_epoch =
+              Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
+                consensus
+            in
+            let next_epoch =
+              Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
+                consensus
+            in
+            let staking_epoch_seed =
+              Mina_base.Epoch_seed.to_base58_check
+                staking_epoch.Mina_base.Epoch_data.Poly.seed
+            in
+            let next_epoch_seed =
+              Mina_base.Epoch_seed.to_base58_check
+                next_epoch.Mina_base.Epoch_data.Poly.seed
+            in
             let runtime_config = Mina_lib.runtime_config mina in
             match
-              Runtime_config.make_fork_config ~ledger ~global_slot
-                ~blockchain_length
+              let open Result.Let_syntax in
+              let%bind staking_ledger =
+                match Mina_lib.staking_ledger mina with
+                | None ->
+                    Error "Staking ledger is not initialized."
+                | Some (Genesis_epoch_ledger l) ->
+                    Ok (Ledger.Any_ledger.cast (module Ledger) l)
+                | Some (Ledger_db l) ->
+                    Ok (Ledger.Any_ledger.cast (module Ledger.Db) l)
+              in
+              let%bind next_epoch_ledger =
+                match Mina_lib.next_epoch_ledger mina with
+                | None ->
+                    Error "Next epoch ledger is not initialized."
+                | Some `Notfinalized ->
+                    Ok None
+                | Some (`Finalized (Genesis_epoch_ledger l)) ->
+                    Ok (Some (Ledger.Any_ledger.cast (module Ledger) l))
+                | Some (`Finalized (Ledger_db l)) ->
+                    Ok (Some (Ledger.Any_ledger.cast (module Ledger.Db) l))
+              in
+              Runtime_config.make_fork_config ~staged_ledger ~global_slot
+                ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
+                ~next_epoch_seed ~blockchain_length
                 ~protocol_state_hash:protocol_state.previous_state_hash
                 runtime_config
             with
