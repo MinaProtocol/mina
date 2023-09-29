@@ -18,21 +18,15 @@ We wish for zkApps developers to be able to make their contract immutable withou
 
 NB: This RFC relies on the [protocol versioning RFC](TODO).
 
-In order to prevent a zkApp from breaking upon a future incompatible upgrade of the protocol, we will not allow users to set the `Impossible` or `Proof` permissions on the verification key. Instead, we will add 2 new permissions, `Impossible_during_hard_fork` and `Proof_during_hard_fork`, each of which will carry a specific transaction logic version to represent the hard fork they in which they are valid. Thus, the total set of permissions allowed to be set on verification keys would be:
+In order to prevent a zkApp from breaking upon a future incompatible upgrade of the protocol, we will not allow users to set the `Impossible` or `Proof` permissions on the verification key. Instead, the verification key permission will be represented as a tuple `(Control.t * txn_version`, and `Proof`/`Impossible` controllers will be reinterpreted as `Signature` if the protocol `txn_version` differs. User interfaces may provide a less-detailed representation for `None` and `Either`, but the snark and over-the-wire protocol must accept a tuple for all variants.
 
-* `None`
-* `Either`
-* `Signature`
-* `Proof_during_hard_fork of txn_version`
-* `Impossible_during_hard_fork of txn_version`
+To ensure that contracts do not become soft-locked, both the transaction logic and the snark must only accept transactions with `txn_version` equal to the current version. Any other versions must be rejected by the transaction pool, block validation logic, and by the snark.
 
-There is a restriction enforced in the transaction snark when a user attempts to set the permission to either `Proof_during_hard_fork` or `Impossible_during_hard_fork`. For any hard fork version, the transaction snark will only accept attempts to set one of these permissions to the current hard fork version. Any attempt to set one of these permissions to a hard fork version other than the current one will result in a failure. This failure should be implemented as a well formed transaction error rather than failing on chain, since it is something that can be checked statically before accepting transactions into the transaction pool. Thus, the transaction snark will fail to prove any such transactions, rather than failing on-chain.
+Where the verification key permission is set in an account update, the `txn_version` must be included in its hash, to ensure that the update cannot be replayed to 're-lock' the account to a newer, incompatible version.
 
 When the `txn_version` referenced by either of these new permissions matches the current hard fork version of the protocol, the permissions act exactly like their normal counterparts (`Proof` fields can only be updated with a valid proof, `Impossible` fields can never be updated). When the `txn_version` is older than (less than) the current hard fork version, then both of these permissions fallback to the `Signature` case, so that the now broken zkApps can be updated for the new hard fork.
 
 An account permission that is set to either of these new permissions can be updated when the `txn_version` referenced is older than the current hard fork version. This scenario ignores restrictions by `set_permission`, and operates as if `set_permission` were `Signature`.
-
-The transaction snark asserts that any `txn_version` referenced by any account permission cannot be newer than the current protocol version.
 
 ## Test plan and functional requirements
 
