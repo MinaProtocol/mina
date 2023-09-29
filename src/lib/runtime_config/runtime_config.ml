@@ -1147,47 +1147,86 @@ let gen =
       None (* Leave it empty until we know better what should go there. *)
   }
 
-let make_fork_config ~ledger ~global_slot ~blockchain_length
-    ~protocol_state_hash (runtime_config : t) =
+let ledger_accounts (ledger : Mina_base.Ledger.Any_ledger.witness) =
+  Mina_base.Ledger.Any_ledger.M.foldi ~init:[]
+    ~f:(fun _ accum act -> act :: accum)
+    ledger
+  |> map_results ~f:Accounts.Single.of_account
+
+let ledger_of_accounts accounts =
+  Ledger.
+    { base = Accounts accounts
+    ; num_accounts = Some (List.length accounts)
+    ; balances = List.mapi accounts ~f:(fun i a -> (i, a.balance))
+    ; hash = None
+    ; name = None
+    ; add_genesis_winner = Some false
+    }
+
+let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
+    ~protocol_state_hash ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
+    ~next_epoch_seed (runtime_config : t) =
+  let open Result.Let_syntax in
   let global_slot = Mina_numbers.Global_slot.to_int global_slot in
   let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
-  let accounts_or_error =
-    Mina_base.Ledger.foldi ~init:[] ~f:(fun _ accum act -> act :: accum) ledger
-    |> map_results ~f:Accounts.Single.of_account
+  let%bind accounts =
+    ledger_accounts
+    @@ Mina_base.Ledger.Any_ledger.cast (module Mina_base.Ledger) staged_ledger
   in
-  Result.map accounts_or_error ~f:(fun accounts ->
-      let ledger = Option.value_exn runtime_config.ledger in
-      let previous_length =
-        let open Option.Let_syntax in
-        let%bind proof = runtime_config.proof in
-        let%map fork = proof.fork in
-        fork.previous_length + blockchain_length
-      in
-      let fork =
-        Fork_config.
-          { previous_state_hash =
-              Mina_base.State_hash.to_base58_check protocol_state_hash
-          ; previous_length = Option.value ~default:global_slot previous_length
-          ; previous_global_slot = global_slot
-          }
-      in
-      let update =
-        make
-        (* add_genesis_winner must be set to false, because this
-           config effectively creates a continuation of the current
-           blockchain state and therefore the genesis ledger already
-           contains the winner of the previous block. No need to
-           artificially add it. In fact, it wouldn't work at all,
-           because the new node would try to create this account at
-           startup, even though it already exists, leading to an error.*)
-          ~ledger:
-            { ledger with
-              base = Accounts accounts
-            ; add_genesis_winner = Some false
-            }
-          ~proof:(Proof_keys.make ~fork ()) ()
-      in
-      combine runtime_config update )
+  let ledger = Option.value_exn runtime_config.ledger in
+  let previous_length =
+    let open Option.Let_syntax in
+    let%bind proof = runtime_config.proof in
+    let%map fork = proof.fork in
+    fork.previous_length + blockchain_length
+  in
+  let fork =
+    Fork_config.
+      { previous_state_hash =
+          Mina_base.State_hash.to_base58_check protocol_state_hash
+      ; previous_length =
+          Option.value ~default:blockchain_length previous_length
+      ; previous_global_slot = global_slot
+      }
+  in
+  let%bind staking_ledger_accounts = ledger_accounts staking_ledger in
+  let%map next_epoch_ledger_accounts =
+    match next_epoch_ledger with
+    | None ->
+        return None
+    | Some l ->
+        ledger_accounts l >>| Option.return
+  in
+  let epoch_data =
+    let open Epoch_data in
+    let open Data in
+    { staking =
+        { ledger = ledger_of_accounts staking_ledger_accounts
+        ; seed = staking_epoch_seed
+        }
+    ; next =
+        Option.map next_epoch_ledger_accounts ~f:(fun accounts ->
+            { ledger = ledger_of_accounts accounts; seed = next_epoch_seed } )
+    }
+  in
+  let update =
+    make
+    (* add_genesis_winner must be set to false, because this
+       config effectively creates a continuation of the current
+       blockchain state and therefore the genesis ledger already
+       contains the winner of the previous block. No need to
+       artificially add it. In fact, it wouldn't work at all,
+       because the new node would try to create this account at
+       startup, even though it already exists, leading to an error.*)
+      ~epoch_data
+      ~ledger:
+        { ledger with
+          base = Accounts accounts
+        ; add_genesis_winner = Some false
+        }
+      ~proof:(Proof_keys.make ~fork ()) ()
+  in
+  combine runtime_config update
 
 module Test_configs = struct
   let bootstrap =

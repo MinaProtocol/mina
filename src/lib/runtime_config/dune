@@ -14,6 +14,7 @@
    ;; local libraries
    currency
    data_hash_lib
+   merkle_ledger
    mina_base
    mina_numbers
    ppx_dhall_type
