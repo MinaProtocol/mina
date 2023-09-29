@@ -18,52 +18,41 @@ We wish for zkApps developers to be able to make their contract immutable withou
 
 NB: This RFC relies on the [protocol versioning RFC](TODO).
 
-In order to prevent a zkApp from breaking upon a future incompatible upgrade of the protocol, we will not allow users to set the `Impossible` or `Proof` permissions on the verification key. Instead, we will add 2 new permissions, `Impossible_during_hard_fork` and `Proof_during_hard_fork`, each of which will carry a specific transaction logic version to represent the hard fork they in which they are valid. Thus, the total set of permissions allowed to be set on verification keys would be:
+In order to prevent a zkApp from breaking upon a future incompatible upgrade of the protocol, we will put special rules in place for the `Impossible` and `Proof` permissions on the verification key. The verification key permission will be represented as a tuple `(Control.t * txn_version)`, and `Proof`/`Impossible` controllers will be reinterpreted as `Signature` if the specified `txn_version` differs from the current protocol's transaction version. User interfaces may provide a less-detailed representation for `None` and `Either`, but the snark and over-the-wire protocol must accept a tuple for all variants.
 
-* `None`
-* `Either`
-* `Signature`
-* `Proof_during_hard_fork of txn_version`
-* `Impossible_during_hard_fork of txn_version`
+To ensure that contracts do not become soft-locked, both the transaction logic and the snark must only accept transactions with verification key permission `txn_version`s equal to the current version. Any other versions must be rejected by the transaction pool, block validation logic, and by the snark. We will accomplish this by adding a `txn_version` check to the set of well-formedness checks we do against transactions.
 
-There is a restriction enforced in the transaction snark when a user attempts to set the permission to either `Proof_during_hard_fork` or `Impossible_during_hard_fork`. For any hard fork version, the transaction snark will only accept attempts to set one of these permissions to the current hard fork version. Any attempt to set one of these permissions to a hard fork version other than the current one will result in a failure. This failure should be implemented as a well formed transaction error rather than failing on chain, since it is something that can be checked statically before accepting transactions into the transaction pool. Thus, the transaction snark will fail to prove any such transactions, rather than failing on-chain.
+Because setting the verification key permission requires specifying the `txn_version`, the `txn_version` will be included in the transactions hash, ensuring that the update cannot be replayed to 're-lock' the account to a newer, incompatible version.
 
-When the `txn_version` referenced by either of these new permissions matches the current hard fork version of the protocol, the permissions act exactly like their normal counterparts (`Proof` fields can only be updated with a valid proof, `Impossible` fields can never be updated). When the `txn_version` is older than (less than) the current hard fork version, then both of these permissions fallback to the `Signature` case, so that the now broken zkApps can be updated for the new hard fork.
+When the `txn_version` stored in the account's verification key permission matches the current hard fork version of the protocol, the `Impossible` and `Proof` permissions act exactly like their normal counterparts (`Proof` fields can only be updated with a valid proof, `Impossible` fields can never be updated). When the `txn_version` stored within an account's verification key permission is older than (less than) the current hard fork version, then both of these permissions fallback to the `Signature` case, so that the now broken zkApps can be updated for the new hard fork.
 
-An account permission that is set to either of these new permissions can be updated when the `txn_version` referenced is older than the current hard fork version. This scenario ignores restrictions by `set_permission`, and operates as if `set_permission` were `Signature`.
-
-The transaction snark asserts that any `txn_version` referenced by any account permission cannot be newer than the current protocol version.
+The details for updating an old version account to a new version account are elided in this proposal and will be determined on a per upgrade basis. As such, we will keep the existing `zkapp_version` on accounts, storing both the `zkapp_version` of an account and the verificatin key permission `txn_version` separately. This separation means that the migration of an account's format happens separately from the account's smart contract migration. The migration of the account format can flexibly be done either on-chain, upon first interaction with an account, or off-chain, during the hard fork package generation step (but the decision of which route to take is left until we know what we are upgrading to).
 
 ## Test plan and functional requirements
 
-Unit tests will be written to test these new permissions, and a new test case will be added to the hard fork integration test.
+Unit tests will be written to test these new permission rules, and a new test case will be added to the hard fork integration test.
 
 The unit tests are to be written against the transaction snark, testing various account updates as inputs. The tests are broken into categories by the expected result: that the statement is unprovable, that the statement was proven to be failed, or that the statement was proven to be successful.
 
 * Unprovable account updates
-    * updates operating on an account in the ledger where the `verification_key` permission is set to `Proof` or `Impossible`
-    * updates operating on an account in the ledger where the `verification_key` permission is set to `Proof_during_hard_fork` or `Impossible_during_hard_fork` that references a `txn_version` that is greater than the current hard fork version
-    * updates which set the `verification_key` permission to `Proof` or `Impossible`
-    * updates which set the `verification_key` permission to `Proof_during_hard_fork` or `Impossible_during_hard_fork` that references a `txn_version` other than the current hard fork version
+    * updates which set the `verification_key` permission to `Proof` or `Impossible` with a `txn_version` other than the current hard fork version
 * Failed account updates
-    * updates which set the `verification_key` permission to `Proof_during_hard_fork` or `Impossible_during_hard_fork` that references a `txn_version` equal t the current hard fork version if `set_permission` does not allow it.
-    * updates that modify the `verification_key` using a `Signature` authorization when the `verification_key` permission is set to `Proof_during_hard_fork` or `Impossible_during_hard_fork`.
-    * updates that modify the `verification_key` when the `verification_key` permission is set to `Impossible_during_hard_fork` set to the current hard fork version.
-    * updates that modify `verification_key` using a `Signature` authorization when the `verification_key` permission is set to `Proof_during_hard_fork` or `Impossible_during_hard_fork` set to the current hard fork version
-    * updates that modify the `verification_key` permission using a `Signature` authorization whenever the `verification_key` permission is set to `Proof_during_hard_fork` or `Impossible_during_hard_fork` set to the current hard fork version when the `set_permission` is not `None`, `Either`, or `Signature`
+    * updates which modify the `verification_key` permission in a way that violates the `set_permission` setting while the account's verification key permission's `txn_version` is equal to the current hard fork version
+    * updates which modify the `verification_key` using `Signature` or `None` authorizations when the `verification_key` permission is set to `Proof` or `Impossible` while the account's verification key permission's `txn_version` is equal to the current hard fork version
+    * updates which modify the `verification_key` using a `Proof` authorization when the `verification_key` permission is set to `Impossible` while the account's verification key permission's `txn_version` is equal to the current hard fork version
 * Successful account updates
-    * updates which set the `verification_key` permission to `Proof_during_hard_fork` or `Impossible_during_hard_fork` that references a `txn_version` equal t the current hard fork version, given `set_permission` allows it.
-    * updates that modify the `verification_key` using a `Proof` authorization when the `verification_key` permission is set to `Proof_during_hard_fork` set to the current hard fork version.
-    * updates that modify the `verification_key` using a `Signature` authorization when the `verification_key` permission is set to `Proof_during_hard_fork` or `Impossible_during_hard_fork` set to an older hard fork version
-    * updates that modify the `verification_key` permission using a `Signature` authorization whenever the `verification_key` permission is set to `Proof_during_hard_fork` or `Impossible_during_hard_fork` set to an older hard fork version (even if `set_permission` disagrees)
+    * updates which set the `verification_key` permission to `Proof` or `Impossible` with a `txn_version` equal to the current hard fork version, given `set_permission` allows it
+    * updates that modify the `verification_key` using a `Proof` authorization when the `verification_key` permission is set to `Proof` while the account's verification key permission's `txn_version` is equal to the current hard fork version
+    * updates that modify the `verification_key` using a `Signature` authorization when the `verification_key` permission is set to `Proof` or `Impossible` while the account's verification key permission's `txn_version` is less than the current hard fork version
+    * updates that modify the `verification_key` permission using a `Signature` authorization whenever the `verification_key` permission is set to `Proof` or `Impossible` while the account's verification key permission's `txn_version` is less than the current hard fork version (even if `set_permission` disagrees)
 
 The new test cases in the hard fork integration tests will utilize 2 accounts in the ledger which we will name A and B. The new test cases are as follows:
 
 * Before the hard fork
-    * Attempt to set any account's `verification_key` permission to `Proof_during_hard_fork` for the wrong hard fork
-    * Attempt to set any account's `verification_key` permission to `Impossible_during_hard_fork` for the wrong hard fork
-    * Set A's `verification_key` permission to `Proof_during_hard_fork` for the current hard fork
-    * Set B's `verification_key` permission to `Impossible_during_hard_fork` for the current hard fork
+    * Attempt to set any account's `verification_key` permission to `Proof` for the wrong hard fork
+    * Attempt to set any account's `verification_key` permission to `Impossible` for the wrong hard fork
+    * Set A's `verification_key` permission to `Proof` for the current hard fork
+    * Set B's `verification_key` permission to `Impossible` for the current hard fork
     * Check that you can still update A's `verification_key` using the `Proof` authorization
     * Check that neither A nor B can have their `verification_key` updated using the `Signature` authorization
 * After the hard fork
@@ -79,3 +68,4 @@ The new test cases in the hard fork integration tests will utilize 2 accounts in
 
 * Should we require that any outdated permissions must be reset by the first account update sent to it?
     * At a glance, this seems to make sense, but it also seems unnecessarily restrictive.
+    * DECISION: it is unnecessary to enforce this, especially given we are tracking the verification key permission's `txn_version` separately from the `zkapp_version` of the underlying account
