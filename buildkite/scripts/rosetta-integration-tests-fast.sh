@@ -1,1 +1,1 @@
-buildkite/scripts/rosetta-integration-tests.sh 2
+buildkite/scripts/rosetta-integration-tests.sh 3
