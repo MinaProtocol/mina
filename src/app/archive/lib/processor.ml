@@ -2641,15 +2641,18 @@ module Accounts_created = struct
 end
 
 module Protocol_versions = struct
-  type t = { transaction : int; network : int } [@@deriving hlist, fields]
+  type t = { transaction : int; network : int; patch : int }
+  [@@deriving hlist, fields]
 
   let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist Caqti_type.[ int; int ]
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; int ]
 
   let table_name = "protocol_versions"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) ~transaction ~network =
-    let t = { transaction; network } in
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~transaction ~network
+      ~patch =
+    let t = { transaction; network; patch } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -2812,19 +2815,21 @@ module Block = struct
         let%bind protocol_version_id =
           let transaction = Protocol_version.transaction protocol_version in
           let network = Protocol_version.network protocol_version in
+          let patch = Protocol_version.patch protocol_version in
           Protocol_versions.add_if_doesn't_exist
             (module Conn)
-            ~transaction ~network
+            ~transaction ~network ~patch
         in
         let%bind proposed_protocol_version_id =
           Option.value_map proposed_protocol_version ~default:(return None)
             ~f:(fun ppv ->
               let transaction = Protocol_version.transaction ppv in
               let network = Protocol_version.network ppv in
+              let patch = Protocol_version.patch ppv in
               let%map id =
                 Protocol_versions.add_if_doesn't_exist
                   (module Conn)
-                  ~transaction ~network
+                  ~transaction ~network ~patch
               in
               Some id )
         in
@@ -3189,19 +3194,21 @@ module Block = struct
               Protocol_version.transaction block.protocol_version
             in
             let network = Protocol_version.network block.protocol_version in
+            let patch = Protocol_version.patch block.protocol_version in
             Protocol_versions.add_if_doesn't_exist
               (module Conn)
-              ~transaction ~network
+              ~transaction ~network ~patch
           in
           let%bind proposed_protocol_version_id =
             Option.value_map block.proposed_protocol_version
               ~default:(return None) ~f:(fun ppv ->
                 let transaction = Protocol_version.transaction ppv in
                 let network = Protocol_version.network ppv in
+                let patch = Protocol_version.patch ppv in
                 let%map id =
                   Protocol_versions.add_if_doesn't_exist
                     (module Conn)
-                    ~transaction ~network
+                    ~transaction ~network ~patch
                 in
                 Some id )
           in

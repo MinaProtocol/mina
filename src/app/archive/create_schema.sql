@@ -134,6 +134,7 @@ CREATE TABLE protocol_versions
 ( id               serial PRIMARY KEY
 , transaction      int    NOT NULL
 , network          int    NOT NULL
+, patch            int    NOT NULL
 , UNIQUE (transaction,network)
 );
 
