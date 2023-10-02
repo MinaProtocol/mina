@@ -1224,10 +1224,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ~protocol_transaction_version ~protocol_network_version
           in
           [%log info] "Daemon will use chain id %s" chain_id ;
-          [%log info]
-            "Daemon running protocol version %s, with implementation version %s"
-            Protocol_version.(to_string current)
-            Protocol_version.Protocol_impl.(to_string current) ;
+          [%log info] "Daemon running protocol version %s"
+            Protocol_version.(to_string current) ;
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout = Time.Span.of_sec 3.

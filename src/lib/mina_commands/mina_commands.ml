@@ -202,8 +202,6 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
      Receipt.Chain_hash.cons_zkapp_command_commitment fee_payer_index elt parent_hash *)
 end)
 
-[%%inject "compile_time_current_protocol_version", current_protocol_version]
-
 (* keep this code in sync with Mina_cli_entrypoint.chain_id *)
 let chain_id_inputs (t : Mina_lib.t) =
   (* these are the inputs to Blake2.digest_string in Mina.chain_id *)
@@ -217,9 +215,7 @@ let chain_id_inputs (t : Mina_lib.t) =
     Lazy.force precomputed_values.constraint_system_digests
     |> List.map ~f:(fun (_, digest) -> Md5.to_hex digest)
   in
-  let protocol_version =
-    Protocol_version.of_string_exn compile_time_current_protocol_version
-  in
+  let protocol_version = Protocol_version.current in
   let protocol_transaction_version =
     Protocol_version.transaction protocol_version
   in

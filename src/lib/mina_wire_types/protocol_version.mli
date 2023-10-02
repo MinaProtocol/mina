@@ -6,7 +6,7 @@ end
 
 module type Concrete = sig
   module V2 : sig
-    type t = { transaction : int; network : int }
+    type t = { transaction : int; network : int; patch : int }
   end
 end
 

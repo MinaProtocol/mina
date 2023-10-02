@@ -6,13 +6,13 @@ end
 
 module type Concrete = sig
   module V2 : sig
-    type t = { transaction : int; network : int }
+    type t = { transaction : int; network : int; patch : int }
   end
 end
 
 module M = struct
   module V2 = struct
-    type t = { transaction : int; network : int }
+    type t = { transaction : int; network : int; patch : int }
   end
 end
 

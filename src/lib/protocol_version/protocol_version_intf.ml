@@ -10,7 +10,9 @@ module type Full = sig
 
   val network : t -> int
 
-  val create : transaction:int -> network:int -> t
+  val patch : t -> int
+
+  val create : transaction:int -> network:int -> patch:int -> t
 
   val current : t
 
@@ -29,6 +31,4 @@ module type Full = sig
 
   (** useful when deserializing, could contain negative integers *)
   val is_valid : t -> bool
-
-  module Protocol_impl : module type of Protocol_impl
 end

@@ -276,7 +276,7 @@ let sample_block_sexp =
  (delta_transition_chain_proof
   (16014239194902465465595109881398070442140660435305474755749637269252225632503
    ()))
- (protocol_version ((transaction 1) (network 1)))
+ (protocol_version ((transaction 1) (network 1) (patch 0)))
  (proposed_protocol_version ())
  (accounts_accessed
   ((2
@@ -883,7 +883,8 @@ let sample_block_json =
     ],
     "protocol_version": {
       "transaction": 1,
-      "network": 1
+      "network": 1,
+      "patch": 0
     },
     "accounts_accessed": [
       [

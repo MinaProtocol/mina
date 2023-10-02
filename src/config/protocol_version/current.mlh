@@ -1,13 +1,4 @@
-(* transaction . network
-
-   where transaction >= 1 and
-         network >= 1
-*)
-[%%define current_protocol_version "3.1"]
-
-(* api . patch [ - tag ]
-
-   where api >= 1 and
-         patch >= 0
-*)
-[%%define current_protocol_implementation "2.0"]
+(* transaction >= 1, network >= 1, patch >= 0 *)
+[%%define protocol_version_transaction 3]
+[%%define protocol_version_network 1]
+[%%define protocol_version_patch 0]
