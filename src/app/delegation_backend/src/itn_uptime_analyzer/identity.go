@@ -99,7 +99,7 @@ func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext
 				}
 
 				if !IsIdentityInArray(identity.id, identities) {
-					identities.AddIdentity(identity)
+					identities = append(identities, identity)
 				}
 			}
 		}
@@ -118,7 +118,7 @@ func GetFullIdentity(pubKey string, ip string, graphqlPort string) Identity {
 		publicKey:   pubKey,
 		publicIp:    ip,
 		uptime:      "",
-		graphQLPort: graphqlPort,
+		graphQLPort: &graphqlPort,
 	}
 
 	return identity
@@ -138,9 +138,4 @@ func GetPartialIdentity(pubKey string, ip string) Identity {
 	}
 
 	return identity
-}
-
-// Adds an identity to the map
-func (identities []Identity) AddIdentity(identity Identity) {
-	identities = append(identities, identity)
 }

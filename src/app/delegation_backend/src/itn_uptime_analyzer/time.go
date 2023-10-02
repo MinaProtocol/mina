@@ -77,16 +77,6 @@ func IdentifyWeek(config AppConfig, client *sheets.Service, log *logging.ZapEven
 		log.Fatalf("Error parsing time: %v\n", err)
 	}
 
-	readRange := fmt.Sprintf("%s!A%d:Z%d", lastSheet.Properties.Title, 1, 1)
-	spId := config.AnalyzerOutputGsheetId
-
-	resp, err := client.Spreadsheets.Values.Get(spId, readRange).Do()
-	if err != nil {
-		log.Fatalf("Unable to retrieve data from sheet: %v\n", err)
-	}
-
-	var lastFilledColumn int = len(resp.Values[0]) - 1
-
 	currentDate := currentTime.Format("2006-01-02")
 	oneWeekLater := currentTime.Add(6 * 24 * time.Hour).Format("2006-01-02")
 	sheetTitle := strings.Join([]string{currentDate, oneWeekLater}, " - ")

@@ -67,11 +67,7 @@ func main() {
 
 	// Go over identities and calculate uptime
 	for _, identity := range identities {
-		if itn.IsExecutionIntervalEnough(currentTime, executionInterval) {
-			identity.GetUptimeOfTwoDays(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime, syncPeriod, executionInterval)
-		} else {
-			identity.GetUptimeOfToday(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime, syncPeriod, executionInterval)
-		}
+		identity.GetUptime(appCfg, sheetsService, awsctx, log, sheetTitle, currentTime, syncPeriod, executionInterval)
 
 		exactMatch, rowIndex, firstEmptyRow := identity.GetCell(appCfg, sheetsService, log, sheetTitle)
 

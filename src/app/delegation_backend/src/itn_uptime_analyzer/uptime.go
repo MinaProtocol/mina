@@ -29,7 +29,7 @@ func (identity Identity) GetUptime(config AppConfig, sheet *sheets.Service, ctx 
 	}
 
 	//Create a regex pattern for finding submissions matching identity pubkey
-	regex, err := regexp.Compile(strings.Join([]string{".*-", identity.publicKey, ".json"}))
+	regex, err := regexp.Compile(strings.Join([]string{".*-", identity.publicKey, ".json"}, ""))
 	if err != nil {
 		log.Fatalf("Error creating regular expression out of key: %v\n", err)
 	}
@@ -81,7 +81,7 @@ func (identity Identity) GetUptime(config AppConfig, sheet *sheets.Service, ctx 
 					}
 
 					if submissionDataToday.GraphqlControlPort != 0 {
-						if (identity.publicKey == submissionDataToday.Submitter.String()) && (identity.publicIp == submissionDataToday.RemoteAddr) && (identity.graphQLPort == strconv.Itoa(submissionDataToday.GraphqlControlPort)) {
+						if (identity.publicKey == submissionDataToday.Submitter.String()) && (identity.publicIp == submissionDataToday.RemoteAddr) && (*identity.graphQLPort == strconv.Itoa(submissionDataToday.GraphqlControlPort)) {
 							if lastSubmissionTimeString != "" {
 								lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
 								if err != nil {
@@ -106,6 +106,11 @@ func (identity Identity) GetUptime(config AppConfig, sheet *sheets.Service, ctx 
 						if (identity.publicKey == submissionDataToday.Submitter.String()) && (identity.publicIp == submissionDataToday.RemoteAddr) {
 							if lastSubmissionTimeString != "" {
 								lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
+								if err != nil {
+									log.Fatalf("Error parsing time: %v\n", err)
+								}
+
+								currentSubmissionTime, err := time.Parse(time.RFC3339, submissionDataToday.CreatedAt)
 								if err != nil {
 									log.Fatalf("Error parsing time: %v\n", err)
 								}
@@ -178,7 +183,7 @@ func (identity Identity) GetUptime(config AppConfig, sheet *sheets.Service, ctx 
 						}
 
 						if submissionDataYesterday.GraphqlControlPort != 0 {
-							if (identity.publicKey == submissionDataYesterday.Submitter.String()) && (identity.publicIp == submissionDataYesterday.RemoteAddr) && (identity.graphQLPort == strconv.Itoa(submissionDataYesterday.GraphqlControlPort)) {
+							if (identity.publicKey == submissionDataYesterday.Submitter.String()) && (identity.publicIp == submissionDataYesterday.RemoteAddr) && (*identity.graphQLPort == strconv.Itoa(submissionDataYesterday.GraphqlControlPort)) {
 								if lastSubmissionTimeString != "" {
 									lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionTimeString)
 									if err != nil {
@@ -207,6 +212,11 @@ func (identity Identity) GetUptime(config AppConfig, sheet *sheets.Service, ctx 
 										log.Fatalf("Error parsing time: %v\n", err)
 									}
 
+									currentSubmissionTime, err := time.Parse(time.RFC3339, submissionDataToday.CreatedAt)
+									if err != nil {
+										log.Fatalf("Error parsing time: %v\n", err)
+									}
+
 									if (lastSubmissionTimeString != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(time.Duration(syncPeriod-5) * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(time.Duration(syncPeriod+5) * time.Minute))) {
 										uptimeYesterday = append(uptimeYesterday, true)
 										lastSubmissionTimeString = submissionDataYesterday.CreatedAt
@@ -227,5 +237,5 @@ func (identity Identity) GetUptime(config AppConfig, sheet *sheets.Service, ctx 
 	if uptimePercent > 100.00 {
 		uptimePercent = 100.00
 	}
-	identity.uptime = strconv.FormatFloat(uptimePercent, "f", 2, 64)
+	identity.uptime = strconv.FormatFloat(uptimePercent, 'f', 2, 64)
 }

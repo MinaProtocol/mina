@@ -26,8 +26,8 @@ func (identity Identity) GetCell(config AppConfig, client *sheets.Service, log *
 		log.Fatalf("Unable to retrieve data from sheet: %v", err)
 	}
 
-	if identity.graphQLPort != "" {
-		identityString = strings.Join([]string{identity.publicKey, identity.publicIp, identity.graphQLPort}, "-")
+	if *identity.graphQLPort != "" {
+		identityString = strings.Join([]string{identity.publicKey, identity.publicIp, *identity.graphQLPort}, "-")
 	} else {
 		identityString = strings.Join([]string{identity.publicKey, identity.publicIp}, "-")
 	}
@@ -42,7 +42,8 @@ func (identity Identity) GetCell(config AppConfig, client *sheets.Service, log *
 
 	if !exactMatch {
 		for index, row := range resp.Values {
-			if strings.Split(row[0], "-")[0] == identity.publicKey {
+			str := fmt.Sprintf("%v\n", row[0]) // Had to use fmt package although it is buggy because type of row[0] might differ
+			if strings.Split(str, "-")[0] == identity.publicKey {
 				rowIndex = index + 1
 				exactMatch = false
 			}
@@ -59,8 +60,8 @@ func (identity Identity) AppendNext(config AppConfig, client *sheets.Service, lo
 	spId := config.AnalyzerOutputGsheetId
 	var identityString string
 
-	if identity.graphQLPort != "" {
-		identityString = strings.Join([]string{identity.publicKey, identity.publicIp, identity.graphQLPort}, "-")
+	if *identity.graphQLPort != "" {
+		identityString = strings.Join([]string{identity.publicKey, identity.publicIp, *identity.graphQLPort}, "-")
 	} else {
 		identityString = strings.Join([]string{identity.publicKey, identity.publicIp}, "-")
 	}
@@ -84,8 +85,8 @@ func (identity Identity) InsertBelow(config AppConfig, client *sheets.Service, l
 	spId := config.AnalyzerOutputGsheetId
 	var identityString string
 
-	if identity.graphQLPort != "" {
-		identityString = strings.Join([]string{identity.publicKey, identity.publicIp, identity.graphQLPort}, "-")
+	if *identity.graphQLPort != "" {
+		identityString = strings.Join([]string{identity.publicKey, identity.publicIp, *identity.graphQLPort}, "-")
 	} else {
 		identityString = strings.Join([]string{identity.publicKey, identity.publicIp}, "-")
 	}
@@ -116,7 +117,7 @@ func (identity Identity) AppendUptime(config AppConfig, client *sheets.Service, 
 
 	updateRange := fmt.Sprintf("%s!%s%d", sheetTitle, string(nextEmptyColumn+65), rowIndex)
 
-	cellValue := []interface{}{strings.Join([]string{identity.uptime, "%"})}
+	cellValue := []interface{}{strings.Join([]string{identity.uptime, "%"}, "")}
 
 	valueRange := sheets.ValueRange{
 		Values: [][]interface{}{cellValue},
