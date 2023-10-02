@@ -115,7 +115,7 @@ let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
       match%map
         try_with (fun () ->
             with_timeout (Time.Span.of_int_sec individual_test_timeout)
-            @@ U.check_zkapp_command_with_merges_exn ~global_slot ledger
+            @@ U.check_zkapp_command_with_merges_exn ~logger ~global_slot ledger
                  [ zkapp_command ] )
       with
       | Ok (`Result ()) ->
@@ -165,7 +165,7 @@ let generate_zkapp_commands_and_apply_them_freshly ~successful
     match%map
       try_with (fun () ->
           with_timeout (Time.Span.of_int_sec individual_test_timeout)
-          @@ U.check_zkapp_command_with_merges_exn ~global_slot ledger
+          @@ U.check_zkapp_command_with_merges_exn ~logger ~global_slot ledger
                [ zkapp_command ] )
     with
     | Ok (`Result ()) ->
@@ -213,7 +213,7 @@ let mk_invalid_test ~successful ~max_account_updates ~type_of_failure
     match%map
       try_with (fun () ->
           with_timeout (Time.Span.of_int_sec individual_test_timeout)
-          @@ U.check_zkapp_command_with_merges_exn
+          @@ U.check_zkapp_command_with_merges_exn ~logger
                ~expected_failure:expected_failure_status ledger
                [ zkapp_command ] ~global_slot )
     with
@@ -266,7 +266,7 @@ let test_timed_account ~successful ~max_account_updates ~individual_test_timeout
     match%map
       try_with (fun () ->
           with_timeout (Time.Span.of_int_sec individual_test_timeout)
-          @@ U.check_zkapp_command_with_merges_exn
+          @@ U.check_zkapp_command_with_merges_exn ~logger
                ~expected_failure:
                  ( Transaction_status.Failure.Source_minimum_balance_violation
                  , Pass_1 )
