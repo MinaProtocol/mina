@@ -26,6 +26,7 @@ configuration, automatically updated with:
 genesis ledger for the new network
 * updated values of `Fork_config`, i.e. previous state hash, previous
 blockchain length and previous global slot.
+* updated epoch data, in particular current and next epoch ledger and seed.
 
 **IMPORTANT**: as of now the `genesis_ledger_timestamp` is **not**
 being updated and must be manually set to the right value (which is at
