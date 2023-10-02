@@ -258,8 +258,6 @@ send_payments() {
 }
 send_payments &
 
-if [[ $STAGES_TO_RUN -gt 0 ]]; then
-
 # Fee payer cache creation
 echo "==================== PREPARE FEE PAYER CACHE ======================"
 zkapp_fee_payer_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key.pub)
