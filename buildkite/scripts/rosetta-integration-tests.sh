@@ -353,8 +353,6 @@ rosetta-cli configuration:validate ${ROSETTA_CONFIGURATION_FILE}
 echo "========================= ROSETTA CLI: CHECK:SPEC ==========================="
 rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
-
-# if override not provided, default to testnets DIR
 if [[ $MODE == "full" ]]; then
 
   echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
