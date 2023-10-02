@@ -16,19 +16,27 @@
 # See https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L222
 
 set -eo pipefail
+#! /bin/bash
 
-if [[ $# -ne 1 ]]; then
-    echo "Usage: $0 <test-stages-to-run>"
-    echo "  test-stages-to-run (int): Number of test stages to run"
-    echo "    1 - VALIDATE CONF FILE"
-    echo "    2 - CHECK:SPEC"
-    echo "    3 - CHECK:CONSTRUCTION and above"
-    echo "    4 - CHECK:DATA and above"
-    echo "    5 - CHECK:PERF and above"
-    exit 1
-fi
+# If yes then script will use zkapps operations when testing rosetta
+ENABLE_ZKAPPS_OPS=0
 
-STAGES_TO_RUN=$1
+# Defines scope of test. Currently supported are:
+# - minimal -> only quick checks (~5 mins)
+# - full -> all checks
+MODE="minimal"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --with-zkapps)
+      ENABLE_ZKAPPS_OPS=1
+      ;;
+    --mode=*)
+      MODE="${1#*=}"
+      ;;
+  esac
+  shift
+done
 
 export MINA_NETWORK=${MINA_NETWORK:=sandbox}
 export LOG_LEVEL="${LOG_LEVEL:=Info}"
@@ -250,6 +258,8 @@ send_payments() {
 }
 send_payments &
 
+if [[ $STAGES_TO_RUN -gt 0 ]]; then
+
 # Fee payer cache creation
 echo "==================== PREPARE FEE PAYER CACHE ======================"
 zkapp_fee_payer_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key.pub)
@@ -258,31 +268,35 @@ zkapp_fee_payer_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_
 mkdir -p /root/.cache/zkapp-cli/keys
 echo -e "{\n    \"privateKey\": \"${zkapp_fee_payer_privkey}\",\n    \"publicKey\": \"${zkapp_fee_payer_pk}\"\n}" >/root/.cache/zkapp-cli/keys/sandbox.json
 
-# Deploy zkApps
-echo "==================== DEPLOYING ZKAPPS ======================"
-echo "If this fails, it's likely due to incompatibility between the
-o1js and zkapp-cli versions in use."
-echo "NOTE: At the moment the daemon still has an old version of
-      snarkyjs pinned to it, so we cannot use the latest version of
-      zkapp-cli, which requires o1js. Once the pinned snarkyjs version
-      gets updated, this build will most likely fail and we will then
-      need to update the zkapp-cli version used here. This is
-      unfortunate, but necessary. Please delete this warning once it's
-      done." > /dev/stderr
 
-deploy_txs=()
-for zkapp_path in ${ZKAPP_PATH}/*/; do
-  zkapp_path=${zkapp_path%/}
-  zkapp=$(basename $zkapp_path)
-  echo "Deploying ${zkapp}..."
+# if override not provided, default to testnets DIR
+if [[ $ENABLE_ZKAPPS_OPS == 1 ]]; then
 
-  zkapp_account_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key.pub)
-  zkapp_account_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key" | sed -ne "s/Private key: //p")
+  # Deploy zkApps
+  echo "==================== DEPLOYING ZKAPPS ======================"
+  echo "If this fails, it's likely due to incompatibility between the
+  o1js and zkapp-cli versions in use."
+  echo "NOTE: At the moment the daemon still has an old version of
+        snarkyjs pinned to it, so we cannot use the latest version of
+        zkapp-cli, which requires o1js. Once the pinned snarkyjs version
+        gets updated, this build will most likely fail and we will then
+        need to update the zkapp-cli version used here. This is
+        unfortunate, but necessary. Please delete this warning once it's
+        done." > /dev/stderr
 
-  mkdir -p ${zkapp_path}/keys
-  echo -e "{\n    \"privateKey\": \"${zkapp_account_privkey}\",\n    \"publicKey\": \"${zkapp_account_pk}\"\n}" >"${zkapp_path}/keys/sandbox.json"
+  deploy_txs=()
+  for zkapp_path in ${ZKAPP_PATH}/*/; do
+    zkapp_path=${zkapp_path%/}
+    zkapp=$(basename $zkapp_path)
+    echo "Deploying ${zkapp}..."
 
-  cat <<EOF >"${zkapp_path}/config.json"
+    zkapp_account_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key.pub)
+    zkapp_account_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key" | sed -ne "s/Private key: //p")
+
+    mkdir -p ${zkapp_path}/keys
+    echo -e "{\n    \"privateKey\": \"${zkapp_account_privkey}\",\n    \"publicKey\": \"${zkapp_account_pk}\"\n}" >"${zkapp_path}/keys/sandbox.json"
+
+    cat <<EOF >"${zkapp_path}/config.json"
 {
   "version": 1,
   "networks": {
@@ -296,66 +310,62 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
   }
 }
 EOF
-  cd "$zkapp_path"
-  npm ci
-  npm run build
-  txn=$(zk deploy sandbox -y | sed -ne "s/https:\/\/berkeley.minaexplorer.com\/transaction\///p")
-  deploy_txs+=txn
-  cd -
-  echo "Done."
-done
+    cd "$zkapp_path"
+    npm ci
+    npm run build
+    txn=$(zk deploy sandbox -y | sed -ne "s/https:\/\/berkeley.minaexplorer.com\/transaction\///p")
+    deploy_txs+=txn
+    cd -
+    echo "Done."
+  done
 
-# TODO: wait until all zkApps deploy txns are included in a block
+  # TODO: wait until all zkApps deploy txns are included in a block
 
-next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"')
-curr_time=$(date +%s%N | cut -b1-13)
-sleep_time=$((($next_block_time - $curr_time) / 1000))
-echo "Sleeping for ${sleep_time}s until next block is created..."
-sleep ${sleep_time}
+  next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"')
+  curr_time=$(date +%s%N | cut -b1-13)
+  sleep_time=$((($next_block_time - $curr_time) / 1000))
+  echo "Sleeping for ${sleep_time}s until next block is created..."
+  sleep ${sleep_time}
 
-# Start calling zkApp methods
-echo "==================== INTERACTING WITH ZKAPPS ======================"
-RECEIVER_PK=$BLOCK_PRODUCER_PK
-for zkapp_path in ${ZKAPP_PATH}/*/; do
-  zkapp_path=${zkapp_path%/}
-  zkapp=$(basename $zkapp_path)
-  echo "Interacting with ${zkapp}..."
+  # Start calling zkApp methods
+  echo "==================== INTERACTING WITH ZKAPPS ======================"
+  RECEIVER_PK=$BLOCK_PRODUCER_PK
+  for zkapp_path in ${ZKAPP_PATH}/*/; do
+    zkapp_path=${zkapp_path%/}
+    zkapp=$(basename $zkapp_path)
+    echo "Interacting with ${zkapp}..."
 
-  cd "$zkapp_path"
-  ./interact.sh sandbox
-  cd -
-  echo "Done."
-done
+    cd "$zkapp_path"
+    ./interact.sh sandbox
+    cd -
+    echo "Done."
+  done
 
-next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"')
-curr_time=$(date +%s%N | cut -b1-13)
-sleep_time=$((($next_block_time - $curr_time) / 1000))
-echo "Sleeping for ${sleep_time}s until next block is created..."
-sleep ${sleep_time}
-
-
-if [[ $STAGES_TO_RUN -gt 0 ]]; then
-  # Mina Rosetta Checks (spec construction data perf)
-  echo "============ ROSETTA CLI: VALIDATE CONF FILE ${ROSETTA_CONFIGURATION_FILE} =============="
-  rosetta-cli configuration:validate ${ROSETTA_CONFIGURATION_FILE}
+  next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"')
+  curr_time=$(date +%s%N | cut -b1-13)
+  sleep_time=$((($next_block_time - $curr_time) / 1000))
+  echo "Sleeping for ${sleep_time}s until next block is created..."
+  sleep ${sleep_time}
 fi
 
-if [[ $STAGES_TO_RUN -gt 1 ]]; then
-  echo "========================= ROSETTA CLI: CHECK:SPEC ==========================="
-  rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
-fi
+# Mina Rosetta Checks (spec construction data perf)
+echo "============ ROSETTA CLI: VALIDATE CONF FILE ${ROSETTA_CONFIGURATION_FILE} =============="
+rosetta-cli configuration:validate ${ROSETTA_CONFIGURATION_FILE}
 
-if [[ $STAGES_TO_RUN -gt 2 ]]; then
+echo "========================= ROSETTA CLI: CHECK:SPEC ==========================="
+rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+
+
+# if override not provided, default to testnets DIR
+if [[ $MODE == "full" ]]; then
+
   echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
   rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
-fi
 
-if [[ $STAGES_TO_RUN -gt 3 ]]; then
   echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
   rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
-fi
 
-if [[ $STAGES_TO_RUN -gt 4 ]]; then
   echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
   echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
+
 fi
