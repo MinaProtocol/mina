@@ -37,6 +37,11 @@ needed and fed directly into a new node, running a different protocol
 version, using `--config-file` flag. As of the moment of writing this,
 `compatible` and `berkeley` branches' configuration files are
 compatible with each other (see: [PR #13768](https://github.com/MinaProtocol/mina/pull/13768)).
+Sadly since then that compatibility has been broken by [PR #14014](https://github.com/MinaProtocol/mina/pull/14014).
+We need to either port this change back to `compatible` or create a
+migration script which will adapt a `mainnet` config file to the
+format required by `berkeley`. The former solution would probably
+be better.
 
 The `fork_config` field has been added to GraphQL in [PR #13787](https://github.com/MinaProtocol/mina/pull/13787).
 
@@ -116,3 +121,10 @@ for some time still) unknown. This makes it hard to put it into the
 configuration in any automated fashion. Relying on personnel
 performing the hard fork to update it is far from ideal, but there
 seems to be no better solution available at the moment.
+
+Also epoch seeds from mainnet are incompatible with those on berkeley.
+When epoch ledgers are being exported from a compatible node and
+transferred into a berkeley node, the latter cannot load them, because
+Base58check fails to decode them. This is a problem we need to overcome
+or decide that we won't export the epoch ledgers and assume they're
+the same as the genesis ledger for the purpose of hard fork.
