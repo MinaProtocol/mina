@@ -20,7 +20,7 @@ let dirtyWhen = [
   S.strictlyStart (S.contains "src/lib"),
   S.strictlyStart (S.contains "src/app/archive"),
   S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall",
-  S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
+  S.exactly "buildkite/scripts/rosetta-integration-tests" "sh",
   S.exactly "buildkite/scripts/rosetta-integration-tests-fast.sh" "sh"
 ]
 
