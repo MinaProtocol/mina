@@ -2347,7 +2347,7 @@ module Queries = struct
                           protocol_state.previous_state_hash
                     ; previous_length =
                         Option.value ~default:global_slot previous_length
-                    ; previous_global_slot = global_slot
+                    ; genesis_slot = global_slot
                     }
                 in
                 let update =
@@ -2452,6 +2452,24 @@ module Queries = struct
         |> Deferred.Result.map_error ~f:Error.to_string_hum
         >>| Pickles.Verification_key.to_yojson >>| Yojson.Safe.to_basic )
 
+  let network_id =
+    field "networkID"
+      ~doc:
+        "The chain-agnostic identifier of the network this daemon is \
+         participating in"
+      ~typ:(non_null string)
+      ~args:Arg.[]
+      ~resolve:(fun { ctx = mina; _ } () ->
+        let configured_name =
+          let open Option.Let_syntax in
+          let cfg = Mina_lib.runtime_config mina in
+          let%bind ledger = cfg.ledger in
+          ledger.name
+        in
+        "mina:"
+        ^ Option.value ~default:Mina_compile_config.network_id configured_name
+        )
+
   let commands =
     [ sync_status
     ; daemon_status
@@ -2487,6 +2505,7 @@ module Queries = struct
     ; fork_config
     ; thread_graph
     ; blockchain_verification_key
+    ; network_id
     ]
 
   module Itn = struct
