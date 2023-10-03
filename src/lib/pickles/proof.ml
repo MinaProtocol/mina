@@ -116,7 +116,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
   let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
-  let lengths = Commitment_lengths.create ~of_int:Fn.id in
+  let lengths = Commitment_lengths.default in
   T
     { statement =
         { proof_state =
@@ -190,8 +190,8 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
           }
     ; prev_evals =
         (let e =
-           Plonk_types.Evals.map (Evaluation_lengths.create ~of_int:Fn.id)
-             ~f:(fun n -> (tick_arr n, tick_arr n))
+           Plonk_types.Evals.map Evaluation_lengths.default ~f:(fun n ->
+               (tick_arr n, tick_arr n) )
          in
          let ex =
            { Plonk_types.All_evals.With_public_input.public_input =

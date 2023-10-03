@@ -17,6 +17,9 @@
  *)
 type 'a t := 'a Pickles_types.Plonk_types.Evals.t
 
-(** [create of_int] creates a value of type ['a t] with default values set to
-    [1]. *)
-val create : of_int:(int -> 'a) -> 'a t
+(** [default] is a value of type [int t].
+
+    Its field values are set to [1] when they are non-optional, contains only
+    [1]-values when they are containers (like {!type:Pickles_types.Vector.t})
+    and are set to {!Option.None} when optional. *)
+val default : int t
