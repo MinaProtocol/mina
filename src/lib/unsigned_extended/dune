@@ -18,7 +18,6 @@
    ;; local libraries
    bignum_bigint
    snark_params
-   ppx_dhall_type
    test_util
    ppx_version.runtime
  )
