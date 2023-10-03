@@ -106,9 +106,9 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       ~hash:(Mina_block.Validated.state_hash transition) )
 
 let process_transition ~context:(module Context : CONTEXT) ~trust_system
-    ~verifier ~frontier ~catchup_scheduler ~processed_transition_writer
-    ~time_controller ~transition:cached_initially_validated_transition ~valid_cb
-    =
+    ~verifier ~get_completed_work ~frontier ~catchup_scheduler
+    ~processed_transition_writer ~time_controller
+    ~transition:cached_initially_validated_transition ~valid_cb =
   let open Context in
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
@@ -218,7 +218,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       cached_transform_deferred_result cached_initially_validated_transition
         ~transform_cached:(fun _ ->
           Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
-            ~verifier ~trust_system ~transition_receipt_time
+            ~verifier ~get_completed_work ~trust_system ~transition_receipt_time
             ~sender:(Some sender) ~parent:parent_breadcrumb
             ~transition:mostly_validated_transition
             (* TODO: Can we skip here? *) () )
@@ -261,7 +261,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
     Result.return result)
 
 let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
-    ~time_controller ~frontier
+    ~time_controller ~frontier ~get_completed_work
     ~(primary_transition_reader :
        ( [ `Block of
            ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -300,7 +300,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
   let process_transition =
     process_transition
       ~context:(module Context)
-      ~trust_system ~verifier ~frontier ~catchup_scheduler
+      ~get_completed_work ~trust_system ~verifier ~frontier ~catchup_scheduler
       ~processed_transition_writer ~time_controller
   in
   O1trace.background_thread "process_blocks" (fun () ->
@@ -514,8 +514,8 @@ let%test_module "Transition_handler.Processor tests" =
                 let cache = Unprocessed_transition_cache.create ~logger in
                 run
                   ~context:(module Context)
-                  ~time_controller ~verifier ~trust_system
-                  ~clean_up_catchup_scheduler ~frontier
+                  ~time_controller ~verifier ~get_completed_work:(Fn.const None)
+                  ~trust_system ~clean_up_catchup_scheduler ~frontier
                   ~primary_transition_reader:valid_transition_reader
                   ~producer_transition_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer

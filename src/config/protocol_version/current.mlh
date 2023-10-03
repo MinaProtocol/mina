@@ -1,1 +1,4 @@
-[%%define current_protocol_version "3.0.0"]
+(* transaction >= 1, network >= 1, patch >= 0 *)
+[%%define protocol_version_transaction 3]
+[%%define protocol_version_network 1]
+[%%define protocol_version_patch 0]

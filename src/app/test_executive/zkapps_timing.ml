@@ -44,10 +44,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_mina_nodes))
     in
     let block_producer_nodes =
       Network.block_producers network |> Core.String.Map.data
@@ -559,7 +559,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; preconditions =
             Some
               { network = Zkapp_precondition.Protocol_state.accept
-              ; account = Nonce (Account.Nonce.succ nonce)
+              ; account =
+                  Zkapp_precondition.Account.nonce (Account.Nonce.succ nonce)
               ; valid_while =
                   Check
                     Zkapp_precondition.Closed_interval.

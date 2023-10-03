@@ -14525,6 +14525,23 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "networkID",
+              "description":
+                "The chain-agnostic identifier of the network this daemon is participating in",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
