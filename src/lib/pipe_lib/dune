@@ -1,6 +1,6 @@
 (library
  (name pipe_lib)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (public_name pipe_lib)
  (libraries
    ;; opam libraries
