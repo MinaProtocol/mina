@@ -47,7 +47,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_mina_nodes))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
     in
     let block_producer_nodes =
       Network.block_producers network |> Core.String.Map.data
