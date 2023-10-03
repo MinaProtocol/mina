@@ -3,6 +3,7 @@
 open Core
 open Integration_test_lib
 open Mina_base
+open Mina_numbers
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -17,11 +18,80 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
+  module Balances = struct
+    module Balance = Currency.Balance
+
+    type balance = { liquid : Balance.t; locked : Balance.t } [@@deriving equal]
+
+    let mina = Balance.of_mina_int_exn
+
+    let nanomina = Balance.of_nanomina_int_exn
+
+    let make_unlocked liquid = { liquid; locked = Balance.zero }
+
+    let make ~liquid ~locked = { liquid; locked }
+
+    let of_graphql = function
+      | Graphql_requests.
+          { total_balance
+          ; liquid_balance_opt = None
+          ; locked_balance_opt = None
+          ; _
+          } ->
+          { liquid = total_balance; locked = Balance.zero }
+      | Graphql_requests.
+          { total_balance
+          ; liquid_balance_opt = Some liquid_balance
+          ; locked_balance_opt = Some locked_balance
+          ; _
+          } ->
+          [%test_eq: Balance.t] total_balance
+            Balance.(
+              Option.value_exn
+                (liquid_balance + Balance.to_amount locked_balance)) ;
+          { liquid = liquid_balance; locked = locked_balance }
+      | _ ->
+          failwith "Malformed GraphQL balance."
+
+    let total { liquid; locked } =
+      Option.value_exn Balance.(locked + Balance.to_amount liquid)
+
+    let assert_equal ?(name = "account") ~expected actual =
+      if equal_balance expected actual then Malleable_error.return ()
+      else
+        Malleable_error.hard_error_format
+          "%s has unexpected balances. Expected total balance to be %s, liquid \
+           balance to be %s, and locked balance to be %s"
+          name
+          (Balance.to_mina_string @@ total expected)
+          (Balance.to_mina_string expected.liquid)
+          (Balance.to_mina_string expected.locked)
+
+    let log ?global_slot ?(name = "account") logger balance =
+      match global_slot with
+      | Some gs ->
+          [%log info]
+            "At global slot since hard fork: %s; %s: total balance = %s, \
+             liquid balance = %s, locked balance = %s"
+            (Global_slot_since_hard_fork.to_string gs)
+            name
+            (Balance.to_mina_string @@ total balance)
+            (Balance.to_mina_string balance.liquid)
+            (Balance.to_mina_string balance.locked)
+      | None ->
+          [%log info]
+            "%s: total balance = %s, liquid balance = %s, locked balance = %s"
+            name
+            (Balance.to_mina_string @@ total balance)
+            (Balance.to_mina_string balance.liquid)
+            (Balance.to_mina_string balance.locked)
+  end
+
   let fork_config : Runtime_config.Fork_config.t =
     { previous_state_hash =
         "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
     ; previous_length = 300000
-    ; previous_global_slot = 500000
+    ; genesis_slot = 500000
     }
 
   let config =
@@ -65,6 +135,32 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         @ [ { account_name = "fish1"; balance = "100"; timing = Untimed }
           ; { account_name = "fish2"; balance = "100"; timing = Untimed }
           ; { account_name = "fish3"; balance = "1000"; timing = Untimed }
+            (* account fully vested before hard fork *)
+          ; { account_name = "timed1"
+            ; balance = "10000" (* balance in Mina *)
+            ; timing =
+                make_timing ~min_balance:10_000_000_000_000 ~cliff_time:100_000
+                  ~cliff_amount:1_000_000_000_000 ~vesting_period:1000
+                  ~vesting_increment:1_000_000_000_000
+            }
+            (* account starts vesting before hard fork, not fully vested after
+               cliff is before hard fork
+            *)
+          ; { account_name = "timed2"
+            ; balance = "10000" (* balance in Mina *)
+            ; timing =
+                make_timing ~min_balance:10_000_000_000_000 ~cliff_time:499_995
+                  ~cliff_amount:2_000_000_000_000 ~vesting_period:5
+                  ~vesting_increment:3_000_000_000_000
+            }
+            (* cliff at hard fork, vesting with each slot *)
+          ; { account_name = "timed3"
+            ; balance = "20000" (* balance in Mina *)
+            ; timing =
+                make_timing ~min_balance:20_000_000_000_000 ~cliff_time:500_000
+                  ~cliff_amount:2_000_000_000_000 ~vesting_period:1
+                  ~vesting_increment:1_000_000_000_000
+            }
           ]
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
@@ -106,6 +202,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let fish2 =
       Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2"
+    in
+    let timed1 =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "timed1"
+    in
+    let timed2 =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "timed2"
+    in
+    let timed3 =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "timed3"
     in
     let sender = fish2.keypair in
     let receiver = fish1.keypair in
@@ -193,6 +298,55 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       [%log info] "ZkApp transaction included in transition frontier"
     in
+    let get_account_balances (net_keypair : Network_keypair.t) =
+      let pk =
+        net_keypair.keypair.public_key |> Signature_lib.Public_key.compress
+      in
+      let account_id = Account_id.create pk Token_id.default in
+      let%map account_data =
+        Integration_test_lib.Graphql_requests.must_get_account_data
+          (Network.Node.get_ingress_uri node_a)
+          ~logger ~account_id
+      in
+      Balances.of_graphql account_data
+    in
+    let%bind () =
+      section "Check that timed1 account is fully vested"
+        (let%bind balance = get_account_balances timed1 in
+         Balances.log logger ~name:"timed1" balance ;
+         let expected = Balances.(make_unlocked @@ mina 10_000) in
+         Balances.assert_equal ~expected balance )
+    in
+    let%bind () =
+      section "Check that timed2 account is partially vested"
+        (let%bind global_slot_since_hard_fork =
+           Integration_test_lib.Graphql_requests
+           .must_get_global_slot_since_hard_fork ~logger
+             (Network.Node.get_ingress_uri node_b)
+         in
+         let%bind balance = get_account_balances timed2 in
+         Balances.log logger ~name:"timed2"
+           ~global_slot:global_slot_since_hard_fork balance ;
+         let total = 10_000_000_000_000 in
+         let locked =
+           let num_slots_since_cliff =
+             (* cliff at 499,995, hard fork at 500,000, so 5 slots before the fork *)
+             Mina_numbers.Global_slot_since_hard_fork.to_int
+               global_slot_since_hard_fork
+             + 5
+           in
+           let vesting_periods_since_cliff = num_slots_since_cliff / 5 in
+           (* min balance - cliff amount - vesting *)
+           let calc_balance =
+             10_000_000_000_000 - 2_000_000_000_000
+             - (vesting_periods_since_cliff * 3_000_000_000_000)
+           in
+           max calc_balance 0
+         in
+         let liquid = Balances.nanomina (total - locked) in
+         let locked = Balances.nanomina locked in
+         Balances.(assert_equal ~expected:(make ~liquid ~locked) balance) )
+    in
     let%bind () =
       section "send a single signed payment between 2 fish accounts"
         (let%bind { hash; _ } =
@@ -236,6 +390,33 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~test_config:config ~num_proofs:1 ) )
     in
     let%bind () =
+      section_hard "Check vesting of timed3 account"
+        (let%bind global_slot_since_hard_fork =
+           Integration_test_lib.Graphql_requests
+           .must_get_global_slot_since_hard_fork ~logger
+             (Network.Node.get_ingress_uri node_b)
+         in
+         let%bind balance = get_account_balances timed3 in
+         Balances.log logger ~name:"timed3"
+           ~global_slot:global_slot_since_hard_fork balance ;
+         let num_slots_since_fork_genesis =
+           Mina_numbers.Global_slot_since_hard_fork.to_int
+             global_slot_since_hard_fork
+         in
+         let total = 20_000_000_000_000 in
+         let locked =
+           let calc_balance =
+             (* min balance - cliff amount - vesting *)
+             20_000_000_000_000 - 2_000_000_000_000
+             - (num_slots_since_fork_genesis * 1_000_000_000_000)
+           in
+           max calc_balance 0
+         in
+         let liquid = Balances.nanomina (total - locked) in
+         let locked = Balances.nanomina locked in
+         Balances.(assert_equal ~expected:(make ~liquid ~locked) balance) )
+    in
+    let%bind () =
       section_hard "checking height, global slot since genesis in best chain"
         (let%bind blocks =
            Integration_test_lib.Graphql_requests.must_get_best_chain ~logger
@@ -267,7 +448,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                let bad_slot =
                  Mina_numbers.Global_slot_since_genesis.to_int
                    global_slot_since_genesis
-                 < fork_config.previous_global_slot
+                 < fork_config.genesis_slot
                in
                if bad_height && bad_slot then
                  Malleable_error.hard_error
@@ -283,14 +464,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                else return () )
          in
          [%log info]
-           "All blocks in best tip have a height and global slot since genesis \
-            derived from hard fork config" ;
+           "All %d blocks in best tip have a height and global slot since \
+            genesis derived from hard fork config"
+           (List.length blocks) ;
          return () )
     in
     section_hard "running replayer"
       (let%bind logs =
          Network.Node.run_replayer
-           ~start_slot_since_genesis:fork_config.previous_global_slot ~logger
+           ~start_slot_since_genesis:fork_config.genesis_slot ~logger
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )

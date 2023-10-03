@@ -128,9 +128,11 @@ let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
   txn_count := !txn_count + num_zkapps ;
   match result with
   | Ok (`Broadcasted, commands, []) ->
-      let zkapp_jsons = List.map commands ~f:User_command.to_yojson in
+      let zkapp_jsons =
+        List.map commands ~f:User_command.fee_payer_summary_json
+      in
       [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:[ ("zkapp_commands", `List zkapp_jsons) ]
+        ~metadata:[ ("summaries", `List zkapp_jsons) ]
         "Scheduled %d zkApps" num_zkapps ;
       Ok zkapp_commands
   | Ok (decision, valid_commands, invalid_commands) ->
@@ -144,7 +146,9 @@ let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
                 | `Not_broadcasted ->
                     "not_broadcasted" ) )
           ; ( "valid_zkapp_commands"
-            , `List (List.map ~f:User_command.to_yojson valid_commands) )
+            , `List
+                (List.map ~f:User_command.fee_payer_summary_json valid_commands)
+            )
           ; ( "invalid_zkapp_commands"
             , `List
                 (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
@@ -198,8 +202,7 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
      Receipt.Chain_hash.cons_zkapp_command_commitment fee_payer_index elt parent_hash *)
 end)
 
-[%%inject "compile_time_current_protocol_version", current_protocol_version]
-
+(* keep this code in sync with Mina_cli_entrypoint.chain_id *)
 let chain_id_inputs (t : Mina_lib.t) =
   (* these are the inputs to Blake2.digest_string in Mina.chain_id *)
   let config = Mina_lib.config t in
@@ -212,11 +215,16 @@ let chain_id_inputs (t : Mina_lib.t) =
     Lazy.force precomputed_values.constraint_system_digests
     |> List.map ~f:(fun (_, digest) -> Md5.to_hex digest)
   in
-  let protocol_major_version =
-    Protocol_version.of_string_exn compile_time_current_protocol_version
-    |> Protocol_version.major
+  let protocol_version = Protocol_version.current in
+  let protocol_transaction_version =
+    Protocol_version.transaction protocol_version
   in
-  (genesis_state_hash, genesis_constants, snark_keys, protocol_major_version)
+  let protocol_network_version = Protocol_version.network protocol_version in
+  ( genesis_state_hash
+  , genesis_constants
+  , snark_keys
+  , protocol_transaction_version
+  , protocol_network_version )
 
 let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
     (init_receipt, proof) =

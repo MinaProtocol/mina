@@ -711,22 +711,76 @@ module T = struct
     in
     (txns_with_witnesses, updated_stack1, updated_stack2, first_pass_ledger_end)
 
-  let check_completed_works ~logger ~verifier scan_state
+  (** Checks if the work has already been verified before by the snark pool logic *)
+  let work_already_verified_check ~get_completed_work jobs work =
+    let exception Statement_of_job_failure in
+    let statement_of_job_exn job =
+      Option.value_exn ~error:(Error.of_exn Statement_of_job_failure)
+      @@ Scan_state.statement_of_job job
+    in
+    try
+      let job_statements = One_or_two.map ~f:statement_of_job_exn jobs in
+      let work_statement = Transaction_snark_work.statement work in
+      let statements_match =
+        Transaction_snark_work.Statement.equal job_statements work_statement
+      in
+      let matching_completed_work_in_pool = get_completed_work work_statement in
+      match (statements_match, matching_completed_work_in_pool) with
+      | true, Some (completed_work : Transaction_snark_work.Checked.t) ->
+          let verified_proofs = completed_work.proofs in
+          let block_work_proofs = work.proofs in
+          if not @@ Fee.equal completed_work.fee work.fee then
+            Second "fee_not_equal"
+          else if not @@ Account.Key.equal completed_work.prover work.prover
+          then Second "prover_account_not_equal"
+          else if
+            not
+            @@ One_or_two.equal Ledger_proof.equal verified_proofs
+                 block_work_proofs
+          then Second "proof_not_equal"
+          else First ()
+      | _ ->
+          Second "not_found_in_pool"
+    with Statement_of_job_failure -> Second "statement_of_job_failure"
+
+  let check_completed_works ~logger ~verifier ~get_completed_work scan_state
       (completed_works : Transaction_snark_work.t list) =
     let work_count = List.length completed_works in
     let job_pairs =
       Scan_state.k_work_pairs_for_new_diff scan_state ~k:work_count
     in
+    let found_in_snarkpool_count = ref 0 in
+    let mismatch_reasons = String.Table.create ~size:10 () in
     let jmps =
       List.concat_map (List.zip_exn job_pairs completed_works)
         ~f:(fun (jobs, work) ->
-          let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-          One_or_two.(
-            to_list
-              (map (zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
-                   (job, message, proof) ) )) )
+          match work_already_verified_check ~get_completed_work jobs work with
+          | First () ->
+              incr found_in_snarkpool_count ;
+              []
+          | Second reason ->
+              String.Table.incr mismatch_reasons reason ;
+              let message =
+                Sok_message.create ~fee:work.fee ~prover:work.prover
+              in
+              One_or_two.(
+                to_list
+                  (map (zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
+                       (job, message, proof) ) )) )
     in
-    verify jmps ~logger ~verifier
+    [%log debug]
+      ~metadata:
+        [ ("completed_work_found_in_pool", `Int !found_in_snarkpool_count)
+        ; ( "non_skipped_reasons"
+          , `Assoc
+              (List.map (String.Table.to_alist mismatch_reasons)
+                 ~f:(fun (reason, count) -> (reason, `Int count)) ) )
+        ]
+      "check_completed_works: completed works found in SNARK pool: \
+       $completed_work_found_in_pool\n\
+      \      Non skipped work reasons: $non_skipped_reasons" ;
+    if List.is_empty jmps then Deferred.return (Ok ())
+    else verify jmps ~logger ~verifier
 
   (**The total fee excess caused by any diff should be zero. In the case where
      the slots are split into two partitions, total fee excess of the transactions
@@ -1163,8 +1217,9 @@ module T = struct
                  (Error.of_string "batch verification failed") ) ) )
 
   let apply ?skip_verification ~constraint_constants ~global_slot t
-      (witness : Staged_ledger_diff.t) ~logger ~verifier ~current_state_view
-      ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase =
+      ~get_completed_work (witness : Staged_ledger_diff.t) ~logger ~verifier
+      ~current_state_view ~state_and_body_hash ~coinbase_receiver
+      ~supercharge_coinbase =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
@@ -1175,7 +1230,8 @@ module T = struct
           | None ->
               [%log internal] "Check_completed_works"
                 ~metadata:[ ("work_count", `Int (List.length work)) ] ;
-              check_completed_works ~logger ~verifier t.scan_state work )
+              check_completed_works ~get_completed_work ~logger ~verifier
+                t.scan_state work )
     in
     [%log internal] "Prediff" ;
     let%bind prediff =
@@ -1994,23 +2050,26 @@ module T = struct
                               , `String
                                   "Snark fee insufficient to create snark \
                                    worker account" )
+                            ; ( "interrupt_get_completed_work_ids"
+                              , Transaction_snark_work.Statement.compact_json w
+                              )
                             ] ;
                         Stop (seq, count) )
                   | None ->
                       [%log debug]
                         ~metadata:
-                          [ ( "statement"
-                            , Transaction_snark_work.Statement.to_yojson w )
-                          ; ( "work_ids"
+                          [ ( "work_ids"
                             , Transaction_snark_work.Statement.compact_json w )
                           ]
                         !"Staged_ledger_diff creation: No snark work found for \
-                          $statement" ;
+                          $work_ids" ;
                       [%log internal] "@block_metadata"
                         ~metadata:
                           [ ("interrupt_get_completed_work_at", `Int count)
                           ; ( "interrupt_get_completed_work_reason"
                             , `String "Snark work for statement not found" )
+                          ; ( "interrupt_get_completed_work_ids"
+                            , Transaction_snark_work.Statement.compact_json w )
                           ] ;
                       Stop (seq, count) )
                 ~finish:Fn.id
@@ -2208,8 +2267,8 @@ let%test_module "staged ledger tests" =
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
           Sl.apply ~constraint_constants ~global_slot !sl diff' ~logger
-            ~verifier ~current_state_view ~state_and_body_hash
-            ~coinbase_receiver ~supercharge_coinbase
+            ~verifier ~get_completed_work:(Fn.const None) ~current_state_view
+            ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
         with
         | Ok x ->
             x
@@ -2759,14 +2818,14 @@ let%test_module "staged ledger tests" =
       assert (List.length cmds = num_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
-    let gen_zkapps ?failure ~num_zkapps zkapps_per_iter :
+    let gen_zkapps ?ledger_init_state ?failure ~num_zkapps zkapps_per_iter :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind zkapp_command_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators
-        .sequence_zkapp_command_with_ledger ~max_token_updates:1
-          ~length:num_zkapps ~vk ?failure ()
+        .sequence_zkapp_command_with_ledger ?ledger_init_state
+          ~max_token_updates:1 ~length:num_zkapps ~vk ?failure ()
       in
       let zkapps =
         List.map zkapp_command_and_fee_payer_keypairs ~f:(function
@@ -2828,7 +2887,8 @@ let%test_module "staged ledger tests" =
       let num_zkapps = transaction_capacity * iters in
       gen_zkapps ~num_zkapps (List.init iters ~f:(Fn.const None))
 
-    let gen_zkapps_below_capacity ?(extra_blocks = false) () :
+    let gen_zkapps_below_capacity ?ledger_init_state ?(extra_blocks = false) ()
+        :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
@@ -2843,7 +2903,8 @@ let%test_module "staged ledger tests" =
           (Int.gen_incl 1 ((transaction_capacity / 2) - 1))
       in
       let num_zkapps = List.fold zkapps_per_iter ~init:0 ~f:( + ) in
-      gen_zkapps ~num_zkapps (List.map ~f:Option.some zkapps_per_iter)
+      gen_zkapps ?ledger_init_state ~num_zkapps
+        (List.map ~f:Option.some zkapps_per_iter)
 
     (*Same as gen_at_capacity except that the number of iterations[iters] is
       the function of [extra_block_count] and is same for all generated values*)
@@ -2889,9 +2950,11 @@ let%test_module "staged ledger tests" =
 
     let gen_all_user_commands_below_capacity () =
       let open Quickcheck.Generator.Let_syntax in
-      let%bind ledger, zkapps, iters_zkapps = gen_zkapps_below_capacity () in
       let%bind ledger_init_state, cmds, iters_signed_commands =
         gen_below_capacity ()
+      in
+      let%bind ledger, zkapps, iters_zkapps =
+        gen_zkapps_below_capacity ~ledger_init_state ()
       in
       Ledger.apply_initial_ledger_state ledger ledger_init_state ;
       let iters = iters_zkapps @ iters_signed_commands in
@@ -3189,7 +3252,8 @@ let%test_module "staged ledger tests" =
                     in
                     let%bind apply_res =
                       Sl.apply ~constraint_constants ~global_slot !sl diff
-                        ~logger ~verifier ~current_state_view:current_view
+                        ~logger ~verifier ~get_completed_work:(Fn.const None)
+                        ~current_state_view:current_view
                         ~state_and_body_hash:
                           ( state_hashes.state_hash
                           , state_hashes.state_body_hash |> Option.value_exn )
@@ -4216,7 +4280,8 @@ let%test_module "staged ledger tests" =
                   match%map
                     Sl.apply ~constraint_constants ~global_slot !sl
                       (Staged_ledger_diff.forget diff)
-                      ~logger ~verifier ~current_state_view ~state_and_body_hash
+                      ~logger ~verifier ~get_completed_work:(Fn.const None)
+                      ~current_state_view ~state_and_body_hash
                       ~coinbase_receiver ~supercharge_coinbase:false
                   with
                   | Ok _x ->
@@ -4418,13 +4483,7 @@ let%test_module "staged ledger tests" =
                   | _ ->
                       failwith "expecting zkapp_command transaction" ) ) )
 
-    (* This test uses dummy verifiers, that's why it's not rejecting the problematic zkapp command
-       But this test is still useful, since it exercises the parts that doesn't requires a pickles
-       instance. Currently we only have the test with dummy verifier. The test that uses a full
-       verifier is still under working.
-    *)
-    let%test_unit "Invalid account_update_hash would not be rejected by dummy \
-                   verifier" =
+    let%test_unit "Invalid account_update_hash would be rejected" =
       let open Transaction_snark.For_tests in
       Quickcheck.test ~trials:1 gen_spec_keypair_and_global_slot
         ~f:(fun ({ init_ledger; specs }, zkapp_account_keypair, global_slot) ->
@@ -4504,15 +4563,31 @@ let%test_module "staged ledger tests" =
                           (Staged_ledger_diff.With_valid_signatures_and_proofs
                            .commands diff )
                         = 1 ) ;
+                      let%bind verifier_full =
+                        Verifier.create ~logger ~proof_level:Full
+                          ~constraint_constants ~conf_dir:None
+                          ~pids:
+                            (Child_processes.Termination.create_pid_table ())
+                          ()
+                      in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl
                           (Staged_ledger_diff.forget diff)
-                          ~logger ~verifier ~current_state_view
+                          ~get_completed_work:(Fn.const None) ~logger
+                          ~verifier:verifier_full ~current_state_view
                           ~state_and_body_hash ~coinbase_receiver
                           ~supercharge_coinbase:false
                       with
                       | Ok _ ->
-                          ()
+                          failwith "invalid block should be rejected"
                       | Error e ->
-                          failwith (Staged_ledger_error.to_string e) ) ) ) )
+                          if
+                            String.is_substring
+                              (Staged_ledger_error.to_string e)
+                              ~substring:"batch verification failed"
+                          then ()
+                          else
+                            failwith
+                              "block should be rejected because batch \
+                               verification failed" ) ) ) )
   end )
