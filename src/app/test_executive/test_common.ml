@@ -76,7 +76,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Malleable_error.hard_error_format
           "Node '%s' did not have a network keypair, if node is a block \
            producer this should not happen"
-          (Engine.Network.Node.id node)
+          (Engine.Network.Node.infra_id node)
 
   let check_common_prefixes ~tolerance ~logger chains =
     assert (List.length chains > 1) ;
@@ -139,8 +139,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* this check checks if every single peer in the network is connected to every other peer, in graph theory this network would be a complete graph.  this property will only hold true on small networks *)
     let check_peer_connected_to_all_others ~nodes_by_peer_id ~peer_id
         ~connected_peers =
-      let get_node_id p =
-        p |> String.Map.find_exn nodes_by_peer_id |> Engine.Network.Node.id
+      let get_node_infra_id p =
+        p
+        |> String.Map.find_exn nodes_by_peer_id
+        |> Engine.Network.Node.infra_id
       in
       let expected_peers =
         nodes_by_peer_id |> String.Map.keys
@@ -149,7 +151,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Malleable_error.List.iter expected_peers ~f:(fun p ->
           let error =
             Printf.sprintf "node %s (id=%s) is not connected to node %s (id=%s)"
-              (get_node_id peer_id) peer_id (get_node_id p) p
+              (get_node_infra_id peer_id)
+              peer_id (get_node_infra_id p) p
             |> Error.of_string
           in
           Malleable_error.ok_if_true

@@ -47,11 +47,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
-           (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes)) )
+          (Wait_condition.nodes_to_initialize
+             (Core.String.Map.data all_mina_nodes) ) )
     in
     let node_a =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
@@ -83,7 +84,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
        let%bind final_connectivity_data =
-         fetch_connectivity_data ~logger (Core.String.Map.data all_nodes)
+         fetch_connectivity_data ~logger (Core.String.Map.data all_mina_nodes)
        in
        assert_peers_completely_connected final_connectivity_data )
 end

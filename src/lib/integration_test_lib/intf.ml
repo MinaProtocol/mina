@@ -42,11 +42,18 @@ module Engine = struct
 
       val id : t -> string
 
+      val infra_id : t -> string
+
       val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t
 
       val stop : t -> unit Malleable_error.t
+
+      (** Returns true when [start] was most recently called, or false if
+          [stop] was more recent.
+      *)
+      val should_be_running : t -> bool
 
       val get_ingress_uri : t -> Uri.t
 
@@ -72,13 +79,15 @@ module Engine = struct
 
     val seeds : t -> Node.t Core.String.Map.t
 
-    val all_non_seed_pods : t -> Node.t Core.String.Map.t
+    val all_non_seed_nodes : t -> Node.t Core.String.Map.t
 
     val block_producers : t -> Node.t Core.String.Map.t
 
     val snark_coordinators : t -> Node.t Core.String.Map.t
 
     val archive_nodes : t -> Node.t Core.String.Map.t
+
+    val all_mina_nodes : t -> Node.t Core.String.Map.t
 
     val all_nodes : t -> Node.t Core.String.Map.t
 
@@ -262,6 +271,8 @@ module Dsl = struct
     val section : string -> unit Malleable_error.t -> unit Malleable_error.t
 
     val network_state : t -> Network_state.t
+
+    val event_router : t -> Event_router.t
 
     val wait_for : t -> Wait_condition.t -> unit Malleable_error.t
 
