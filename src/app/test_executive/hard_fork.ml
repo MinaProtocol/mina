@@ -3,6 +3,7 @@
 open Core
 open Integration_test_lib
 open Mina_base
+open Mina_numbers
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -17,11 +18,80 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
+  module Balances = struct
+    module Balance = Currency.Balance
+
+    type balance = { liquid : Balance.t; locked : Balance.t } [@@deriving equal]
+
+    let mina = Balance.of_mina_int_exn
+
+    let nanomina = Balance.of_nanomina_int_exn
+
+    let make_unlocked liquid = { liquid; locked = Balance.zero }
+
+    let make ~liquid ~locked = { liquid; locked }
+
+    let of_graphql = function
+      | Graphql_requests.
+          { total_balance
+          ; liquid_balance_opt = None
+          ; locked_balance_opt = None
+          ; _
+          } ->
+          { liquid = total_balance; locked = Balance.zero }
+      | Graphql_requests.
+          { total_balance
+          ; liquid_balance_opt = Some liquid_balance
+          ; locked_balance_opt = Some locked_balance
+          ; _
+          } ->
+          [%test_eq: Balance.t] total_balance
+            Balance.(
+              Option.value_exn
+                (liquid_balance + Balance.to_amount locked_balance)) ;
+          { liquid = liquid_balance; locked = locked_balance }
+      | _ ->
+          failwith "Malformed GraphQL balance."
+
+    let total { liquid; locked } =
+      Option.value_exn Balance.(locked + Balance.to_amount liquid)
+
+    let assert_equal ?(name = "account") ~expected actual =
+      if equal_balance expected actual then Malleable_error.return ()
+      else
+        Malleable_error.hard_error_format
+          "%s has unexpected balances. Expected total balance to be %s, liquid \
+           balance to be %s, and locked balance to be %s"
+          name
+          (Balance.to_mina_string @@ total expected)
+          (Balance.to_mina_string expected.liquid)
+          (Balance.to_mina_string expected.locked)
+
+    let log ?global_slot ?(name = "account") logger balance =
+      match global_slot with
+      | Some gs ->
+          [%log info]
+            "At global slot since hard fork: %s; %s: total balance = %s, \
+             liquid balance = %s, locked balance = %s"
+            (Global_slot_since_hard_fork.to_string gs)
+            name
+            (Balance.to_mina_string @@ total balance)
+            (Balance.to_mina_string balance.liquid)
+            (Balance.to_mina_string balance.locked)
+      | None ->
+          [%log info]
+            "%s: total balance = %s, liquid balance = %s, locked balance = %s"
+            name
+            (Balance.to_mina_string @@ total balance)
+            (Balance.to_mina_string balance.liquid)
+            (Balance.to_mina_string balance.locked)
+  end
+
   let fork_config : Runtime_config.Fork_config.t =
     { previous_state_hash =
         "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
     ; previous_length = 300000
-    ; previous_global_slot = 500000
+    ; genesis_slot = 500000
     }
 
   let config =
@@ -238,48 +308,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (Network.Node.get_ingress_uri node_a)
           ~logger ~account_id
       in
-      let total_balance =
-        Currency.Balance.to_nanomina_int account_data.total_balance
-      in
-      let liquid_balance =
-        Currency.Balance.to_nanomina_int
-          (Option.value_exn account_data.liquid_balance_opt)
-      in
-      let locked_balance =
-        Currency.Balance.to_nanomina_int
-          (Option.value_exn account_data.locked_balance_opt)
-      in
-      (total_balance, liquid_balance, locked_balance)
+      Balances.of_graphql account_data
     in
     let%bind () =
       section "Check that timed1 account is fully vested"
-        (let%bind total_balance, liquid_balance, locked_balance =
-           get_account_balances timed1
-         in
-         [%log info]
-           "timed1 total balance = %d, liquid balance = %d, locked balance = \
-            %d (in nanomina)"
-           total_balance liquid_balance locked_balance ;
-         let expected_total_balance = 10_000_000_000_000 in
-         let expected_locked_balance =
-           (* skip the calculation, it's vested way before the fork *)
-           0
-         in
-         let expected_liquid_balance =
-           expected_total_balance - expected_locked_balance
-         in
-         if
-           not
-             ( total_balance = expected_total_balance
-             && liquid_balance = expected_liquid_balance
-             && locked_balance = expected_locked_balance )
-         then
-           Malleable_error.hard_error_format
-             "timed1 account has unexpected balances. Expected total balance \
-              to be %d, liquid balance to be %d, and locked balance to be %d"
-             expected_total_balance expected_total_balance
-             expected_locked_balance
-         else return () )
+        (let%bind balance = get_account_balances timed1 in
+         Balances.log logger ~name:"timed1" balance ;
+         let expected = Balances.(make_unlocked @@ mina 10_000) in
+         Balances.assert_equal ~expected balance )
     in
     let%bind () =
       section "Check that timed2 account is partially vested"
@@ -288,17 +324,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            .must_get_global_slot_since_hard_fork ~logger
              (Network.Node.get_ingress_uri node_b)
          in
-         let%bind total_balance, liquid_balance, locked_balance =
-           get_account_balances timed2
-         in
-         [%log info]
-           "At global slot since hard fork %d, timed2 total balance = %d, \
-            liquid balance = %d, locked balance = %d (in nanomina)"
-           (Mina_numbers.Global_slot_since_hard_fork.to_int
-              global_slot_since_hard_fork )
-           total_balance liquid_balance locked_balance ;
-         let expected_total_balance = 10_000_000_000_000 in
-         let expected_locked_balance =
+         let%bind balance = get_account_balances timed2 in
+         Balances.log logger ~name:"timed2"
+           ~global_slot:global_slot_since_hard_fork balance ;
+         let total = 10_000_000_000_000 in
+         let locked =
            let num_slots_since_cliff =
              (* cliff at 499,995, hard fork at 500,000, so 5 slots before the fork *)
              Mina_numbers.Global_slot_since_hard_fork.to_int
@@ -313,21 +343,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            in
            max calc_balance 0
          in
-         let expected_liquid_balance =
-           expected_total_balance - expected_locked_balance
-         in
-         if
-           not
-             ( total_balance = expected_total_balance
-             && liquid_balance = expected_liquid_balance
-             && locked_balance = expected_locked_balance )
-         then
-           Malleable_error.hard_error_format
-             "timed2 account has unexpected balances. Expected total balance \
-              to be %d, liquid balance to be %d, and locked balance to be %d"
-             expected_total_balance expected_liquid_balance
-             expected_locked_balance
-         else return () )
+         let liquid = Balances.nanomina (total - locked) in
+         let locked = Balances.nanomina locked in
+         Balances.(assert_equal ~expected:(make ~liquid ~locked) balance) )
     in
     let%bind () =
       section "send a single signed payment between 2 fish accounts"
@@ -378,21 +396,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            .must_get_global_slot_since_hard_fork ~logger
              (Network.Node.get_ingress_uri node_b)
          in
-         let%bind total_balance, liquid_balance, locked_balance =
-           get_account_balances timed3
-         in
-         [%log info]
-           "At global slot since hard fork %d, timed3 total balance = %d, \
-            liquid balance = %d, locked balance = %d (in nanomina)"
-           (Mina_numbers.Global_slot_since_hard_fork.to_int
-              global_slot_since_hard_fork )
-           total_balance liquid_balance locked_balance ;
+         let%bind balance = get_account_balances timed3 in
+         Balances.log logger ~name:"timed3"
+           ~global_slot:global_slot_since_hard_fork balance ;
          let num_slots_since_fork_genesis =
            Mina_numbers.Global_slot_since_hard_fork.to_int
              global_slot_since_hard_fork
          in
-         let expected_total_balance = 20_000_000_000_000 in
-         let expected_locked_balance =
+         let total = 20_000_000_000_000 in
+         let locked =
            let calc_balance =
              (* min balance - cliff amount - vesting *)
              20_000_000_000_000 - 2_000_000_000_000
@@ -400,21 +412,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            in
            max calc_balance 0
          in
-         let expected_liquid_balance =
-           expected_total_balance - expected_locked_balance
-         in
-         if
-           not
-             ( total_balance = expected_total_balance
-             && liquid_balance = expected_liquid_balance
-             && locked_balance = expected_locked_balance )
-         then
-           Malleable_error.hard_error_format
-             "timed3 account has unexpected balances. Expected total balance \
-              to be %d, liquid balance to be %d, and locked balance to be %d"
-             expected_total_balance expected_total_balance
-             expected_locked_balance
-         else return () )
+         let liquid = Balances.nanomina (total - locked) in
+         let locked = Balances.nanomina locked in
+         Balances.(assert_equal ~expected:(make ~liquid ~locked) balance) )
     in
     let%bind () =
       section_hard "checking height, global slot since genesis in best chain"
@@ -448,7 +448,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                let bad_slot =
                  Mina_numbers.Global_slot_since_genesis.to_int
                    global_slot_since_genesis
-                 < fork_config.previous_global_slot
+                 < fork_config.genesis_slot
                in
                if bad_height && bad_slot then
                  Malleable_error.hard_error
@@ -472,7 +472,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "running replayer"
       (let%bind logs =
          Network.Node.run_replayer
-           ~start_slot_since_genesis:fork_config.previous_global_slot ~logger
+           ~start_slot_since_genesis:fork_config.genesis_slot ~logger
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )

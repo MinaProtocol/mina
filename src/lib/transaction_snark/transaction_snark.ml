@@ -4224,8 +4224,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ~default:Zkapp_precondition.Protocol_state.accept
             ; account =
                 ( if sender_is_the_same_as_fee_payer then
-                  Account_update.Account_precondition.Accept
-                else Nonce (Account.Nonce.succ sender_nonce) )
+                  Zkapp_precondition.Account.accept
+                else
+                  Zkapp_precondition.Account.nonce
+                    (Account.Nonce.succ sender_nonce) )
             ; valid_while =
                 Option.value_map preconditions
                   ~f:(fun { valid_while; _ } -> valid_while)
@@ -4318,7 +4320,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                         account =
                           Option.map preconditions ~f:(fun { account; _ } ->
                               account )
-                          |> Option.value ~default:Accept
+                          |> Option.value
+                               ~default:Zkapp_precondition.Account.accept
                       }
                   ; use_full_commitment = true
                   ; implicit_account_creation_fee = false
@@ -4362,7 +4365,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; actions = []
                 ; call_data = Field.zero
                 ; call_depth = 0
-                ; preconditions = { preconditions' with account = Accept }
+                ; preconditions =
+                    { preconditions' with
+                      account = Zkapp_precondition.Account.accept
+                    }
                 ; use_full_commitment
                 ; implicit_account_creation_fee = false
                 ; may_use_token = No
@@ -5020,7 +5026,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; call_depth = 0
             ; preconditions =
                 { network = protocol_state_predicate
-                ; account = Nonce (Account.Nonce.succ sender_nonce)
+                ; account =
+                    Zkapp_precondition.Account.nonce
+                      (Account.Nonce.succ sender_nonce)
                 ; valid_while = Ignore
                 }
             ; use_full_commitment = false
@@ -5044,7 +5052,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; call_depth = 0
             ; preconditions =
                 { network = protocol_state_predicate
-                ; account = Full Zkapp_precondition.Account.accept
+                ; account = Zkapp_precondition.Account.accept
                 ; valid_while = Ignore
                 }
             ; use_full_commitment = false

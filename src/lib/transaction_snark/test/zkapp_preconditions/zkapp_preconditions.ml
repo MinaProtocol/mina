@@ -40,7 +40,7 @@ let%test_module "Valid_while precondition tests" =
           Some
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
-            ; account = Account_update.Account_precondition.Accept
+            ; account = Zkapp_precondition.Account.accept
             ; valid_while = Check { lower = global_slot; upper = global_slot }
             }
       }
@@ -170,7 +170,7 @@ let%test_module "Protocol state precondition tests" =
                   { Account_update.Preconditions.network =
                       precondition_exact
                         (Mina_state.Protocol_state.Body.view state_body)
-                  ; account = Account_update.Account_precondition.Accept
+                  ; account = Zkapp_precondition.Account.accept
                   ; valid_while = Ignore
                   }
             }
@@ -212,7 +212,7 @@ let%test_module "Protocol state precondition tests" =
             ; preconditions =
                 Some
                   { Account_update.Preconditions.network = network_precondition
-                  ; account = Account_update.Account_precondition.Accept
+                  ; account = Zkapp_precondition.Account.accept
                   ; valid_while = Ignore
                   }
             }
@@ -287,7 +287,9 @@ let%test_module "Protocol state precondition tests" =
                         ; preconditions =
                             { Account_update.Preconditions.network =
                                 invalid_network_precondition
-                            ; account = Nonce (Account.Nonce.succ sender_nonce)
+                            ; account =
+                                Zkapp_precondition.Account.nonce
+                                  (Account.Nonce.succ sender_nonce)
                             ; valid_while = Ignore
                             }
                         ; use_full_commitment = false
@@ -320,8 +322,7 @@ let%test_module "Protocol state precondition tests" =
                         ; preconditions =
                             { Account_update.Preconditions.network =
                                 invalid_network_precondition
-                            ; account =
-                                Account_update.Account_precondition.Accept
+                            ; account = Zkapp_precondition.Account.accept
                             ; valid_while = Ignore
                             }
                         ; use_full_commitment = true
@@ -482,7 +483,7 @@ let%test_module "Account precondition tests" =
         ; is_new
         }
       in
-      Account_update.Account_precondition.Full predicate_account
+      predicate_account
 
     let%test_unit "exact account predicate" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -604,16 +605,15 @@ let%test_module "Account precondition tests" =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
             Ignore )
       in
-      Full
-        { balance = Ignore
-        ; nonce = Ignore
-        ; receipt_chain_hash = Ignore
-        ; delegate = Check pk
-        ; state
-        ; action_state = Ignore
-        ; proved_state = Ignore
-        ; is_new = Check true
-        }
+      { balance = Ignore
+      ; nonce = Ignore
+      ; receipt_chain_hash = Ignore
+      ; delegate = Check pk
+      ; state
+      ; action_state = Ignore
+      ; proved_state = Ignore
+      ; is_new = Check true
+      }
 
     let add_account_precondition ~at precondition account_updates =
       Zkapp_command.Call_forest.mapi account_updates
@@ -876,7 +876,9 @@ let%test_module "Account precondition tests" =
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
-                        ; account = Nonce (Account.Nonce.succ sender_nonce)
+                        ; account =
+                            Zkapp_precondition.Account.nonce
+                              (Account.Nonce.succ sender_nonce)
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
@@ -907,7 +909,7 @@ let%test_module "Account precondition tests" =
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
-                        ; account = Account_update.Account_precondition.Accept
+                        ; account = Zkapp_precondition.Account.accept
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = true

@@ -25,8 +25,8 @@ module Stable : sig
       ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
-      ; protocol_version : Protocol_version.Stable.V1.t
-      ; proposed_protocol_version : Protocol_version.Stable.V1.t option
+      ; protocol_version : Protocol_version.Stable.V2.t
+      ; proposed_protocol_version : Protocol_version.Stable.V2.t option
       ; accounts_accessed : (int * Account.Stable.V2.t) list
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
