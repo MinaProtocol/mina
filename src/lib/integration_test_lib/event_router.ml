@@ -73,7 +73,7 @@ module Make (Engine : Intf.Engine.S) () :
            [%log debug] "Dispatching event $event for $node"
              ~metadata:
                [ ("event", Event_type.event_to_yojson event)
-               ; ("node", `String (Node.id node))
+               ; ("node", `String (Node.infra_id node))
                ] ;
            dispatch_event handlers node event ) ) ;
     { logger; handlers }
