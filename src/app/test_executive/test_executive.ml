@@ -367,9 +367,9 @@ let main inputs =
         [%log info] "Starting the daemons within the pods" ;
         let start_print (node : Engine.Network.Node.t) =
           let open Malleable_error.Let_syntax in
-          [%log info] "starting %s ..." (Engine.Network.Node.id node) ;
+          [%log info] "starting %s ..." (Engine.Network.Node.infra_id node) ;
           let%bind res = Engine.Network.Node.start ~fresh_state:false node in
-          [%log info] "%s started" (Engine.Network.Node.id node) ;
+          [%log info] "%s started" (Engine.Network.Node.infra_id node) ;
           Malleable_error.return res
         in
         let seed_nodes =

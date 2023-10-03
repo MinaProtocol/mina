@@ -58,12 +58,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "short bootstrap"
         (let%bind () = Node.stop node_c in
          [%log info] "%s stopped, will now wait for blocks to be produced"
-           (Node.id node_c) ;
+           (Node.infra_id node_c) ;
          let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 2) in
          let%bind () = Node.start ~fresh_state:true node_c in
          [%log info]
            "%s started again, will now wait for this node to initialize"
-           (Node.id node_c) ;
+           (Node.infra_id node_c) ;
          let%bind () = wait_for t (Wait_condition.node_to_initialize node_c) in
          wait_for t
            ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]

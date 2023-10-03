@@ -455,7 +455,6 @@ module For_tests = struct
           ~blockchain_state:next_blockchain_state ~consensus_state
           ~constants:(Protocol_state.constants previous_protocol_state)
       in
-      Protocol_version.(set_current zero) ;
       let next_block =
         let header =
           Mina_block.Header.create ~protocol_state

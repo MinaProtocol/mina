@@ -818,7 +818,7 @@ module Network_manager = struct
     in
     let nodes_to_string =
       Fn.compose (String.concat ~sep:", ")
-        (List.map ~f:Kubernetes_network.Node.id)
+        (List.map ~f:Kubernetes_network.Node.infra_id)
     in
     [%log info] "Network deployed" ;
     [%log info] "testnet namespace: %s" t.namespace ;
