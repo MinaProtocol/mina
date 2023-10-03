@@ -31,7 +31,7 @@
           "node_id": "string",
           "fresh_state": "bool"
         },
-        "command": "MINIMINA node start {{fresh_state}} --network-id {{network_id}} --node-id {{node_id}}"
+        "command": "MINIMINA node start {{fresh_state}} --network-id {{network_id}} --node-id {{node_id}} --import-accounts"
       },
       {
         "name": "stop_node",
