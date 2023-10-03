@@ -42,7 +42,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ ( "peers"
           , `List
               (List.map (Core.String.Map.data all_mina_nodes) ~f:(fun n ->
-                   `String (Node.id n) ) ) )
+                   `String (Node.infra_id n) ) ) )
         ] ;
     let node_a =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
@@ -173,7 +173,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "short bootstrap"
         (let%bind () = Node.stop node_c in
          [%log info] "%s stopped, will now wait for blocks to be produced"
-           (Node.id node_c) ;
+           (Node.infra_id node_c) ;
          let%bind () =
            wait_for t
              ( Wait_condition.blocks_to_be_produced 1
@@ -185,7 +185,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind () = Node.start ~fresh_state:true node_c in
          [%log info]
            "%s started again, will now wait for this node to initialize"
-           (Node.id node_c) ;
+           (Node.infra_id node_c) ;
          (* we've witnessed the loading of the node_c frontier on initialization
             so the event here must be the frontier loading on the node_c restart
          *)

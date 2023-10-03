@@ -106,7 +106,7 @@ module Make
                 ] ;
             update ~f:(fun state ->
                 [%log debug] "handling block production from $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 if block_produced.block_height > state.block_height then
                   let snarked_ledgers_generated =
                     if block_produced.snarked_ledger_generated then 1 else 0
@@ -142,7 +142,7 @@ module Make
                application event" ;
             update ~f:(fun state ->
                 [%log debug] "handling frontier diff application of $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 Option.value_map diff_application.best_tip_changed
                   ~default:state ~f:(fun new_best_tip ->
                     let best_tips_by_node' =
@@ -167,11 +167,11 @@ module Make
                             | Some state ->
                                 state
                           in
-                          [%log debug] "GOSSIP RECEIVED by $node"
-                            ~metadata:[ ("node", `String (Node.id node)) ] ;
-                          [%log debug] "GOSSIP RECEIVED received event: $event"
+                          [%log debug]
+                            "GOSSIP RECEIVED node: $node.  event: $event"
                             ~metadata:
-                              [ ( "event"
+                              [ ("node", `String (Node.infra_id node))
+                              ; ( "event"
                                 , Event_type.event_to_yojson
                                     (Event_type.Event
                                        (event_type, gossip_with_direction) ) )
@@ -204,7 +204,7 @@ module Make
             update ~f:(fun state ->
                 [%log debug]
                   "Updating network state with initialization event of $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 let node_initialization' =
                   String.Map.set state.node_initialization ~key:(Node.id node)
                     ~data:true
@@ -288,7 +288,7 @@ module Make
                 [%log debug]
                   "Updating network state with event of $node being stopped \
                    deliberately"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
 
                 let node_initialization' =
                   String.Map.set state.node_initialization ~key:(Node.id node)
@@ -414,7 +414,7 @@ module Make
             update ~f:(fun state ->
                 [%log debug]
                   "Updating network state with Breadcrumb added to $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 let blocks_seen_by_node' =
                   String.Map.update state.blocks_seen_by_node (Node.id node)
                     ~f:(fun block_set ->
