@@ -2,7 +2,7 @@
  (name work_selector)
  (public_name work_selector)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    bin_prot.shape
@@ -40,7 +40,8 @@
    mina_metrics
    transition_frontier_extensions
    mina_ledger
-   ppx_version.runtime)
+   ppx_version.runtime
+   o1trace)
  (preprocess
   (pps ppx_mina ppx_version ppx_assert ppx_base ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot
        ppx_custom_printf ppx_inline_test ppx_optcomp))

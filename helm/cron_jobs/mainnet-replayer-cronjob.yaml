@@ -35,7 +35,7 @@ spec:
                ARCHIVE_SQL=$(basename $ARCHIVE_DUMP_URI .tar.gz);
                echo "Getting archive dump" $ARCHIVE_DUMP_URI;
                gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $ARCHIVE_DUMP_URI . ;
-               MOST_RECENT_CHECKPOINT_URI=$(gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json ls gs://mainnet-replayer-checkpoints/replayer-checkpoint-*.json | sort -r | head -n 1);
+               MOST_RECENT_CHECKPOINT_URI=$(gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json ls gs://mainnet-replayer-checkpoints/mainnet-replayer-checkpoint-*.json | sort -r | head -n 1);
                MOST_RECENT_CHECKPOINT=$(basename $MOST_RECENT_CHECKPOINT_URI);
                echo "Getting replayer checkpoint file" $MOST_RECENT_CHECKPOINT;
                gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $MOST_RECENT_CHECKPOINT_URI . ;
@@ -57,7 +57,7 @@ spec:
                rm -f $MOST_RECENT_CHECKPOINT;
                DISK_CHECKPOINT=$(ls -t replayer-checkpoint*.json | head -n 1);
                DATE=$(date +%F);
-               TODAY_CHECKPOINT=replayer-checkpoint-$DATE.json;
+               TODAY_CHECKPOINT=mainnet-replayer-checkpoint-$DATE.json;
                mv $DISK_CHECKPOINT $TODAY_CHECKPOINT;
                echo "Uploading checkpoint file" $TODAY_CHECKPOINT;
                gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $TODAY_CHECKPOINT gs://mainnet-replayer-checkpoints/$TODAY_CHECKPOINT;
@@ -65,7 +65,7 @@ spec:
                grep Error replayer.log;
                HAVE_ERRORS=$?;
                if [ $HAVE_ERRORS -eq 0 ];
-                 then REPLAYER_ERRORS=replayer_errors_${DATE};
+                 then REPLAYER_ERRORS=mainnet-replayer_errors_${DATE};
                  echo "The replayer found errors, uploading log" $REPLAYER_ERRORS;
                  mv replayer.log $REPLAYER_ERRORS;
                  gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $REPLAYER_ERRORS gs://mainnet-replayer-checkpoints/$REPLAYER_ERRORS;
@@ -73,7 +73,7 @@ spec:
             env:
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: gcr.io/o1labs-192920/mina-rosetta:1.4.0beta2-fix-replayer-start-ledger-hash-2627643-bullseye
+            image: gcr.io/o1labs-192920/mina-rosetta:1.4.0beta2-fix-replayer-not-orphaned-slot-5827016-bullseye
             imagePullPolicy: IfNotPresent
             name: mainnet-replayer-cronjob
             resources:

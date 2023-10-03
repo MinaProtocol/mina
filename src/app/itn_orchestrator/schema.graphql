@@ -99,6 +99,15 @@ type mutation {
     """Greatest log ID to be deleted"""
     endLogId: Int!
   ): String!
+
+  """Stop the Mina daemon"""
+  stopDaemon(
+    """Whether to remove saved configuration data (default false)"""
+    cleanConfig: Boolean
+
+    """Seconds to delay before stopping daemon (minimum 5)"""
+    delaySeconds: Int
+  ): String!
 }
 
 """Network identifiers for another protocol participant"""
@@ -189,6 +198,12 @@ input ZkappCommandsDetails {
 
   """Minimum balance change"""
   minBalanceChange: CurrencyAmount!
+
+  """Minimum new zkapp balance"""
+  minNewZkappBalance: CurrencyAmount!
+
+  """Maximum new zkapp balance"""
+  maxNewZkappBalance: CurrencyAmount!
 
   """Disable the precondition in account updates"""
   noPrecondition: Boolean!

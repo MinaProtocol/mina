@@ -2,7 +2,7 @@
  (name transaction_snark)
  (public_name transaction_snark)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    ppx_inline_test.config
@@ -32,6 +32,7 @@
    snarky_integer
    pickles.backend
    signature_lib
+   mina_signature_kind
    genesis_constants
    currency
    random_oracle
@@ -64,6 +65,7 @@
    mina_base.util
    ppx_version.runtime
    logger
+   zkapp_command_builder
  )
  (preprocess
   (pps ppx_snarky ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))

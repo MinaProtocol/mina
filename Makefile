@@ -67,7 +67,9 @@ endif
 ocaml_checks: ocaml_version ocaml_word_size check_opam_switch
 
 libp2p_helper:
+ifeq (, $(MINA_LIBP2P_HELPER_PATH))
 	make -C src/app/libp2p_helper
+endif
 
 genesis_ledger: ocaml_checks
 	$(info Building runtime_genesis_ledger)
@@ -260,9 +262,6 @@ deb_optimized:
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
-test_executive_deb:
-	./scripts/rebuild_test_executive_deb.sh
-
 build_pv_keys: ocaml_checks
 	$(info Building keys)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
@@ -272,9 +271,6 @@ build_or_download_pv_keys: ocaml_checks
 	$(info Building keys)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
 	$(info Keys built)
-
-publish_deb:
-	@./scripts/publish-deb.sh
 
 publish_debs:
 	@./buildkite/scripts/publish-deb.sh

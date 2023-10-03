@@ -3,7 +3,7 @@
  (public_name blake2)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_compare ppx_deriving_yojson))
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    base.base_internalhash_types

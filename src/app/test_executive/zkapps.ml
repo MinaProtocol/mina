@@ -136,7 +136,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Wait for nodes to initialize"
         (wait_for t
            ( Wait_condition.nodes_to_initialize
-           @@ (Network.all_nodes network |> Core.String.Map.data) ) )
+           @@ (Network.all_mina_nodes network |> Core.String.Map.data) ) )
     in
     let node =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
@@ -154,6 +154,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let zkapp_keypairs =
       List.init num_zkapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
     in
+    let single_zkapp_keypair = List.hd_exn zkapp_keypairs in
     let zkapp_account_ids =
       List.map zkapp_keypairs ~f:(fun zkapp_keypair ->
           Account_id.create
@@ -242,7 +243,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                       , zkapp_command_invalid_nonce
                       , zkapp_command_insufficient_funds
                       , zkapp_command_insufficient_replace_fee
-                      , zkapp_command_insufficient_fee ) =
+                      , zkapp_command_insufficient_fee
+                      , zkapp_command_cross_network_replay ) =
       let amount = Currency.Amount.zero in
       let nonce = Account.Nonce.of_int 1 in
       let memo =
@@ -327,7 +329,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Transaction_snark.For_tests.update_states ~constraint_constants
           spec_insufficient_replace_fee
       in
-      let%map.Deferred zkapp_command_insufficient_fee =
+      let%bind.Deferred zkapp_command_insufficient_fee =
         let spec_insufficient_fee :
             Transaction_snark.For_tests.Update_states_spec.t =
           { zkapp_command_spec with
@@ -337,12 +339,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Transaction_snark.For_tests.update_states ~constraint_constants
           spec_insufficient_fee
       in
+
+      let%map.Deferred zkapp_command_cross_network_replay =
+        let spec : Transaction_snark.For_tests.Single_account_update_spec.t =
+          { fee
+          ; fee_payer = (fish2_kp, nonce)
+          ; zkapp_account_keypair = single_zkapp_keypair
+          ; memo
+          ; update = snapp_update
+          ; call_data = Snark_params.Tick.Field.zero
+          ; events = []
+          ; actions = []
+          }
+        in
+        Transaction_snark.For_tests.single_account_update
+          ~chain:Mina_signature_kind.(Other_network "Invalid")
+          ~constraint_constants spec
+      in
       ( snapp_update
       , zkapp_command_update_all
       , zkapp_command_invalid_nonce
       , zkapp_command_insufficient_funds
       , zkapp_command_insufficient_replace_fee
-      , zkapp_command_insufficient_fee )
+      , zkapp_command_insufficient_fee
+      , zkapp_command_cross_network_replay )
     in
     let zkapp_command_invalid_signature =
       let p = zkapp_command_update_all in
@@ -733,6 +753,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         )
     in
     let%bind () =
+      section_hard "Send a zkapp with a different chain id"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_cross_network_replay "Invalid_proof" )
+    in
+    let%bind () =
       section_hard "Send a zkapp with an insufficient fee"
         (send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri node)
@@ -749,7 +775,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a zkapp with an invalid proof"
         (send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri node)
-           zkapp_command_invalid_proof "Verification_failed" )
+           zkapp_command_invalid_proof "Invalid_proof" )
     in
     let%bind () =
       section_hard "Send a zkapp with an insufficient replace fee"
@@ -774,7 +800,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a zkApp transaction with an invalid signature"
         (send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri node)
-           zkapp_command_invalid_signature "Verification_failed" )
+           zkapp_command_invalid_signature "Invalid_signature" )
     in
     let%bind () =
       section_hard "Send a zkApp transaction with a nonexistent fee payer"

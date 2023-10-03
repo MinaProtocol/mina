@@ -313,6 +313,7 @@ struct
           `Statement_not_referenced
 
       let verify_and_act t ~work ~sender =
+        let open Intf.Verification_error in
         let statements, priced_proof = work in
         let { Priced_proof.proof = proofs; fee = { prover; fee } } =
           priced_proof
@@ -346,11 +347,11 @@ struct
         let message = Mina_base.Sok_message.create ~fee ~prover in
         let verify proofs =
           let open Deferred.Let_syntax in
-          let%bind statement_check =
+          let statement_check () =
             One_or_two.Deferred_result.map proofs ~f:(fun (p, s) ->
                 let proof_statement = Ledger_proof.statement p in
                 if Transaction_snark.Statement.( = ) proof_statement s then
-                  Deferred.Or_error.ok_unit
+                  Deferred.Result.return ()
                 else
                   let e = Error.of_string "Statement and proof do not match" in
                   if is_local then
@@ -360,7 +361,7 @@ struct
                         %{sexp: Transaction_snark.Statement.t}"
                       proof_statement s ;
                   let%map () = log_and_punish s e in
-                  Error e )
+                  Error (Invalid e) )
           in
           let work = One_or_two.map proofs ~f:snd in
           let account_opt =
@@ -385,14 +386,15 @@ struct
             && Mina_base.Account.has_permission
                  ~control:Mina_base.Control.Tag.None_given ~to_:`Receive account
           in
+          let invalid s = Deferred.Result.fail @@ Invalid (Error.of_string s) in
           if
             not (fee_is_sufficient t ~fee ~account_exists:prover_account_exists)
           then (
             [%log' debug t.logger]
               "Snark work did not have sufficient fee to create prover $prover \
-               acccount"
+               account"
               ~metadata ;
-            return false )
+            invalid "fee not sufficient to create prover account" )
           else if
             Option.value_map ~default:false ~f:not prover_permitted_to_receive
           then (
@@ -407,57 +409,49 @@ struct
                          ~f:(fun (a : Mina_base.Account.t) -> a.permissions) )
                         .receive )
                 :: metadata ) ;
-            return false )
+            invalid "prover not permitted to receive fees" )
           else if not (work_is_referenced t work) then (
-            [%log' debug t.logger] "Work $stmt not referenced"
+            [%log' debug t.logger] "Work for $work_ids not referenced"
               ~metadata:
-                ( ( "stmt"
-                  , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
-                      work )
+                ( ( "work_ids"
+                  , Transaction_snark_work.Statement.compact_json work )
                 :: metadata ) ;
-            return false )
+            invalid "work not referenced" )
           else
-            match statement_check with
-            | Error _ ->
-                return false
-            | Ok _ -> (
-                let log ?punish e =
-                  Deferred.List.iter (One_or_two.to_list proofs)
-                    ~f:(fun (_, s) -> log_and_punish ?punish s e)
-                in
-                let proof_env =
-                  Envelope.Incoming.wrap
-                    ~data:(One_or_two.map proofs ~f:fst, message)
-                    ~sender
-                in
-                match Signature_lib.Public_key.decompress prover with
-                | None ->
-                    (* We may need to decompress the key when paying the fee
-                       transfer, so check that we can do it now.
-                    *)
-                    [%log' error t.logger]
-                      "Proof had an invalid key: $public_key"
-                      ~metadata:
-                        [ ( "public_key"
-                          , Signature_lib.Public_key.Compressed.to_yojson prover
-                          )
-                        ] ;
-                    Deferred.return false
-                | Some _ -> (
-                    match%bind
-                      Batcher.Snark_pool.verify t.batcher proof_env
-                    with
-                    | Ok true ->
-                        return true
-                    | Ok false ->
-                        (* if this proof is in the set of invalid proofs*)
-                        let e = Error.of_string "Invalid proof" in
-                        let%map () = log e in
-                        false
-                    | Error e ->
-                        (* Verifier crashed or other errors at our end. Don't punish the peer*)
-                        let%map () = log ~punish:false e in
-                        false ) )
+            let%bind.Deferred.Result _ = statement_check () in
+            let log ?punish e =
+              Deferred.List.iter (One_or_two.to_list proofs) ~f:(fun (_, s) ->
+                  log_and_punish ?punish s e )
+            in
+            let proof_env =
+              Envelope.Incoming.wrap
+                ~data:(One_or_two.map proofs ~f:fst, message)
+                ~sender
+            in
+            match Signature_lib.Public_key.decompress prover with
+            | None ->
+                (* We may need to decompress the key when paying the fee
+                   transfer, so check that we can do it now.
+                *)
+                [%log' error t.logger] "Proof had an invalid key: $public_key"
+                  ~metadata:
+                    [ ( "public_key"
+                      , Signature_lib.Public_key.Compressed.to_yojson prover )
+                    ] ;
+                invalid "invalid key"
+            | Some _ -> (
+                match%bind Batcher.Snark_pool.verify t.batcher proof_env with
+                | Ok true ->
+                    Deferred.Result.return ()
+                | Ok false ->
+                    (* if this proof is in the set of invalid proofs*)
+                    let e = Error.of_string "Invalid proof" in
+                    let%bind () = log e in
+                    invalid "invalid proof"
+                | Error e ->
+                    (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                    let%map () = log ~punish:false e in
+                    Error (Failure e) )
         in
         match One_or_two.zip proofs statements with
         | Ok pairs ->
@@ -472,7 +466,8 @@ struct
                   ]
                 @ metadata )
               "One_or_two length mismatch: $error" ;
-            Deferred.return false
+            Deferred.Result.fail
+            @@ Invalid (Error.tag ~tag:"One_or_two length mismatch" e)
     end
 
     include T

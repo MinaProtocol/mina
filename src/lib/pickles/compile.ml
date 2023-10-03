@@ -381,6 +381,7 @@ struct
       type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
          self:(var, value, max_proofs_verified, branches) Tag.t
       -> cache:Key_cache.Spec.t list
+      -> proof_cache:Proof_cache.t option
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
            * Cache.Wrap.Key.Verification.t
@@ -418,10 +419,10 @@ struct
          * _
          * _
          * _ =
-   fun ~self ~cache ?disk_keys ?(return_early_digest_exception = false)
-       ?override_wrap_domain ?override_wrap_main ~branches:(module Branches)
-       ~max_proofs_verified ~name ~constraint_constants ~public_input
-       ~auxiliary_typ ~choices () ->
+   fun ~self ~cache ~proof_cache ?disk_keys
+       ?(return_early_digest_exception = false) ?override_wrap_domain
+       ?override_wrap_main ~branches:(module Branches) ~max_proofs_verified
+       ~name ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
@@ -780,7 +781,7 @@ struct
                            , return_value
                            , auxiliary_value
                            , actual_wrap_domains ) =
-            step handler ~maxes:(module Maxes) next_state
+            step ~proof_cache handler ~maxes:(module Maxes) next_state
           in
           let proof =
             { proof with
@@ -809,9 +810,9 @@ struct
                   *)
                   Some tweak_statement
             in
-            Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n ~feature_flags
-              ~actual_feature_flags:b.feature_flags full_signature.maxes
-              wrap_requests ?tweak_statement
+            Wrap.wrap ~proof_cache ~max_proofs_verified:Max_proofs_verified.n
+              ~feature_flags ~actual_feature_flags:b.feature_flags
+              full_signature.maxes wrap_requests ?tweak_statement
               ~dlog_plonk_index:wrap_vk.commitments wrap_main ~typ ~step_vk
               ~step_plonk_indices:(Lazy.force step_vks) ~actual_wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
@@ -965,6 +966,7 @@ let compile_with_wrap_main_override_promise :
     type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess prev_ret_varss prev_ret_valuess widthss heightss max_proofs_verified branches.
        ?self:(var, value, max_proofs_verified, branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
+    -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
          * Cache.Wrap.Key.Verification.t
@@ -1017,9 +1019,10 @@ let compile_with_wrap_main_override_promise :
  (* This function is an adapter between the user-facing Pickles.compile API
     and the underlying Make(_).compile function which builds the circuits.
  *)
- fun ?self ?(cache = []) ?disk_keys ?(return_early_digest_exception = false)
-     ?override_wrap_domain ?override_wrap_main ~public_input ~auxiliary_typ
-     ~branches ~max_proofs_verified ~name ~constraint_constants ~choices () ->
+ fun ?self ?(cache = []) ?proof_cache ?disk_keys
+     ?(return_early_digest_exception = false) ?override_wrap_domain
+     ?override_wrap_main ~public_input ~auxiliary_typ ~branches
+     ~max_proofs_verified ~name ~constraint_constants ~choices () ->
   let self =
     match self with
     | None ->
@@ -1085,9 +1088,10 @@ let compile_with_wrap_main_override_promise :
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~return_early_digest_exception ~self ~cache ?disk_keys
-      ?override_wrap_domain ?override_wrap_main ~branches ~max_proofs_verified
-      ~name ~public_input ~auxiliary_typ ~constraint_constants
+    M.compile ~return_early_digest_exception ~self ~proof_cache ~cache
+      ?disk_keys ?override_wrap_domain ?override_wrap_main ~branches
+      ~max_proofs_verified ~name ~public_input ~auxiliary_typ
+      ~constraint_constants
       ~choices:(fun ~self -> conv_irs (choices ~self))
       ()
   in

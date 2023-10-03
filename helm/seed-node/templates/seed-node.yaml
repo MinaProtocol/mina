@@ -24,6 +24,9 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{- if $.Values.priorityClass }}
+      priorityClassName: {{ $.Values.priorityClass }}
+      {{- end }}
       initContainers:
       {{ if $config.libp2pSecret -}}
       - name: libp2p-perms
@@ -75,6 +78,10 @@ spec:
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
           {{- end -}}
+          {{- if $.Values.mina.exposeItnGraphql }}
+          "--itn-graphql-port", "$(DAEMON_ITN_REST_PORT)",
+          "--itn-keys", "$(DAEMON_ITN_KEYS)",
+          {{- end -}}
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",
@@ -111,6 +118,10 @@ spec:
           value: "6"
         - name: DAEMON_REST_PORT
           value: {{ $.Values.mina.ports.graphql | quote }}
+        - name: DAEMON_ITN_REST_PORT
+          value: {{ $.Values.mina.itn.port | quote }}
+        - name: DAEMON_ITN_KEYS
+          value: {{ $.Values.mina.itn.keys | quote }}
         - name: DAEMON_CLIENT_PORT
           value: {{ $.Values.mina.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
@@ -143,6 +154,12 @@ spec:
           protocol: TCP
           containerPort: {{ $.Values.mina.ports.p2p }}
           hostPort: {{ $.Values.mina.ports.p2p }}
+        {{- if $.Values.mina.exposeItnGraphql }}
+        - name: itn-port
+          protocol: TCP
+          containerPort: {{ $.Values.mina.itn.port }}
+        {{- end }} 
+        
 {{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.seed.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
@@ -244,6 +261,12 @@ spec:
     protocol: TCP
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
+  {{- if $.Values.mina.exposeItnGraphql }}
+  - name: http-itn-graphql
+    protocol: TCP
+    port: {{ $.Values.mina.itn.port }}
+    targetPort: {{ $.Values.mina.itn.port }}
+  {{- end }}  
 {{- end }}
 ---
 {{- if $.Values.persist_working_dir }}
@@ -262,3 +285,4 @@ spec:
 {{ end }}
 ---
 {{ end }}
+---
