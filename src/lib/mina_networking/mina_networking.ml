@@ -1148,7 +1148,7 @@ let create (config : Config.t) ~sinks
                          (Header.current_protocol_version
                             (Mina_block.header external_transition) ) ) )
                 ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(to_string @@ get_current ()) )
+                  , `String Protocol_version.(to_string current) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger

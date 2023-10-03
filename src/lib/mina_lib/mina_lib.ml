@@ -1608,7 +1608,6 @@ let create ?wallets (config : Config.t) =
                 >>| Result.ok )
           in
           log_snark_coordinator_warning config snark_worker ;
-          Protocol_version.set_current config.initial_protocol_version ;
           Protocol_version.set_proposed_opt config.proposed_protocol_version_opt ;
           let log_rate_limiter_occasionally rl ~label =
             let t = Time.Span.of_min 1. in
