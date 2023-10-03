@@ -1,3 +1,87 @@
+(* versioned_module.ml -- modules with versioned types *)
+
+(* Modules in structures with versioned types are annotated:
+
+   [%%versioned
+     module Stable = struct
+       module Vn = struct
+         type t = ...
+       end
+      ...
+   end]
+
+   Within a `Stable` module, there may be arbitrarily many versioned
+   type modules, which must be listed in descending numeric order (most recent
+   version first).
+
+   Modules in signatures are annotated similarly (note the colon):
+
+   [%%versioned:
+     module Stable : sig
+       module Vn : sig
+         type t = ...
+       end
+      ...
+   end]
+
+   The annotation generates a deriver list for the type that includes
+   `bin_io` and `version`, which are added to any other deriver items
+   already listed
+
+   Just past the most recent Vn, a definition is generated:
+
+     module Latest = Vn
+
+   A type definition is generated just past the `Stable` module:
+
+     type t = Stable.Latest.t
+
+   Sometimes that causes compilation issues, which can be avoided by
+   adding the annotation `[@@@no_toplevel_latest_type]` at the start of
+   the `Stable` module, in either structures or signatures.
+
+   For compatibility with older code, there is the annotation:
+
+     [@@@with_all_version_tags]
+
+     Given at the start of a `Vn` module, generates a module
+     `Vn.With_all_version_tags`, where the `Bin_prot` functions add
+     the version number as an integer at the start of the
+     serialization of this type, and similarly for all versioned types referred
+     to by this type (which means those referred-to types must also
+     have that annotation). That mimics the way all types were
+     serialized in the original Mina mainnet. The representation of
+     some values, like public keys, rely on the `Bin_prot`
+     serialization, so we require this annotation in order to maintain
+     that representation.
+
+   A related annotation is:
+
+     [@@@with_top_version_tag]
+
+     Given at the start of a `Stable` module, generates for each
+     contained module `Vn`, another module `Vn.With_top_version_tag`,
+     where the `Bin_prot` serialization adds the version number at the
+     start of the type serialization, but does not change the
+     serialization of referred-to types. That's useful to know which
+     version the remainder of the serialization is for. For example, a transaction
+     id is the Base64 encoding of the `Bin_prot` serialization of a command.
+     Therefore, the transaction id contains the information about the
+     transaction type version used to create it.
+
+   For JSON serialization, we have:
+
+     [@@@with_versioned_json]
+
+     When given at the start of a `Stable` module, for each module `Vn`, if the `yojson` deriver is used
+     in `Vn.t`, then `Vn.to_yojson` generates:
+
+       `Assoc [("version",`Int n); ("data",<the yojson serialization of `t`>)]
+
+     For example, we use this version-tagged JSON for precomputed and extensional blocks, to know
+     which version of the code produced them.
+*)
+
 open Core_kernel
 open Ppxlib
 open Versioned_util
