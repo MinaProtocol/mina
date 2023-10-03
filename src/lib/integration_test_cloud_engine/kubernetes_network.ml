@@ -414,7 +414,7 @@ let snark_workers { snark_workers; _ } = snark_workers
 
 let archive_nodes { archive_nodes; _ } = archive_nodes
 
-(* all_mina_nodes returns all *actual* mina nodes; that is, any node running an actual mina daemon.  note that a snark_worker is a node within the network but not technically a *mina* node because it runs no mina daemon, therefore not included here.  snark coordinators on the other hand are mina nodes running actual mina daemons *)
+(* all_mina_nodes returns all *actual* mina nodes; that is, any node running an actual mina daemon. Note that a snark_worker is a node within the network but not technically a *mina* node because it runs no mina daemon, therefore not included here. snark_coordinators on the other hand are mina nodes running actual mina daemons. *)
 let all_mina_nodes
     { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
   List.concat
@@ -425,7 +425,7 @@ let all_mina_nodes
     ]
   |> Core.String.Map.of_alist_exn
 
-(* all_nodes returns everything in the network.  remember that snark_workers will never initialize and will never sync, and aren't supposed to *)
+(* all_nodes returns everything in the network.  Remember that snark_workers will never initialize and will never sync, and aren't supposed to. *)
 (* TODO snark workers and snark coordinators have the same key name, but different workload ids*)
 let all_nodes t =
   List.concat
@@ -437,7 +437,7 @@ let all_nodes t =
     ]
   |> Core.String.Map.of_alist_exn
 
-(* all_non_seed_nodes returns everything in the network except seed nodes *)
+(* all_non_seed_nodes returns everything in the network except seed nodes. *)
 let all_non_seed_nodes t =
   List.concat
     [ Core.String.Map.to_alist t.block_producers
@@ -472,7 +472,7 @@ let all_pod_ids_refreshed t =
   return (List.concat pod_ids)
 
 let lookup_node_by_pod_id t id =
-  let nodes = all_nodes t |> Map.to_alist in
+  let nodes = all_nodes t |> Core.Map.to_alist in
   List.fold nodes ~init:None ~f:(fun acc (node_name, node) ->
       match acc with
       | Some acc ->
