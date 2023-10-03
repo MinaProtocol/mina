@@ -147,7 +147,6 @@
 (package (name pipe_lib))
 (package (name pokolog))
 (package (name ppx_annot))
-(package (name ppx_dhall_type))
 (package (name ppx_mina))
 (package (name ppx_register_event))
 (package (name ppx_representatives))
