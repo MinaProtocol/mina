@@ -869,9 +869,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             | _ ->
                 respond
                   (Provide
-                     (Snarky_backendless.Request.Handler.run handlers
-                        [ "Ledger Handler"; "Pending Coinbase Handler" ]
-                        request ) )
+                     (Option.value_exn ~message:"unhandled request"
+                        (Snarky_backendless.Request.Handler.run handlers request) )
+                  )
       end
 
       let check ~context:(module Context : CONTEXT)
@@ -2606,9 +2606,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           | _ ->
               respond
                 (Provide
-                   (Snarky_backendless.Request.Handler.run handlers
-                      [ "Ledger Handler"; "Pending Coinbase Handler" ]
-                      request ) )
+                   (Option.value_exn ~message:"unhandled request"
+                      (Snarky_backendless.Request.Handler.run handlers request) )
+                )
 
       let ledger_depth { ledger; _ } = ledger.depth
     end
