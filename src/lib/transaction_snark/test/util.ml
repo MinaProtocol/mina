@@ -255,7 +255,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                                 in
                                 T.merge ~sok_digest prev curr )
                           in
-                          [%log debug]
+                          [%log info]
                             ~metadata:
                               [ ( "duration"
                                 , `String
