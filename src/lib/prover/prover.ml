@@ -218,7 +218,6 @@ module Worker_state = struct
                let set_itn_logger_data ~daemon_port:_ = ()
              end : S )
        in
-       Memory_stats.log_memory_stats logger ~process:"prover" ;
        m )
 
   let get = Fn.id

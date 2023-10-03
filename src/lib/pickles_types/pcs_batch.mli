@@ -4,6 +4,8 @@ val map : ('a, 'n, 'm) t -> f:('a -> 'b) -> ('b, 'n, 'm) t
 
 val pow : one:'f -> mul:('f -> 'f -> 'f) -> 'f -> int -> 'f
 
+val num_bits : int -> int
+
 val create :
      without_degree_bound:'n Nat.t
   -> with_degree_bound:('a, 'm) Vector.t
