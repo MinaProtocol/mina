@@ -1,1 +1,1 @@
-buildkite/scripts/rosetta-integration-tests.sh --with-zkapps --mode=full
+buildkite/scripts/rosetta-integration-tests.sh --mode=full
