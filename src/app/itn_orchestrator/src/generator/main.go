@@ -169,7 +169,7 @@ func main() {
 	}
 	privkeys := p.Privkeys
 	if p.GenerateFundKeys > 0 {
-		fundKeysDir := fmt.Sprintf("%s/funding", p.FundKeyPrefix)
+		fundKeysDir := fmt.Sprintf("%s/funding/%s", p.FundKeyPrefix, p.ExperimentName)
 		privkeys = make([]string, p.GenerateFundKeys)
 		privkeyAmounts := make([]uint64, p.GenerateFundKeys)
 		for i := range privkeys {
