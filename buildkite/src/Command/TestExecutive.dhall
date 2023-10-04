@@ -55,7 +55,7 @@ in
         depends_on = dependsOn
       },
 
-  executeLocal = \(testName : Text) ->
+  executeLocal = \(testName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
     Command.build
       Command.Config::{
         commands = [
@@ -64,7 +64,8 @@ in
         artifact_paths = [SelectFiles.exactly "." "${testName}.local.test.log"],
         label = "${testName} integration test local",
         key = "integration-test-${testName}-local",
-        target = Size.Integration
+        target = Size.Integration,
+        depends_on = dependsOn
       },
 
   buildJs = \(duneProfile : Text) -> 
