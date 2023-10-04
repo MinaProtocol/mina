@@ -765,6 +765,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Network.Node.get_ingress_uri node)
            zkapp_command_insufficient_fee "Insufficient fee" )
     in
+    let%bind () =
+      Malleable_error.lift (after (Time.Span.of_sec 120.0))
+    in
     (* Won't be accepted until the previous transactions are applied *)
     let%bind () =
       section_hard "Send a zkApp transaction to update all fields"
