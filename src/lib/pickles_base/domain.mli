@@ -1,4 +1,4 @@
-(* Domain specification *)
+(** Wrapping integers for computing NTT domain *)
 
 module Stable : sig
   module V1 : sig

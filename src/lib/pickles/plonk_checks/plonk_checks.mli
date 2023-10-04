@@ -1,8 +1,5 @@
 open Pickles_types
 
-type 'field vanishing_polynomial_domain =
-  < vanishing_polynomial : 'field -> 'field >
-
 type 'field plonk_domain =
   < vanishing_polynomial : 'field -> 'field
   ; shifts : 'field Pickles_types.Plonk_types.Shifts.t

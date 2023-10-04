@@ -76,6 +76,21 @@ module Make_str (_ : Wire_types.Concrete) = struct
      where f is a snarky function defined over an Impl with Field.t = Fp
      and each Ai is itself an inductive rule (possibly equal to A itself).
 
+     a1, ..., an can be seen as previous statements, i.e.
+
+             prev_statement_1 ∈ A1, ..., prev_statement_n ∈ An
+     f [ prev_statement_1; ...; prev_statement_n ] new_statement = true
+     -------------------------------------------------------------------
+                            new_statement ∈ A
+
+     In the case of a blockchain, the description of the sets A1, ..., An, A can
+     be blockchain state, and f would be a function updating the state:
+
+                          prev_blockchain_state ∈ A
+     update_blockchain_state [prev_blockchain_state] new_blockchain_state = true
+     ---------------------------------------------------------------------------
+                          new_blockchain_state ∈ A
+
      We pursue the "step" then "wrap" approach for proof composition.
 
      The main source of complexity is that we must "wrap" proofs whose verifiers are
@@ -88,7 +103,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         Schematically, from the circuit point-of-view, we can say a proof is
      - a sequence of F_0 elements xs_0
-     - a sequence of F_1 elelements xs_1
+     - a sequence of F_1 elements xs_1
         and a verifier is a pair of "snarky functions"
      - check_0 : F_0 list -> F_1 list -> unit which uses the Impl with Field.t = F_0
      - check_1 : F_0 list -> F_1 list -> unit which uses the Impl with Field.t = F_1

@@ -1,3 +1,7 @@
+(** The type of intermediate (step) and emitted (wrap) proofs that pickles
+    generates
+*)
+
 module Base : sig
   module Messages_for_next_proof_over_same_field =
     Reduced_messages_for_next_proof_over_same_field

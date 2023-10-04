@@ -2,6 +2,7 @@
 
 val hash_fold_array : 'a Sigs.hashable -> 'a array Sigs.hashable
 
+(** Features are custom gates, lookup tables or runtime tables *)
 module Features : sig
   module Full : sig
     type 'bool t = private
@@ -64,11 +65,14 @@ module Features : sig
 
   type flags = bool t
 
+  (** [to_data flags] takes the record defined above and deconstructs it in a
+      list, in the field order *)
   val to_data :
        'a t
     -> ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
        Hlist.HlistId.t
 
+  (** [of_data flags_list] constructs a record from the flags list *)
   val of_data :
        ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
        Hlist.HlistId.t
@@ -100,10 +104,15 @@ module Poly_comm : sig
   end
 end
 
+(** The number of wires in the proving system *)
 module Columns_vec = Vector.Vector_15
+
 module Columns = Nat.N15
-module Permuts_vec = Vector.Vector_7
+
+(** The number of wires that are considered in the permutation argument *)
 module Permuts = Nat.N7
+
+module Permuts_vec = Vector.Vector_7
 module Permuts_minus_1 = Nat.N6
 module Permuts_minus_1_vec = Vector.Vector_6
 module Lookup_sorted_minus_1 = Nat.N4
@@ -111,11 +120,15 @@ module Lookup_sorted_minus_1_vec = Vector.Vector_4
 module Lookup_sorted = Nat.N5
 module Lookup_sorted_vec = Vector.Vector_5
 
+(** Messages involved in the polynomial IOP *)
 module Messages : sig
   module Poly : sig
     type ('w, 'z, 't) t = { w : 'w; z : 'z; t : 't }
   end
 
+  (** The types of lookup tables. This should stay in line with the {{
+  https://o1-labs.github.io/proof-systems/rfcs/extended-lookup-tables.html} RFC4
+  - Extended lookup tables } in the kimchi book *)
   module Lookup : sig
     module Stable : sig
       module V1 : sig
@@ -143,6 +156,15 @@ module Messages : sig
 
   module Stable : sig
     module V2 : sig
+      (** Commitments to the different polynomials.
+          - [w_comm] is a vector containing the commitments to the wires. As
+            usual, the vector size is encoded at the type level using
+            {!Columns_vec} for compile time verification of vector properties.
+          - [z_comm] is the commitment to the permutation polynomial
+          - [t_comm] is the commitment to the quotient polynomial
+          - [lookup] contains the commitments to the polynomials involved the
+            lookup arguments.
+      *)
       type 'g t =
         { w_comm : 'g Poly_comm.Without_degree_bound.t Columns_vec.t
         ; z_comm : 'g Poly_comm.Without_degree_bound.t
@@ -169,15 +191,7 @@ module Messages : sig
           , 'bool )
           Opt.t
       }
-
-    (** Field accessors *)
-
-    val w_comm :
-      ('g, 'bool) t -> 'g Poly_comm.Without_degree_bound.t Columns_vec.t
-
-    val z_comm : ('g, 'bool) t -> 'g Poly_comm.Without_degree_bound.t
-
-    val t_comm : ('g, 'bool) t -> 'g Poly_comm.Without_degree_bound.t
+    [@@deriving fields]
   end
 
   val typ :
@@ -341,6 +355,8 @@ module Proof : sig
     module Latest = V2
   end
 
+  (** Represents a proof. A proof consists of messages and openings from the
+      polynomial protocols *)
   type ('a, 'b, 'c) t =
     { messages : 'a Messages.t; openings : ('a, 'b, 'c) Openings.t }
   [@@deriving compare, sexp, yojson, hash, equal]
@@ -400,6 +416,7 @@ module All_evals : sig
        Snarky_backendless.Types.Typ.typ
 end
 
+(** Shifts, related to the permutation argument in Plonk *)
 module Shifts : sig
   type 'a t = 'a array
 end

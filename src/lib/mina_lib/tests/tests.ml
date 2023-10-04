@@ -25,9 +25,6 @@ let%test_module "Epoch ledger sync tests" =
 
     exception Sync_timeout
 
-    let () =
-      Protocol_version.(set_current @@ create_exn ~major:2 ~minor:0 ~patch:0)
-
     let logger = Logger.create ()
 
     let default_timeout_min = 5.0
@@ -327,8 +324,9 @@ let%test_module "Epoch ledger sync tests" =
             (make_dirname "persistent_frontier_location")
           ~frontier_broadcast_pipe:
             (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
-          ~catchup_mode:`Normal ~network_transition_reader:block_reader
-          ~producer_transition_reader ~most_recent_valid_block ~notify_online ()
+          ~get_completed_work:(Fn.const None) ~catchup_mode:`Normal
+          ~network_transition_reader:block_reader ~producer_transition_reader
+          ~most_recent_valid_block ~notify_online ()
       in
       let%bind () = Ivar.read initialization_finish_signal in
       let tr_tm1 = Unix.gettimeofday () in
