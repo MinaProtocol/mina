@@ -6352,6 +6352,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "genesisTimestamp",
+              "description": "The genesis timestamp in ISO 8601 format",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -14460,6 +14476,23 @@
               "deprecationReason": null
             },
             {
+              "name": "fork_config",
+              "description":
+                "The runtime configuration for a blockchain fork intended to be a continuation of the current one.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "JSON",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "threadGraph",
               "description":
                 "A graphviz dot format representation of the deamon's internal thread graph",
@@ -14487,6 +14520,23 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "JSON",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "networkID",
+              "description":
+                "The chain-agnostic identifier of the network this daemon is participating in",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
                   "ofType": null
                 }
               },

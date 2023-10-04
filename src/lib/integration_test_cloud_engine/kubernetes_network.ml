@@ -39,9 +39,14 @@ module Node = struct
     ; pod_ids : string list
     ; pod_info : pod_info
     ; config : config
+    ; mutable should_be_running : bool
     }
 
-  let id { pod_ids; _ } = List.hd_exn pod_ids
+  let id { app_id; _ } = app_id
+
+  let infra_id { pod_ids; _ } = List.hd_exn pod_ids
+
+  let should_be_running { should_be_running; _ } = should_be_running
 
   let network_keypair { pod_info = { network_keypair; _ }; _ } = network_keypair
 
@@ -102,6 +107,7 @@ module Node = struct
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
+    node.should_be_running <- true ;
     let%bind () =
       if fresh_state then
         run_in_container node ~cmd:[ "sh"; "-c"; "rm -rf .mina-config/*" ]
@@ -112,6 +118,7 @@ module Node = struct
 
   let stop node =
     let open Malleable_error.Let_syntax in
+    node.should_be_running <- false ;
     run_in_container ~exit_code:12 node ~cmd:[ "/stop.sh" ] >>| ignore
 
   let logger_infra_metadata node =
@@ -160,7 +167,7 @@ module Node = struct
     Out_channel.with_file data_file ~f:(fun out_ch ->
         Out_channel.output_string out_ch data )
 
-  let run_replayer ~logger (t : t) =
+  let run_replayer ?(start_slot_since_genesis = 0) ~logger (t : t) =
     [%log info] "Running replayer on archived data (node: %s, container: %s)"
       (List.hd_exn t.pod_ids) mina_archive_container_id ;
     let open Malleable_error.Let_syntax in
@@ -170,8 +177,9 @@ module Node = struct
     in
     let replayer_input =
       sprintf
-        {| { "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }} |}
-        accounts
+        {| { "start_slot_since_genesis": %d,
+             "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }} |}
+        start_slot_since_genesis accounts
     in
     let dest = "replayer-input.json" in
     let%bind _res =
@@ -319,7 +327,8 @@ module Workload_to_deploy = struct
       (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
       (* TODO fix this^ and have a more elegant solution *)
       let pod_info = t.pod_info in
-      return { Node.app_id; pod_ids; pod_info; config }
+      return
+        { Node.app_id; pod_ids; pod_info; config; should_be_running = false }
 end
 
 type t =
@@ -351,8 +360,9 @@ let snark_workers { snark_workers; _ } = snark_workers
 
 let archive_nodes { archive_nodes; _ } = archive_nodes
 
-(* all_nodes returns all *actual* mina nodes; note that a snark_worker is a pod within the network but not technically a mina node, therefore not included here.  snark coordinators on the other hand ARE mina nodes *)
-let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
+(* all_mina_nodes returns all *actual* mina nodes; that is, any node running an actual mina daemon. Note that a snark_worker is a node within the network but not technically a *mina* node because it runs no mina daemon, therefore not included here. snark_coordinators on the other hand are mina nodes running actual mina daemons. *)
+let all_mina_nodes
+    { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
   List.concat
     [ Core.String.Map.to_alist seeds
     ; Core.String.Map.to_alist block_producers
@@ -361,9 +371,9 @@ let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
     ]
   |> Core.String.Map.of_alist_exn
 
-(* all_pods returns everything in the network.  remember that snark_workers will never initialize and will never sync, and aren't supposed to *)
+(* all_nodes returns everything in the network.  Remember that snark_workers will never initialize and will never sync, and aren't supposed to. *)
 (* TODO snark workers and snark coordinators have the same key name, but different workload ids*)
-let all_pods t =
+let all_nodes t =
   List.concat
     [ Core.String.Map.to_alist t.seeds
     ; Core.String.Map.to_alist t.block_producers
@@ -373,8 +383,8 @@ let all_pods t =
     ]
   |> Core.String.Map.of_alist_exn
 
-(* all_non_seed_pods returns everything in the network except seed nodes *)
-let all_non_seed_pods t =
+(* all_non_seed_nodes returns everything in the network except seed nodes. *)
+let all_non_seed_nodes t =
   List.concat
     [ Core.String.Map.to_alist t.block_producers
     ; Core.String.Map.to_alist t.snark_coordinators
@@ -386,8 +396,8 @@ let all_non_seed_pods t =
 let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
 
 let lookup_node_by_pod_id t id =
-  let pods = all_pods t |> Core.Map.to_alist in
-  List.fold pods ~init:None ~f:(fun acc (node_name, node) ->
+  let nodes = all_nodes t |> Core.Map.to_alist in
+  List.fold nodes ~init:None ~f:(fun acc (node_name, node) ->
       match acc with
       | Some acc ->
           Some acc
@@ -396,10 +406,16 @@ let lookup_node_by_pod_id t id =
             Some (node_name, node)
           else None )
 
+let all_ids t =
+  let deployments = all_nodes t |> Core.Map.to_alist in
+  List.fold deployments ~init:[] ~f:(fun acc (_, node) ->
+      List.cons node.app_id acc )
+
+(* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
 let all_pod_ids t =
-  let pods = all_pods t |> Core.Map.to_alist in
-  List.fold pods ~init:[] ~f:(fun acc (_, node) ->
-      List.cons (List.hd_exn node.pod_ids) acc )
+  let node_list = Core.String.Map.data (all_nodes t) in
+  let pod_ids = List.map node_list ~f:(fun n -> n.pod_ids) in
+  List.concat pod_ids
 
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in

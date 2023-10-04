@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Mina_transaction
 
 let all_equal ~equal ~compare ls =
   Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
@@ -268,7 +267,7 @@ struct
     { id = Signed_command_to_be_included_in_frontier
     ; description =
         sprintf "signed command with hash %s"
-          (Transaction_hash.to_base58_check txn_hash)
+          (Mina_transaction.Transaction_hash.to_base58_check txn_hash)
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
@@ -299,50 +298,54 @@ struct
     }
 
   let zkapp_to_be_included_in_frontier ~has_failures ~zkapp_command =
-    let command_matches_zkapp_command cmd =
-      let open User_command in
-      match cmd with
-      | Zkapp_command p ->
-          Zkapp_command.equal p zkapp_command
-      | Signed_command _ ->
-          false
+    let txn_hash =
+      Mina_transaction.Transaction_hash.hash_command
+        (Zkapp_command zkapp_command)
     in
     let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
       let zkapp_opt =
-        List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
-            cmd_with_status.With_status.data |> User_command.forget_check
-            |> command_matches_zkapp_command )
+        List.find breadcrumb_added.transaction_hashes
+          ~f:
+            (Fn.compose
+               (Mina_transaction.Transaction_hash.equal txn_hash)
+               With_status.data )
       in
       [%log' info (Logger.create ())]
-        "Looking for a zkApp transaction match in block with state_hash \
-         $state_hash"
+        "Looking for a zkApp transaction match for txn $txn with hash \
+         $txn_hash in block with state_hash $state_hash"
         ~metadata:
-          [ ("state_hash", State_hash.to_yojson breadcrumb_added.state_hash) ] ;
+          [ ("state_hash", State_hash.to_yojson breadcrumb_added.state_hash)
+          ; ("txn_hash", Mina_transaction.Transaction_hash.to_yojson txn_hash)
+          ; ("txn", Zkapp_command.to_yojson zkapp_command)
+          ] ;
       [%log' debug (Logger.create ())]
         "wait_condition check, zkapp_to_be_included_in_frontier, \
          zkapp_command: $zkapp_command "
         ~metadata:[ ("zkapp_command", Zkapp_command.to_yojson zkapp_command) ] ;
       [%log' debug (Logger.create ())]
         "wait_condition check, zkapp_to_be_included_in_frontier, user_commands \
-         from breadcrumb: $user_commands state_hash: $state_hash"
+         from breadcrumb: $tx_hashes state_hash: $state_hash"
         ~metadata:
-          [ ( "user_commands"
+          [ ( "tx_hashes"
             , `List
-                (List.map breadcrumb_added.user_commands
-                   ~f:(With_status.to_yojson User_command.Valid.to_yojson) ) )
+                (List.map breadcrumb_added.transaction_hashes
+                   ~f:
+                     (With_status.to_yojson
+                        Mina_transaction.Transaction_hash.to_yojson ) ) )
           ; ("state_hash", State_hash.to_yojson breadcrumb_added.state_hash)
           ] ;
       match zkapp_opt with
-      | Some cmd_with_status ->
+      | Some hash_with_status ->
           [%log' debug (Logger.create ())]
             "wait_condition check, zkapp_to_be_included_in_frontier, \
              cmd_with_status: $cmd_with_status "
             ~metadata:
               [ ( "cmd_with_status"
-                , (With_status.to_yojson User_command.Valid.to_yojson)
-                    cmd_with_status )
+                , (With_status.to_yojson
+                     Mina_transaction.Transaction_hash.to_yojson )
+                    hash_with_status )
               ] ;
-          let actual_status = cmd_with_status.With_status.status in
+          let actual_status = hash_with_status.With_status.status in
           let successful =
             match actual_status with
             | Transaction_status.Applied ->

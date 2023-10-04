@@ -1,7 +1,7 @@
 (library
  (name lib)
  (public_name lib)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;;opam libraries
    ppx_inline_test.config
@@ -35,6 +35,7 @@
    signature_lib
    rosetta_coding
    rosetta_lib
+   mina_runtime_config
    mina_caqti
    logger
    mina_compile_config

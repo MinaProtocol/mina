@@ -1,7 +1,7 @@
 (library
  (name snarky_field_extensions)
  (public_name snarky_field_extensions)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare ppx_deriving_yojson))
  (libraries

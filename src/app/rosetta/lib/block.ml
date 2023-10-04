@@ -448,13 +448,37 @@ module Sql = struct
          * blocks older than k + epsilon
          *)
         {|
-SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_winner_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.min_window_density, c.total_currency, c.ledger_hash, c.height, c.global_slot_since_hard_fork, c.global_slot_since_genesis, c.timestamp, c.chain_status, pk.value as creator, bw.value as winner FROM blocks c
-  INNER JOIN public_keys pk
-  ON pk.id = c.creator_id
-  INNER JOIN public_keys bw
-  ON bw.id = c.block_winner_id
-  WHERE c.height = ? AND c.chain_status = 'canonical'
-      |}
+         SELECT c.id,
+                c.state_hash,
+                c.parent_id,
+                c.parent_hash,
+                c.creator_id,
+                c.block_winner_id,
+                c.last_vrf_output,
+                c.snarked_ledger_hash_id,
+                c.staking_epoch_data_id,
+                c.next_epoch_data_id,
+                c.min_window_density,
+                c.sub_window_densities,
+                c.total_currency,
+                c.ledger_hash,
+                c.height,
+                c.global_slot_since_hard_fork,
+                c.global_slot_since_genesis,
+                c.protocol_version_id,
+                c.proposed_protocol_version_id,
+                c.timestamp,
+                c.chain_status,
+                pk.value as creator,
+                bw.value as winner
+         FROM blocks c
+         INNER JOIN public_keys pk
+           ON pk.id = c.creator_id
+         INNER JOIN public_keys bw
+           ON bw.id = c.block_winner_id
+         WHERE c.height = ?
+           AND c.chain_status = 'canonical'
+        |}
 
     let query_height_pending =
       Caqti_request.find_opt Caqti_type.int64 typ
@@ -471,63 +495,233 @@ SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_win
          * requests since recursive queries stress PostgreSQL.
          *)
         {|
-WITH RECURSIVE chain AS (
-  (SELECT id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, min_window_density, total_currency, ledger_hash, height, global_slot_since_hard_fork, global_slot_since_genesis, timestamp, chain_status FROM blocks b WHERE height = (select MAX(height) from blocks)
-  ORDER BY timestamp ASC, state_hash ASC
-  LIMIT 1)
+         WITH RECURSIVE chain AS (
+           (SELECT id,
+                   state_hash,
+                   parent_id,
+                   parent_hash,
+                   creator_id,
+                   block_winner_id,
+                   last_vrf_output,
+                   snarked_ledger_hash_id,
+                   staking_epoch_data_id,
+                   next_epoch_data_id,
+                   min_window_density,
+                   sub_window_densities,
+                   total_currency,
+                   ledger_hash,
+                   height,
+                   global_slot_since_hard_fork,
+                   global_slot_since_genesis,
+                   protocol_version_id,
+                   proposed_protocol_version_id,
+                   timestamp,
+                   chain_status
+           FROM blocks b
+           WHERE height = (select MAX(height) from blocks)
+           ORDER BY timestamp ASC, state_hash ASC
+           LIMIT 1)
 
-  UNION ALL
+         UNION ALL
 
-  SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.min_window_density, b.total_currency, b.ledger_hash, b.height, b.global_slot_since_hard_fork, b.global_slot_since_genesis, b.timestamp, b.chain_status FROM blocks b
-  INNER JOIN chain
-  ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND chain.chain_status <> 'canonical'
-) SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_winner_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.min_window_density, c.total_currency, c.ledger_hash, c.height, c.global_slot_since_hard_fork, c.global_slot_since_genesis, c.timestamp, c.chain_status, pk.value as creator, bw.value as winner FROM chain c
-  INNER JOIN public_keys pk
-  ON pk.id = c.creator_id
-  INNER JOIN public_keys bw
-  ON bw.id = c.block_winner_id
-  WHERE c.height = ?
-      |}
+           SELECT b.id,
+                  b.state_hash,
+                  b.parent_id,
+                  b.parent_hash,
+                  b.creator_id,
+                  b.block_winner_id,
+                  b.last_vrf_output,
+                  b.snarked_ledger_hash_id,
+                  b.staking_epoch_data_id,
+                  b.next_epoch_data_id,
+                  b.min_window_density,
+                  b.sub_window_densities,
+                  b.total_currency,
+                  b.ledger_hash,
+                  b.height,
+                  b.global_slot_since_hard_fork,
+                  b.global_slot_since_genesis,
+                  b.protocol_version_id,
+                  b.proposed_protocol_version_id,
+                  b.timestamp,
+                  b.chain_status
+           FROM blocks b
+           INNER JOIN chain
+             ON b.id = chain.parent_id
+             AND chain.id <> chain.parent_id
+             AND chain.chain_status <> 'canonical')
+
+         SELECT c.id,
+                c.state_hash,
+                c.parent_id,
+                c.parent_hash,
+                c.creator_id,
+                c.block_winner_id,
+                c.last_vrf_output,
+                c.snarked_ledger_hash_id,
+                c.staking_epoch_data_id,
+                c.next_epoch_data_id,
+                c.min_window_density,
+                c.sub_window_densities,
+                c.total_currency,
+                c.ledger_hash,
+                c.height,
+                c.global_slot_since_hard_fork,
+                c.global_slot_since_genesis,
+                c.protocol_version_id,
+                c.proposed_protocol_version_id,
+                c.timestamp,
+                c.chain_status,
+                pk.value as creator,
+                bw.value as winner
+         FROM chain c
+         INNER JOIN public_keys pk
+           ON pk.id = c.creator_id
+         INNER JOIN public_keys bw
+           ON bw.id = c.block_winner_id
+         WHERE c.height = ?
+       |}
 
     let query_hash =
       Caqti_request.find_opt Caqti_type.string typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.min_window_density, b.total_currency, b.ledger_hash, b.height, b.global_slot_since_hard_fork, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
-        INNER JOIN public_keys pk
-        ON pk.id = b.creator_id
-        INNER JOIN public_keys bw
-        ON bw.id = b.block_winner_id
-        WHERE b.state_hash = ? |}
+        {|
+         SELECT b.id,
+                b.state_hash,
+                b.parent_id,
+                b.parent_hash,
+                b.creator_id,
+                b.block_winner_id,
+                b.last_vrf_output,
+                b.snarked_ledger_hash_id,
+                b.staking_epoch_data_id,
+                b.next_epoch_data_id,
+                b.min_window_density,
+                b.sub_window_densities,
+                b.total_currency,
+                b.ledger_hash,
+                b.height,
+                b.global_slot_since_hard_fork,
+                b.global_slot_since_genesis,
+                b.protocol_version_id,
+                b.proposed_protocol_version_id,
+                b.timestamp,
+                b.chain_status,
+                pk.value as creator,
+                bw.value as winner
+         FROM blocks b
+         INNER JOIN public_keys pk
+         ON pk.id = b.creator_id
+         INNER JOIN public_keys bw
+         ON bw.id = b.block_winner_id
+         WHERE b.state_hash = ?
+        |}
 
     let query_both =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.min_window_density, b.total_currency, b.ledger_hash, b.height, b.global_slot_since_hard_fork, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
-        INNER JOIN public_keys pk
-        ON pk.id = b.creator_id
-        INNER JOIN public_keys bw
-        ON bw.id = b.block_winner_id
-        WHERE b.state_hash = ? AND b.height = ? |}
+        {|
+         SELECT b.id,
+                b.state_hash,
+                b.parent_id,
+                b.parent_hash,
+                b.creator_id,
+                b.block_winner_id,
+                b.last_vrf_output,
+                b.snarked_ledger_hash_id,
+                b.staking_epoch_data_id,
+                b.next_epoch_data_id,
+                b.min_window_density,
+                b.sub_window_densities,
+                b.total_currency,
+                b.ledger_hash,
+                b.height,
+                b.global_slot_since_hard_fork,
+                b.global_slot_since_genesis,
+                b.protocol_version_id,
+                b.proposed_protocol_version_id,
+                b.timestamp,
+                b.chain_status,
+                pk.value as creator,
+                bw.value as winner
+         FROM blocks b
+         INNER JOIN public_keys pk
+           ON pk.id = b.creator_id
+         INNER JOIN public_keys bw
+           ON bw.id = b.block_winner_id
+         WHERE b.state_hash = ?
+           AND b.height = ?
+        |}
 
     let query_by_id =
       Caqti_request.find_opt Caqti_type.int typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.min_window_density, b.total_currency, b.ledger_hash, b.height, b.global_slot_since_hard_fork, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
-        INNER JOIN public_keys pk
-        ON pk.id = b.creator_id
-        INNER JOIN public_keys bw
-        ON bw.id = b.block_winner_id
-        WHERE b.id = ? |}
+        {|
+         SELECT b.id,
+                b.state_hash,
+                b.parent_id,
+                b.parent_hash,
+                b.creator_id,
+                b.block_winner_id,
+                b.last_vrf_output,
+                b.snarked_ledger_hash_id,
+                b.staking_epoch_data_id,
+                b.next_epoch_data_id,
+                b.min_window_density,
+                b.sub_window_densities,
+                b.total_currency,
+                b.ledger_hash,
+                b.height,
+                b.global_slot_since_hard_fork,
+                b.global_slot_since_genesis,
+                b.protocol_version_id,
+                b.proposed_protocol_version_id,
+                b.timestamp,
+                b.chain_status,
+                pk.value as creator,
+                bw.value as winner
+         FROM blocks b
+         INNER JOIN public_keys pk
+           ON pk.id = b.creator_id
+         INNER JOIN public_keys bw
+           ON bw.id = b.block_winner_id
+         WHERE b.id = ?
+        |}
 
     let query_best =
       Caqti_request.find_opt Caqti_type.unit typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.min_window_density, b.total_currency, b.ledger_hash, b.height, b.global_slot_since_hard_fork, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
-           INNER JOIN public_keys pk
+        {|
+         SELECT b.id,
+                b.state_hash,
+                b.parent_id,
+                b.parent_hash,
+                b.creator_id,
+                b.block_winner_id,
+                b.last_vrf_output,
+                b.snarked_ledger_hash_id,
+                b.staking_epoch_data_id,
+                b.next_epoch_data_id,
+                b.min_window_density,
+                b.sub_window_densities,
+                b.total_currency,
+                b.ledger_hash,
+                b.height,
+                b.global_slot_since_hard_fork,
+                b.global_slot_since_genesis,
+                b.protocol_version_id,
+                b.proposed_protocol_version_id,
+                b.timestamp,
+                b.chain_status,
+                pk.value as creator,
+                bw.value as winner
+         FROM blocks b
+         INNER JOIN public_keys pk
            ON pk.id = b.creator_id
-           INNER JOIN public_keys bw
+         INNER JOIN public_keys bw
            ON bw.id = b.block_winner_id
-           WHERE b.height = (select MAX(b.height) from blocks b)
-           ORDER BY timestamp ASC, state_hash ASC
-           LIMIT 1 |}
+         WHERE b.height = (select MAX(b.height) from blocks b)
+         ORDER BY timestamp ASC, state_hash ASC
+         LIMIT 1
+        |}
 
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
@@ -612,34 +806,50 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT u.id, u.command_type, u.fee_payer_id, u.source_id, u.receiver_id, u.nonce, u.amount, u.fee,
-        u.valid_until, u.memo, u.hash,
-        pk_payer.value as fee_payer, pk_source.value as source, pk_receiver.value as receiver,
-        buc.status,
-        buc.failure_reason,
-        ac.creation_fee
-        FROM user_commands u
-        INNER JOIN blocks_user_commands buc ON buc.user_command_id = u.id
-        INNER JOIN account_identifiers ai_payer on ai_payer.id = u.fee_payer_id
-        INNER JOIN public_keys pk_payer ON pk_payer.id = ai_payer.public_key_id
-        INNER JOIN account_identifiers ai_source on ai_source.id = u.source_id
-        INNER JOIN public_keys pk_source ON pk_source.id = ai_source.public_key_id
-        INNER JOIN account_identifiers ai_receiver on ai_receiver.id = u.receiver_id
-        INNER JOIN public_keys pk_receiver ON pk_receiver.id = ai_receiver.public_key_id
+        {|
+         SELECT u.id,
+                u.command_type,
+                u.fee_payer_id,
+                u.source_id,
+                u.receiver_id,
+                u.nonce,
+                u.amount,
+                u.fee,
+                u.valid_until,
+                u.memo,
+                u.hash,
+                pk_payer.value as fee_payer,
+                pk_source.value as source,
+                pk_receiver.value as receiver,
+                buc.status,
+                buc.failure_reason,
+                ac.creation_fee
+         FROM user_commands u
+         INNER JOIN blocks_user_commands buc
+           ON buc.user_command_id = u.id
+         INNER JOIN public_keys pk_payer
+           ON pk_payer.id = u.fee_payer_id
+         INNER JOIN public_keys pk_source
+           ON pk_source.id = u.source_id
+         INNER JOIN public_keys pk_receiver
+           ON pk_receiver.id = u.receiver_id
+         INNER JOIN account_identifiers ai_receiver
+           ON ai_receiver.public_key_id = pk_receiver.id
         /* Account creation fees are attributed to the first successful command in the
            block that mentions the account with the following LEFT JOIN */
-        LEFT JOIN accounts_created ac
-            ON buc.block_id = ac.block_id
-                   AND u.receiver_id = ac.account_identifier_id
-                   AND buc.status = 'applied'
-                   AND buc.sequence_no =
-                       (SELECT MIN(buc2.sequence_no)
-                        FROM blocks_user_commands buc2
-                            INNER JOIN user_commands uc2 on buc2.user_command_id = uc2.id
-                                   AND uc2.receiver_id = ac.account_identifier_id
-                                   AND buc2.block_id = buc.block_id)
-        WHERE buc.block_id = ?
-      |}
+         LEFT JOIN accounts_created ac
+           ON buc.block_id = ac.block_id
+           AND ai_receiver.id = ac.account_identifier_id
+           AND buc.status = 'applied'
+           AND buc.sequence_no =
+             (SELECT MIN(buc2.sequence_no)
+              FROM blocks_user_commands buc2
+              INNER JOIN user_commands uc2
+                ON buc2.user_command_id = uc2.id
+                AND uc2.receiver_id = u.receiver_iD
+                AND buc2.block_id = buc.block_id)
+         WHERE buc.block_id = ?
+        |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
       Conn.collect_list query id
@@ -664,15 +874,27 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no) i.id, i.command_type, i.receiver_id, i.fee, i.hash,
-            ac.creation_fee, pk.value as receiver,
-            bic.sequence_no, bic.secondary_sequence_no
-        FROM internal_commands i
-        INNER JOIN blocks_internal_commands bic ON bic.internal_command_id = i.id
-        INNER JOIN account_identifiers ai on ai.id = i.receiver_id
-        LEFT JOIN accounts_created ac on ac.account_identifier_id = ai.id
-        INNER JOIN public_keys pk ON pk.id = ai.public_key_id
-        WHERE bic.block_id = ?
+        {|
+         SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
+           i.id,
+           i.command_type,
+           i.receiver_id,
+           i.fee,
+           i.hash,
+           ac.creation_fee,
+           pk.value as receiver,
+           bic.sequence_no,
+           bic.secondary_sequence_no
+         FROM internal_commands i
+         INNER JOIN blocks_internal_commands bic
+           ON bic.internal_command_id = i.id
+         INNER JOIN public_keys pk
+           ON pk.id = i.receiver_id
+         INNER JOIN account_identifiers ai
+           ON ai.public_key_id = receiver_id
+         LEFT JOIN accounts_created ac
+           ON ac.account_identifier_id = ai.id
+         WHERE bic.block_id = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -722,18 +944,26 @@ WITH RECURSIVE chain AS (
     let query =
       Caqti_request.collect Caqti_type.int typ
         {| 
-  SELECT zc.id, zc.memo, zc.hash,
-    pk_fee_payer.value as fee_payer, zfpb.fee, zfpb.valid_until, zfpb.nonce,
-    bzc.sequence_no, bzc.status,
-    array(SELECT unnest(zauf.failures)
-          FROM zkapp_account_update_failures zauf
-          WHERE zauf.id = ANY (bzc.failure_reasons_ids))
-FROM blocks_zkapp_commands bzc
- INNER JOIN zkapp_commands zc on zc.id = bzc.zkapp_command_id
- INNER JOIN zkapp_fee_payer_body zfpb on zc.zkapp_fee_payer_body_id = zfpb.id
- INNER JOIN account_identifiers ai_fee_payer on ai_fee_payer.id = zfpb.account_identifier_id
- INNER JOIN public_keys pk_fee_payer on ai_fee_payer.public_key_id = pk_fee_payer.id
-WHERE bzc.block_id = ?
+         SELECT zc.id,
+                zc.memo,
+                zc.hash,
+                pk_fee_payer.value as fee_payer,
+                zfpb.fee,
+                zfpb.valid_until,
+                zfpb.nonce,
+                bzc.sequence_no,
+                bzc.status,
+                array(SELECT unnest(zauf.failures)
+                      FROM zkapp_account_update_failures zauf
+                      WHERE zauf.id = ANY (bzc.failure_reasons_ids))
+         FROM blocks_zkapp_commands bzc
+         INNER JOIN zkapp_commands zc
+           ON zc.id = bzc.zkapp_command_id
+         INNER JOIN zkapp_fee_payer_body zfpb
+           ON zc.zkapp_fee_payer_body_id = zfpb.id
+         INNER JOIN public_keys pk_fee_payer
+           ON zfpb.public_key_id = pk_fee_payer.id
+         WHERE bzc.block_id = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -758,19 +988,33 @@ WHERE bzc.block_id = ?
     let query =
       Caqti_request.collect Caqti_type.int typ
         {|
-SELECT zaub.account_identifier_id, zaub.id,
-    zaub.balance_change, zaub.increment_nonce, zaub.events_id,
-    zaub.actions_id, zaub.call_data_id, zaub.call_depth,
-    zaub.zkapp_network_precondition_id, zaub.zkapp_account_precondition_id,
-    zaub.use_full_commitment, zaub.may_use_token, zaub.authorization_kind,
-    pk.value as account, bzc.status
-FROM zkapp_commands zc
- INNER JOIN blocks_zkapp_commands bzc on bzc.zkapp_command_id = zc.id
- INNER JOIN zkapp_account_update zau on zau.id = ANY(zc.zkapp_account_updates_ids)
- INNER JOIN zkapp_account_update_body zaub on zaub.id = zau.body_id
- INNER JOIN account_identifiers ai on ai.id = zaub.account_identifier_id
- INNER JOIN public_keys pk on ai.public_key_id = pk.id
-WHERE zc.id = ?
+         SELECT zaub.account_identifier_id,
+                zaub.id,
+                zaub.balance_change,
+                zaub.increment_nonce,
+                zaub.events_id,
+                zaub.actions_id,
+                zaub.call_data_id,
+                zaub.call_depth,
+                zaub.zkapp_network_precondition_id,
+                zaub.zkapp_account_precondition_id,
+                zaub.use_full_commitment,
+                zaub.may_use_token,
+                zaub.authorization_kind,
+                pk.value as account,
+                bzc.status
+         FROM zkapp_commands zc
+         INNER JOIN blocks_zkapp_commands bzc
+           ON bzc.zkapp_command_id = zc.id
+         INNER JOIN zkapp_account_update zau
+           ON zau.id = ANY(zc.zkapp_account_updates_ids)
+         INNER JOIN zkapp_account_update_body zaub
+           ON zaub.id = zau.body_id
+         INNER JOIN account_identifiers ai
+           ON ai.id = zaub.account_identifier_id
+         INNER JOIN public_keys pk
+           ON ai.public_key_id = pk.id
+         WHERE zc.id = ?
     |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =

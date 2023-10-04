@@ -21,17 +21,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   (* TODO: test account creation fee *)
   let config =
     let open Test_config in
-    let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
-        ~vesting_increment : Mina_base.Account_timing.t =
-      let open Currency in
-      Timed
-        { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
-        ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
-        ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
-        ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
-        ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
-        }
-    in
     { default with
       requires_graphql = true
     ; genesis_ledger =
@@ -81,10 +70,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
     in
     let untimed_node_a =
       Core.String.Map.find_exn
@@ -543,6 +533,26 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Currency.Balance.to_mina_string key_1_balance_actual)
              (Currency.Balance.to_mina_string key_2_balance_actual)
              (Currency.Amount.to_mina_string key_2_balance_expected) )
+    in
+    let%bind () =
+      section "delegate all mina currency from node_b to node_a"
+        (let delegation_receiver = untimed_node_a in
+         let%bind delegation_receiver_pub_key =
+           pub_key_of_node delegation_receiver
+         in
+         let delegation_sender = untimed_node_b in
+         let%bind delegation_sender_pub_key =
+           pub_key_of_node delegation_sender
+         in
+         let%bind { hash; _ } =
+           Integration_test_lib.Graphql_requests.must_send_delegation ~logger
+             (Network.Node.get_ingress_uri delegation_sender)
+             ~sender_pub_key:delegation_sender_pub_key
+             ~receiver_pub_key:delegation_receiver_pub_key ~fee
+         in
+         wait_for t
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~txn_hash:hash ~node_included_in:`Any_node ) )
     in
     section_hard "running replayer"
       (let%bind logs =
