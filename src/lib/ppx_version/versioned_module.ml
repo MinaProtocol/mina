@@ -52,7 +52,7 @@
      have that annotation). That mimics the way all types were
      serialized in the original Mina mainnet. The representation of
      some values, like public keys, rely on the `Bin_prot`
-     serialization, so we require this annotation in order to maintain
+     serialization, so this annotation is required in order to maintain
      that representation.
 
    A related annotation is:
