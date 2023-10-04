@@ -10,7 +10,7 @@
       ...
    end]
 
-   Within a `Stable` module, there may be arbitrarily many versioned
+   Within a `Stable` module, there can be arbitrarily many versioned
    type modules, which must be listed in descending numeric order (most recent
    version first).
 
