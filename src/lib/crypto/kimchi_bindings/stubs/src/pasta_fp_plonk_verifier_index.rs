@@ -10,7 +10,7 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use kimchi::circuits::constraints::FeatureFlags;
 use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupPatterns};
 use kimchi::circuits::polynomials::permutation::Shifts;
-use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
+use kimchi::circuits::polynomials::permutation::{permutation_vanishing_polynomial, zk_w};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fp, Pallas, Vesta};
@@ -110,43 +110,51 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<V
         };
 
         // TODO dummy_lookup_value ?
-        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
+        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true, 3);
 
         VerifierIndex::<Vesta, OpeningProof<Vesta>> {
             domain,
             max_poly_size: index.max_poly_size as usize,
-            srs: { Arc::clone(&index.srs.0) },
             public: index.public as usize,
             prev_challenges: index.prev_challenges as usize,
+            powers_of_alpha,
+            srs: { Arc::clone(&index.srs.0) },
+
+            zk_rows: 3,
+
             sigma_comm,
             coefficients_comm,
             generic_comm: evals.generic_comm.into(),
+
             psm_comm: evals.psm_comm.into(),
+
             complete_add_comm: evals.complete_add_comm.into(),
             mul_comm: evals.mul_comm.into(),
             emul_comm: evals.emul_comm.into(),
             endomul_scalar_comm: evals.endomul_scalar_comm.into(),
+
+            xor_comm: evals.xor_comm.map(Into::into),
             range_check0_comm: evals.range_check0_comm.map(Into::into),
             range_check1_comm: evals.range_check1_comm.map(Into::into),
-            xor_comm: evals.xor_comm.map(Into::into),
-            rot_comm: evals.rot_comm.map(Into::into),
             foreign_field_add_comm: evals.foreign_field_add_comm.map(Into::into),
             foreign_field_mul_comm: evals.foreign_field_mul_comm.map(Into::into),
+            rot_comm: evals.rot_comm.map(Into::into),
+
             shift,
-            zkpm: {
+            permutation_vanishing_polynomial_m: {
                 let res = once_cell::sync::OnceCell::new();
-                res.set(zk_polynomial(domain)).unwrap();
+                res.set(permutation_vanishing_polynomial(domain, 3)).unwrap();
                 res
             },
             w: {
                 let res = once_cell::sync::OnceCell::new();
-                res.set(zk_w3(domain)).unwrap();
+                res.set(zk_w(domain, 3)).unwrap();
                 res
             },
             endo: endo_q,
+
             lookup_index: index.lookup_index.map(Into::into),
             linearization,
-            powers_of_alpha,
         }
     }
 }
