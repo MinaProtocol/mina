@@ -78,7 +78,7 @@
 
        `Assoc [("version",`Int n); ("data",<the yojson serialization of `t`>)]
 
-     For example, we use this version-tagged JSON for precomputed and extensional blocks, to know
+     For example, use this version-tagged JSON for precomputed and extensional blocks to know
      which version of the code produced them.
 *)
 
