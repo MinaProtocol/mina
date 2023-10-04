@@ -27,6 +27,6 @@ in Pipeline.build Pipeline.Config::{
     mode = PipelineMode.Type.Stable
   },
   steps = [
-    TestExecutive.execute "hard-fork" dependsOn
+    TestExecutive.executeCloud "hard-fork" dependsOn
   ]
 }

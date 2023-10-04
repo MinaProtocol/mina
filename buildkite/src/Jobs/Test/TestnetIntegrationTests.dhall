@@ -26,7 +26,9 @@ in Pipeline.build Pipeline.Config::{
         S.strictlyStart (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Command/TestExecutive"),
         S.strictlyStart (S.contains "automation/terraform/modules/o1-integration"),
-        S.strictlyStart (S.contains "automation/terraform/modules/kubernetes/testnet")
+        S.strictlyStart (S.contains "automation/terraform/modules/kubernetes/testnet"),
+        S.strictlyStart (S.contains "automation/buildkite/script/run-test-executive-cloud"),
+        S.strictlyStart (S.contains "automation/buildkite/script/run-test-executive-local")
     ],
     path = "Test",
     name = "TestnetIntegrationTests",
@@ -35,17 +37,20 @@ in Pipeline.build Pipeline.Config::{
   steps = [
     TestExecutive.build "integration_tests",
     TestExecutive.buildJs "integration_tests",
-    TestExecutive.execute "peers-reliability" dependsOn,
-    TestExecutive.execute "chain-reliability" dependsOn,
-    TestExecutive.execute "payment" dependsOn,
-    TestExecutive.execute "gossip-consis" dependsOn,
-    TestExecutive.execute "block-prod-prio" dependsOn,
-    TestExecutive.execute "medium-bootstrap" dependsOn,
-    TestExecutive.execute "block-reward" dependsOn,
-    TestExecutive.execute "zkapps" dependsOn,
-    TestExecutive.execute "zkapps-timing" dependsOn,
-    TestExecutive.execute "zkapps-nonce" dependsOn,
-    TestExecutive.execute "verification-key" dependsOn,
+    TestExecutive.executeCloud "peers-reliability" dependsOn,
+    TestExecutive.executeCloud "chain-reliability" dependsOn,
+    TestExecutive.executeCloud "payment" dependsOn,
+    TestExecutive.executeCloud "gossip-consis" dependsOn,
+    TestExecutive.executeCloud "block-prod-prio" dependsOn,
+    TestExecutive.executeCloud "medium-bootstrap" dependsOn,
+    TestExecutive.executeCloud "block-reward" dependsOn,
+    TestExecutive.executeCloud "zkapps" dependsOn,
+    TestExecutive.executeCloud "zkapps-timing" dependsOn,
+    TestExecutive.executeCloud "zkapps-nonce" dependsOn,
+    TestExecutive.executeCloud "verification-key" dependsOn,
+    TestExecutive.executeLocal "gossip-consis" dependsOn,
+    TestExecutive.executeLocal "verification-key" dependsOn,
+    TestExecutive.executeLocal "medium-bootstrap" dependsOn,
     TestExecutive.executeWithJs "snarkyjs" dependsOnJs
   ]
 }

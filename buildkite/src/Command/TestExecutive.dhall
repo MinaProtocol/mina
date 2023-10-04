@@ -36,7 +36,7 @@ in
         target = Size.XLarge
       },
 
-  execute = \(testName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
+  executeCloud = \(testName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
     Command.build
       Command.Config::{
         commands =
@@ -46,13 +46,25 @@ in
               Cmd.run "artifact-cache-helper.sh logproc.exe && chmod +x logproc.exe",
 
               -- Execute test based on BUILD image
-              Cmd.run "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive.sh ${testName}"
+              Cmd.run "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive-cloud.sh ${testName}"
             ],
-        artifact_paths = [SelectFiles.exactly "." "${testName}.test.log"],
+        artifact_paths = [SelectFiles.exactly "." "${testName}.cloud.test.log"],
         label = "${testName} integration test",
         key = "integration-test-${testName}",
         target = Size.Integration,
         depends_on = dependsOn
+      },
+
+  executeLocal = \(testName : Text) ->
+    Command.build
+      Command.Config::{
+        commands = [
+          Cmd.run "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive-local.sh ${testName}"
+        ],
+        artifact_paths = [SelectFiles.exactly "." "${testName}.local.test.log"],
+        label = "${testName} integration test local",
+        key = "integration-test-${testName}-local",
+        target = Size.Integration
       },
 
   buildJs = \(duneProfile : Text) -> 
