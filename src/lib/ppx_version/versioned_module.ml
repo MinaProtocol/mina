@@ -69,7 +69,7 @@
      Therefore, the transaction id contains the information about the
      transaction type version used to create it.
 
-   For JSON serialization, we have:
+   For JSON serialization:
 
      [@@@with_versioned_json]
 
