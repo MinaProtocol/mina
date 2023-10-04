@@ -1,6 +1,3 @@
-;; Don't build tests automatically
-(vendored_dirs test)
-
 (library
  (name ppx_version)
  (public_name ppx_version)
