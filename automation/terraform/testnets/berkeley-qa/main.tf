@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-berkeley-qa.tfstate"
+    key     = "terraform-berkeley-qa-v2.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -14,10 +14,10 @@ provider "aws" {
 }
 
 provider "google" {
-  alias   = "google-us-east4"
+  alias   = "google-northamerica-northeast1"
   project = "o1labs-192920"
-  region  = "us-east4"
-  zone    = "us-east4-b"
+  region  = "northamerica-northeast1"
+  zone    = "northamerica-northeast1-b"
 }
 
 provider "google" {
@@ -60,10 +60,10 @@ variable "plain_node_count" {
 
 locals {
   testnet_name       = "berkeley-qa"
-  mina_image         = "minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-6f9d956-focal"
-  seed_region        = "us-central1"
-  seed_zone          = "us-central1-b"
+  mina_image         = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup3-rampup-264bcac-focal-berkeley"
+  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup3-rampup-264bcac-focal"
+  seed_region        = "northamerica-northeast1"
+  seed_zone          = "northamerica-northeast1-b"
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
   make_report_discord_webhook_url = ""
@@ -81,9 +81,9 @@ module "berkeley" {
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-central1"
-  cluster_region = "us-central1"
-  k8s_context    = "gke_o1labs-192920_us-central1_coda-infra-central1"
+  cluster_name   = "mina-infra-canada"
+  cluster_region = "northamerica-northeast1"
+  k8s_context    = "gke_o1labs-192920_northamerica-northeast1_mina-infra-canada"
   testnet_name   = local.testnet_name
 
   mina_image                  = local.mina_image
@@ -181,4 +181,3 @@ module "berkeley" {
   seed_peers_url                  = "https://storage.googleapis.com/seed-lists/berkeley-qa_seeds.txt"
 
 }
-

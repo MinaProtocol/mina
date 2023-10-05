@@ -60,8 +60,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name       = "berkeley"
-  mina_image         = "minaprotocol/mina-daemon:focal-berkeley-latest" #"minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
-  mina_archive_image = "minaprotocol/mina-archive:focal-latest"         #"minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-6f9d956-focal"
+  mina_image         = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup1-rampup-b1facec-focal-berkeley" #"minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
+  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup1-rampup-b1facec-focal"         #"minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-6f9d956-focal"
   seed_region        = "us-central1"
   seed_zone          = "us-central1-b"
 
@@ -96,7 +96,7 @@ module "berkeley" {
 
   archive_node_count            = 3
   mina_archive_schema           = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/8468f29424fa5e70cfedf69ee281f4fa24037dfe/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/8468f29424fa5e70cfedf69ee281f4fa24037dfe/src/app/archive/zkapp_tables.sql"]
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/b1facecde934ce3969771c34962b878d75321ca7/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/b1facecde934ce3969771c34962b878d75321ca7/src/app/archive/zkapp_tables.sql"]
 
   archive_configs = [
     {
