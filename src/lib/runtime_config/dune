@@ -16,10 +16,11 @@
    data_hash_lib
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   merkle_ledger
    mina_base
    mina_base.import
+   mina_ledger
    mina_numbers
-   signature_lib
    ppx_dhall_type
    snark_params
    unsigned_extended
@@ -27,6 +28,8 @@
    pickles.backend
    pickles_types
    with_hash
+   signature_lib
+   staged_ledger
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson
