@@ -163,7 +163,6 @@ mina-dev daemon \
   --libp2p-keypair ${MINA_LIBP2P_KEYPAIR_PATH} \
   --log-level ${LOG_LEVEL} \
   --proof-level none \
-  --insecure-rest-server \
   --rest-port ${MINA_GRAPHQL_PORT} \
   --run-snark-worker "$SNARK_PRODUCER_PK" \
   --seed \
@@ -180,13 +179,16 @@ until [ $daemon_status == "Synced" ]; do
 done
 
 send_zkapp_txn() {
-  local GRAPHQL_REQUEST="$1"
-  local ENDPOINT="http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
+  local url="http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
+  local query="$1"
 
-  curl -X POST \
-    -H "Content-Type: application/json" \
-    --data "{\"query\":\"$GRAPHQL_REQUEST\"}" \
-    "$ENDPOINT"
+  python3 <<EOF
+import requests
+response = requests.post(url="$url", json={"query": "$query"})
+print("zkApp txn status code:", response.status_code)
+print("zkApp txn response content:", response.text)
+print("zkApp txn request:", response.request.body)
+EOF
 }
 
 echo "========================= ZKAPP ACCOUNT SETTING UP ==========================="
@@ -208,6 +210,7 @@ send_value_transfer_txns() {
 }
 send_value_transfer_txns &
 
+# Start sending zkapp transactions
 ZKAPP_FEE_PAYER_NONCE=1
 ZKAPP_SENDER_NONCE=1
 ZKAPP_STATE=0
