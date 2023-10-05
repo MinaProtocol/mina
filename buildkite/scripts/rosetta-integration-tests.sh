@@ -81,7 +81,7 @@ ZKAPP_FEE_PAYER_PUB_KEY=$(cat ${ZKAPP_FEE_PAYER_KEY}.pub)
 ZKAPP_SENDER_KEY=$MINA_KEYS_PATH/zkapp-sender.key
 ZKAPP_SENDER_PUB_KEY=$(cat ${ZKAPP_SENDER_KEY}.pub)
 ZKAPP_ACCOUNT_KEY=$MINA_KEYS_PATH/zkapp-account.key
-ZKAPP_ACCOUNT_PUB_KEY=$(cat ${ZKAPP_ACCOUNT_KEY}.key.pub)
+ZKAPP_ACCOUNT_PUB_KEY=$(cat ${ZKAPP_ACCOUNT_KEY}.pub)
 
 mkdir -p $MINA_CONFIG_DIR/wallets/store
 cp $MINA_KEYS_PATH/block-producer.key $MINA_CONFIG_DIR/wallets/store/$BLOCK_PRODUCER_PK
@@ -97,7 +97,7 @@ cat <<EOF >"$MINA_CONFIG_FILE"
       { "pk": "${SNARK_PRODUCER_PK}", "balance": "65500.000000000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null }
       { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null },
       { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null },
-      { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null },
+      { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null }
     ]
   }
 }
