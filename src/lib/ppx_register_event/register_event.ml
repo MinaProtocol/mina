@@ -1,3 +1,36 @@
+(* register_event.ml -- deriver for structured events *)
+
+(* When declaring new structured events, add the deriver.
+
+   The constructor for the type can be nullary, or have a record argument
+
+   The registration can specify a `msg` for the event, which can be any
+      string-valued expression, or omit it (in which case the `msg` is
+      computed from the constructor and any argument)
+
+   A `msg` may refer to a record label `f` in the record argument with
+   the syntax `$f`. Such references are checked at compile-time. For a label
+   of type `M.t`, the function `M.to_yojson` must exist.
+
+   Examples:
+
+     -- nullary constructor, no msg
+     type Structured_log_events.t += Foo
+      [@@deriving register_event]
+
+     -- nullary constructor, with string constant msg
+     type Structured_log_events.t += Bar
+      [@@deriving register_event { msg = "got a Bar!" }]
+
+     -- record, with computed msg
+     type Structured_log_events.t += Quux
+      [@@deriving register_event { msg = sprintf "compiled at: %0.02f" (Unix.gettimeofday ()) }]
+
+     -- record, with msg referring to record labels
+     type Structured_log_events.t += Baz of { n : int; s : string; p : M.t }
+      [@@deriving register_event { msg = "n = $n, s = $s, and p = $p" } ]
+*)
+
 open Core_kernel
 open Ppxlib
 
