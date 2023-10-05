@@ -178,11 +178,15 @@ until [ $daemon_status == "Synced" ]; do
   echo "Daemon Status: ${daemon_status}"
 done
 
+echo "--- Which Python? ---"
+which python
+which python3
+
 send_zkapp_txn() {
   local url="http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
   local query="$1"
 
-  python <<EOF
+  python3 <<EOF
 import requests
 response = requests.post(url="$url", json={"query": "$query"})
 print("zkApp txn status code:", response.status_code)
