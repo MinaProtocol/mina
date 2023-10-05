@@ -75,12 +75,18 @@ let combine_split_commitments _t ~scale_and_add ~init:i ~xi (type n)
         ~f:(fun { With_degree_bound.unshifted; shifted } ->
           Array.to_list unshifted @ [ shifted ] )
   in
-  match List.rev flat with
-  | [] ->
-      failwith "combine_split_commitments: empty"
-  | init :: comms ->
-      List.fold_left comms ~init:(i init) ~f:(fun acc p ->
-          scale_and_add ~acc ~xi p )
+  let rec go = function
+    | [] ->
+        failwith "combine_split_commitments: empty"
+    | init :: comms -> (
+        match i init with
+        | None ->
+            go comms
+        | Some init ->
+            List.fold_left comms ~init ~f:(fun acc p ->
+                scale_and_add ~acc ~xi p ) )
+  in
+  go (List.rev flat)
 
 let combine_split_evaluations (type f f')
     ~(mul_and_add : acc:f' -> xi:f' -> f -> f') ~init:(i : f -> f') ~(xi : f')

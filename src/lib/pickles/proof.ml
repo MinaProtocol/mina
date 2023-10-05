@@ -1,7 +1,6 @@
 open Core_kernel
 open Pickles_types
 open Import
-open Common
 open Backend
 
 let hash_fold_array = Pickles_types.Plonk_types.hash_fold_array
@@ -27,15 +26,6 @@ module Base = struct
       ; prev_evals : 'prev_evals
       ; proof : Tick.Proof.t
       }
-  end
-
-  module Double = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type 'a t = 'a * 'a [@@deriving compare, sexp, yojson, hash, equal]
-      end
-    end]
   end
 
   module Wrap = struct
@@ -126,7 +116,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
   let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
-  let lengths = Commitment_lengths.create ~of_int:Fn.id in
+  let lengths = Commitment_lengths.default in
   T
     { statement =
         { proof_state =
@@ -140,7 +130,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                             N1
                         | S (S Z) ->
                             N2
-                        | _ ->
+                        | S _ ->
                             assert false )
                     ; domain_log2 =
                         Branch_data.Domain_log2.of_int_exn domain_log2
@@ -184,23 +174,24 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
               ; lookup = None
               }
           ; openings =
-              { proof =
-                  { lr =
-                      Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ ->
-                          (g0, g0) )
-                  ; z_1 = Ro.tock ()
-                  ; z_2 = Ro.tock ()
-                  ; delta = g0
-                  ; challenge_polynomial_commitment = g0
-                  }
-              ; evals = Dummy.evals.evals.evals
-              ; ft_eval1 = Dummy.evals.ft_eval1
-              }
+              (let evals = Lazy.force Dummy.evals in
+               { proof =
+                   { lr =
+                       Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ ->
+                           (g0, g0) )
+                   ; z_1 = Ro.tock ()
+                   ; z_2 = Ro.tock ()
+                   ; delta = g0
+                   ; challenge_polynomial_commitment = g0
+                   }
+               ; evals = evals.evals.evals
+               ; ft_eval1 = evals.ft_eval1
+               } )
           }
     ; prev_evals =
         (let e =
-           Plonk_types.Evals.map (Evaluation_lengths.create ~of_int:Fn.id)
-             ~f:(fun n -> (tick_arr n, tick_arr n))
+           Plonk_types.Evals.map Evaluation_lengths.default ~f:(fun n ->
+               (tick_arr n, tick_arr n) )
          in
          let ex =
            { Plonk_types.All_evals.With_public_input.public_input =

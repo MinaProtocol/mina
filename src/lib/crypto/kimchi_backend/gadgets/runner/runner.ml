@@ -2,11 +2,15 @@
 module Tick = Kimchi_backend.Pasta.Vesta_based_plonk
 module Impl = Snarky_backendless.Snark.Run.Make (Tick)
 
-let generate_and_verify_proof circuit =
+let generate_and_verify_proof ?cs circuit =
   (* Generate constraint system for the circuit *)
   let constraint_system =
-    Impl.constraint_system ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
-      (fun () () -> circuit ())
+    match cs with
+    | Some cs ->
+        cs
+    | None ->
+        Impl.constraint_system ~input_typ:Impl.Typ.unit
+          ~return_typ:Impl.Typ.unit (fun () () -> circuit ())
   in
   (* Generate the indexes from the constraint system *)
   let proof_keypair =
@@ -28,10 +32,11 @@ let generate_and_verify_proof circuit =
       (fun () () -> circuit ())
       ()
   in
+
   (* Verify proof *)
   let verifier_index = Tick.Keypair.vk proof_keypair in
   (* We have an empty public input; create an empty vector. *)
   let public_input = Kimchi_bindings.FieldVectors.Fp.create () in
   (* Assert that the proof verifies. *)
   assert (Tick.Proof.verify ~message:[] proof verifier_index public_input) ;
-  (proof_keypair, proof)
+  (constraint_system, proof_keypair, proof)

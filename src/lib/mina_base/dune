@@ -40,6 +40,7 @@
    rosetta_coding
    random_oracle
    hash_prefix_states
+   hash_prefix_create
    dummy_values
    currency
    mina_numbers

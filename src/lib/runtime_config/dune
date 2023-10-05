@@ -20,7 +20,6 @@
    mina_base.import
    mina_numbers
    signature_lib
-   ppx_dhall_type
    snark_params
    unsigned_extended
    pickles
@@ -30,4 +29,4 @@
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson
-                  ppx_fields_conv ppx_dhall_type ppx_version ppx_compare)))
+                  ppx_fields_conv ppx_version ppx_compare)))
