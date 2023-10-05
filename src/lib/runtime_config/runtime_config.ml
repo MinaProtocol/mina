@@ -2,10 +2,7 @@ open Core_kernel
 
 module Fork_config = struct
   type t =
-    { previous_state_hash : string
-    ; previous_length : int
-    ; previous_global_slot : int
-    }
+    { previous_state_hash : string; previous_length : int; genesis_slot : int }
   [@@deriving yojson, dhall_type, bin_io_unversioned]
 end
 
@@ -1005,6 +1002,19 @@ let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
   { daemon; genesis; proof; ledger; epoch_data }
 
 let to_yojson x = Json_layout.to_yojson (to_json_layout x)
+
+let to_yojson_without_accounts x =
+  let layout = to_json_layout x in
+  let num_accounts =
+    let%bind.Option ledger = layout.ledger in
+    let%map.Option accounts = ledger.accounts in
+    List.length accounts
+  in
+  let layout =
+    let f ledger = { ledger with Json_layout.Ledger.accounts = None } in
+    { layout with ledger = Option.map ~f layout.ledger }
+  in
+  (Json_layout.to_yojson layout, num_accounts)
 
 let of_yojson json = Result.bind ~f:of_json_layout (Json_layout.of_yojson json)
 

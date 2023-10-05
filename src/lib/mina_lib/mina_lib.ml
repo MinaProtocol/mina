@@ -1608,7 +1608,6 @@ let create ?wallets (config : Config.t) =
                 >>| Result.ok )
           in
           log_snark_coordinator_warning config snark_worker ;
-          Protocol_version.set_current config.initial_protocol_version ;
           Protocol_version.set_proposed_opt config.proposed_protocol_version_opt ;
           let log_rate_limiter_occasionally rl ~label =
             let t = Time.Span.of_min 1. in
@@ -1843,8 +1842,9 @@ let create ?wallets (config : Config.t) =
               ; on_push = notify_online
               ; log_gossip_heard = config.net_config.log_gossip_heard.new_state
               ; time_controller = config.net_config.time_controller
-              ; consensus_constants = config.net_config.consensus_constants
+              ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
+              ; constraint_constants
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
@@ -2019,6 +2019,8 @@ let create ?wallets (config : Config.t) =
                 (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
               ~catchup_mode ~network_transition_reader:block_reader
               ~producer_transition_reader ~most_recent_valid_block
+              ~get_completed_work:
+                (Network_pool.Snark_pool.get_completed_work snark_pool)
               ~notify_online ()
           in
           let ( valid_transitions_for_network

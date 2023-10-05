@@ -26,7 +26,7 @@
    mina_transaction_logic
    )
   (library_flags -linkall)
-  (inline_tests)
+  (inline_tests (flags -verbose -show-counts))
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane ppx_mina))
   (instrumentation (backend bisect_ppx)))
