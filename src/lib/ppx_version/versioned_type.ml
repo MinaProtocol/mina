@@ -1,54 +1,5 @@
 (* versioned_types.ml -- deriver for versioned types *)
 
-(* This deriver is meant to be added automatically when using the
-   %%versioned annotation for `Stable` modules. That code is in
-   versioned_module.ml
-
-   *** You should not need to add this deriver to the `deriving` list explicitly ***
-
-   The deriver accomplishes these goals:
-
-   1) check that a versioned type is always in valid module hierarchy
-   2) versioned types depend only on other versioned types or OCaml built-in types
-
-   The usage in type declarations is:
-
-     [@@deriving version]
-
-   or
-
-     [@@deriving version { option }]
-
-   where the option is one of "rpc" or "binable" (mutally exclusively). For types
-   within signatures, no options are used.
-
-   Within structures, the deriver generates two definitions:
-
-     let version = n
-     let __versioned__ = ()
-
-   where `n` is taken from the surrounding module Vn.
-
-   Within signatures, the deriver generates the definition:
-
-     val __versioned__ : unit
-
-   The purpose of `__versioned__` is to make sure that types referred to in
-   versioned type definitions are themselves versioned.
-
-   Without options (the common case), the type must be named "t", and its definition
-   occurs in the module hierarchy "Stable.Vn" or "Stable.Vn.T", where n is a positive integer.
-
-   The "binable" option asserts that the type is versioned, to allow compilation
-   to proceed. The types referred to in the type are not checked for versioning
-   with this option. It assumes that the type will be serialized using a
-   "Binable.Of_..." or "Make_binable" functors, which relies on the serialization of
-   some other type.
-
-   If "rpc" is true, again, the type must be named "query", "response", or "msg",
-   and the type definition occurs in the hierarchy "Vn.T".
-*)
-
 open Core_kernel
 open Ppxlib
 open Versioned_util
