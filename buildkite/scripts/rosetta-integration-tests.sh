@@ -179,8 +179,8 @@ until [ $daemon_status == "Synced" ]; do
 done
 
 echo "--- Which Python? ---"
-which python
-which python3
+which python || true
+which python3 || true
 
 send_zkapp_txn() {
   local url="http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
