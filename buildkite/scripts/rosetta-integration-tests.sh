@@ -13,9 +13,9 @@ MODE="minimal"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --mode=*)
-      MODE="${1#*=}"
-      ;;
+  --mode=*)
+    MODE="${1#*=}"
+    ;;
   esac
   shift
 done
@@ -70,9 +70,18 @@ echo "=========================== GENERATING GENESIS LEDGER FOR ${MINA_NETWORK} 
 mkdir -p $MINA_KEYS_PATH
 mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/block-producer.key
 mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/snark-producer.key
+mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/zkapp-fee-payer.key
+mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/zkapp-sender.key
+mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/zkapp-account.key
 chmod -R 0700 $MINA_KEYS_PATH
 BLOCK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/block-producer.key.pub)
 SNARK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/snark-producer.key.pub)
+ZKAPP_FEE_PAYER_KEY=$MINA_KEYS_PATH/zkapp-fee-payer.key
+ZKAPP_FEE_PAYER_PUB_KEY=$(cat ${ZKAPP_FEE_PAYER_KEY}.pub)
+ZKAPP_SENDER_KEY=$MINA_KEYS_PATH/zkapp-sender.key
+ZKAPP_SENDER_PUB_KEY=$(cat ${ZKAPP_SENDER_KEY}.pub)
+ZKAPP_ACCOUNT_KEY=$MINA_KEYS_PATH/zkapp-account.key
+ZKAPP_ACCOUNT_PUB_KEY=$(cat ${ZKAPP_ACCOUNT_KEY}.key.pub)
 
 mkdir -p $MINA_CONFIG_DIR/wallets/store
 cp $MINA_KEYS_PATH/block-producer.key $MINA_CONFIG_DIR/wallets/store/$BLOCK_PRODUCER_PK
@@ -84,8 +93,11 @@ cat <<EOF >"$MINA_CONFIG_FILE"
   "ledger": {
     "name": "${MINA_NETWORK}",
     "accounts": [
-      { "pk": "${BLOCK_PRODUCER_PK}", "balance": "1000", "delegate": null, "sk": null },
-      { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null }
+      { "pk": "${BLOCK_PRODUCER_PK}", "balance": "11550000.000000000", "delegate": null, "sk": null },
+      { "pk": "${SNARK_PRODUCER_PK}", "balance": "65500.000000000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null }
+      { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null },
+      { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null },
+      { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null },
     ]
   }
 }
@@ -151,6 +163,7 @@ mina-dev daemon \
   --libp2p-keypair ${MINA_LIBP2P_KEYPAIR_PATH} \
   --log-level ${LOG_LEVEL} \
   --proof-level none \
+  --insecure-rest-server \
   --rest-port ${MINA_GRAPHQL_PORT} \
   --run-snark-worker "$SNARK_PRODUCER_PK" \
   --seed \
@@ -165,6 +178,25 @@ until [ $daemon_status == "Synced" ]; do
   daemon_status=$(mina-dev client status --json | jq -r .sync_status 2>/dev/null || echo "Pending")
   echo "Daemon Status: ${daemon_status}"
 done
+
+debug_zkapp_output() {
+  echo ""
+  echo ""
+  echo "=========== DEBUG ZKAPP TXN (Start) ==========="
+  echo ""
+  echo ""
+  echo ${1}
+  echo ""
+  echo ""
+  echo "=========== DEBUG ZKAPP TXN (End) ==========="
+  echo ""
+  echo ""
+}
+
+echo "========================= ZKAPP ACCOUNT SETTING UP ==========================="
+QUERY=$(zkapp_test_transaction create-zkapp-account --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce 0 --sender-key ${ZKAPP_SENDER_KEY} --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY} --fee 5 | sed 1,7d)
+# TODO: Send txn against "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
+debug_zkapp_output "${QUERY}"
 
 # Unlock Genesis Accounts
 echo "==================== UNLOCKING GENESIS ACCOUNTS ======================"
@@ -181,7 +213,27 @@ send_payments() {
 }
 send_payments &
 
-next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"')  curr_time=$(date +%s%N | cut -b1-13)
+ZKAPP_FEE_PAYER_NONCE=1
+ZKAPP_SENDER_NONCE=1
+ZKAPP_STATE=0
+send_zkapp_transactions() {
+  while true; do
+    QUERY=$(zkapp_test_transaction transfer-funds-one-receiver --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce ${ZKAPP_FEE_PAYER_NONCE} --sender-key ${ZKAPP_SENDER_KEY} --sender-nonce ${ZKAPP_SENDER_NONCE} --receiver-amount 1 --fee 5 --receiver ${ZKAPP_ACCOUNT_PUB_KEY} | sed 1,5d)
+    # TODO: Send txn against "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
+    debug_zkapp_output "${QUERY}"
+    let ZKAPP_FEE_PAYER_NONCE++
+    let ZKAPP_SENDER_NONCE++
+
+    QUERY=$(zkapp_test_transaction update-state --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce ${ZKAPP_FEE_PAYER_NONCE} --zkapp-account-key ${ZKAPP_SENDER_KEY} --zkapp-state ${ZKAPP_STATE} --fee 5 | sed 1,5d)
+    # TODO: Send txn against "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
+    debug_zkapp_output "${QUERY}"
+    let ZKAPP_FEE_PAYER_NONCE++
+    let ZKAPP_STATE++
+  done
+}
+send_zkapp_transactions &
+
+next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
 sleep_time=$((($next_block_time - $curr_time) / 1000))
 echo "Sleeping for ${sleep_time}s until next block is created..."
 sleep ${sleep_time}
