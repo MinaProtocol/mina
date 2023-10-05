@@ -65,13 +65,16 @@ Modules in structures with versioned types are annotated:
     module Stable = struct
       module Vn = struct
         type t = ...
+		let to_latest = ...
       end
      ...
   end]
 
 Within a `Stable` module, there can be arbitrarily many versioned type
 modules, which must be listed in descending numeric order (most recent
-version first).
+version first). A versioned module must define `to_latest`, which
+takes instances of the type `t` to instances of the most recent type
+version.
 
 Modules in signatures are annotated similarly (note the colon):
 
@@ -85,7 +88,7 @@ Modules in signatures are annotated similarly (note the colon):
 
 The annotation generates a deriver list for the type that includes
 `bin_io` and `version`, which are added to any other deriver items
-already listed
+already listed.
 
 Just past the most recent Vn, a definition is generated:
 
@@ -138,6 +141,12 @@ the `yojson` deriver is used in `Vn.t`, then `Vn.to_yojson` generates:
 
 For example, use this version-tagged JSON for precomputed and
 extensional blocks to know which version of the code produced them.
+
+Using %%versioned on a `Stable` module generates code that registers a
+shape, that is, an instance of `Bin_prot.Shape.t`, for each versioned
+type defined in that module. That supports the CLI command
+`mina internal dump-type-shapes`, which prints shapes for all versioned
+types.
 
 Syntax linter
 -------------
