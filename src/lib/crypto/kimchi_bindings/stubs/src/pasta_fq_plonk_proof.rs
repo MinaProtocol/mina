@@ -70,7 +70,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .expect("the witness should be a column of 15 vectors");
-    let index: &ProverIndex<Pallas> = &index.as_ref().0;
+    let index: &ProverIndex<Pallas, OpeningProof<Pallas>> = &index.as_ref().0;
 
     let runtime_tables: Vec<RuntimeTable<Fq>> =
         runtime_tables.into_iter().map(Into::into).collect();
@@ -115,6 +115,7 @@ pub fn caml_pasta_fq_plonk_proof_verify(
         Pallas,
         DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
+        OpeningProof<Pallas>,
     >(&group_map, &[context])
     .is_ok()
 }
@@ -129,12 +130,13 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
         .into_iter()
         .zip(proofs.into_iter())
         .map(|(caml_index, caml_proof)| {
-            let verifier_index: VerifierIndex<Pallas> = caml_index.into();
-            let (proof, public_input): (ProverProof<_>, Vec<_>) = caml_proof.into();
+            let verifier_index: VerifierIndex<Pallas, OpeningProof<Pallas>> = caml_index.into();
+            let (proof, public_input): (ProverProof<Pallas, OpeningProof<Pallas>>, Vec<_>) =
+                caml_proof.into();
             (verifier_index, proof, public_input)
         })
         .collect();
-    let ts_ref: Vec<_> = ts
+    let ts_ref: Vec<Context<Pallas, OpeningProof<Pallas>>> = ts
         .iter()
         .map(|(verifier_index, proof, public_input)| Context {
             verifier_index,
@@ -148,6 +150,7 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
         Pallas,
         DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
+        OpeningProof<Pallas>,
     >(&group_map, &ts_ref)
     .is_ok()
 }
