@@ -1,14 +1,5 @@
 (* missing_blocks_auditor.ml *)
 
-(* missing_blocks_auditor looks for blocks without parent blocks in an
-   archive database.
-
-   The app also looks for blocks marked as pending that are lower
-   (have a lesser height) than the highest (most recent) canonical
-   block. There can be such blocks if blocks are added when there are
-   missing blocks in the database.
-*)
-
 open Core_kernel
 open Async
 
