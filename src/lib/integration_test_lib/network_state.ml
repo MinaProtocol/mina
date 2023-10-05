@@ -273,10 +273,10 @@ module Make
                   ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 let node_initialization' =
                   String.Map.set state.node_initialization
-                    ~key:(Node.infra_id node) ~data:false
+                    ~key:(Node.id node) ~data:false
                 in
                 let best_tips_by_node' =
-                  String.Map.remove state.best_tips_by_node (Node.infra_id node)
+                  String.Map.remove state.best_tips_by_node (Node.id node)
                 in
                 { state with
                   node_initialization = node_initialization'
@@ -293,7 +293,7 @@ module Make
                   ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 let blocks_seen_by_node' =
                   String.Map.update state.blocks_seen_by_node
-                    (Node.infra_id node) ~f:(fun block_set ->
+                    (Node.id node) ~f:(fun block_set ->
                       State_hash.Set.add
                         (Option.value block_set ~default:State_hash.Set.empty)
                         breadcrumb.state_hash )
