@@ -117,8 +117,8 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , 'max_local_max_proofs_verifieds )
          Full_signature.t
       -> ('prev_varss, 'branches) Hlist.Length.t
-      -> ( ( Wrap_main_inputs.Inner_curve.Constant.t
-           , Wrap_main_inputs.Inner_curve.Constant.t option )
+      -> ( ( Wrap_main_inputs.Inner_curve.Constant.t array
+           , Wrap_main_inputs.Inner_curve.Constant.t array option )
            Wrap_verifier.index'
          , 'branches )
          Vector.t
@@ -727,7 +727,11 @@ struct
         let step handler next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
-            ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
+            ~self ~step_domains
+            ~self_dlog_plonk_index:
+              ((* TODO *) Plonk_verification_key_evals.map
+                 ~f:(fun x -> [| x |])
+                 wrap_vk.commitments )
             ~public_input ~auxiliary_typ ~feature_flags
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
             wrap_vk.index
@@ -771,8 +775,12 @@ struct
             Wrap.wrap ~proof_cache ~max_proofs_verified:Max_proofs_verified.n
               ~feature_flags ~actual_feature_flags:b.feature_flags
               full_signature.maxes wrap_requests ?tweak_statement
-              ~dlog_plonk_index:wrap_vk.commitments wrap_main ~typ ~step_vk
-              ~step_plonk_indices:(Lazy.force step_vks) ~actual_wrap_domains
+              ~dlog_plonk_index:
+                ((* TODO *) Plonk_verification_key_evals.map
+                   ~f:(fun x -> [| x |])
+                   wrap_vk.commitments )
+              wrap_main ~typ ~step_vk ~step_plonk_indices:(Lazy.force step_vks)
+              ~actual_wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
           in
@@ -819,7 +827,10 @@ struct
       ; proofs_verifieds
       ; max_proofs_verified
       ; public_input = typ
-      ; wrap_key = Lazy.map wrap_vk ~f:Verification_key.commitments
+      ; wrap_key =
+          Lazy.map wrap_vk ~f:(fun x ->
+              Plonk_verification_key_evals.map (Verification_key.commitments x)
+                ~f:(fun x -> [| x |]) )
       ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
       ; wrap_domains
       ; step_domains
@@ -847,7 +858,9 @@ module Side_loaded = struct
           ~log_2_domain_size:(Lazy.force d.wrap_vk).domain.log_size_of_group
       in
       { wrap_vk = Some (Lazy.force d.wrap_vk)
-      ; wrap_index = Lazy.force d.wrap_key
+      ; wrap_index =
+          Plonk_verification_key_evals.map (Lazy.force d.wrap_key) ~f:(fun x ->
+              x.(0) )
       ; max_proofs_verified =
           Pickles_base.Proofs_verified.of_nat (Nat.Add.n d.max_proofs_verified)
       ; actual_wrap_domain_size
