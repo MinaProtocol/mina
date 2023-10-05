@@ -97,8 +97,8 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
         | Some _ ->
             ()
         | None ->
-            [%log error] "Validation timed out on $block"
-              ~metadata:[ ("block", Mina_block.to_yojson state) ] ) ;
+            [%log error] "Validation timed out on block $state_hash"
+              ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ) ;
       Perf_histograms.add_span ~name:"external_transition_latency"
         (Core.Time.abs_diff
            Block_time.(now time_controller |> to_time_exn)

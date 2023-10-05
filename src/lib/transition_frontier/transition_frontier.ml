@@ -455,12 +455,15 @@ let add_breadcrumb_exn t breadcrumb =
     Mina_block.Validated.valid_commands
     @@ Breadcrumb.validated_transition breadcrumb
   in
+  let tx_hash_json =
+    Fn.compose
+      Mina_transaction.Transaction_hash.(Fn.compose to_yojson hash_command)
+      User_command.forget_check
+  in
   [%str_log' trace t.logger] Added_breadcrumb_user_commands
     ~metadata:
       [ ( "user_commands"
-        , `List
-            (List.map user_cmds
-               ~f:(With_status.to_yojson User_command.Valid.to_yojson) ) )
+        , `List (List.map user_cmds ~f:(With_status.to_yojson tx_hash_json)) )
       ; ("state_hash", State_hash.to_yojson (Breadcrumb.state_hash breadcrumb))
       ] ;
   let lite_diffs =
@@ -595,7 +598,6 @@ module For_tests = struct
     let constraint_constants = precomputed_values.constraint_constants in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let transition_receipt_time = Some (Time.now ()) in
-        Protocol_version.(set_current zero) ;
         let genesis_transition =
           Mina_block.Validated.lift (Mina_block.genesis ~precomputed_values)
         in
