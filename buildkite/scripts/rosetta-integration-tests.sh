@@ -179,54 +179,47 @@ until [ $daemon_status == "Synced" ]; do
   echo "Daemon Status: ${daemon_status}"
 done
 
-debug_zkapp_output() {
-  echo ""
-  echo ""
-  echo "=========== DEBUG ZKAPP TXN (Start) ==========="
-  echo ""
-  echo ""
-  echo ${1}
-  echo ""
-  echo ""
-  echo "=========== DEBUG ZKAPP TXN (End) ==========="
-  echo ""
-  echo ""
+send_zkapp_txn() {
+  local GRAPHQL_REQUEST="$1"
+  local ENDPOINT="http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
+
+  curl -X POST \
+    -H "Content-Type: application/json" \
+    --data "{\"query\":\"$GRAPHQL_REQUEST\"}" \
+    "$ENDPOINT"
 }
 
 echo "========================= ZKAPP ACCOUNT SETTING UP ==========================="
-QUERY=$(zkapp_test_transaction create-zkapp-account --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce 0 --sender-key ${ZKAPP_SENDER_KEY} --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY} --fee 5 | sed 1,7d)
-# TODO: Send txn against "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
-debug_zkapp_output "${QUERY}"
+ZKAPP_TXN_QUERY=$(zkapp_test_transaction create-zkapp-account --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce 0 --sender-key ${ZKAPP_SENDER_KEY} --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY} --fee 5 | sed 1,7d)
+send_zkapp_txn "${ZKAPP_TXN_QUERY}"
 
 # Unlock Genesis Accounts
 echo "==================== UNLOCKING GENESIS ACCOUNTS ======================"
 mina-dev accounts unlock --public-key $BLOCK_PRODUCER_PK
 mina-dev accounts unlock --public-key $SNARK_PRODUCER_PK
 
-# Start sending payments
-send_payments() {
+# Start sending value transfer transactions
+send_value_transfer_txns() {
   mina-dev client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -nonce 0 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
   while true; do
     sleep $TRANSACTION_FREQUENCY
     mina-dev client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
   done
 }
-send_payments &
+send_value_transfer_txns &
 
 ZKAPP_FEE_PAYER_NONCE=1
 ZKAPP_SENDER_NONCE=1
 ZKAPP_STATE=0
 send_zkapp_transactions() {
   while true; do
-    QUERY=$(zkapp_test_transaction transfer-funds-one-receiver --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce ${ZKAPP_FEE_PAYER_NONCE} --sender-key ${ZKAPP_SENDER_KEY} --sender-nonce ${ZKAPP_SENDER_NONCE} --receiver-amount 1 --fee 5 --receiver ${ZKAPP_ACCOUNT_PUB_KEY} | sed 1,5d)
-    # TODO: Send txn against "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
-    debug_zkapp_output "${QUERY}"
+    ZKAPP_TXN_QUERY=$(zkapp_test_transaction transfer-funds-one-receiver --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce ${ZKAPP_FEE_PAYER_NONCE} --sender-key ${ZKAPP_SENDER_KEY} --sender-nonce ${ZKAPP_SENDER_NONCE} --receiver-amount 1 --fee 5 --receiver ${ZKAPP_ACCOUNT_PUB_KEY} | sed 1,5d)
+    send_zkapp_txn "${ZKAPP_TXN_QUERY}"
     let ZKAPP_FEE_PAYER_NONCE++
     let ZKAPP_SENDER_NONCE++
 
-    QUERY=$(zkapp_test_transaction update-state --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce ${ZKAPP_FEE_PAYER_NONCE} --zkapp-account-key ${ZKAPP_SENDER_KEY} --zkapp-state ${ZKAPP_STATE} --fee 5 | sed 1,5d)
-    # TODO: Send txn against "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
-    debug_zkapp_output "${QUERY}"
+    ZKAPP_TXN_QUERY=$(zkapp_test_transaction update-state --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce ${ZKAPP_FEE_PAYER_NONCE} --zkapp-account-key ${ZKAPP_SENDER_KEY} --zkapp-state ${ZKAPP_STATE} --fee 5 | sed 1,5d)
+    send_zkapp_txn "${ZKAPP_TXN_QUERY}"
     let ZKAPP_FEE_PAYER_NONCE++
     let ZKAPP_STATE++
   done
