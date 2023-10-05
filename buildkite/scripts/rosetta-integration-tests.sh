@@ -182,7 +182,7 @@ send_zkapp_txn() {
   local url="http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
   local query="$1"
 
-  python3 <<EOF
+  python <<EOF
 import requests
 response = requests.post(url="$url", json={"query": "$query"})
 print("zkApp txn status code:", response.status_code)
