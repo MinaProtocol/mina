@@ -94,7 +94,7 @@ cat <<EOF >"$MINA_CONFIG_FILE"
     "name": "${MINA_NETWORK}",
     "accounts": [
       { "pk": "${BLOCK_PRODUCER_PK}", "balance": "11550000.000000000", "delegate": null, "sk": null },
-      { "pk": "${SNARK_PRODUCER_PK}", "balance": "65500.000000000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null }
+      { "pk": "${SNARK_PRODUCER_PK}", "balance": "65500.000000000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null },
       { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null },
       { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null },
       { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null }
