@@ -178,7 +178,11 @@ until [ $daemon_status == "Synced" ]; do
   echo "Daemon Status: ${daemon_status}"
 done
 
-echo "--- Which Python? ---"
+# Install Python3 and dependencies
+apt-get install --no-install-recommends --quiet --yes python3 python3-pip
+pip3 install requests
+
+echo "Which Python?"
 which python || true
 which python3 || true
 
