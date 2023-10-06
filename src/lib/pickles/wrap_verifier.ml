@@ -186,7 +186,8 @@ struct
 
   module One_hot_vector = One_hot_vector.Make (Impl)
 
-  type ('a, 'a_opt) index' = ('a, 'a_opt) Plonk_verification_key_evals.Step.t
+  type ('comm, 'comm_opt) index' =
+    ('comm, 'comm_opt) Plonk_verification_key_evals.Step.t
 
   (* Mask out the given vector of indices with the given one-hot vector *)
   let choose_key :
