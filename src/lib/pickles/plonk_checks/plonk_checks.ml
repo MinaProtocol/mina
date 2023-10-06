@@ -5,9 +5,6 @@ module Scalars = Scalars
 module Domain = Domain
 module Opt = Opt
 
-type 'field vanishing_polynomial_domain =
-  < vanishing_polynomial : 'field -> 'field >
-
 type 'field plonk_domain =
   < vanishing_polynomial : 'field -> 'field
   ; shifts : 'field Plonk_types.Shifts.t

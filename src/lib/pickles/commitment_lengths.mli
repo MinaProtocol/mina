@@ -5,7 +5,7 @@
     understanding of the different polynomials involved in a proof.
 *)
 
-(** [create ~of_int] returns a tuple of naturals [(length_w, length_z, length_t)]
+(** [default] returns a tuple of naturals [(length_w, length_z, length_t)]
     encoding at the type level the number of polynomials we must commit to.
     - [length_w] is the number of wires. It must be in line with
       {Plonk_types.Commons}.
@@ -15,9 +15,8 @@
     Encoding the size at the type level allows to check at compile time the
     length of vectors, and avoid runtime checks.
 *)
-val create :
-     of_int:(int -> 'a)
-  -> ( 'a Pickles_types.Plonk_types.Columns_vec.t
-     , 'a
-     , 'a )
-     Pickles_types.Plonk_types.Messages.Poly.t
+val default :
+  ( int Pickles_types.Plonk_types.Columns_vec.t
+  , int
+  , int )
+  Pickles_types.Plonk_types.Messages.Poly.t

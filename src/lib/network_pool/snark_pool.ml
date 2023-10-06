@@ -411,11 +411,10 @@ struct
                 :: metadata ) ;
             invalid "prover not permitted to receive fees" )
           else if not (work_is_referenced t work) then (
-            [%log' debug t.logger] "Work $stmt not referenced"
+            [%log' debug t.logger] "Work for $work_ids not referenced"
               ~metadata:
-                ( ( "stmt"
-                  , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
-                      work )
+                ( ( "work_ids"
+                  , Transaction_snark_work.Statement.compact_json work )
                 :: metadata ) ;
             invalid "work not referenced" )
           else

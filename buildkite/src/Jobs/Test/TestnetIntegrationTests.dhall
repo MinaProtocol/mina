@@ -32,7 +32,8 @@ in Pipeline.build Pipeline.Config::{
     ],
     path = "Test",
     name = "TestnetIntegrationTests",
-    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ],
+    mode = PipelineMode.Type.Stable
   },
   steps = [
     TestExecutive.build "integration_tests",

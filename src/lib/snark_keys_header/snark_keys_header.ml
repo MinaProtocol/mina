@@ -89,7 +89,7 @@ module Constraint_constants = struct
     type t =
       { previous_state_hash : string
       ; previous_length : int
-      ; previous_global_slot : int
+      ; genesis_slot : int
       }
     [@@deriving yojson, sexp, ord, equal]
 
