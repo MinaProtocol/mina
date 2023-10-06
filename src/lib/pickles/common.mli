@@ -35,6 +35,9 @@ val bits_to_bytes : bool list -> string
     [Invalid_argument] otherwise.*)
 val finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a
 
+(** See https://o1-labs.github.io/proof-systems/plonk/maller_15.html.
+    TODO: functorize
+*)
 val ft_comm :
      add:('a -> 'a -> 'a)
   -> scale:('a -> 'b -> 'a)
