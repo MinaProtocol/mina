@@ -25,9 +25,6 @@ let%test_module "Epoch ledger sync tests" =
 
     exception Sync_timeout
 
-    let () =
-      Protocol_version.(set_current @@ create_exn ~major:2 ~minor:0 ~patch:0)
-
     let logger = Logger.create ()
 
     let default_timeout_min = 5.0

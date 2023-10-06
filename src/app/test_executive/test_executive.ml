@@ -364,16 +364,16 @@ let main inputs =
         [%log info] "Starting the daemons within the pods" ;
         let start_print (node : Engine.Network.Node.t) =
           let open Malleable_error.Let_syntax in
-          [%log info] "starting %s ..." (Engine.Network.Node.id node) ;
+          [%log info] "starting %s ..." (Engine.Network.Node.infra_id node) ;
           let%bind res = Engine.Network.Node.start ~fresh_state:false node in
-          [%log info] "%s started" (Engine.Network.Node.id node) ;
+          [%log info] "%s started" (Engine.Network.Node.infra_id node) ;
           Malleable_error.return res
         in
         let seed_nodes =
           network |> Engine.Network.seeds |> Core.String.Map.data
         in
         let non_seed_pods =
-          network |> Engine.Network.all_non_seed_pods |> Core.String.Map.data
+          network |> Engine.Network.all_non_seed_nodes |> Core.String.Map.data
         in
         let _offline_node_event_subscription =
           (* Monitor for offline nodes; abort the test if a node goes down
@@ -381,7 +381,7 @@ let main inputs =
           *)
           Dsl.Event_router.on (Dsl.event_router dsl) Node_offline
             ~f:(fun offline_node () ->
-              let node_name = Engine.Network.Node.app_id offline_node in
+              let node_name = Engine.Network.Node.infra_id offline_node in
               [%log info] "Detected node offline $node"
                 ~metadata:[ ("node", `String node_name) ] ;
               if Engine.Network.Node.should_be_running offline_node then (
