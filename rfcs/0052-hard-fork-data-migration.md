@@ -43,7 +43,7 @@ runs only against the new database.
 These applications can be run in sequence to get a fully-migrated
 database. They should be able to work incrementally, so that part of
 the mainnet database can be migrated and, as new blocks are added on
-mainnet, the new data in the databannnnnse can be migrated.
+mainnet, the new data in the database can be migrated.
 
 To obtain that incrementality, the first application can look at the
 migrated database, and determine the most recent migrated block. It
