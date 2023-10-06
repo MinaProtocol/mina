@@ -38,10 +38,8 @@ val finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a
 val ft_comm :
      add:('a -> 'a -> 'a)
   -> scale:('a -> 'b -> 'a)
-  -> endoscale:('a -> 'c -> 'a)
   -> negate:('a -> 'a)
   -> verification_key:'a Pickles_types.Plonk_verification_key_evals.t
-  -> alpha:'c
   -> plonk:
        ( 'd
        , 'e
