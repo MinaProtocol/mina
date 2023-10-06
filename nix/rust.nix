@@ -8,10 +8,16 @@ let
       # override stdenv.targetPlatform here, if neccesary
     };
   toolchainHashes = {
-    "1.67.0" = "sha256-riZUc+R9V35c/9e8KJUE+8pzpXyl0lRXt3ZkKlxoY0g=";
-    "nightly-2023-02-05" =
-      "sha256-MM8fdvveBEWzpwjH7u6C0F7qSWGPIMpfZWLgVxSqtxY=";
-    # copy this line with the correct toolchain name
+    "1.72" = "sha256-dxE7lmCFWlq0nl/wKcmYvpP9zqQbBitAQgZ1zx9Ooik=";
+    "nightly-2023-09-01" = "sha256-nfYc8EgbYl75yIIHmEEmpux4ZpwaIyuC+g6Hf4y1Hyk=";
+    # copy the placeholder line with the correct toolchain name when adding a new toolchain
+    # That is,
+    # 1. Put the correct version name;
+    #
+    # 2. Put the hash you get in line "got" from the error you obtain, which looks like
+    #    error: hash mismatch in fixed-output derivation '/nix/store/XXXXX'
+    #          specified: sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+    #             got:    sha256-Q9UgzzvxLi4x9aWUJTn+/5EXekC98ODRU1TwhUs9RnY=
     "placeholder" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   };
   # rust-toolchain.toml -> { rustc, cargo, rust-analyzer, ... }
@@ -150,8 +156,9 @@ in
 
         checkInputs = [ final.nodejs ];
 
-        # other tests require it to be ran in the wasm-bindgen monorepo
-        cargoTestFlags = [ "--test=interface-types" ];
+        # other tests, like --test=wasm-bindgen, require it to be ran in the
+        # wasm-bindgen monorepo
+        cargoTestFlags = [ "--test=interface-types --test=reference" ];
       };
     in
     rustPlatform.buildRustPackage {
@@ -200,4 +207,3 @@ in
     cargoLock.lockFile = ../src/app/trace-tool/Cargo.lock;
   };
 }
-
