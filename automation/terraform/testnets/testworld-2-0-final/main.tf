@@ -103,7 +103,6 @@ module "testworld-2-0" {
     }
   ]
 
-
   mina_faucet_amount = "10000000000"
   mina_faucet_fee    = "100000000"
 
@@ -151,10 +150,6 @@ module "testworld-2-0" {
     }
   ]
 
-  # nodes_with_user_agent = ["fish-1-1","fish-2-1"]
-
-
-
   upload_blocks_to_gcloud         = true
   restart_nodes                   = false
   restart_nodes_every_mins        = "60"
@@ -163,6 +158,39 @@ module "testworld-2-0" {
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
   seed_peers_url                  = "https://storage.googleapis.com/seed-lists/testworld-2-0_seeds.txt"
-
 }
+
+resource "helm_release" "itn-services" {
+  provider  = helm.testnet_deploy
+  name      = "itn-services"
+  chart     = "../../../../helm/itn-services"
+  namespace = kubernetes_namespace.testnet_namespace.metadata[0].name
+
+  #   set {
+  #     name  = "replicaCount"
+  #     value = 3
+  #   }
+
+  depends_on = [module.testworld-2-0] # requires the ITN testnet to deploy first
+}
+
+
+
+# resource "helm_release" "seeds" {
+#   provider = helm.testnet_deploy
+
+#   name       = "${var.testnet_name}-seeds"
+#   repository = var.use_local_charts ? "" : local.mina_helm_repo
+#   chart      = var.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
+#   version    = "1.0.11"
+#   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+#   values = [
+#     yamlencode(local.seed_vars)
+#   ]
+#   wait    = false
+#   timeout = 600
+#   depends_on = [
+#     kubernetes_role_binding.helm_release
+#   ]
+# }
 
