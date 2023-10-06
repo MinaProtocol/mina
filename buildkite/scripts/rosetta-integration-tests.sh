@@ -1,10 +1,8 @@
 #!/bin/bash
+set -eox pipefail
 
 # These tests use the mina-dev binary, as rosetta-cli assumes we use a testnet.
 # See https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L222
-
-set -eo pipefail
-#! /bin/bash
 
 # Defines scope of test. Currently supported are:
 # - minimal -> only quick checks (~5 mins)
@@ -93,11 +91,11 @@ cat <<EOF >"$MINA_CONFIG_FILE"
   "ledger": {
     "name": "${MINA_NETWORK}",
     "accounts": [
-      { "pk": "${BLOCK_PRODUCER_PK}", "balance": "11550000.000000000", "delegate": null, "sk": null },
-      { "pk": "${SNARK_PRODUCER_PK}", "balance": "65500.000000000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null },
-      { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null },
-      { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null },
-      { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "155.000000000", "delegate": null, "sk": null }
+      { "pk": "${BLOCK_PRODUCER_PK}", "balance": "101550000.000000000", "delegate": null, "sk": null },
+      { "pk": "${SNARK_PRODUCER_PK}", "balance": "605500.000000000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null },
+      { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "10055.000000000", "delegate": null, "sk": null },
+      { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "10055.000000000", "delegate": null, "sk": null },
+      { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "10055.000000000", "delegate": null, "sk": null }
     ]
   }
 }
@@ -178,16 +176,14 @@ until [ $daemon_status == "Synced" ]; do
   echo "Daemon Status: ${daemon_status}"
 done
 
-# Install jq
-apt-get install --no-install-recommends --quiet --yes jq
-
 send_zkapp_txn() {
   local GRAPHQL_REQUEST="$1"
+  local ESCAPED_GRAPHQL_REQUEST="${GRAPHQL_REQUEST//\"/\\\"}"
   local ENDPOINT="http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
 
   curl -X POST \
     -H "Content-Type: application/json" \
-    --data "$(echo "{\"query\": $(echo "$GRAPHQL_REQUEST" | jq -R .)}")" \
+    --data "{\"query\":\"$ESCAPED_GRAPHQL_REQUEST\"}" \
     "$ENDPOINT"
 }
 
