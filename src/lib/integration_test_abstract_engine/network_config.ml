@@ -135,9 +135,26 @@ let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
   in
   [%log trace] "Pulled %d keypairs from %s in %s" num_keypairs !keypairs_path
     Time.(abs_diff before @@ now () |> Span.to_string) ;
+  let clean_test_config =
+    match seed_nodes with
+    | [] ->
+        test_config
+    | x :: xs ->
+        if String.equal x.node_name "default-seed" then
+          { test_config with
+            seed_nodes =
+              { Test_config.Seed_node.node_name = x.node_name
+              ; account_name = x.account_name
+              ; docker_image = Some images.mina
+              ; git_build = None
+              }
+              :: xs
+          }
+        else test_config
+  in
   let topology =
-    Test_config.topology_of_test_config test_config private_keys libp2p_keypairs
-      libp2p_peerids
+    Test_config.topology_of_test_config clean_test_config private_keys
+      libp2p_keypairs libp2p_peerids
   in
   let labeled_accounts :
       (Runtime_config.Accounts.single * (Network_keypair.t * Private_key.t))
