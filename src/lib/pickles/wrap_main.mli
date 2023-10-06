@@ -9,12 +9,15 @@ val wrap_main :
      , 'max_local_max_proofs_verifieds )
      Full_signature.t
   -> ('prev_varss, 'branches) Pickles_types.Hlist.Length.t
-  -> ( ( Wrap_main_inputs.Inner_curve.Constant.t
-       , Wrap_main_inputs.Inner_curve.Constant.t option )
+  -> ( ( Wrap_main_inputs.Inner_curve.Constant.t (* commitments *)
+       , Wrap_main_inputs.Inner_curve.Constant.t option
+       (* commitments to optional gates *) )
        Wrap_verifier.index'
      , 'branches )
      Pickles_types.Vector.t
      Core_kernel.Lazy.t
+     (* All the commitments, include commitments to optional gates, saved in a
+        vector of size ['branches] *)
   -> (int, 'branches) Pickles_types.Vector.t
   -> (Import.Domains.t, 'branches) Pickles_types.Vector.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fp.t
