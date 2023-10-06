@@ -178,25 +178,17 @@ until [ $daemon_status == "Synced" ]; do
   echo "Daemon Status: ${daemon_status}"
 done
 
-# Install Python3 and dependencies
-apt-get install --no-install-recommends --quiet --yes python3 python3-pip
-pip3 install requests
-
-echo "Which Python?"
-which python || true
-which python3 || true
+# Install jq
+apt-get install --no-install-recommends --quiet --yes jq
 
 send_zkapp_txn() {
-  local url="http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
-  local query="$1"
+  local GRAPHQL_REQUEST="$1"
+  local ENDPOINT="http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql"
 
-  python3 <<EOF
-import requests
-response = requests.post(url="$url", json={"query": "$query"})
-print("zkApp txn status code:", response.status_code)
-print("zkApp txn response content:", response.text)
-print("zkApp txn request:", response.request.body)
-EOF
+  curl -X POST \
+    -H "Content-Type: application/json" \
+    --data "$(echo "{\"query\": $(echo "$GRAPHQL_REQUEST" | jq -R .)}")" \
+    "$ENDPOINT"
 }
 
 echo "========================= ZKAPP ACCOUNT SETTING UP ==========================="
