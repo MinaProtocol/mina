@@ -164,7 +164,7 @@ module Make
                           in
                           [%log debug] "GOSSIP RECEIVED by $node"
                             ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
-                          [%log debug] "GOSSIP RECEIVED recevied event: $event"
+                          [%log debug] "GOSSIP RECEIVED received event: $event"
                             ~metadata:
                               [ ( "event"
                                 , Event_type.event_to_yojson
@@ -202,7 +202,7 @@ module Make
                 [%log debug]
                   "Updating network state with persisted frontier loaded event \
                    of $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 { state with
                   num_persisted_frontier_loaded =
                     state.num_persisted_frontier_loaded + 1
@@ -216,7 +216,7 @@ module Make
                 [%log debug]
                   "Updating network state with persisted frontier fresh boot \
                    event of $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 { state with
                   num_persisted_frontier_fresh_boot =
                     state.num_persisted_frontier_fresh_boot + 1
@@ -230,7 +230,7 @@ module Make
                 [%log debug]
                   "Updating network state with bootstrap required event of \
                    $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 { state with
                   num_bootstrap_required = state.num_bootstrap_required + 1
                 } ) )
@@ -243,7 +243,7 @@ module Make
                 [%log debug]
                   "Updating network state with persisted frontier dropped \
                    event of $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 { state with
                   num_persisted_frontier_dropped =
                     state.num_persisted_frontier_dropped + 1
@@ -258,7 +258,7 @@ module Make
                 [%log debug]
                   "Updating network state with transition frontier loaded \
                    event of $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 { state with
                   num_transition_frontier_loaded_from_persistence =
                     state.num_transition_frontier_loaded_from_persistence + 1
