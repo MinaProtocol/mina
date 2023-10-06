@@ -242,12 +242,11 @@ let ft_comm ~add:( + ) ~scale ~endoscale:_ ~negate
     done ;
     !res
   in
-  let ( * ) x g = scale g x in
   let _, [ sigma_comm_last ] =
     Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
   let sigma_comm_last = reduce_chunks sigma_comm_last in
-  let f_comm = List.reduce_exn ~f:( + ) [ plonk.perm * sigma_comm_last ] in
+  let f_comm = List.reduce_exn ~f:( + ) [ scale sigma_comm_last plonk.perm ] in
   let chunked_t_comm = reduce_chunks t_comm in
   f_comm + chunked_t_comm
   + negate (scale chunked_t_comm plonk.zeta_to_domain_size)
