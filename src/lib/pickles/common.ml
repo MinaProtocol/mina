@@ -234,6 +234,26 @@ let ft_comm ~add:( + ) ~scale ~negate
     ~verification_key:(m : _ array Plonk_verification_key_evals.t)
     ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
     ~t_comm =
+  (* Compute
+     ```
+       comm.(0)                 + \
+       \zeta^n       * comm.(1) + \
+       \zeta^(2n)    * comm.(2) + \
+       ...                      + \
+       \zeta^(k * n) * comm.(k)
+     ```
+     by computing
+
+     ```
+     comm.(0) + \zeta^n * [
+       ... +
+       comm.(k - 2) + [
+         \zeta^(n) * \
+           [comm.(k - 1) + \zeta^n * comm.(k)]
+       ]
+     ]
+     ```
+  *)
   let reduce_chunks comm =
     let n = Array.length comm in
     let res = ref comm.(n - 1) in
