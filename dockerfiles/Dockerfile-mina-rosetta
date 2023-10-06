@@ -6,6 +6,10 @@
 ARG image=ubuntu:focal
 FROM ${image} AS production
 ARG deb_codename=focal
+ARG deb_version
+ARG deb_release=unstable
+ARG network=mainnet
+
 
 ARG psql_version=13
 
@@ -17,6 +21,23 @@ ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 ARG ROSETTA_CLI_VERSION=v0.10.1
 
 ENV DEBIAN_FRONTEND noninteractive
+
+# We do not install the below platform-specific dependencies,
+# and instead assume that apt will install the proper deps based on the package definition.
+# The packages are noted here just for clarity/documentation.
+# Stretch-only Deps:
+#    libffi6
+#    libprocps6
+#    libjemalloc1
+# Buster-only Deps:
+#    libffi7
+#    libprocps7
+#    libjemalloc2
+# Bullseye/Focal-only Deps:
+#    libffi7
+#    libprocps8
+#    libjemalloc2
+
 
 # --- Dependencies across many platforms
 RUN apt-get update --quiet --yes \
@@ -46,33 +67,6 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
        postgresql-"$psql_version" \
        postgresql-client-"$psql_version"
 
-# --- Debian 11 "Bullseye" Dependencies
-RUN test "$deb_codename" = "bullseye" \
-     && apt-get update -y \
-     && apt-get install -y \
-         libjemalloc2 \
-         libprocps8 \
-         libffi7 \
-     || exit 0
-
-# --- Debian 10 "Buster" Dependencies
-RUN test "$deb_codename" = "buster" \
-     && apt-get update --quiet --yes \
-     && apt-get install --quiet --yes --no-install-recommends \
-         libjemalloc2 \
-         libprocps7 \
-         libffi6 \
-     || exit 0
-
-# --- Ubuntu 20.04 "Focal Fossa" Dependencies
-RUN test "$deb_codename" = "focal" \
-     && apt-get update --quiet --yes \
-     && apt-get install --quiet --yes --no-install-recommends \
-         libjemalloc2 \
-         libprocps8 \
-         libffi7 \
-     || exit 0
-
 # --- Install rosetta-cli
 
 # The following commands install rosetta-cli with an updated rosetta-sdk-go dependency, which supports delegation transactions.
@@ -89,6 +83,16 @@ RUN export GOBIN="$(pwd)/bin" \
   && /usr/lib/go/bin/go mod tidy \
   && /usr/lib/go/bin/go install
 
+
+# Rosetta-demo artifacts / build dir removal:
+# Make rosetta-crucial components and the generate_keypair tool
+#  && dune build --profile=${DUNE_PROFILE} \
+#  && _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+#    --config-file src/app/rosetta/demo-config.json \
+#    --genesis-dir ${HOME}/demo-genesis \
+#  && mv _build/default/src/app $HOME/app \
+#  && rm -rf _build
+
 # --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
 RUN locale-gen en_US.UTF-8
 
@@ -99,15 +103,24 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   > ${MINA_CONFIG_DIR}/wallets/store/${PK} \
   && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
 
-# --- Copy artifacts from the 3-builder stage
-COPY --from=builder /home/opam/app/* /usr/local/bin/
-COPY --from=builder /home/opam/mina/src/app/rosetta/*.sh /rosetta/
-COPY --from=builder /home/opam/mina/src/app/rosetta/*.conf /rosetta/
-COPY --from=builder /home/opam/mina/src/app/rosetta/README.md /rosetta/
-COPY --from=builder /home/opam/mina/src/app/rosetta/rosetta-cli-config/*.json /rosetta/rosetta-cli-config/
-COPY --from=builder /home/opam/mina/src/app/rosetta/rosetta-cli-config/*.ros /rosetta/rosetta-cli-config/
-COPY --from=builder /home/opam/mina/src/app/archive/*.sql /archive/
-COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
+
+# Mina daemon package
+# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
+RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
+  && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+  && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" \
+  && rm -rf /var/lib/apt/lists/*
+
+
+# --- Copy artifacts
+COPY src/app/rosetta/*.sh /rosetta/
+COPY src/app/rosetta/*.conf /rosetta/
+COPY src/app/rosetta/README.md /rosetta/
+COPY src/app/rosetta/rosetta-cli-config/*.json /rosetta/rosetta-cli-config/
+COPY src/app/rosetta/rosetta-cli-config/*.ros /rosetta/rosetta-cli-config/
+COPY src/app/archive/*.sql /archive/
+COPY genesis_ledgers /genesis_ledgers/
 
 # --- Set up postgres
 USER postgres

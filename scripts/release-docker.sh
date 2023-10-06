@@ -95,7 +95,7 @@ mina-batch-txn)
   VERSION="${VERSION}-${NETWORK##*=}"
   ;;
 mina-rosetta)
-  DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-production"
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
   ;;
 mina-zkapp-test-transaction)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
