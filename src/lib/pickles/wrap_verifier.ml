@@ -1192,11 +1192,10 @@ struct
               Common.ft_comm
                 ~add:(Ops.add_fast ?check_finite:None)
                 ~scale:scale_fast ~negate:Inner_curve.negate
-                ~endoscale:(Scalar_challenge.endo ?num_bits:None)
                 ~verification_key:
                   (Plonk_verification_key_evals.Step.forget_optional_commitments
                      m )
-                ~plonk ~alpha ~t_comm )
+                ~plonk ~t_comm )
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
