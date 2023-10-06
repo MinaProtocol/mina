@@ -1,4 +1,4 @@
-p## Summary
+## Summary
 [summary]: #summary
 
 This document describes a strategy for migrating mainnet archive data
