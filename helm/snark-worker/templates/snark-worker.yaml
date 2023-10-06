@@ -42,6 +42,6 @@ spec:
         ]
         env:
           - name: "RAYON_NUM_THREADS"
-            value: "4"
+            value: "8"
         imagePullPolicy: Always
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}

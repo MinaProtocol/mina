@@ -4,8 +4,8 @@ mina:
   runtimeConfig:
   generateGenesisProof: true
   logLevel: "Debug"
-  logSnarkWorkGossip: false
-  logPrecomputedBlocks: false
+  logSnarkWorkGossip: true
+  logPrecomputedBlocks: true
   logTxnPoolGossip: false
   image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
   useCustomEntrypoint: false
@@ -19,6 +19,7 @@ mina:
     graphql: "3085"
     metrics: "10001"
     p2p: "10909"
+    itn: "3086"
   exposeGraphql: true
   cpuRequest: 6
   memRequest: "12.0Gi"

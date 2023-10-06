@@ -65,10 +65,17 @@ spec:
         args: [ "daemon",
           "-log-level", "Debug",
           "-log-json",
+          "-internal-tracing",
           "-log-snark-work-gossip", "true",
           "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
+          "-itn-graphql-port", "$(DAEMON_ITN_GRAPHQL_PORT)",
+          "-itn-keys", "f1F38+W3zLcc45fGZcAf9gsZ7o9Rh3ckqZQw6yOJiS4=,6GmWmMYv5oPwQd2xr6YArmU1YXYCAxQAxKH7aYnBdrk=,ZJDkF9EZlhcAU1jyvP3m9GbkhfYa0yPV+UdAqSamr1Q=,NW2Vis7S5G1B9g2l9cKh3shy9qkI1lvhid38763vZDU=,Cg/8l+JleVH8yNwXkoLawbfLHD93Do4KbttyBS7m9hQ=",
+          "-uptime-submitter-key", "/root/wallet-keys/key",
+          "-uptime-url", "https://block-producers-uptime-itn.minaprotocol.tools/v1/submit",
+          "-node-status-url", "https://nodestats-itn.minaprotocol.tools/submit/stats",
+          "-node-error-url", "https://nodestats-itn.minaprotocol.tools/submit/stats",
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
           {{- end -}}
@@ -108,6 +115,8 @@ spec:
           value: "6"
         - name: DAEMON_REST_PORT
           value: {{ $.Values.mina.ports.graphql | quote }}
+        - name: DAEMON_ITN_GRAPHQL_PORT
+          value: {{ $.Values.mina.ports.itn | quote }}
         - name: DAEMON_CLIENT_PORT
           value: {{ $.Values.mina.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
