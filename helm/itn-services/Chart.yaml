@@ -1,6 +1,6 @@
 apiVersion: v2
 name: itn-services
-description: A Helm chart for Kubernetes
+description: This application bundles backend infrastructure to support log ingest for Mina incentivized testnets (ITN)
 
 # A chart can be either an 'application' or a 'library' chart.
 #
