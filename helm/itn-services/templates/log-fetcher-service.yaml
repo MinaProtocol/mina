@@ -1,15 +1,22 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "itn-services.fullname" . }}-log-fetcher
+  name: {{ .Release.Name }}-log-fetcher
   labels:
     {{- include "itn-services.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
-  ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
-      protocol: TCP
-      name: http
+  type: ClusterIP
   selector:
-    {{- include "itn-services.selectorLabels" . | nindent 4 }}
+    app: {{ .Release.Name }}-log-fetcher
+  ports:
+    - protocol: TCP
+      port: 4000
+      targetPort: 4000
+      name: unnamed-port
+
+    # port ranges are not allowed
+
+    # - protocol: TCP 
+    #   port: 11000-11700
+    #   targetPort: 11000-11700
+    #   name: unnamed-port-range

@@ -5,47 +5,49 @@ metadata:
   labels:
     {{- include "itn-services.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
+  replicas: 1
   selector:
     matchLabels:
-      {{- include "itn-services.selectorLabels" . | nindent 6 }}
+      app: {{ .Release.Name }}-log-fetcher
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       labels:
-        {{- include "itn-services.selectorLabels" . | nindent 8 }}
+        app: {{ .Release.Name }}-log-fetcher
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        - name: log-fetcher
+          image: gcr.io/o1labs-192920/mina-internal-trace-consumer:1.1.0
+          command:
+            - bash
+            - -c
+            - fetcher -k /keys/secret_key -o /output -n /names-data/node_names.json --db-uri 'postgresql://<postgresuser>:<postgressecret>@postgres:5432' discovery
+          env:
+            - name: NETWORK
+              value: "ITN"
+            - name: GOOGLE_BUCKET
+              value: "uptime-itn-pre-launch-sanity-check"
+            - name: GOOGLE_SERVICE_ACCOUNT
+              value: "/credentials/itn-keyfile.json"
+            - name: INTERNAL_TRACE_CONSUMER_EXE
+              value: "/internal_trace_consumer"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - name: http
-              containerPort: 80
+            - name: unnamed-port
+              containerPort: 4000
               protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
+          volumeMounts:
+            - name: gcloud-keyfile
+              mountPath: "/credentials/"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: gcloud-keyfile
+          secret:
+            secretName: gcloud-keyfile
+            defaultMode: 256
+            items:
+              - key: keyfile
+                path: itn-keyfile.json
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
