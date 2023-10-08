@@ -97,8 +97,11 @@ val gen_list_of_zkapp_command_from :
 
 (** Generate a zkapp command with max cost *)
 val gen_max_cost_zkapp_command_from :
-     fee_payer_keypair:Signature_lib.Keypair.t
+     ?memo:string
+  -> ?fee_range:Currency.Fee.t * Currency.Fee.t
+  -> fee_payer_keypair:Signature_lib.Keypair.t
   -> account_state_tbl:(Account.t * role) Account_id.Table.t
   -> vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
   -> genesis_constants:Genesis_constants.t
+  -> unit
   -> Zkapp_command.t Quickcheck.Generator.t
