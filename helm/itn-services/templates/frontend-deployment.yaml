@@ -1,37 +1,31 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "itn-services.fullname" . }}
-  labels:
-    {{- include "itn-services.labels" . | nindent 4 }}
+  name: {{ .Release.Name }}-frontend
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
+  replicas: 1
   selector:
     matchLabels:
-      {{- include "itn-services.selectorLabels" . | nindent 6 }}
+      app: {{ .Release.Name }}-frontend
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       labels:
-        {{- include "itn-services.selectorLabels" . | nindent 8 }}
+        app: {{ .Release.Name }}-frontend
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "itn-services.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        - name: frontend
+          image: directcuteo/mina-frontend:663f692
+          ports:
+            - containerPort: 80
+          command:
+            - sh
+            - -ce
+            - |
+              ENV=$(cat /fe-config.json | tr -d '\n' | tr -s ' ' | sed -e 's/ //g') envsubst < /usr/share/nginx/html/assets/env.template.js > /usr/share/nginx/html/assets/env.js
+              exec nginx -g 'daemon off;'
+        #   volumeMounts:
+        #     - name: fe-config-volume
+        #       mountPath: /fe-config.json
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
