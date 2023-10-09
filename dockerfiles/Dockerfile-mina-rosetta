@@ -73,7 +73,6 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
 # Upstream PR to rosetta-sdk-go: https://github.com/coinbase/rosetta-sdk-go/pull/457
 # They can be replaced once there is a new release of rosetta-cli containing the above change by:
 # RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/${ROSETTA_CLI_VERSION}/scripts/install.sh | sh -s
-COPY --from=builder /usr/lib/go /usr/lib/go
 RUN apt-get install -y gcc
 RUN export GOBIN="$(pwd)/bin" \
   && curl -L "https://github.com/coinbase/rosetta-cli/archive/refs/tags/v0.10.1.tar.gz" -o "/tmp/v0.10.1.tar.gz" \
