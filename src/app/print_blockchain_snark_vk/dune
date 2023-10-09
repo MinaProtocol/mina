@@ -1,7 +1,9 @@
 (executable
  (name print_blockchain_snark_vk)
  (libraries
-   blockchain_snark))
+   blockchain_snark)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))
 
 (rule
  (deps print_blockchain_snark_vk.exe)
