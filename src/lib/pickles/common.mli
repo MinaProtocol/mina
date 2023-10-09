@@ -36,22 +36,22 @@ val bits_to_bytes : bool list -> string
 val finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a
 
 val ft_comm :
-     add:('a -> 'a -> 'a)
-  -> scale:('a -> 'b -> 'a)
-  -> endoscale:('a -> 'c -> 'a)
-  -> negate:('a -> 'a)
-  -> verification_key:'a Pickles_types.Plonk_verification_key_evals.t
+     add:('comm -> 'comm -> 'comm)
+  -> scale:('comm -> 'scalar -> 'comm)
+  -> endoscale:('comm -> 'c -> 'comm)
+  -> negate:('comm -> 'comm)
+  -> verification_key:'comm Pickles_types.Plonk_verification_key_evals.t
   -> alpha:'c
   -> plonk:
        ( 'd
        , 'e
-       , 'b
+       , 'scalar
        , 'g
        , 'f
        , 'bool )
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
-  -> t_comm:'a array
-  -> 'a
+  -> t_comm:'comm array
+  -> 'comm
 
 val dlog_pcs_batch :
      'total Pickles_types.Nat.t
