@@ -8,12 +8,10 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
-    { name = "TestnetIntegrationTests", key = "build-test-executive" },
     { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
     { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
 ]
 let dependsOnJs = [
-    { name = "TestnetIntegrationTests", key = "build-test-executive" },
     { name = "TestnetIntegrationTests", key = "build-js-tests" },
     { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
     { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
@@ -35,7 +33,6 @@ in Pipeline.build Pipeline.Config::{
     tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
   },
   steps = [
-    TestExecutive.build "integration_tests",
     TestExecutive.buildJs "integration_tests",
     TestExecutive.execute "peers-reliability" dependsOn,
     TestExecutive.execute "chain-reliability" dependsOn,

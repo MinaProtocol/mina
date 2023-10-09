@@ -7,7 +7,6 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
-    { name = "TestnetIntegrationTests", key = "build-test-executive" },
     { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
     { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
 ]
