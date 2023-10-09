@@ -56,6 +56,9 @@ module Protocol = struct
         external digest : int -> t -> bytes
           = "caml_pasta_fp_plonk_gate_vector_digest"
 
+        external feature_flags : t -> bool -> Kimchi_types.feature_flags
+          = "caml_pasta_fp_plonk_gate_vector_feature_flags"
+
         external to_json : int -> t -> string
           = "caml_pasta_fp_plonk_circuit_serialize"
       end
@@ -78,6 +81,9 @@ module Protocol = struct
 
         external digest : int -> t -> bytes
           = "caml_pasta_fq_plonk_gate_vector_digest"
+
+        external feature_flags : t -> bool -> Kimchi_types.feature_flags
+          = "caml_pasta_fq_plonk_gate_vector_feature_flags"
 
         external to_json : int -> t -> string
           = "caml_pasta_fq_plonk_circuit_serialize"

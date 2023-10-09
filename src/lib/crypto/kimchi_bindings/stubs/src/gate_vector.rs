@@ -1,6 +1,7 @@
 //! A GateVector: this is used to represent a list of gates.
 
 use kimchi::circuits::{
+    constraints::FeatureFlags,
     gate::{caml::CamlCircuitGate, Circuit, CircuitGate},
     wires::caml::CamlWire,
 };
@@ -101,6 +102,15 @@ pub mod fp {
         let circuit = Circuit::new(usize::try_from(public_input_size).unwrap(), &v.as_ref().0);
         serde_json::to_string(&circuit).expect("couldn't serialize constraints")
     }
+
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_pasta_fp_plonk_gate_vector_feature_flags(
+        v: CamlPastaFpPlonkGateVectorPtr,
+        using_runtime_table: bool,
+    ) -> FeatureFlags {
+        FeatureFlags::from_gates(v.as_ref().0.as_slice(), using_runtime_table)
+    }
 }
 
 //
@@ -193,5 +203,14 @@ pub mod fq {
     ) -> String {
         let circuit = Circuit::new(usize::try_from(public_input_size).unwrap(), &v.as_ref().0);
         serde_json::to_string(&circuit).expect("couldn't serialize constraints")
+    }
+
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_pasta_fq_plonk_gate_vector_feature_flags(
+        v: CamlPastaFqPlonkGateVectorPtr,
+        using_runtime_table: bool,
+    ) -> FeatureFlags {
+        FeatureFlags::from_gates(v.as_ref().0.as_slice(), using_runtime_table)
     }
 }

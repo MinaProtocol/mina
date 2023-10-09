@@ -174,6 +174,16 @@ type nonrec lookup_features =
   ; uses_runtime_tables : bool
   }
 
+type nonrec feature_flags =
+  { range_check0 : bool
+  ; range_check1 : bool
+  ; foreign_field_add : bool
+  ; foreign_field_mul : bool
+  ; xor : bool
+  ; rot : bool
+  ; lookup_features : lookup_features
+  }
+
 type nonrec feature_flag =
   | RangeCheck0
   | RangeCheck1
