@@ -18,6 +18,19 @@ branches = dict(
 )
 
 '''
+Controls updates from submodules. Tool can handle testing changes in submodules. 
+On push event for any related branches submodules defined in `sub-modules` section
+tool will create new commit in main repo with new hash and additionally will start buildkite
+pipeline to test new changes in main repo.
+'''
+class SubModule:
+    
+    def __init__(self, name, branches, pipeline):
+        self.name = name
+        self.branches = branches
+        self.pipeline = pipeline
+
+'''
     Settings for github repository. 
     dryrun: if set to true, program will not perform any operations but will printout
     token: github webhook secret (for validation of request)
@@ -68,6 +81,5 @@ This PR conflicts with one of our main branches. As a result below Pull requests
 '''
 buildkite = {
     "token": "...",
-    "org": "mina-foundation",
-    "pipeline": "test-buildkite"    
+    "org": "mina-foundation"    
 }
