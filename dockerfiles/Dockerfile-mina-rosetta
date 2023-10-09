@@ -72,15 +72,15 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
 # The following commands install rosetta-cli with an updated rosetta-sdk-go dependency, which supports delegation transactions.
 # Upstream PR to rosetta-sdk-go: https://github.com/coinbase/rosetta-sdk-go/pull/457
 # They can be replaced once there is a new release of rosetta-cli containing the above change by:
-# RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/${ROSETTA_CLI_VERSION}/scripts/install.sh | sh -s
-RUN apt-get install -y gcc
-RUN export GOBIN="$(pwd)/bin" \
-  && curl -L "https://github.com/coinbase/rosetta-cli/archive/refs/tags/v0.10.1.tar.gz" -o "/tmp/v0.10.1.tar.gz" \
-  && tar xzf "/tmp/v0.10.1.tar.gz" -C "/tmp" \
-  && cd "/tmp/rosetta-cli-0.10.1" \
-  && /usr/lib/go/bin/go mod edit -replace github.com/coinbase/rosetta-sdk-go@v0.8.1=github.com/MinaProtocol/rosetta-sdk-go@stake-delegation-v1 \
-  && /usr/lib/go/bin/go mod tidy \
-  && /usr/lib/go/bin/go install
+RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/${ROSETTA_CLI_VERSION}/scripts/install.sh | sh -s
+#RUN apt-get install -y golang-go
+#RUN export GOBIN="$(pwd)/bin" \
+##  && curl -L "https://github.com/coinbase/rosetta-cli/archive/refs/tags/v0.10.1.tar.gz" -o "/tmp/v0.10.1.tar.gz" \
+ # && tar xzf "/tmp/v0.10.1.tar.gz" -C "/tmp" \
+#  && cd "/tmp/rosetta-cli-0.10.1" \
+#  && /usr/lib/go/bin/go mod edit -replace github.com/coinbase/rosetta-sdk-go@v0.8.1=github.com/MinaProtocol/rosetta-sdk-go@stake-delegation-v1 \
+#  && /usr/lib/go/bin/go mod tidy \
+#  && /usr/lib/go/bin/go install
 
 
 # Rosetta-demo artifacts / build dir removal:
@@ -115,11 +115,11 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
 # --- Copy artifacts
 COPY src/app/rosetta/*.sh /rosetta/
 COPY src/app/rosetta/*.conf /rosetta/
-COPY src/app/rosetta/README.md /rosetta/
+COPY src/app/rosetta/*.md /rosetta/
 COPY src/app/rosetta/rosetta-cli-config/*.json /rosetta/rosetta-cli-config/
 COPY src/app/rosetta/rosetta-cli-config/*.ros /rosetta/rosetta-cli-config/
 COPY src/app/archive/*.sql /archive/
-COPY genesis_ledgers /genesis_ledgers/
+COPY genesis_ledgers/* /genesis_ledgers/
 
 # --- Set up postgres
 USER postgres
