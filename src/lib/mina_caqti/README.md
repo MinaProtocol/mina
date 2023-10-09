@@ -49,8 +49,10 @@ Encoding values as NULLs
 
 In the descriptions of the functions that follow, please note that the
 values returned are in the `Deferred` monad, because they are the
-result of database queries. For the `add...` functions, the result
-actually has a `Deferred.Result.t` type, because queries can fail. For
+result of database queries. 
+- For the `add...` functions, the result
+actually has a `Deferred.Result.t` type because queries can fail. 
+- For
 the `get...` functions, a failure raises an exception.
 
 There are some zkApps-related functions that are useful for storing
