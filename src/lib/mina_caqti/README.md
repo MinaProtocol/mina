@@ -35,8 +35,7 @@ are documented in the source code.
 Custom array types
 ------------------
 
-Another notable feature of the library are the custom array types,
-which are used to provide a `Caqti.Type.t` for OCaml array types not
+You can use custom array types to provide a `Caqti.Type.t` for OCaml array types not
 already built into Caqti.  For example, `array_int_typ` is used to
 give a type for the OCaml type `int array`. Such Caqti types can be
 used for the input or result type of queries, or to provide type
