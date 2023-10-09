@@ -260,7 +260,31 @@ cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDD
 
 build_deb mina-zkapp-test-transaction
 
-##################################### END SNAPP TEST TXN PACKAGE #######################################
+##################################### END ZKAPP TEST TXN PACKAGE #######################################
+
+##################################### ROSETTA #######################################
+echo "------------------------------------------------------------"
+echo "--- Building Mina Rosetta :"
+
+create_control_file mina-rosetta "${SHARED_DEPS}${DAEMON_DEPS}" 'Rosetta implementation for Mina'
+
+# --- Copy artifacts
+cp "../src/app/rosetta/*.conf" "${BUILDDIR}/etc/mina/rosetta"
+cp "../src/app/rosetta/*.sh" "${BUILDDIR}/etc/mina/rosetta"
+cp "../src/app/rosetta/*.sh" "${BUILDDIR}/etc/mina/rosetta"
+
+cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+cp ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/rosetta/archive"
+cp ../genesis_ledgers/* ${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/
+
+cp ./default/src/app/rosetta/rosetta_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+cp ./default/src/app/rosetta/ocaml-signer/signer_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta-ocaml-signer"
+ 
+build_deb mina-rosetta
+
+#################################### END ROSETTA PACKAGE #######################################
+
 
 ##################################### BERKELEY PACKAGE #######################################
 echo "------------------------------------------------------------"
