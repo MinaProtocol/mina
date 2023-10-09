@@ -3,7 +3,7 @@ Mina_caqti
 
 This library is designed to assist in querying relational databases
 using the Caqti library. It is used extensively for querying the
-archive database in the modules `Processor` and `Load_data` modules in
+archive database in the `Processor` and `Load_data` modules in
 `Archive_lib`.
 
 Constructing SQL queries
