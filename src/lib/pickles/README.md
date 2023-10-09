@@ -20,7 +20,7 @@ A particularity of Pickles is to use the power of the OCaml type system to
 encode runtime invariants like vector sizes, heterogeneous lists and others at
 the type level to avoid constructing some statements that might be wrong at
 compile time. Some encoded theories can be found in
-[`Pickles_types`](pickles_types).
+[`Pickles_types`](../pickles_types/).
 Some types are parametrized by type-level defined naturals.
 
 ## Coding guidelines
