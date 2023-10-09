@@ -49,9 +49,9 @@ Encoding values as NULLs
 
 In the descriptions of the functions that follow, please note that the
 values returned are in the `Deferred` monad, because they are the
-result of database queries. 
+result of database queries.
 - For the `add...` functions, the result
-actually has a `Deferred.Result.t` type because queries can fail. 
+actually has a `Deferred.Result.t` type because queries can fail.
 - For
 the `get...` functions, a failure raises an exception.
 
@@ -62,7 +62,7 @@ result (if it succeeds), and if the data is `Keep`, returns `None`.
 Similarly, `add_if_zkapp_check` runs a query if the data is `Check`,
 returning its result (if it succeeds), and if the data is `Ignore`,
 returns `None`.  The functions `get_zkapp_set_or_keep` and
-`get_zkapp_or_ignore` symmetrically, by converting a queried value to
+`get_zkapp_or_ignore` operate symmetrically, by converting a queried value to
 a value construct with `Set` or `Check`, if not NULL, and converting a
 NULL to `Keep` or `Ignore`. The use of NULL to encode these
 zkApp-related values is mentioned as the `NULL convention` in the part
