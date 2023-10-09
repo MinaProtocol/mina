@@ -68,4 +68,6 @@ module type Full = sig
   val digest : t -> Md5.t
 
   val to_json : t -> string
+
+  val feature_flags : t -> Kimchi_types.feature_flags
 end

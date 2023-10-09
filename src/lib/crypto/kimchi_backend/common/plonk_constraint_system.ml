@@ -1275,10 +1275,10 @@ end = struct
     let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
     Gates.to_json public_input_size gates
 
-  let feature_flags (sys : t) : Kimchi_types.feature_flags =
+  let rec feature_flags (sys : t) : Kimchi_types.feature_flags =
     match (sys.gates, sys.runtime_tables_cfg) with
     | Unfinalized_rev _, _ | _, Unfinalized_runtime_tables_cfg_rev _ ->
-        failwith "feature_flags called on unfinalized constraint system"
+        finalize sys ; feature_flags sys
     | Compiled (_, gates), Compiled_runtime_tables_cfg runtime_tables ->
         Gates.feature_flags gates (not (Array.is_empty runtime_tables))
 

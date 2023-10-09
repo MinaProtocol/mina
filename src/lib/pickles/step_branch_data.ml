@@ -148,7 +148,7 @@ let create
     |> unstage
   in
   Timer.clock __LOC__ ;
-  let own_domains, actual_feature_flags =
+  let own_domains, computed_feature_flags =
     let main =
       step
         ~step_domains:
@@ -159,11 +159,27 @@ let create
         ~wrap_rounds:Backend.Tock.Rounds.n
       (* TODO *)
     in
-    Fix_domains.domains ~feature_flags:actual_feature_flags
+    Fix_domains.domains
+      ~get_feature_flags:Backend.Tick.R1CS_constraint_system.feature_flags
       (module Impls.Step)
       (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
       etyp main
   in
+  if
+    not
+      (Pickles_types.Plonk_types.Features.equal Bool.( = ) actual_feature_flags
+         computed_feature_flags )
+  then
+    failwithf
+      "The feature flags provided do not match the ones calculated from the \
+       circuit for rule %s:\n\
+       %s"
+      rule.identifier
+      (Yojson.Safe.pretty_to_string
+         (Pickles_types.Plonk_types.Features.to_yojson
+            (fun x -> `Bool x)
+            computed_feature_flags ) )
+      () ;
   Timer.clock __LOC__ ;
   T
     { proofs_verified = (self_width, proofs_verified)
@@ -173,5 +189,5 @@ let create
     ; domains = own_domains
     ; main = step
     ; requests
-    ; feature_flags = actual_feature_flags
+    ; feature_flags = computed_feature_flags
     }

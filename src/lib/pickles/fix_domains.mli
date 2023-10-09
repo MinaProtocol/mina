@@ -4,7 +4,9 @@
 *)
 
 val domains :
-     ?feature_flags:bool Pickles_types.Plonk_types.Features.t
+     ?get_feature_flags:
+       (   ('field, 'gates) Kimchi_backend_common.Plonk_constraint_system.t
+        -> Kimchi_types.feature_flags )
   -> (module Snarky_backendless.Snark_intf.Run
         with type field = 'field
          and type R1CS_constraint_system.t = ( 'field

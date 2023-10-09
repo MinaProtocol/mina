@@ -19,9 +19,6 @@ let test_fix_domains_with_runtime_table_cfgs () =
   let table_sizes = [ [ 1 ]; [ 1; 1 ]; [ 1; 10; 42; 36 ] ] in
   (* Log2 value *)
   let exp_output = [ 3; 3; 7 ] in
-  let feature_flags =
-    Pickles_types.Plonk_types.Features.{ none_bool with runtime_tables = true }
-  in
   assert (
     List.for_all2
       (fun table_sizes exp_output ->
@@ -34,10 +31,12 @@ let test_fix_domains_with_runtime_table_cfgs () =
               in
               add_constraint
                 (AddRuntimeTableCfg { id = Int32.of_int i; first_column }) )
-            table_sizes
+            table_sizes ;
+          add_constraint (Raw { kind = Lookup; values = [||]; coeffs = [||] })
         in
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
+        let domains, _feature_flags =
+          Pickles__Fix_domains.domains
+            ~get_feature_flags:Backend.Tick.R1CS_constraint_system.feature_flags
             (module Pickles.Impls.Step)
             etyp_unit etyp_unit main
         in
@@ -50,10 +49,6 @@ let test_fix_domains_with_runtime_table_cfgs_and_fixed_lookup_tables () =
   let fixed_table_sizes = [ [ 1 ]; [ 1; 1 ]; [ 1; 10; 42; 36 ]; []; [ 1 ] ] in
   let rt_cfgs_table_sizes = [ [ 1 ]; [ 1; 1 ]; [ 1; 10; 42; 36 ]; [ 1 ]; [] ] in
   let exp_outputs = [ 3; 3; 8; 3; 3 ] in
-  let feature_flags =
-    Pickles_types.Plonk_types.Features.
-      { none_bool with lookup = true; runtime_tables = true }
-  in
   assert (
     List.for_all2
       (fun (fixed_table_sizes, rt_cfgs_table_sizes) exp_output ->
@@ -81,10 +76,12 @@ let test_fix_domains_with_runtime_table_cfgs_and_fixed_lookup_tables () =
                 (AddRuntimeTableCfg
                    { id = Int32.of_int (n_fixed_table_sizes + i); first_column }
                 ) )
-            rt_cfgs_table_sizes
+            rt_cfgs_table_sizes ;
+          add_constraint (Raw { kind = Lookup; values = [||]; coeffs = [||] })
         in
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
+        let domains, _feature_flags =
+          Pickles__Fix_domains.domains
+            ~get_feature_flags:Backend.Tick.R1CS_constraint_system.feature_flags
             (module Pickles.Impls.Step)
             etyp_unit etyp_unit main
         in
@@ -100,10 +97,6 @@ let test_fix_domains_with_runtime_table_cfgs_and_fixed_lookup_tables_sharing_id
   let rt_cfg_sizes = [ 3; 7; 8 ] in
   (* log2 value *)
   let exp_outputs = [ 4; 4; 5 ] in
-  let feature_flags =
-    Pickles_types.Plonk_types.Features.
-      { none_bool with lookup = true; runtime_tables = true }
-  in
   assert (
     List.for_all2
       (fun (fixed_table_size, rt_cfg_table_size) exp_output ->
@@ -121,10 +114,12 @@ let test_fix_domains_with_runtime_table_cfgs_and_fixed_lookup_tables_sharing_id
             Array.init rt_cfg_table_size
               Pickles.Impls.Step.Field.Constant.of_int
           in
-          add_constraint (AddRuntimeTableCfg { id; first_column })
+          add_constraint (AddRuntimeTableCfg { id; first_column }) ;
+          add_constraint (Raw { kind = Lookup; values = [||]; coeffs = [||] })
         in
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
+        let domains, _feature_flags =
+          Pickles__Fix_domains.domains
+            ~get_feature_flags:Backend.Tick.R1CS_constraint_system.feature_flags
             (module Pickles.Impls.Step)
             etyp_unit etyp_unit main
         in
@@ -137,9 +132,6 @@ let test_fix_domains_with_fixed_lookup_tables () =
   let table_sizes = [ [ 1 ]; [ 1; 1 ]; [ 1; 10; 42; 36 ] ] in
   (* Log2 value *)
   let exp_output = [ 3; 3; 7 ] in
-  let feature_flags =
-    Pickles_types.Plonk_types.Features.{ none_bool with lookup = true }
-  in
   assert (
     List.for_all2
       (fun table_sizes exp_output ->
@@ -156,10 +148,12 @@ let test_fix_domains_with_fixed_lookup_tables () =
               add_constraint
                 (AddFixedLookupTable
                    { id = Int32.of_int i; data = [| indexes; values |] } ) )
-            table_sizes
+            table_sizes ;
+          add_constraint (Raw { kind = Lookup; values = [||]; coeffs = [||] })
         in
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
+        let domains, _feature_flags =
+          Pickles__Fix_domains.domains
+            ~get_feature_flags:Backend.Tick.R1CS_constraint_system.feature_flags
             (module Pickles.Impls.Step)
             etyp_unit etyp_unit main
         in
