@@ -47,6 +47,8 @@ module type Gate_vector_intf = sig
   val digest : int -> t -> bytes
 
   val to_json : int -> t -> string
+
+  val feature_flags : t -> bool -> Kimchi_types.feature_flags
 end
 
 (** A row indexing in a constraint system. *)
@@ -891,6 +893,8 @@ module Make
   val digest : t -> Md5.t
 
   val to_json : t -> string
+
+  val feature_flags : t -> Kimchi_types.feature_flags
 end = struct
   open Core_kernel
   open Pickles_types
@@ -1270,6 +1274,13 @@ end = struct
     let gates, _, _ = finalize_and_get_gates sys in
     let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
     Gates.to_json public_input_size gates
+
+  let feature_flags (sys : t) : Kimchi_types.feature_flags =
+    match (sys.gates, sys.runtime_tables_cfg) with
+    | Unfinalized_rev _, _ | _, Unfinalized_runtime_tables_cfg_rev _ ->
+        failwith "feature_flags called on unfinalized constraint system"
+    | Compiled (_, gates), Compiled_runtime_tables_cfg runtime_tables ->
+        Gates.feature_flags gates (not (Array.is_empty runtime_tables))
 
   (* Returns a hash of the circuit. *)
   let rec digest (sys : t) =
