@@ -148,7 +148,7 @@ let create
     |> unstage
   in
   Timer.clock __LOC__ ;
-  let own_domains =
+  let own_domains, actual_feature_flags =
     let main =
       step
         ~step_domains:

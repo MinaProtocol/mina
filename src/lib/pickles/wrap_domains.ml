@@ -38,7 +38,7 @@ struct
         dummy_step_keys dummy_step_widths dummy_step_domains max_proofs_verified
     in
     Timer.clock __LOC__ ;
-    let t =
+    let t, _feature_flags =
       Fix_domains.domains
         (module Impls.Wrap)
         (Impls.Wrap.input ~feature_flags ())
