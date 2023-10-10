@@ -40,7 +40,7 @@ val ft_comm :
   -> scale:('comm -> 'scalar -> 'comm)
   -> endoscale:('comm -> 'c -> 'comm)
   -> negate:('comm -> 'comm)
-  -> verification_key:'comm Pickles_types.Plonk_verification_key_evals.t
+  -> verification_key:'comm array Pickles_types.Plonk_verification_key_evals.t
   -> alpha:'c
   -> plonk:
        ( 'd
@@ -145,7 +145,7 @@ end
 
 val hash_messages_for_next_step_proof :
      app_state:('a -> Kimchi_pasta.Basic.Fp.Stable.Latest.t Core_kernel.Array.t)
-  -> ( Backend.Tock.Curve.Affine.t
+  -> ( Backend.Tock.Curve.Affine.t array
      , 'a
      , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
          * Kimchi_pasta.Basic.Fp.Stable.Latest.t
