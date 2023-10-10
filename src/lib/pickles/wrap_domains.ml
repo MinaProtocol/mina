@@ -28,7 +28,11 @@ struct
     let dummy_step_keys =
       lazy
         (Vector.init num_choices ~f:(fun _ ->
-             let g = Backend.Tock.Inner_curve.(to_affine_exn one) in
+             let num_chunks = (* TODO *) 1 in
+             let g =
+               Array.init num_chunks ~f:(fun _ ->
+                   Backend.Tock.Inner_curve.(to_affine_exn one) )
+             in
              Verification_key.dummy_step_commitments g ) )
     in
     Timer.clock __LOC__ ;

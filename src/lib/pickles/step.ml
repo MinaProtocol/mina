@@ -121,7 +121,7 @@ struct
     let expand_proof :
         type var value local_max_proofs_verified m.
            Impls.Wrap.Verification_key.t
-        -> 'a
+        -> _ array Plonk_verification_key_evals.t
         -> value
         -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t
         -> (var, value, local_max_proofs_verified, m) Tag.t

@@ -225,13 +225,13 @@ module Make (Inputs : Inputs_intf) = struct
     }
 
   let full_vk_commitments (t : Inputs.Verifier_index.t) :
-      ( Inputs.Curve.Affine.t
-      , Inputs.Curve.Affine.t option )
+      ( Inputs.Curve.Affine.t array
+      , Inputs.Curve.Affine.t array option )
       Pickles_types.Plonk_verification_key_evals.Step.t =
-    let g c : Inputs.Curve.Affine.t =
+    let g c : Inputs.Curve.Affine.t array =
       match Inputs.Poly_comm.of_backend_without_degree_bound c with
       | `Without_degree_bound x ->
-          x.(0)
+          x
       | `With_degree_bound _ ->
           assert false
     in

@@ -241,6 +241,13 @@ struct
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
           with_label "combined_polynomial" (fun () ->
               Pcs_batch.combine_split_commitments pcs_batch
+                ~reduce_without_degree_bound:Array.to_list
+                ~reduce_with_degree_bound:(fun { Plonk_types.Poly_comm
+                                                 .With_degree_bound
+                                                 .unshifted
+                                               ; shifted
+                                               } ->
+                  Array.to_list unshifted @ [ shifted ] )
                 ~scale_and_add:(fun ~(acc :
                                        [ `Maybe_finite of
                                          Boolean.var * Inner_curve.t
@@ -572,14 +579,11 @@ struct
           let without_degree_bound =
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
-              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
-              :: [| m.psm_comm |] :: [| m.complete_add_comm |]
-              :: [| m.mul_comm |] :: [| m.emul_comm |]
-              :: [| m.endomul_scalar_comm |]
+              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: m.generic_comm
+              :: m.psm_comm :: m.complete_add_comm :: m.mul_comm :: m.emul_comm
+              :: m.endomul_scalar_comm
               :: Vector.append w_comm
-                   (Vector.append
-                      (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
-                      (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                   (Vector.append m.coefficients_comm sigma_comm_init
                       (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
                    (snd
                       Plonk_types.(
@@ -1107,8 +1111,9 @@ struct
     let sponge = Sponge.create sponge_params in
     Array.iter
       (Types.index_to_field_elements
-         ~g:(fun (z : Inputs.Inner_curve.t) ->
-           List.to_array (Inner_curve.to_field_elements z) )
+         ~g:
+           (Array.concat_map ~f:(fun (z : Inputs.Inner_curve.t) ->
+                List.to_array (Inner_curve.to_field_elements z) ) )
          index )
       ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
     sponge
