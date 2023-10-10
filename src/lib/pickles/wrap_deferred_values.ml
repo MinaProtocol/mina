@@ -12,7 +12,7 @@ module Plonk_checks = struct
     Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
 end
 
-let expand_deferred (type n most_recent_width)
+let expand_deferred (type n most_recent_width) ~zk_rows
     ~(evals :
        ( Backend.Tick.Field.t
        , Backend.Tick.Field.t array )
@@ -101,7 +101,7 @@ let expand_deferred (type n most_recent_width)
       (module Env_bool)
       (module Env_field)
       ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
-      ~srs_length_log2:Common.Max_degree.step_log2
+      ~srs_length_log2:Common.Max_degree.step_log2 ~zk_rows
       ~field_of_hex:(fun s ->
         Kimchi_pasta.Pasta.Bigint256.of_hex_string s
         |> Kimchi_pasta.Pasta.Fp.of_bigint )

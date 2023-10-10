@@ -79,6 +79,7 @@ val scalars_env :
   -> mds:'t array array
   -> field_of_hex:(string -> 't)
   -> domain:< generator : 't ; vanishing_polynomial : 't -> 't ; .. >
+  -> zk_rows:int
   -> srs_length_log2:int
   -> ( 't
      , 't

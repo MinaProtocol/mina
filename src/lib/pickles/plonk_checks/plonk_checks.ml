@@ -152,7 +152,7 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
 
 let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     (module F : Field_with_if_intf with type t = t and type bool = boolean)
-    ~endo ~mds ~field_of_hex ~domain ~srs_length_log2
+    ~endo ~mds ~field_of_hex ~domain ~zk_rows:_ ~srs_length_log2
     ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
       (t, _, boolean) Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
     =

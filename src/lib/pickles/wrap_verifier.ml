@@ -1538,7 +1538,7 @@ struct
       Plonk_checks.scalars_env
         (module Env_bool)
         (module Env_field)
-        ~srs_length_log2:Common.Max_degree.wrap_log2
+        ~srs_length_log2:Common.Max_degree.wrap_log2 ~zk_rows:3
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
         ~field_of_hex:(fun s ->

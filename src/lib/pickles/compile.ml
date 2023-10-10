@@ -745,7 +745,9 @@ struct
                            , return_value
                            , auxiliary_value
                            , actual_wrap_domains ) =
-            step ~proof_cache handler ~maxes:(module Maxes) next_state
+            step ~zk_rows:step_vk.zk_rows ~proof_cache handler
+              ~maxes:(module Maxes)
+              next_state
           in
           let proof =
             { proof with

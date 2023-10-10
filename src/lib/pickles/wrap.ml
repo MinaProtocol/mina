@@ -195,7 +195,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
       (module Env_bool)
       (module Env_field)
       ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
-      ~srs_length_log2:Common.Max_degree.step_log2
+      ~zk_rows:step_vk.zk_rows ~srs_length_log2:Common.Max_degree.step_log2
       ~field_of_hex:(fun s ->
         Kimchi_pasta.Pasta.Bigint256.of_hex_string s
         |> Kimchi_pasta.Pasta.Fp.of_bigint )

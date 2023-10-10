@@ -1305,7 +1305,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let wrap =
                 let wrap_vk = Lazy.force wrap_vk in
                 let%bind.Promise proof, (), (), _ =
-                  step ~proof_cache:None ~maxes:(module Maxes)
+                  step ~zk_rows:pairing_vk.zk_rows ~proof_cache:None
+                    ~maxes:(module Maxes)
                 in
                 let proof =
                   { proof with
@@ -1562,6 +1563,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ~endo:Endo.Step_inner_curve.base
                           ~mds:Tick_field_sponge.params.mds
                           ~srs_length_log2:Common.Max_degree.step_log2
+                          ~zk_rows:3
                           ~field_of_hex:(fun s ->
                             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
                             |> Kimchi_pasta.Pasta.Fp.of_bigint )
