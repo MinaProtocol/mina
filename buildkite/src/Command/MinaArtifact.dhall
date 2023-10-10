@@ -95,6 +95,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         let rosettaSpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
           service="mina-rosetta",
+          network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
         }
