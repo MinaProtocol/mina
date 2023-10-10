@@ -4,6 +4,8 @@ let Cmd = ../../Lib/Cmds.dhall
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
+let PipelineMode = ../../Pipeline/Mode.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -26,21 +28,11 @@ Pipeline.build
           S.strictly (S.contains "opam.export")
         ],
         path = "Release",
-        name = "MinaToolchainArtifact"
+        name = "MinaToolchainArtifactBuster",
+        tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ],
+        mode = PipelineMode.Type.Stable        
       },
     steps = [
-
-      -- mina-toolchain Debian 11 "Bullseye" Toolchain
-      let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
-        service="mina-toolchain",
-        deb_codename="bullseye",
-        extra_args="--no-cache",
-        step_key="toolchain-bullseye-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep toolchainBullseyeSpec,
 
       -- mina-toolchain Debian 10 "Buster" Toolchain
       let toolchainBusterSpec = DockerImage.ReleaseSpec::{

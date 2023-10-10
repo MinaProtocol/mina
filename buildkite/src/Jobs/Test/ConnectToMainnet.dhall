@@ -2,6 +2,7 @@ let S = ../../Lib/SelectFiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 
 let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 
@@ -17,7 +18,8 @@ in Pipeline.build Pipeline.Config::{
       S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh"
     ],
     path = "Test",
-    name = "ConnectToMainnet"
+    name = "ConnectToMainnet",
+    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
   },
   steps = [
     ConnectToTestnet.step dependsOn

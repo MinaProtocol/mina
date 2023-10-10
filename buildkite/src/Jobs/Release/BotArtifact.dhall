@@ -5,6 +5,8 @@ let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -27,19 +29,10 @@ Pipeline.build
           S.strictlyStart (S.contains "frontend/bot")
         ],
         path = "Release",
-        name = "BotArtifact"
+        name = "BotArtifact",
+        tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
       },
     steps = [
-      Command.build
-        Command.Config::{
-          commands = [
-              Cmd.run "echo export MINA_VERSION=$(cat frontend/bot/package.json | jq '.version') > BOT_DEPLOY_ENV"
-          ],
-          label = "Setup o1bot docker image deploy environment",
-          key = "setup-deploy-env",
-          target = Size.Small,
-          artifact_paths = [ S.contains "frontend/bot/*.json" ]
-        },
       DockerImage.generateStep spec
     ]
   }
