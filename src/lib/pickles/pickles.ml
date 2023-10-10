@@ -307,21 +307,21 @@ module Make_str (_ : Wire_types.Concrete) = struct
     Compile.compile_with_wrap_main_override_promise
 
   let compile_promise ?self ?cache ?proof_cache ?disk_keys
-      ?return_early_digest_exception ?override_wrap_domain ~public_input
-      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
-      ~choices () =
-    compile_with_wrap_main_override_promise ?self ?cache ?proof_cache ?disk_keys
-      ?return_early_digest_exception ?override_wrap_domain ~public_input
-      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
-      ~choices ()
-
-  let compile ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
+      ?return_early_digest_exception ?override_wrap_domain ?num_chunks
       ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
       ~constraint_constants ~choices () =
+    compile_with_wrap_main_override_promise ?self ?cache ?proof_cache ?disk_keys
+      ?return_early_digest_exception ?override_wrap_domain ?num_chunks
+      ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
+      ~constraint_constants ~choices ()
+
+  let compile ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
+      ?num_chunks ~public_input ~auxiliary_typ ~branches ~max_proofs_verified
+      ~name ~constraint_constants ~choices () =
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
-        ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
-        ~constraint_constants ~choices ()
+        ?num_chunks ~public_input ~auxiliary_typ ~branches ~max_proofs_verified
+        ~name ~constraint_constants ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -1125,6 +1125,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Wrap_domains.Make (A) (A_value) (A) (A_value) (A) (A_value)
             in
             M.f full_signature prev_varss_n prev_varss_length ~feature_flags
+              ~num_chunks:1
               ~max_proofs_verified:(module Max_proofs_verified)
           in
           let module Branch_data = struct
