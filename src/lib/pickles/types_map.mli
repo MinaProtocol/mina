@@ -11,7 +11,7 @@ module Basic : sig
     ; branches : 'n2 Pickles_types.Nat.t
     ; wrap_domains : Import.Domains.t
     ; wrap_key :
-        Backend.Tick.Inner_curve.Affine.t
+        Backend.Tick.Inner_curve.Affine.t array
         Pickles_types.Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
@@ -69,7 +69,7 @@ module Compiled : sig
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key :
-        Backend.Tick.Inner_curve.Affine.t
+        Backend.Tick.Inner_curve.Affine.t array
         Pickles_types.Plonk_verification_key_evals.t
         Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
@@ -88,7 +88,8 @@ module For_step : sig
         [ `Known of (Impls.Step.Field.t, 'branches) Pickles_types.Vector.t
         | `Side_loaded ]
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; wrap_key : inner_curve_var Pickles_types.Plonk_verification_key_evals.t
+    ; wrap_key :
+        inner_curve_var array Pickles_types.Plonk_verification_key_evals.t
     ; wrap_domain :
         [ `Known of Import.Domain.t
         | `Side_loaded of

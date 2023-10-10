@@ -49,7 +49,8 @@ let hash_messages_for_next_step_proof ~app_state
   let g (x, y) = [ x; y ] in
   Tick_field_sponge.digest Tick_field_sponge.params
     (Types.Step.Proof_state.Messages_for_next_step_proof.to_field_elements t ~g
-       ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
+       ~comm:(fun (x : Tock.Curve.Affine.t array) ->
+         Array.concat_map x ~f:(fun x -> Array.of_list (g x)) )
        ~app_state )
 
 let dlog_pcs_batch (type nat proofs_verified total)
@@ -230,21 +231,23 @@ let tick_public_input_of_statement ~max_proofs_verified
     ~f:(Backend.Tick.Field.Vector.get input)
 
 let ft_comm ~add:( + ) ~scale ~endoscale:_ ~negate
-    ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha:_
+    ~verification_key:(m : _ array Plonk_verification_key_evals.t) ~alpha:_
     ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
     ~t_comm =
-  let _, [ sigma_comm_last ] =
-    Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
-  in
-  let f_comm = List.reduce_exn ~f:( + ) [ scale sigma_comm_last plonk.perm ] in
-  let chunked_t_comm =
-    let n = Array.length t_comm in
-    let res = ref t_comm.(n - 1) in
+  let reduce_chunks comm =
+    let n = Array.length comm in
+    let res = ref comm.(n - 1) in
     for i = n - 2 downto 0 do
-      res := t_comm.(i) + scale !res plonk.zeta_to_srs_length
+      res := comm.(i) + scale !res plonk.zeta_to_srs_length
     done ;
     !res
   in
+  let _, [ sigma_comm_last ] =
+    Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
+  in
+  let sigma_comm_last = reduce_chunks sigma_comm_last in
+  let f_comm = List.reduce_exn ~f:( + ) [ scale sigma_comm_last plonk.perm ] in
+  let chunked_t_comm = reduce_chunks t_comm in
   f_comm + chunked_t_comm
   + negate (scale chunked_t_comm plonk.zeta_to_domain_size)
 
