@@ -26,6 +26,7 @@ in Pipeline.build Pipeline.Config::{
       S.exactly "buildkite/src/Jobs/Test/DevelopCompatibility" "dhall"
     ],
     path = "Test",
+    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ],
     name = "DevelopCompatibility"
   },
   steps = [
@@ -37,7 +38,6 @@ in Pipeline.build Pipeline.Config::{
       key = "develop-compatibilty-test",
       target = Size.XLarge,
       docker = None Docker.Type,
-      tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ],
       depends_on = dependsOn
     }
   ]
