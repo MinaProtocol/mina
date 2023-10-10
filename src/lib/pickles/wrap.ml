@@ -102,7 +102,7 @@ type deferred_values_and_hints =
   }
 
 let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
-    ~feature_flags ~actual_feature_flags
+    ~actual_feature_flags
     ~(prev_challenges : ((Backend.Tick.Field.t, _) Vector.t, n) Vector.t)
     ~(step_vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
     ~(public_input : Backend.Tick.Field.t list) ~(proof : Backend.Tick.Proof.t)
@@ -214,8 +214,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     end in
     Type1.derive_plonk
       (module Field)
-      ~feature_flags ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
-      tick_combined_evals
+      ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
   and new_bulletproof_challenges, b =
     let prechals =
       Array.map (O.opening_prechallenges o) ~f:(fun x ->
@@ -386,9 +385,8 @@ let%test_module "gate finalization" =
           compute those values correctly inside the circuit.  Special thanks to Matthew Ryan for
           explaining this in detail. *)
       let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
-        deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
-          ~prev_challenges:[] ~step_vk:vk ~public_input ~proof
-          ~actual_proofs_verified:Nat.N0.n
+        deferred_values ~actual_feature_flags ~sgs:[] ~prev_challenges:[]
+          ~step_vk:vk ~public_input ~proof ~actual_proofs_verified:Nat.N0.n
       in
 
       (* Define Typ.t for Deferred_values.t -- A Type.t defines how to convert a value of some type
@@ -423,12 +421,6 @@ let%test_module "gate finalization" =
             plonk =
               { deferred_values.plonk with
                 lookup = Opt.to_option_unsafe deferred_values.plonk.lookup
-              ; optional_column_scalars =
-                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                  .In_circuit
-                  .Optional_column_scalars
-                  .map ~f:Opt.to_option
-                    deferred_values.plonk.optional_column_scalars
               }
           }
       (* Prepare all of the evaluations (i.e. all of the columns in the proof that we open)
@@ -558,7 +550,7 @@ let%test_module "gate finalization" =
           }
       end) )
 
-    let%test_module "foreign field multiplication" =
+    (*let%test_module "foreign field multiplication" =
       ( module Make (struct
         let example =
           no_public_input
@@ -570,9 +562,8 @@ let%test_module "gate finalization" =
           ; range_check1 = true
           ; foreign_field_add = true
           ; foreign_field_mul = true
-          ; lookup = true
           }
-      end) )
+      end) )*)
 
     let%test_module "range check" =
       ( module Make (struct
@@ -584,7 +575,6 @@ let%test_module "gate finalization" =
           { Plonk_types.Features.none_bool with
             range_check0 = true
           ; range_check1 = true
-          ; lookup = true
           }
       end) )
 
@@ -595,10 +585,7 @@ let%test_module "gate finalization" =
             Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check0
 
         let actual_feature_flags =
-          { Plonk_types.Features.none_bool with
-            range_check0 = true
-          ; lookup = true
-          }
+          { Plonk_types.Features.none_bool with range_check0 = true }
       end) )
 
     let%test_module "xor" =
@@ -607,7 +594,7 @@ let%test_module "gate finalization" =
           public_input_2 Kimchi_bindings.Protocol.Proof.Fp.example_with_xor
 
         let actual_feature_flags =
-          { Plonk_types.Features.none_bool with xor = true; lookup = true }
+          { Plonk_types.Features.none_bool with xor = true }
       end) )
 
     let%test_module "rot" =
@@ -619,7 +606,6 @@ let%test_module "gate finalization" =
           { Plonk_types.Features.none_bool with
             range_check0 = true
           ; rot = true
-          ; lookup = true
           }
       end) )
 
@@ -633,7 +619,6 @@ let%test_module "gate finalization" =
             range_check0 = true
           ; range_check1 = true
           ; foreign_field_add = true
-          ; lookup = true
           }
       end) )
   end )
@@ -643,7 +628,7 @@ module Step_acc = Tock.Inner_curve.Affine
 (* The prover for wrapping a proof *)
 let wrap
     (type actual_proofs_verified max_proofs_verified
-    max_local_max_proofs_verifieds )
+    max_local_max_proofs_verifieds ) ~proof_cache
     ~(max_proofs_verified : max_proofs_verified Nat.t)
     (module Max_local_max_proof_verifieds : Hlist.Maxes.S
       with type ns = max_local_max_proofs_verifieds
@@ -819,7 +804,7 @@ let wrap
   [%log internal] "Wrap_compute_deferred_values" ;
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~sgs ~prev_challenges ~step_vk ~public_input ~proof
-      ~actual_proofs_verified ~feature_flags ~actual_feature_flags
+      ~actual_proofs_verified ~actual_feature_flags
   in
   [%log internal] "Wrap_compute_deferred_values_done" ;
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =
@@ -880,9 +865,26 @@ let wrap
         Impls.Wrap.generate_witness_conv
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             [%log internal] "Backend_tock_proof_create_async" ;
-            let%map.Promise proof =
+            let create_proof () =
               Backend.Tock.Proof.create_async ~primary:public_inputs
                 ~auxiliary:auxiliary_inputs pk ~message:next_accumulator
+            in
+            let%map.Promise proof =
+              match proof_cache with
+              | None ->
+                  create_proof ()
+              | Some proof_cache -> (
+                  match
+                    Proof_cache.get_wrap_proof proof_cache ~keypair:pk
+                      ~public_input:public_inputs
+                  with
+                  | None ->
+                      let%map.Promise proof = create_proof () in
+                      Proof_cache.set_wrap_proof proof_cache ~keypair:pk
+                        ~public_input:public_inputs proof ;
+                      proof
+                  | Some proof ->
+                      Promise.return proof )
             in
             [%log internal] "Backend_tock_proof_create_async_done" ;
             proof )
@@ -905,26 +907,13 @@ let wrap
                         lookup =
                           (* TODO: This assumes wrap circuits do not use lookup *)
                           None
-                      ; optional_column_scalars =
-                          (* TODO: This assumes that wrap circuits do not use
-                             optional gates.
-                          *)
-                          { range_check0 = None
-                          ; range_check1 = None
-                          ; foreign_field_add = None
-                          ; foreign_field_mul = None
-                          ; xor = None
-                          ; rot = None
-                          ; lookup_gate = None
-                          ; runtime_tables = None
-                          }
                       }
                   }
               }
           } )
   in
   [%log internal] "Pickles_wrap_proof_done" ;
-  ( { proof = next_proof
+  ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof
     ; statement =
         Types.Wrap.Statement.to_minimal next_statement
           ~to_option:Opt.to_option_unsafe

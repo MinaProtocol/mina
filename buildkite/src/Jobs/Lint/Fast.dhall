@@ -29,8 +29,10 @@ in  Pipeline.build
       Pipeline.Config::{
         spec = JobSpec::{
         , dirtyWhen = [
+            S.strictly (S.contains "Makefile"),
             S.strictlyStart (S.contains "src/"),
-            S.strictlyStart (S.contains "rfcs/")
+            S.strictlyStart (S.contains "rfcs/"),
+            S.exactly "scripts/check-snarky-submodule" "sh"
           ]
         , path = "Lint"
         , name = "Fast"
@@ -40,38 +42,12 @@ in  Pipeline.build
             Command.Config::{
             , commands = commands
             , label =
-                "Fast lint steps; CODEOWNERs, RFCs, Check Snarky Submodule, Preprocessor Deps"
+                "Fast lint steps; CODEOWNERs, RFCs, Check Snarky & Proof-Systems submodules, Preprocessor Deps"
             , key = "lint"
             , target = Size.Small
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
-            }
-        , Command.build
-            Command.Config::{
-            , commands =
-                RunInToolchain.runInToolchain
-                  [ "CI=true"
-                  , "BASE_BRANCH_NAME=\$BUILDKITE_PULL_REQUEST_BASE_BRANCH"
-                  ]
-                  "./scripts/compare_ci_diff_types.sh"
-            , label = "Versions compatibility linter"
-            , key = "lint-types"
-            , target = Size.Medium
-            , docker = None Docker.Type
-            }
-        , Command.build
-            Command.Config::{
-            , commands =
-                RunInToolchain.runInToolchain
-                  [ "CI=true"
-                  , "BASE_BRANCH_NAME=\$BUILDKITE_PULL_REQUEST_BASE_BRANCH"
-                  ]
-                  "./scripts/compare_ci_diff_binables.sh"
-            , label = "Binable compatibility linter"
-            , key = "lint-binable"
-            , target = Size.Medium
-            , docker = None Docker.Type
             }
         ]
       }

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 )
 
 type Output struct {
+	Time  time.Time       `json:"time,omitempty"`
 	Step  int             `json:"step"`
 	Name  string          `json:"name"`
 	Multi bool            `json:"multi,omitempty"`
@@ -57,10 +59,19 @@ func loadOutputFile(filename string) (map[int]map[string]OutputCacheEntry, error
 }
 
 type ComplexValue struct {
-	Type string
-	File string `json:",omitempty"`
-	Step int
-	Name string
+	Type    string          `json:"type"`
+	File    string          `json:"file,omitempty"`
+	Step    int             `json:"step"`
+	Name    string          `json:"name"`
+	OnEmpty json.RawMessage `json:"onEmpty,omitempty"`
+}
+
+func LocalComplexValue(step int, name string) ComplexValue {
+	return ComplexValue{
+		Type: "output",
+		Step: step,
+		Name: name,
+	}
 }
 
 func ResolveParam(config ResolutionConfig, step int, raw json.RawMessage) (json.RawMessage, error) {
@@ -86,7 +97,10 @@ func ResolveParam(config ResolutionConfig, step int, raw json.RawMessage) (json.
 	}
 	entry, has := config.OutputCache[val.File][val.Step][val.Name]
 	if !has {
-		return nil, fmt.Errorf("couldn't find output %s (step %d, file \"%s\") needed for step %d", val.Name, val.Step, val.File, step)
+		if val.OnEmpty == nil {
+			return nil, fmt.Errorf("couldn't find output %s (step %d, file \"%s\") needed for step %d", val.Name, val.Step, val.File, step)
+		}
+		return val.OnEmpty, nil
 	}
 	if entry.Multi {
 		res, err := json.Marshal(entry.Values)

@@ -44,6 +44,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Cache_handle = Cache_handle
   module Step_main_inputs = Step_main_inputs
   module Step_verifier = Step_verifier
+  module Proof_cache = Proof_cache
 
   exception Return_digest = Compile.Return_digest
 
@@ -288,19 +289,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let compile_with_wrap_main_override_promise =
     Compile.compile_with_wrap_main_override_promise
 
-  let compile_promise ?self ?cache ?disk_keys ?return_early_digest_exception
-      ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ~constraint_constants ~choices () =
-    compile_with_wrap_main_override_promise ?self ?cache ?disk_keys
+  let compile_promise ?self ?cache ?proof_cache ?disk_keys
+      ?return_early_digest_exception ?override_wrap_domain ~public_input
+      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
+      ~choices () =
+    compile_with_wrap_main_override_promise ?self ?cache ?proof_cache ?disk_keys
       ?return_early_digest_exception ?override_wrap_domain ~public_input
       ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
       ~choices ()
 
-  let compile ?self ?cache ?disk_keys ?override_wrap_domain ~public_input
-      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
-      ~choices () =
+  let compile ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
+      ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
+      ~constraint_constants ~choices () =
     let self, cache_handle, proof_module, provers =
-      compile_promise ?self ?cache ?disk_keys ?override_wrap_domain
+      compile_promise ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
         ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
         ~constraint_constants ~choices ()
     in
@@ -652,6 +654,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
+                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -785,6 +788,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
+                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -1382,7 +1386,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let wrap =
                 let wrap_vk = Lazy.force wrap_vk in
                 let%bind.Promise proof, (), (), _ =
-                  step ~maxes:(module Maxes)
+                  step ~proof_cache:None ~maxes:(module Maxes)
                 in
                 let proof =
                   { proof with
@@ -1720,7 +1724,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         end in
                         Wrap.Type1.derive_plonk
                           (module Field)
-                          ~feature_flags:Plonk_types.Features.none
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
                       in
@@ -1837,22 +1840,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                             .plonk
                                           with
                                           lookup = None
-                                        ; optional_column_scalars =
-                                            { range_check0 = None
-                                            ; range_check1 = None
-                                            ; foreign_field_add = None
-                                            ; foreign_field_mul = None
-                                            ; xor = None
-                                            ; rot = None
-                                            ; lookup_gate = None
-                                            ; runtime_tables = None
-                                            }
                                         }
                                     }
                                 }
                             } )
                     in
-                    ( { proof = next_proof
+                    ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof
                       ; statement =
                           Types.Wrap.Statement.to_minimal
                             ~to_option:Plonk_types.Opt.to_option next_statement
@@ -2011,40 +2004,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let () = Backtrace.elide := false
 
       let () = Snarky_backendless.Snark0.set_eval_constraints true
-
-      let%test_module "test uncorrelated deferred b" =
-        ( module Compile.Make_adversarial_test (struct
-          let tweak_statement (stmt : _ Import.Types.Wrap.Statement.In_circuit.t)
-              =
-            (* Modify the statement to contain an invalid [b] value. *)
-            let b = Tick.Field.random () in
-            let shift_value =
-              Shifted_value.Type1.of_field
-                (module Tick.Field)
-                ~shift:Shifts.tick1
-            in
-            { stmt with
-              proof_state =
-                { stmt.proof_state with
-                  deferred_values =
-                    { stmt.proof_state.deferred_values with b = shift_value b }
-                }
-            }
-
-          let check_verifier_error err =
-            (* Convert to JSON to make it easy to parse. *)
-            err |> Error_json.error_to_yojson
-            |> Yojson.Safe.Util.member "multiple"
-            |> Yojson.Safe.Util.to_list
-            |> List.find_exn ~f:(fun json ->
-                   let prefix =
-                     json
-                     |> Yojson.Safe.Util.member "string"
-                     |> Yojson.Safe.Util.to_string |> String.sub ~pos:0 ~len:3
-                   in
-                   String.equal prefix "b: " )
-            |> fun _ -> ()
-        end) )
 
       let%test_module "test domain size too large" =
         ( module Compile.Make_adversarial_test (struct
@@ -2237,6 +2196,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
+                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -2584,6 +2544,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
+                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)

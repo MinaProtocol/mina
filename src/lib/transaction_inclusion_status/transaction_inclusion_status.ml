@@ -126,7 +126,7 @@ let%test_module "transaction_status" =
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
-           ~f:(fun transactions ->
+           ~f:(fun Network_pool.With_nonce.{ message = transactions; _ } ->
              [%log trace]
                "Transactions have been applied successfully and is propagated \
                 throughout the 'network'"

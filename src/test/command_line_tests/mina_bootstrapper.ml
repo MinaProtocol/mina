@@ -27,8 +27,6 @@ module MinaBootstrapper = struct
     ; t.config.dirs.conf
     ; "-genesis-ledger-dir"
     ; t.config.dirs.genesis
-    ; "-current-protocol-version"
-    ; "0.0.0"
     ; "-external-ip"
     ; "0.0.0.0"
     ; "-libp2p-keypair"

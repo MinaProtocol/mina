@@ -24,6 +24,9 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{- if $.Values.priorityClass }}
+      priorityClassName: {{ $.Values.priorityClass }}
+      {{- end }}
       initContainers:
       - name: fix-perms
         image: busybox
@@ -276,6 +279,12 @@ spec:
           protocol: TCP
           containerPort: {{ default $.Values.mina.ports.p2p $config.externalPort }}
           hostPort: {{ default $.Values.mina.ports.external $config.externalPort }}
+        {{- if $.Values.mina.exposeItnGraphql }}
+        - name: http-itn-graphql
+          protocol: TCP
+          port: {{ $.Values.mina.itn.port }}
+          targetPort: {{ $.Values.mina.itn.port }}
+        {{- end }}  
 {{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
@@ -394,6 +403,12 @@ spec:
     protocol: TCP
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
+  {{- if $.Values.mina.exposeItnGraphql }}
+  - name: http-itn-graphql
+    protocol: TCP
+    port: {{ $.Values.mina.itn.port }}
+    targetPort: {{ $.Values.mina.itn.port }}
+  {{- end }}  
 {{- end }}
 ---
 {{- if $.Values.persist_working_dir }}
@@ -412,3 +427,4 @@ spec:
 {{ end }}
 ---
 {{ end }}
+---

@@ -53,7 +53,6 @@ module Worker_state = struct
   type t = (module S)
 
   let create { logger; proof_level; constraint_constants; _ } : t Deferred.t =
-    Memory_stats.log_memory_stats logger ~process:"verifier" ;
     match proof_level with
     | Full ->
         Pickles.Side_loaded.srs_precomputation () ;
@@ -422,7 +421,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
          [rest] handler for the 'rest' of the errors after the value is
          determined, which logs the errors and then swallows them.
       *)
-      Monitor.try_with ~name:"Verifier RPC worker" ~here:[%here] ~run:`Now
+      Monitor.try_with ~here:[%here] ~name:"Verifier RPC worker" ~run:`Now
         ~rest:
           (`Call
             (fun exn ->

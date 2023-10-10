@@ -21,17 +21,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   (* TODO: test account creation fee *)
   let config =
     let open Test_config in
-    let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
-        ~vesting_increment : Mina_base.Account_timing.t =
-      let open Currency in
-      Timed
-        { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
-        ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
-        ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
-        ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
-        ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
-        }
-    in
     { default with
       requires_graphql = true
     ; genesis_ledger =
@@ -67,7 +56,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; account_name = "snark-node-key1"
           ; worker_nodes = 4
           }
-    ; snark_worker_fee = "0.0001"
+    ; snark_worker_fee = "0.0002"
     ; num_archive_nodes = 1
     ; proof_config =
         { proof_config_default with
@@ -80,10 +69,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
     in
     let untimed_node_a =
       Core.String.Map.find_exn
@@ -473,15 +463,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard
         "change snark worker key from snark-node-key1 to snark-node-key2"
-        (let%bind () =
-           Integration_test_lib.Graphql_requests.must_set_snark_worker ~logger
-             (Network.Node.get_ingress_uri snark_coordinator)
-             ~new_snark_pub_key:
-               ( snark_node_key2.keypair.public_key
-               |> Signature_lib.Public_key.compress )
-         in
-         (* adding a wait for 3 minutes so that the new snark worker can start.  this is a temporary solution to what's essentially a race condition causing lots of flakiness/non-determinism for this test *)
-         Malleable_error.lift (Async.after (Time.Span.of_int_sec 180)) )
+        (Integration_test_lib.Graphql_requests.must_set_snark_worker ~logger
+           (Network.Node.get_ingress_uri snark_coordinator)
+           ~new_snark_pub_key:
+             ( snark_node_key2.keypair.public_key
+             |> Signature_lib.Public_key.compress ) )
+    in
+    let new_snark_work_fee = Currency.Amount.of_mina_string_exn "0.0001" in
+    let%bind () =
+      section_hard "change snark work fee from 0.0002 to 0.0001"
+        (Integration_test_lib.Graphql_requests.must_set_snark_work_fee ~logger
+           (Network.Node.get_ingress_uri snark_coordinator)
+           ~new_snark_work_fee:
+             (Currency.Amount.to_nanomina_int new_snark_work_fee) )
     in
     let%bind () =
       section_hard
@@ -513,22 +507,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.get_ingress_uri untimed_node_a)
              ~account_id:(get_account_id snark_node_key2.keypair.public_key)
          in
-         let key_2_balance_expected =
-           Currency.Amount.of_mina_string_exn config.snark_worker_fee
-         in
          if
            Currency.Amount.( >= )
              (Currency.Balance.to_amount key_2_balance_actual)
-             key_2_balance_expected
+             new_snark_work_fee
          then (
            [%log info]
              "balance check successful.  \n\
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
-              snark-worker-fee: %s"
+              new-snark-work-fee: %s"
              (Currency.Balance.to_mina_string key_1_balance_actual)
              (Currency.Balance.to_mina_string key_2_balance_actual)
-             config.snark_worker_fee ;
+             (Currency.Amount.to_mina_string new_snark_work_fee) ;
 
            Malleable_error.return () )
          else
@@ -536,10 +527,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Error with balance of snark-node-key2.  \n\
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
-              snark-worker-fee: %s"
+              new-snark-work-fee: %s"
              (Currency.Balance.to_mina_string key_1_balance_actual)
              (Currency.Balance.to_mina_string key_2_balance_actual)
-             config.snark_worker_fee )
+             (Currency.Amount.to_mina_string new_snark_work_fee) )
+    in
+    let%bind () =
+      section "delegate all mina currency from node_b to node_a"
+        (let delegation_receiver = untimed_node_a in
+         let%bind delegation_receiver_pub_key =
+           pub_key_of_node delegation_receiver
+         in
+         let delegation_sender = untimed_node_b in
+         let%bind delegation_sender_pub_key =
+           pub_key_of_node delegation_sender
+         in
+         let%bind { hash; _ } =
+           Integration_test_lib.Graphql_requests.must_send_delegation ~logger
+             (Network.Node.get_ingress_uri delegation_sender)
+             ~sender_pub_key:delegation_sender_pub_key
+             ~receiver_pub_key:delegation_receiver_pub_key ~fee
+         in
+         wait_for t
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~txn_hash:hash ~node_included_in:`Any_node ) )
     in
     section_hard "running replayer"
       (let%bind logs =

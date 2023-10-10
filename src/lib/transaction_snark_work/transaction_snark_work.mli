@@ -6,11 +6,15 @@ module Statement : sig
   type t = Transaction_snark.Statement.t One_or_two.t
   [@@deriving compare, sexp, yojson, equal]
 
+  include Comparable.S with type t := t
+
   include Hashable.S with type t := t
 
   module Stable : sig
     module V2 : sig
       type t [@@deriving bin_io, compare, sexp, version, yojson, equal]
+
+      include Comparable.S with type t := t
 
       include Hashable.S_binable with type t := t
     end

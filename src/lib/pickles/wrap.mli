@@ -1,7 +1,8 @@
 open Pickles_types
 
 val wrap :
-     max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
+     proof_cache:Proof_cache.t option
+  -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
   -> (module Pickles_types.Hlist.Maxes.S
         with type length = 'max_proofs_verified
          and type ns = 'max_local_max_proofs_verifieds )
@@ -115,13 +116,6 @@ val wrap :
      , ( ( Impls.Wrap.Challenge.Constant.t
          , Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
          , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
-         , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
-           option
-         , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
-           Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
-           option
          , ( Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
              Import.Types.Bulletproof_challenge.t
            , Backend.Tock.Rounds.n )

@@ -711,22 +711,76 @@ module T = struct
     in
     (txns_with_witnesses, updated_stack1, updated_stack2, first_pass_ledger_end)
 
-  let check_completed_works ~logger ~verifier scan_state
+  (** Checks if the work has already been verified before by the snark pool logic *)
+  let work_already_verified_check ~get_completed_work jobs work =
+    let exception Statement_of_job_failure in
+    let statement_of_job_exn job =
+      Option.value_exn ~error:(Error.of_exn Statement_of_job_failure)
+      @@ Scan_state.statement_of_job job
+    in
+    try
+      let job_statements = One_or_two.map ~f:statement_of_job_exn jobs in
+      let work_statement = Transaction_snark_work.statement work in
+      let statements_match =
+        Transaction_snark_work.Statement.equal job_statements work_statement
+      in
+      let matching_completed_work_in_pool = get_completed_work work_statement in
+      match (statements_match, matching_completed_work_in_pool) with
+      | true, Some (completed_work : Transaction_snark_work.Checked.t) ->
+          let verified_proofs = completed_work.proofs in
+          let block_work_proofs = work.proofs in
+          if not @@ Fee.equal completed_work.fee work.fee then
+            Second "fee_not_equal"
+          else if not @@ Account.Key.equal completed_work.prover work.prover
+          then Second "prover_account_not_equal"
+          else if
+            not
+            @@ One_or_two.equal Ledger_proof.equal verified_proofs
+                 block_work_proofs
+          then Second "proof_not_equal"
+          else First ()
+      | _ ->
+          Second "not_found_in_pool"
+    with Statement_of_job_failure -> Second "statement_of_job_failure"
+
+  let check_completed_works ~logger ~verifier ~get_completed_work scan_state
       (completed_works : Transaction_snark_work.t list) =
     let work_count = List.length completed_works in
     let job_pairs =
       Scan_state.k_work_pairs_for_new_diff scan_state ~k:work_count
     in
+    let found_in_snarkpool_count = ref 0 in
+    let mismatch_reasons = String.Table.create ~size:10 () in
     let jmps =
       List.concat_map (List.zip_exn job_pairs completed_works)
         ~f:(fun (jobs, work) ->
-          let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-          One_or_two.(
-            to_list
-              (map (zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
-                   (job, message, proof) ) )) )
+          match work_already_verified_check ~get_completed_work jobs work with
+          | First () ->
+              incr found_in_snarkpool_count ;
+              []
+          | Second reason ->
+              String.Table.incr mismatch_reasons reason ;
+              let message =
+                Sok_message.create ~fee:work.fee ~prover:work.prover
+              in
+              One_or_two.(
+                to_list
+                  (map (zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
+                       (job, message, proof) ) )) )
     in
-    verify jmps ~logger ~verifier
+    [%log debug]
+      ~metadata:
+        [ ("completed_work_found_in_pool", `Int !found_in_snarkpool_count)
+        ; ( "non_skipped_reasons"
+          , `Assoc
+              (List.map (String.Table.to_alist mismatch_reasons)
+                 ~f:(fun (reason, count) -> (reason, `Int count)) ) )
+        ]
+      "check_completed_works: completed works found in SNARK pool: \
+       $completed_work_found_in_pool\n\
+      \      Non skipped work reasons: $non_skipped_reasons" ;
+    if List.is_empty jmps then Deferred.return (Ok ())
+    else verify jmps ~logger ~verifier
 
   (**The total fee excess caused by any diff should be zero. In the case where
      the slots are split into two partitions, total fee excess of the transactions
@@ -736,8 +790,7 @@ module T = struct
     let txns_from_data data =
       List.fold_right ~init:(Ok []) data
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
-          let open Or_error.Let_syntax in
-          let%map acc = acc in
+          let%map.Or_error acc = acc in
           let t =
             d.transaction_with_info |> Ledger.Transaction_applied.transaction
           in
@@ -1164,8 +1217,9 @@ module T = struct
                  (Error.of_string "batch verification failed") ) ) )
 
   let apply ?skip_verification ~constraint_constants ~global_slot t
-      (witness : Staged_ledger_diff.t) ~logger ~verifier ~current_state_view
-      ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase =
+      ~get_completed_work (witness : Staged_ledger_diff.t) ~logger ~verifier
+      ~current_state_view ~state_and_body_hash ~coinbase_receiver
+      ~supercharge_coinbase =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
@@ -1176,7 +1230,8 @@ module T = struct
           | None ->
               [%log internal] "Check_completed_works"
                 ~metadata:[ ("work_count", `Int (List.length work)) ] ;
-              check_completed_works ~logger ~verifier t.scan_state work )
+              check_completed_works ~get_completed_work ~logger ~verifier
+                t.scan_state work )
     in
     [%log internal] "Prediff" ;
     let%bind prediff =
@@ -1995,23 +2050,26 @@ module T = struct
                               , `String
                                   "Snark fee insufficient to create snark \
                                    worker account" )
+                            ; ( "interrupt_get_completed_work_ids"
+                              , Transaction_snark_work.Statement.compact_json w
+                              )
                             ] ;
                         Stop (seq, count) )
                   | None ->
                       [%log debug]
                         ~metadata:
-                          [ ( "statement"
-                            , Transaction_snark_work.Statement.to_yojson w )
-                          ; ( "work_ids"
+                          [ ( "work_ids"
                             , Transaction_snark_work.Statement.compact_json w )
                           ]
                         !"Staged_ledger_diff creation: No snark work found for \
-                          $statement" ;
+                          $work_ids" ;
                       [%log internal] "@block_metadata"
                         ~metadata:
                           [ ("interrupt_get_completed_work_at", `Int count)
                           ; ( "interrupt_get_completed_work_reason"
                             , `String "Snark work for statement not found" )
+                          ; ( "interrupt_get_completed_work_ids"
+                            , Transaction_snark_work.Statement.compact_json w )
                           ] ;
                       Stop (seq, count) )
                 ~finish:Fn.id
@@ -2209,8 +2267,8 @@ let%test_module "staged ledger tests" =
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
           Sl.apply ~constraint_constants ~global_slot !sl diff' ~logger
-            ~verifier ~current_state_view ~state_and_body_hash
-            ~coinbase_receiver ~supercharge_coinbase
+            ~verifier ~get_completed_work:(Fn.const None) ~current_state_view
+            ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
         with
         | Ok x ->
             x
@@ -2623,8 +2681,7 @@ let%test_module "staged ledger tests" =
               let apply_second_pass = Ledger.apply_transaction_second_pass in
               let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
                   sparse_ledger txn =
-                let open Or_error.Let_syntax in
-                let%map _ledger, partial_txn =
+                let%map.Or_error _ledger, partial_txn =
                   Mina_ledger.Sparse_ledger.apply_transaction_first_pass
                     ~constraint_constants ~global_slot ~txn_state_view
                     sparse_ledger txn
@@ -2761,14 +2818,14 @@ let%test_module "staged ledger tests" =
       assert (List.length cmds = num_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
-    let gen_zkapps ?failure ~num_zkapps zkapps_per_iter :
+    let gen_zkapps ?ledger_init_state ?failure ~num_zkapps zkapps_per_iter :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind zkapp_command_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators
-        .sequence_zkapp_command_with_ledger ~max_token_updates:1
-          ~length:num_zkapps ~vk ?failure ()
+        .sequence_zkapp_command_with_ledger ?ledger_init_state
+          ~max_token_updates:1 ~length:num_zkapps ~vk ?failure ()
       in
       let zkapps =
         List.map zkapp_command_and_fee_payer_keypairs ~f:(function
@@ -2830,7 +2887,8 @@ let%test_module "staged ledger tests" =
       let num_zkapps = transaction_capacity * iters in
       gen_zkapps ~num_zkapps (List.init iters ~f:(Fn.const None))
 
-    let gen_zkapps_below_capacity ?(extra_blocks = false) () :
+    let gen_zkapps_below_capacity ?ledger_init_state ?(extra_blocks = false) ()
+        :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
@@ -2845,7 +2903,8 @@ let%test_module "staged ledger tests" =
           (Int.gen_incl 1 ((transaction_capacity / 2) - 1))
       in
       let num_zkapps = List.fold zkapps_per_iter ~init:0 ~f:( + ) in
-      gen_zkapps ~num_zkapps (List.map ~f:Option.some zkapps_per_iter)
+      gen_zkapps ?ledger_init_state ~num_zkapps
+        (List.map ~f:Option.some zkapps_per_iter)
 
     (*Same as gen_at_capacity except that the number of iterations[iters] is
       the function of [extra_block_count] and is same for all generated values*)
@@ -2891,9 +2950,11 @@ let%test_module "staged ledger tests" =
 
     let gen_all_user_commands_below_capacity () =
       let open Quickcheck.Generator.Let_syntax in
-      let%bind ledger, zkapps, iters_zkapps = gen_zkapps_below_capacity () in
       let%bind ledger_init_state, cmds, iters_signed_commands =
         gen_below_capacity ()
+      in
+      let%bind ledger, zkapps, iters_zkapps =
+        gen_zkapps_below_capacity ~ledger_init_state ()
       in
       Ledger.apply_initial_ledger_state ledger ledger_init_state ;
       let iters = iters_zkapps @ iters_signed_commands in
@@ -3191,7 +3252,8 @@ let%test_module "staged ledger tests" =
                     in
                     let%bind apply_res =
                       Sl.apply ~constraint_constants ~global_slot !sl diff
-                        ~logger ~verifier ~current_state_view:current_view
+                        ~logger ~verifier ~get_completed_work:(Fn.const None)
+                        ~current_state_view:current_view
                         ~state_and_body_hash:
                           ( state_hashes.state_hash
                           , state_hashes.state_body_hash |> Option.value_exn )
@@ -4215,13 +4277,13 @@ let%test_module "staged ledger tests" =
                         ({ f with commands = [ failed_command ] }, s)
                     }
                   in
-                  let%map res =
+                  match%map
                     Sl.apply ~constraint_constants ~global_slot !sl
                       (Staged_ledger_diff.forget diff)
-                      ~logger ~verifier ~current_state_view ~state_and_body_hash
+                      ~logger ~verifier ~get_completed_work:(Fn.const None)
+                      ~current_state_view ~state_and_body_hash
                       ~coinbase_receiver ~supercharge_coinbase:false
-                  in
-                  match res with
+                  with
                   | Ok _x ->
                       assert false
                   (*TODO: check transaction logic errors here. Verified that the error is here is [The source account has an insufficient balance]*)
@@ -4231,26 +4293,267 @@ let%test_module "staged ledger tests" =
                   | Error _ ->
                       assert false ) ) )
 
+    let gen_spec_keypair_and_global_slot =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind test_spec = Mina_transaction_logic.For_tests.Test_spec.gen in
+      let pks =
+        Public_key.Compressed.Set.of_list
+          (List.map (Array.to_list test_spec.init_ledger) ~f:(fun s ->
+               Public_key.compress (fst s).public_key ) )
+      in
+      let%map kp =
+        Quickcheck.Generator.filter Keypair.gen ~f:(fun kp ->
+            not
+              (Public_key.Compressed.Set.mem pks
+                 (Public_key.compress kp.public_key) ) )
+      and global_slot = Quickcheck.Generator.small_positive_int in
+      (test_spec, kp, global_slot)
+
+    let%test_unit "When creating diff, invalid commands would be skipped" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind spec_keypair_and_slot = gen_spec_keypair_and_global_slot in
+        let%map signed_commands_or_zkapps =
+          List.gen_with_length 7 Bool.quickcheck_generator
+        in
+        (spec_keypair_and_slot, signed_commands_or_zkapps |> List.to_array)
+      in
+      Async.Thread_safe.block_on_async_exn
+      @@ fun () ->
+      Async.Quickcheck.async_test ~trials:20 gen
+        ~f:(fun
+             ( ({ init_ledger; _ }, new_kp, global_slot)
+             , signed_commands_or_zkapps )
+           ->
+          let open Transaction_snark.For_tests in
+          let zkapp_pk = Public_key.compress new_kp.public_key in
+          let ledger =
+            Ledger.create ~depth:constraint_constants.ledger_depth ()
+          in
+          Mina_transaction_logic.For_tests.Init_ledger.init
+            (module Ledger.Ledger_inner)
+            init_ledger ledger ;
+          Transaction_snark.For_tests.create_trivial_zkapp_account
+            ~permissions:Permissions.user_default ~vk ~ledger zkapp_pk ;
+          let sl = Sl.create_exn ~constraint_constants ~ledger in
+          [%log info] "signed commands or zkapps"
+            ~metadata:
+              [ ( "signed_commands_or_zkapps"
+                , `List
+                    (List.map (Array.to_list signed_commands_or_zkapps)
+                       ~f:(fun b -> `Bool b) ) )
+              ] ;
+          let default_fee = Fee.of_nanomina_int_exn 2_000_000 in
+          let default_amount = Amount.of_mina_int_exn 1 in
+          let mk_signed_command ~(fee_payer : Keypair.t) ~(receiver : Keypair.t)
+              ?(amount = default_amount) ~(nonce : Account.Nonce.t) () =
+            let body =
+              Signed_command_payload.Body.Payment
+                Payment_payload.Poly.
+                  { receiver_pk = Public_key.compress receiver.public_key
+                  ; amount
+                  }
+            in
+            let payload =
+              Signed_command.Payload.create ~fee:default_fee
+                ~fee_payer_pk:Public_key.(compress fee_payer.public_key)
+                ~nonce ~memo:Signed_command_memo.dummy ~valid_until:None ~body
+            in
+            User_command.Signed_command (Signed_command.sign fee_payer payload)
+          in
+          let mk_zkapp_command ~(fee_payer : Keypair.t) ?(fee = default_fee)
+              ~(nonce : Account.Nonce.t) () =
+            let spec : Update_states_spec.t =
+              { sender = (new_kp, Account.Nonce.zero)
+              ; fee
+              ; fee_payer = Some (fee_payer, nonce)
+              ; receivers = []
+              ; amount = default_amount
+              ; zkapp_account_keypairs = [ new_kp ]
+              ; memo = Signed_command_memo.dummy
+              ; new_zkapp_account = false
+              ; snapp_update =
+                  { Account_update.Update.dummy with
+                    delegate = Zkapp_basic.Set_or_keep.Set zkapp_pk
+                  }
+              ; current_auth = Permissions.Auth_required.Signature
+              ; call_data = Snark_params.Tick.Field.zero
+              ; events = []
+              ; actions = []
+              ; preconditions = None
+              }
+            in
+            let%map zkapp_command =
+              Transaction_snark.For_tests.update_states
+                ~zkapp_prover_and_vk:(zkapp_prover, vk) ~constraint_constants
+                spec
+            in
+            let valid_zkapp_command =
+              Zkapp_command.Valid.to_valid ~status:Applied
+                ~find_vk:
+                  (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                     ~get:Ledger.get
+                     ~location_of_account:Ledger.location_of_account )
+                zkapp_command
+              |> Or_error.ok_exn
+            in
+            User_command.Zkapp_command valid_zkapp_command
+          in
+          let mk_user_command ~signed_command_or_zkapp ~fee_payer ~receiver
+              ?amount ~nonce () =
+            match signed_command_or_zkapp with
+            | true ->
+                return
+                @@ mk_signed_command ~fee_payer ~receiver ?amount ~nonce ()
+            | false ->
+                mk_zkapp_command ~fee_payer
+                  ?fee:
+                    (Option.map amount ~f:(fun amount -> Amount.to_fee amount))
+                  ~nonce ()
+          in
+          let fee_payer, _ = init_ledger.(0) in
+          let fee_payer1, _ = init_ledger.(2) in
+          let receiver, _ = init_ledger.(1) in
+          let%bind valid_command_1 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(0)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 0) ()
+          and valid_command_2 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(1)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 1) ()
+          and invalid_command_3 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(2)
+              ~fee_payer ~receiver ~amount:Amount.max_int
+              ~nonce:(Account.Nonce.of_int 2) ()
+          and invalid_command_4 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(3)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 3) ()
+          and valid_command_5 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(4)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 2) ()
+          and invalid_command_6 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(5)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 4) ()
+          and valid_command_7 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(6)
+              ~fee_payer:fee_payer1 ~receiver ~nonce:(Account.Nonce.of_int 0) ()
+          in
+          let global_slot =
+            Mina_numbers.Global_slot_since_genesis.of_int global_slot
+          in
+          let current_state, current_state_view =
+            dummy_state_and_view ~global_slot ()
+          in
+          let state_and_body_hash =
+            let state_hashes = Mina_state.Protocol_state.hashes current_state in
+            ( state_hashes.state_hash
+            , state_hashes.state_body_hash |> Option.value_exn )
+          in
+          match
+            Sl.create_diff ~constraint_constants ~global_slot sl ~logger
+              ~current_state_view
+              ~transactions_by_fee:
+                (Sequence.of_list
+                   [ valid_command_1
+                   ; valid_command_2
+                   ; invalid_command_3
+                   ; invalid_command_4
+                   ; valid_command_5
+                   ; invalid_command_6
+                   ; valid_command_7
+                   ] )
+              ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
+              ~coinbase_receiver ~supercharge_coinbase:false
+          with
+          | Error e ->
+              Error.raise (Pre_diff_info.Error.to_error e)
+          | Ok (diff, invalid_txns) -> (
+              let valid_commands =
+                Staged_ledger_diff.With_valid_signatures_and_proofs.commands
+                  diff
+                |> List.map ~f:(fun { data; _ } ->
+                       User_command.forget_check data )
+              in
+              assert (
+                List.equal User_command.equal valid_commands
+                  ( [ valid_command_1
+                    ; valid_command_2
+                    ; valid_command_5
+                    ; valid_command_7
+                    ]
+                  |> List.map ~f:(fun cmd -> User_command.forget_check cmd) ) ) ;
+              assert (List.length invalid_txns = 3) ;
+              match%bind
+                Sl.apply ~constraint_constants ~global_slot sl
+                  (Staged_ledger_diff.forget diff)
+                  ~logger ~verifier ~get_completed_work:(Fn.const None)
+                  ~current_state_view ~state_and_body_hash ~coinbase_receiver
+                  ~supercharge_coinbase:false
+              with
+              | Ok _x -> (
+                  let valid_command_1_with_status =
+                    With_status.
+                      { data = valid_command_1
+                      ; status = Transaction_status.Applied
+                      }
+                  in
+                  let invalid_command_3_with_status =
+                    With_status.
+                      { data = invalid_command_3
+                      ; status = Transaction_status.Applied
+                      }
+                  in
+                  let invalid_command_4_with_status =
+                    With_status.
+                      { data = invalid_command_4
+                      ; status = Transaction_status.Applied
+                      }
+                  in
+                  let valid_command_7_with_status =
+                    With_status.
+                      { data = valid_command_7
+                      ; status = Transaction_status.Applied
+                      }
+                  in
+                  let f, s = diff.diff in
+                  let diff =
+                    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff =
+                        ( { f with
+                            commands =
+                              [ valid_command_1_with_status
+                              ; invalid_command_3_with_status
+                              ; invalid_command_4_with_status
+                              ; valid_command_7_with_status
+                              ]
+                          }
+                        , s )
+                    }
+                  in
+                  match%map
+                    Sl.apply ~constraint_constants ~global_slot sl
+                      (Staged_ledger_diff.forget diff)
+                      ~logger ~verifier ~get_completed_work:(Fn.const None)
+                      ~current_state_view ~state_and_body_hash
+                      ~coinbase_receiver ~supercharge_coinbase:false
+                  with
+                  | Ok _x ->
+                      assert false
+                  | Error _e ->
+                      assert true )
+              | Error e ->
+                  [%log info] "Error %s" (Staged_ledger_error.to_string e) ;
+                  assert false ) )
+
     let%test_unit "Mismatched verification keys in zkApp accounts and \
                    transactions" =
       let open Transaction_snark.For_tests in
-      let gen =
-        let open Quickcheck.Generator.Let_syntax in
-        let%bind test_spec = Mina_transaction_logic.For_tests.Test_spec.gen in
-        let pks =
-          Public_key.Compressed.Set.of_list
-            (List.map (Array.to_list test_spec.init_ledger) ~f:(fun s ->
-                 Public_key.compress (fst s).public_key ) )
-        in
-        let%map kp =
-          Quickcheck.Generator.filter Keypair.gen ~f:(fun kp ->
-              not
-                (Public_key.Compressed.Set.mem pks
-                   (Public_key.compress kp.public_key) ) )
-        and global_slot = Quickcheck.Generator.small_positive_int in
-        (test_spec, kp, global_slot)
-      in
-      Quickcheck.test ~trials:1 gen
+      Quickcheck.test ~trials:1 gen_spec_keypair_and_global_slot
         ~f:(fun ({ init_ledger; specs = _ }, new_kp, global_slot) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
           let amount = Amount.of_mina_int_exn 10 in
@@ -4420,4 +4723,112 @@ let%test_module "staged ledger tests" =
                            |> Yojson.Safe.to_string ) )
                   | _ ->
                       failwith "expecting zkapp_command transaction" ) ) )
+
+    let%test_unit "Invalid account_update_hash would be rejected" =
+      let open Transaction_snark.For_tests in
+      Quickcheck.test ~trials:1 gen_spec_keypair_and_global_slot
+        ~f:(fun ({ init_ledger; specs }, zkapp_account_keypair, global_slot) ->
+          let fee = Fee.of_nanomina_int_exn 1_000_000 in
+          let fee_payer = (List.hd_exn specs).sender in
+          let memo = Signed_command_memo.dummy in
+          let spec : Single_account_update_spec.t =
+            { fee_payer
+            ; fee
+            ; zkapp_account_keypair
+            ; memo
+            ; update =
+                { Account_update.Update.dummy with zkapp_uri = Set "abc" }
+            ; call_data = Snark_params.Tick.Field.zero
+            ; events = []
+            ; actions = []
+            }
+          in
+          Ledger.with_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let zkapp_account_pk =
+                    Signature_lib.Public_key.compress
+                      zkapp_account_keypair.public_key
+                  in
+                  let zkapp_prover_and_vk = (zkapp_prover, vk) in
+                  let%bind zkapp_command =
+                    single_account_update
+                      ~chain:Mina_signature_kind.(Other_network "invalid")
+                      ~zkapp_prover_and_vk ~constraint_constants spec
+                  in
+                  Mina_transaction_logic.For_tests.Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  Transaction_snark.For_tests.create_trivial_zkapp_account
+                    ~permissions:
+                      { Permissions.user_default with set_zkapp_uri = Proof }
+                    ~vk ~ledger zkapp_account_pk ;
+                  let invalid_zkapp_command =
+                    Or_error.ok_exn
+                      (Zkapp_command.Valid.to_valid ~status:Applied
+                         ~find_vk:
+                           (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                              ~get:Ledger.get
+                              ~location_of_account:Ledger.location_of_account )
+                         zkapp_command )
+                  in
+                  let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
+                  let global_slot =
+                    Mina_numbers.Global_slot_since_genesis.of_int global_slot
+                  in
+                  let current_state, current_state_view =
+                    dummy_state_and_view ~global_slot ()
+                  in
+                  let state_and_body_hash =
+                    let state_hashes =
+                      Mina_state.Protocol_state.hashes current_state
+                    in
+                    ( state_hashes.state_hash
+                    , state_hashes.state_body_hash |> Option.value_exn )
+                  in
+                  match
+                    Sl.create_diff ~constraint_constants ~global_slot !sl
+                      ~logger ~current_state_view
+                      ~transactions_by_fee:
+                        (Sequence.singleton
+                           (User_command.Zkapp_command invalid_zkapp_command) )
+                      ~get_completed_work:
+                        (stmt_to_work_zero_fee ~prover:self_pk)
+                      ~coinbase_receiver ~supercharge_coinbase:false
+                  with
+                  | Error e ->
+                      Error.raise (Pre_diff_info.Error.to_error e)
+                  | Ok (diff, _invalid_txns) -> (
+                      assert (
+                        List.length
+                          (Staged_ledger_diff.With_valid_signatures_and_proofs
+                           .commands diff )
+                        = 1 ) ;
+                      let%bind verifier_full =
+                        Verifier.create ~logger ~proof_level:Full
+                          ~constraint_constants ~conf_dir:None
+                          ~pids:
+                            (Child_processes.Termination.create_pid_table ())
+                          ()
+                      in
+                      match%map
+                        Sl.apply ~constraint_constants ~global_slot !sl
+                          (Staged_ledger_diff.forget diff)
+                          ~get_completed_work:(Fn.const None) ~logger
+                          ~verifier:verifier_full ~current_state_view
+                          ~state_and_body_hash ~coinbase_receiver
+                          ~supercharge_coinbase:false
+                      with
+                      | Ok _ ->
+                          failwith "invalid block should be rejected"
+                      | Error e ->
+                          if
+                            String.is_substring
+                              (Staged_ledger_error.to_string e)
+                              ~substring:"batch verification failed"
+                          then ()
+                          else
+                            failwith
+                              "block should be rejected because batch \
+                               verification failed" ) ) ) )
   end )

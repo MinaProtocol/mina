@@ -207,12 +207,12 @@ module Block_produced = struct
       find int breadcrumb_consensus_state [ "blockchain_length" ]
     in
     let%bind global_slot =
-      (* the associated field looks like "slot_number":["Since_hard_fork", 1] *)
+      (* the associated field looks like "slot_number":1 *)
       let%map global_slot_since_hard_fork =
-        find (list string) breadcrumb_consensus_state
+        find string breadcrumb_consensus_state
           [ "curr_global_slot"; "slot_number" ]
       in
-      List.nth_exn global_slot_since_hard_fork 1 |> Int.of_string
+      Int.of_string global_slot_since_hard_fork
     in
     let%map epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
     { block_height; global_slot; epoch; snarked_ledger_generated; state_hash }
@@ -230,7 +230,8 @@ module Breadcrumb_added = struct
 
   type t =
     { state_hash : State_hash.t
-    ; user_commands : User_command.Valid.t With_status.t list
+    ; transaction_hashes :
+        Mina_transaction.Transaction_hash.t With_status.t list
     }
   [@@deriving to_yojson]
 
@@ -244,11 +245,25 @@ module Breadcrumb_added = struct
     let state_hash =
       parser_from_of_yojson State_hash.of_yojson state_hash_json
     in
-    let%map user_commands =
+    let%map transaction_hashes =
       get_metadata message "user_commands"
-      >>= parse valid_commands_with_statuses
+      >>= parse transaction_hashes_with_statuses
     in
-    { state_hash; user_commands }
+    { state_hash; transaction_hashes }
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
+module Transition_frontier_loaded_from_persistence = struct
+  type t = unit [@@deriving to_yojson]
+
+  let name = "Transition_frontier_loaded_from_persistence"
+
+  let structured_event_id =
+    Transition_frontier
+    .transition_frontier_loaded_from_persistence_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
 
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
@@ -260,6 +275,45 @@ module Persisted_frontier_loaded = struct
 
   let structured_event_id =
     Transition_frontier.persisted_frontier_loaded_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
+module Persisted_frontier_fresh_boot = struct
+  type t = unit [@@deriving to_yojson]
+
+  let name = "persistent frontier database does not exist"
+
+  let structured_event_id =
+    Transition_frontier.persisted_frontier_fresh_boot_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
+module Bootstrap_required = struct
+  type t = unit [@@deriving to_yojson]
+
+  let name = "Bootstrap required"
+
+  let structured_event_id =
+    Transition_frontier.bootstrap_required_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
+module Persisted_frontier_dropped = struct
+  type t = unit [@@deriving to_yojson]
+
+  let name = "Persistent frontier dropped"
+
+  let structured_event_id =
+    Transition_frontier.persisted_frontier_dropped_structured_events_id
 
   let parse_func = Fn.const (Or_error.return ())
 
@@ -325,8 +379,7 @@ module Gossip = struct
   end
 
   module Transactions = struct
-    type r =
-      { txns : Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t }
+    type r = { fee_payer_summaries : User_command.fee_payer_summary_t list }
     [@@deriving yojson, hash]
 
     type t = r With_direction.t [@@deriving yojson]
@@ -340,10 +393,10 @@ module Gossip = struct
     let parse_func message =
       match%bind parse id message with
       | Network_pool.Transaction_pool.Resource_pool.Diff.Transactions_received
-          { txns; sender = _ } ->
-          Ok ({ txns }, Direction.Received)
-      | Mina_networking.Gossip_transaction_pool_diff { txns } ->
-          Ok ({ txns }, Sent)
+          { fee_payer_summaries; sender = _ } ->
+          Ok ({ fee_payer_summaries }, Direction.Received)
+      | Mina_networking.Gossip_transaction_pool_diff { fee_payer_summaries } ->
+          Ok ({ fee_payer_summaries }, Sent)
       | _ ->
           bad_parse
 
@@ -381,7 +434,12 @@ type 'a t =
   | Snark_work_gossip : Gossip.Snark_work.t t
   | Transactions_gossip : Gossip.Transactions.t t
   | Snark_work_failed : Snark_work_failed.t t
+  | Transition_frontier_loaded_from_persistence
+      : Transition_frontier_loaded_from_persistence.t t
   | Persisted_frontier_loaded : Persisted_frontier_loaded.t t
+  | Persisted_frontier_fresh_boot : Persisted_frontier_fresh_boot.t t
+  | Persisted_frontier_dropped : Persisted_frontier_dropped.t t
+  | Bootstrap_required : Bootstrap_required.t t
 
 type existential = Event_type : 'a t -> existential
 
@@ -406,8 +464,16 @@ let existential_to_string = function
       "Transactions_gossip"
   | Event_type Snark_work_failed ->
       "Snark_work_failed"
+  | Event_type Transition_frontier_loaded_from_persistence ->
+      "Transition_frontier_loaded_from_persistence"
   | Event_type Persisted_frontier_loaded ->
       "Persisted_frontier_loaded"
+  | Event_type Persisted_frontier_fresh_boot ->
+      "Persisted_frontier_fresh_boot"
+  | Event_type Persisted_frontier_dropped ->
+      "Persisted_frontier_dropped"
+  | Event_type Bootstrap_required ->
+      "Bootstrap_requied"
 
 let to_string e = existential_to_string (Event_type e)
 
@@ -434,6 +500,14 @@ let existential_of_string_exn = function
       Event_type Snark_work_failed
   | "Persisted_frontier_loaded" ->
       Event_type Persisted_frontier_loaded
+  | "Transition_frontier_loaded_from_persistence" ->
+      Event_type Transition_frontier_loaded_from_persistence
+  | "Persisted_frontier_fresh_boot" ->
+      Event_type Persisted_frontier_fresh_boot
+  | "Persisted_frontier_dropped" ->
+      Event_type Persisted_frontier_dropped
+  | "Bootstrap_requied" ->
+      Event_type Bootstrap_required
   | _ ->
       failwith "invalid event type string"
 
@@ -475,7 +549,11 @@ let all_event_types =
   ; Event_type Snark_work_gossip
   ; Event_type Transactions_gossip
   ; Event_type Snark_work_failed
+  ; Event_type Transition_frontier_loaded_from_persistence
   ; Event_type Persisted_frontier_loaded
+  ; Event_type Persisted_frontier_fresh_boot
+  ; Event_type Persisted_frontier_dropped
+  ; Event_type Bootstrap_required
   ]
 
 let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
@@ -500,8 +578,16 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
       (module Gossip.Transactions)
   | Snark_work_failed ->
       (module Snark_work_failed)
+  | Transition_frontier_loaded_from_persistence ->
+      (module Transition_frontier_loaded_from_persistence)
   | Persisted_frontier_loaded ->
       (module Persisted_frontier_loaded)
+  | Persisted_frontier_fresh_boot ->
+      (module Persisted_frontier_fresh_boot)
+  | Persisted_frontier_dropped ->
+      (module Persisted_frontier_dropped)
+  | Bootstrap_required ->
+      (module Bootstrap_required)
 
 let event_to_yojson event =
   let (Event (t, d)) = event in
@@ -622,7 +708,16 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
       h e
   | Snark_work_failed, Snark_work_failed ->
       h e
+  | ( Transition_frontier_loaded_from_persistence
+    , Transition_frontier_loaded_from_persistence ) ->
+      h e
   | Persisted_frontier_loaded, Persisted_frontier_loaded ->
+      h e
+  | Persisted_frontier_fresh_boot, Persisted_frontier_fresh_boot ->
+      h e
+  | Persisted_frontier_dropped, Persisted_frontier_dropped ->
+      h e
+  | Bootstrap_required, Bootstrap_required ->
       h e
   | _ ->
       failwithf "Mismatched event types: %s, %s" (to_string t1) (to_string t2)
@@ -769,10 +864,7 @@ let%test_unit "parse breadcrumb functions properly" =
                     "block_creator": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
                     "curr_global_slot": {
                       "slots_per_epoch": "480",
-                      "slot_number": [
-                        "Since_hard_fork",
-                        "14"
-                      ]
+                      "slot_number": "14"
                     },
                     "staking_epoch_data": {
                       "lock_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
@@ -810,10 +902,7 @@ let%test_unit "parse breadcrumb functions properly" =
                       "2"
                     ],
                     "total_currency": "730300000001000",
-                    "global_slot_since_genesis": [
-                      "Since_genesis",
-                      "14"
-                    ],
+                    "global_slot_since_genesis": "14",
                     "epoch_count": "0",
                     "min_window_density": "22",
                     "has_ancestor_in_same_checkpoint_window": true,

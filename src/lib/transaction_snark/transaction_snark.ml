@@ -9,6 +9,8 @@ open Currency
 open Pickles_types
 module Wire_types = Mina_wire_types.Transaction_snark
 
+let proof_cache = ref None
+
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S = Transaction_snark_intf.Full with type Stable.V2.t = A.V2.t
 end
@@ -3281,33 +3283,26 @@ module Make_str (A : Wire_types.Concrete) = struct
     , Nat.N5.n )
     Pickles.Tag.t
 
-  let time lab f =
-    let start = Time.now () in
-    let x = f () in
-    let stop = Time.now () in
-    printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
-    x
-
   let system ~proof_level ~constraint_constants =
-    time "Transaction_snark.system" (fun () ->
-        Pickles.compile () ~cache:Cache_dir.cache
-          ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
-          ~branches:(module Nat.N5)
-          ~max_proofs_verified:(module Nat.N2)
-          ~name:"transaction-snark"
-          ~constraint_constants:
-            (Genesis_constants.Constraint_constants.to_snark_keys_header
-               constraint_constants )
-          ~choices:(fun ~self ->
-            let zkapp_command x =
-              Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
-            in
-            [ Base.rule ~constraint_constants
-            ; Merge.rule ~proof_level self
-            ; zkapp_command Opt_signed_opt_signed
-            ; zkapp_command Opt_signed
-            ; zkapp_command Proved
-            ] ) )
+    Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
+      ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+      ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
+      ~branches:(module Nat.N5)
+      ~max_proofs_verified:(module Nat.N2)
+      ~name:"transaction-snark"
+      ~constraint_constants:
+        (Genesis_constants.Constraint_constants.to_snark_keys_header
+           constraint_constants )
+      ~choices:(fun ~self ->
+        let zkapp_command x =
+          Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
+        in
+        [ Base.rule ~constraint_constants
+        ; Merge.rule ~proof_level self
+        ; zkapp_command Opt_signed_opt_signed
+        ; zkapp_command Opt_signed
+        ; zkapp_command Proved
+        ] )
 
   module Verification = struct
     module type S = sig
@@ -4127,6 +4122,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       [@@deriving sexp]
     end
 
+    let set_proof_cache x = proof_cache := Some x
+
     let create_trivial_snapp ~constraint_constants () =
       let tag, _, (module P), Pickles.Provers.[ trivial_prover ] =
         let trivial_rule : _ Pickles.Inductive_rule.t =
@@ -4149,7 +4146,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
           }
         in
-        Pickles.compile () ~cache:Cache_dir.cache
+        Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
           ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
           ~branches:(module Nat.N1)
           ~max_proofs_verified:(module Nat.N0)
@@ -4227,8 +4224,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ~default:Zkapp_precondition.Protocol_state.accept
             ; account =
                 ( if sender_is_the_same_as_fee_payer then
-                  Account_update.Account_precondition.Accept
-                else Nonce (Account.Nonce.succ sender_nonce) )
+                  Zkapp_precondition.Account.accept
+                else
+                  Zkapp_precondition.Account.nonce
+                    (Account.Nonce.succ sender_nonce) )
             ; valid_while =
                 Option.value_map preconditions
                   ~f:(fun { valid_while; _ } -> valid_while)
@@ -4321,7 +4320,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                         account =
                           Option.map preconditions ~f:(fun { account; _ } ->
                               account )
-                          |> Option.value ~default:Accept
+                          |> Option.value
+                               ~default:Zkapp_precondition.Account.accept
                       }
                   ; use_full_commitment = true
                   ; implicit_account_creation_fee = false
@@ -4365,7 +4365,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; actions = []
                 ; call_data = Field.zero
                 ; call_depth = 0
-                ; preconditions = { preconditions' with account = Accept }
+                ; preconditions =
+                    { preconditions' with
+                      account = Zkapp_precondition.Account.accept
+                    }
                 ; use_full_commitment
                 ; implicit_account_creation_fee = false
                 ; may_use_token = No
@@ -4579,6 +4582,136 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
       in
       zkapp_command
+
+    (* This spec is intended to build a zkapp command with only one account update
+       with proof authorization. This is mainly for cross-network replay tests. We
+       want to test the condition that when a proof is generated in one network
+       and being rejected by another network.
+    *)
+    module Single_account_update_spec = struct
+      type t =
+        { fee : Currency.Fee.t
+        ; fee_payer : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+        ; zkapp_account_keypair : Signature_lib.Keypair.t
+        ; memo : Signed_command_memo.t
+        ; update : Account_update.Update.t
+        ; actions : Tick.Field.t array list
+        ; events : Tick.Field.t array list
+        ; call_data : Tick.Field.t
+        }
+
+      let spec_of_t ~vk
+          { fee
+          ; fee_payer
+          ; zkapp_account_keypair
+          ; memo
+          ; update = _
+          ; actions
+          ; events
+          ; call_data
+          } : Spec.t =
+        { fee
+        ; sender = fee_payer
+        ; fee_payer = None
+        ; receivers = []
+        ; amount = Currency.Amount.zero
+        ; zkapp_account_keypairs = [ zkapp_account_keypair ]
+        ; memo
+        ; new_zkapp_account = false
+        ; actions
+        ; events
+        ; call_data
+        ; preconditions = None
+        ; authorization_kind = Proof (With_hash.hash vk)
+        }
+    end
+
+    let single_account_update ?zkapp_prover_and_vk ~chain ~constraint_constants
+        (spec : Single_account_update_spec.t) : Zkapp_command.t Async.Deferred.t
+        =
+      let `VK vk, `Prover prover =
+        match zkapp_prover_and_vk with
+        | Some (prover, vk) ->
+            (`VK vk, `Prover prover)
+        | None ->
+            create_trivial_snapp ~constraint_constants ()
+      in
+      let ( `Zkapp_command { Zkapp_command.fee_payer; memo; _ }
+          , `Sender_account_update _
+          , `Proof_zkapp_command _
+          , `Txn_commitment _
+          , `Full_txn_commitment _ ) =
+        create_zkapp_command ~constraint_constants
+          (Single_account_update_spec.spec_of_t ~vk spec)
+          ~update:spec.update ~receiver_update:Account_update.Update.noop
+      in
+      let account_update_with_dummy_auth =
+        Account_update.
+          { body =
+              { public_key =
+                  Signature_lib.Public_key.compress
+                    spec.zkapp_account_keypair.public_key
+              ; update = spec.update
+              ; token_id = Token_id.default
+              ; balance_change = Amount.Signed.zero
+              ; increment_nonce = false
+              ; events = spec.events
+              ; actions = spec.events
+              ; call_data = spec.call_data
+              ; preconditions = Account_update.Preconditions.accept
+              ; use_full_commitment = true
+              ; implicit_account_creation_fee = false
+              ; may_use_token = No
+              ; authorization_kind = Proof (With_hash.hash vk)
+              }
+          ; authorization = Control.Proof Mina_base.Proof.blockchain_dummy
+          }
+      in
+      let account_update_digest_with_selected_chain =
+        Zkapp_command.Digest.Account_update.create ~chain
+          account_update_with_dummy_auth
+      in
+      let account_update_digest_with_current_chain =
+        Zkapp_command.Digest.Account_update.create
+          account_update_with_dummy_auth
+      in
+      let tree_with_dummy_auth =
+        Zkapp_command.Call_forest.Tree.
+          { account_update = account_update_with_dummy_auth
+          ; calls = []
+          ; account_update_digest = account_update_digest_with_selected_chain
+          }
+      in
+      let statement = Zkapp_statement.of_tree tree_with_dummy_auth in
+      let%map.Async.Deferred tree =
+        let handler (Snarky_backendless.Request.With { request; respond }) =
+          match request with _ -> respond Unhandled
+        in
+        let%map.Async.Deferred (), (), (pi : Pickles.Side_loaded.Proof.t) =
+          prover ~handler statement
+        in
+        { tree_with_dummy_auth with
+          account_update =
+            { account_update_with_dummy_auth with authorization = Proof pi }
+        ; account_update_digest = account_update_digest_with_current_chain
+        }
+      in
+      let forest =
+        [ With_stack_hash.
+            { elt = tree
+            ; stack_hash =
+                Zkapp_command.Digest.(
+                  Forest.cons
+                    (Tree.create
+                       { tree with
+                         account_update_digest =
+                           account_update_digest_with_current_chain
+                       } )
+                    Forest.empty)
+            }
+        ]
+      in
+      ({ fee_payer; memo; account_updates = forest } : Zkapp_command.t)
 
     module Update_states_spec = struct
       type t =
@@ -4892,7 +5025,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; call_depth = 0
             ; preconditions =
                 { network = protocol_state_predicate
-                ; account = Nonce (Account.Nonce.succ sender_nonce)
+                ; account =
+                    Zkapp_precondition.Account.nonce
+                      (Account.Nonce.succ sender_nonce)
                 ; valid_while = Ignore
                 }
             ; use_full_commitment = false
@@ -4916,7 +5051,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; call_depth = 0
             ; preconditions =
                 { network = protocol_state_predicate
-                ; account = Full Zkapp_precondition.Account.accept
+                ; account = Zkapp_precondition.Account.accept
                 ; valid_while = Ignore
                 }
             ; use_full_commitment = false

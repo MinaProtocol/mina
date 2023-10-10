@@ -22,6 +22,27 @@ let cluster_zone = "us-west1a"
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
+  (* This function computes the priority value of pods to use for the deployment. Pod priority will
+   * determine the order of the queue in which unscheduled pods are scheduled onto nodes. By
+   * computing the pod priority from the timestamp of the deployment, we ensure that earlier
+   * deployments will take scheduling priority over older deployments that are also waiting to be
+   * scheduled. For more information on pod priority, refer to the kubernetes documentation.
+   * https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass
+   *)
+  let compute_pod_priority () =
+    let pod_priority_genesis_timestamp = 1690569524 in
+    let max_pod_priority = 1000000000 in
+    let min_pod_priority = -2147483648 in
+    let current_timestamp =
+      Time.now () |> Time.to_span_since_epoch |> Time.Span.to_sec
+      |> Float.to_int
+    in
+    let priority =
+      max_pod_priority - (current_timestamp - pod_priority_genesis_timestamp)
+    in
+    assert (priority > min_pod_priority) ;
+    priority
+
   type block_producer_config =
     { name : string (* ; id : string *)
     ; keypair : Network_keypair.t
@@ -59,15 +80,13 @@ module Network_config = struct
     ; mem_request : string
     ; worker_cpu_request : int
     ; worker_mem_request : string
+    ; pod_priority : int
     }
   [@@deriving to_yojson]
 
   type t =
     { mina_automation_location : string
     ; debug_arg : bool
-    ; check_capacity : bool
-    ; check_capacity_delay : int
-    ; check_capacity_retries : int
     ; genesis_keypairs :
         (Network_keypair.t Core.String.Map.t
         [@to_yojson
@@ -93,6 +112,7 @@ module Network_config = struct
       =
     let { requires_graphql
         ; genesis_ledger
+        ; epoch_data
         ; block_producers
         ; snark_coordinator
         ; snark_worker_fee
@@ -138,42 +158,32 @@ module Network_config = struct
     let keypairs =
       List.take
         (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
-        (List.drop
-           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
-           1 )
+        (List.tl_exn
+           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs)) )
         (List.length genesis_ledger)
     in
-    let labeled_accounts :
-        ( Runtime_config.Accounts.single
-        * (Public_key.Compressed.t * Private_key.t) )
-        String.Map.t =
-      String.Map.empty
+    let runtime_timing_of_timing = function
+      | Account.Timing.Untimed ->
+          None
+      | Timed t ->
+          Some
+            { Runtime_config.Accounts.Single.Timed.initial_minimum_balance =
+                t.initial_minimum_balance
+            ; cliff_time = t.cliff_time
+            ; cliff_amount = t.cliff_amount
+            ; vesting_period = t.vesting_period
+            ; vesting_increment = t.vesting_increment
+            }
     in
-    let rec add_accounts mp zip =
-      match zip with
-      | [] ->
-          mp
-      | hd :: tl ->
-          let ( { Test_config.Test_Account.balance; account_name; timing }
-              , (pk, sk) ) =
-            hd
-          in
-          let timing =
-            match timing with
-            | Account.Timing.Untimed ->
-                None
-            | Timed t ->
-                Some
-                  { Runtime_config.Accounts.Single.Timed.initial_minimum_balance =
-                      t.initial_minimum_balance
-                  ; cliff_time = t.cliff_time
-                  ; cliff_amount = t.cliff_amount
-                  ; vesting_period = t.vesting_period
-                  ; vesting_increment = t.vesting_increment
-                  }
-          in
+    let add_accounts accounts_and_keypairs =
+      List.map accounts_and_keypairs
+        ~f:(fun
+             ( { Test_config.Test_Account.balance; account_name; timing }
+             , (pk, sk) )
+           ->
+          let timing = runtime_timing_of_timing timing in
           let default = Runtime_config.Accounts.Single.default in
-          let acct =
+          let account =
             { default with
               pk = Public_key.Compressed.to_string pk
             ; sk = Some (Private_key.to_base58_check sk)
@@ -184,17 +194,21 @@ module Network_config = struct
             ; timing
             }
           in
-          add_accounts
-            (String.Map.add_exn mp ~key:account_name ~data:(acct, (pk, sk)))
-            tl
+          (account_name, account) )
     in
-    let genesis_ledger_accounts =
-      add_accounts labeled_accounts (List.zip_exn genesis_ledger keypairs)
-    in
+    let genesis_accounts_and_keys = List.zip_exn genesis_ledger keypairs in
+    let genesis_ledger_accounts = add_accounts genesis_accounts_and_keys in
     (* DAEMON CONFIG *)
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
         ~default:Genesis_constants.Constraint_constants.compiled proof_config
+    in
+    let ledger_is_prefix ledger1 ledger2 =
+      List.is_prefix ledger2 ~prefix:ledger1
+        ~equal:(fun
+                 ({ account_name = name1; _ } : Test_config.Test_Account.t)
+                 ({ account_name = name2; _ } : Test_config.Test_Account.t)
+               -> String.equal name1 name2 )
     in
     let runtime_config =
       { Runtime_config.daemon =
@@ -222,9 +236,7 @@ module Network_config = struct
           Some
             { base =
                 Accounts
-                  (let tuplist = String.Map.data genesis_ledger_accounts in
-                   List.map tuplist ~f:(fun tup ->
-                       let acct, _ = tup in
+                  (List.map genesis_ledger_accounts ~f:(fun (_name, acct) ->
                        acct ) )
             ; add_genesis_winner = None
             ; num_accounts = None
@@ -232,7 +244,92 @@ module Network_config = struct
             ; hash = None
             ; name = None
             }
-      ; epoch_data = None
+      ; epoch_data =
+          (* each staking epoch ledger account must also be a genesis ledger account, though
+             the balance may be different; the converse is not necessarily true, since
+             an account may have been added after the last epoch ledger was taken
+
+             each staking epoch ledger account must also be in the next epoch ledger, if provided
+
+             if provided, each next_epoch_ledger account must be in the genesis ledger
+
+             in all ledgers, the accounts must be in the same order, so that accounts will
+             be in the same leaf order
+          *)
+          Option.map epoch_data ~f:(fun { staking = staking_ledger; next } ->
+              let genesis_winner_account : Runtime_config.Accounts.single =
+                Runtime_config.Accounts.Single.of_account
+                  Mina_state.Consensus_state_hooks.genesis_winner_account
+                |> Result.ok_or_failwith
+              in
+              let ledger_of_epoch_accounts
+                  (epoch_accounts : Test_config.Test_Account.t list) =
+                let epoch_ledger_accounts =
+                  List.map epoch_accounts
+                    ~f:(fun { account_name; balance; timing } ->
+                      let balance = Balance.of_mina_string_exn balance in
+                      let timing = runtime_timing_of_timing timing in
+                      let genesis_account =
+                        match
+                          List.Assoc.find genesis_ledger_accounts account_name
+                            ~equal:String.equal
+                        with
+                        | Some acct ->
+                            acct
+                        | None ->
+                            failwithf
+                              "Epoch ledger account %s not in genesis ledger"
+                              account_name ()
+                      in
+                      { genesis_account with balance; timing } )
+                in
+                (* because we run integration tests with Proof_level = Full, the winner account
+                   gets added to the genesis ledger
+
+                   there isn't a corresponding mechanism to add the winner account to epoch
+                   ledgers, so we add it explicitly here
+
+                   `add_genesis_winner` in the record below has no effect, it's ignored in
+                   Runtime_config.Epoch_data.to_yojson, which is used to create the config file
+                *)
+                ( { base =
+                      Accounts (genesis_winner_account :: epoch_ledger_accounts)
+                  ; add_genesis_winner = None (* no effect *)
+                  ; num_accounts = None
+                  ; balances = []
+                  ; hash = None
+                  ; name = None
+                  }
+                  : Runtime_config.Ledger.t )
+              in
+              let staking =
+                let ({ epoch_ledger; epoch_seed }
+                      : Test_config.Epoch_data.Data.t ) =
+                  staking_ledger
+                in
+                if not (ledger_is_prefix epoch_ledger genesis_ledger) then
+                  failwith "Staking epoch ledger not a prefix of genesis ledger" ;
+                let ledger = ledger_of_epoch_accounts epoch_ledger in
+                let seed = epoch_seed in
+                ({ ledger; seed } : Runtime_config.Epoch_data.Data.t)
+              in
+              let next =
+                Option.map next ~f:(fun { epoch_ledger; epoch_seed } ->
+                    if
+                      not
+                        (ledger_is_prefix staking_ledger.epoch_ledger
+                           epoch_ledger )
+                    then
+                      failwith
+                        "Staking epoch ledger not a prefix of next epoch ledger" ;
+                    if not (ledger_is_prefix epoch_ledger genesis_ledger) then
+                      failwith
+                        "Next epoch ledger not a prefix of genesis ledger" ;
+                    let ledger = ledger_of_epoch_accounts epoch_ledger in
+                    let seed = epoch_seed in
+                    ({ ledger; seed } : Runtime_config.Epoch_data.Data.t) )
+              in
+              ({ staking; next } : Runtime_config.Epoch_data.t) )
       }
     in
     let genesis_constants =
@@ -255,10 +352,14 @@ module Network_config = struct
     in
     let block_producer_configs =
       List.map block_producers ~f:(fun node ->
-          let _, key_tup =
-            match String.Map.find genesis_ledger_accounts node.account_name with
-            | Some acct ->
-                acct
+          let keypair =
+            match
+              List.find genesis_accounts_and_keys
+                ~f:(fun ({ account_name; _ }, _keypair) ->
+                  String.equal account_name node.account_name )
+            with
+            | Some (_acct, keypair) ->
+                keypair
             | None ->
                 let failstring =
                   Format.sprintf
@@ -270,7 +371,7 @@ module Network_config = struct
                 failwith failstring
           in
           block_producer_config node.node_name
-            (mk_net_keypair node.account_name key_tup) )
+            (mk_net_keypair node.account_name keypair) )
     in
     let mina_archive_schema = "create_schema.sql" in
     let long_commit_id =
@@ -289,11 +390,10 @@ module Network_config = struct
       ]
     in
     let genesis_keypairs =
-      String.Map.of_alist_exn
-        (List.map (String.Map.to_alist genesis_ledger_accounts)
-           ~f:(fun element ->
-             let kp_name, (_, (pk, sk)) = element in
-             (kp_name, mk_net_keypair kp_name (pk, sk)) ) )
+      List.fold genesis_accounts_and_keys ~init:String.Map.empty
+        ~f:(fun map ({ account_name; _ }, (pk, sk)) ->
+          let keypair = mk_net_keypair account_name (pk, sk) in
+          String.Map.add_exn map ~key:account_name ~data:keypair )
     in
     let snark_coordinator_config =
       match snark_coordinator with
@@ -326,9 +426,6 @@ module Network_config = struct
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
-    ; check_capacity = cli_inputs.check_capacity
-    ; check_capacity_delay = cli_inputs.check_capacity_delay
-    ; check_capacity_retries = cli_inputs.check_capacity_retries
     ; genesis_keypairs
     ; constants
     ; terraform =
@@ -355,6 +452,7 @@ module Network_config = struct
         ; mem_request = "12Gi"
         ; worker_cpu_request = 6
         ; worker_mem_request = "8Gi"
+        ; pod_priority = compute_pod_priority ()
         }
     }
 
@@ -428,107 +526,13 @@ module Network_manager = struct
   let run_cmd_or_hard_error t prog args =
     Util.run_cmd_or_hard_error t.testnet_dir prog args
 
-  let rec check_kube_capacity t ~logger ~(retries : int) ~(delay : float) :
-      unit Malleable_error.t =
-    let open Malleable_error.Let_syntax in
-    let%bind () =
-      Malleable_error.return ([%log info] "Running capacity check")
-    in
-    let%bind kubectl_top_nodes_output =
-      Util.run_cmd_or_hard_error "/" "kubectl"
-        [ "top"; "nodes"; "--sort-by=cpu"; "--no-headers" ]
-    in
-    let num_kube_nodes =
-      String.split_on_chars kubectl_top_nodes_output ~on:[ '\n' ] |> List.length
-    in
-    let%bind gcloud_descr_output =
-      Util.run_cmd_or_hard_error "/" "gcloud"
-        [ "container"
-        ; "clusters"
-        ; "describe"
-        ; cluster_name
-        ; "--project"
-        ; "o1labs-192920"
-        ; "--region"
-        ; cluster_region
-        ]
-    in
-    (* gcloud container clusters describe mina-integration-west1 --project o1labs-192920 --region us-west1
-        this command gives us lots of information, including the max number of nodes per node pool.
-    *)
-    let%bind max_node_count_str =
-      Util.run_cmd_or_hard_error "/" "bash"
-        [ "-c"
-        ; Format.sprintf "echo \"%s\" | grep \"maxNodeCount\" "
-            gcloud_descr_output
-        ]
-    in
-    let max_node_count_by_node_pool =
-      Re2.find_all_exn (Re2.of_string "[0-9]+") max_node_count_str
-      |> List.map ~f:(fun str -> Int.of_string str)
-    in
-    (* We can have any number of node_pools.  this string parsing will yield a list of ints, each int represents the
-        max_node_count for each node pool *)
-    let max_nodes =
-      List.fold max_node_count_by_node_pool ~init:0 ~f:(fun accum max_nodes ->
-          accum + (max_nodes * 3) )
-      (*
-        the max_node_count_by_node_pool is per zone.  us-west1 has 3 zones (we assume this never changes).
-          therefore to get the actual number of nodes a node_pool has, we multiply by 3.
-          then we sum up the number of nodes in all our node_pools to get the actual total maximum number of nodes that we can scale up to *)
-    in
-    let nodes_available = max_nodes - num_kube_nodes in
-    let cpus_needed_estimate =
-      6
-      * ( Core.Map.length t.seed_workloads
-        + Core.Map.length t.block_producer_workloads
-        + Core.Map.length t.snark_coordinator_workloads )
-      (* as of 2022/07, the seed, bps, and the snark coordinator use 6 cpus.  this is just a rough heuristic so we're not bothering to calculate memory needed *)
-    in
-    let cluster_nodes_needed =
-      Int.of_float
-        (Float.round_up (Float.( / ) (Float.of_int cpus_needed_estimate) 64.0))
-      (* assuming that each node on the cluster has 64 cpus, as we've configured it to be in GCP as of *)
-    in
-    if nodes_available >= cluster_nodes_needed then
-      let%bind () =
-        Malleable_error.return
-          ([%log info]
-             "Capacity check passed.  %d nodes are provisioned, the cluster \
-              can scale up to a max of %d nodes.  This test needs at least 1 \
-              node to be unprovisioned."
-             num_kube_nodes max_nodes )
-      in
-      Malleable_error.return ()
-    else if retries <= 0 then
-      let%bind () =
-        Malleable_error.return
-          ([%log info]
-             "Capacity check failed.  %d nodes are provisioned, the cluster \
-              can scale up to a max of %d nodes.  This test needs at least 1 \
-              node to be unprovisioned.  no more retries, thus exiting"
-             num_kube_nodes max_nodes )
-      in
-      exit 7
-    else
-      let%bind () =
-        Malleable_error.return
-          ([%log info]
-             "Capacity check failed.  %d nodes are provisioned, the cluster \
-              can scale up to a max of %d nodes.  This test needs at least 1 \
-              node to be unprovisioned.  sleeping for 60 seconds before \
-              retrying.  will retry %d more times"
-             num_kube_nodes max_nodes (retries - 1) )
-      in
-      let%bind () = Malleable_error.return (Thread.delay delay) in
-      check_kube_capacity t ~logger ~retries:(retries - 1) ~delay
-
   let create ~logger (network_config : Network_config.t) =
     let open Malleable_error.Let_syntax in
     let%bind current_cluster =
       Util.run_cmd_or_hard_error "/" "kubectl" [ "config"; "current-context" ]
     in
     [%log info] "Using cluster: %s" current_cluster ;
+    (* check if namespace already exists *)
     let%bind all_namespaces_str =
       Util.run_cmd_or_hard_error "/" "kubectl"
         [ "get"; "namespaces"; "-ojsonpath={.items[*].metadata.name}" ]
@@ -554,6 +558,42 @@ module Network_manager = struct
         in
         Util.run_cmd_or_hard_error "/" "kubectl"
           [ "delete"; "namespace"; network_config.terraform.testnet_name ]
+        >>| Fn.const ()
+      else return ()
+    in
+    (* check if priority class already exists *)
+    let%bind all_priorityclasses_str =
+      Util.run_cmd_or_hard_error "/" "kubectl"
+        [ "get"; "priorityclasses"; "-ojsonpath={.items[*].metadata.name}" ]
+    in
+    let all_priorityclasses = String.split ~on:' ' all_priorityclasses_str in
+    let expected_priorityclass_name =
+      String.concat
+        [ network_config.terraform.testnet_name
+        ; "-nonpreemptible-priority-class"
+        ]
+    in
+    let%bind () =
+      if
+        List.mem all_priorityclasses expected_priorityclass_name
+          ~equal:String.equal
+      then
+        let%bind () =
+          if network_config.debug_arg then
+            Deferred.bind ~f:Malleable_error.return
+              (Util.prompt_continue
+                 "Existing priority class of same name detected, pausing \
+                  startup. Enter [y/Y] to continue on and remove existing \
+                  priority class, start clean, and run the test; press Cntrl-C \
+                  to quit out: " )
+          else
+            Malleable_error.return
+              ([%log info]
+                 "Existing priority class of same name detected; removing to \
+                  start clean" )
+        in
+        Util.run_cmd_or_hard_error "/" "kubectl"
+          [ "delete"; "priorityclasses"; expected_priorityclass_name ]
         >>| Fn.const ()
       else return ()
     in
@@ -678,14 +718,6 @@ module Network_manager = struct
       ; genesis_keypairs = network_config.genesis_keypairs
       }
     in
-    (* check capacity *)
-    let%bind () =
-      if network_config.check_capacity then
-        check_kube_capacity t ~logger
-          ~delay:(Float.of_int network_config.check_capacity_delay)
-          ~retries:network_config.check_capacity_retries
-      else Malleable_error.return ()
-    in
     (* making the main.tf.json *)
     let open Deferred.Let_syntax in
     let%bind () =
@@ -780,7 +812,7 @@ module Network_manager = struct
     in
     let nodes_to_string =
       Fn.compose (String.concat ~sep:", ")
-        (List.map ~f:Kubernetes_network.Node.id)
+        (List.map ~f:Kubernetes_network.Node.infra_id)
     in
     [%log info] "Network deployed" ;
     [%log info] "testnet namespace: %s" t.namespace ;
@@ -808,6 +840,6 @@ module Network_manager = struct
     Deferred.unit
 
   let destroy t =
-    Deferred.Or_error.try_with (fun () -> destroy t)
+    Deferred.Or_error.try_with ~here:[%here] (fun () -> destroy t)
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 end
