@@ -283,8 +283,8 @@ cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/ros
 cp ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/rosetta/archive"
 cp -r ../genesis_ledgers/* ${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/
 
-cp ./default/src/app/rosetta/rosetta_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
-cp ./default/src/app/rosetta/ocaml-signer/signer_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta-ocaml-signer"
+cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+cp ./default/src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta-ocaml-signer"
  
 build_deb mina-rosetta
 
