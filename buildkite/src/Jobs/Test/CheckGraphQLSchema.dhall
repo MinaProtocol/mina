@@ -2,7 +2,6 @@ let S = ../../Lib/SelectFiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
-let PipelineTag = ../../Pipeline/Tag.dhall
 
 let CheckGraphQLSchema = ../../Command/CheckGraphQLSchema.dhall
 
@@ -19,8 +18,7 @@ in Pipeline.build Pipeline.Config::{
       S.strictly (S.contains "Makefile")
     ],
     path = "Test",
-    name = "CheckGraphQLSchema", 
-    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+    name = "CheckGraphQLSchema"
   },
   steps = [
     CheckGraphQLSchema.step dependsOn
