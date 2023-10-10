@@ -234,21 +234,25 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     done ;
     arr
   in
-  let w4, w3, w2, w1 =
+  let omega_to_zk_minus_1, omega_to_zk, omega_to_zk_plus_1, omega_to_minus_1 =
     (* generator^{n - 3} *)
     let gen = domain#generator in
     (* gen_inv = gen^{n - 1} = gen^{-1} *)
-    let w1 = one / gen in
-    let w2 = square w1 in
-    let w3 = w2 * w1 in
-    let w4 = lazy (w3 * w1) in
-    (w4, w3, w2, w1)
+    let omega_to_minus_1 = one / gen in
+    let omega_to_minus_2 = square omega_to_minus_1 in
+    let omega_to_zk_plus_1 = omega_to_minus_2 in
+    let omega_to_zk = omega_to_minus_2 * omega_to_minus_1 in
+    let omega_to_zk_minus_1 = lazy (omega_to_zk * omega_to_minus_1) in
+    (omega_to_zk_minus_1, omega_to_zk, omega_to_zk_plus_1, omega_to_minus_1)
   in
   let zk_polynomial =
-    (* Vanishing polynomial of [w1, w2, w3]
-        evaluated at x = zeta
+    (* Vanishing polynomial of
+       [omega_to_minus_1, omega_to_zk_plus_1, omega_to_zk]
+       evaluated at x = zeta
     *)
-    (zeta - w1) * (zeta - w2) * (zeta - w3)
+    (zeta - omega_to_minus_1)
+    * (zeta - omega_to_zk_plus_1)
+    * (zeta - omega_to_zk)
   in
   let zeta_to_n_minus_1 = lazy (domain#vanishing_polynomial zeta) in
   { Scalars.Env.add = ( + )
@@ -262,7 +266,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
   ; cell = Fn.id
   ; double = (fun x -> of_int 2 * x)
   ; zk_polynomial
-  ; omega_to_mins_zk_rows = w3
+  ; omega_to_mins_zk_rows = omega_to_zk
   ; zeta_to_n_minus_1 = domain#vanishing_polynomial zeta
   ; endo_coefficient = endo
   ; mds = (fun (row, col) -> mds.(row).(col))
@@ -273,7 +277,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
           (* No need to compute anything when not using lookups *)
           F.one
       | Some _ ->
-          zk_polynomial * (zeta - Lazy.force w4) )
+          zk_polynomial * (zeta - Lazy.force omega_to_zk_minus_1) )
   ; joint_combiner = Option.value joint_combiner ~default:F.one
   ; beta
   ; gamma
@@ -286,13 +290,13 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
           | false, 1 ->
               domain#generator
           | false, -1 ->
-              w1
+              omega_to_minus_1
           | false, -2 ->
-              w2
+              omega_to_zk_plus_1
           | false, -3 | true, 0 ->
-              w3
-          | false, -4 | true, -1 ->
-              Lazy.force w4
+              omega_to_zk
+          | true, -1 ->
+              Lazy.force omega_to_zk_minus_1
           | b, i ->
               failwithf "TODO: unnormalized_lagrange_basis(%b, %i)" b i ()
         in
