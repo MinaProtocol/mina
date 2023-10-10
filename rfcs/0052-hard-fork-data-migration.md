@@ -127,6 +127,10 @@ so those blocks are downloaded in batches, which helps considerably.
 
 There has been some local testing of these applications.
 
+The replayer cron jobs for mainnet, devnet, and berkeley can serve as
+a starting point for the implementation of the cron job described
+here.
+
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
