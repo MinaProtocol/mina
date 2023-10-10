@@ -5,9 +5,6 @@ let S = ../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
 let Pipeline = ../Pipeline/Dsl.dhall
-let PipelineTag = ../Pipeline/Tag.dhall
-let PipelineMode = ../Pipeline/Mode.dhall
-
 let JobSpec = ../Pipeline/JobSpec.dhall
 
 let Command = ./Base.dhall
@@ -19,16 +16,13 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 in
 
-let pipeline : DebianVersions.DebVersion -> PipelineMode.Type -> Pipeline.Config.Type = \(debVersion : DebianVersions.DebVersion) ->
-\(mode: PipelineMode.Type) -> 
+let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion : DebianVersions.DebVersion) ->
     Pipeline.Config::{
       spec =
         JobSpec::{
           dirtyWhen = DebianVersions.dirtyWhen debVersion,
           path = "Release",
-          name = "MinaArtifact${DebianVersions.capitalName debVersion}",
-          tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ],
-          mode = mode
+          name = "MinaArtifact${DebianVersions.capitalName debVersion}"
         },
       steps = [
         Libp2p.step debVersion,
@@ -111,9 +105,9 @@ let pipeline : DebianVersions.DebVersion -> PipelineMode.Type -> Pipeline.Config
 
 in
 {
-  bullseye  = pipeline DebianVersions.DebVersion.Bullseye PipelineMode.Type.PullRequest
-  , buster  = pipeline DebianVersions.DebVersion.Buster PipelineMode.Type.PullRequest
-  , stretch = pipeline DebianVersions.DebVersion.Stretch PipelineMode.Type.PullRequest
-  , focal   = pipeline DebianVersions.DebVersion.Focal PipelineMode.Type.PullRequest
-  , bionic  = pipeline DebianVersions.DebVersion.Bionic PipelineMode.Type.PullRequest
+  bullseye  = pipeline DebianVersions.DebVersion.Bullseye
+  , buster  = pipeline DebianVersions.DebVersion.Buster
+  , stretch = pipeline DebianVersions.DebVersion.Stretch
+  , focal   = pipeline DebianVersions.DebVersion.Focal
+  , bionic  = pipeline DebianVersions.DebVersion.Bionic
 }
