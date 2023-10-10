@@ -262,7 +262,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
   ; cell = Fn.id
   ; double = (fun x -> of_int 2 * x)
   ; zk_polynomial
-  ; omega_to_minus_3 = w3
+  ; omega_to_mins_zk_rows = w3
   ; zeta_to_n_minus_1 = domain#vanishing_polynomial zeta
   ; endo_coefficient = endo
   ; mds = (fun (row, col) -> mds.(row).(col))
@@ -359,11 +359,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let nominator =
       ( zeta1m1
         * alpha_pow Int.(perm_alpha0 + 1)
-        * (zeta - env.omega_to_minus_3)
+        * (zeta - env.omega_to_mins_zk_rows)
       + (zeta1m1 * alpha_pow Int.(perm_alpha0 + 2) * (zeta - one)) )
       * (one - e0 z)
     in
-    let denominator = (zeta - env.omega_to_minus_3) * (zeta - one) in
+    let denominator = (zeta - env.omega_to_mins_zk_rows) * (zeta - one) in
     let ft_eval0 = ft_eval0 + (nominator / denominator) in
     let constant_term = Sc.constant_term env in
     ft_eval0 - constant_term
