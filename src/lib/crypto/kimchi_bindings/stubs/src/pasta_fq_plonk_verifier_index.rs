@@ -111,7 +111,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas, OpeningProof<
 
         // TODO dummy_lookup_value ?
         let (linearization, powers_of_alpha) =
-            expr_linearization(Some(&feature_flags), true, index.zk_rows as usize);
+            expr_linearization(Some(&feature_flags), true);
 
         VerifierIndex::<Pallas, OpeningProof<Pallas>> {
             domain,

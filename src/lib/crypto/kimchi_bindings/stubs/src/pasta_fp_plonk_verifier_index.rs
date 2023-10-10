@@ -112,7 +112,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<V
 
         // TODO dummy_lookup_value ?
         let (linearization, powers_of_alpha) =
-            expr_linearization(Some(&feature_flags), true, index.zk_rows as usize);
+            expr_linearization(Some(&feature_flags), true);
 
         VerifierIndex::<Vesta, OpeningProof<Vesta>> {
             domain,
