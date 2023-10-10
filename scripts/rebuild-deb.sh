@@ -268,9 +268,15 @@ echo "--- Building Mina Rosetta :"
 
 create_control_file mina-rosetta "${SHARED_DEPS}${DAEMON_DEPS}" 'Rosetta implementation for Mina'
 
+mkdir -p "${BUILDDIR}/etc/mina/rosetta"
+mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+mkdir -p "${BUILDDIR}/usr/local/bin/mina-rosetta"
+mkdir -p "${BUILDDIR}/etc/mina/rosetta/archive"
+mkdir -p "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers"
+
 # --- Copy artifacts
 cp ../src/app/rosetta/*.conf "${BUILDDIR}/etc/mina/rosetta"
-cp ../src/app/rosetta/*.sh" "${BUILDDIR}/etc/mina/rosetta
+cp ../src/app/rosetta/*.sh "${BUILDDIR}/etc/mina/rosetta"
 
 cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
 cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
