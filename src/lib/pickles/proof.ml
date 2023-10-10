@@ -35,9 +35,6 @@ module Base = struct
 
       module V2 = struct
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
-              ( 'messages_for_next_wrap_proof
-              , 'messages_for_next_step_proof )
-              Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
@@ -67,9 +64,13 @@ module Base = struct
     end]
 
     type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
-          ( 'messages_for_next_wrap_proof
-          , 'messages_for_next_step_proof )
-          Stable.Latest.t =
+          (* NB: This should be on the *serialized type*. However, the actual
+             serialized type [Repr.t] is hidden by this module, so this alias is
+             effectively junk anyway..
+          *)
+      ( 'messages_for_next_wrap_proof
+      , 'messages_for_next_step_proof )
+      Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
       { statement :
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.t
@@ -195,7 +196,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
          in
          let ex =
            { Plonk_types.All_evals.With_public_input.public_input =
-               (tick (), tick ())
+               ([| tick () |], [| tick () |])
            ; evals = e
            }
          in
@@ -356,8 +357,43 @@ module Proofs_verified_2 = struct
 
     include T.Repr
 
-    (* Force the typechecker to verify that these types are equal. *)
-    let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
+    let to_binable
+        ({ statement
+         ; prev_evals = { evals = { public_input; evals }; ft_eval1 }
+         ; proof
+         } :
+          t ) : Stable.Latest.t =
+      { statement
+      ; prev_evals =
+          { evals =
+              { public_input =
+                  (let x1, x2 = public_input in
+                   (x1.(0), x2.(0)) )
+              ; evals
+              }
+          ; ft_eval1
+          }
+      ; proof
+      }
+
+    let of_binable
+        ({ statement
+         ; prev_evals = { evals = { public_input; evals }; ft_eval1 }
+         ; proof
+         } :
+          Stable.Latest.t ) : t =
+      { statement
+      ; prev_evals =
+          { evals =
+              { public_input =
+                  (let x1, x2 = public_input in
+                   ([| x1 |], [| x2 |]) )
+              ; evals
+              }
+          ; ft_eval1
+          }
+      ; proof
+      }
   end
 
   [%%versioned_binable
@@ -377,9 +413,9 @@ module Proofs_verified_2 = struct
           (struct
             type nonrec t = t
 
-            let to_binable = to_repr
+            let to_binable x = Repr.to_binable (to_repr x)
 
-            let of_binable = of_repr
+            let of_binable x = of_repr (Repr.of_binable x)
           end)
     end
   end]
@@ -426,8 +462,43 @@ module Proofs_verified_max = struct
 
     include T.Repr
 
-    (* Force the typechecker to verify that these types are equal. *)
-    let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
+    let to_binable
+        ({ statement
+         ; prev_evals = { evals = { public_input; evals }; ft_eval1 }
+         ; proof
+         } :
+          t ) : Stable.Latest.t =
+      { statement
+      ; prev_evals =
+          { evals =
+              { public_input =
+                  (let x1, x2 = public_input in
+                   (x1.(0), x2.(0)) )
+              ; evals
+              }
+          ; ft_eval1
+          }
+      ; proof
+      }
+
+    let of_binable
+        ({ statement
+         ; prev_evals = { evals = { public_input; evals }; ft_eval1 }
+         ; proof
+         } :
+          Stable.Latest.t ) : t =
+      { statement
+      ; prev_evals =
+          { evals =
+              { public_input =
+                  (let x1, x2 = public_input in
+                   ([| x1 |], [| x2 |]) )
+              ; evals
+              }
+          ; ft_eval1
+          }
+      ; proof
+      }
   end
 
   [%%versioned_binable
@@ -447,9 +518,9 @@ module Proofs_verified_max = struct
           (struct
             type nonrec t = t
 
-            let to_binable = to_repr
+            let to_binable x = Repr.to_binable (to_repr x)
 
-            let of_binable = of_repr
+            let of_binable x = of_repr (Repr.of_binable x)
           end)
     end
   end]

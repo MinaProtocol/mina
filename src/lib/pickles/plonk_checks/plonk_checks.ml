@@ -327,6 +327,16 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let zkp = env.zk_polynomial in
     let alpha_pow = env.alpha_pow in
     let zeta1m1 = env.zeta_to_n_minus_1 in
+    let zeta1 = F.(zeta1m1 + one) in
+    let p_eval0 =
+      Option.value_exn
+        (Array.fold_right ~init:None p_eval0 ~f:(fun p_eval0 acc ->
+             match acc with
+             | None ->
+                 Some p_eval0
+             | Some acc ->
+                 Some F.(p_eval0 + (zeta1 * acc)) ) )
+    in
     let open F in
     let w0 = Vector.to_array e.w |> Array.map ~f:fst in
     let ft_eval0 =

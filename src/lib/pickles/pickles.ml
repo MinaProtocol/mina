@@ -1575,7 +1575,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ~actual_proofs_verified:
                             (Nat.Add.create actual_proofs_verified)
                           { evals = proof.proof.openings.evals
-                          ; public_input = x_hat
+                          ; public_input =
+                              (let x1, x2 = x_hat in
+                               ([| x1 |], [| x2 |]) )
                           }
                           ~r ~xi ~zeta ~zetaw
                           ~old_bulletproof_challenges:prev_challenges
@@ -1771,7 +1773,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             ~to_option:Opt.to_option next_statement
                       ; prev_evals =
                           { Plonk_types.All_evals.evals =
-                              { public_input = x_hat
+                              { public_input =
+                                  (let x1, x2 = x_hat in
+                                   ([| x1 |], [| x2 |]) )
                               ; evals = proof.proof.openings.evals
                               }
                           ; ft_eval1 = proof.proof.openings.ft_eval1

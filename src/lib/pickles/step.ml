@@ -489,7 +489,7 @@ struct
           Plonk_checks.Type2.ft_eval0
             (module Tock.Field)
             ~domain:tock_domain ~env:tock_env tock_plonk_minimal
-            tock_combined_evals x_hat_1
+            tock_combined_evals [| x_hat_1 |]
         in
         let open Tock.Field in
         combine ~which_eval:`Fst ~ft_eval:ft_eval0 As_field.zeta
@@ -890,7 +890,11 @@ struct
                  Plonk_types.All_evals.
                    { ft_eval1
                    ; evals =
-                       { With_public_input.evals = es; public_input = x_hat }
+                       { With_public_input.evals = es
+                       ; public_input =
+                           (let x1, x2 = x_hat in
+                            ([| x1 |], [| x2 |]) )
+                       }
                    } ) )
             lte Max_proofs_verified.n (Lazy.force Dummy.evals)
       }

@@ -97,7 +97,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        , 'b )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
     -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
-    -> 't
+    -> 't array
     -> 't
 
   val derive_plonk :

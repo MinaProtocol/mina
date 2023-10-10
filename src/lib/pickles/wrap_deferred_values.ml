@@ -156,8 +156,8 @@ let expand_deferred (type n most_recent_width)
    absorb evals.ft_eval1 ;
    let xs = Plonk_types.Evals.to_absorption_sequence evals.evals.evals in
    let x1, x2 = evals.evals.public_input in
-   absorb x1 ;
-   absorb x2 ;
+   Array.iter ~f:absorb x1 ;
+   Array.iter ~f:absorb x2 ;
    List.iter xs ~f:(fun (x1, x2) ->
        Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
   let xi_chal = squeeze () in

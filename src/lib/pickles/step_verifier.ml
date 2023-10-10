@@ -923,8 +923,12 @@ struct
       in
       Sponge.absorb sponge (`Field challenge_digest) ;
       Sponge.absorb sponge (`Field ft_eval1) ;
-      Sponge.absorb sponge (`Field (fst evals.public_input)) ;
-      Sponge.absorb sponge (`Field (snd evals.public_input)) ;
+      Array.iter
+        ~f:(fun x -> Sponge.absorb sponge (`Field x))
+        (fst evals.public_input) ;
+      Array.iter
+        ~f:(fun x -> Sponge.absorb sponge (`Field x))
+        (snd evals.public_input) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
       (* This is a hacky, but much more efficient, version of the opt sponge.
          This uses the assumption that the sponge 'absorption state' will align
@@ -1052,7 +1056,8 @@ struct
                      Array.map a ~f:(Opt.maybe b) )
           in
           let v =
-            List.append sg_evals ([| Opt.just x_hat |] :: [| Opt.just ft |] :: a)
+            List.append sg_evals
+              (Array.map ~f:Opt.just x_hat :: [| Opt.just ft |] :: a)
           in
           Common.combined_evaluation (module Impl) ~xi v
         in
