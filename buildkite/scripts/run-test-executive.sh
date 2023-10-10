@@ -10,9 +10,21 @@ if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]
   exit 0
 fi
 
-./test_executive.exe cloud "$TEST_NAME" \
+# Don't prompt for answers during apt-get install
+export DEBIAN_FRONTEND=noninteractive
+
+echo "deb [trusted=yes] https://apt.releases.hashicorp.com $MINA_DEB_CODENAME main" | tee /etc/apt/sources.list.d/hashicorp.list
+apt-get update
+apt-get install -y "terraform"
+
+echo "Installing mina daemon package: mina-test-executive=${MINA_DEB_VERSION}"
+echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
+apt-get update
+apt-get install --allow-downgrades -y "mina-test-executive=$MINA_DEB_VERSION" "mina-logproc=$MINA_DEB_VERSION"
+
+mina-test-executive cloud "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
   --mina-automation-location ./automation \
   | tee "$TEST_NAME.test.log" \
-  | ./logproc.exe -i inline -f '!(.level in ["Debug", "Spam"])'
+  | mina-logproc -i inline -f '!(.level in ["Debug", "Spam"])'
