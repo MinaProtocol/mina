@@ -153,6 +153,7 @@
 (package (name ppx_to_enum))
 (package (name ppx_util))
 (package (name ppx_version))
+(package (name ppx_version.runtime))
 (package (name precomputed_values))
 (package (name promise))
 (package (name proof_carrying_data))

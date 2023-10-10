@@ -1,0 +1,18 @@
+(executable
+ (name print_blockchain_snark_vk)
+ (libraries
+   blockchain_snark)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))
+
+(rule
+ (deps print_blockchain_snark_vk.exe)
+ (targets blockchain_snark_vk.json.corrected)
+ (action
+  (with-stdout-to %{targets}
+   (run %{deps}))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff blockchain_snark_vk.json blockchain_snark_vk.json.corrected)))
