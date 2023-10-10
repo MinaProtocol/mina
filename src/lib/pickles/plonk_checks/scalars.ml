@@ -93,7 +93,7 @@ module Env = struct
     ; joint_combiner : 'a
     ; beta : 'a
     ; gamma : 'a
-    ; unnormalized_lagrange_basis : int -> 'a
+    ; unnormalized_lagrange_basis : bool * int -> 'a
     ; if_feature : Kimchi_types.feature_flag * (unit -> 'a) * (unit -> 'a) -> 'a
     }
 end
@@ -3332,13 +3332,13 @@ module Tick : S = struct
                       + cell (var (LookupTable, Curr))
                       + (beta * cell (var (LookupTable, Next))) ) ) ) )
             + alpha_pow 25
-              * ( unnormalized_lagrange_basis 0
+              * ( unnormalized_lagrange_basis (false, 0)
                 * ( cell (var (LookupAggreg, Curr))
                   - field
                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                   ) )
             + alpha_pow 26
-              * ( unnormalized_lagrange_basis (-4)
+              * ( unnormalized_lagrange_basis (true, -1)
                 * ( cell (var (LookupAggreg, Curr))
                   - field
                       "0x0000000000000000000000000000000000000000000000000000000000000001"
@@ -3347,7 +3347,7 @@ module Tick : S = struct
               * if_feature
                   ( LookupsPerRow 1
                   , (fun () ->
-                      unnormalized_lagrange_basis (-4)
+                      unnormalized_lagrange_basis (true, -1)
                       * ( cell (var (LookupSorted 0, Curr))
                         - cell (var (LookupSorted 1, Curr)) ) )
                   , fun () ->
@@ -3358,7 +3358,7 @@ module Tick : S = struct
               * if_feature
                   ( LookupsPerRow 2
                   , (fun () ->
-                      unnormalized_lagrange_basis 0
+                      unnormalized_lagrange_basis (false, 0)
                       * ( cell (var (LookupSorted 1, Curr))
                         - cell (var (LookupSorted 2, Curr)) ) )
                   , fun () ->
@@ -3369,7 +3369,7 @@ module Tick : S = struct
               * if_feature
                   ( LookupsPerRow 3
                   , (fun () ->
-                      unnormalized_lagrange_basis (-4)
+                      unnormalized_lagrange_basis (true, -1)
                       * ( cell (var (LookupSorted 2, Curr))
                         - cell (var (LookupSorted 3, Curr)) ) )
                   , fun () ->
@@ -3380,7 +3380,7 @@ module Tick : S = struct
               * if_feature
                   ( LookupsPerRow 4
                   , (fun () ->
-                      unnormalized_lagrange_basis 0
+                      unnormalized_lagrange_basis (false, 0)
                       * ( cell (var (LookupSorted 3, Curr))
                         - cell (var (LookupSorted 4, Curr)) ) )
                   , fun () ->
