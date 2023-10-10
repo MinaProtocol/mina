@@ -9,7 +9,7 @@ use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{Fp, Pallas, Vesta, VestaParameters};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
-use poly_commitment::evaluation_proof::OpeningProof;
+use poly_commitment::{evaluation_proof::OpeningProof, SRS as _};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -70,6 +70,7 @@ pub fn caml_pasta_fp_plonk_index_create(
     let cs = match ConstraintSystem::<Fp>::create(gates)
         .public(public as usize)
         .prev_challenges(prev_challenges as usize)
+        .max_poly_size(Some(srs.0.max_poly_size()))
         .lookup(lookup_tables)
         .runtime(if runtime_tables.is_empty() {
             None
