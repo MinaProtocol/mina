@@ -108,8 +108,9 @@ let expand_feature_flags (type boolean)
     (features : boolean Plonk_types.Features.t) : boolean all_feature_flags =
   features
   |> Plonk_types.Features.map ~f:(fun x -> lazy x)
-  |> Plonk_types.Features.to_full ~or_:(fun x y ->
-         lazy B.(Lazy.force x ||| Lazy.force y) )
+  |> Plonk_types.Features.to_full
+       ~or_:(fun x y -> lazy B.(Lazy.force x ||| Lazy.force y))
+       ~any:(fun x -> lazy (B.any (List.map ~f:Lazy.force x)))
 
 let lookup_tables_used feature_flags =
   let module Bool = struct

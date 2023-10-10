@@ -209,12 +209,12 @@ struct
             ~f_opt:(function
               (* Here, we split the 3 variants into 3 separate accumulators. This
                  allows us to only compute the 'maybe' flag when we need to, and
-                 allows us to fall back to the basically-free `None` when a
-                 feature is entirely unused, or to the less expensive `Some` if
+                 allows us to fall back to the basically-free `Nothing` when a
+                 feature is entirely unused, or to the less expensive `Just` if
                  it is used for every circuit.
-                 In particular, it is important that we generate exactly `None`
-                 when none of the optional gates are used, otherwise we will
-                 change the serialization of the protocol circuits.
+                 In particular, it is important that we generate exactly
+                 `Nothing` when none of the optional gates are used, otherwise
+                 we will change the serialization of the protocol circuits.
               *)
               | Opt.Nothing ->
                   ([], [], [ b ])
@@ -230,23 +230,23 @@ struct
                   (yes_1 @ yes_2, maybe_1 @ maybe_2, no_1 @ no_2) ) )
       |> Plonk_verification_key_evals.Step.map ~f:Fn.id ~f_opt:(function
            | [], [], _nones ->
-               (* We only have `None`s, so we can emit exactly `None` without
-                  further computation.
+               (* We only have `Nothing`s, so we can emit exactly `Nothing`
+                  without further computation.
                *)
                Opt.Nothing
-           | somes, [], [] ->
+           | justs, [], [] ->
                (* Special case: we don't need to compute the 'maybe' bool
-                  because we know statically that all entries are `Some`.
+                  because we know statically that all entries are `Just`.
                *)
                let sum =
-                 somes
+                 justs
                  |> List.map ~f:(fun ((b : Boolean.var), g) ->
                         Array.map g ~f:(Double.map ~f:(( * ) (b :> t))) )
                  |> List.reduce_exn
                       ~f:(Array.map2_exn ~f:(Double.map2 ~f:( + )))
                in
                Opt.just sum
-           | somes, maybes, nones ->
+           | justs, maybes, nones ->
                let is_none =
                  List.reduce nones
                    ~f:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
@@ -258,8 +258,8 @@ struct
                      Array.init num_chunks ~f:(fun _ ->
                          Double.map Inner_curve.one ~f:(( * ) (b :> t)) ) )
                in
-               let some_is_yes, some_sum =
-                 somes
+               let just_is_yes, just_sum =
+                 justs
                  |> List.map ~f:(fun ((b : Boolean.var), g) ->
                         (b, Array.map g ~f:(Double.map ~f:(( * ) (b :> t)))) )
                  |> List.reduce
@@ -283,19 +283,31 @@ struct
                  |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
                in
                let is_yes =
-                 [| some_is_yes; maybe_is_yes |]
+                 [| just_is_yes; maybe_is_yes |]
                  |> Array.filter_map ~f:Fn.id
                  |> Array.reduce_exn
                       ~f:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
                         Boolean.Unsafe.of_cvar ((b1 :> t) + (b2 :> t)) )
                in
                let sum =
-                 [| none_sum; maybe_sum; some_sum |]
+                 [| none_sum; maybe_sum; just_sum |]
                  |> Array.filter_map ~f:Fn.id
                  |> Array.reduce_exn
                       ~f:(Array.map2_exn ~f:(Double.map2 ~f:( + )))
                in
                Opt.Maybe (is_yes, sum) )
+      |> Plonk_verification_key_evals.Step.map
+           ~f:(fun g -> Array.map ~f:(Double.map ~f:(Util.seal (module Impl))) g)
+           ~f_opt:(function
+             | Opt.Nothing ->
+                 Opt.Nothing
+             | Opt.Maybe (b, x) ->
+                 Opt.Maybe
+                   ( Boolean.Unsafe.of_cvar (Util.seal (module Impl) (b :> t))
+                   , Array.map ~f:(Double.map ~f:(Util.seal (module Impl))) x )
+             | Opt.Just x ->
+                 Opt.Just
+                   (Array.map ~f:(Double.map ~f:(Util.seal (module Impl))) x) )
 
   (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
