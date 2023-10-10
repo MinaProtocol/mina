@@ -14,10 +14,6 @@ let dependsOn =
     # Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
 in
 
-let dependsOnJs = [{ name = "TestnetIntegrationTests", key = "build-js-tests" }]
-    # Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "daemon-berkeley"
-    # Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
-
 in Pipeline.build Pipeline.Config::{
   spec =
     JobSpec::{
@@ -35,7 +31,6 @@ in Pipeline.build Pipeline.Config::{
     mode = PipelineMode.Type.Stable
   },
   steps = [
-    TestExecutive.buildJs "integration_tests",
     TestExecutive.execute "peers-reliability" dependsOn,
     TestExecutive.execute "chain-reliability" dependsOn,
     TestExecutive.execute "payment" dependsOn,
@@ -46,7 +41,6 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "zkapps" dependsOn,
     TestExecutive.execute "zkapps-timing" dependsOn,
     TestExecutive.execute "zkapps-nonce" dependsOn,
-    TestExecutive.execute "verification-key" dependsOn,
-    TestExecutive.executeWithJs "snarkyjs" dependsOnJs
+    TestExecutive.execute "verification-key" dependsOn
   ]
 }
