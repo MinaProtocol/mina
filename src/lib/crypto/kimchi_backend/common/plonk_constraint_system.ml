@@ -1372,8 +1372,8 @@ end = struct
   let reduce_lincom sys (x : Fp.t Snarky_backendless.Cvar.t) =
     let constant, terms =
       Fp.(
-        Snarky_backendless.Cvar.to_constant_and_terms ~add ~mul ~zero:(of_int 0)
-          ~equal ~one:(of_int 1))
+        Snarky_backendless.Cvar.to_constant_and_terms ~add ~mul ~zero ~equal
+          ~one)
         x
     in
     let terms = accumulate_terms terms in
