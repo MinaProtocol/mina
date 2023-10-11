@@ -462,9 +462,12 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
   let open Mina_incremental.Status in
   let restart_delay = Time.Span.of_min 5. in
   let offline_shutdown_delay = Time.Span.of_min 25. in
-  let genesis_timestamp =
-    Genesis_constants.(
-      genesis_timestamp_of_string genesis_state_timestamp_string)
+  let after_genesis =
+    let genesis_timestamp =
+      Genesis_constants.(
+        genesis_timestamp_of_string genesis_state_timestamp_string)
+    in
+    fun () -> Time.(( >= ) (now ())) genesis_timestamp
   in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
@@ -476,7 +479,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
           match online_status with
           | `Offline ->
               (* nothing to do if offline before genesis *)
-              ( if Time.(( >= ) (now ())) genesis_timestamp then
+              ( if after_genesis () then
                 match !next_helper_restart with
                 | None ->
                     next_helper_restart :=
@@ -579,7 +582,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
           ()
       | None ->
           (* don't check bootstrap timeout before genesis *)
-          if Time.(( >= ) (now ())) genesis_timestamp then
+          if after_genesis () then
             bootstrap_timeout :=
               Some
                 (Timeout.create () bootstrap_timeout_duration
