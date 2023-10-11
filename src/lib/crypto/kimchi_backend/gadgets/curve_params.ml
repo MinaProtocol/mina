@@ -208,3 +208,9 @@ let to_circuit_constants (type field)
               curve.ia.neg_acc
         }
     }
+
+let from_strings (type field)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = field)
+    (a : string) =
+  let a = Bignum_bigint.of_string a in
+  to_circuit_constants (module Circuit) { default with a }
