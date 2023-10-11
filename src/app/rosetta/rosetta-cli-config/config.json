@@ -1,7 +1,7 @@
 {
  "network": {
   "blockchain": "mina",
-  "network": "debug"
+  "network": "PLACEHOLDER_NETWORK_NAME"
  },
  "online_url": "http://localhost:PLACEHOLDER_ROSETTA_ONLINE_PORT",
  "data_directory": "",

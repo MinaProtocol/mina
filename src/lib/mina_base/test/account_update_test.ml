@@ -55,14 +55,16 @@ module Fd = Fields_derivers_zkapps.Derivers
 
 let precondition_json_roundtrip_accept () =
   let open Account_precondition in
-  let account_precondition : t = Accept in
+  let account_precondition : t = Zkapp_precondition.Account.accept in
   let full = deriver (Fd.o ()) in
   [%test_eq: t] account_precondition
     (account_precondition |> Fd.to_json full |> Fd.of_json full)
 
 let precondition_json_roundtrip_nonce () =
   let open Account_precondition in
-  let account_precondition : t = Nonce (Account_nonce.of_int 928472) in
+  let account_precondition : t =
+    Zkapp_precondition.Account.nonce (Account_nonce.of_int 928472)
+  in
   let full = deriver (Fd.o ()) in
   [%test_eq: t] account_precondition
     (account_precondition |> Fd.to_json full |> Fd.of_json full)
@@ -70,12 +72,7 @@ let precondition_json_roundtrip_nonce () =
 let precondition_json_roundtrip_full_with_nonce () =
   let open Account_precondition in
   let n = Account_nonce.of_int 4321 in
-  let account_precondition : t =
-    Full
-      { Zkapp_precondition.Account.accept with
-        nonce = Check { lower = n; upper = n }
-      }
-  in
+  let account_precondition : t = Zkapp_precondition.Account.nonce n in
   let full = deriver (Fd.o ()) in
   [%test_eq: t] account_precondition
     (account_precondition |> Fd.to_json full |> Fd.of_json full)
@@ -84,11 +81,8 @@ let precondition_json_roundtrip_full () =
   let open Account_precondition in
   let n = Account_nonce.of_int 4513 in
   let account_precondition : t =
-    Full
-      { Zkapp_precondition.Account.accept with
-        nonce = Check { lower = n; upper = n }
-      ; delegate = Check Public_key.Compressed.empty
-      }
+    let nonce_precondition = Zkapp_precondition.Account.nonce n in
+    { nonce_precondition with delegate = Check Public_key.Compressed.empty }
   in
   let full = deriver (Fd.o ()) in
   [%test_eq: t] account_precondition
@@ -96,7 +90,9 @@ let precondition_json_roundtrip_full () =
 
 let precondition_to_json () =
   let open Account_precondition in
-  let account_precondition : t = Nonce (Account_nonce.of_int 34928) in
+  let account_precondition : t =
+    Zkapp_precondition.Account.nonce (Account_nonce.of_int 34928)
+  in
   let full = deriver (Fd.o ()) in
   [%test_eq: string]
     (account_precondition |> Fd.to_json full |> Yojson.Safe.to_string)

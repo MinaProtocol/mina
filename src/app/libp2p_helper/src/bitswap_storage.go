@@ -6,7 +6,7 @@ import (
 
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ledgerwatch/lmdb-go/lmdb"
 	"github.com/multiformats/go-multihash"
 	lmdbbs "github.com/o1-labs/go-bs-lmdb"
@@ -49,7 +49,7 @@ func OpenBitswapStorageLmdb(path string) (*BitswapStorageLmdb, error) {
 	}
 	statusDB, err := blockstore.OpenDB("status")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create/open lmdb status database: %w", err)
+		return nil, fmt.Errorf("failed to create/open lmdb status database: %s", err)
 	}
 	return &BitswapStorageLmdb{blockstore: blockstore, statusDB: statusDB}, nil
 }
