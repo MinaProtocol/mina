@@ -29,7 +29,7 @@ resource "google_sql_database" "itn_database" {
 }
 
 resource "google_sql_user" "itn_user" {
-  name     = "itn-db-user" # Set the username for your database
+  name     = "" # Set the username for your database
   instance = google_sql_database_instance.itn_instance.name
   password = "" # Set the desired password
 }
