@@ -266,7 +266,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
   ; cell = Fn.id
   ; double = (fun x -> of_int 2 * x)
   ; zk_polynomial
-  ; omega_to_mins_zk_rows = omega_to_zk
+  ; omega_to_minus_zk_rows = omega_to_zk
   ; zeta_to_n_minus_1 = domain#vanishing_polynomial zeta
   ; endo_coefficient = endo
   ; mds = (fun (row, col) -> mds.(row).(col))

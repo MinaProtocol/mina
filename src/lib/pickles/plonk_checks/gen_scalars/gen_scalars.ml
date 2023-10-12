@@ -91,7 +91,7 @@ module Env = struct
     ; pow : 'a * int -> 'a
     ; square : 'a -> 'a
     ; zk_polynomial : 'a
-    ; omega_to_mins_zk_rows : 'a
+    ; omega_to_minus_zk_rows : 'a
     ; zeta_to_n_minus_1 : 'a
     ; var : Column.t * curr_or_next -> 'a
     ; field : string -> 'a
@@ -132,7 +132,7 @@ module Tick : S = struct
        ; alpha_pow
        ; double
        ; zk_polynomial = _
-       ; omega_to_mins_zk_rows = _
+       ; omega_to_minus_zk_rows = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
        ; vanishes_on_zero_knowledge_and_previous_rows
@@ -195,7 +195,7 @@ module Tock : S = struct
        ; alpha_pow
        ; double
        ; zk_polynomial = _
-       ; omega_to_mins_zk_rows = _
+       ; omega_to_minus_zk_rows = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
        ; vanishes_on_zero_knowledge_and_previous_rows = _
