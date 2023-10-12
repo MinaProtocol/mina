@@ -248,7 +248,7 @@ module Features = struct
     ; runtime_tables
     }
 
-  let to_full ~or_:( ||| )
+  let to_full ~or_:( ||| ) ?(any = List.reduce_exn ~f:( ||| ))
       { range_check0
       ; range_check1
       ; foreign_field_add
@@ -277,12 +277,15 @@ module Features = struct
     in
     let table_width_at_least_1 =
       (* RangeCheck, ForeignFieldMul have max_joint_size = 1 *)
-      table_width_at_least_2 ||| lookup_pattern_range_check
-      ||| foreign_field_mul
+      any
+        [ table_width_at_least_2
+        ; lookup_pattern_range_check
+        ; foreign_field_mul
+        ]
     in
     let lookups_per_row_4 =
       (* Xor, RangeCheckGate, ForeignFieldMul, have max_lookups_per_row = 4 *)
-      lookup_pattern_xor ||| lookup_pattern_range_check ||| foreign_field_mul
+      any [ lookup_pattern_xor; lookup_pattern_range_check; foreign_field_mul ]
     in
     let lookups_per_row_3 =
       (* Lookup has max_lookups_per_row = 3 *)

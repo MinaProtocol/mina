@@ -1,6 +1,7 @@
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
-
+let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let Prelude = ../../External/Prelude.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
@@ -25,6 +26,7 @@ in Pipeline.build Pipeline.Config::{
       S.exactly "buildkite/src/Jobs/Test/DevelopCompatibility" "dhall"
     ],
     path = "Test",
+    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ],
     name = "DevelopCompatibility"
   },
   steps = [
