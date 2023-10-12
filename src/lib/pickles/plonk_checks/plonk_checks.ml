@@ -152,7 +152,7 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
 
 let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     (module F : Field_with_if_intf with type t = t and type bool = boolean)
-    ~endo ~mds ~field_of_hex ~domain ~zk_rows:_ ~srs_length_log2
+    ~endo ~mds ~field_of_hex ~domain ~zk_rows ~srs_length_log2
     ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
       (t, _, boolean) Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
     =
@@ -256,7 +256,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
       in
       (omega_to_intermediate_powers, !next_term)
     in
-    let omega_to_zk = omega_to_minus_2 * omega_to_minus_1 in
+    let omega_to_zk = omega_to_zk_plus_1 * omega_to_minus_1 in
     let omega_to_zk_minus_1 = lazy (omega_to_zk * omega_to_minus_1) in
     ( omega_to_zk_minus_1
     , omega_to_zk
@@ -287,6 +287,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
   ; zk_polynomial
   ; omega_to_minus_zk_rows = omega_to_zk
   ; zeta_to_n_minus_1 = domain#vanishing_polynomial zeta
+  ; zeta_to_srs_length = lazy (pow2pow (module F) zeta srs_length_log2)
   ; endo_coefficient = endo
   ; mds = (fun (row, col) -> mds.(row).(col))
   ; srs_length_log2
@@ -352,7 +353,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let zkp = env.zk_polynomial in
     let alpha_pow = env.alpha_pow in
     let zeta1m1 = env.zeta_to_n_minus_1 in
-    let zeta1 = F.(zeta1m1 + one) in
     let p_eval0 =
       Option.value_exn
         (Array.fold_right ~init:None p_eval0 ~f:(fun p_eval0 acc ->
@@ -360,6 +360,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
              | None ->
                  Some p_eval0
              | Some acc ->
+                 let zeta1 = Lazy.force env.zeta_to_srs_length in
                  Some F.(p_eval0 + (zeta1 * acc)) ) )
     in
     let open F in
@@ -428,7 +429,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; gamma
         ; zeta
         ; zeta_to_domain_size = env.zeta_to_n_minus_1 + F.one
-        ; zeta_to_srs_length = pow2pow (module F) zeta env.srs_length_log2
+        ; zeta_to_srs_length = Lazy.force env.zeta_to_srs_length
         ; perm
         ; joint_combiner = Opt.of_option joint_combiner
         ; feature_flags = actual_feature_flags

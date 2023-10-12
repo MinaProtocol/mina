@@ -93,6 +93,7 @@ module Env = struct
     ; zk_polynomial : 'a
     ; omega_to_minus_zk_rows : 'a
     ; zeta_to_n_minus_1 : 'a
+    ; zeta_to_srs_length : 'a Lazy.t
     ; var : Column.t * curr_or_next -> 'a
     ; field : string -> 'a
     ; cell : 'a -> 'a
@@ -134,6 +135,7 @@ module Tick : S = struct
        ; zk_polynomial = _
        ; omega_to_minus_zk_rows = _
        ; zeta_to_n_minus_1 = _
+       ; zeta_to_srs_length = _
        ; srs_length_log2 = _
        ; vanishes_on_zero_knowledge_and_previous_rows
        ; joint_combiner
@@ -197,6 +199,7 @@ module Tock : S = struct
        ; zk_polynomial = _
        ; omega_to_minus_zk_rows = _
        ; zeta_to_n_minus_1 = _
+       ; zeta_to_srs_length = _
        ; srs_length_log2 = _
        ; vanishes_on_zero_knowledge_and_previous_rows = _
        ; joint_combiner = _
