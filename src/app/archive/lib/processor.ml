@@ -1,5 +1,23 @@
 (* processor.ml -- database processing for archive node *)
 
+(* For each table in the archive database schema, there is a
+   corresponding module here containing code to read from and write to
+   that table. The module defines a type `t`, a record with fields
+   corresponding to columns in the table; typically, the `id` column
+   does not have an associated field.
+
+   The more recently-written modules use the Mina_caqti library to
+   construct the SQL for those queries. For consistency and
+   simplicity, the older modules should probably be refactored to use
+   Mina_caqti.
+
+   Module `Account_identifiers` is a good example of how Mina_caqti
+   can be used.
+
+   After these table-related modules, there are functions related to
+   running the archive process and archive-related apps.
+*)
+
 module Archive_rpc = Rpc
 open Async
 open Core
@@ -51,6 +69,7 @@ module Public_key = struct
           public_key
 end
 
+(* Unlike other modules here, `Token_owners` does not correspond with a database table *)
 module Token_owners = struct
   (* hash table of token owners, updated for each block *)
   let owner_tbl : Account_id.t Token_id.Table.t = Token_id.Table.create ()
@@ -3755,6 +3774,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
   in
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
 
+(* used by `archive_blocks` app *)
 let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
     ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
@@ -3765,6 +3785,7 @@ let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
     ~accounts_created:block.Precomputed.accounts_created
     ~tokens_used:block.Precomputed.tokens_used block
 
+(* used by `archive_blocks` app *)
 let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
     ~add_block:Block.add_from_extensional
@@ -3773,6 +3794,7 @@ let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
     ~accounts_created:block.Extensional.Block.accounts_created
     ~tokens_used:block.Extensional.Block.tokens_used block
 
+(* receive blocks from a daemon, write them to the database *)
 let run pool reader ~constraint_constants ~logger ~delete_older_than :
     unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
@@ -3799,6 +3821,7 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
     | Transition_frontier _ ->
         Deferred.unit )
 
+(* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     pool =
   match runtime_config_opt with
@@ -3976,6 +3999,7 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
       in
       go ()
 
+(* for running the archive process *)
 let setup_server ~metrics_server_port ~constraint_constants ~logger
     ~postgres_address ~server_port ~delete_older_than ~runtime_config_opt
     ~missing_blocks_width =
