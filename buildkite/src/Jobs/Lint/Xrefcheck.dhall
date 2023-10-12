@@ -4,6 +4,8 @@ let B = ../../External/Buildkite.dhall
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
@@ -23,7 +25,8 @@ Pipeline.build
         SelectFiles.strictly (SelectFiles.contains ".xrefcheck.yml")
       ],
       path = "Lint",
-      name = "Xrefcheck"
+      name = "Xrefcheck",
+      tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
     },
     steps = [
       Command.build
