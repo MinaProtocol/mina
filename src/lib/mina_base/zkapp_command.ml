@@ -1955,6 +1955,14 @@ let has_zero_vesting_period t =
       | Set { vesting_period; _ } ->
           Mina_numbers.Global_slot_span.(equal zero) vesting_period )
 
+let is_incompatible_version t =
+  Call_forest.exists t.account_updates ~f:(fun p ->
+      match p.body.update.permissions with
+      | Keep ->
+          false
+      | Set { set_verification_key = auth, txn_version; _ } ->
+          not Protocol_version.(equal txn_version current) )
+
 let get_transaction_commitments (zkapp_command : t) =
   let memo_hash = Signed_command_memo.hash zkapp_command.memo in
   let fee_payer_hash =

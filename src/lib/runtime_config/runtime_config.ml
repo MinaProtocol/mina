@@ -112,6 +112,24 @@ module Json_layout = struct
                 Impossible
         end
 
+        module Protocol_version = struct
+          type t = { transaction : int; network : int; patch : int }
+          [@@deriving dhall_type, sexp, bin_io_unversioned, yojson]
+
+          let of_protocol_version t =
+            { transaction = Protocol_version.transaction t
+            ; network = Protocol_version.network t
+            ; patch = Protocol_version.patch t
+            }
+
+          let current = of_protocol_version Protocol_version.current
+        end
+
+        module Verification_key_permission = struct
+          type t = { auth : Auth_required.t; version : Protocol_version.t }
+          [@@deriving dhall_type, sexp, bin_io_unversioned, yojson]
+        end
+
         type t =
           { edit_state : Auth_required.t [@default None]
           ; send : Auth_required.t [@default None]
@@ -119,7 +137,8 @@ module Json_layout = struct
           ; access : Auth_required.t [@default None]
           ; set_delegate : Auth_required.t [@default None]
           ; set_permissions : Auth_required.t [@default None]
-          ; set_verification_key : Auth_required.t [@default None]
+          ; set_verification_key : Verification_key_permission.t
+                [@default { auth = None; version = Protocol_version.current }]
           ; set_zkapp_uri : Auth_required.t [@default None]
           ; edit_action_state : Auth_required.t [@default None]
           ; set_token_symbol : Auth_required.t [@default None]
@@ -298,8 +317,10 @@ module Json_layout = struct
                       Auth_required.of_account_perm
                         a.permissions.set_permissions
                   ; set_verification_key =
-                      Auth_required.of_account_perm
-                        a.permissions.set_verification_key
+                      (let auth, version = a.permissions.set_verification_key in
+                       { auth = Auth_required.of_account_perm auth
+                       ; version = Protocol_version.of_protocol_version version
+                       } )
                   ; set_token_symbol =
                       Auth_required.of_account_perm
                         a.permissions.set_token_symbol

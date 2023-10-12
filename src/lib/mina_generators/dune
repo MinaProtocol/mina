@@ -18,6 +18,7 @@
    ppx_inline_test.config
    ppx_deriving_yojson.runtime
    ;; local libraries
+   protocol_version
    genesis_constants
    sgn
    pickles_types

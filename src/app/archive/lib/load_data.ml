@@ -182,21 +182,25 @@ let update_of_id pool update_id =
   let%bind permissions =
     let%map perms_opt =
       Option.value_map permissions_id ~default:(return None) ~f:(fun id ->
-          let%map { edit_state
-                  ; send
-                  ; receive
-                  ; access
-                  ; set_delegate
-                  ; set_permissions
-                  ; set_verification_key
-                  ; set_zkapp_uri
-                  ; edit_action_state
-                  ; set_token_symbol
-                  ; increment_nonce
-                  ; set_voting_for
-                  ; set_timing
-                  } =
+          let%bind { edit_state
+                   ; send
+                   ; receive
+                   ; access
+                   ; set_delegate
+                   ; set_permissions
+                   ; set_verification_key = verification_key_auth, version_id
+                   ; set_zkapp_uri
+                   ; edit_action_state
+                   ; set_token_symbol
+                   ; increment_nonce
+                   ; set_voting_for
+                   ; set_timing
+                   } =
             query_db ~f:(fun db -> Processor.Zkapp_permissions.load db id)
+          in
+          let%map { transaction; network; patch } =
+            query_db ~f:(fun db ->
+                Processor.Protocol_versions.load db version_id )
           in
           (* same fields, different types *)
           Some
@@ -206,7 +210,9 @@ let update_of_id pool update_id =
               ; access
               ; set_delegate
               ; set_permissions
-              ; set_verification_key
+              ; set_verification_key =
+                  ( verification_key_auth
+                  , Protocol_version.create ~transaction ~network ~patch )
               ; set_zkapp_uri
               ; edit_action_state
               ; set_token_symbol
@@ -724,29 +730,35 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             }
   in
   let%bind permissions =
-    let%map { edit_state
-            ; send
-            ; receive
-            ; access
-            ; set_delegate
-            ; set_permissions
-            ; set_verification_key
-            ; set_zkapp_uri
-            ; edit_action_state
-            ; set_token_symbol
-            ; increment_nonce
-            ; set_voting_for
-            ; set_timing
-            } =
+    let%bind { edit_state
+             ; send
+             ; receive
+             ; access
+             ; set_delegate
+             ; set_permissions
+             ; set_verification_key = verification_key_auth, version_id
+             ; set_zkapp_uri
+             ; edit_action_state
+             ; set_token_symbol
+             ; increment_nonce
+             ; set_voting_for
+             ; set_timing
+             } =
       query_db ~f:(fun db -> Processor.Zkapp_permissions.load db permissions_id)
     in
+    let%map { transaction; network; patch } =
+      query_db ~f:(fun db -> Processor.Protocol_versions.load db version_id)
+    in
+
     ( { edit_state
       ; send
       ; receive
       ; access
       ; set_delegate
       ; set_permissions
-      ; set_verification_key
+      ; set_verification_key =
+          ( verification_key_auth
+          , Protocol_version.create ~transaction ~network ~patch )
       ; set_zkapp_uri
       ; edit_action_state
       ; set_token_symbol

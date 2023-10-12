@@ -19,6 +19,7 @@
    async_unix
    splittable_random
    ;; local libraries
+   protocol_version
    mina_wire_types
    mina_base.import
    mina_transaction

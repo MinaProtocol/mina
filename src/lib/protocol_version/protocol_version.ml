@@ -16,7 +16,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Stable = struct
     module V2 = struct
       type t = A.V2.t = { transaction : int; network : int; patch : int }
-      [@@deriving compare, equal, sexp, yojson, fields]
+      [@@deriving compare, equal, sexp, yojson, fields, hash, annot]
 
       let to_latest = Fn.id
     end
@@ -71,6 +71,104 @@ module Make_str (A : Wire_types.Concrete) = struct
      negative numbers
   *)
   let is_valid t = t.transaction >= 1 && t.network >= 1 && t.patch >= 0
+
+  let older_than_current t =
+    transaction t < transaction current
+    || (transaction t = transaction current && network t < network current)
+    || transaction t = transaction current
+       && network t = network current
+       && patch t < patch current
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map transaction = Quickcheck.Generator.small_non_negative_int
+    and network = Quickcheck.Generator.small_non_negative_int
+    and patch = Quickcheck.Generator.small_non_negative_int in
+    { transaction = transaction + 1; network = network + 1; patch }
+
+  let deriver obj =
+    let open Fields_derivers_zkapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots in
+    Fields.make_creator obj ~transaction:!.int ~network:!.int ~patch:!.int
+    |> finish "ProtocolVersion" ~t_toplevel_annots
 end
 
-include Wire_types.Make (Make_sig) (Make_str)
+module T = Wire_types.Make (Make_sig) (Make_str)
+include T
+
+module N = Mina_numbers.Nat.Make32 ()
+
+type var =
+  { transaction : N.Checked.t; network : N.Checked.t; patch : N.Checked.t }
+
+module Checked = struct
+  let to_input { transaction; network; patch } =
+    Random_oracle.Input.Chunked.(
+      append
+        (append (N.Checked.to_input transaction) (N.Checked.to_input network))
+        (N.Checked.to_input patch))
+
+  let if_ cond ~(then_ : var) ~(else_ : var) =
+    let open Snark_params.Tick in
+    let%map transaction =
+      N.Checked.if_ cond ~then_:then_.transaction ~else_:else_.transaction
+    and network = N.Checked.if_ cond ~then_:then_.network ~else_:else_.network
+    and patch = N.Checked.if_ cond ~then_:then_.patch ~else_:else_.network in
+    { transaction; network; patch }
+
+  let constant (t : t) =
+    { transaction = N.Checked.constant (N.of_int (transaction t))
+    ; network = N.Checked.constant (N.of_int (network t))
+    ; patch = N.Checked.constant (N.of_int (patch t))
+    }
+
+  let current = constant current
+
+  let equal_to_current t =
+    let open Snark_params.Tick in
+    let%bind transaction = N.Checked.equal t.transaction current.transaction
+    and network = N.Checked.equal t.network current.network
+    and patch = N.Checked.equal t.patch current.patch in
+    Boolean.all [ transaction; network; patch ]
+
+  let older_than_current t =
+    let open Snark_params.Tick in
+    let open N.Checked in
+    let%bind transaction_older = t.transaction < current.transaction in
+    let%bind transaction_equal = t.transaction = current.transaction in
+    let%bind network_less = t.network < current.network in
+    let%bind network_older = Boolean.(transaction_equal && network_less) in
+    let%bind network_equal = t.network = current.network in
+    let%bind patch_less = t.patch < current.patch in
+    let%bind patch_older =
+      Boolean.all [ transaction_equal; network_equal; patch_less ]
+    in
+    Boolean.any [ transaction_older; network_older; patch_older ]
+
+  type t = var
+end
+
+open Snark_params
+
+let typ : (Checked.t, t) Tick.Typ.t =
+  Tick.Typ.tuple3 N.Checked.typ N.Checked.typ N.typ
+  |> Tick.Typ.transport
+       ~there:(fun t ->
+         (N.of_int @@ transaction t, N.of_int @@ network t, N.of_int @@ patch t)
+         )
+       ~back:(fun (transaction, network, patch) ->
+         T.create ~transaction:(N.to_int transaction)
+           ~network:(N.to_int network) ~patch:(N.to_int patch) )
+  |> Tick.Typ.transport_var
+       ~there:(fun { transaction; network; patch } ->
+         (transaction, network, patch) )
+       ~back:(fun (transaction, network, patch) ->
+         { transaction; network; patch } )
+
+let to_input t =
+  Random_oracle.Input.Chunked.(
+    append
+      (append
+         (N.to_input (N.of_int (transaction t)))
+         (N.to_input (N.of_int (network t))) )
+      (N.to_input (N.of_int (patch t))))

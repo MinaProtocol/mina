@@ -24,6 +24,7 @@
    core_kernel.uuid
    ;; local libraries
    mina_wire_types
+   protocol_version
    run_in_thread
    kimchi_backend_common
    kimchi_backend.pasta

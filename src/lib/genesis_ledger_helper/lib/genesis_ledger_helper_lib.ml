@@ -69,13 +69,29 @@ module Accounts = struct
               | Impossible ->
                   Impossible
             in
+            let protocol_version
+                { Runtime_config.Accounts.Single.Permissions.Protocol_version
+                  .transaction
+                ; network
+                ; patch
+                } =
+              Protocol_version.create ~transaction ~network ~patch
+            in
+            let verification_key
+                { Runtime_config.Accounts.Single.Permissions
+                  .Verification_key_permission
+                  .auth
+                ; version
+                } =
+              (auth_required auth, protocol_version version)
+            in
             { Mina_base.Permissions.Poly.edit_state = auth_required edit_state
             ; access = auth_required access
             ; send = auth_required send
             ; receive = auth_required receive
             ; set_delegate = auth_required set_delegate
             ; set_permissions = auth_required set_permissions
-            ; set_verification_key = auth_required set_verification_key
+            ; set_verification_key = verification_key set_verification_key
             ; set_zkapp_uri = auth_required set_zkapp_uri
             ; edit_action_state = auth_required edit_action_state
             ; set_token_symbol = auth_required set_token_symbol
@@ -212,6 +228,20 @@ module Accounts = struct
           | Impossible ->
               Impossible
         in
+        let protocol_version t =
+          { Runtime_config.Accounts.Single.Permissions.Protocol_version
+            .transaction = Protocol_version.transaction t
+          ; network = Protocol_version.network t
+          ; patch = Protocol_version.patch t
+          }
+        in
+        let verification_key (auth, version) =
+          { Runtime_config.Accounts.Single.Permissions
+            .Verification_key_permission
+            .auth = auth_required auth
+          ; version = protocol_version version
+          }
+        in
         let { Mina_base.Permissions.Poly.edit_state
             ; send
             ; receive
@@ -236,7 +266,7 @@ module Accounts = struct
           ; access = auth_required access
           ; set_delegate = auth_required set_delegate
           ; set_permissions = auth_required set_permissions
-          ; set_verification_key = auth_required set_verification_key
+          ; set_verification_key = verification_key set_verification_key
           ; set_zkapp_uri = auth_required set_zkapp_uri
           ; edit_action_state = auth_required edit_action_state
           ; set_token_symbol = auth_required set_token_symbol

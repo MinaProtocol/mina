@@ -16,6 +16,7 @@
    base.caml
    base.base_internalhash_types
    ;;local libraries
+   protocol_version
    mina_wire_types
    child_processes
    snark_worker

@@ -537,6 +537,39 @@ module Zkapp_verification_keys = struct
       id
 end
 
+module Protocol_versions = struct
+  type t = { transaction : int; network : int; patch : int }
+  [@@deriving hlist, fields]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; int ]
+
+  let table_name = "protocol_versions"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~transaction ~network
+      ~patch =
+    let t = { transaction; network; patch } in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      t
+
+  let find (module Conn : CONNECTION) ~major ~minor ~patch =
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup3 int int int)
+         Caqti_type.int
+         (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
+      (major, minor, patch)
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+      id
+end
+
 module Zkapp_permissions = struct
   let auth_required_typ =
     let encode = function
@@ -574,7 +607,7 @@ module Zkapp_permissions = struct
     ; access : Permissions.Auth_required.t
     ; set_delegate : Permissions.Auth_required.t
     ; set_permissions : Permissions.Auth_required.t
-    ; set_verification_key : Permissions.Auth_required.t
+    ; set_verification_key : Permissions.Auth_required.t * int
     ; set_zkapp_uri : Permissions.Auth_required.t
     ; edit_action_state : Permissions.Auth_required.t
     ; set_token_symbol : Permissions.Auth_required.t
@@ -592,7 +625,7 @@ module Zkapp_permissions = struct
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
-      ; auth_required_typ
+      ; Caqti_type.(tup2 auth_required_typ int)
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
@@ -604,6 +637,15 @@ module Zkapp_permissions = struct
   let table_name = "zkapp_permissions"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (perms : Permissions.t) =
+    let open Deferred.Result.Let_syntax in
+    let version = snd perms.set_verification_key in
+    let%bind protocol_version_id =
+      Protocol_versions.add_if_doesn't_exist
+        (module Conn)
+        ~transaction:(Protocol_version.transaction version)
+        ~network:(Protocol_version.network version)
+        ~patch:(Protocol_version.patch version)
+    in
     let value =
       { edit_state = perms.edit_state
       ; send = perms.send
@@ -611,7 +653,8 @@ module Zkapp_permissions = struct
       ; access = perms.access
       ; set_delegate = perms.set_delegate
       ; set_permissions = perms.set_permissions
-      ; set_verification_key = perms.set_verification_key
+      ; set_verification_key =
+          (fst perms.set_verification_key, protocol_version_id)
       ; set_zkapp_uri = perms.set_zkapp_uri
       ; edit_action_state = perms.edit_action_state
       ; set_token_symbol = perms.set_token_symbol
@@ -2638,39 +2681,6 @@ module Accounts_created = struct
                WHERE block_id = ?
          |sql} )
       block_id
-end
-
-module Protocol_versions = struct
-  type t = { transaction : int; network : int; patch : int }
-  [@@deriving hlist, fields]
-
-  let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int ]
-
-  let table_name = "protocol_versions"
-
-  let add_if_doesn't_exist (module Conn : CONNECTION) ~transaction ~network
-      ~patch =
-    let t = { transaction; network; patch } in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
-      (module Conn)
-      t
-
-  let find (module Conn : CONNECTION) ~major ~minor ~patch =
-    Conn.find
-      (Caqti_request.find
-         Caqti_type.(tup3 int int int)
-         Caqti_type.int
-         (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
-      (major, minor, patch)
-
-  let load (module Conn : CONNECTION) id =
-    Conn.find
-      (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
-      id
 end
 
 module Block = struct

@@ -12,6 +12,7 @@
    result
    sexplib0
    ;; local libraries
+   protocol_version
    currency
    data_hash_lib
    kimchi_backend.pasta

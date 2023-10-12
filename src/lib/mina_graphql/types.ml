@@ -732,6 +732,19 @@ let genesis_constants =
             |> Genesis_constants.genesis_timestamp_to_string )
       ] )
 
+let protocol_version =
+  obj "ProtocolVersion" ~fields:(fun _ ->
+      [ field "transaction" ~typ:(non_null int)
+          ~args:Arg.[]
+          ~resolve:(fun _ version -> Protocol_version.transaction version)
+      ; field "network" ~typ:(non_null int)
+          ~args:Arg.[]
+          ~resolve:(fun _ version -> Protocol_version.network version)
+      ; field "patch" ~typ:(non_null int)
+          ~args:Arg.[]
+          ~resolve:(fun _ version -> Protocol_version.patch version)
+      ] )
+
 module AccountObj = struct
   module AnnotatedBalance = struct
     type t =
@@ -994,6 +1007,20 @@ module AccountObj = struct
         ; enum_value "Impossible" ~value:Impossible
         ]
 
+  let verification_key_permission =
+    obj "VerificationKeyPermission" ~fields:(fun _ ->
+        [ field "auth" ~typ:(non_null auth_required)
+            ~doc:
+              "Authorization required to set the verification key of the zkApp \
+               associated with the account"
+            ~args:Arg.[]
+            ~resolve:(fun _ (auth, _) -> auth)
+        ; field "version"
+            ~typ:(non_null protocol_version)
+            ~args:Arg.[]
+            ~resolve:(fun _ (_, version) -> version)
+        ] )
+
   let account_permissions =
     obj "AccountPermissions" ~fields:(fun _ ->
         [ field "editState" ~typ:(non_null auth_required)
@@ -1022,7 +1049,8 @@ module AccountObj = struct
             ~args:Arg.[]
             ~resolve:(fun _ permission ->
               permission.Permissions.Poly.set_permissions )
-        ; field "setVerificationKey" ~typ:(non_null auth_required)
+        ; field "setVerificationKey"
+            ~typ:(non_null verification_key_permission)
             ~doc:
               "Authorization required to set the verification key of the zkApp \
                associated with the account"

@@ -396,7 +396,7 @@ let permissions_from_update (update : Account_update.Update.t) ~auth =
   ; set_verification_key =
       ( if Zkapp_basic.Set_or_keep.is_keep update.verification_key then
         default.set_verification_key
-      else auth )
+      else (auth, Protocol_version.current) )
   ; set_permissions =
       ( if Zkapp_basic.Set_or_keep.is_keep update.permissions then
         default.set_permissions

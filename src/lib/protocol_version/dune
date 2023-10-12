@@ -11,10 +11,21 @@
    base
    ppx_version.runtime
    ;; local libraries
+   fields_derivers_zkapps
+   fields_derivers.graphql
+   fields_derivers.json
    mina_wire_types
+   mina_numbers
+   snark_params
+   pickles
+   pickles_types
+   snarky.backendless
+   snarky
+   random_oracle
+   random_oracle_input
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_version ppx_bin_prot ppx_optcomp ppx_fields_conv ppx_sexp_conv ppx_compare ppx_deriving_yojson))
+  (pps ppx_annot ppx_let ppx_hash ppx_version ppx_bin_prot ppx_optcomp ppx_fields_conv ppx_sexp_conv ppx_compare ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
  (synopsis "Protocol version representation"))
