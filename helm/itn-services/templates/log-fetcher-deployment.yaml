@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: log-fetcher
-          image: gcr.io/o1labs-192920/mina-internal-trace-consumer:1.1.0
+          image: gcr.io/o1labs-192920/mina-internal-trace-consumer:1.2.0
           command:
             - bash
             - -c
@@ -24,12 +24,18 @@ spec:
           env:
             - name: NETWORK
               value: "ITN"
-            - name: GOOGLE_BUCKET
-              value: "uptime-itn-pre-launch-sanity-check"
+            # - name: GOOGLE_BUCKET
+            #   value: "uptime-itn-pre-launch-sanity-check"
             - name: GOOGLE_SERVICE_ACCOUNT
               value: "/credentials/itn-keyfile.json"
             - name: INTERNAL_TRACE_CONSUMER_EXE
               value: "/internal_trace_consumer"
+            - name: AWS_DEFAULT_REGION
+              value: "us-west-2"
+            - name: AWS_BUCKET
+              value: "673156464838-block-producers-uptime"
+            - name: AWS_PREFIX
+              value: "berkeley"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: unnamed-port

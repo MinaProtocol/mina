@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-testworld-v2.tfstate"
+    key     = "terraform-testworld-v2-final.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -34,7 +34,6 @@ provider "google" {
   zone    = "us-central1-c"
 }
 
-
 variable "whale_count" {
   type        = number
   description = "Number of online whales for the network to run"
@@ -56,24 +55,24 @@ variable "plain_node_count" {
 }
 
 locals {
-  testnet_name                    = "testworld-2-0"
+  testnet_name                    = "testworld-2-0-final"
   mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-berkeley-itn3-ledger-validate-25f9de2-focal-berkeley"
   mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-berkeley-itn3-ledger-validate-25f9de2-focal"
-  seed_region                     = "us-central1"
-  seed_zone                       = "us-central1-b"
+  seed_region                     = "us-east4"
+  seed_zone                       = "us-east4-b"
   make_report_discord_webhook_url = ""
   make_report_accounts            = ""
 }
 
 module "testworld-2-0" {
-  providers = { google.gke = google.google-us-central1 }
+  providers = { google.gke = google.google-us-east4 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-central1"
-  cluster_region = "us-central1"
-  k8s_context    = "gke_o1labs-192920_us-central1_coda-infra-central1"
+  cluster_name   = "coda-infra-east4"
+  cluster_region = "us-east4"
+  k8s_context    = "gke_o1labs-192920_us-east4_coda-infra-east4"
   testnet_name   = local.testnet_name
 
   mina_image                  = local.mina_image
@@ -157,40 +156,10 @@ module "testworld-2-0" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/testworld-2-0_seeds.txt"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/testworld-2-0_seeds-final.txt"
 }
 
-resource "helm_release" "itn-services" {
-  provider  = helm.testnet_deploy
-  name      = "itn-services"
-  chart     = "../../../../helm/itn-services"
-  namespace = kubernetes_namespace.testnet_namespace.metadata[0].name
-
-  #   set {
-  #     name  = "replicaCount"
-  #     value = 3
-  #   }
-
-  depends_on = [module.testworld-2-0] # requires the ITN testnet to deploy first
+module "supplemental-services" {
+  providers = { google.gke = google.google-us-east4 }
+  source    = "../../modules/o1-itn"
 }
-
-
-
-# resource "helm_release" "seeds" {
-#   provider = helm.testnet_deploy
-
-#   name       = "${var.testnet_name}-seeds"
-#   repository = var.use_local_charts ? "" : local.mina_helm_repo
-#   chart      = var.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
-#   version    = "1.0.11"
-#   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
-#   values = [
-#     yamlencode(local.seed_vars)
-#   ]
-#   wait    = false
-#   timeout = 600
-#   depends_on = [
-#     kubernetes_role_binding.helm_release
-#   ]
-# }
-
