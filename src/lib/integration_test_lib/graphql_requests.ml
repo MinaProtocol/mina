@@ -192,6 +192,14 @@ module Graphql = struct
       }
     }
   |}]
+
+  module Genesis_ledger_export =
+  [%graphql
+  {|
+         query {
+           fork_config
+         }
+         |}]
 end
 
 (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
@@ -337,6 +345,20 @@ let get_account_data ~logger node_uri ~public_key =
 let must_get_account_data ~logger node_uri ~public_key =
   get_account_data ~logger node_uri ~public_key
   |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+let export_genesis_ledger ~logger node_uri =
+  let open Deferred.Let_syntax in
+  [%log info] "Exporting genesis ledger"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let q = Graphql.Genesis_ledger_export.(make @@ makeVariables ()) in
+  let%bind response =
+    exec_graphql_request ~logger ~node_uri ~query_name:"fork_config" q
+  in
+  Result.bind response ~f:(fun r ->
+      (r.Graphql.Genesis_ledger_export.fork_config :> Yojson.Safe.t)
+      |> Runtime_config.of_yojson
+      |> Result.map_error ~f:(fun msg -> Error.of_string msg) )
+  |> Malleable_error.or_hard_error
 
 type signed_command_result =
   { id : string; hash : Transaction_hash.t; nonce : Unsigned.uint32 }
