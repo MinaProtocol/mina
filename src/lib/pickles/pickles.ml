@@ -47,6 +47,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   exception Return_digest = Compile.Return_digest
 
+  type chunking_data = Verify.Instance.chunking_data =
+    { num_chunks : int; domain_size : int }
+
   let verify_promise = Verify.verify
 
   let verify max_proofs_verified statement key proofs =
@@ -291,7 +294,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     { constraints = 0 }
                 }
               in
-              Verify.Instance.T (max_proofs_verified, m, vk, x, p) )
+              Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
           |> Verify.verify_heterogenous )
 
     let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred

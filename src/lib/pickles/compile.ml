@@ -25,6 +25,9 @@ open Kimchi_backend
 module Proof_ = P.Base
 module Proof = P
 
+type chunking_data = Verify.Instance.chunking_data =
+  { num_chunks : int; domain_size : int }
+
 let pad_messages_for_next_wrap_proof
     (type local_max_proofs_verifieds max_local_max_proofs_verifieds
     max_proofs_verified )
@@ -926,7 +929,7 @@ module Side_loaded = struct
                   { constraints = 0 }
               }
             in
-            Verify.Instance.T (max_proofs_verified, m, vk, x, p) )
+            Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
         |> Verify.verify_heterogenous )
 
   let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
@@ -1090,6 +1093,21 @@ let compile_with_wrap_main_override_promise :
       let (Typ typ) = typ in
       fun x -> fst (typ.value_to_fields x)
   end in
+  let chunking_data =
+    match num_chunks with
+    | None ->
+        None
+    | Some num_chunks ->
+        let { h = Pow_2_roots_of_unity domain_size } =
+          (Types_map.lookup_compiled self.id).step_domains
+          |> Vector.reduce_exn
+               ~f:(fun
+                    { h = Pow_2_roots_of_unity d1 }
+                    { h = Pow_2_roots_of_unity d2 }
+                  -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
+        in
+        Some { Verify.Instance.num_chunks; domain_size }
+  in
   let module P = struct
     type statement = value
 
@@ -1109,7 +1127,7 @@ let compile_with_wrap_main_override_promise :
     let verification_key = wrap_vk
 
     let verify_promise ts =
-      verify_promise
+      verify_promise ?chunking_data
         ( module struct
           include Max_proofs_verified
         end )

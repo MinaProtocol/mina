@@ -44,8 +44,12 @@ module type Proof_intf = sig
   val verify_promise : (statement * t) list -> unit Or_error.t Promise.t
 end
 
+type chunking_data = Verify.Instance.chunking_data =
+  { num_chunks : int; domain_size : int }
+
 val verify_promise :
-     (module Nat.Intf with type n = 'n)
+     ?chunking_data:chunking_data
+  -> (module Nat.Intf with type n = 'n)
   -> (module Statement_value_intf with type t = 'a)
   -> Verification_key.t
   -> ('a * ('n, 'n) Proof.t) list
