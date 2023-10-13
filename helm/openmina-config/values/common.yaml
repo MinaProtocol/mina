@@ -101,7 +101,7 @@ resources:
 
 bpfDebugger:
   enable: true
-  image: openmina/mina-network-debugger:ec4dd2dd
+  image: openmina/mina-network-debugger:0aa55313
   cpu: "1500m"
   memory: "4Gi"
   restartMina: false
