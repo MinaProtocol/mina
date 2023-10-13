@@ -16,22 +16,25 @@ let get_account t (addr : Account_id.t) =
   let%bind loc = Mina_ledger.Ledger.location_of_account ledger addr in
   Mina_ledger.Ledger.get ledger loc
 
-let get_accounts t =
-  let open Participating_state.Let_syntax in
-  let%map ledger = Mina_lib.best_ledger t in
-  Mina_ledger.Ledger.to_list ledger
+let get_accounts t : Account.t list Participating_state.t Deferred.t =
+  match Mina_lib.best_ledger t with
+  | `Active ledger ->
+      let%map accts = Mina_ledger.Ledger.to_list ledger in
+      `Active accts
+  | `Bootstrapping ->
+      Deferred.return `Bootstrapping
 
 let string_of_public_key =
   Fn.compose Public_key.Compressed.to_base58_check Account.public_key
 
-let get_public_keys t =
-  let open Participating_state.Let_syntax in
-  let%map account = get_accounts t in
-  List.map account ~f:string_of_public_key
+let get_public_keys t : string list Participating_state.t Deferred.t =
+  let%map.Deferred accounts_pstate = get_accounts t in
+  let%map.Participating_state accounts = accounts_pstate in
+  List.map accounts ~f:string_of_public_key
 
 let get_keys_with_details t =
-  let open Participating_state.Let_syntax in
-  let%map accounts = get_accounts t in
+  let%map.Deferred accounts_pstate = get_accounts t in
+  let%map.Participating_state accounts = accounts_pstate in
   List.map accounts ~f:(fun account ->
       ( string_of_public_key account
       , account.Account.Poly.balance |> Currency.Balance.to_nanomina_int
@@ -125,9 +128,11 @@ let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
   txn_count := !txn_count + num_zkapps ;
   match result with
   | Ok (`Broadcasted, commands, []) ->
-      let zkapp_jsons = List.map commands ~f:User_command.to_yojson in
+      let zkapp_jsons =
+        List.map commands ~f:User_command.fee_payer_summary_json
+      in
       [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:[ ("zkapp_commands", `List zkapp_jsons) ]
+        ~metadata:[ ("summaries", `List zkapp_jsons) ]
         "Scheduled %d zkApps" num_zkapps ;
       Ok zkapp_commands
   | Ok (decision, valid_commands, invalid_commands) ->
@@ -141,7 +146,9 @@ let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
                 | `Not_broadcasted ->
                     "not_broadcasted" ) )
           ; ( "valid_zkapp_commands"
-            , `List (List.map ~f:User_command.to_yojson valid_commands) )
+            , `List
+                (List.map ~f:User_command.fee_payer_summary_json valid_commands)
+            )
           ; ( "invalid_zkapp_commands"
             , `List
                 (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
@@ -195,8 +202,7 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
      Receipt.Chain_hash.cons_zkapp_command_commitment fee_payer_index elt parent_hash *)
 end)
 
-[%%inject "compile_time_current_protocol_version", current_protocol_version]
-
+(* keep this code in sync with Mina_cli_entrypoint.chain_id *)
 let chain_id_inputs (t : Mina_lib.t) =
   (* these are the inputs to Blake2.digest_string in Mina.chain_id *)
   let config = Mina_lib.config t in
@@ -209,11 +215,16 @@ let chain_id_inputs (t : Mina_lib.t) =
     Lazy.force precomputed_values.constraint_system_digests
     |> List.map ~f:(fun (_, digest) -> Md5.to_hex digest)
   in
-  let protocol_major_version =
-    Protocol_version.of_string_exn compile_time_current_protocol_version
-    |> Protocol_version.major
+  let protocol_version = Protocol_version.current in
+  let protocol_transaction_version =
+    Protocol_version.transaction protocol_version
   in
-  (genesis_state_hash, genesis_constants, snark_keys, protocol_major_version)
+  let protocol_network_version = Protocol_version.network protocol_version in
+  ( genesis_state_hash
+  , genesis_constants
+  , snark_keys
+  , protocol_transaction_version
+  , protocol_network_version )
 
 let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
     (init_receipt, proof) =
@@ -390,7 +401,7 @@ let get_status ~flag t =
       Consensus.Data.Consensus_state.consensus_time consensus_state
     in
     let global_slot_since_genesis =
-      Mina_numbers.Global_slot.to_int
+      Mina_numbers.Global_slot_since_genesis.to_int
       @@ Consensus.Data.Consensus_state.global_slot_since_genesis
            consensus_state
     in
@@ -455,6 +466,13 @@ let get_status ~flag t =
       ; transactions_added_to_pool =
           Float.to_int
           @@ Counter.value Transaction_pool.transactions_added_to_pool
+      ; snark_pool_diff_received =
+          Float.to_int @@ Gauge.value Network.snark_pool_diff_received
+      ; snark_pool_diff_broadcasted =
+          Float.to_int @@ Gauge.value Network.snark_pool_diff_broadcasted
+      ; snark_pool_size = Float.to_int @@ Gauge.value Snark_work.snark_pool_size
+      ; pending_snark_work =
+          Float.to_int @@ Gauge.value Snark_work.pending_snark_work
       }
   in
   { Daemon_rpcs.Types.Status.num_accounts

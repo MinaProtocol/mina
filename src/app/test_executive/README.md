@@ -120,7 +120,7 @@ Running it directly in the terminal is not the most recommended method, but it i
 
 - `cloud` : the first argument specifies if you'd like to run the testnet in the cloud (ie GCP) or locally in virtual machines.  only the `cloud` option works at the moment, the local implementation has yet to be implemented
 - `$TEST_NAME`: the second argument is the name of the pre-written test which you wish to run.
-	+ In the current state of development, the following pre-written tests are available on all major branches: `peers-reliability`, `chain-reliability`, `payments`, `delegation`, `archive-node`, `gossip-consis`, `medium-bootstrap`, `opt-block-prod`
+	+ In the current state of development, the following pre-written tests are available on all major branches: `peers-reliability`, `chain-reliability`, `payments`, `delegation`, `archive-node`, `gossip-consis`, `medium-bootstrap`, `block-prod-prio`
 	+ The following pre-written tests are available only on versions of Lucy based off the `develop` branch: `zkapps`, `zkapps-timing`, `snarkyjs`
 	+ The following pre-written tests are available only on version of Lucy based off the `compatible` branch: `archive-node` (the test logic for the archive-node test was rolled into other tests in develop based branches)
 - `--mina-image $MINA_IMAGE`: this must be a url to a docker image which is the mina-daemon.  This is required.  Go to the [mina-daemon dockerhub page](https://hub.docker.com/r/minaprotocol/mina-daemon/tags) or the [mina-daemon GCR page](https://console.cloud.google.com/gcr/images/o1labs-192920/global/mina-daemon) and pick a suitable, preferably recent, image to run the tests with.  When choosing an image, keep in mind the following tips.  1. Usually, you should choose the most recent image from the branch one is currently working on.  2. Generally use "-devnet" images instead of "-mainnet" images for testing, although it usually won't make a difference.  Also, please keep in mind that changes to Lucy itself do not make it into the daemon image, ie they are compiled separately and built into separate images.  This means that if you make changes to Lucy in a branch, the changes will not be reflected in the latest mina image off of the same branch.
@@ -307,11 +307,12 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 - Exit code `4` will be returned if not all pods were assigned to nodes and ready in time.
 - Exit code `5` will be returned if some pods could not be found.
 - Exit code `6` will be returned if Subscriptions, Topics, or Log sinks could not be created
-- Exit code `7` will be returned if the capacity check reports that the integration test cluster is out of capacity and no further tests can be run
+- Exit code `7` will be returned if the capacity check reports that the integration test cluster is out of capacity and no further tests can be run.  (deprecated given that we've changed how capacity is handled, replaced by exit code 14)
 - Exit code `10` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a command in a container.  This exit code is the general case of such errors, there are subsequent exit codes which are preferred in more specific cases
 - Exit code `11` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `start.sh` script in a container
 - Exit code `12` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `stop.sh` script in a container
 - Exit code `13` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to retrieve logs.
+- Exit code `14` will be returned if any pods enter a failure state while waiting for all pods to be assigned to nodes.
 - Exit code `20` will be returned if any testnet nodes hard timed-out on initialization
 
 ![totally heterosexual and entirely becoming of good christian victorian woman behavior](https://user-images.githubusercontent.com/3465290/213062986-35ab48cc-d57f-4348-bda2-a8a504944cb5.png)

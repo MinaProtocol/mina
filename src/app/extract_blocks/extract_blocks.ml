@@ -1,5 +1,7 @@
 (* extract_blocks.ml -- dump extensional blocks from archive db *)
 
+[@@@coverage exclude_file]
+
 open Core_kernel
 open Async
 open Mina_base
@@ -87,26 +89,31 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let height = Unsigned.UInt32.of_int64 block.height in
   let global_slot_since_hard_fork =
     Unsigned.UInt32.of_int64 block.global_slot_since_hard_fork
+    |> Mina_numbers.Global_slot_since_hard_fork.of_uint32
   in
   let global_slot_since_genesis =
     Unsigned.UInt32.of_int64 block.global_slot_since_genesis
+    |> Mina_numbers.Global_slot_since_genesis.of_uint32
   in
   let timestamp = Block_time.of_string_exn block.timestamp in
   let chain_status = Chain_status.of_string block.chain_status in
   let%bind protocol_version =
-    let%map { major; minor; patch } =
+    let%map { transaction; network; patch } =
       query_db ~f:(fun db ->
           Processor.Protocol_versions.load db block.protocol_version_id )
     in
-    Protocol_version.create_exn ~major ~minor ~patch
+    Protocol_version.create ~transaction ~network ~patch
   in
   let%bind proposed_protocol_version =
     Option.value_map block.proposed_protocol_version_id ~default:(return None)
       ~f:(fun id ->
-        let%map { major; minor; patch } =
+        let%map { transaction; network; patch } =
           query_db ~f:(fun db -> Processor.Protocol_versions.load db id)
         in
-        Some (Protocol_version.create_exn ~major ~minor ~patch) )
+        let protocol_version =
+          Protocol_version.create ~transaction ~network ~patch
+        in
+        Some protocol_version )
   in
   (* commands, accounts_accessed, accounts_created, tokens_used to be filled in later *)
   return
@@ -293,7 +300,8 @@ let fill_in_user_commands pool block_state_hash =
       let fee = Currency.Fee.of_string user_cmd.fee in
       let valid_until =
         Option.map user_cmd.valid_until ~f:(fun valid ->
-            Unsigned.UInt32.of_int64 valid |> Mina_numbers.Global_slot.of_uint32 )
+            Unsigned.UInt32.of_int64 valid
+            |> Mina_numbers.Global_slot_since_genesis.of_uint32 )
       in
       let memo = user_cmd.memo |> Signed_command_memo.of_base58_check_exn in
       let hash = user_cmd.hash |> Transaction_hash.of_base58_check_exn in

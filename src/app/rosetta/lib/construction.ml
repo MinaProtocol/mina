@@ -23,9 +23,6 @@ module Get_options_metadata =
         }
         nonce
       }
-      daemonStatus {
-        chainId
-      }
       initialPeers
      }
 |}]
@@ -615,8 +612,7 @@ module Parse = struct
     module T (M : Monad_fail.S) = struct
       type t =
         { verify_payment_signature :
-               network_identifier:Rosetta_models.Network_identifier.t
-            -> payment:Transaction.Unsigned.Rendered.Payment.t
+               payment:Transaction.Unsigned.Rendered.Payment.t
             -> signature:Mina_base.Signature.t
             -> unit
             -> (bool, Errors.t) M.t
@@ -629,7 +625,7 @@ module Parse = struct
 
     let real : Real.t =
       { verify_payment_signature =
-          (fun ~network_identifier ~payment ~signature () ->
+          (fun ~payment ~signature () ->
             let open Deferred.Result in
             let open Deferred.Result.Let_syntax in
             let parse_pk ~which s =
@@ -646,21 +642,19 @@ module Parse = struct
                             which)
                        (`Json_parse (Some (Core_kernel.Error.to_string_hum e))))
             in
-            let%bind source_pk = parse_pk ~which:"source" payment.from in
+            let%bind fee_payer_pk = parse_pk ~which:"source" payment.from in
             let%bind receiver_pk = parse_pk ~which:"receiver" payment.to_ in
             let body =
               Signed_command_payload.Body.Payment
-                { source_pk
-                ; receiver_pk
+                { receiver_pk
                 ; amount = Mina_currency.Amount.of_uint64 payment.amount
                 }
             in
-            let fee_payer_pk = source_pk in
             let fee = Mina_currency.Fee.of_uint64 payment.fee in
             let signer = fee_payer_pk in
             let valid_until =
               Option.map payment.valid_until
-                ~f:Mina_numbers.Global_slot.of_uint32
+                ~f:Mina_numbers.Global_slot_since_genesis.of_uint32
             in
             let nonce = payment.nonce in
             let%map memo =
@@ -677,15 +671,8 @@ module Parse = struct
               Signed_command_payload.create ~fee ~fee_payer_pk ~nonce
                 ~valid_until ~memo ~body
             in
-            (* choose signature verification based on network *)
-            let signature_kind : Mina_signature_kind.t =
-              if String.equal network_identifier.network "mainnet" then
-                Mainnet
-              else Testnet
-            in
             Option.is_some @@
-              Signed_command.create_with_signature_checked ~signature_kind
-                signature signer payload )
+              Signed_command.create_with_signature_checked signature signer payload )
       ; lift = Deferred.return
       }
   end
@@ -729,8 +716,7 @@ module Parse = struct
               | Some payment ->
                   (* Only perform signature validation on payments. *)
                   let%bind res =
-                    env.verify_payment_signature
-                      ~network_identifier:req.network_identifier ~payment
+                    env.verify_payment_signature ~payment
                       ~signature:signed_transaction.signature ()
                   in
                   if res then M.return ()

@@ -18,6 +18,7 @@ type block_sink_config =
   ; log_gossip_heard : bool
   ; consensus_constants : Consensus.Constants.t
   ; genesis_constants : Genesis_constants.t
+  ; constraint_constants : Genesis_constants.Constraint_constants.t
   }
 
 type t =
@@ -30,6 +31,7 @@ type t =
       ; log_gossip_heard : bool
       ; consensus_constants : Consensus.Constants.t
       ; genesis_constants : Genesis_constants.t
+      ; constraint_constants : Genesis_constants.Constraint_constants.t
       }
   | Void
 
@@ -50,6 +52,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       ; log_gossip_heard
       ; consensus_constants
       ; genesis_constants
+      ; constraint_constants
       } ->
       O1trace.sync_thread "handle_block_gossip"
       @@ fun () ->
@@ -61,13 +64,21 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
           state |> header |> Header.protocol_state |> Protocol_state.hashes)
           .state_hash
       in
+      Internal_tracing.Context_call.with_call_id ~tag:"block_received"
+      @@ fun () ->
       Internal_tracing.with_state_hash state_hash
       @@ fun () ->
+      let open Mina_transaction in
+      let txs =
+        Mina_block.transactions ~constraint_constants state
+        |> List.map ~f:Transaction.yojson_summary_with_status
+      in
       [%log internal] "@block_metadata"
         ~metadata:
           [ ( "blockchain_length"
             , Mina_numbers.Length.to_yojson (Mina_block.blockchain_length state)
             )
+          ; ("transactions", `List txs)
           ] ;
       [%log internal] "External_block_received" ;
       let processing_start_time =
@@ -86,8 +97,8 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
         | Some _ ->
             ()
         | None ->
-            [%log error] "Validation timed out on $block"
-              ~metadata:[ ("block", Mina_block.to_yojson state) ] ) ;
+            [%log error] "Validation timed out on block $state_hash"
+              ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ) ;
       Perf_histograms.add_span ~name:"external_transition_latency"
         (Core.Time.abs_diff
            Block_time.(now time_controller |> to_time_exn)
@@ -131,24 +142,27 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
         Mina_block.transactions state
           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
       in
-      let exists_too_big_txn =
-        (* we only detect and log the first too-big transaction *)
+      let exists_well_formedness_errors =
         List.exists transactions ~f:(fun txn ->
-            let size_validity =
-              Mina_transaction.Transaction.valid_size ~genesis_constants
-                txn.data
-            in
-            match size_validity with
+            match
+              Mina_transaction.Transaction.check_well_formedness
+                ~genesis_constants txn.data
+            with
             | Ok () ->
                 false
-            | Error err ->
+            | Error errs ->
                 [%log warn]
-                  "Rejecting block with at least one too-big transaction"
+                  "Rejecting block due to one or more errors in a transaction"
                   ~metadata:
-                    [ ("size_violation", Error_json.error_to_yojson err) ] ;
+                    [ ( "errors"
+                      , `List
+                          (List.map errs
+                             ~f:User_command.Well_formedness_error.to_yojson )
+                      )
+                    ] ;
                 true )
       in
-      if exists_too_big_txn then
+      if exists_well_formedness_errors then
         Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject ;
       let lift_consensus_time =
         Fn.compose Unsigned.UInt32.to_int
@@ -192,6 +206,7 @@ let create
     ; log_gossip_heard
     ; consensus_constants
     ; genesis_constants
+    ; constraint_constants
     } =
   let rate_limiter =
     Network_pool.Rate_limiter.create
@@ -212,6 +227,7 @@ let create
       ; log_gossip_heard
       ; consensus_constants
       ; genesis_constants
+      ; constraint_constants
       } )
 
 let void = Void

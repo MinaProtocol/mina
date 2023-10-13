@@ -56,7 +56,7 @@ let get_global_slot_bounds pool id =
         in
         let slot_of_int64 int64 =
           int64 |> Unsigned.UInt32.of_int64
-          |> Mina_numbers.Global_slot.of_uint32
+          |> Mina_numbers.Global_slot_since_genesis.of_uint32
         in
         let lower = slot_of_int64 bounds.global_slot_lower_bound in
         let upper = slot_of_int64 bounds.global_slot_upper_bound in
@@ -242,12 +242,12 @@ let update_of_id pool update_id =
           in
           let cliff_time =
             cliff_time |> Unsigned.UInt32.of_int64
-            |> Mina_numbers.Global_slot.of_uint32
+            |> Mina_numbers.Global_slot_since_genesis.of_uint32
           in
           let cliff_amount = Currency.Amount.of_string cliff_amount in
           let vesting_period =
             vesting_period |> Unsigned.UInt32.of_int64
-            |> Mina_numbers.Global_slot.of_uint32
+            |> Mina_numbers.Global_slot_span.of_uint32
           in
           let vesting_increment = Currency.Amount.of_string vesting_increment in
           Some
@@ -367,7 +367,6 @@ let protocol_state_precondition_of_id pool id =
   ( { snarked_ledger_hash
     ; blockchain_length
     ; min_window_density
-    ; last_vrf_output = ()
     ; total_currency
     ; global_slot_since_genesis
     ; staking_epoch_data
@@ -404,7 +403,7 @@ let get_fee_payer_body ~pool body_id =
   let valid_until =
     let open Option.Let_syntax in
     valid_until >>| Unsigned.UInt32.of_int64
-    >>| Mina_numbers.Global_slot.of_uint32
+    >>| Mina_numbers.Global_slot_since_genesis.of_uint32
   in
   let nonce =
     nonce |> Unsigned.UInt32.of_int64 |> Mina_numbers.Account_nonce.of_uint32
@@ -463,139 +462,118 @@ let get_account_update_body ~pool body_id =
     protocol_state_precondition_of_id pool zkapp_network_precondition_id
   in
   let%bind account_precondition =
-    let%bind ({ kind; account_precondition_values_id; nonce }
+    let%bind ({ balance_id
+              ; nonce_id
+              ; receipt_chain_hash
+              ; delegate_id
+              ; state_id
+              ; action_state_id
+              ; proved_state
+              ; is_new
+              }
                : Processor.Zkapp_account_precondition.t ) =
       query_db ~f:(fun db ->
           Processor.Zkapp_account_precondition.load db
             zkapp_account_precondition_id )
     in
-    match kind with
-    | Nonce ->
-        assert (Option.is_some nonce) ;
-        let nonce =
-          Option.value_exn nonce |> Unsigned.UInt32.of_int64
-          |> Mina_numbers.Account_nonce.of_uint32
-        in
-        return @@ Account_update.Account_precondition.Nonce nonce
-    | Accept ->
-        return Account_update.Account_precondition.Accept
-    | Full ->
-        assert (Option.is_some account_precondition_values_id) ;
-        let%bind { balance_id
-                 ; nonce_id
-                 ; receipt_chain_hash
-                 ; delegate_id
-                 ; state_id
-                 ; action_state_id
-                 ; proved_state
-                 ; is_new
-                 } =
-          query_db ~f:(fun db ->
-              Processor.Zkapp_account_precondition_values.load db
-                (Option.value_exn account_precondition_values_id) )
-        in
-        let%bind balance =
-          let%map balance_opt =
-            Option.value_map balance_id ~default:(return None) ~f:(fun id ->
-                let%map { balance_lower_bound; balance_upper_bound } =
-                  query_db ~f:(fun db ->
-                      Processor.Zkapp_balance_bounds.load db id )
-                in
-                let lower = Currency.Balance.of_string balance_lower_bound in
-                let upper = Currency.Balance.of_string balance_upper_bound in
-                Some ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t) )
-          in
-          Or_ignore.of_option balance_opt
-        in
-        let%bind nonce =
-          let%map nonce_opt =
-            Option.value_map nonce_id ~default:(return None) ~f:(fun id ->
-                let%map { nonce_lower_bound; nonce_upper_bound } =
-                  query_db ~f:(fun db ->
-                      Processor.Zkapp_nonce_bounds.load db id )
-                in
-                let balance_of_int64 int64 =
-                  int64 |> Unsigned.UInt32.of_int64
-                  |> Mina_numbers.Account_nonce.of_uint32
-                in
-                let lower = balance_of_int64 nonce_lower_bound in
-                let upper = balance_of_int64 nonce_upper_bound in
-                Some ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t) )
-          in
-          Or_ignore.of_option nonce_opt
-        in
-        let receipt_chain_hash =
-          Option.map receipt_chain_hash
-            ~f:Receipt.Chain_hash.of_base58_check_exn
-          |> Or_ignore.of_option
-        in
-        let get_pk id =
-          let%map pk_opt =
-            Option.value_map id ~default:(return None) ~f:(fun id ->
-                let%map pk = pk_of_id id in
-                Some pk )
-          in
-          Or_ignore.of_option pk_opt
-        in
-        let%bind delegate = get_pk delegate_id in
-        let%bind state =
-          let%bind { element0
-                   ; element1
-                   ; element2
-                   ; element3
-                   ; element4
-                   ; element5
-                   ; element6
-                   ; element7
-                   } =
-            query_db ~f:(fun db ->
-                Processor.Zkapp_states_nullable.load db state_id )
-          in
-          let elements =
-            [ element0
-            ; element1
-            ; element2
-            ; element3
-            ; element4
-            ; element5
-            ; element6
-            ; element7
-            ]
-          in
-          let%map fields =
-            Deferred.List.map elements ~f:(fun id_opt ->
-                Option.value_map id_opt ~default:(return None) ~f:(fun id ->
-                    let%map field_str =
-                      query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
-                    in
-                    Some (Zkapp_basic.F.of_string field_str) ) )
-          in
-          List.map fields ~f:Or_ignore.of_option |> Zkapp_state.V.of_list_exn
-        in
-        let%bind action_state =
-          let%map action_state_opt =
-            Option.value_map action_state_id ~default:(return None)
-              ~f:(fun id ->
+    let%bind balance =
+      let%map balance_opt =
+        Option.value_map balance_id ~default:(return None) ~f:(fun id ->
+            let%map { balance_lower_bound; balance_upper_bound } =
+              query_db ~f:(fun db -> Processor.Zkapp_balance_bounds.load db id)
+            in
+            let lower = Currency.Balance.of_string balance_lower_bound in
+            let upper = Currency.Balance.of_string balance_upper_bound in
+            Some ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t) )
+      in
+      Or_ignore.of_option balance_opt
+    in
+    let%bind nonce =
+      let%map nonce_opt =
+        Option.value_map nonce_id ~default:(return None) ~f:(fun id ->
+            let%map { nonce_lower_bound; nonce_upper_bound } =
+              query_db ~f:(fun db -> Processor.Zkapp_nonce_bounds.load db id)
+            in
+            let balance_of_int64 int64 =
+              int64 |> Unsigned.UInt32.of_int64
+              |> Mina_numbers.Account_nonce.of_uint32
+            in
+            let lower = balance_of_int64 nonce_lower_bound in
+            let upper = balance_of_int64 nonce_upper_bound in
+            Some ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t) )
+      in
+      Or_ignore.of_option nonce_opt
+    in
+    let receipt_chain_hash =
+      Option.map receipt_chain_hash ~f:Receipt.Chain_hash.of_base58_check_exn
+      |> Or_ignore.of_option
+    in
+    let get_pk id =
+      let%map pk_opt =
+        Option.value_map id ~default:(return None) ~f:(fun id ->
+            let%map pk = pk_of_id id in
+            Some pk )
+      in
+      Or_ignore.of_option pk_opt
+    in
+    let%bind delegate = get_pk delegate_id in
+    let%bind state =
+      let%bind { element0
+               ; element1
+               ; element2
+               ; element3
+               ; element4
+               ; element5
+               ; element6
+               ; element7
+               } =
+        query_db ~f:(fun db ->
+            Processor.Zkapp_states_nullable.load db state_id )
+      in
+      let elements =
+        [ element0
+        ; element1
+        ; element2
+        ; element3
+        ; element4
+        ; element5
+        ; element6
+        ; element7
+        ]
+      in
+      let%map fields =
+        Deferred.List.map elements ~f:(fun id_opt ->
+            Option.value_map id_opt ~default:(return None) ~f:(fun id ->
                 let%map field_str =
                   query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
                 in
-                Some (Zkapp_basic.F.of_string field_str) )
-          in
-          Or_ignore.of_option action_state_opt
-        in
-        let proved_state = Or_ignore.of_option proved_state in
-        let is_new = Or_ignore.of_option is_new in
-        return
-          (Account_update.Account_precondition.Full
-             { balance
-             ; nonce
-             ; receipt_chain_hash
-             ; delegate
-             ; state
-             ; action_state
-             ; proved_state
-             ; is_new
-             } )
+                Some (Zkapp_basic.F.of_string field_str) ) )
+      in
+      List.map fields ~f:Or_ignore.of_option |> Zkapp_state.V.of_list_exn
+    in
+    let%bind action_state =
+      let%map action_state_opt =
+        Option.value_map action_state_id ~default:(return None) ~f:(fun id ->
+            let%map field_str =
+              query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
+            in
+            Some (Zkapp_basic.F.of_string field_str) )
+      in
+      Or_ignore.of_option action_state_opt
+    in
+    let proved_state = Or_ignore.of_option proved_state in
+    let is_new = Or_ignore.of_option is_new in
+    return
+      ( { balance
+        ; nonce
+        ; receipt_chain_hash
+        ; delegate
+        ; state
+        ; action_state
+        ; proved_state
+        ; is_new
+        }
+        : Zkapp_precondition.Account.t )
   in
   let%bind valid_while_precondition =
     get_global_slot_bounds pool zkapp_valid_while_precondition_id
@@ -729,12 +707,12 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           in
           let cliff_time =
             cliff_time |> Unsigned.UInt32.of_int64
-            |> Mina_numbers.Global_slot.of_uint32
+            |> Mina_numbers.Global_slot_since_genesis.of_uint32
           in
           let cliff_amount = Currency.Amount.of_string cliff_amount in
           let vesting_period =
             vesting_period |> Unsigned.UInt32.of_int64
-            |> Mina_numbers.Global_slot.of_uint32
+            |> Mina_numbers.Global_slot_span.of_uint32
           in
           let vesting_increment = Currency.Amount.of_string vesting_increment in
           Timed
@@ -869,7 +847,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         in
         let last_action_slot =
           last_action_slot |> Unsigned.UInt32.of_int64
-          |> Mina_numbers.Global_slot.of_uint32
+          |> Mina_numbers.Global_slot_since_genesis.of_uint32
         in
         let%map zkapp_uri =
           query_db ~f:(fun db -> Processor.Zkapp_uri.load db zkapp_uri_id)

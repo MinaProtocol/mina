@@ -1,7 +1,7 @@
 (library
  (name mina_ledger)
  (public_name mina_ledger)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_custom_printf ppx_base ppx_deriving_yojson ppx_inline_test ppx_assert))
  (libraries

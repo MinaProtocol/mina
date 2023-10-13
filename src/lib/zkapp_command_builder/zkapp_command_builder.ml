@@ -19,7 +19,7 @@ let mk_account_update_body ?preconditions ?(increment_nonce = false)
       ~default:
         Account_update.Preconditions.
           { network = Zkapp_precondition.Protocol_state.accept
-          ; account = Account_update.Account_precondition.Accept
+          ; account = Zkapp_precondition.Account.accept
           ; valid_while = Ignore
           }
   in
@@ -70,7 +70,7 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
                | None_given ->
                    Control.None_given
                | Proof _ ->
-                   Control.Proof Mina_base.Proof.blockchain_dummy
+                   Control.Proof (Lazy.force Mina_base.Proof.blockchain_dummy)
                | Signature ->
                    Control.Signature Signature.dummy
              in

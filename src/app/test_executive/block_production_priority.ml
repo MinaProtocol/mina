@@ -15,7 +15,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  (* let num_extra_keys = 1000 *)
+  let num_extra_keys = 1000
 
   (* let num_sender_nodes = 4 *)
 
@@ -31,7 +31,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { account_name = "empty-bp-key"; balance = "0"; timing = Untimed }
         ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
         ]
-        @ List.init 1000 ~f:(fun i ->
+        @ List.init num_extra_keys ~f:(fun i ->
               let i_str = Int.to_string i in
               { Test_Account.account_name =
                   String.concat [ "sender-account"; i_str ]
@@ -50,10 +50,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key"
-          ; worker_nodes = 25
+          ; worker_nodes = 4
           }
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
+    ; proof_config =
+        { proof_config_default with
+          work_delay = Some 1
+        ; transaction_capacity =
+            Some Runtime_config.Proof_keys.Transaction_capacity.small
+        }
     }
 
   let fee = Currency.Fee.of_nanomina_int_exn 10_000_000
@@ -108,10 +114,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
     in
     let%bind () =
       section_hard "wait for 3 blocks to be produced (warm-up)"
@@ -142,8 +149,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          Malleable_error.List.fold ~init:sender_priv_keys empty_bps
            ~f:(fun keys node ->
              let keys0, rest = List.split_n keys keys_per_sender in
-             Network.Node.must_send_test_payments ~repeat_count ~repeat_delay_ms
-               ~logger ~senders:keys0 ~receiver_pub_key ~amount ~fee node
+             Integration_test_lib.Graphql_requests.must_send_test_payments
+               ~repeat_count ~repeat_delay_ms ~logger ~senders:keys0
+               ~receiver_pub_key ~amount ~fee
+               (Network.Node.get_ingress_uri node)
              >>| const rest )
          >>| const () )
     in
@@ -157,8 +166,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "checked produced blocks"
         (let%bind blocks =
-           Network.Node.must_get_best_chain ~logger ~max_length:(2 * num_slots)
-             receiver
+           Integration_test_lib.Graphql_requests.must_get_best_chain ~logger
+             ~max_length:(2 * num_slots)
+             (Network.Node.get_ingress_uri receiver)
          in
          let%bind () =
            ok_if_true "not enough blocks"
@@ -194,19 +204,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let get_metrics node =
       Async_kernel.Deferred.bind
-        (Network.Node.get_metrics ~logger node)
+        (Integration_test_lib.Graphql_requests.get_metrics ~logger
+           (Network.Node.get_ingress_uri node) )
         ~f:Malleable_error.or_hard_error
     in
     let%bind () =
-      section "check metrics of tx receiver node"
-        (let%bind { block_production_delay = rcv_delay; _ } =
+      section
+        "ensure \\not\\exists more than \\epsilon block production delays of \
+         greater 60s from start slot where we should have produced"
+        (let%bind { block_production_delay =
+                      block_production_delay_histogram_buckets_60s_min
+                  ; _
+                  } =
            get_metrics receiver
          in
-         let rcv_delay_rest =
-           List.fold ~init:0 ~f:( + ) @@ List.drop rcv_delay 1
+         let blocks_delayed_over_60s =
+           List.fold ~init:0 ~f:( + )
+           @@ List.drop block_production_delay_histogram_buckets_60s_min 1
          in
          (* First two slots might be delayed because of test's bootstrap, so we have 2 as a threshold *)
-         ok_if_true "block production was delayed" (rcv_delay_rest <= 2) )
+         ok_if_true "block production was delayed" (blocks_delayed_over_60s <= 2)
+        )
     in
     let%bind () =
       section "retrieve metrics of tx sender nodes"

@@ -1,4 +1,4 @@
-/CODEOWNERS @nholland94 @bkase @imeckler @mrmr1993
+/CODEOWNERS @nholland94 @bkase @aneesharaines @mrmr1993
 /buildkite @MinaProtocol/infra-eng-reviewers
 /frontend/ @MinaProtocol/product-eng-reviewers
 /dockerfiles/ @MinaProtocol/infra-eng-reviewers
@@ -6,17 +6,16 @@
 /Makefile @MinaProtocol/infra-eng-reviewers
 /src/config/dev.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /src/config/testnet_postake_medium_curves.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
-/CODE_OF_CONDUCT.md @imeckler
+/CODE_OF_CONDUCT.md @aneesharaines
 /CONTRIBUTING.md @MinaProtocol/product-eng-reviewers
-/LICENSE @imeckler
+/LICENSE @aneesharaines
 /README.md @MinaProtocol/product-eng-reviewers
 /README-dev.md @MinaProtocol/protocol-eng-reviewers
 /graphql_schema.json @MinaProtocol/product-eng-reviewers
 
-/src/external/ @bkase @psteckler @imeckler @mrmr1993
+/src/external/ @bkase @psteckler @aneesharaines @mrmr1993
 
 /src/app/archive @MinaProtocol/product-eng-reviewers
-/src/app/cli/src/tests @MinaProtocol/protocol-eng-reviewers
 /src/app/cli/src/mina.ml @MinaProtocol/protocol-eng-reviewers
 /src/app/cli/src/init @MinaProtocol/protocol-eng-reviewers
 /src/app/libp2p_helper @MinaProtocol/protocol-eng-reviewers
@@ -31,8 +30,6 @@
 /src/lib/ @MinaProtocol/protocol-eng-reviewers
 
 /src/lib/blake2/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/cli_lib/ @MinaProtocol/product-eng-reviewers
-/src/lib/mina_commands @MinaProtocol/product-eng-reviewers
 /src/lib/mina_graphql @MinaProtocol/product-eng-reviewers
 /src/lib/mina_numbers/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/crs/ @MinaProtocol/crypto-eng-reviewers
@@ -54,7 +51,7 @@
 /src/lib/snarky_curves/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_field_extensions/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_group_map/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/snarkyjs/ @MinaProtocol/product-eng-reviewers
+/src/lib/snarkyjs @MinaProtocol/product-eng-reviewers
 /src/lib/snarky_log/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/unsigned_extended/ @MinaProtocol/crypto-eng-reviewers
 

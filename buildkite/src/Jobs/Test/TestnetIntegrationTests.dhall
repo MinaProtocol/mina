@@ -2,16 +2,16 @@ let S = ../../Lib/SelectFiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
-    { name = "TestnetIntegrationTests", key = "build-test-executive" },
     { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
     { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
 ]
 let dependsOnJs = [
-    { name = "TestnetIntegrationTests", key = "build-test-executive" },
     { name = "TestnetIntegrationTests", key = "build-js-tests" },
     { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
     { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
@@ -24,20 +24,22 @@ in Pipeline.build Pipeline.Config::{
         S.strictlyStart (S.contains "src"),
         S.strictlyStart (S.contains "dockerfiles"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest"),
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Command/TestExecutive")
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Command/TestExecutive"),
+        S.strictlyStart (S.contains "automation/terraform/modules/o1-integration"),
+        S.strictlyStart (S.contains "automation/terraform/modules/kubernetes/testnet")
     ],
     path = "Test",
-    name = "TestnetIntegrationTests"
+    name = "TestnetIntegrationTests",
+    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ],
+    mode = PipelineMode.Type.Stable
   },
   steps = [
-    TestExecutive.build "integration_tests",
     TestExecutive.buildJs "integration_tests",
     TestExecutive.execute "peers-reliability" dependsOn,
     TestExecutive.execute "chain-reliability" dependsOn,
     TestExecutive.execute "payment" dependsOn,
-    TestExecutive.execute "delegation" dependsOn,
     TestExecutive.execute "gossip-consis" dependsOn,
-    TestExecutive.execute "opt-block-prod" dependsOn,
+    TestExecutive.execute "block-prod-prio" dependsOn,
     TestExecutive.execute "medium-bootstrap" dependsOn,
     TestExecutive.execute "block-reward" dependsOn,
     TestExecutive.execute "zkapps" dependsOn,

@@ -54,6 +54,8 @@ module Worker_state = struct
     val verify : Protocol_state.Value.t -> Proof.t -> unit Or_error.t Deferred.t
 
     val toggle_internal_tracing : bool -> unit
+
+    val set_itn_logger_data : daemon_port:int -> unit
   end
 
   (* bin_io required by rpc_parallel *)
@@ -78,7 +80,7 @@ module Worker_state = struct
             with
             sok_digest = Sok_message.Digest.default
           }
-        , Proof.transaction_dummy )
+        , Lazy.force Proof.transaction_dummy )
 
   let create { logger; proof_level; constraint_constants; _ } : t Deferred.t =
     Deferred.return
@@ -155,6 +157,9 @@ module Worker_state = struct
                  don't_wait_for
                  @@ Internal_tracing.toggle ~logger
                       (if enabled then `Enabled else `Disabled)
+
+               let set_itn_logger_data ~daemon_port =
+                 Itn_logger.set_data ~process_kind:"prover" ~daemon_port
              end : S )
          | Check ->
              ( module struct
@@ -170,9 +175,11 @@ module Worker_state = struct
                      ~constraint_constants
                      { transition = block
                      ; prev_state = Blockchain_snark.Blockchain.state chain
-                     ; prev_state_proof = Mina_base.Proof.blockchain_dummy
+                     ; prev_state_proof =
+                         Lazy.force Mina_base.Proof.blockchain_dummy
                      ; txn_snark = t
-                     ; txn_snark_proof = Mina_base.Proof.transaction_dummy
+                     ; txn_snark_proof =
+                         Lazy.force Mina_base.Proof.transaction_dummy
                      }
                      ~handler:
                        (Consensus.Data.Prover_state.handler state_for_handler
@@ -180,7 +187,7 @@ module Worker_state = struct
                      next_state
                    |> Or_error.map ~f:(fun () ->
                           Blockchain_snark.Blockchain.create ~state:next_state
-                            ~proof:Mina_base.Proof.blockchain_dummy )
+                            ~proof:(Lazy.force Mina_base.Proof.blockchain_dummy) )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
@@ -191,6 +198,8 @@ module Worker_state = struct
                let verify _state _proof = Deferred.return (Ok ())
 
                let toggle_internal_tracing _ = ()
+
+               let set_itn_logger_data ~daemon_port:_ = ()
              end : S )
          | None ->
              ( module struct
@@ -201,15 +210,16 @@ module Worker_state = struct
                  Deferred.return
                  @@ Ok
                       (Blockchain_snark.Blockchain.create
-                         ~proof:Mina_base.Proof.blockchain_dummy
+                         ~proof:(Lazy.force Mina_base.Proof.blockchain_dummy)
                          ~state:next_state )
 
                let verify _ _ = Deferred.return (Ok ())
 
                let toggle_internal_tracing _ = ()
+
+               let set_itn_logger_data ~daemon_port:_ = ()
              end : S )
        in
-       Memory_stats.log_memory_stats logger ~process:"prover" ;
        m )
 
   let get = Fn.id
@@ -258,6 +268,12 @@ module Functions = struct
         let (module M) = Worker_state.get w in
         M.toggle_internal_tracing enabled ;
         Deferred.unit )
+
+  let set_itn_logger_data =
+    create bin_int bin_unit (fun w daemon_port ->
+        let (module M) = Worker_state.get w in
+        M.set_itn_logger_data ~daemon_port ;
+        Deferred.unit )
 end
 
 module Worker = struct
@@ -270,6 +286,7 @@ module Worker = struct
           ('w, Extend_blockchain_input.t, Blockchain.t Or_error.t) F.t
       ; verify_blockchain : ('w, Blockchain.t, unit Or_error.t) F.t
       ; toggle_internal_tracing : ('w, bool, unit) F.t
+      ; set_itn_logger_data : ('w, int, unit) F.t
       }
 
     module Worker_state = Worker_state
@@ -297,6 +314,7 @@ module Worker = struct
         ; extend_blockchain = f extend_blockchain
         ; verify_blockchain = f verify_blockchain
         ; toggle_internal_tracing = f toggle_internal_tracing
+        ; set_itn_logger_data = f set_itn_logger_data
         }
 
       let init_worker_state
@@ -316,6 +334,8 @@ module Worker = struct
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-prover.log" ~max_size ~num_rotate ) ;
         Option.iter internal_trace_filename ~f:(fun log_filename ->
+            Itn_logger.set_message_postprocessor
+              Internal_tracing.For_itn_logger.post_process_message ;
             Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
               ~processor:Internal_tracing.For_logger.processor
               ~transport:
@@ -536,3 +556,7 @@ let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
 let toggle_internal_tracing { connection; _ } enabled =
   Worker.Connection.run connection ~f:Worker.functions.toggle_internal_tracing
     ~arg:enabled
+
+let set_itn_logger_data { connection; _ } ~daemon_port =
+  Worker.Connection.run connection ~f:Worker.functions.set_itn_logger_data
+    ~arg:daemon_port

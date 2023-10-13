@@ -42,8 +42,7 @@ let verify_one ~srs
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
-          ~feature_flags:d.feature_flags ~sponge ~prev_challenges
-          deferred_values prev_proof_evals )
+          ~sponge ~prev_challenges deferred_values prev_proof_evals )
   in
   let branch_data = deferred_values.branch_data in
   let sponge_after_index, hash_messages_for_next_step_proof =
@@ -57,6 +56,7 @@ let verify_one ~srs
     in
     (sponge_after_index, unstage hash_messages_for_next_step_proof)
   in
+  (* prepare the statement to be verified below *)
   let statement =
     let prev_messages_for_next_step_proof =
       with_label __LOC__ (fun () ->
@@ -75,16 +75,21 @@ let verify_one ~srs
             ; old_bulletproof_challenges = prev_challenges
             } )
     in
+    (* Returns messages for the next step proof and messages for the next
+       wrap proof *)
     { Types.Wrap.Statement.messages_for_next_step_proof =
         prev_messages_for_next_step_proof
     ; proof_state = { proof_state with messages_for_next_wrap_proof }
     }
   in
+  (* and when the statement is prepared, we call the step verifier with this
+     statement *)
   let verified =
     with_label __LOC__ (fun () ->
-        verify ~srs ~feature_flags:d.feature_flags
+        verify ~srs
+          ~feature_flags:(Plonk_types.Features.of_full d.feature_flags)
           ~lookup_parameters:
-            { use = Plonk_checks.lookup_tables_used d.feature_flags
+            { use = d.feature_flags.uses_lookups
             ; zero =
                 { var =
                     { challenge = Field.zero
@@ -197,7 +202,7 @@ let step_main :
         type pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> (pvars, br) Length.t
-        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t =
+        -> (Opt.Flag.t Plonk_types.Features.Full.t, br) Vector.t =
      fun ds ld ->
       match[@warning "-4"] (ds, ld) with
       | [], Z ->
@@ -220,7 +225,7 @@ let step_main :
         -> (pvars, br) Length.t
         -> (ns1, br) Length.t
         -> (ns2, br) Length.t
-        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t
+        -> (Opt.Flag.t Plonk_types.Features.Full.t, br) Vector.t
         -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
      fun ds ns1 ns2 ld ln1 ln2 feature_flagss ->
       match[@warning "-4"] (ds, ns1, ns2, ld, ln1, ln2, feature_flagss) with
@@ -334,9 +339,11 @@ let step_main :
             in
             Req.Compute_prev_proof_parts previous_proof_statements ) ;
         let dlog_plonk_index =
+          let num_chunks = (* TODO *) 1 in
           exists
             ~request:(fun () -> Req.Wrap_index)
-            (Plonk_verification_key_evals.typ Inner_curve.typ)
+            (Plonk_verification_key_evals.typ
+               (Typ.array ~length:num_chunks Inner_curve.typ) )
         and prevs =
           exists (Prev_typ.f prev_proof_typs) ~request:(fun () ->
               Req.Proof_with_datas )
@@ -344,9 +351,8 @@ let step_main :
           exists
             (Vector.typ'
                (Vector.map
-                  ~f:(fun feature_flags ->
-                    Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
-                      ~feature_flags )
+                  ~f:(fun _feature_flags ->
+                    Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n )
                   feature_flags ) )
             ~request:(fun () -> Req.Unfinalized_proofs)
         and messages_for_next_wrap_proof =

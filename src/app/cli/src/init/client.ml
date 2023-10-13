@@ -436,7 +436,8 @@ let batch_send_payments =
       { receiver : string
       ; amount : Currency.Amount.t
       ; fee : Currency.Fee.t
-      ; valid_until : Mina_numbers.Global_slot.t option [@sexp.option]
+      ; valid_until : Mina_numbers.Global_slot_since_genesis.t option
+            [@sexp.option]
       }
     [@@deriving sexp]
   end in
@@ -453,7 +454,8 @@ let batch_send_payments =
           { Payment_info.receiver =
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
-          ; valid_until = Some (Mina_numbers.Global_slot.random ())
+          ; valid_until =
+              Some (Mina_numbers.Global_slot_since_genesis.random ())
           ; amount = Currency.Amount.of_nanomina_int_exn (Random.int 100)
           ; fee = Currency.Fee.of_nanomina_int_exn (Random.int 100)
           }
@@ -481,7 +483,7 @@ let batch_send_payments =
           in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty ~valid_until
-            ~body:(Payment { source_pk = signer_pk; receiver_pk; amount })
+            ~body:(Payment { receiver_pk; amount })
             ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
     in
     Daemon_rpcs.Client.dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
@@ -1623,6 +1625,34 @@ let generate_libp2p_keypair =
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
     generate_libp2p_keypair_do privkey_path)
 
+let dump_libp2p_keypair_do privkey_path =
+  Cli_lib.Exceptions.handle_nicely
+  @@ fun () ->
+  Deferred.ignore_m
+    (let open Deferred.Let_syntax in
+    let logger = Logger.null () in
+    (* Using the helper only for keypair generation requires no state. *)
+    File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
+        match%bind
+          Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
+        with
+        | Ok net ->
+            let%bind () = Mina_net2.shutdown net in
+            let%map me = Secrets.Libp2p_keypair.read_exn' privkey_path in
+            printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
+        | Error e ->
+            [%log fatal] "failed to dump libp2p keypair: $error"
+              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+            exit 20 ))
+
+let dump_libp2p_keypair =
+  Command.async ~summary:"Print an existing libp2p keypair"
+    (let open Command.Let_syntax in
+    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
+    dump_libp2p_keypair_do privkey_path)
+
 let trustlist_ip_flag =
   Command.Param.(
     flag "--ip-address" ~aliases:[ "ip-address" ]
@@ -2103,7 +2133,8 @@ let chain_id_inputs =
              ( genesis_state_hash
              , genesis_constants
              , snark_keys
-             , protocol_major_version ) ->
+             , protocol_transaction_version
+             , protocol_network_version ) ->
              let open Format in
              printf
                "@[<v>Genesis state hash: %s@,\
@@ -2114,7 +2145,8 @@ let chain_id_inputs =
                 @]@,\
                 @[<v 2>Snark keys:@,\
                 %a@]@,\
-                Protocol major version: %d@]@."
+                Protocol transaction version: %u@,\
+                Protocol network version: %u@]@."
                (State_hash.to_base58_check genesis_state_hash)
                Yojson.Safe.pp
                (Genesis_constants.Protocol.to_yojson genesis_constants.protocol)
@@ -2124,7 +2156,7 @@ let chain_id_inputs =
                   pp_print_int )
                genesis_constants.num_accounts
                (pp_print_list ~pp_sep:pp_print_cut pp_print_string)
-               snark_keys protocol_major_version
+               snark_keys protocol_transaction_version protocol_network_version
          | Error err ->
              Format.eprintf "Could not get chain id inputs: %s@."
                (Error.to_string_hum err) ) )
@@ -2306,7 +2338,7 @@ let client_trustlist_group =
     ]
 
 let advanced =
-  Command.group ~summary:"Advanced client commands"
+  let cmds0 =
     [ ("get-nonce", get_nonce_cmd)
     ; ("client-trustlist", client_trustlist_group)
     ; ("get-trust-status", get_trust_status)
@@ -2347,8 +2379,14 @@ let advanced =
     ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
-    ; ("itn-create-accounts", itn_create_accounts)
     ]
+  in
+  let cmds =
+    if Mina_compile_config.itn_features then
+      ("itn-create-accounts", itn_create_accounts) :: cmds0
+    else cmds0
+  in
+  Command.group ~summary:"Advanced client commands" cmds
 
 let ledger =
   Command.group ~summary:"Ledger commands"
@@ -2359,4 +2397,6 @@ let ledger =
 
 let libp2p =
   Command.group ~summary:"Libp2p commands"
-    [ ("generate-keypair", generate_libp2p_keypair) ]
+    [ ("generate-keypair", generate_libp2p_keypair)
+    ; ("dump-keypair", dump_libp2p_keypair)
+    ]

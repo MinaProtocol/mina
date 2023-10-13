@@ -147,7 +147,7 @@ module Accounts = struct
             in
 
             let last_action_slot =
-              Mina_numbers.Global_slot.of_int last_action_slot
+              Mina_numbers.Global_slot_since_genesis.of_int last_action_slot
             in
             Some
               { Zkapp_account.verification_key
@@ -263,7 +263,7 @@ module Accounts = struct
             in
             let action_state = Pickles_types.Vector.to_list action_state in
             let last_action_slot =
-              Mina_numbers.Global_slot.to_int last_action_slot
+              Mina_numbers.Global_slot_since_genesis.to_int last_action_slot
             in
             { Runtime_config.Accounts.Single.Zkapp_account.app_state
             ; verification_key
@@ -458,13 +458,13 @@ let make_constraint_constants
       ( match config.fork with
       | None ->
           default.fork
-      | Some { previous_state_hash; previous_length; previous_global_slot } ->
+      | Some { previous_state_hash; previous_length; genesis_slot } ->
           Some
             { previous_state_hash =
                 State_hash.of_base58_check_exn previous_state_hash
             ; previous_length = Mina_numbers.Length.of_int previous_length
-            ; previous_global_slot =
-                Mina_numbers.Global_slot.of_int previous_global_slot
+            ; genesis_slot =
+                Mina_numbers.Global_slot_since_genesis.of_int genesis_slot
             } )
   }
 
@@ -493,13 +493,12 @@ let runtime_config_of_constraint_constants
   ; account_creation_fee = Some constraint_constants.account_creation_fee
   ; fork =
       Option.map constraint_constants.fork
-        ~f:(fun { previous_state_hash; previous_length; previous_global_slot }
-           ->
+        ~f:(fun { previous_state_hash; previous_length; genesis_slot } ->
           { Runtime_config.Fork_config.previous_state_hash =
               State_hash.to_base58_check previous_state_hash
           ; previous_length = Mina_numbers.Length.to_int previous_length
-          ; previous_global_slot =
-              Mina_numbers.Global_slot.to_int previous_global_slot
+          ; genesis_slot =
+              Mina_numbers.Global_slot_since_genesis.to_int genesis_slot
           } )
   }
 

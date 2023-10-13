@@ -51,7 +51,9 @@ module Scan_state : sig
   (** All the transactions with hash of the parent block in which they were included in the order in which they were applied*)
   val staged_transactions_with_state_hash :
        t
-    -> (Transaction.t With_status.t * State_hash.t * Mina_numbers.Global_slot.t)
+    -> ( Transaction.t With_status.t
+       * State_hash.t
+       * Mina_numbers.Global_slot_since_genesis.t )
        Transactions_ordered.Poly.t
        list
 
@@ -76,7 +78,7 @@ module Scan_state : sig
     -> get_protocol_state:
          (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
     -> apply_first_pass:
-         (   global_slot:Mina_numbers.Global_slot.t
+         (   global_slot:Mina_numbers.Global_slot_since_genesis.t
           -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
           -> Ledger.t
           -> Transaction.t
@@ -86,7 +88,7 @@ module Scan_state : sig
           -> Ledger.Transaction_partially_applied.t
           -> Ledger.Transaction_applied.t Or_error.t )
     -> apply_first_pass_sparse_ledger:
-         (   global_slot:Mina_numbers.Global_slot.t
+         (   global_slot:Mina_numbers.Global_slot_since_genesis.t
           -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
           -> Mina_ledger.Sparse_ledger.t
           -> Mina_transaction.Transaction.t
@@ -104,7 +106,7 @@ module Scan_state : sig
     -> get_protocol_state:
          (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
     -> apply_first_pass:
-         (   global_slot:Mina_numbers.Global_slot.t
+         (   global_slot:Mina_numbers.Global_slot_since_genesis.t
           -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
           -> Ledger.t
           -> Transaction.t
@@ -114,7 +116,7 @@ module Scan_state : sig
           -> Ledger.Transaction_partially_applied.t
           -> Ledger.Transaction_applied.t Or_error.t )
     -> apply_first_pass_sparse_ledger:
-         (   global_slot:Mina_numbers.Global_slot.t
+         (   global_slot:Mina_numbers.Global_slot_since_genesis.t
           -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
           -> Mina_ledger.Sparse_ledger.t
           -> Mina_transaction.Transaction.t
@@ -164,7 +166,9 @@ val replace_ledger_exn : t -> Ledger.t -> t
 
 val proof_txns_with_state_hashes :
      t
-  -> (Transaction.t With_status.t * State_hash.t * Mina_numbers.Global_slot.t)
+  -> ( Transaction.t With_status.t
+     * State_hash.t
+     * Mina_numbers.Global_slot_since_genesis.t )
      Scan_state.Transactions_ordered.Poly.t
      Mina_stdlib.Nonempty_list.t
      option
@@ -176,8 +180,11 @@ val hash : t -> Staged_ledger_hash.t
 val apply :
      ?skip_verification:[ `Proofs | `All ]
   -> constraint_constants:Genesis_constants.Constraint_constants.t
-  -> global_slot:Mina_numbers.Global_slot.t
+  -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
+  -> get_completed_work:
+       (   Transaction_snark_work.Statement.t
+        -> Transaction_snark_work.Checked.t option )
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
@@ -190,7 +197,7 @@ val apply :
            ( Ledger_proof.t
            * ( Transaction.t With_status.t
              * State_hash.t
-             * Mina_numbers.Global_slot.t )
+             * Mina_numbers.Global_slot_since_genesis.t )
              Scan_state.Transactions_ordered.Poly.t
              list )
            option ]
@@ -201,7 +208,7 @@ val apply :
 
 val apply_diff_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> global_slot:Mina_numbers.Global_slot.t
+  -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t
@@ -214,7 +221,7 @@ val apply_diff_unchecked :
            ( Ledger_proof.t
            * ( Transaction.t With_status.t
              * State_hash.t
-             * Mina_numbers.Global_slot.t )
+             * Mina_numbers.Global_slot_since_genesis.t )
              Scan_state.Transactions_ordered.Poly.t
              list )
            option ]
@@ -229,7 +236,7 @@ val current_ledger_proof : t -> Ledger_proof.t option
 
 val create_diff :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> global_slot:Mina_numbers.Global_slot.t
+  -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> ?log_block_creation:bool
   -> t
   -> coinbase_receiver:Public_key.Compressed.t
@@ -248,7 +255,7 @@ val create_diff :
 val can_apply_supercharged_coinbase_exn :
      winner:Public_key.Compressed.t
   -> epoch_ledger:Mina_ledger.Sparse_ledger.t
-  -> global_slot:Mina_numbers.Global_slot.t
+  -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> bool
 
 val of_scan_state_pending_coinbases_and_snarked_ledger :

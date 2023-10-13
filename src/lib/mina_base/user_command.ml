@@ -294,7 +294,7 @@ let valid_until (t : t) =
       | Some valid_until ->
           valid_until
       | None ->
-          Mina_numbers.Global_slot.max_value )
+          Mina_numbers.Global_slot_since_genesis.max_value )
 
 module Valid = struct
   type t_ = t
@@ -378,3 +378,74 @@ let valid_size ~genesis_constants = function
       Ok ()
   | Zkapp_command zkapp_command ->
       Zkapp_command.valid_size ~genesis_constants zkapp_command
+
+let has_zero_vesting_period = function
+  | Signed_command _ ->
+      false
+  | Zkapp_command p ->
+      Zkapp_command.has_zero_vesting_period p
+
+module Well_formedness_error = struct
+  (* syntactically-evident errors such that a user command can never succeed *)
+  type t =
+    | Insufficient_fee
+    | Zero_vesting_period
+    | Zkapp_too_big of (Error.t[@to_yojson Error_json.error_to_yojson])
+  [@@deriving compare, to_yojson]
+
+  let to_string = function
+    | Insufficient_fee ->
+        "Insufficient fee"
+    | Zero_vesting_period ->
+        "Zero vesting period"
+    | Zkapp_too_big err ->
+        sprintf "Zkapp too big (%s)" (Error.to_string_hum err)
+end
+
+let check_well_formedness ~genesis_constants t :
+    (unit, Well_formedness_error.t list) result =
+  let preds =
+    let open Well_formedness_error in
+    [ (has_insufficient_fee, Insufficient_fee)
+    ; (has_zero_vesting_period, Zero_vesting_period)
+    ]
+  in
+  let errs0 =
+    List.fold preds ~init:[] ~f:(fun acc (f, err) ->
+        if f t then err :: acc else acc )
+  in
+  let errs =
+    match valid_size ~genesis_constants t with
+    | Ok () ->
+        errs0
+    | Error err ->
+        Zkapp_too_big err :: errs0
+  in
+  if List.is_empty errs then Ok () else Error errs
+
+type fee_payer_summary_t = Signature.t * Account.key * int
+[@@deriving yojson, hash]
+
+let fee_payer_summary : t -> fee_payer_summary_t = function
+  | Zkapp_command cmd ->
+      let fp = Zkapp_command.fee_payer_account_update cmd in
+      let open Account_update in
+      let body = Fee_payer.body fp in
+      ( Fee_payer.authorization fp
+      , Body.Fee_payer.public_key body
+      , Body.Fee_payer.nonce body |> Unsigned.UInt32.to_int )
+  | Signed_command cmd ->
+      Signed_command.
+        (signature cmd, fee_payer_pk cmd, nonce cmd |> Unsigned.UInt32.to_int)
+
+let fee_payer_summary_json =
+  Fn.compose fee_payer_summary_t_to_yojson fee_payer_summary
+
+let fee_payer_summary_string =
+  let to_string (signature, pk, nonce) =
+    sprintf "%s (%s %d)"
+      (Signature.to_base58_check signature)
+      (Signature_lib.Public_key.Compressed.to_base58_check pk)
+      nonce
+  in
+  Fn.compose to_string fee_payer_summary

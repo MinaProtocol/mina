@@ -31,7 +31,6 @@ type t =
   ; work_reassignment_wait : int
   ; gossip_net_params : Gossip_net.Libp2p.Config.t
   ; net_config : Mina_networking.Config.t
-  ; initial_protocol_version : Protocol_version.t
         (* Option.t instead of option, so that the derived `make' requires an argument *)
   ; proposed_protocol_version_opt : Protocol_version.t Option.t
   ; snark_pool_disk_location : string
@@ -58,6 +57,7 @@ type t =
   ; node_status_url : string option [@default None]
   ; uptime_url : Uri.t option [@default None]
   ; uptime_submitter_keypair : Keypair.t option [@default None]
+  ; uptime_send_node_commit : bool [@default false]
   ; stop_time : int
   ; graphql_control_port : int option [@default None]
   }

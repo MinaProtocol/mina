@@ -83,8 +83,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind sender_pub_key = pub_key_of_node sender in
     let%bind receiver_pub_key = pub_key_of_node receiver in
     repeat_seq ~n ~f:(fun () ->
-        Network.Node.must_send_payment ~logger sender ~sender_pub_key
-          ~receiver_pub_key ~amount:Currency.Amount.one ~fee
+        Graphql_requests.must_send_online_payment ~logger
+          (Network.Node.get_ingress_uri sender)
+          ~sender_pub_key ~receiver_pub_key ~amount:Currency.Amount.one ~fee
         >>| ignore )
 
   let run network t =
@@ -135,7 +136,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (List.filter
               ~f:(fun n ->
                 String.(Network.Node.id n <> Network.Node.id first_bp) )
-              (Core.String.Map.data (Network.all_nodes network)) ) )
+              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
     in
     let keymap =
       List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
@@ -157,7 +158,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
-                     ; account = Nonce (Account.Nonce.of_int 1)
+                     ; account =
+                         Zkapp_precondition.Account.nonce
+                           (Account.Nonce.of_int 1)
                      ; valid_while = Ignore
                      } )
                 []
@@ -182,7 +185,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
-                     ; account = Nonce (Account.Nonce.of_int 2)
+                     ; account =
+                         Zkapp_precondition.Account.nonce
+                           (Account.Nonce.of_int 2)
                      ; valid_while = Ignore
                      } )
                 []
@@ -279,7 +284,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Send a zkapp commands with fee payer nonce increments and nonce \
          preconditions"
-        (send_zkapp_batch ~logger node
+        (send_zkapp_batch ~logger
+           (Network.Node.get_ingress_uri node)
            [ invalid_nonce_zkapp_cmd_from_fish1; valid_zkapp_cmd_from_fish1 ] )
     in
     let%bind () =
@@ -298,7 +304,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Send zkapp commands with account updates for fish1 that sets send \
          permission to Proof and then tries to send funds "
-        (send_zkapp_batch ~logger node
+        (send_zkapp_batch ~logger
+           (Network.Node.get_ingress_uri node)
            [ set_permission_zkapp_cmd_from_fish1
            ; valid_fee_invalid_permission_zkapp_cmd_from_fish1
            ; invalid_fee_invalid_permission_zkapp_cmd_from_fish1
@@ -321,7 +328,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Verify account update after the updated permission failed by checking \
          account nonce"
         (let%bind { nonce = fish1_nonce; _ } =
-           Network.Node.get_account_data ~logger node
+           Graphql_requests.get_account_data ~logger
+             (Network.Node.get_ingress_uri node)
              ~account_id:fish1_account_id
            |> Deferred.bind ~f:Malleable_error.or_hard_error
          in
@@ -335,29 +343,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Invalid zkapp command was ignored as expected due to low fee" ;
            return () ) )
     in
-    (*TODO: enable later
-      let%bind () =
-        section_hard
-          "Verify invalid zkapp commands are removed from transaction pool"
-          (let%bind pooled_zkapp_commands =
-             Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
-             |> Deferred.bind ~f:Malleable_error.or_hard_error
-           in
-           [%log debug] "Pooled zkapp_commands $commands"
-             ~metadata:
-               [ ( "commands"
-                 , `List (List.map ~f:(fun s -> `String s) pooled_zkapp_commands)
-                 )
-               ] ;
-           if List.is_empty pooled_zkapp_commands then (
-             [%log info] "Transaction pool is empty" ;
-             return () )
-           else
-             Malleable_error.hard_error
-               (Error.of_string
-                  "Transaction pool contains invalid zkapp commands after a \
-                   block was produced" ) )
-      in *)
+    let%bind () =
+      section_hard
+        "Verify invalid zkapp commands are removed from transaction pool"
+        (let%bind pooled_zkapp_commands =
+           Graphql_requests.get_pooled_zkapp_commands ~logger
+             (Network.Node.get_ingress_uri node)
+             ~pk:fish1_pk
+           |> Deferred.bind ~f:Malleable_error.or_hard_error
+         in
+         [%log debug] "Pooled zkapp_commands $commands"
+           ~metadata:
+             [ ( "commands"
+               , `List (List.map ~f:(fun s -> `String s) pooled_zkapp_commands)
+               )
+             ] ;
+         if List.is_empty pooled_zkapp_commands then (
+           [%log info] "Transaction pool is empty" ;
+           return () )
+         else
+           Malleable_error.hard_error
+             (Error.of_string
+                "Transaction pool contains invalid zkapp commands after a \
+                 block was produced" ) )
+    in
     let%bind () =
       (*wait for blocks required to produce 2 proofs given 0.75 slot fill rate + some buffer*)
       section_hard "Wait for proof to be emitted"

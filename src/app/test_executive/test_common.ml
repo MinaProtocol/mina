@@ -26,13 +26,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       if n = 0 then return hashlist
       else
         let%bind hash =
-          let%map { hash; _ } =
-            Engine.Network.Node.must_send_payment ~logger ~sender_pub_key
-              ~receiver_pub_key ~amount ~fee node
+          let%map { hash; nonce; _ } =
+            Integration_test_lib.Graphql_requests.must_send_online_payment
+              ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee
+              (Engine.Network.Node.get_ingress_uri node)
           in
           [%log info]
-            "sending multiple payments: payment #%d sent with hash %s." n
-            (Transaction_hash.to_base58_check hash) ;
+            "sending multiple payments: payment #%d sent with hash of %s and \
+             nonce of %d."
+            n
+            (Transaction_hash.to_base58_check hash)
+            (Unsigned.UInt32.to_int nonce) ;
           hash
         in
         go (n - 1) (List.append hashlist [ hash ])
@@ -82,7 +86,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Malleable_error.hard_error_format
           "Node '%s' did not have a network keypair, if node is a block \
            producer this should not happen"
-          (Engine.Network.Node.id node)
+          (Engine.Network.Node.infra_id node)
 
   let pub_key_of_node =
     make_get_key ~f:(fun nk ->
@@ -141,15 +145,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let fetch_connectivity_data ~logger nodes =
     let open Malleable_error.Let_syntax in
     Malleable_error.List.map nodes ~f:(fun node ->
-        let%map response = Engine.Network.Node.must_get_peer_id ~logger node in
+        let%map response =
+          Integration_test_lib.Graphql_requests.must_get_peer_id ~logger
+            (Engine.Network.Node.get_ingress_uri node)
+        in
         (node, response) )
 
   let assert_peers_completely_connected nodes_and_responses =
     (* this check checks if every single peer in the network is connected to every other peer, in graph theory this network would be a complete graph.  this property will only hold true on small networks *)
     let check_peer_connected_to_all_others ~nodes_by_peer_id ~peer_id
         ~connected_peers =
-      let get_node_id p =
-        p |> String.Map.find_exn nodes_by_peer_id |> Engine.Network.Node.id
+      let get_node_infra_id p =
+        p
+        |> String.Map.find_exn nodes_by_peer_id
+        |> Engine.Network.Node.infra_id
       in
       let expected_peers =
         nodes_by_peer_id |> String.Map.keys
@@ -158,7 +167,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Malleable_error.List.iter expected_peers ~f:(fun p ->
           let error =
             Printf.sprintf "node %s (id=%s) is not connected to node %s (id=%s)"
-              (get_node_id peer_id) peer_id (get_node_id p) p
+              (get_node_infra_id peer_id)
+              peer_id (get_node_infra_id p) p
             |> Error.of_string
           in
           Malleable_error.ok_if_true
@@ -196,9 +206,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     | `Ok ->
         Malleable_error.return ()
 
-  open Inputs.Engine
-
-  let send_zkapp_batch ~logger node zkapp_commands =
+  let send_zkapp_batch ~logger node_uri zkapp_commands =
     List.iter zkapp_commands ~f:(fun zkapp_command ->
         [%log info] "Sending zkApp"
           ~metadata:
@@ -209,7 +217,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                      zkapp_command.memo ) )
             ] ) ;
     match%bind.Deferred
-      Network.Node.send_zkapp_batch ~logger node ~zkapp_commands
+      Integration_test_lib.Graphql_requests.send_zkapp_batch ~logger node_uri
+        ~zkapp_commands
     with
     | Ok _zkapp_ids ->
         [%log info] "ZkApp transactions sent" ;
@@ -224,10 +233,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let send_zkapp ~logger node zkapp_command =
     send_zkapp_batch ~logger node [ zkapp_command ]
 
-  let send_invalid_zkapp ~logger node zkapp_command substring =
+  let send_invalid_zkapp ~logger node_uri zkapp_command substring =
     [%log info] "Sending zkApp, expected to fail" ;
     match%bind.Deferred
-      Network.Node.send_zkapp_batch ~logger node
+      Integration_test_lib.Graphql_requests.send_zkapp_batch ~logger node_uri
         ~zkapp_commands:[ zkapp_command ]
     with
     | Ok _zkapp_ids ->
@@ -250,14 +259,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             "ZkApp transaction failed: %s, but expected \"%s\"" err_str
             substring )
 
-  let send_invalid_payment ~logger node ~sender_pub_key ~receiver_pub_key
+  let send_invalid_payment ~logger node_uri ~sender_pub_key ~receiver_pub_key
       ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature ~expected_failure :
       unit Malleable_error.t =
     [%log info] "Sending payment, expected to fail" ;
     let expected_failure = String.lowercase expected_failure in
     match%bind.Deferred
-      Network.Node.send_payment_with_raw_sig ~logger node ~sender_pub_key
-        ~receiver_pub_key ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature
+      Integration_test_lib.Graphql_requests.send_payment_with_raw_sig ~logger
+        node_uri ~sender_pub_key ~receiver_pub_key ~amount ~fee ~nonce ~memo
+        ~valid_until ~raw_signature
     with
     | Ok _ ->
         [%log error] "Payment succeeded, expected error \"%s\"" expected_failure ;
@@ -278,11 +288,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Malleable_error.hard_error_format
             "Payment failed: %s, but expected \"%s\"" err_str expected_failure )
 
-  let get_account_permissions ~logger node account_id =
+  let get_account_permissions ~logger node_uri account_id =
     [%log info] "Getting permissions for account"
       ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
     match%bind.Deferred
-      Network.Node.get_account_permissions ~logger node ~account_id
+      Integration_test_lib.Graphql_requests.get_account_permissions ~logger
+        node_uri ~account_id
     with
     | Ok permissions ->
         [%log info] "Got account permissions" ;
@@ -293,11 +304,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~metadata:[ ("error", `String err_str) ] ;
         Malleable_error.hard_error (Error.of_string err_str)
 
-  let get_account_update ~logger node account_id =
+  let get_account_update ~logger node_uri account_id =
     [%log info] "Getting update for account"
       ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
     match%bind.Deferred
-      Network.Node.get_account_update ~logger node ~account_id
+      Integration_test_lib.Graphql_requests.get_account_update ~logger node_uri
+        ~account_id
     with
     | Ok update ->
         [%log info] "Got account update" ;
@@ -308,12 +320,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~metadata:[ ("error", `String err_str) ] ;
         Malleable_error.hard_error (Error.of_string err_str)
 
-  let get_pooled_zkapp_commands ~logger node pk =
+  let get_pooled_zkapp_commands ~logger node_uri pk =
     [%log info] "Getting pooled zkApp commands"
       ~metadata:
         [ ("pub_key", Signature_lib.Public_key.Compressed.to_yojson pk) ] ;
     match%bind.Deferred
-      Network.Node.get_pooled_zkapp_commands ~logger node ~pk
+      Integration_test_lib.Graphql_requests.get_pooled_zkapp_commands ~logger
+        node_uri ~pk
     with
     | Ok zkapp_commands ->
         [%log info] "Got pooled zkApp commands" ;
@@ -428,4 +441,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     else
       let error = String.concat error_logs ~sep:"\n  " in
       Malleable_error.hard_error_string ("Replayer errors:\n  " ^ error)
+
+  let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
+      ~vesting_increment : Mina_base.Account_timing.t =
+    let open Currency in
+    Timed
+      { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
+      ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
+      ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
+      ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
+      ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
+      }
 end

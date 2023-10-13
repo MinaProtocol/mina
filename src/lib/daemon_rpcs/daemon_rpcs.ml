@@ -130,7 +130,7 @@ module Chain_id_inputs = struct
   type query = unit [@@deriving bin_io_unversioned]
 
   type response =
-    State_hash.Stable.Latest.t * Genesis_constants.t * string list * int
+    State_hash.Stable.Latest.t * Genesis_constants.t * string list * int * int
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -179,6 +179,9 @@ module Get_status = struct
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_status" ~version:0 ~bin_query ~bin_response
 end
+
+(* ITN internal logs from prover and verifier *)
+module Submit_internal_log = Itn_logger.Submit_internal_log
 
 module Clear_hist_status = struct
   type query = [ `Performance | `None ] [@@deriving bin_io_unversioned]

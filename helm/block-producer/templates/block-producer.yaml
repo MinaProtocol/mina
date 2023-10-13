@@ -24,6 +24,9 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{- if $.Values.priorityClass }}
+      priorityClassName: {{ $.Values.priorityClass }}
+      {{- end }}
       initContainers:
       - name: fix-perms
         image: busybox
@@ -232,7 +235,7 @@ spec:
           "-upload-blocks-to-gcloud", "true",
           {{- end }}
           {{- if $.Values.mina.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
+          "-config-file", "/root/config/daemon.json",
           {{- end -}}
           "-generate-genesis-proof", {{ $.Values.mina.generateGenesisProof | quote }},
           {{- if $config.enableArchive }}
@@ -276,6 +279,12 @@ spec:
           protocol: TCP
           containerPort: {{ default $.Values.mina.ports.p2p $config.externalPort }}
           hostPort: {{ default $.Values.mina.ports.external $config.externalPort }}
+        {{- if $.Values.mina.exposeItnGraphql }}
+        - name: http-itn-graphql
+          protocol: TCP
+          port: {{ $.Values.mina.itn.port }}
+          targetPort: {{ $.Values.mina.itn.port }}
+        {{- end }}  
 {{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
@@ -292,10 +301,17 @@ spec:
         {{- end }}
         {{- if $.Values.mina.runtimeConfig }}
         - name: daemon-config
-          mountPath: "/config/"
+          mountPath: "/root/config/"
         {{- end }}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
       volumes:
+      - name: config-dir
+      {{- if $.Values.persist_working_dir }}
+        persistentVolumeClaim:
+          claimName: pvc-{{ $config.name }}
+      {{- else}}
+        emptyDir: {}
+      {{- end }}
       - name: private-keys
         secret:
           secretName: {{ $config.keypairName }}
@@ -337,8 +353,6 @@ spec:
             path: faucet-key.pub
       {{ end -}}
       - name: wallet-keys
-        emptyDir: {}
-      - name: config-dir
         emptyDir: {}
       - name: actual-libp2p
         emptyDir: {}
@@ -389,6 +403,28 @@ spec:
     protocol: TCP
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
+  {{- if $.Values.mina.exposeItnGraphql }}
+  - name: http-itn-graphql
+    protocol: TCP
+    port: {{ $.Values.mina.itn.port }}
+    targetPort: {{ $.Values.mina.itn.port }}
+  {{- end }}  
 {{- end }}
 ---
+{{- if $.Values.persist_working_dir }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-{{ $config.name }}
+spec:
+  accessModes:
+      - {{ $.Values.storage.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ $.Values.storage.size | quote }}
+  storageClassName: "{{ $.Values.storage.storageClass }}"
+---
 {{ end }}
+---
+{{ end }}
+---

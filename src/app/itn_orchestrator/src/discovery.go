@@ -2,6 +2,7 @@ package itn_orchestrator
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -24,12 +25,14 @@ type Node struct {
 }
 
 type DiscoveryParams struct {
-	OffsetMin          int
-	Limit              int
-	OnlyBlockProducers bool `json:"omitempty"`
+	OffsetMin          int  `json:"offsetMin"`
+	Limit              int  `json:"limit,omitempty"`
+	OnlyBlockProducers bool `json:"onlyBPs,omitempty"`
+	NoBlockProducers   bool `json:"noBPs,omitempty"`
+	Exactly            bool `json:"exactly,omitempty"`
 }
 
-func DiscoverParticipants(config Config, params DiscoveryParams, output func(NodeAddress)) error {
+func discoverParticipantsDo(config Config, params DiscoveryParams, output func(NodeAddress)) error {
 	before := time.Now().Add(-time.Duration(params.OffsetMin) * time.Minute)
 	query := &storage.Query{StartOffset: prefixByTime(before)}
 	log := config.Log
@@ -64,9 +67,12 @@ func DiscoverParticipants(config Config, params DiscoveryParams, output func(Nod
 		if _, has := cache[addr]; has {
 			continue
 		}
-		_, err = config.GetGqlClient(ctx, addr)
+		_, _, err = GetGqlClient(config, addr)
 		if err != nil {
 			log.Errorf("Error on auth for %s: %v", addr, err)
+			continue
+		}
+		if config.NodeData[addr].IsBlockProducer && params.NoBlockProducers {
 			continue
 		}
 		if !config.NodeData[addr].IsBlockProducer && params.OnlyBlockProducers {
@@ -78,12 +84,32 @@ func DiscoverParticipants(config Config, params DiscoveryParams, output func(Nod
 			break
 		}
 	}
+	if len(cache) != params.Limit && params.Exactly {
+		return errors.New("failed to discover the exact number of nodes")
+	}
+	if len(cache) == 0 {
+		return errors.New("didn't find any participants")
+	}
 	return nil
 }
 
-type DiscoverParticipantsAction struct{}
+func DiscoverParticipants(config Config, params DiscoveryParams, output func(NodeAddress)) (err error) {
+	for retryPause := 10; retryPause <= 40; retryPause = retryPause * 2 {
+		err = discoverParticipantsDo(config, params, output)
+		if err == nil {
+			return
+		}
+		if retryPause <= 20 {
+			config.Log.Warnf("Failed to discover participants, retrying in %d minutes: %s", retryPause, err)
+			time.Sleep(time.Duration(retryPause) * time.Minute)
+		}
+	}
+	return
+}
 
-func (DiscoverParticipantsAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
+type DiscoveryAction struct{}
+
+func (DiscoveryAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
 	var params DiscoveryParams
 	if err := json.Unmarshal(rawParams, &params); err != nil {
 		return err
@@ -93,4 +119,6 @@ func (DiscoverParticipantsAction) Run(config Config, rawParams json.RawMessage, 
 	})
 }
 
-var _ Action = DiscoverParticipantsAction{}
+func (DiscoveryAction) Name() string { return "discovery" }
+
+var _ Action = DiscoveryAction{}

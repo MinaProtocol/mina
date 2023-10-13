@@ -1,9 +1,15 @@
+use crate::arkworks::CamlFq;
 use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
+use kimchi::circuits::lookup::runtime_tables::caml::CamlRuntimeTableCfg;
+use kimchi::circuits::lookup::runtime_tables::RuntimeTableCfg;
+use kimchi::circuits::lookup::tables::caml::CamlLookupTable;
+use kimchi::circuits::lookup::tables::LookupTable;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{Fq, Pallas, PallasParameters, Vesta};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
+use poly_commitment::evaluation_proof::OpeningProof;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -12,7 +18,7 @@ use std::{
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[derive(ocaml_gen::CustomType)]
-pub struct CamlPastaFqPlonkIndex(pub Box<ProverIndex<Pallas>>);
+pub struct CamlPastaFqPlonkIndex(pub Box<ProverIndex<Pallas, OpeningProof<Pallas>>>);
 pub type CamlPastaFqPlonkIndexPtr<'a> = ocaml::Pointer<'a, CamlPastaFqPlonkIndex>;
 
 extern "C" fn caml_pasta_fq_plonk_index_finalize(v: ocaml::Raw) {
@@ -39,6 +45,8 @@ impl ocaml::custom::Custom for CamlPastaFqPlonkIndex {
 pub fn caml_pasta_fq_plonk_index_create(
     gates: CamlPastaFqPlonkGateVectorPtr,
     public: ocaml::Int,
+    lookup_tables: Vec<CamlLookupTable<CamlFq>>,
+    runtime_tables: Vec<CamlRuntimeTableCfg<CamlFq>>,
     prev_challenges: ocaml::Int,
     srs: CamlFqSrs,
 ) -> Result<CamlPastaFqPlonkIndex, ocaml::Error> {
@@ -53,10 +61,21 @@ pub fn caml_pasta_fq_plonk_index_create(
         })
         .collect();
 
+    let runtime_tables: Vec<RuntimeTableCfg<Fq>> =
+        runtime_tables.into_iter().map(Into::into).collect();
+
+    let lookup_tables: Vec<LookupTable<Fq>> = lookup_tables.into_iter().map(Into::into).collect();
+
     // create constraint system
     let cs = match ConstraintSystem::<Fq>::create(gates)
         .public(public as usize)
         .prev_challenges(prev_challenges as usize)
+        .lookup(lookup_tables)
+        .runtime(if runtime_tables.is_empty() {
+            None
+        } else {
+            Some(runtime_tables)
+        })
         .build()
     {
         Err(_) => {
@@ -80,7 +99,7 @@ pub fn caml_pasta_fq_plonk_index_create(
     }
 
     // create index
-    let mut index = ProverIndex::<Pallas>::create(cs, endo_q, srs.clone());
+    let mut index = ProverIndex::<Pallas, OpeningProof<Pallas>>::create(cs, endo_q, srs.clone());
     // Compute and cache the verifier index digest
     index.compute_verifier_index_digest::<DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>>();
 
@@ -143,10 +162,12 @@ pub fn caml_pasta_fq_plonk_index_read(
     }
 
     // deserialize the index
-    let mut t = ProverIndex::<Pallas>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
+    let mut t = ProverIndex::<Pallas, OpeningProof<Pallas>>::deserialize(
+        &mut rmp_serde::Deserializer::new(r),
+    )?;
     t.srs = srs.clone();
 
-    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true);
+    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true, 3);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

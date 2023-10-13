@@ -40,7 +40,7 @@ let%test_module "Valid_while precondition tests" =
           Some
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
-            ; account = Account_update.Account_precondition.Accept
+            ; account = Zkapp_precondition.Account.accept
             ; valid_while = Check { lower = global_slot; upper = global_slot }
             }
       }
@@ -50,7 +50,9 @@ let%test_module "Valid_while precondition tests" =
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  let global_slot = Mina_numbers.Global_slot.of_int 5 in
+                  let global_slot =
+                    Mina_numbers.Global_slot_since_genesis.of_int 5
+                  in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
                     init_ledger ledger ;
@@ -72,7 +74,9 @@ let%test_module "Valid_while precondition tests" =
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  let global_slot = Mina_numbers.Global_slot.of_int 5 in
+                  let global_slot =
+                    Mina_numbers.Global_slot_since_genesis.of_int 5
+                  in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
                     init_ledger ledger ;
@@ -89,8 +93,8 @@ let%test_module "Valid_while precondition tests" =
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:
                       (Valid_while_precondition_unsatisfied, U.Pass_2)
-                    ~global_slot:Mina_numbers.Global_slot.zero ledger
-                    [ zkapp_command ] ) ) )
+                    ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
+                    ledger [ zkapp_command ] ) ) )
   end )
 
 let%test_module "Protocol state precondition tests" =
@@ -133,7 +137,6 @@ let%test_module "Protocol state precondition tests" =
           Check protocol_state.snarked_ledger_hash
       ; blockchain_length = Check (interval protocol_state.blockchain_length)
       ; min_window_density = Check (interval protocol_state.min_window_density)
-      ; last_vrf_output = ()
       ; total_currency = Check (interval protocol_state.total_currency)
       ; global_slot_since_genesis =
           Check (interval protocol_state.global_slot_since_genesis)
@@ -167,7 +170,7 @@ let%test_module "Protocol state precondition tests" =
                   { Account_update.Preconditions.network =
                       precondition_exact
                         (Mina_state.Protocol_state.Body.view state_body)
-                  ; account = Account_update.Account_precondition.Accept
+                  ; account = Zkapp_precondition.Account.accept
                   ; valid_while = Ignore
                   }
             }
@@ -209,7 +212,7 @@ let%test_module "Protocol state precondition tests" =
             ; preconditions =
                 Some
                   { Account_update.Preconditions.network = network_precondition
-                  ; account = Account_update.Account_precondition.Accept
+                  ; account = Zkapp_precondition.Account.accept
                   ; valid_while = Ignore
                   }
             }
@@ -238,7 +241,8 @@ let%test_module "Protocol state precondition tests" =
                   let amount = Amount.of_mina_int_exn 10 in
                   let spec = List.hd_exn specs in
                   let new_slot =
-                    Mina_numbers.Global_slot.succ psv.global_slot_since_genesis
+                    Mina_numbers.Global_slot_since_genesis.succ
+                      psv.global_slot_since_genesis
                   in
                   let invalid_network_precondition =
                     { network_precondition with
@@ -283,7 +287,9 @@ let%test_module "Protocol state precondition tests" =
                         ; preconditions =
                             { Account_update.Preconditions.network =
                                 invalid_network_precondition
-                            ; account = Nonce (Account.Nonce.succ sender_nonce)
+                            ; account =
+                                Zkapp_precondition.Account.nonce
+                                  (Account.Nonce.succ sender_nonce)
                             ; valid_while = Ignore
                             }
                         ; use_full_commitment = false
@@ -316,8 +322,7 @@ let%test_module "Protocol state precondition tests" =
                         ; preconditions =
                             { Account_update.Preconditions.network =
                                 invalid_network_precondition
-                            ; account =
-                                Account_update.Account_precondition.Accept
+                            ; account = Zkapp_precondition.Account.accept
                             ; valid_while = Ignore
                             }
                         ; use_full_commitment = true
@@ -478,7 +483,7 @@ let%test_module "Account precondition tests" =
         ; is_new
         }
       in
-      Account_update.Account_precondition.Full predicate_account
+      predicate_account
 
     let%test_unit "exact account predicate" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -600,16 +605,15 @@ let%test_module "Account precondition tests" =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
             Ignore )
       in
-      Full
-        { balance = Ignore
-        ; nonce = Ignore
-        ; receipt_chain_hash = Ignore
-        ; delegate = Check pk
-        ; state
-        ; action_state = Ignore
-        ; proved_state = Ignore
-        ; is_new = Check true
-        }
+      { balance = Ignore
+      ; nonce = Ignore
+      ; receipt_chain_hash = Ignore
+      ; delegate = Check pk
+      ; state
+      ; action_state = Ignore
+      ; proved_state = Ignore
+      ; is_new = Check true
+      }
 
     let add_account_precondition ~at precondition account_updates =
       Zkapp_command.Call_forest.mapi account_updates
@@ -872,7 +876,9 @@ let%test_module "Account precondition tests" =
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
-                        ; account = Nonce (Account.Nonce.succ sender_nonce)
+                        ; account =
+                            Zkapp_precondition.Account.nonce
+                              (Account.Nonce.succ sender_nonce)
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
@@ -903,7 +909,7 @@ let%test_module "Account precondition tests" =
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
-                        ; account = Account_update.Account_precondition.Accept
+                        ; account = Zkapp_precondition.Account.accept
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = true

@@ -164,7 +164,9 @@ let%test_module "Fee payer tests" =
               let txn_state_view =
                 Mina_state.Protocol_state.Body.view U.genesis_state_body
               in
-              let global_slot = Mina_numbers.Global_slot.of_int global_slot in
+              let global_slot =
+                Mina_numbers.Global_slot_since_genesis.of_int global_slot
+              in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               ( match
                   let mask = Ledger.Mask.create ~depth:U.ledger_depth () in
@@ -180,10 +182,12 @@ let%test_module "Fee payer tests" =
               (*Sparse ledger application fails*)
               match
                 let sparse_ledger =
-                  Sparse_ledger.of_any_ledger
-                    (Ledger.Any_ledger.cast
-                       (module Ledger.Mask.Attached)
-                       ledger )
+                  Sparse_ledger.of_ledger_subset_exn ledger
+                    ( init_ledger |> Array.to_list
+                    |> List.map ~f:(fun (kp, _) ->
+                           Account_id.create
+                             (Public_key.compress kp.public_key)
+                             Token_id.default ) )
                 in
                 Sparse_ledger.apply_transaction_first_pass ~constraint_constants
                   ~global_slot ~txn_state_view sparse_ledger

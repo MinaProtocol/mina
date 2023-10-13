@@ -111,7 +111,7 @@ let mk_scan_state_base_node
       (* for zkApps, some or all of the accounts will be zkApp accounts, so this
          understates mem usage
       *)
-      let ledger = Mina_ledger.Ledger.create ~depth () in
+      let ledger = Mina_ledger.Sparse_ledger.L.empty ~depth () in
       let accounts =
         Quickcheck.random_value
         @@ Quickcheck.Generator.list_with_length num_accounts_accessed
@@ -119,12 +119,10 @@ let mk_scan_state_base_node
       in
       List.iter accounts ~f:(fun acct ->
           ignore
-            ( Mina_ledger.Ledger.get_or_create_account ledger
-                (Mina_base.Account.identifier acct)
-                acct
-              : _ ) ) ;
-      Mina_ledger.Sparse_ledger.of_any_ledger
-        (Mina_ledger.Ledger.Any_ledger.cast (module Mina_ledger.Ledger) ledger)
+            (Mina_ledger.Sparse_ledger.L.get_or_create_account ledger
+               (Mina_base.Account.identifier acct)
+               acct ) ) ;
+      !ledger
     in
     let transaction_with_info : Mina_transaction_logic.Transaction_applied.t =
       let previous_hash = get Mina_base.Ledger_hash.gen in
@@ -137,7 +135,7 @@ let mk_scan_state_base_node
       ; init_stack
       ; first_pass_ledger_witness = ledger_witness
       ; second_pass_ledger_witness = ledger_witness
-      ; block_global_slot = Mina_numbers.Global_slot.zero
+      ; block_global_slot = Mina_numbers.Global_slot_since_genesis.zero
       }
     in
     let record : _ Parallel_scan.Base.Record.t =
@@ -176,7 +174,7 @@ let scan_state_base_node_payment =
         { fee = Currency.Fee.zero
         ; fee_payer_pk = sample_pk_compressed
         ; nonce = Mina_numbers.Account_nonce.zero
-        ; valid_until = Mina_numbers.Global_slot.max_value
+        ; valid_until = Mina_numbers.Global_slot_since_genesis.max_value
         ; memo = Mina_base.Signed_command_memo.empty
         }
       in
@@ -244,7 +242,7 @@ let scan_state_merge_node :
       let sok_msg : Mina_base.Sok_message.t =
         { fee = Currency.Fee.zero; prover = sample_pk_compressed }
       in
-      let proof = Mina_base.Proof.transaction_dummy in
+      let proof = Lazy.force Mina_base.Proof.transaction_dummy in
       let statement =
         let without_sok =
           Quickcheck.random_value ~seed:(`Deterministic "no sok left")
@@ -260,7 +258,7 @@ let scan_state_merge_node :
         { fee = Currency.Fee.zero; prover = sample_pk_compressed }
       in
       (* so the left, right proofs differ, don't want sharing *)
-      let proof = Mina_base.Proof.blockchain_dummy in
+      let proof = Lazy.force Mina_base.Proof.blockchain_dummy in
       let statement =
         let without_sok =
           Quickcheck.random_value ~seed:(`Deterministic "no sok right")
@@ -310,7 +308,6 @@ let protocol_state =
             "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
             "excess": {
               "magnitude": "0",
               "sgn": [
@@ -345,7 +342,6 @@ let protocol_state =
             "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
             "excess": {
               "magnitude": "0",
               "sgn": [
@@ -493,7 +489,6 @@ let staged_ledger_diff =
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                         "receiver_pk": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                         "amount": "1000000001"
                       }
@@ -522,7 +517,6 @@ let staged_ledger_diff =
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qrA2eWb592uRLtH5ohzQnx7WTLYp2jGirCw5M7Fb9gTf1RrvTPqX",
                         "receiver_pk": "B62qkYgXYkzT5fuPNhMEHk8ouiThjNNDSTMnpBAuaf6q7pNnCFkUqtz",
                         "amount": "1000000001"
                       }
@@ -551,7 +545,6 @@ let staged_ledger_diff =
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
                         "receiver_pk": "B62qqR5XfP9CoC5DALUJX2jBoY6aaoLrN46YpM2NQTSV14qgpoWibL7",
                         "amount": "1000000001"
                       }
@@ -580,7 +573,6 @@ let staged_ledger_diff =
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qp5sdhH48MurWgtHNkXUTphEmUfcKVmZFspYAqxcKZ7YxaPF1pyF",
                         "receiver_pk": "B62qji8zLZEuMUpZnRN3FHgsgnybYhhMFBBMcLAwGGLR3hTdfkhmM4X",
                         "amount": "1000000001"
                       }
@@ -609,7 +601,6 @@ let staged_ledger_diff =
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qqR5XfP9CoC5DALUJX2jBoY6aaoLrN46YpM2NQTSV14qgpoWibL7",
                         "receiver_pk": "B62qqMGFkBEtgGs2Gi6AWd1Abn9yzXdj5HRMzm95uwbJ8Wa88C7urCD",
                         "amount": "1000000001"
                       }
@@ -638,7 +629,6 @@ let staged_ledger_diff =
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qr4GMdg4ZVk1Y6BXaDHxgFRtCsZm2sZiyn7PCmubTZnAi3iZDDxq",
                         "receiver_pk": "B62qpaA93gHfmvNoH9DLGgxreGnijhh5aui4duxiV3foX4p5ay5RNis",
                         "amount": "1000000001"
                       }
@@ -667,7 +657,6 @@ let staged_ledger_diff =
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qpgjtMzVpodthL3kMfXAAzzv1kgGZRMEeLv592u4hSVQKCzTGLvA",
                         "receiver_pk": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
                         "amount": "1000000001"
                       }

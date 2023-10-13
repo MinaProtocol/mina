@@ -2,7 +2,7 @@
  (name hash_prefix_states)
  (public_name hash_prefix_states)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    core_kernel
@@ -12,6 +12,7 @@
    random_oracle
    mina_signature_kind
    hash_prefixes
+   hash_prefix_create
    pickles
    )
  (preprocessor_deps ../../config.mlh)

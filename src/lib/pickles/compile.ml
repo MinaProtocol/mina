@@ -117,7 +117,9 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , 'max_local_max_proofs_verifieds )
          Full_signature.t
       -> ('prev_varss, 'branches) Hlist.Length.t
-      -> ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+      -> ( ( Wrap_main_inputs.Inner_curve.Constant.t array
+           , Wrap_main_inputs.Inner_curve.Constant.t array option )
+           Wrap_verifier.index'
          , 'branches )
          Vector.t
          Lazy.t
@@ -130,14 +132,10 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                  , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                  , ( Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                    , Impls.Wrap.Boolean.var )
-                   Plonk_types.Opt.t
+                   Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-                     Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                     .In_circuit
-                     .Lookup
-                     .t
                    , Impls.Wrap.Boolean.var )
-                   Pickles_types__Plonk_types.Opt.t
+                   Pickles_types__Opt.t
                  , Impls.Wrap.Boolean.var )
                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                  .In_circuit
@@ -167,9 +165,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -199,9 +194,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -348,6 +340,7 @@ struct
       type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
          self:(var, value, max_proofs_verified, branches) Tag.t
       -> cache:Key_cache.Spec.t list
+      -> proof_cache:Proof_cache.t option
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
            * Cache.Wrap.Key.Verification.t
@@ -385,10 +378,10 @@ struct
          * _
          * _
          * _ =
-   fun ~self ~cache ?disk_keys ?(return_early_digest_exception = false)
-       ?override_wrap_domain ?override_wrap_main ~branches:(module Branches)
-       ~max_proofs_verified ~name ~constraint_constants ~public_input
-       ~auxiliary_typ ~choices () ->
+   fun ~self ~cache ~proof_cache ?disk_keys
+       ?(return_early_digest_exception = false) ?override_wrap_domain
+       ?override_wrap_main ~branches:(module Branches) ~max_proofs_verified
+       ~name ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
@@ -425,25 +418,26 @@ struct
     let feature_flags =
       let rec go :
           type a b c d.
-             (a, b, c, d) H4.T(IR).t
-          -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+          (a, b, c, d) H4.T(IR).t -> Opt.Flag.t Plonk_types.Features.Full.t =
        fun rules ->
         match rules with
         | [] ->
-            Plonk_types.Features.none
+            Plonk_types.Features.Full.none
         | [ r ] ->
             Plonk_types.Features.map r.feature_flags ~f:(function
               | true ->
-                  Plonk_types.Opt.Flag.Yes
+                  Opt.Flag.Yes
               | false ->
-                  Plonk_types.Opt.Flag.No )
+                  Opt.Flag.No )
+            |> Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| )
         | r :: rules ->
             let feature_flags = go rules in
-            Plonk_types.Features.map2 r.feature_flags feature_flags
-              ~f:(fun enabled flag ->
+            Plonk_types.Features.Full.map2
+              (Plonk_types.Features.to_full ~or_:( || ) r.feature_flags)
+              feature_flags ~f:(fun enabled flag ->
                 match (enabled, flag) with
                 | true, Yes ->
-                    Plonk_types.Opt.Flag.Yes
+                    Opt.Flag.Yes
                 | false, No ->
                     No
                 | _, Maybe | true, No | false, Yes ->
@@ -546,7 +540,7 @@ struct
           (struct
             let etyp =
               Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                ~wrap_rounds:Tock.Rounds.n ~feature_flags
+                ~wrap_rounds:Tock.Rounds.n
 
             let f (T b : _ Branch_data.t) =
               let (T (typ, _conv, conv_inv)) = etyp in
@@ -617,7 +611,7 @@ struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
+             Tick.Keypair.full_vk_commitments (fst (Lazy.force vk)) ) )
     in
     Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =
@@ -642,7 +636,7 @@ struct
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
-      let (T (typ, conv, _conv_inv)) = input () in
+      let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
       let main x () : unit = wrap_main (conv x) in
       let () = if true then log_wrap main typ name self.id in
       let self_id = Type_equal.Id.uid self.id in
@@ -684,6 +678,19 @@ struct
       (r, disk_key_verifier)
     in
     Timer.clock __LOC__ ;
+    let wrap_vk =
+      Lazy.map wrap_vk ~f:(fun ((wrap_vk, _) as res) ->
+          let computed_domain_size = wrap_vk.index.domain.log_size_of_group in
+          let (Pow_2_roots_of_unity proposed_domain_size) = wrap_domains.h in
+          if computed_domain_size <> proposed_domain_size then
+            failwithf
+              "This circuit was compiled for proofs using the wrap domain of \
+               size %d, but the actual wrap domain size for the circuit has \
+               size %d. You should pass the ~override_wrap_domain argument to \
+               set the correct domain size."
+              proposed_domain_size computed_domain_size () ;
+          res )
+    in
     accum_dirty (Lazy.map wrap_pk ~f:snd) ;
     accum_dirty (Lazy.map wrap_vk ~f:snd) ;
     let wrap_vk = Lazy.map wrap_vk ~f:fst in
@@ -720,7 +727,11 @@ struct
         let step handler next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
-            ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
+            ~self ~step_domains
+            ~self_dlog_plonk_index:
+              ((* TODO *) Plonk_verification_key_evals.map
+                 ~f:(fun x -> [| x |])
+                 wrap_vk.commitments )
             ~public_input ~auxiliary_typ ~feature_flags
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
             wrap_vk.index
@@ -732,7 +743,7 @@ struct
                            , return_value
                            , auxiliary_value
                            , actual_wrap_domains ) =
-            step handler ~maxes:(module Maxes) next_state
+            step ~proof_cache handler ~maxes:(module Maxes) next_state
           in
           let proof =
             { proof with
@@ -761,11 +772,15 @@ struct
                   *)
                   Some tweak_statement
             in
-            Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n ~feature_flags
-              ~actual_feature_flags:b.feature_flags full_signature.maxes
-              wrap_requests ?tweak_statement
-              ~dlog_plonk_index:wrap_vk.commitments wrap_main ~typ ~step_vk
-              ~step_plonk_indices:(Lazy.force step_vks) ~actual_wrap_domains
+            Wrap.wrap ~proof_cache ~max_proofs_verified:Max_proofs_verified.n
+              ~feature_flags ~actual_feature_flags:b.feature_flags
+              full_signature.maxes wrap_requests ?tweak_statement
+              ~dlog_plonk_index:
+                ((* TODO *) Plonk_verification_key_evals.map
+                   ~f:(fun x -> [| x |])
+                   wrap_vk.commitments )
+              wrap_main ~typ ~step_vk ~step_plonk_indices:(Lazy.force step_vks)
+              ~actual_wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
           in
@@ -812,7 +827,10 @@ struct
       ; proofs_verifieds
       ; max_proofs_verified
       ; public_input = typ
-      ; wrap_key = Lazy.map wrap_vk ~f:Verification_key.commitments
+      ; wrap_key =
+          Lazy.map wrap_vk ~f:(fun x ->
+              Plonk_verification_key_evals.map (Verification_key.commitments x)
+                ~f:(fun x -> [| x |]) )
       ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
       ; wrap_domains
       ; step_domains
@@ -840,7 +858,9 @@ module Side_loaded = struct
           ~log_2_domain_size:(Lazy.force d.wrap_vk).domain.log_size_of_group
       in
       { wrap_vk = Some (Lazy.force d.wrap_vk)
-      ; wrap_index = Lazy.force d.wrap_key
+      ; wrap_index =
+          Plonk_verification_key_evals.map (Lazy.force d.wrap_key) ~f:(fun x ->
+              x.(0) )
       ; max_proofs_verified =
           Pickles_base.Proofs_verified.of_nat (Nat.Add.n d.max_proofs_verified)
       ; actual_wrap_domain_size
@@ -858,7 +878,8 @@ module Side_loaded = struct
       { max_proofs_verified
       ; public_input = typ
       ; branches = Verification_key.Max_branches.n
-      ; feature_flags
+      ; feature_flags =
+          Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
       }
 
   module Proof = struct
@@ -917,6 +938,7 @@ let compile_with_wrap_main_override_promise :
     type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
        ?self:(var, value, max_proofs_verified, branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
+    -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
          * Cache.Wrap.Key.Verification.t
@@ -969,9 +991,10 @@ let compile_with_wrap_main_override_promise :
  (* This function is an adapter between the user-facing Pickles.compile API
     and the underlying Make(_).compile function which builds the circuits.
  *)
- fun ?self ?(cache = []) ?disk_keys ?(return_early_digest_exception = false)
-     ?override_wrap_domain ?override_wrap_main ~public_input ~auxiliary_typ
-     ~branches ~max_proofs_verified ~name ~constraint_constants ~choices () ->
+ fun ?self ?(cache = []) ?proof_cache ?disk_keys
+     ?(return_early_digest_exception = false) ?override_wrap_domain
+     ?override_wrap_main ~public_input ~auxiliary_typ ~branches
+     ~max_proofs_verified ~name ~constraint_constants ~choices () ->
   let self =
     match self with
     | None ->
@@ -1037,9 +1060,10 @@ let compile_with_wrap_main_override_promise :
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~return_early_digest_exception ~self ~cache ?disk_keys
-      ?override_wrap_domain ?override_wrap_main ~branches ~max_proofs_verified
-      ~name ~public_input ~auxiliary_typ ~constraint_constants
+    M.compile ~return_early_digest_exception ~self ~proof_cache ~cache
+      ?disk_keys ?override_wrap_domain ?override_wrap_main ~branches
+      ~max_proofs_verified ~name ~public_input ~auxiliary_typ
+      ~constraint_constants
       ~choices:(fun ~self -> conv_irs (choices ~self))
       ()
   in
@@ -1151,9 +1175,6 @@ module Make_adversarial_test (M : sig
          , bool )
          Import.Types.Opt.t
        , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
          , bool )
          Import.Types.Opt.t
        , bool
@@ -1183,9 +1204,6 @@ module Make_adversarial_test (M : sig
          , bool )
          Import.Types.Opt.t
        , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
          , bool )
          Import.Types.Opt.t
        , bool

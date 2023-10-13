@@ -8,7 +8,7 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
@@ -32,7 +32,7 @@ func (m ValidationPush) handle(app *app) {
 	}
 	vid, err := ValidationPushT(m).ValidationId()
 	if err != nil {
-		app.P2p.Logger.Errorf("handleValidation: error %w", err)
+		app.P2p.Logger.Errorf("handleValidation: error %s", err)
 		return
 	}
 	seqno := vid.Id()

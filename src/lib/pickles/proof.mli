@@ -1,3 +1,7 @@
+(** The type of intermediate (step) and emitted (wrap) proofs that pickles
+    generates
+*)
+
 module Base : sig
   module Messages_for_next_proof_over_same_field =
     Reduced_messages_for_next_proof_over_same_field
@@ -52,7 +56,7 @@ module Base : sig
               ( Backend.Tick.Field.Stable.V1.t
               , Backend.Tick.Field.Stable.V1.t array )
               Pickles_types.Plonk_types.All_evals.Stable.V1.t
-          ; proof : Backend.Tock.Proof.Stable.V2.t
+          ; proof : Wrap_wire_proof.Stable.V1.t
           }
         [@@deriving compare, sexp, hash, equal]
       end
@@ -79,7 +83,7 @@ module Base : sig
           ( Backend.Tick.Field.t
           , Backend.Tick.Field.t array )
           Pickles_types.Plonk_types.All_evals.t
-      ; proof : Backend.Tock.Proof.t
+      ; proof : Wrap_wire_proof.Stable.V1.t
       }
     [@@deriving compare, sexp, yojson, hash, equal]
   end

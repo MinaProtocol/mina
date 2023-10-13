@@ -11,9 +11,12 @@ end = struct
 
   let create s : t =
     let string_length = String.length s in
-    assert (string_length <= length_in_bytes) ;
-    let diff = length_in_bytes - string_length in
-    let r = s ^ String.init diff (fun _ -> padding_char) in
+    let r =
+      if string_length <= length_in_bytes then
+        let diff = length_in_bytes - string_length in
+        s ^ String.init diff (fun _ -> padding_char)
+      else String.sub s 0 length_in_bytes
+    in
     assert (String.length r = length_in_bytes) ;
     r
 end
@@ -32,7 +35,18 @@ let zkapp_account = create "MinaZkappAccount"
 
 let zkapp_payload = create "MinaZkappPayload"
 
-let zkapp_body = create "MinaZkappBody"
+let zkapp_body_mainnet = create "MainnetZkappBody"
+
+let zkapp_body_testnet = create "TestnetZkappBody"
+
+let zkapp_body ?(chain = Mina_signature_kind.t) =
+  match chain with
+  | Mainnet ->
+      zkapp_body_mainnet
+  | Testnet ->
+      zkapp_body_testnet
+  | Other_network chain_name ->
+      create (chain_name ^ "ZkappBody")
 
 let merkle_tree i = create (Printf.sprintf "MinaMklTree%03d" i)
 
@@ -47,6 +61,8 @@ let transition_system_snark = create "MinaTransitionSnark"
 let signature_testnet = create "CodaSignature"
 
 let signature_mainnet = create "MinaSignatureMainnet"
+
+let signature_other chain_name = create (chain_name ^ "Signature")
 
 let receipt_chain_user_command = create "MinaReceiptUC"
 
@@ -85,8 +101,6 @@ let zkapp_precondition_protocol_state = create "MinaZkappPredPS"
 
 (*for Account_update.Account_precondition.t*)
 let account_update_account_precondition = create "MinaAcctUpdAcctPred"
-
-let account_update = create "MinaAcctUpdate"
 
 let account_update_cons = create "MinaAcctUpdateCons"
 

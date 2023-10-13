@@ -15,7 +15,6 @@
    bin_prot
    bin_prot.shape
    init
-   tests
    async
    core.daemon
    base.caml
@@ -44,7 +43,6 @@
    mina_base
    error_json
    genesis_ledger_helper
-   memory_stats
    consensus
    child_processes
    node_addrs_and_ports

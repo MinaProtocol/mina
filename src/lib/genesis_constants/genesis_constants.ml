@@ -28,7 +28,7 @@ module Fork_constants = struct
   type t =
     { previous_state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
     ; previous_length : Mina_numbers.Length.Stable.Latest.t
-    ; previous_global_slot : Mina_numbers.Global_slot.Stable.Latest.t
+    ; genesis_slot : Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 end
@@ -67,13 +67,15 @@ module Constraint_constants = struct
     ; account_creation_fee = Currency.Fee.to_uint64 t.account_creation_fee
     ; fork =
         ( match t.fork with
-        | Some { previous_length; previous_state_hash; previous_global_slot } ->
+        | Some { previous_length; previous_state_hash; genesis_slot } ->
             Some
               { previous_length = Unsigned.UInt32.to_int previous_length
               ; previous_state_hash =
                   Pickles.Backend.Tick.Field.to_string previous_state_hash
-              ; previous_global_slot =
-                  Unsigned.UInt32.to_int previous_global_slot
+              ; genesis_slot =
+                  Unsigned.UInt32.to_int
+                    (Mina_numbers.Global_slot_since_genesis.to_uint32
+                       genesis_slot )
               }
         | None ->
             None )
@@ -162,17 +164,16 @@ module Constraint_constants = struct
 
       [%%inject "fork_previous_state_hash", fork_previous_state_hash]
 
-      [%%inject "fork_previous_global_slot", fork_previous_global_slot]
+      [%%inject "fork_genesis_slot", fork_genesis_slot]
 
       let fork =
         Some
-          { Fork_constants.previous_length =
-              Mina_numbers.Length.of_int fork_previous_length
-          ; previous_state_hash =
+          { Fork_constants.previous_state_hash =
               Data_hash_lib.State_hash.of_base58_check_exn
                 fork_previous_state_hash
-          ; previous_global_slot =
-              Mina_numbers.Global_slot.of_int fork_previous_global_slot
+          ; previous_length = Mina_numbers.Length.of_int fork_previous_length
+          ; genesis_slot =
+              Mina_numbers.Global_slot_since_genesis.of_int fork_genesis_slot
           }
 
       [%%endif]

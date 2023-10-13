@@ -31,6 +31,31 @@ let iteri (type a n) (t : (a, n) t) ~(f : int -> a -> unit) : unit =
   in
   go 0 t
 
+let rec length : type a n. (a, n) t -> n Nat.t = function
+  | [] ->
+      Z
+  | _ :: xs ->
+      S (length xs)
+
+let nth v i =
+  let rec loop : type a n. int -> (a, n) t -> a option =
+   fun j -> function
+    | [] ->
+        None
+    | x :: xs ->
+        if Int.equal i j then Some x else loop (j + 1) xs
+  in
+  loop 0 v
+
+let nth_exn v i =
+  match nth v i with
+  | None ->
+      invalid_argf "Vector.nth_exn %d called on a vector of length %d" i
+        (length v |> Nat.to_int)
+        ()
+  | Some e ->
+      e
+
 let rec iter2 : type a b n. (a, n) t -> (b, n) t -> f:(a -> b -> unit) -> unit =
  fun t1 t2 ~f ->
   match (t1, t2) with
@@ -75,6 +100,16 @@ let rec mapn :
   | [] ->
       failwith "mapn: Empty args"
 
+let rec nth : type a n. (a, n) t -> int -> a option =
+ fun t idx ->
+  match t with
+  | [] ->
+      None
+  | x :: _ when idx = 0 ->
+      Some x
+  | _ :: t ->
+      nth t (idx - 1)
+
 let zip xs ys = map2 xs ys ~f:(fun x y -> (x, y))
 
 let rec to_list : type a n. (a, n) t -> a list =
@@ -83,12 +118,6 @@ let rec to_list : type a n. (a, n) t -> a list =
 let sexp_of_t a _ v = List.sexp_of_t a (to_list v)
 
 let to_array t = Array.of_list (to_list t)
-
-let rec length : type a n. (a, n) t -> n Nat.t = function
-  | [] ->
-      Z
-  | _ :: xs ->
-      S (length xs)
 
 let rec init : type a n. int -> n Nat.t -> f:(int -> a) -> (a, n) t =
  fun i n ~f -> match n with Z -> [] | S n -> f i :: init (i + 1) n ~f

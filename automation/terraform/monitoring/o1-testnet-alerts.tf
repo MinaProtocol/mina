@@ -18,10 +18,12 @@ terraform {
 module "o1testnet_alerts" {
   source = "../modules/testnet-alerts"
 
-  rule_filter            = "{testnet!~\"^(it-|ci-net|test-).+\"}" # omit testnets deployed by integration/CI tests
+  rule_filter            = "{testnet!~\"^(berkeley|testworld-2-0|it-|ci-net|test-).+\"}" # omit testnets deployed by integration/CI tests and also omit berkeley network and testworld-2-0
   alert_timeframe        = "1h"
   alert_duration         = "10m"
   pagerduty_alert_filter = "devnet2|mainnet"
+  berkeley_testnet       = "testnet=~\"(berkeley|testworld-2-0)\""
+  synced_status_filter   = "syncStatus=\"SYNCED\""
 }
 
 output "testnet_alert_rules" {

@@ -1,5 +1,3 @@
-open Pickles_types
-
 module Challenge : module type of Import.Challenge.Make (Step_main_inputs.Impl)
 
 module Digest : module type of Import.Digest.Make (Step_main_inputs.Impl)
@@ -40,7 +38,6 @@ val assert_n_bits :
 
 val finalize_other_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
   -> step_domains:
        [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
        | `Side_loaded ]
@@ -58,7 +55,6 @@ val finalize_other_proof :
        Composition_types.Opt.t
      , ( Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Import.Scalar_challenge.t
-         Import.Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
        , Step_main_inputs.Impl.Boolean.var )
        Composition_types.Opt.t
      , ( Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
@@ -80,7 +76,7 @@ val finalize_other_proof :
 
 val hash_messages_for_next_step_proof :
      index:
-       Step_main_inputs.Inner_curve.t
+       Step_main_inputs.Inner_curve.t array
        Pickles_types.Plonk_verification_key_evals.t
   -> ('s -> Step_main_inputs.Impl.Field.t array)
   -> (   ( 'a
@@ -95,7 +91,7 @@ val hash_messages_for_next_step_proof :
 
 val hash_messages_for_next_step_proof_opt :
      index:
-       Step_main_inputs.Inner_curve.t
+       Step_main_inputs.Inner_curve.t array
        Pickles_types.Plonk_verification_key_evals.t
   -> ('s -> Step_main_inputs.Impl.Field.t array)
   -> Step_main_inputs.Sponge.t
@@ -115,6 +111,8 @@ val hash_messages_for_next_step_proof_opt :
         -> Step_main_inputs.Impl.Field.t )
        Core_kernel.Staged.t
 
+(** Actual verification using cryptographic tools. Returns [true] (encoded as a
+    in-circuit Boolean variable) if the verification is successful *)
 val verify :
      proofs_verified:(module Pickles_types.Nat.Add.Intf with type n = 'a)
   -> is_base_case:Step_main_inputs.Impl.Boolean.var
@@ -127,7 +125,8 @@ val verify :
        , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
          Pickles_types.Hlist0.Id.t )
        Composition_types.Wrap.Lookup_parameters.t
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+       (* lookup arguments parameters *)
+  -> feature_flags:Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
   -> proof:Wrap_proof.Checked.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fq.t
   -> wrap_domain:
@@ -136,7 +135,7 @@ val verify :
          Step_main_inputs.Impl.field
          Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
   -> wrap_verification_key:
-       Step_main_inputs.Inner_curve.t
+       Step_main_inputs.Inner_curve.t array
        Pickles_types.Plonk_verification_key_evals.t
   -> ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
      , Step_main_inputs.Impl.field Limb_vector.Challenge.t
@@ -144,15 +143,12 @@ val verify :
      , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
      , ( Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
        , Step_main_inputs.Impl.Boolean.var )
-       Pickles_types.Plonk_types.Opt.t
+       Pickles_types.Opt.t
      , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
          Composition_types.Scalar_challenge.t
-         Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-         .Lookup
-         .t
        , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Snarky_backendless.Snark_intf.Boolean0.t )
-       Pickles_types.Plonk_types.Opt.t
+       Pickles_types.Opt.t
      , Step_main_inputs.Impl.Boolean.var
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
@@ -165,16 +161,16 @@ val verify :
        Pickles_types.Hlist0.Id.t
      , Step_main_inputs.Impl.field Composition_types.Branch_data.Checked.t )
      Import.Types.Wrap.Statement.In_circuit.t
+     (* statement *)
   -> ( Step_main_inputs.Impl.Field.t
      , Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
      , Other_field.t Pickles_types.Shifted_value.Type2.t
-     , _
-     , 'c
      , ( Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
          Import.Bulletproof_challenge.t
        , 'd )
        Pickles_types.Vector.t
      , Step_main_inputs.Impl.Field.t
-     , 'e )
+     , Step_main_inputs.Impl.Boolean.var )
      Import.Types.Step.Proof_state.Per_proof.In_circuit.t
+     (* unfinalized *)
   -> Step_main_inputs.Impl.Boolean.var

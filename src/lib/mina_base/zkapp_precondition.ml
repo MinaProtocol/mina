@@ -144,7 +144,7 @@ module Numeric = struct
         }
 
     let global_slot =
-      Global_slot.
+      Global_slot_since_genesis.
         { zero
         ; max_value
         ; compare
@@ -195,7 +195,9 @@ module Numeric = struct
 
     let length obj = deriver "Length" uint32 range_uint32 obj
 
-    let global_slot obj = deriver "GlobalSlot" uint32 range_uint32 obj
+    let global_slot_since_genesis obj =
+      deriver "GlobalSlotSinceGenesis" global_slot_since_genesis range_uint32
+        obj
 
     let block_time obj = deriver "BlockTime" block_time_inner range_uint64 obj
   end
@@ -520,6 +522,19 @@ module Account = struct
     }
 
   let is_accept : t -> bool = equal accept
+
+  let nonce (n : Account.Nonce.t) =
+    let nonce : _ Numeric.t = Check { lower = n; upper = n } in
+    { accept with nonce }
+
+  let is_nonce (t : t) =
+    match t.nonce with
+    | Ignore ->
+        false
+    | Check { lower; upper } ->
+        (* nonce is exact, all other fields are Ignore *)
+        Mina_numbers.Account_nonce.equal lower upper
+        && is_accept { t with nonce = Ignore }
 
   let deriver obj =
     let open Fields_derivers_zkapps in
@@ -907,14 +922,12 @@ module Protocol_state = struct
       module V1 = struct
         type ( 'snarked_ledger_hash
              , 'length
-             , 'vrf_output
              , 'global_slot
              , 'amount
              , 'epoch_data )
              t =
               ( 'snarked_ledger_hash
               , 'length
-              , 'vrf_output
               , 'global_slot
               , 'amount
               , 'epoch_data )
@@ -938,7 +951,6 @@ module Protocol_state = struct
                    TODO: Now that we removed global_slot_since_hard_fork, maybe we want to add epoch_count back
                 *)
           ; min_window_density : 'length
-          ; last_vrf_output : 'vrf_output [@skip]
           ; total_currency : 'amount
           ; global_slot_since_genesis : 'global_slot
           ; staking_epoch_data : 'epoch_data
@@ -955,8 +967,7 @@ module Protocol_state = struct
       type t =
         ( Frozen_ledger_hash.Stable.V1.t Hash.Stable.V1.t
         , Length.Stable.V1.t Numeric.Stable.V1.t
-        , unit (* TODO *)
-        , Global_slot.Stable.V1.t Numeric.Stable.V1.t
+        , Global_slot_since_genesis.Stable.V1.t Numeric.Stable.V1.t
         , Currency.Amount.Stable.V1.t Numeric.Stable.V1.t
         , Epoch_data.Stable.V1.t )
         Poly.Stable.V1.t
@@ -971,13 +982,12 @@ module Protocol_state = struct
     let ( !. ) ?skip_data =
       ( !. ) ?skip_data ~t_fields_annots:Poly.t_fields_annots
     in
-    let last_vrf_output = ( !. ) ~skip_data:() skip in
     Poly.Fields.make_creator obj
       ~snarked_ledger_hash:!.(Or_ignore.deriver field)
       ~blockchain_length:!.Numeric.Derivers.length
-      ~min_window_density:!.Numeric.Derivers.length ~last_vrf_output
+      ~min_window_density:!.Numeric.Derivers.length
       ~total_currency:!.Numeric.Derivers.amount
-      ~global_slot_since_genesis:!.Numeric.Derivers.global_slot
+      ~global_slot_since_genesis:!.Numeric.Derivers.global_slot_since_genesis
       ~staking_epoch_data:!.Epoch_data.deriver
       ~next_epoch_data:!.Epoch_data.deriver
     |> finish "NetworkPrecondition" ~t_toplevel_annots:Poly.t_toplevel_annots
@@ -998,20 +1008,18 @@ module Protocol_state = struct
         (Length.gen_incl Length.zero max_min_window_density)
         Length.compare
     in
-    (* TODO: fix when type becomes something other than unit *)
-    let last_vrf_output = () in
     let%bind total_currency =
       Numeric.gen Currency.Amount.gen Currency.Amount.compare
     in
     let%bind global_slot_since_genesis =
-      Numeric.gen Global_slot.gen Global_slot.compare
+      Numeric.gen Global_slot_since_genesis.gen
+        Global_slot_since_genesis.compare
     in
     let%bind staking_epoch_data = Epoch_data.gen in
     let%map next_epoch_data = Epoch_data.gen in
     { Poly.snarked_ledger_hash
     ; blockchain_length
     ; min_window_density
-    ; last_vrf_output
     ; total_currency
     ; global_slot_since_genesis
     ; staking_epoch_data
@@ -1022,7 +1030,6 @@ module Protocol_state = struct
       ({ snarked_ledger_hash
        ; blockchain_length
        ; min_window_density
-       ; last_vrf_output
        ; total_currency
        ; global_slot_since_genesis
        ; staking_epoch_data
@@ -1030,7 +1037,6 @@ module Protocol_state = struct
        } :
         t ) =
     let open Random_oracle.Input.Chunked in
-    let () = last_vrf_output in
     let length = Numeric.(to_input Tc.length) in
     List.reduce_exn ~f:append
       [ Hash.(to_input Tc.field snarked_ledger_hash)
@@ -1054,8 +1060,7 @@ module Protocol_state = struct
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
           , Length.Stable.V1.t
-          , unit (* TODO *)
-          , Global_slot.Stable.V1.t
+          , Global_slot_since_genesis.Stable.V1.t
           , Currency.Amount.Stable.V1.t
           , ( ( Frozen_ledger_hash.Stable.V1.t
               , Currency.Amount.Stable.V1.t )
@@ -1076,8 +1081,7 @@ module Protocol_state = struct
       type t =
         ( Frozen_ledger_hash.var
         , Length.Checked.t
-        , unit (* TODO *)
-        , Global_slot.Checked.t
+        , Global_slot_since_genesis.Checked.t
         , Currency.Amount.var
         , ( (Frozen_ledger_hash.var, Currency.Amount.var) Epoch_ledger.Poly.t
           , Epoch_seed.var
@@ -1110,11 +1114,10 @@ module Protocol_state = struct
       let ( !. ) ?skip_data =
         ( !. ) ?skip_data ~t_fields_annots:Poly.t_fields_annots
       in
-      let last_vrf_output = ( !. ) ~skip_data:() skip in
       Poly.Fields.make_creator obj ~snarked_ledger_hash:!.field
         ~blockchain_length:!.uint32 ~min_window_density:!.uint32
-        ~last_vrf_output ~total_currency:!.amount
-        ~global_slot_since_genesis:!.uint32
+        ~total_currency:!.amount
+        ~global_slot_since_genesis:!.global_slot_since_genesis
         ~staking_epoch_data:!.epoch_data_deriver
         ~next_epoch_data:!.epoch_data_deriver
       |> finish "NetworkView" ~t_toplevel_annots:Poly.t_toplevel_annots
@@ -1124,8 +1127,7 @@ module Protocol_state = struct
     type t =
       ( Frozen_ledger_hash.var Hash.Checked.t
       , Length.Checked.t Numeric.Checked.t
-      , unit (* TODO *)
-      , Global_slot.Checked.t Numeric.Checked.t
+      , Global_slot_since_genesis.Checked.t Numeric.Checked.t
       , Currency.Amount.var Numeric.Checked.t
       , Epoch_data.Checked.t )
       Poly.Stable.Latest.t
@@ -1134,7 +1136,6 @@ module Protocol_state = struct
         ({ snarked_ledger_hash
          ; blockchain_length
          ; min_window_density
-         ; last_vrf_output
          ; total_currency
          ; global_slot_since_genesis
          ; staking_epoch_data
@@ -1142,7 +1143,6 @@ module Protocol_state = struct
          } :
           t ) =
       let open Random_oracle.Input.Chunked in
-      let () = last_vrf_output in
       let length = Numeric.(Checked.to_input Tc.length) in
       List.reduce_exn ~f:append
         [ Hash.(to_input_checked Tc.frozen_ledger_hash snarked_ledger_hash)
@@ -1164,7 +1164,6 @@ module Protocol_state = struct
           ({ snarked_ledger_hash
            ; blockchain_length
            ; min_window_density
-           ; last_vrf_output
            ; total_currency
            ; global_slot_since_genesis
            ; staking_epoch_data
@@ -1189,7 +1188,6 @@ module Protocol_state = struct
           ; Numeric.(Checked.check Tc.length) epoch_length t.epoch_length
           ]
       in
-      ignore last_vrf_output ;
       Boolean.all
         ( [ Hash.(check_checked Tc.ledger_hash)
               snarked_ledger_hash s.snarked_ledger_hash
@@ -1231,7 +1229,6 @@ module Protocol_state = struct
       [ frozen_ledger_hash
       ; length
       ; length
-      ; Typ.unit
       ; amount
       ; global_slot
       ; epoch_data
@@ -1252,7 +1249,6 @@ module Protocol_state = struct
     { snarked_ledger_hash = Ignore
     ; blockchain_length = Ignore
     ; min_window_density = Ignore
-    ; last_vrf_output = ()
     ; total_currency = Ignore
     ; global_slot_since_genesis = Ignore
     ; staking_epoch_data = epoch_data
@@ -1263,7 +1259,6 @@ module Protocol_state = struct
     { snarked_ledger_hash = Ignore
     ; blockchain_length = Ignore
     ; min_window_density = Ignore
-    ; last_vrf_output = ()
     ; total_currency = Ignore
     ; global_slot_since_genesis = Check time
     ; staking_epoch_data = epoch_data
@@ -1281,7 +1276,6 @@ module Protocol_state = struct
         ({ snarked_ledger_hash
          ; blockchain_length
          ; min_window_density
-         ; last_vrf_output
          ; total_currency
          ; global_slot_since_genesis
          ; staking_epoch_data
@@ -1333,7 +1327,6 @@ module Protocol_state = struct
       Numeric.(check ~label:"min_window_density" Tc.length)
         min_window_density s.min_window_density
     in
-    ignore last_vrf_output ;
     (* TODO: Decide whether to expose this *)
     let%bind () =
       Numeric.(check ~label:"total_currency" Tc.amount)
@@ -1356,16 +1349,17 @@ module Valid_while = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Global_slot.Stable.V1.t Numeric.Stable.V1.t
+      type t = Global_slot_since_genesis.Stable.V1.t Numeric.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  let deriver = Numeric.Derivers.global_slot
+  let deriver = Numeric.Derivers.global_slot_since_genesis
 
-  let gen = Numeric.gen Global_slot.gen Global_slot.compare
+  let gen =
+    Numeric.gen Global_slot_since_genesis.gen Global_slot_since_genesis.compare
 
   let typ = Numeric.(typ Tc.global_slot)
 
@@ -1376,7 +1370,7 @@ module Valid_while = struct
       valid_while global_slot
 
   module Checked = struct
-    type t = Global_slot.Checked.t Numeric.Checked.t
+    type t = Global_slot_since_genesis.Checked.t Numeric.Checked.t
 
     let check (valid_while : t) global_slot =
       Numeric.(Checked.check Tc.global_slot) valid_while global_slot

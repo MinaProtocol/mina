@@ -653,10 +653,14 @@ module Zkapp_timing_info = struct
     let initial_minimum_balance =
       Currency.Balance.to_string timing_info.initial_minimum_balance
     in
-    let cliff_time = timing_info.cliff_time |> Unsigned.UInt32.to_int64 in
+    let cliff_time =
+      Mina_numbers.Global_slot_since_genesis.to_uint32 timing_info.cliff_time
+      |> Unsigned.UInt32.to_int64
+    in
     let cliff_amount = Currency.Amount.to_string timing_info.cliff_amount in
     let vesting_period =
-      timing_info.vesting_period |> Unsigned.UInt32.to_int64
+      Mina_numbers.Global_slot_span.to_uint32 timing_info.vesting_period
+      |> Unsigned.UInt32.to_int64
     in
     let vesting_increment =
       Currency.Amount.to_string timing_info.vesting_increment
@@ -852,7 +856,7 @@ module Zkapp_nonce_bounds = struct
       id
 end
 
-module Zkapp_account_precondition_values = struct
+module Zkapp_account_precondition = struct
   type t =
     { balance_id : int option
     ; nonce_id : int option
@@ -878,7 +882,7 @@ module Zkapp_account_precondition_values = struct
         ; option bool
         ]
 
-  let table_name = "zkapp_account_precondition_values"
+  let table_name = "zkapp_account_precondition"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (acct : Zkapp_precondition.Account.t) =
@@ -928,75 +932,6 @@ module Zkapp_account_precondition_values = struct
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
       value
-
-  let load (module Conn : CONNECTION) id =
-    Conn.find
-      (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
-      id
-end
-
-module Zkapp_account_precondition = struct
-  type t =
-    { kind : Account_update.Account_precondition.Tag.t
-    ; account_precondition_values_id : int option
-    ; nonce : int64 option
-    }
-  [@@deriving fields, hlist]
-
-  let zkapp_account_precondition_kind_typ =
-    let encode = function
-      | Account_update.Account_precondition.Tag.Full ->
-          "full"
-      | Nonce ->
-          "nonce"
-      | Accept ->
-          "accept"
-    in
-    let decode = function
-      | "full" ->
-          Result.return Account_update.Account_precondition.Tag.Full
-      | "nonce" ->
-          Result.return Account_update.Account_precondition.Tag.Nonce
-      | "accept" ->
-          Result.return Account_update.Account_precondition.Tag.Accept
-      | _ ->
-          Result.failf "Failed to decode zkapp_account_precondition_kind_typ"
-    in
-    Caqti_type.enum "zkapp_precondition_type" ~encode ~decode
-
-  let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.
-        [ zkapp_account_precondition_kind_typ; option int; option int64 ]
-
-  let table_name = "zkapp_account_precondition"
-
-  let add_if_doesn't_exist (module Conn : CONNECTION)
-      (account_precondition : Account_update.Account_precondition.t) =
-    let open Deferred.Result.Let_syntax in
-    let%bind account_precondition_values_id =
-      match account_precondition with
-      | Account_update.Account_precondition.Full acct ->
-          Zkapp_account_precondition_values.add_if_doesn't_exist
-            (module Conn)
-            acct
-          >>| Option.some
-      | _ ->
-          return None
-    in
-    let kind = Account_update.Account_precondition.tag account_precondition in
-    let nonce =
-      match account_precondition with
-      | Account_update.Account_precondition.Nonce nonce ->
-          Option.some @@ Unsigned.UInt32.to_int64 nonce
-      | _ ->
-          None
-    in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
-      (module Conn)
-      { kind; account_precondition_values_id; nonce }
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -1133,14 +1068,14 @@ module Zkapp_global_slot_bounds = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (global_slot_bounds :
-        Mina_numbers.Global_slot.t
+        Mina_numbers.Global_slot_since_genesis.t
         Mina_base.Zkapp_precondition.Closed_interval.t ) =
     let global_slot_lower_bound =
-      Mina_numbers.Global_slot.to_uint32 global_slot_bounds.lower
+      Mina_numbers.Global_slot_since_genesis.to_uint32 global_slot_bounds.lower
       |> Unsigned.UInt32.to_int64
     in
     let global_slot_upper_bound =
-      Mina_numbers.Global_slot.to_uint32 global_slot_bounds.upper
+      Mina_numbers.Global_slot_since_genesis.to_uint32 global_slot_bounds.upper
       |> Unsigned.UInt32.to_int64
     in
     let value = { global_slot_lower_bound; global_slot_upper_bound } in
@@ -1205,7 +1140,11 @@ module Timing_info = struct
       (timing : Account_timing.t) =
     let open Deferred.Result.Let_syntax in
     let slot_to_int64 x =
-      Mina_numbers.Global_slot.to_uint32 x |> Unsigned.UInt32.to_int64
+      Mina_numbers.Global_slot_since_genesis.to_uint32 x
+      |> Unsigned.UInt32.to_int64
+    in
+    let slot_span_to_int64 x =
+      Mina_numbers.Global_slot_span.to_uint32 x |> Unsigned.UInt32.to_int64
     in
     match%bind
       Conn.find_opt
@@ -1224,7 +1163,7 @@ module Timing_info = struct
                   Currency.Balance.to_string timing.initial_minimum_balance
               ; cliff_time = slot_to_int64 timing.cliff_time
               ; cliff_amount = Currency.Amount.to_string timing.cliff_amount
-              ; vesting_period = slot_to_int64 timing.vesting_period
+              ; vesting_period = slot_span_to_int64 timing.vesting_period
               ; vesting_increment =
                   Currency.Amount.to_string timing.vesting_increment
               }
@@ -1701,7 +1640,7 @@ module Zkapp_fee_payer_body = struct
     in
     let valid_until =
       let open Option.Let_syntax in
-      body.valid_until >>| Mina_numbers.Global_slot.to_uint32
+      body.valid_until >>| Mina_numbers.Global_slot_since_genesis.to_uint32
       >>| Unsigned.UInt32.to_int64
     in
     let nonce =
@@ -1820,8 +1759,7 @@ module User_command = struct
            (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
         id
 
-    type balance_public_key_ids =
-      { fee_payer_id : int; source_id : int; receiver_id : int }
+    type balance_public_key_ids = { fee_payer_id : int; receiver_id : int }
 
     let add_account_ids_if_don't_exist (module Conn : CONNECTION)
         (t : Signed_command.t) =
@@ -1830,15 +1768,11 @@ module User_command = struct
         let pk = Signed_command.fee_payer_pk t in
         Public_key.add_if_doesn't_exist (module Conn) pk
       in
-      let%bind source_id =
-        let pk = Signed_command.source_pk t in
-        Public_key.add_if_doesn't_exist (module Conn) pk
-      in
       let%map receiver_id =
         let pk = Signed_command.receiver_pk t in
         Public_key.add_if_doesn't_exist (module Conn) pk
       in
-      { fee_payer_id; source_id; receiver_id }
+      { fee_payer_id; receiver_id }
 
     let add_if_doesn't_exist ?(via = `Ident) (module Conn : CONNECTION)
         (t : Signed_command.t) =
@@ -1848,16 +1782,19 @@ module User_command = struct
       | Some user_command_id ->
           return user_command_id
       | None ->
-          let%bind { fee_payer_id; source_id; receiver_id } =
+          let%bind { fee_payer_id; receiver_id } =
             add_account_ids_if_don't_exist (module Conn) t
           in
           let valid_until =
             let open Mina_numbers in
             let slot = Signed_command.valid_until t in
-            if Global_slot.equal slot Global_slot.max_value then None
+            if
+              Global_slot_since_genesis.equal slot
+                Global_slot_since_genesis.max_value
+            then None
             else
               Some
-                ( slot |> Mina_numbers.Global_slot.to_uint32
+                ( slot |> Mina_numbers.Global_slot_since_genesis.to_uint32
                 |> Unsigned.UInt32.to_int64 )
           in
           (* TODO: Converting these uint64s to int64 can overflow; see #5419 *)
@@ -1874,7 +1811,7 @@ module User_command = struct
                 | `Zkapp_command ->
                     "zkapp" )
             ; fee_payer_id
-            ; source_id
+            ; source_id = fee_payer_id
             ; receiver_id
             ; nonce = Signed_command.nonce t |> Unsigned.UInt32.to_int64
             ; amount =
@@ -1921,7 +1858,7 @@ module User_command = struct
                 Option.map user_cmd.valid_until
                   ~f:
                     (Fn.compose Unsigned.UInt32.to_int64
-                       Mina_numbers.Global_slot.to_uint32 )
+                       Mina_numbers.Global_slot_since_genesis.to_uint32 )
             ; memo = user_cmd.memo |> Signed_command_memo.to_base58_check
             ; hash = user_cmd.hash |> Transaction_hash.to_base58_check
             }
@@ -2503,7 +2440,7 @@ module Zkapp_account = struct
       Zkapp_action_states.add_if_doesn't_exist (module Conn) action_state
     in
     let last_action_slot =
-      Mina_numbers.Global_slot.to_uint32 last_action_slot
+      Mina_numbers.Global_slot_since_genesis.to_uint32 last_action_slot
       |> Unsigned.UInt32.to_int64
     in
     let%bind zkapp_uri_id =
@@ -2704,7 +2641,8 @@ module Accounts_created = struct
 end
 
 module Protocol_versions = struct
-  type t = { major : int; minor : int; patch : int } [@@deriving hlist, fields]
+  type t = { transaction : int; network : int; patch : int }
+  [@@deriving hlist, fields]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -2712,8 +2650,9 @@ module Protocol_versions = struct
 
   let table_name = "protocol_versions"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) ~major ~minor ~patch =
-    let t = { major; minor; patch } in
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~transaction ~network
+      ~patch =
+    let t = { transaction; network; patch } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -2869,27 +2808,28 @@ module Block = struct
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
         let global_slot_since_hard_fork =
-          Consensus.Data.Consensus_state.curr_global_slot consensus_state
+          Mina_numbers.Global_slot_since_hard_fork.to_uint32
+          @@ Consensus.Data.Consensus_state.curr_global_slot consensus_state
           |> Unsigned.UInt32.to_int64
         in
         let%bind protocol_version_id =
-          let major = Protocol_version.major protocol_version in
-          let minor = Protocol_version.minor protocol_version in
+          let transaction = Protocol_version.transaction protocol_version in
+          let network = Protocol_version.network protocol_version in
           let patch = Protocol_version.patch protocol_version in
           Protocol_versions.add_if_doesn't_exist
             (module Conn)
-            ~major ~minor ~patch
+            ~transaction ~network ~patch
         in
         let%bind proposed_protocol_version_id =
           Option.value_map proposed_protocol_version ~default:(return None)
             ~f:(fun ppv ->
-              let major = Protocol_version.major ppv in
-              let minor = Protocol_version.minor ppv in
+              let transaction = Protocol_version.transaction ppv in
+              let network = Protocol_version.network ppv in
               let patch = Protocol_version.patch ppv in
               let%map id =
                 Protocol_versions.add_if_doesn't_exist
                   (module Conn)
-                  ~major ~minor ~patch
+                  ~transaction ~network ~patch
               in
               Some id )
         in
@@ -2946,6 +2886,7 @@ module Block = struct
             ; global_slot_since_genesis =
                 consensus_state
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
+                |> Mina_numbers.Global_slot_since_genesis.to_uint32
                 |> Unsigned.UInt32.to_int64
             ; protocol_version_id
             ; proposed_protocol_version_id
@@ -3249,23 +3190,25 @@ module Block = struct
             Epoch_data.add_if_doesn't_exist (module Conn) block.next_epoch_data
           in
           let%bind protocol_version_id =
-            let major = Protocol_version.major block.protocol_version in
-            let minor = Protocol_version.minor block.protocol_version in
+            let transaction =
+              Protocol_version.transaction block.protocol_version
+            in
+            let network = Protocol_version.network block.protocol_version in
             let patch = Protocol_version.patch block.protocol_version in
             Protocol_versions.add_if_doesn't_exist
               (module Conn)
-              ~major ~minor ~patch
+              ~transaction ~network ~patch
           in
           let%bind proposed_protocol_version_id =
             Option.value_map block.proposed_protocol_version
               ~default:(return None) ~f:(fun ppv ->
-                let major = Protocol_version.major ppv in
-                let minor = Protocol_version.minor ppv in
+                let transaction = Protocol_version.transaction ppv in
+                let network = Protocol_version.network ppv in
                 let patch = Protocol_version.patch ppv in
                 let%map id =
                   Protocol_versions.add_if_doesn't_exist
                     (module Conn)
-                    ~major ~minor ~patch
+                    ~transaction ~network ~patch
                 in
                 Some id )
           in
@@ -3306,9 +3249,13 @@ module Block = struct
             ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
             ; height = block.height |> Unsigned.UInt32.to_int64
             ; global_slot_since_hard_fork =
-                block.global_slot_since_hard_fork |> Unsigned.UInt32.to_int64
+                block.global_slot_since_hard_fork
+                |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
+                |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis =
-                block.global_slot_since_genesis |> Unsigned.UInt32.to_int64
+                block.global_slot_since_genesis
+                |> Mina_numbers.Global_slot_since_genesis.to_uint32
+                |> Unsigned.UInt32.to_int64
             ; protocol_version_id
             ; proposed_protocol_version_id
             ; timestamp = Block_time.to_string_exn block.timestamp
@@ -3865,13 +3812,6 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
             "Runtime config does not contain a ledger, could not add genesis \
              accounts"
       | Some runtime_config_ledger -> (
-          (* blocks depend on having the protocol version set, which the daemon does on startup;
-             the actual value doesn't affect the block state hash, which is how we
-             identify a block in the archive db
-
-             here, we just set the protocol version to a dummy value
-          *)
-          Protocol_version.(set_current zero) ;
           let proof_level = Genesis_constants.Proof_level.compiled in
           let%bind precomputed_values =
             match%map
@@ -3906,8 +3846,9 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
               ~depth:constraint_constants.ledger_depth padded_accounts
           in
           let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
-          let account_ids =
-            Mina_ledger.Ledger.accounts ledger |> Account_id.Set.to_list
+          let%bind account_ids =
+            let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
+            Account_id.Set.to_list account_id_set
           in
           let genesis_block =
             let With_hash.{ data = block; hash = the_hash }, _ =

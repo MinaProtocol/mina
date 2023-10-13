@@ -169,7 +169,11 @@ Now, whenever you start vim from `nix develop mina#with-lsp`, it should just wor
 ##### Emacs
 
 You need to install [tuareg](https://github.com/ocaml/tuareg) and  a LSP client, like  [lsp-mode](https://github.com/emacs-lsp/lsp-mode) or [eglot](https://github.com/joaotavora/eglot).
+You do not need to use [merlin](https://github.com/ocaml/merlin) directly (through `merlin-mode`), as `ocaml-lsp-server` that LSP client will use uses `merlin` backend.
+Note that LSP with flycheck and similar tools will not provide the global project compilation functionality, they will focus on individual buffers instead.
+To compile the whole project you can still use `M-x compile` or anything else; compilation results will be then seen by the LSP/flycheck.
 This should just work without any configuration, as long as you start it from `nix develop mina#with-lsp`.
+If you prefer to have just one instance of `emacs` running, consider installing `direnv` as explained in the sections below: emacs packages [envrc](https://github.com/purcell/envrc) and [emacs-direnv](https://github.com/wbolster/emacs-direnv) (just `direnv` in MELPA) provide integration with the tool, allowing emacs to use nix-defined sandbox variables when the open buffer is a repository file.
 
 ### "Pure" build
 
@@ -210,7 +214,7 @@ branches, or otherwise changing the dependency tree of Mina.
 TL;DR:
 ```
 $(nix build mina#mina-image-full) | docker load
-# Also available: mina-image-slim, mina-archive-image-full
+# Also available: mina-image-slim, mina-image-instr, mina-archive-image-full,
 ```
 
 Since a "pure" build can happen entirely inside the Nix sandbox, we can use its
@@ -227,6 +231,8 @@ us-west2-docker.pkg.dev/o1labs-192920/nix-containers/mina-image-full:develop` .
 
 The `slim` image only has the Mina daemon itself, whereas `full` images also
 contain many useful tools, such as coreutils, fake init, jq, etc.
+
+The `instr` image is a replica of `full` image with additional instrumenation data.
 
 ### Debian package
 
@@ -375,6 +381,14 @@ networking inside the Nix sandbox (in order to vendor all the dependencies using
 `go mod vendor`), but in exchange requires the hash of the output to be
 specified explicitly. This is the hash you're updating by running
 `./nix/update-libp2p-hashes.sh`.
+
+### Notes on instrumenation package
+
+`nix build mina#mina_with_instrumentation` allows to build a special version on mina
+ with instrumentation enabled. This can be helpful if one would like verify 
+what is a code coverage of end-to-end/manual tests performed over mina under development. 
+Additionally there is a docker image available which wraps up above mina build into full mina image. 
+One can prepare it using command: `$(nix build mina#mina-image-instr-full --print-out-paths) | docker load`
 
 ### Discovering all the packages this Flake provides
 

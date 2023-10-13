@@ -55,7 +55,6 @@ let tests : test list =
   ; ( "chain-reliability"
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
-  ; ("delegation", (module Delegation_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
   ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
   ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))
@@ -63,11 +62,11 @@ let tests : test list =
   ; ("zkapps-nonce", (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf))
   ; ( "verification-key"
     , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
-  ; ( "opt-block-prod"
+  ; ( "block-prod-prio"
     , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
-  ; ("snark", (module Snark_test.Make : Intf.Test.Functor_intf))
   ; ("snarkyjs", (module Snarkyjs.Make : Intf.Test.Functor_intf))
   ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
+  ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
@@ -365,16 +364,31 @@ let main inputs =
         [%log info] "Starting the daemons within the pods" ;
         let start_print (node : Engine.Network.Node.t) =
           let open Malleable_error.Let_syntax in
-          [%log info] "starting %s ..." (Engine.Network.Node.id node) ;
+          [%log info] "starting %s ..." (Engine.Network.Node.infra_id node) ;
           let%bind res = Engine.Network.Node.start ~fresh_state:false node in
-          [%log info] "%s started" (Engine.Network.Node.id node) ;
+          [%log info] "%s started" (Engine.Network.Node.infra_id node) ;
           Malleable_error.return res
         in
         let seed_nodes =
           network |> Engine.Network.seeds |> Core.String.Map.data
         in
         let non_seed_pods =
-          network |> Engine.Network.all_non_seed_pods |> Core.String.Map.data
+          network |> Engine.Network.all_non_seed_nodes |> Core.String.Map.data
+        in
+        let _offline_node_event_subscription =
+          (* Monitor for offline nodes; abort the test if a node goes down
+             unexpectedly.
+          *)
+          Dsl.Event_router.on (Dsl.event_router dsl) Node_offline
+            ~f:(fun offline_node () ->
+              let node_name = Engine.Network.Node.infra_id offline_node in
+              [%log info] "Detected node offline $node"
+                ~metadata:[ ("node", `String node_name) ] ;
+              if Engine.Network.Node.should_be_running offline_node then (
+                [%log fatal] "Offline $node is required for this test"
+                  ~metadata:[ ("node", `String node_name) ] ;
+                failwith "Aborted because of required offline node" ) ;
+              Async_kernel.Deferred.return `Continue )
         in
         (* TODO: parallelize (requires accumlative hard errors) *)
         let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in

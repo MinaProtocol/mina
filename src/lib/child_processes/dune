@@ -2,7 +2,7 @@
  (name child_processes)
  (public_name child_processes)
  (foreign_stubs (language c) (names caml_syslimits))
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                ppx_assert ppx_mina ppx_version ppx_here ppx_custom_printf ppx_deriving.show

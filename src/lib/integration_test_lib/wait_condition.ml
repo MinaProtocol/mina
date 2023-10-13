@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Mina_transaction
 
 let all_equal ~equal ~compare ls =
   Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
@@ -40,6 +39,7 @@ struct
     | Block_height_growth
     | Zkapp_to_be_included_in_frontier
     | Persisted_frontier_loaded
+    | Transition_frontier_loaded_from_persistence
 
   type t =
     { id : wait_condition_id
@@ -108,6 +108,68 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
+  let transition_frontier_loaded_from_persistence ~fresh_data ~sync_needed =
+    let init state =
+      Predicate_continuation
+        ( state.num_persisted_frontier_loaded
+        , state.num_persisted_frontier_fresh_boot
+        , state.num_bootstrap_required
+        , state.num_persisted_frontier_dropped
+        , state.num_transition_frontier_loaded_from_persistence )
+    in
+
+    let check init state =
+      let ( num_init_persisted_frontier_loaded
+          , num_init_persisted_frontier_fresh_boot
+          , num_init_bootstrap_required
+          , num_init_persisted_frontier_dropped
+          , num_init_transition_frontier_loaded_from_persistence ) =
+        init
+      in
+
+      let fresh_data_condition =
+        if fresh_data then
+          state.num_persisted_frontier_fresh_boot
+          > num_init_persisted_frontier_fresh_boot
+          && state.num_persisted_frontier_dropped
+             > num_init_persisted_frontier_dropped
+        else
+          state.num_persisted_frontier_fresh_boot
+          = num_init_persisted_frontier_fresh_boot
+          && state.num_persisted_frontier_dropped
+             = num_init_persisted_frontier_dropped
+      in
+      let sync_needed_condition =
+        if sync_needed then
+          state.num_bootstrap_required >= num_init_bootstrap_required
+        else state.num_bootstrap_required = num_init_bootstrap_required
+      in
+      if
+        fresh_data_condition && sync_needed_condition
+        && state.num_persisted_frontier_loaded
+           > num_init_persisted_frontier_loaded
+        && state.num_transition_frontier_loaded_from_persistence
+           > num_init_transition_frontier_loaded_from_persistence
+      then Predicate_passed
+      else
+        Predicate_continuation
+          ( num_init_persisted_frontier_loaded
+          , num_init_persisted_frontier_fresh_boot
+          , num_init_bootstrap_required
+          , num_init_persisted_frontier_dropped
+          , num_init_transition_frontier_loaded_from_persistence )
+    in
+    { id = Transition_frontier_loaded_from_persistence
+    ; description =
+        sprintf
+          "Transition frontier loaded with 'fresh_data' set to %b and \
+           'sync_needed' set to %b"
+          fresh_data sync_needed
+    ; predicate = Network_state_predicate (init, check)
+    ; soft_timeout = Literal (Time.Span.of_min 10.0)
+    ; hard_timeout = Literal (Time.Span.of_min 15.0)
+    }
+
   let block_height_growth ~height_growth =
     (* block height is an objective measurement for the whole chain.  block height growth checks that the block height increased by the desired_height since the wait condition was called *)
     let init state = Predicate_continuation state.block_height in
@@ -143,7 +205,8 @@ struct
       then Predicate_passed
       else Predicate_continuation ()
     in
-    let soft_timeout_in_slots = 8 * 3 in
+    let soft_timeout_in_slots = 4 in
+    let hard_timeout_in_slots = 6 in
     let formatted_nodes =
       nodes
       |> List.map ~f:(fun node -> "\"" ^ Node.id node ^ "\"")
@@ -153,7 +216,7 @@ struct
     ; description = sprintf "%s to synchronize" formatted_nodes
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
-    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    ; hard_timeout = Slots hard_timeout_in_slots
     }
 
   let signed_command_to_be_included_in_frontier ~txn_hash
@@ -186,7 +249,7 @@ struct
     { id = Signed_command_to_be_included_in_frontier
     ; description =
         sprintf "signed command with hash %s"
-          (Transaction_hash.to_base58_check txn_hash)
+          (Mina_transaction.Transaction_hash.to_base58_check txn_hash)
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
@@ -217,50 +280,54 @@ struct
     }
 
   let zkapp_to_be_included_in_frontier ~has_failures ~zkapp_command =
-    let command_matches_zkapp_command cmd =
-      let open User_command in
-      match cmd with
-      | Zkapp_command p ->
-          Zkapp_command.equal p zkapp_command
-      | Signed_command _ ->
-          false
+    let txn_hash =
+      Mina_transaction.Transaction_hash.hash_command
+        (Zkapp_command zkapp_command)
     in
     let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
       let zkapp_opt =
-        List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
-            cmd_with_status.With_status.data |> User_command.forget_check
-            |> command_matches_zkapp_command )
+        List.find breadcrumb_added.transaction_hashes
+          ~f:
+            (Fn.compose
+               (Mina_transaction.Transaction_hash.equal txn_hash)
+               With_status.data )
       in
       [%log' info (Logger.create ())]
-        "Looking for a zkApp transaction match in block with state_hash \
-         $state_hash"
+        "Looking for a zkApp transaction match for txn $txn with hash \
+         $txn_hash in block with state_hash $state_hash"
         ~metadata:
-          [ ("state_hash", State_hash.to_yojson breadcrumb_added.state_hash) ] ;
+          [ ("state_hash", State_hash.to_yojson breadcrumb_added.state_hash)
+          ; ("txn_hash", Mina_transaction.Transaction_hash.to_yojson txn_hash)
+          ; ("txn", Zkapp_command.to_yojson zkapp_command)
+          ] ;
       [%log' debug (Logger.create ())]
         "wait_condition check, zkapp_to_be_included_in_frontier, \
          zkapp_command: $zkapp_command "
         ~metadata:[ ("zkapp_command", Zkapp_command.to_yojson zkapp_command) ] ;
       [%log' debug (Logger.create ())]
         "wait_condition check, zkapp_to_be_included_in_frontier, user_commands \
-         from breadcrumb: $user_commands state_hash: $state_hash"
+         from breadcrumb: $tx_hashes state_hash: $state_hash"
         ~metadata:
-          [ ( "user_commands"
+          [ ( "tx_hashes"
             , `List
-                (List.map breadcrumb_added.user_commands
-                   ~f:(With_status.to_yojson User_command.Valid.to_yojson) ) )
+                (List.map breadcrumb_added.transaction_hashes
+                   ~f:
+                     (With_status.to_yojson
+                        Mina_transaction.Transaction_hash.to_yojson ) ) )
           ; ("state_hash", State_hash.to_yojson breadcrumb_added.state_hash)
           ] ;
       match zkapp_opt with
-      | Some cmd_with_status ->
+      | Some hash_with_status ->
           [%log' debug (Logger.create ())]
             "wait_condition check, zkapp_to_be_included_in_frontier, \
              cmd_with_status: $cmd_with_status "
             ~metadata:
               [ ( "cmd_with_status"
-                , (With_status.to_yojson User_command.Valid.to_yojson)
-                    cmd_with_status )
+                , (With_status.to_yojson
+                     Mina_transaction.Transaction_hash.to_yojson )
+                    hash_with_status )
               ] ;
-          let actual_status = cmd_with_status.With_status.status in
+          let actual_status = hash_with_status.With_status.status in
           let successful =
             match actual_status with
             | Transaction_status.Applied ->
