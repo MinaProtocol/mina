@@ -121,6 +121,9 @@ module Graphql = struct
     query ($public_key: PublicKey!) @encoders(module: "Encoders"){
       account(publicKey: $public_key) {
         nonce
+        delegateAccount {
+          publicKey
+        }
         balance {
           total @ppxCustom(module: "Scalars.Balance")
         }
@@ -306,7 +309,10 @@ let must_get_best_chain ?max_length ~logger node_uri =
   |> Deferred.bind ~f:Malleable_error.or_hard_error
 
 type account_data =
-  { nonce : Unsigned.uint32; total_balance : Currency.Balance.t }
+  { nonce : Unsigned.uint32
+  ; total_balance : Currency.Balance.t
+  ; delegate : Signature_lib.Public_key.Compressed.t option
+  }
 
 let get_account_data ~logger node_uri ~public_key =
   let open Deferred.Or_error.Let_syntax in
@@ -340,6 +346,10 @@ let get_account_data ~logger node_uri ~public_key =
             |> Option.value_exn ~message:"the nonce from get_balance is None"
             |> Unsigned.UInt32.of_string
         ; total_balance = acc.balance.total
+        ; delegate =
+            Option.map
+              ~f:(fun delegate -> delegate.publicKey)
+              acc.delegateAccount
         }
 
 let must_get_account_data ~logger node_uri ~public_key =

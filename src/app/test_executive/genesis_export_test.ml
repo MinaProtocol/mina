@@ -255,13 +255,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~public_key
             (Network.Node.get_ingress_uri node)
         in
+        let%bind () =
+          if
+            Option.equal Public_key.Compressed.equal
+              (Option.map ~f:Public_key.Compressed.of_base58_check_exn
+                 genesis_account.delegate )
+              gql_account.delegate
+          then Malleable_error.return ()
+          else
+            Malleable_error.soft_error_format ~value:()
+              "Error: delegate mismatch in account %s.  \n\
+               In the genesis ledger: %s.  \n\
+               On the original blockchain: %s."
+              (Option.value_exn genesis_account.pk)
+              (Option.value_exn genesis_account.delegate)
+              ( Public_key.Compressed.to_base58_check
+              @@ Option.value_exn gql_account.delegate )
+        in
         if Balance.equal genesis_account.balance gql_account.total_balance then (
           [%log info] "balance check successful for account %s."
             (Option.value_exn genesis_account.pk) ;
           Malleable_error.return () )
         else
           Malleable_error.soft_error_format ~value:()
-            "Error with balance of %s.  \n\
+            "Error: balance mismatch in account %s.  \n\
              In the genesis ledger: %s.  \n\
              On the original blockchain: %s."
             (Option.value_exn genesis_account.pk)
