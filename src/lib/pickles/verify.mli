@@ -1,7 +1,7 @@
 open Core_kernel
 
 module Instance : sig
-  type chunking_data = { num_chunks : int; domain_size : int }
+  type chunking_data = { num_chunks : int; domain_size : int; zk_rows : int }
 
   type t =
     | T :

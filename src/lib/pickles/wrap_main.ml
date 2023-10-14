@@ -262,7 +262,9 @@ let wrap_main
               let evals =
                 let ty =
                   let ty =
-                    Plonk_types.All_evals.typ (module Impl) feature_flags
+                    Plonk_types.All_evals.typ
+                      (module Impl)
+                      ~num_chunks:1 feature_flags
                   in
                   Vector.typ ty Max_proofs_verified.n
                 in

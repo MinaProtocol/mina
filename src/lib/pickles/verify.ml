@@ -4,7 +4,7 @@ open Common
 open Import
 
 module Instance = struct
-  type chunking_data = { num_chunks : int; domain_size : int }
+  type chunking_data = { num_chunks : int; domain_size : int; zk_rows : int }
 
   type t =
     | T :
@@ -117,12 +117,8 @@ let verify_heterogenous (ts : Instance.t list) =
         Timer.clock __LOC__ ;
         let deferred_values =
           let zk_rows =
-            match chunking_data with
-            | None ->
-                3
-            | Some { num_chunks; _ } ->
-                let permuts = 7 in
-                ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts
+            Option.value_map ~default:3 chunking_data ~f:(fun x ->
+                x.Instance.zk_rows )
           in
           Wrap_deferred_values.expand_deferred ~evals ~zk_rows
             ~old_bulletproof_challenges ~proof_state

@@ -48,7 +48,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   exception Return_digest = Compile.Return_digest
 
   type chunking_data = Verify.Instance.chunking_data =
-    { num_chunks : int; domain_size : int }
+    { num_chunks : int; domain_size : int; zk_rows : int }
 
   let verify_promise = Verify.verify
 
@@ -251,6 +251,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; branches = Verification_key.Max_branches.n
         ; feature_flags =
             Plonk_types.(Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags)
+        ; num_chunks = 1
+        ; zk_rows = 3
         }
 
     module Proof = struct
@@ -1149,7 +1151,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           end in
           let proofs_verifieds = Vector.singleton 2 in
           let (T inner_step_data as step_data) =
-            Step_branch_data.create ~index:0 ~feature_flags
+            Step_branch_data.create ~index:0 ~feature_flags ~num_chunks:1
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
               ~branches:Branches.n ~self ~public_input:(Input typ)
               ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
@@ -1308,8 +1310,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let wrap =
                 let wrap_vk = Lazy.force wrap_vk in
                 let%bind.Promise proof, (), (), _ =
-                  step ~zk_rows:pairing_vk.zk_rows ~proof_cache:None
-                    ~maxes:(module Maxes)
+                  step ~proof_cache:None ~maxes:(module Maxes)
                 in
                 let proof =
                   { proof with
@@ -1830,6 +1831,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
             ; wrap_domains
             ; step_domains
+            ; num_chunks = 1
+            ; zk_rows = 3
             }
           in
           Types_map.add_exn self data ;

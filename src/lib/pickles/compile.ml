@@ -26,7 +26,7 @@ module Proof_ = P.Base
 module Proof = P
 
 type chunking_data = Verify.Instance.chunking_data =
-  { num_chunks : int; domain_size : int }
+  { num_chunks : int; domain_size : int; zk_rows : int }
 
 let pad_messages_for_next_wrap_proof
     (type local_max_proofs_verifieds max_local_max_proofs_verifieds
@@ -509,7 +509,7 @@ struct
               Timer.clock __LOC__ ;
               let res =
                 Common.time "make step data" (fun () ->
-                    Step_branch_data.create ~index:!i ~feature_flags
+                    Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
                       ~actual_feature_flags:rule.feature_flags
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
@@ -748,9 +748,7 @@ struct
                            , return_value
                            , auxiliary_value
                            , actual_wrap_domains ) =
-            step ~zk_rows:step_vk.zk_rows ~proof_cache handler
-              ~maxes:(module Maxes)
-              next_state
+            step ~proof_cache handler ~maxes:(module Maxes) next_state
           in
           let proof =
             { proof with
@@ -842,6 +840,14 @@ struct
       ; wrap_domains
       ; step_domains
       ; feature_flags
+      ; num_chunks
+      ; zk_rows =
+          ( match num_chunks with
+          | 1 ->
+              3
+          | num_chunks ->
+              let permuts = 7 in
+              ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts )
       }
     in
     Timer.clock __LOC__ ;
@@ -887,6 +893,8 @@ module Side_loaded = struct
       ; branches = Verification_key.Max_branches.n
       ; feature_flags =
           Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
+      ; num_chunks = 1
+      ; zk_rows = 3
       }
 
   module Proof = struct
@@ -1098,15 +1106,20 @@ let compile_with_wrap_main_override_promise :
     | None ->
         None
     | Some num_chunks ->
+        let compiled = Types_map.lookup_compiled self.id in
         let { h = Pow_2_roots_of_unity domain_size } =
-          (Types_map.lookup_compiled self.id).step_domains
+          compiled.step_domains
           |> Vector.reduce_exn
                ~f:(fun
                     { h = Pow_2_roots_of_unity d1 }
                     { h = Pow_2_roots_of_unity d2 }
                   -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
         in
-        Some { Verify.Instance.num_chunks; domain_size }
+        Some
+          { Verify.Instance.num_chunks
+          ; domain_size
+          ; zk_rows = compiled.zk_rows
+          }
   in
   let module P = struct
     type statement = value

@@ -239,7 +239,7 @@ module type S = sig
   end
 
   type chunking_data = Verify.Instance.chunking_data =
-    { num_chunks : int; domain_size : int }
+    { num_chunks : int; domain_size : int; zk_rows : int }
 
   val verify_promise :
        ?chunking_data:chunking_data
