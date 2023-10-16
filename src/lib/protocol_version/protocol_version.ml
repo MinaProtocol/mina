@@ -113,7 +113,7 @@ module Checked = struct
     let%map transaction =
       N.Checked.if_ cond ~then_:then_.transaction ~else_:else_.transaction
     and network = N.Checked.if_ cond ~then_:then_.network ~else_:else_.network
-    and patch = N.Checked.if_ cond ~then_:then_.patch ~else_:else_.network in
+    and patch = N.Checked.if_ cond ~then_:then_.patch ~else_:else_.patch in
     { transaction; network; patch }
 
   let constant (t : t) =
