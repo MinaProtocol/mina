@@ -18,6 +18,14 @@ class GithubPayloadInfo(object):
         return str.split(branch_id,"/")[2]
     
     @property
+    def new_commit_hash(self):
+        """
+            Gets new commit hash
+        """
+        after = self.data["after"]
+        return after
+    
+    @property
     def commits(self):
         """
             Gets commits info

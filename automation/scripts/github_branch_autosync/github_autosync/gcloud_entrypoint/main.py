@@ -21,24 +21,27 @@ def handle_request(request):
     repository_name = event.repo()
 
     if config.repo_fullname() == repository_name:
-        event.verify_signature(request.data, config.github.secret, request.headers['x-hub-signature-256'])
+        event.verify_signature(request.data, config.github.secret)
         handle_incoming_commit_push(event,config=config)
     
     else:
-    
         submodule = config.submodules_for_name(repository_name)
 
         if submodule.is_none():
             print("unknown source repository. skipping...")
             return
         else:
-            event.verify_signature(request.data, submodule.secret, request.headers['x-hub-signature-256'])
+            event.verify_signature(request.data, submodule.secret)
             handle_incoming_commit_push_in_submodule(event,config=config)
     
     print("done")
     
 def handle_incoming_commit_from_submodule(event,config):
-    
+    new_commit_hash = event.info().new_commit_hash()
+    parent_commit = event.info().old_commit_hash()
+    github = GithubApi(config.github)
+    github.submodules(event.info().incoming_branch())
+
 
     return
 
@@ -48,7 +51,7 @@ def handle_incoming_commit_push_in_stable_branches(source_branch):
         source_branch (String): Name of branch which commit was pushed to.
     """
 
-    target_branch = config.branches[source_branch]
+    target_branch = config.github.branches[source_branch]
     github = GithubApi(config.github)
     print(f"generating diff between {source_branch} and '{target_branch}'...")
     cmp = github.get_diff_commits(target_branch,source_branch)

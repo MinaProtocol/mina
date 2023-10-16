@@ -8,8 +8,9 @@ pipeline to test new changes in main repo.
 '''
 class SubModule:
     
-    def __init__(self, name, branches, pipeline,secret):
+    def __init__(self, name, path, branches, pipeline,secret):
         self.name = name
+        self.path = path
         self.branches = branches
         self.pipeline = pipeline
         self.secret = secret
@@ -88,7 +89,7 @@ class Config:
 
 submodules = [
         SubModule(
-            name="proof_system", 
+            name="proof-systems", 
             branches={
                 "develop":"develop",
                 "berkeley":"berkeley"

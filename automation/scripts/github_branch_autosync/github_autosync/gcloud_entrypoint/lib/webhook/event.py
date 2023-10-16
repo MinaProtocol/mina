@@ -7,8 +7,11 @@ class WebHookEvent:
     def __init__(self,flask_request):
         self.request = flask_request
         self.info = GithubPayloadInfo(flask_request.json)
+
+    def info(self):
+        return self.info
     
-    def verify_signature(payload_body, secret_token, signature_header):
+    def verify_signature(self, secret_token):
         """Verify that the payload was sent from GitHub by validating SHA256.
         
         Raise and return 403 if not authorized.
@@ -20,6 +23,8 @@ class WebHookEvent:
             secret_token: GitHub app webhook token (WEBHOOK_SECRET)
             signature_header: header received from GitHub (x-hub-signature-256)
         """
+        payload_body = self.request.data
+        signature_header = self.request.headers['x-hub-signature-256']
         if not signature_header:
             raise HTTPException(status_code=403, detail="x-hub-signature-256 header is missing!")
         hash_object = hmac.new(secret_token.encode('utf-8'), msg=payload_body, digestmod=hashlib.sha256)

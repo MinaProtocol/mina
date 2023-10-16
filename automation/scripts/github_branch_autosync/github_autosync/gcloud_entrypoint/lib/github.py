@@ -36,6 +36,11 @@ class GithubApi:
                 self.get_authorization_header,
                 self.default_timeout)
 
+    def submodules(self,branch):
+        head = self.repository().get_branch(branch).commit.sha
+        tree = self.repository().inner.get_git_tree(head)
+        print(tree)
+
     def branch(self, name):
         '''
             Retrieves github branch from configured repository with given name
@@ -141,6 +146,13 @@ class GithubApi:
                 GithubException: On request failure.
         '''
         self.repository().delete_branch(branch_name)
+
+    def update_module_hash(self,old_hash,new_hash):
+        inputs = [InputGitTreeElement(
+                    path=element.path, mode=element.mode, type=element.type, sha=element.sha
+                )]
+        self.repository().inner.create_git_tree(inputs, old_hash)
+
 
     def cherry_pick_commits(self,new_branch,commits,skip_merges):
         '''
@@ -308,6 +320,7 @@ class Repository:
 
             for label in labels:
                 pull.add_to_labels(label)
+
     def create_git_ref(self,branch_ref_name,from_branch_sha):
         if self.dryrun:
             print(f'{self.dryrun_suffix} New branch created:')
