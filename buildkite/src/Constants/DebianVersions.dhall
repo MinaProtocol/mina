@@ -66,7 +66,8 @@ let minimalDirtyWhen = [
   S.strictlyStart (S.contains "dockerfiles/stages"),
   S.exactly "scripts/rebuild-deb" "sh",
   S.exactly "scripts/release-docker" "sh",
-  S.exactly "buildkite/scripts/build-artifact" "sh"
+  S.exactly "buildkite/scripts/build-artifact" "sh",
+  S.exactly "buildkite/scripts/check-compatibility" "sh"
 ]
 
 -- The default debian version (Bullseye) is used in all downstream CI jobs
