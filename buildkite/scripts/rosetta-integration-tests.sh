@@ -12,7 +12,7 @@
 # that source. It is important to make sure that the zkapp-cli version installed
 # is compatible with o1js version used.
 
-# These tests use the mina-dev binary, as rosetta-cli assumes we use a testnet.
+# These tests use the mina binary, as rosetta-cli assumes we use a testnet.
 # See https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L222
 
 set -eo pipefail
@@ -101,13 +101,13 @@ mv /tmp/MinaProtocol-rosetta-integration-test-zkapps-* $ZKAPP_PATH
 
 # Libp2p Keypair
 echo "=========================== GENERATING KEYPAIR IN ${MINA_LIBP2P_KEYPAIR_PATH} ==========================="
-mina-dev libp2p generate-keypair -privkey-path $MINA_LIBP2P_KEYPAIR_PATH
+mina libp2p generate-keypair -privkey-path $MINA_LIBP2P_KEYPAIR_PATH
 
 # Configuration
 echo "=========================== GENERATING GENESIS LEDGER FOR ${MINA_NETWORK} ==========================="
 mkdir -p $MINA_KEYS_PATH
-mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/block-producer.key
-mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/snark-producer.key
+mina advanced generate-keypair --privkey-path $MINA_KEYS_PATH/block-producer.key
+mina advanced generate-keypair --privkey-path $MINA_KEYS_PATH/snark-producer.key
 chmod -R 0700 $MINA_KEYS_PATH
 BLOCK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/block-producer.key.pub)
 SNARK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/snark-producer.key.pub)
@@ -132,9 +132,9 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
   zkapp_path=${zkapp_path%/}
   zkapp=$(basename $zkapp_path)
   # Generate zkApp account keypair
-  mina-dev advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key
+  mina advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key
   # Generate zkApp fee payer keypair
-  mina-dev advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key
+  mina advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key
   zkapp_fee_payer_pk=$(cat $MINA_KEYS_PATH/zkapp-${zkapp}-fee-payer.key.pub)
   line="[{ \"pk\": \"${zkapp_fee_payer_pk}\", \"balance\": \"10000\", \"delegate\": null, \"sk\": null }]"
   jq ".ledger.accounts |= . + ${line}" $MINA_CONFIG_FILE >${MINA_CONFIG_FILE}.tmp
@@ -158,12 +158,12 @@ done
 
 # Import Genesis Accounts
 echo "==================== IMPORTING GENESIS ACCOUNTS ======================"
-mina-dev accounts import --privkey-path $MINA_KEYS_PATH/block-producer.key --config-directory $MINA_CONFIG_DIR
-mina-dev accounts import --privkey-path $MINA_KEYS_PATH/snark-producer.key --config-directory $MINA_CONFIG_DIR
+mina accounts import --privkey-path $MINA_KEYS_PATH/block-producer.key --config-directory $MINA_CONFIG_DIR
+mina accounts import --privkey-path $MINA_KEYS_PATH/snark-producer.key --config-directory $MINA_CONFIG_DIR
 for zkapp_path in ${ZKAPP_PATH}/*/; do
   zkapp_path=${zkapp_path%/}
   zkapp=$(basename $zkapp_path)
-  mina-dev accounts import --privkey-path $MINA_KEYS_PATH/zkapp-${zkapp}-fee-payer.key --config-directory $MINA_CONFIG_DIR
+  mina accounts import --privkey-path $MINA_KEYS_PATH/zkapp-${zkapp}-fee-payer.key --config-directory $MINA_CONFIG_DIR
 done
 
 # Postgres
@@ -198,7 +198,7 @@ sleep 5
 
 # Daemon
 echo "========================= STARTING DAEMON connected to ${MINA_NETWORK} ==========================="
-mina-dev daemon \
+mina daemon \
   --archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} \
   --background \
   --block-producer-pubkey "$BLOCK_PRODUCER_PK" \
@@ -218,21 +218,21 @@ retries_left=20
 until [ $daemon_status == "Synced" ]; do
   [[ $retries_left -eq 0 ]] && echo "Unable to Sync the Daemon" && exit 1 || ((retries_left--))
   sleep 15
-  daemon_status=$(mina-dev client status --json | jq -r .sync_status 2>/dev/null || echo "Pending")
+  daemon_status=$(mina client status --json | jq -r .sync_status 2>/dev/null || echo "Pending")
   echo "Daemon Status: ${daemon_status}"
 done
 
 # Unlock Genesis Accounts
 echo "==================== UNLOCKING GENESIS ACCOUNTS ======================"
-mina-dev accounts unlock --public-key $BLOCK_PRODUCER_PK
-mina-dev accounts unlock --public-key $SNARK_PRODUCER_PK
+mina accounts unlock --public-key $BLOCK_PRODUCER_PK
+mina accounts unlock --public-key $SNARK_PRODUCER_PK
 
 # Start sending payments
 send_payments() {
-  mina-dev client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -nonce 0 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
+  mina client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -nonce 0 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
   while true; do
     sleep $TRANSACTION_FREQUENCY
-    mina-dev client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
+    mina client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
   done
 }
 send_payments &
@@ -240,7 +240,7 @@ send_payments &
 # Fee payer cache creation
 echo "==================== PREPARE FEE PAYER CACHE ======================"
 zkapp_fee_payer_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key.pub)
-zkapp_fee_payer_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key" | sed -ne "s/Private key: //p")
+zkapp_fee_payer_privkey=$(mina advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key" | sed -ne "s/Private key: //p")
 
 mkdir -p /root/.cache/zkapp-cli/keys
 echo -e "{\n    \"privateKey\": \"${zkapp_fee_payer_privkey}\",\n    \"publicKey\": \"${zkapp_fee_payer_pk}\"\n}" >/root/.cache/zkapp-cli/keys/sandbox.json
@@ -264,7 +264,7 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
   echo "Deploying ${zkapp}..."
 
   zkapp_account_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key.pub)
-  zkapp_account_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key" | sed -ne "s/Private key: //p")
+  zkapp_account_privkey=$(mina advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key" | sed -ne "s/Private key: //p")
 
   mkdir -p ${zkapp_path}/keys
   echo -e "{\n    \"privateKey\": \"${zkapp_account_privkey}\",\n    \"publicKey\": \"${zkapp_account_pk}\"\n}" >"${zkapp_path}/keys/sandbox.json"
@@ -294,7 +294,7 @@ done
 
 # TODO: wait until all zkApps deploy txns are included in a block
 
-next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"')
+next_block_time=$(mina client status --json | jq '.next_block_production.timing[1].time' | tr -d '"')
 curr_time=$(date +%s%N | cut -b1-13)
 sleep_time=$((($next_block_time - $curr_time) / 1000))
 echo "Sleeping for ${sleep_time}s until next block is created..."
@@ -314,7 +314,7 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
   echo "Done."
 done
 
-next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"')
+next_block_time=$(mina client status --json | jq '.next_block_production.timing[1].time' | tr -d '"')
 curr_time=$(date +%s%N | cut -b1-13)
 sleep_time=$((($next_block_time - $curr_time) / 1000))
 echo "Sleeping for ${sleep_time}s until next block is created..."
