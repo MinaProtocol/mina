@@ -154,8 +154,8 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , 'max_local_max_proofs_verifieds )
          Full_signature.t
       -> ('prev_varss, 'branches) Hlist.Length.t
-      -> ( ( Wrap_main_inputs.Inner_curve.Constant.t
-           , Wrap_main_inputs.Inner_curve.Constant.t option )
+      -> ( ( Wrap_main_inputs.Inner_curve.Constant.t array
+           , Wrap_main_inputs.Inner_curve.Constant.t array option )
            Wrap_verifier.index'
          , 'branches )
          Vector.t

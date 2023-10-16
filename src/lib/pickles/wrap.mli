@@ -8,7 +8,8 @@ val wrap :
          and type ns = 'max_local_max_proofs_verifieds )
   -> ('max_proofs_verified, 'max_local_max_proofs_verifieds) Requests.Wrap.t
   -> dlog_plonk_index:
-       Backend.Tock.Curve.Affine.t Pickles_types.Plonk_verification_key_evals.t
+       Backend.Tock.Curve.Affine.t array
+       Pickles_types.Plonk_verification_key_evals.t
   -> (   ( Impls.Wrap.Impl.Field.t
          , Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
          , Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
