@@ -118,7 +118,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
           let new_block = Mina_block.Validated.forget new_block_validated in
           let new_block_no_hash = With_hash.data new_block in
           let hash = State_hash.With_state_hashes.state_hash new_block in
-          (let path, log = !precomputed_block_writer in
+          (let path, _ = !precomputed_block_writer in
            match Broadcast_pipe.Reader.peek transition_frontier with
            | None ->
                [%log warn]
@@ -256,16 +256,13 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                              ] ) ) ;
                    [%log info] "Saw block with state hash $state_hash"
                      ~metadata:
-                       (let state_hash_data =
-                          [ ( "state_hash"
-                            , `String (State_hash.to_base58_check hash) )
-                          ]
-                        in
-                        if is_some log then
-                          state_hash_data
-                          @ [ ("precomputed_block", Lazy.force precomputed_block)
-                            ]
-                        else state_hash_data ) ) ) ;
+                       [ ( "state_hash"
+                         , `String (State_hash.to_base58_check hash) )
+                       ; ( "protocol_state"
+                         , Mina_block.header new_block_no_hash
+                           |> Mina_block.Header.protocol_state
+                           |> Mina_state.Protocol_state.value_to_yojson )
+                       ] ) ) ;
           match
             Filtered_external_transition.validate_transactions
               ~constraint_constants new_block_no_hash

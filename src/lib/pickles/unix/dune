@@ -1,7 +1,7 @@
 (library
  (name pickles_unix)
  (public_name pickles.unix)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    graphql-async

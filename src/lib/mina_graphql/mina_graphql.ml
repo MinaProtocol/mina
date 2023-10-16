@@ -1290,36 +1290,35 @@ module Mutations = struct
                   Public_key.compress public_key )
               |> Public_key.Compressed.Hash_set.of_list
             in
-            upon
-              (Itn_zkapps.wait_until_zkapps_deployed ~scheduler_tbl ~mina
-                 ~ledger ~deployment_fee:zkapp_command_details.deployment_fee
-                 ~max_cost:zkapp_command_details.max_cost
-                 ~init_balance:zkapp_command_details.init_balance
-                 ~fee_payer_array ~constraint_constants zkapp_account_keypairs
-                 ~logger ~uuid ~stop_signal ~stop_time:tm_end
-                 ~memo_prefix:zkapp_command_details.memo_prefix ~wait_span )
-              (fun result ->
-                match result with
-                | None ->
-                    ()
-                | Some ledger ->
-                    let account_state_tbl =
-                      let get_account ids role =
-                        List.map ids ~f:(fun id ->
-                            (id, (Utils.account_of_id id ledger, role)) )
-                      in
-                      Account_id.Table.of_alist_exn
-                        ( get_account fee_payer_ids `Fee_payer
-                        @ get_account zkapp_account_ids `Ordinary_participant )
+            let deploy_zkapps_do () =
+              Itn_zkapps.wait_until_zkapps_deployed ~scheduler_tbl ~mina ~ledger
+                ~deployment_fee:zkapp_command_details.deployment_fee
+                ~max_cost:zkapp_command_details.max_cost
+                ~init_balance:zkapp_command_details.init_balance
+                ~fee_payer_array ~constraint_constants zkapp_account_keypairs
+                ~logger ~uuid ~stop_signal ~stop_time:tm_end
+                ~memo_prefix:zkapp_command_details.memo_prefix ~wait_span
+            in
+            upon (deploy_zkapps_do ()) (function
+              | None ->
+                  ()
+              | Some ledger ->
+                  let account_state_tbl =
+                    let get_account ids role =
+                      List.map ids ~f:(fun id ->
+                          (id, (Utils.account_of_id id ledger, role)) )
                     in
-                    let tm_next = Time.add (Time.now ()) wait_span in
-                    don't_wait_for
-                    @@ Itn_zkapps.send_zkapps ~fee_payer_array
-                         ~constraint_constants ~scheduler_tbl ~uuid ~keymap
-                         ~unused_pks ~stop_signal ~mina ~zkapp_command_details
-                         ~wait_span ~logger ~tm_end ~account_state_tbl tm_next
-                         (List.length zkapp_account_keypairs) ) ;
-
+                    Account_id.Table.of_alist_exn
+                      ( get_account fee_payer_ids `Fee_payer
+                      @ get_account zkapp_account_ids `Ordinary_participant )
+                  in
+                  let tm_next = Time.add (Time.now ()) wait_span in
+                  don't_wait_for
+                  @@ Itn_zkapps.send_zkapps ~fee_payer_array
+                       ~constraint_constants ~scheduler_tbl ~uuid ~keymap
+                       ~unused_pks ~stop_signal ~mina ~zkapp_command_details
+                       ~wait_span ~logger ~tm_end ~account_state_tbl tm_next
+                       (List.length zkapp_account_keypairs) ) ;
             Ok (Uuid.to_string uuid) )
 
     let stop_scheduled_transactions =
@@ -2347,7 +2346,7 @@ module Queries = struct
                           protocol_state.previous_state_hash
                     ; previous_length =
                         Option.value ~default:global_slot previous_length
-                    ; previous_global_slot = global_slot
+                    ; genesis_slot = global_slot
                     }
                 in
                 let update =
@@ -2452,6 +2451,24 @@ module Queries = struct
         |> Deferred.Result.map_error ~f:Error.to_string_hum
         >>| Pickles.Verification_key.to_yojson >>| Yojson.Safe.to_basic )
 
+  let network_id =
+    field "networkID"
+      ~doc:
+        "The chain-agnostic identifier of the network this daemon is \
+         participating in"
+      ~typ:(non_null string)
+      ~args:Arg.[]
+      ~resolve:(fun { ctx = mina; _ } () ->
+        let configured_name =
+          let open Option.Let_syntax in
+          let cfg = Mina_lib.runtime_config mina in
+          let%bind ledger = cfg.ledger in
+          ledger.name
+        in
+        "mina:"
+        ^ Option.value ~default:Mina_compile_config.network_id configured_name
+        )
+
   let commands =
     [ sync_status
     ; daemon_status
@@ -2487,6 +2504,7 @@ module Queries = struct
     ; fork_config
     ; thread_graph
     ; blockchain_verification_key
+    ; network_id
     ]
 
   module Itn = struct

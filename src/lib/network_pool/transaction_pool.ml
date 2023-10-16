@@ -175,7 +175,12 @@ module Diff_versioned = struct
   type verified = Transaction_hash.User_command_with_valid_signature.t list
   [@@deriving sexp, to_yojson]
 
-  let summary t = Printf.sprintf "Transaction diff of length %d" (List.length t)
+  let summary t =
+    Printf.sprintf
+      !"Transaction_pool_diff of length %d with fee payer summary %s"
+      (List.length t)
+      ( String.concat ~sep:","
+      @@ List.map ~f:User_command.fee_payer_summary_string t )
 
   let is_empty t = List.is_empty t
 end
@@ -529,16 +534,19 @@ struct
       in
       List.iter new_commands ~f:(vk_table_lift Vk_refcount_table.inc) ;
       List.iter removed_commands ~f:(vk_table_lift Vk_refcount_table.dec) ;
+      let compact_json =
+        Fn.compose User_command.fee_payer_summary_json User_command.forget_check
+      in
       [%log' trace t.logger]
         ~metadata:
           [ ( "removed"
             , `List
                 (List.map removed_commands
-                   ~f:(With_status.to_yojson User_command.Valid.to_yojson) ) )
+                   ~f:(With_status.to_yojson compact_json) ) )
           ; ( "added"
             , `List
-                (List.map new_commands
-                   ~f:(With_status.to_yojson User_command.Valid.to_yojson) ) )
+                (List.map new_commands ~f:(With_status.to_yojson compact_json))
+            )
           ]
         "Diff: removed: $removed added: $added from best tip" ;
       let pool', dropped_backtrack =
@@ -962,7 +970,11 @@ struct
       let max_per_15_seconds = max_per_15_seconds
 
       let summary t =
-        Printf.sprintf "Transaction diff of length %d" (List.length t)
+        Printf.sprintf
+          !"Transaction_pool_diff of length %d with fee payer summary %s"
+          (List.length t)
+          ( String.concat ~sep:","
+          @@ List.map ~f:User_command.fee_payer_summary_string t )
 
       let is_empty t = List.is_empty t
 
@@ -1035,7 +1047,7 @@ struct
           in
           Deferred.return
           @@ Result.ok_if_true
-               (not (already_mem && not is_sender_local))
+               ((not already_mem) || is_sender_local)
                ~error:Recently_seen
         in
         let%bind () =
@@ -1390,21 +1402,31 @@ struct
             Error (`Other e)
 
       type Structured_log_events.t +=
-        | Transactions_received of { txns : t; sender : Envelope.Sender.t }
+        | Transactions_received of
+            { fee_payer_summaries : User_command.fee_payer_summary_t list
+            ; sender : Envelope.Sender.t
+            }
         [@@deriving
           register_event
-            { msg = "Received transaction-pool diff $txns from $sender" }]
+            { msg =
+                "Received transaction-pool $fee_payer_summaries from $sender"
+            }]
 
       let update_metrics ~logger ~log_gossip_heard envelope valid_cb =
         Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_received) ;
         let diff = Envelope.Incoming.data envelope in
-        if log_gossip_heard then
+        if log_gossip_heard then (
+          let fee_payer_summaries =
+            List.map ~f:User_command.fee_payer_summary diff
+          in
           [%str_log debug]
             (Transactions_received
-               { txns = diff; sender = Envelope.Incoming.sender envelope } ) ;
-        Mina_net2.Validation_callback.set_message_type valid_cb `Transaction ;
-        Mina_metrics.(Counter.inc_one Network.Transaction.received)
+               { fee_payer_summaries
+               ; sender = Envelope.Incoming.sender envelope
+               } ) ;
+          Mina_net2.Validation_callback.set_message_type valid_cb `Transaction ;
+          Mina_metrics.(Counter.inc_one Network.Transaction.received) )
 
       let log_internal ?reason ~logger msg
           { Envelope.Incoming.data = diff; sender; _ } =
@@ -1939,10 +1961,12 @@ let%test_module _ =
               { Account_update.Preconditions.network =
                   protocol_state_precondition
               ; account =
-                  Account_update.Account_precondition.Nonce
-                    ( if Option.is_none fee_payer then
-                      Account.Nonce.succ sender_nonce
-                    else sender_nonce )
+                  (let nonce =
+                     if Option.is_none fee_payer then
+                       Account.Nonce.succ sender_nonce
+                     else sender_nonce
+                   in
+                   Zkapp_precondition.Account.nonce nonce )
               ; valid_while = Ignore
               }
         }
@@ -2019,21 +2043,13 @@ let%test_module _ =
                             preconditions =
                               { p.body.preconditions with
                                 account =
-                                  ( match p.body.preconditions.account with
-                                  | Account_update.Account_precondition.Full
-                                      { nonce =
-                                          Zkapp_basic.Or_ignore.Check n as c
-                                      ; _
-                                      }
+                                  ( match p.body.preconditions.account.nonce with
+                                  | Zkapp_basic.Or_ignore.Check n as c
                                     when Zkapp_precondition.Numeric.(
                                            is_constant Tc.nonce c) ->
-                                      Account_update.Account_precondition.Nonce
-                                        n.lower
-                                  | Account_update.Account_precondition.Full _
-                                    ->
-                                      Account_update.Account_precondition.Accept
-                                  | pre ->
-                                      pre )
+                                      Zkapp_precondition.Account.nonce n.lower
+                                  | _ ->
+                                      Zkapp_precondition.Account.accept )
                               }
                           }
                       } )
@@ -2808,7 +2824,7 @@ let%test_module _ =
           ~default:
             Account_update.Preconditions.
               { network = Zkapp_precondition.Protocol_state.accept
-              ; account = Account_update.Account_precondition.Accept
+              ; account = Zkapp_precondition.Account.accept
               ; valid_while = Ignore
               }
       in
