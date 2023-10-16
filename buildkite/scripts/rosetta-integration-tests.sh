@@ -88,7 +88,7 @@ popd
 # Files from ROSETTA_CLI_CONFIG_FILES will be read from
 # ROSETTA_CONFIGURATION_INPUT_DIR and some placeholders will be
 # substituted.
-ROSETTA_CONFIGURATION_INPUT_DIR=${ROSETTA_CONFIGURATION_INPUT_DIR:=/rosetta/rosetta-cli-config}
+ROSETTA_CONFIGURATION_INPUT_DIR=${ROSETTA_CONFIGURATION_INPUT_DIR:=/etc/mina/rosetta/rosetta-cli-config}
 ROSETTA_CLI_CONFIG_FILES=${ROSETTA_CLI_CONFIG_FILES:="config.json mina.ros"}
 ROSETTA_CLI_MAIN_CONFIG_FILE=${ROSETTA_CLI_MAIN_CONFIG_FILE:="config.json"}
 
@@ -170,7 +170,7 @@ done
 echo "========================= INITIALIZING POSTGRESQL ==========================="
 pg_ctlcluster ${POSTGRES_VERSION} main start
 pg_dropcluster --stop ${POSTGRES_VERSION} main
-pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /rosetta/postgresql.conf ${POSTGRES_VERSION} main
+pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /etc/mina/rosetta/postgresql.conf ${POSTGRES_VERSION} main
 sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
 psql -f "${MINA_ARCHIVE_SQL_SCHEMA_PATH}" "${PG_CONN}"
