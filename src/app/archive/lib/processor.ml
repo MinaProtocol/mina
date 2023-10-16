@@ -1,12 +1,12 @@
 (* processor.ml -- database processing for archive node *)
 
-(* For each table in the archive database schema, there is a
-   corresponding module here containing code to read from and write to
+(* For each table in the archive database schema, a
+   corresponding module contains code to read from and write to
    that table. The module defines a type `t`, a record with fields
    corresponding to columns in the table; typically, the `id` column
-   does not have an associated field.
+   that does not have an associated field.
 
-   The more recently-written modules use the Mina_caqti library to
+   The more recently written modules use the Mina_caqti library to
    construct the SQL for those queries. For consistency and
    simplicity, the older modules should probably be refactored to use
    Mina_caqti.
