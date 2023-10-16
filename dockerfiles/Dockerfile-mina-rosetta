@@ -111,9 +111,6 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
   && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version"  \
   && rm -rf /var/lib/apt/lists/*
 
-COPY /etc/mina/rosetta /rosetta
-COPY /etc/mina/rosetta/genesis_ledgers /genesis_ledgers/
-
 # --- Set up postgres
 USER postgres
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
@@ -123,10 +120,10 @@ RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
 # Run as root so it can create /data/postgresql
 USER root
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
-  && pg_createcluster --start -d /data/postgresql --createclusterconf /rosetta/postgresql.conf ${POSTGRES_VERSION} main
+  && pg_createcluster --start -d /data/postgresql --createclusterconf /etc/mina/rosetta/postgresql.conf ${POSTGRES_VERSION} main
 
 # --- Container workdir, ports, entrypoint, etc.
-WORKDIR /rosetta
+WORKDIR /etc/mina/rosetta
 
 EXPOSE 3087
 EXPOSE $MINA_DAEMON_PORT
