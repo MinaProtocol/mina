@@ -6,14 +6,12 @@ On push event for any related branches submodules defined in `sub-modules` secti
 tool will create new commit in main repo with new hash and additionally will start buildkite
 pipeline to test new changes in main repo.
 '''
+@dataclass
 class SubModule:
-    
-    def __init__(self, name, path, branches, pipeline,secret):
-        self.name = name
-        self.path = path
-        self.branches = branches
-        self.pipeline = pipeline
-        self.secret = secret
+    name: str
+    branches: dict[str,str]
+    pipeline: str
+    token: str
 
 '''
     Settings for github repository. 
@@ -38,15 +36,14 @@ class SubModule:
               If there is a new commit on develop branch, 
               program will attempt to merge new changes to compatible branch
 '''
+@dataclass
 class Github:
-
-    def __init__(self, dryrun, token, username,repo,secret,branches):
-        self.dryrun = dryrun
-        self.token = token
-        self.username = username
-        self.repo = repo
-        self.secret = secret
-        self.branches = branches
+    dryrun: bool
+    token: str
+    username: str
+    repo: str
+    secret: str
+    branches: dict[str, str]
 
     def tmp_branch_name(source_branch,target_branch):
         '''
@@ -58,45 +55,92 @@ class Github:
 '''
 Specific settings for PR creation (if there is necessity to do it based on current repo situation).
 '''
+@dataclass
 class PullRequest:
-    
-    def __init__(self, title_prefix, assignees, body_prefix, labels):
-        self.title_prefix = title_prefix
-        self.assignees = assignees
-        self.body_prefix = body_prefix
-        self.labels = labels
+    title_prefix: str
+    assignees: list[str]
+    body_prefix: str
+    labels: list[str]
     
 '''
     Buildkite specific settings
 '''
+@dataclass
 class Buildkite:
-    def __init__(self, token, org):
-        self.token = token
-        self.org = org  
+    token: str
+    org: str
 
 '''
 Main configuration file for auto-sync logic. 
 One can define relation between branches in section 'branches' or accessibility settings 
 for Buildkite and Github
 '''
+@dataclass
 class Config:
-    def __init__(self, submodules, github, pr, buildkite):
-        self.submodules = submodules
-        self.github = github  
-        self.pr = pr
-        self.buildkite = buildkite
+    submodules: list[Submodule]
+    github: Github  
+    pr: PullRequest
+    buildkite: Buildkite
 
+
+def load(self,config_file_path):
+    if os.path.isfile(config_file_path):
+        with open(config_file_path, 'r') as f:
+            app_config = json.load(f)
+            EnvVarSubs.substitude_env_vars(app_config,SystemEnvVarProvider())
+            return app_config
+    else:
+        raise Exception('Configuration file not found: '.format(config_file_path))
+
+from abc import ABC, abstractmethod
+
+class EnvVarSubs:
+
+    def _cast_to_type(s):
+        try:
+            return int(s)
+        except ValueError:
+            try:
+                return float(s)
+            except ValueError:
+                return s
+
+    def substitude_env_vars(d,env_var_provider):
+        for key in d.keys():
+            v = d.get(key)
+            if isinstance(v, str):
+                m = re.match('\${(\w+)\:-(\w+)}', v)
+                if m:
+                    env_name = m.group(1)
+                    def_val = m.group(2)
+                    env_val = env_var_provider.get(env_name)#os.environ.get(env_name)
+                    if env_val is None:
+                        env_val = _cast_to_type(def_val)
+                    d[key] = env_val
+            elif isinstance(v, dict):
+                _substitude_env_vars(v)
+
+class EnvVarProvider(ABC):
+
+    @abstractmethod
+    def get(env_name):
+        pass
+
+class SystemEnvVarProvider(EnvVarProvider):
+
+    def get(env_name):
+        return os.environ.get(env_name)
 
 submodules = [
-        SubModule(
-            name="proof-systems", 
-            branches={
-                "develop":"develop",
-                "berkeley":"berkeley"
-            },
-            pipeline="Crypto Pipeline",
-            token=os.environ["WEBHOOK_APP_TOKEN"]
-        )
+    SubModule(
+        name="proof-systems", 
+        branches={
+            "develop":"develop",
+            "berkeley":"berkeley"
+        },
+        pipeline="Crypto Pipeline",
+        token=os.environ[f'WEBHOOK__TOKEN']
+    )
 ],
 
 github = Github(

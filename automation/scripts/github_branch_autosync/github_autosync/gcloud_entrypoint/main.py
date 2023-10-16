@@ -3,6 +3,8 @@
 from .lib import GithubPayloadInfo, config, GithubApi, GithubException, verify_signature,is_push_event
 from typing import Optional 
 
+config = config.load('../../tests/config.json')
+
 def handle_request(request):
     """Responds to any HTTP request.
     Args:
@@ -13,7 +15,7 @@ def handle_request(request):
         `make_response <http://flask.pocoo.org/docs/1.0/api/#flask.Flask.make_response>`.
     """
     event = WebHookEvent(request)
-
+    
     if not event.is_push_event():
         print("not a push event. skipping...")
         return
