@@ -1447,7 +1447,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         V.f Max_local_max_proofs_verifieds.length
                           (M.f prev_messages_for_next_wrap_proof)
                       in
-                      O.create pairing_vk
+                      O.create_with_public_evals pairing_vk
                         Vector.(
                           map2 (Vector.trim_front sgs lte) prev_challenges
                             ~f:(fun commitment cs ->
@@ -1520,7 +1520,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       let tick_combined_evals =
                         Plonk_checks.evals_of_split_evals
                           (module Tick.Field)
-                          proof.openings.evals
+                          proof.proof.openings.evals
                           ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta:As_field.zeta
                           ~zetaw
                       in
@@ -1573,11 +1573,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (* Note: We do not pad here. *)
                           ~actual_proofs_verified:
                             (Nat.Add.create actual_proofs_verified)
-                          { evals = proof.openings.evals; public_input = x_hat }
+                          { evals = proof.proof.openings.evals
+                          ; public_input = x_hat
+                          }
                           ~r ~xi ~zeta ~zetaw
                           ~old_bulletproof_challenges:prev_challenges
                           ~env:tick_env ~domain:tick_domain
-                          ~ft_eval1:proof.openings.ft_eval1
+                          ~ft_eval1:proof.proof.openings.ft_eval1
                           ~plonk:tick_plonk_minimal
                       in
                       let chal = Challenge.Constant.of_tick_field in
@@ -1769,9 +1771,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       ; prev_evals =
                           { Plonk_types.All_evals.evals =
                               { public_input = x_hat
-                              ; evals = proof.openings.evals
+                              ; evals = proof.proof.openings.evals
                               }
-                          ; ft_eval1 = proof.openings.ft_eval1
+                          ; ft_eval1 = proof.proof.openings.ft_eval1
                           }
                       }
                       : _ P.Base.Wrap.t )
