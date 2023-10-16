@@ -5,6 +5,8 @@ let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -29,7 +31,8 @@ Pipeline.build
           S.strictlyStart (S.contains "src/app/itn_orchestrator")
         ],
         path = "Release",
-        name = "ItnOrchestratorArtifact"
+        name = "ItnOrchestratorArtifact",
+        tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
       },
     steps = [
       DockerImage.generateStep spec
