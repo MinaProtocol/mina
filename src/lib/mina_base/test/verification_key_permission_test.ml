@@ -39,28 +39,34 @@ let update_vk_perm_to_be ~auth : Zkapp_command.t =
   ; memo = Signed_command_memo.empty
   }
 
-let auth_gen = Quickcheck.Generator.of_list [Permissions.Auth_required.Either; Impossible; None; Proof; Signature]
+let auth_gen =
+  Quickcheck.Generator.of_list
+    [ Permissions.Auth_required.Either; Impossible; None; Proof; Signature ]
+
 let update_vk_perm_with_different_version () =
-  Quickcheck.test ~trials:10 auth_gen
-  ~f:(fun auth ->
-  match
-    User_command.check_well_formedness
-      ~genesis_constants:Genesis_constants.for_unit_tests
-      (Zkapp_command
-         (update_vk_perm_to_be
-            ~auth:(auth, different_version) ) )
-  with 
-  | Ok _ ->
-    raise (Failure "Well-formedness check was expected to fail, but didn't")
-  | Error e ->
-    [%test_eq: User_command.Well_formedness_error.t list] e [ Incompatible_version ])
+  Quickcheck.test ~trials:10 auth_gen ~f:(fun auth ->
+      match
+        User_command.check_well_formedness
+          ~genesis_constants:Genesis_constants.for_unit_tests
+          (Zkapp_command (update_vk_perm_to_be ~auth:(auth, different_version)))
+      with
+      | Ok _ ->
+          raise
+            (Failure "Well-formedness check was expected to fail, but didn't")
+      | Error e ->
+          [%test_eq: User_command.Well_formedness_error.t list] e
+            [ Incompatible_version ] )
 
 let update_vk_perm_with_current_version () =
-  Quickcheck.test ~trials:10 auth_gen 
-  ~f:(fun auth ->
-    match User_command.check_well_formedness 
-    ~genesis_constants:Genesis_constants.for_unit_tests 
-    (Zkapp_command (update_vk_perm_to_be ~auth:(auth, Protocol_version.current)))
-  with 
-  | Ok () -> () 
-  | Error _ -> raise (Failure "Well-formedness check was expected to pass, but didn't"))
+  Quickcheck.test ~trials:10 auth_gen ~f:(fun auth ->
+      match
+        User_command.check_well_formedness
+          ~genesis_constants:Genesis_constants.for_unit_tests
+          (Zkapp_command
+             (update_vk_perm_to_be ~auth:(auth, Protocol_version.current)) )
+      with
+      | Ok () ->
+          ()
+      | Error _ ->
+          raise
+            (Failure "Well-formedness check was expected to pass, but didn't") )

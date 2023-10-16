@@ -398,7 +398,7 @@ module Well_formedness_error = struct
     | Zero_vesting_period
     | Zkapp_too_big of (Error.t[@to_yojson Error_json.error_to_yojson])
     | Incompatible_version
-  [@@deriving compare, to_yojson]
+  [@@deriving compare, to_yojson, sexp]
 
   let to_string = function
     | Insufficient_fee ->
