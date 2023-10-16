@@ -880,7 +880,7 @@ struct
       }
     in
     [%log internal] "Pickles_step_proof_done" ;
-    ( { Proof.Base.Step.proof = next_proof.proof
+    ( { Proof.Base.Step.proof = next_proof
       ; statement = next_statement
       ; index = branch_data.index
       ; prev_evals =

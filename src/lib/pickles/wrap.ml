@@ -99,11 +99,12 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     ~actual_feature_flags
     ~(prev_challenges : ((Backend.Tick.Field.t, _) Vector.t, n) Vector.t)
     ~(step_vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
-    ~(public_input : Backend.Tick.Field.t list) ~(proof : Backend.Tick.Proof.t)
+    ~(public_input : Backend.Tick.Field.t list)
+    ~(proof : Backend.Tick.Proof.with_public_evals)
     ~(actual_proofs_verified : n Nat.t) : deferred_values_and_hints =
   let module O = Tick.Oracles in
   let o =
-    O.create step_vk
+    O.create_with_public_evals step_vk
       Vector.(
         map2 sgs prev_challenges ~f:(fun commitment cs ->
             { Tick.Proof.Challenge_polynomial.commitment
@@ -159,7 +160,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
   let tick_combined_evals =
     Plonk_checks.evals_of_split_evals
       (module Tick.Field)
-      proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
+      proof.proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
       ~zeta:As_field.zeta ~zetaw
     |> Plonk_types.Evals.to_in_circuit
   in
@@ -236,10 +237,11 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
             As_field.(
               combined_inner_product (* Note: We do not pad here. *)
                 ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
-                { evals = proof.openings.evals; public_input = x_hat }
+                { evals = proof.proof.openings.evals; public_input = x_hat }
                 ~r ~xi ~zeta ~zetaw ~old_bulletproof_challenges:prev_challenges
                 ~env:tick_env ~domain:tick_domain
-                ~ft_eval1:proof.openings.ft_eval1 ~plonk:tick_plonk_minimal)
+                ~ft_eval1:proof.proof.openings.ft_eval1
+                ~plonk:tick_plonk_minimal)
       ; branch_data =
           { proofs_verified =
               ( match actual_proofs_verified with
@@ -332,7 +334,8 @@ let%test_module "gate finalization" =
         (feature_flags : Plonk_types.Features.options)
         (public_input : Pasta_bindings.Fp.t list)
         (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
-        (proof : Backend.Tick.Proof.t) : Impls.Step.Boolean.value =
+        (proof : Backend.Tick.Proof.with_public_evals) :
+        Impls.Step.Boolean.value =
       (* Constants helper - takes an OCaml value and converts it to a snarky value, where
                             all values here are constant literals.  N.b. this should be
                             encapsulated as Snarky internals, but it never got merged. *)
@@ -418,8 +421,9 @@ let%test_module "gate finalization" =
       and evals =
         constant
           (Plonk_types.All_evals.typ (module Impls.Step) full_features)
-          { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
-          ; ft_eval1 = proof.openings.ft_eval1
+          { evals =
+              { public_input = x_hat_evals; evals = proof.proof.openings.evals }
+          ; ft_eval1 = proof.proof.openings.ft_eval1
           }
       in
 
@@ -499,7 +503,7 @@ let%test_module "gate finalization" =
 
       let runtest feature_flags =
         run_recursive_proof_test S.actual_feature_flags feature_flags
-          public_input vk proof.proof
+          public_input vk proof
 
       let%test "true -> yes" = runtest test_feature_flags_configs.true_is_yes
 
@@ -734,9 +738,9 @@ let wrap
         in
         k (M.f messages_for_next_wrap_proof)
     | Messages ->
-        k proof.messages
+        k proof.proof.messages
     | Openings_proof ->
-        k proof.openings.proof
+        k proof.proof.openings.proof
     | Proof_state ->
         k prev_statement_with_hashes.proof_state
     | Which_branch ->
@@ -802,7 +806,7 @@ let wrap
     let messages_for_next_wrap_proof :
         _ P.Base.Messages_for_next_proof_over_same_field.Wrap.t =
       { challenge_polynomial_commitment =
-          proof.openings.proof.challenge_polynomial_commitment
+          proof.proof.openings.proof.challenge_polynomial_commitment
       ; old_bulletproof_challenges =
           Vector.map prev_statement.proof_state.unfinalized_proofs ~f:(fun t ->
               t.deferred_values.bulletproof_challenges )
@@ -913,8 +917,8 @@ let wrap
           ~to_option:Opt.to_option_unsafe
     ; prev_evals =
         { Plonk_types.All_evals.evals =
-            { public_input = x_hat_evals; evals = proof.openings.evals }
-        ; ft_eval1 = proof.openings.ft_eval1
+            { public_input = x_hat_evals; evals = proof.proof.openings.evals }
+        ; ft_eval1 = proof.proof.openings.ft_eval1
         }
     }
     : _ P.Base.Wrap.t )

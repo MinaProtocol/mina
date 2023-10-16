@@ -21,7 +21,7 @@ module Base : sig
           Import.Types.Step.Statement.t
       ; index : int
       ; prev_evals : 'prev_evals
-      ; proof : Backend.Tick.Proof.t
+      ; proof : Backend.Tick.Proof.with_public_evals
       }
   end
 
