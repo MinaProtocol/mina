@@ -26,13 +26,13 @@ Quick start instructions:
     git clone git@github.com:MinaProtocol/mina.git
     ```
 
-If you have already done that, remember that the MinaProtocol and o1-labs repositories do not accept the password authentication used by the https URLs. You must set GitHub repos to pull and push over ssh:
+If you have already done that, remember that the MinaProtocol and o1-labs repositories do not accept the password authentication used by the https URLs. You must set GitHub repos to pull and push over ssh: 
 
     ```sh
     git config --global url.ssh://git@github.com/.insteadOf https://github.com/
     ```
 
-3.  Pull in the submodules:
+3.  Pull in the submodules: 
 
     ```sh
     git submodule update --init --recursive
@@ -52,13 +52,73 @@ You can build Mina using Docker. Using Docker works in any dev environment. See 
 
 ### Developer Setup (MacOS)
 
-- Invoke `make macos-setup`
-  - You will be prompted to add a number of `export`s in your shell config file. Do so.
-  - If this is your first time using OCaml, be sure to run `eval $(opam config env)`
-- Install [rustup](https://rustup.rs/).
-- Invoke `make build`
-- Jump to [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin)
-- Note: If you are seeing conf-openssl install errors, try running `export PKG_CONFIG_PATH=$(brew --prefix openssl@1.1)/lib/pkgconfig` and try `opam switch import opam.export` again.
+1. Upgrade to the latest version of macOS.
+2. Install Xcode Command Line Tools: 
+
+    ```sh
+    xcode-select --install
+    ```
+
+3. Invoke `make macos-setup`.
+  - When prompted, confirm that you want to add a number of exports in your shell config file.
+  - Make sure to `source` your shell config file or create a new terminal.
+  - If this is your first time using OCaml, be sure to run: 
+    
+    ```sh
+    eval $(opam config env)
+    ```
+
+4. Install [rustup](https://rustup.rs/).
+5. Create your switch with deps `opam switch import --switch mina opam.export`
+
+  M1- and M-2 operating systems experience issues because Homebrew does not link include files automatically. 
+  
+  If you get an error about failing to find `gmp.h`, update your `~/.zshrc` or `~/.bashrc` with:
+
+  `export CFLAGS="-I/opt/homebrew/Cellar/gmp/6.2.1_1/include/"`
+    
+  or run:
+    
+  `env CFLAGS="/opt/homebrew/Cellar/gmp/6.2.1_1/include/" opam install conf-gmp.2`
+    
+  If you get an error about failing to find `lmdb.h`, update your `~/.zshrc` or `~/.bashrc` with:
+
+  ```text
+  export CPATH="$HOMEBREW_PREFIX/include:$CPATH"
+  export LIBRARY_PATH="$HOMEBREW_PREFIX/lib:$LIBRARY_PATH"
+  export PATH="$(brew --prefix lmdb)/bin:$PATH"
+  export PKG_CONFIG_PATH=$(brew --prefix lmdb)/lib/pkgconfig:$PKG_CONFIG_PATH
+  ```
+
+- Note: If you get conf-openssl install errors, try running `export PKG_CONFIG_PATH=$(brew --prefix openssl@1.1)/lib/pkgconfig` and try `opam switch import opam.export` again.
+- If prompted, run `opam user-setup install` to enable opam-user-setup support for Merlin.
+6. Pin dependencies that override opam versions:
+
+  ```sh
+  scripts/pin-external-packages.sh
+  ```
+
+7. Install the correct version of golang:
+   - `goenv init`
+   - To make sure the right `goenv` is used, update your shell env script with:
+
+    ```text
+     eval "$(goenv init -)"
+     export PATH="/Users/$USER/.goenv/shims:$PATH"
+     ```
+   - `goenv install 1.18.10`
+   - `goenv global 1.18.10`
+   - Check that the `go version` returns the right version, otherwise you see the message `compile: version "go1.18.10" does not match go tool version "go1.20.2"`. If so, run `brew remove go` or get the matching version.
+8. Invoke `make build`.
+
+  If you get errors about `libp2p` and `capnp`, try with `brew install capnp`.
+9.  For better IDE support, install the OCaml-LSP language server for OCaml: 
+
+  ```sh
+  opam install ocaml-lsp-server
+  ```
+
+10. Set up your IDE. See [Customizing your dev environment for autocomplete/merlin](https://github.com/MinaProtocol/mina/blob/develop/README-dev.md#customizing-your-dev-environment-for-autocompletemerlin).
 
 ### Developer Setup (Linux)
 
@@ -72,7 +132,7 @@ To get all of the required opam dependencies, run:
 opam switch import opam.export
 ```
 
-_*NOTE:*_ The `switch` command provides a `dune_wrapper` binary that you can use instead of dune and fails early if your switch becomes out of sync with the `opam.export` file.
+*_NOTE:_*  The `switch` command provides a `dune_wrapper` binary that you can use instead of dune and fails early if your switch becomes out of sync with the `opam.export` file.
 
 Some dependencies that are not taken from `opam` or integrated with `dune` must be added manually. Run the `scripts/pin-external-packages.sh` script.
 
@@ -83,13 +143,12 @@ A number of C libraries are expected to be available in the system and are also 
 - [Ubuntu Setup Instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/)
 
 #### Customizing your dev environment for autocomplete/merlin
-
 [dev-env]: #dev-env
 
 If you use vim, add this snippet in your `.vimrc` file to use Merlin. (Note: Be sure to change the HOME directory to match yours.)
 
 ```bash
-let s:ocamlmerlin="/Users/USERNAME/.opam/4.07/share/merlin"
+let s:ocamlmerlin="/Users/USERNAME/.opam/4.14.0/share/merlin"
 execute "set rtp+=".s:ocamlmerlin."/vim"
 execute "set rtp+=".s:ocamlmerlin."/vimbufsync"
 let g:syntastic_ocaml_checkers=['merlin']
@@ -104,7 +163,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 - If you use emacs, install the `opam` packages mentioned above and also install `tuareg`. Add the following to your `.emacs` file:
 
 ```lisp
-(let ((opam-share (ignore-errors (car (process-lines "opam" "config" "var" "share")))))
+(let ((opam-share (ignore-errors (car (process-lines "opam" "var" "share")))))
   (when (and opam-share (file-directory-p opam-share))
     ;; Register Merlin
     (add-to-list 'load-path (expand-file-name "emacs/site-lisp" opam-share))
@@ -136,6 +195,7 @@ The source code for the Mina node is located in `src/app/cli/`. After it is comp
 $ dune exec src/app/cli/src/mina.exe -- daemon --libp2p-keypair /path/to/key
 ```
 
+
 The results of a successful build appear in `_build/default/src/app/cli/src/mina.exe`.
 
 The default configuration of the node depends on the build profile that is used during compilation. To connect to some networks, you need to compile the daemon with a specific profile.
@@ -144,11 +204,11 @@ Some setup is required:
 
 1. Generate a key pair so that the daemon can create an account to issue blocks from using the same `mina.exe` binary:
 
-```shell
-$ dune exec src/app/cli/src/mina.exe -- libp2p generate-keypair --privkey-path /path/to/key
-```
+  ```shell
+  $ dune exec src/app/cli/src/mina.exe -- libp2p generate-keypair --privkey-path /path/to/key
+  ```
 
-When prompted, enter a passphrase. During development, you can leave it blank for convenience, but using a passphrase is strongly encouraged when running a real node!
+When prompted, enter a passphrase. During development, you can leave it blank for convenience, but using a passphrase is strongly encouraged when running a real node! 
 
 The running daemon expects to find this passphrase in
 an environment variable `MINA_LIBP2P_PASS`, which must be defined even if the passphrase is empty.
@@ -184,14 +244,14 @@ The command line help is the place to learn about other options to the Mina CLI 
 
 ## Using the Makefile
 
-The Makefile contains placeholder targets for all the common tasks that need to be done and automatically knows how to use Docker.
+The Makefile contains placeholder targets for all the common tasks that need to be done and automatically knows how to use Docker. 
 
 The most important `make` targets are:
 
 - `build`: build everything
 - `libp2p_helper`: build the libp2p helper
 - `reformat`: automatically use `ocamlformat` to reformat the source files (use
-  it if the hook fails during a commit)
+    it if the hook fails during a commit)
 
 We use the [Dune](https://github.com/ocaml/dune/) build system for OCaml code.
 
@@ -206,7 +266,7 @@ $ opam switch create mina_fresh 4.14.0
 $ opam switch import opam.export
 ```
 
-After that, install your dependency. You might have to specify versions of current dependencies to avoid having to upgrade dependencies. For example:
+After that, install your dependency. You might have to specify versions of current dependencies to avoid having to upgrade  dependencies. For example:
 
 ```console
 $ opam install alcotest cmdliner=1.0.3 fmt=0.8.6

@@ -16,9 +16,9 @@ module Basic = struct
     ; public_input : ('var, 'value) Impls.Step.Typ.t
     ; branches : 'n2 Nat.t
     ; wrap_domains : Domains.t
-    ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t
+    ; wrap_key : Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
 end
 
@@ -38,7 +38,7 @@ module Side_loaded = struct
     type ('var, 'value, 'n1, 'n2) t =
       { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
-      ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+      ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
       ; branches : 'n2 Nat.t
       }
   end
@@ -59,7 +59,10 @@ module Side_loaded = struct
     let wrap_key, wrap_vk =
       match ephemeral with
       | Some { index = `In_prover i | `In_both (i, _) } ->
-          (i.wrap_index, i.wrap_vk)
+          let wrap_index =
+            Plonk_verification_key_evals.map i.wrap_index ~f:(fun x -> [| x |])
+          in
+          (wrap_index, i.wrap_vk)
       | _ ->
           failwithf "Side_loaded.to_basic: Expected `In_prover (%s)" __LOC__ ()
     in
@@ -76,15 +79,13 @@ module Side_loaded = struct
 end
 
 module Compiled = struct
-  type f = Impls.Wrap.field
-
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) basic =
     { public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
 
   (* This is the data associated to an inductive proof system with statement type
@@ -97,20 +98,21 @@ module Compiled = struct
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t Lazy.t
+    ; wrap_key :
+        Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
 
   type packed =
     | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
 
   let to_basic
-      { branches
+      { branches = _
       ; max_proofs_verified
-      ; proofs_verifieds
+      ; proofs_verifieds = _
       ; public_input
       ; wrap_vk
       ; wrap_domains
@@ -136,16 +138,16 @@ module For_step = struct
     ; proofs_verifieds :
         [ `Known of (Impls.Step.Field.t, 'branches) Vector.t | `Side_loaded ]
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; wrap_key : inner_curve_var Plonk_verification_key_evals.t
+    ; wrap_key : inner_curve_var array Plonk_verification_key_evals.t
     ; wrap_domain :
         [ `Known of Domain.t
         | `Side_loaded of
           Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
 
-  let of_side_loaded (type a b c d e f)
+  let of_side_loaded (type a b c d)
       ({ ephemeral
        ; permanent =
            { branches; max_proofs_verified; public_input; feature_flags }
@@ -159,11 +161,14 @@ module For_step = struct
           failwithf "For_step.side_loaded: Expected `In_circuit (%s)" __LOC__ ()
     in
     let T = Nat.eq_exn branches Side_loaded_verification_key.Max_branches.n in
+    let wrap_key =
+      Plonk_verification_key_evals.map index.wrap_index ~f:(fun x -> [| x |])
+    in
     { branches
     ; max_proofs_verified
     ; public_input
     ; proofs_verifieds = `Side_loaded
-    ; wrap_key = index.wrap_index
+    ; wrap_key
     ; wrap_domain = `Side_loaded index.actual_wrap_domain_size
     ; step_domains = `Side_loaded
     ; feature_flags
@@ -178,6 +183,7 @@ module For_step = struct
        ; wrap_domains
        ; step_domains
        ; feature_flags
+       ; wrap_vk = _
        } :
         _ Compiled.t ) =
     { branches
@@ -187,7 +193,7 @@ module For_step = struct
     ; public_input
     ; wrap_key =
         Plonk_verification_key_evals.map (Lazy.force wrap_key)
-          ~f:Step_main_inputs.Inner_curve.constant
+          ~f:(Array.map ~f:Step_main_inputs.Inner_curve.constant)
     ; wrap_domain = `Known wrap_domains.h
     ; step_domains = `Known step_domains
     ; feature_flags
@@ -252,7 +258,7 @@ let public_input :
 
 let feature_flags :
     type var value.
-    (var, value, _, _) Tag.t -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+    (var, value, _, _) Tag.t -> Opt.Flag.t Plonk_types.Features.Full.t =
  fun tag ->
   match tag.kind with
   | Compiled ->
@@ -260,13 +266,13 @@ let feature_flags :
   | Side_loaded ->
       (lookup_side_loaded tag.id).permanent.feature_flags
 
-let value_to_field_elements :
-    type a. (_, a, _, _) Tag.t -> a -> Tick.Field.t array =
+let _value_to_field_elements :
+    type a. (_, a, _, _) Tag.t -> a -> Backend.Tick.Field.t array =
  fun t ->
   let (Typ typ) = public_input t in
   fun x -> fst (typ.value_to_fields x)
 
-let lookup_map (type var value c d) (t : (var, value, c, d) Tag.t) ~self
+let _lookup_map (type var value c d) (t : (var, value, c, d) Tag.t) ~self
     ~default
     ~(f :
           [ `Compiled of (var, value, c, d) Compiled.t
@@ -295,7 +301,7 @@ let add_side_loaded ~name permanent =
   tag
 
 let set_ephemeral { Tag.kind; id } (eph : Side_loaded.Ephemeral.t) =
-  (match kind with Side_loaded -> () | _ -> failwith "Expected Side_loaded") ;
+  assert (match kind with Side_loaded -> true | Compiled -> false) ;
   Hashtbl.update univ.side_loaded (Type_equal.Id.uid id) ~f:(function
     | None ->
         assert false

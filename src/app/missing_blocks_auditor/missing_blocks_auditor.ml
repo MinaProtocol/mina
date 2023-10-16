@@ -1,4 +1,4 @@
-(* missing_blocks_auditor.ml -- report missing blocks from an archive db *)
+(* missing_blocks_auditor.ml *)
 
 open Core_kernel
 open Async

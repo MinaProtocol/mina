@@ -74,7 +74,7 @@
    error_json
    ppx_version.runtime
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (modes native)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx)))

@@ -34,7 +34,7 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
         })
     };
     let evaluated_cols = linearization_columns::<F>(features.as_ref());
-    let (linearization, _powers_of_alpha) = constraints_expr::<F>(features.as_ref(), true);
+    let (linearization, _powers_of_alpha) = constraints_expr::<F>(features.as_ref(), true, 3);
 
     let Linearization {
         constant_term,

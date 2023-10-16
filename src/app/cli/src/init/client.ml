@@ -1041,7 +1041,7 @@ let pending_snark_work =
                               Currency.Amount.Signed.of_fee
                                 (to_signed_fee_exn f.sign
                                    (Currency.Amount.to_fee f.fee_magnitude) )
-                          ; supply_increase = w.supply_increase
+                          ; supply_increase = w.supply_change.fee_magnitude
                           ; source_first_pass_ledger_hash =
                               w.source_first_pass_ledger_hash
                           ; target_first_pass_ledger_hash =
@@ -1512,7 +1512,7 @@ let create_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createAccount.public_key
+             response.createAccount.account.public_key
          in
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ) )
 
@@ -1529,7 +1529,7 @@ let create_hd_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createHDAccount.public_key
+             response.createHDAccount.account.public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
            (Mina_numbers.Hd_index.to_string hd_index)
@@ -1563,7 +1563,7 @@ let unlock_account =
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
-                 response.unlockAccount.public_key
+                 response.unlockAccount.account.public_key
              in
              printf "\n🔓 Unlocked account!\nPublic key: %s\n" pk_string
          | Error e ->
@@ -1624,6 +1624,34 @@ let generate_libp2p_keypair =
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
     generate_libp2p_keypair_do privkey_path)
+
+let dump_libp2p_keypair_do privkey_path =
+  Cli_lib.Exceptions.handle_nicely
+  @@ fun () ->
+  Deferred.ignore_m
+    (let open Deferred.Let_syntax in
+    let logger = Logger.null () in
+    (* Using the helper only for keypair generation requires no state. *)
+    File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
+        match%bind
+          Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
+        with
+        | Ok net ->
+            let%bind () = Mina_net2.shutdown net in
+            let%map me = Secrets.Libp2p_keypair.read_exn' privkey_path in
+            printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
+        | Error e ->
+            [%log fatal] "failed to dump libp2p keypair: $error"
+              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+            exit 20 ))
+
+let dump_libp2p_keypair =
+  Command.async ~summary:"Print an existing libp2p keypair"
+    (let open Command.Let_syntax in
+    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
+    dump_libp2p_keypair_do privkey_path)
 
 let trustlist_ip_flag =
   Command.Param.(
@@ -2105,7 +2133,8 @@ let chain_id_inputs =
              ( genesis_state_hash
              , genesis_constants
              , snark_keys
-             , protocol_major_version ) ->
+             , protocol_transaction_version
+             , protocol_network_version ) ->
              let open Format in
              printf
                "@[<v>Genesis state hash: %s@,\
@@ -2116,7 +2145,8 @@ let chain_id_inputs =
                 @]@,\
                 @[<v 2>Snark keys:@,\
                 %a@]@,\
-                Protocol major version: %d@]@."
+                Protocol transaction version: %u@,\
+                Protocol network version: %u@]@."
                (State_hash.to_base58_check genesis_state_hash)
                Yojson.Safe.pp
                (Genesis_constants.Protocol.to_yojson genesis_constants.protocol)
@@ -2126,7 +2156,7 @@ let chain_id_inputs =
                   pp_print_int )
                genesis_constants.num_accounts
                (pp_print_list ~pp_sep:pp_print_cut pp_print_string)
-               snark_keys protocol_major_version
+               snark_keys protocol_transaction_version protocol_network_version
          | Error err ->
              Format.eprintf "Could not get chain id inputs: %s@."
                (Error.to_string_hum err) ) )
@@ -2367,4 +2397,6 @@ let ledger =
 
 let libp2p =
   Command.group ~summary:"Libp2p commands"
-    [ ("generate-keypair", generate_libp2p_keypair) ]
+    [ ("generate-keypair", generate_libp2p_keypair)
+    ; ("dump-keypair", dump_libp2p_keypair)
+    ]

@@ -49,7 +49,6 @@ module Step = struct
 
   module Other_field = struct
     (* Tick.Field.t = p < q = Tock.Field.t *)
-    let size_in_bits = Tock.Field.size_in_bits
 
     module Constant = Tock.Field
 
@@ -122,13 +121,14 @@ module Step = struct
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
 
-    let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [ b ]
+    let _to_bits (x, b) =
+      Field.unpack x ~length:(Field.size_in_bits - 1) @ [ b ]
   end
 
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~proofs_verified ~wrap_rounds ~feature_flags =
+  let input ~proofs_verified ~wrap_rounds =
     let open Types.Step.Statement in
     let spec = spec proofs_verified wrap_rounds in
     let (T (typ, f, f_inv)) =
@@ -219,12 +219,15 @@ module Wrap = struct
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
 
-    let to_bits x = Field.unpack x ~length:Field.size_in_bits
+    let _to_bits x = Field.unpack x ~length:Field.size_in_bits
   end
 
-  let input () =
+  let input
+      ~feature_flags:
+        ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags) () =
+    let feature_flags = Plonk_types.Features.of_full feature_flags in
     let lookup =
-      { Types.Wrap.Lookup_parameters.use = No
+      { Types.Wrap.Lookup_parameters.use = uses_lookups
       ; zero =
           { value =
               { challenge = Limb_vector.Challenge.Constant.zero
@@ -251,24 +254,15 @@ module Wrap = struct
                Impl.run_checked (Other_field.check x) ;
                t )
            , Fn.id ) )
-        (* Wrap circuit: no features needed. *)
-        (In_circuit.spec (module Impl) lookup Plonk_types.Features.none)
+        (In_circuit.spec (module Impl) lookup feature_flags)
     in
-    let feature_flags = Plonk_types.Features.none in
     let typ =
       Typ.transport typ
-        ~there:(In_circuit.to_data ~option_map:Option.map ~to_opt:Fn.id)
-        ~back:
-          (In_circuit.of_data ~feature_flags ~option_map:Option.map
-             ~of_opt:Plonk_types.Opt.to_option )
+        ~there:(In_circuit.to_data ~option_map:Option.map)
+        ~back:(In_circuit.of_data ~option_map:Option.map)
     in
     Spec.ETyp.T
       ( typ
-      , (fun x ->
-          In_circuit.of_data ~feature_flags ~option_map:Plonk_types.Opt.map
-            (f x) ~of_opt:Fn.id )
-      , fun x ->
-          f_inv
-            (In_circuit.to_data ~option_map:Plonk_types.Opt.map x
-               ~to_opt:Plonk_types.Opt.to_option_unsafe ) )
+      , (fun x -> In_circuit.of_data ~option_map:Opt.map (f x))
+      , fun x -> f_inv (In_circuit.to_data ~option_map:Opt.map x) )
 end

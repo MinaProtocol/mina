@@ -1,7 +1,7 @@
 (library
  (name mina_numbers)
  (public_name mina_numbers)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (library_flags -linkall)
  (libraries
    ;; opam libraries
@@ -20,7 +20,6 @@
    bignum_bigint
    pickles
    codable
-   ppx_dhall_type
    snarky.backendless
    fold_lib
    tuple_lib

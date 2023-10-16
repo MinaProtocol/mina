@@ -2,9 +2,11 @@ open Core_kernel
 open Pickles_types
 open Import
 open Poly_types
-open Hlist
 
 (* Compute the domains corresponding to wrap_main *)
+
+(* TODO: this functor does not depend on any of its argument why? *)
+
 module Make
     (A : T0)
     (A_value : T0)
@@ -13,7 +15,7 @@ module Make
     (Auxiliary_var : T0)
     (Auxiliary_value : T0) =
 struct
-  let f_debug full_signature num_choices choices_length ~feature_flags
+  let f_debug full_signature _num_choices choices_length ~feature_flags
       ~max_proofs_verified =
     let num_choices = Hlist.Length.to_nat choices_length in
     let dummy_step_domains =
@@ -26,8 +28,12 @@ struct
     let dummy_step_keys =
       lazy
         (Vector.init num_choices ~f:(fun _ ->
-             let g = Backend.Tock.Inner_curve.(to_affine_exn one) in
-             Verification_key.dummy_commitments g ) )
+             let num_chunks = (* TODO *) 1 in
+             let g =
+               Array.init num_chunks ~f:(fun _ ->
+                   Backend.Tock.Inner_curve.(to_affine_exn one) )
+             in
+             Verification_key.dummy_step_commitments g ) )
     in
     Timer.clock __LOC__ ;
     let srs = Backend.Tick.Keypair.load_urs () in
@@ -39,7 +45,7 @@ struct
     let t =
       Fix_domains.domains
         (module Impls.Wrap)
-        (Impls.Wrap.input ())
+        (Impls.Wrap.input ~feature_flags ())
         (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
         main
     in
@@ -59,3 +65,4 @@ struct
       [%test_eq: Domains.t] res res' ) ;
     res
 end
+[@@warning "-60"]

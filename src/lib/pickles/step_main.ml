@@ -1,12 +1,7 @@
-module S = Sponge
-open Core_kernel
 open Pickles_types
-open Common
-open Poly_types
 open Hlist
 open Import
 open Impls.Step
-open Step_main_inputs
 open Step_verifier
 module B = Inductive_rule.B
 
@@ -18,7 +13,7 @@ module B = Inductive_rule.B
 
    to the numeric representation i. *)
 
-let one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
+let _one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
     Field.t =
   let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
   Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
@@ -47,8 +42,7 @@ let verify_one ~srs
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
-          ~feature_flags:d.feature_flags ~sponge ~prev_challenges
-          deferred_values prev_proof_evals )
+          ~sponge ~prev_challenges deferred_values prev_proof_evals )
   in
   let branch_data = deferred_values.branch_data in
   let sponge_after_index, hash_messages_for_next_step_proof =
@@ -62,6 +56,7 @@ let verify_one ~srs
     in
     (sponge_after_index, unstage hash_messages_for_next_step_proof)
   in
+  (* prepare the statement to be verified below *)
   let statement =
     let prev_messages_for_next_step_proof =
       with_label __LOC__ (fun () ->
@@ -80,16 +75,21 @@ let verify_one ~srs
             ; old_bulletproof_challenges = prev_challenges
             } )
     in
+    (* Returns messages for the next step proof and messages for the next
+       wrap proof *)
     { Types.Wrap.Statement.messages_for_next_step_proof =
         prev_messages_for_next_step_proof
     ; proof_state = { proof_state with messages_for_next_wrap_proof }
     }
   in
+  (* and when the statement is prepared, we call the step verifier with this
+     statement *)
   let verified =
     with_label __LOC__ (fun () ->
-        verify ~srs ~feature_flags:d.feature_flags
+        verify ~srs
+          ~feature_flags:(Plonk_types.Features.of_full d.feature_flags)
           ~lookup_parameters:
-            { use = Plonk_checks.lookup_tables_used d.feature_flags
+            { use = d.feature_flags.uses_lookups
             ; zero =
                 { var =
                     { challenge = Field.zero
@@ -120,11 +120,9 @@ let verify_one ~srs
           printf "should_verify: %b\n\n%!" should_verify) ;
   (chals, Boolean.(verified &&& finalized ||| not should_verify))
 
-let finalize_previous_and_verify = ()
-
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main :
-    type proofs_verified self_branches prev_vars prev_values prev_ret_vars var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature.
+    type proofs_verified self_branches prev_vars prev_values var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature.
        (module Requests.Step.S
           with type local_signature = local_signature
            and type local_branches = local_branches
@@ -183,11 +181,6 @@ let step_main :
  fun (module Req) max_proofs_verified ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length
      ~proofs_verified ~lte ~public_input ~auxiliary_typ ~basic ~self rule ->
-  let module T (F : T4) = struct
-    type ('a, 'b, 'n, 'm) t =
-      | Other of ('a, 'b, 'n, 'm) F.t
-      | Self : (a_var, a_value, max_proofs_verified, self_branches) t
-  end in
   let module Typ_with_max_proofs_verified = struct
     type ('var, 'value, 'local_max_proofs_verified, 'local_branches) t =
       ( ( 'var
@@ -206,12 +199,12 @@ let step_main :
   in
   let feature_flags =
     let rec go :
-        type e pvars pvals ns1 ns2 br.
+        type pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> (pvars, br) Length.t
-        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t =
+        -> (Opt.Flag.t Plonk_types.Features.Full.t, br) Vector.t =
      fun ds ld ->
-      match (ds, ld) with
+      match[@warning "-4"] (ds, ld) with
       | [], Z ->
           []
       | d :: ds, S ld ->
@@ -225,27 +218,27 @@ let step_main :
   in
   let prev_proof_typs =
     let rec join :
-        type e pvars pvals ns1 ns2 br.
+        type pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> ns1 H1.T(Nat).t
         -> ns2 H1.T(Nat).t
         -> (pvars, br) Length.t
         -> (ns1, br) Length.t
         -> (ns2, br) Length.t
-        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t
+        -> (Opt.Flag.t Plonk_types.Features.Full.t, br) Vector.t
         -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
      fun ds ns1 ns2 ld ln1 ln2 feature_flagss ->
-      match (ds, ns1, ns2, ld, ln1, ln2, feature_flagss) with
+      match[@warning "-4"] (ds, ns1, ns2, ld, ln1, ln2, feature_flagss) with
       | [], [], [], Z, Z, Z, [] ->
           []
-      | ( d :: ds
+      | ( _d :: ds
         , n1 :: ns1
-        , n2 :: ns2
+        , _n2 :: ns2
         , S ld
         , S ln1
         , S ln2
         , feature_flags :: feature_flagss ) ->
-          let t = Per_proof_witness.typ Typ.unit n1 n2 ~feature_flags in
+          let t = Per_proof_witness.typ Typ.unit n1 ~feature_flags in
           t :: join ds ns1 ns2 ld ln1 ln2 feature_flagss
       | [], _, _, _, _, _, _ ->
           .
@@ -274,7 +267,6 @@ let step_main :
         (input_typ, output_typ)
   in
   let main () : _ Types.Step.Statement.t =
-    let open Requests.Step in
     let open Impls.Step in
     let logger = Internal_tracing_context_logger.get () in
     with_label "step_main" (fun () ->
@@ -347,9 +339,11 @@ let step_main :
             in
             Req.Compute_prev_proof_parts previous_proof_statements ) ;
         let dlog_plonk_index =
+          let num_chunks = (* TODO *) 1 in
           exists
             ~request:(fun () -> Req.Wrap_index)
-            (Plonk_verification_key_evals.typ Inner_curve.typ)
+            (Plonk_verification_key_evals.typ
+               (Typ.array ~length:num_chunks Inner_curve.typ) )
         and prevs =
           exists (Prev_typ.f prev_proof_typs) ~request:(fun () ->
               Req.Proof_with_datas )
@@ -390,7 +384,7 @@ let step_main :
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
               let rec go :
-                  type vars vals prev_vals ns1 ns2 n.
+                  type vars vals ns1 ns2 n.
                      (vars, ns1, ns2) H3.T(Per_proof_witness).t
                   -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
                   -> vars H1.T(E01(Digest)).t

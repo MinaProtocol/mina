@@ -4,13 +4,13 @@ open Backend
 open Composition_types
 open Common
 
-let wrap_domains = Common.wrap_domains
+let _wrap_domains = Common.wrap_domains
 
 let evals =
   lazy
     (let open Plonk_types in
     let e =
-      Evals.map (Evaluation_lengths.create ~of_int:Fn.id) ~f:(fun n ->
+      Evals.map Evaluation_lengths.default ~f:(fun n ->
           let a () = Array.create ~len:n (Ro.tock ()) in
           (a (), a ()) )
     in

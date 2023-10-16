@@ -1060,7 +1060,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                           "Account not in ledger, even though there's a \
                            location for it"
                   in
-                  if not @@ Account.equal account account_in_ledger then
+                  if not @@ Account.equal account account_in_ledger then (
                     [%log error]
                       "Account in ledger does not match account in database"
                       ~metadata:
@@ -1069,8 +1069,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                           , Account.to_yojson account_in_ledger )
                         ; ("account_in_database", Account.to_yojson account)
                         ] ;
-                  if continue_on_error then incr error_count
-                  else Core_kernel.exit 1 )
+                    if continue_on_error then incr error_count
+                    else Core_kernel.exit 1 ) )
         in
         let log_state_hash_on_next_slot curr_global_slot_since_genesis =
           match get_slot_hashes curr_global_slot_since_genesis with

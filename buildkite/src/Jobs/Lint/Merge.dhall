@@ -4,6 +4,7 @@ let B = ../../External/Buildkite.dhall
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
@@ -20,7 +21,8 @@ Pipeline.build
     spec = JobSpec::{
       dirtyWhen = [ SelectFiles.everything ],
       path = "Lint",
-      name = "Merge"
+      name = "Merge",
+      tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
     },
     steps = [
       Command.build
@@ -49,6 +51,7 @@ Pipeline.build
           commands = [ Cmd.run "buildkite/scripts/merges-cleanly.sh berkeley"]
           , label = "Check merges cleanly into berkeley"
           , key = "clean-merge-berkeley"
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , target = Size.Small
           , docker = Some Docker::{
               image = (../../Constants/ContainerImages.dhall).toolchainBase

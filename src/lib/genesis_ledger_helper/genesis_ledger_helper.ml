@@ -827,24 +827,25 @@ let load_config_file filename =
       | Error err ->
           Or_error.error_string err )
 
-let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~proof_level (config : Runtime_config.t) =
+let print_config ~logger config =
   let ledger_name_json =
-    match
-      let open Option.Let_syntax in
-      let%bind ledger = config.ledger in
-      ledger.name
-    with
-    | Some name ->
-        `String name
-    | None ->
-        `Null
+    Option.value ~default:`Null
+    @@ let%bind.Option ledger = config.Runtime_config.ledger in
+       let%map.Option name = ledger.name in
+       `String name
   in
+  let json_config, accounts_omitted =
+    Runtime_config.to_yojson_without_accounts config
+  in
+  let f i = List.cons ("accounts_omitted", `Int i) in
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata:
-      [ ("name", ledger_name_json)
-      ; ("config", Runtime_config.to_yojson config)
-      ] ;
+      (Option.value_map ~f ~default:Fn.id accounts_omitted
+         [ ("name", ledger_name_json); ("config", json_config) ] )
+
+let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
+    ~proof_level (config : Runtime_config.t) =
+  print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
   let proof_level =

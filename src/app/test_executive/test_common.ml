@@ -86,7 +86,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Malleable_error.hard_error_format
           "Node '%s' did not have a network keypair, if node is a block \
            producer this should not happen"
-          (Engine.Network.Node.id node)
+          (Engine.Network.Node.infra_id node)
 
   let pub_key_of_node =
     make_get_key ~f:(fun nk ->
@@ -155,8 +155,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* this check checks if every single peer in the network is connected to every other peer, in graph theory this network would be a complete graph.  this property will only hold true on small networks *)
     let check_peer_connected_to_all_others ~nodes_by_peer_id ~peer_id
         ~connected_peers =
-      let get_node_id p =
-        p |> String.Map.find_exn nodes_by_peer_id |> Engine.Network.Node.id
+      let get_node_infra_id p =
+        p
+        |> String.Map.find_exn nodes_by_peer_id
+        |> Engine.Network.Node.infra_id
       in
       let expected_peers =
         nodes_by_peer_id |> String.Map.keys
@@ -165,7 +167,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Malleable_error.List.iter expected_peers ~f:(fun p ->
           let error =
             Printf.sprintf "node %s (id=%s) is not connected to node %s (id=%s)"
-              (get_node_id peer_id) peer_id (get_node_id p) p
+              (get_node_infra_id peer_id)
+              peer_id (get_node_infra_id p) p
             |> Error.of_string
           in
           Malleable_error.ok_if_true
@@ -438,4 +441,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     else
       let error = String.concat error_logs ~sep:"\n  " in
       Malleable_error.hard_error_string ("Replayer errors:\n  " ^ error)
+
+  let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
+      ~vesting_increment : Mina_base.Account_timing.t =
+    let open Currency in
+    Timed
+      { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
+      ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
+      ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
+      ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
+      ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
+      }
 end
