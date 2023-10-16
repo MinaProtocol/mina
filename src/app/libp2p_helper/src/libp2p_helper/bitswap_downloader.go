@@ -106,7 +106,7 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 		bitswapLogger.Errorf("Tag %d is not supported by Bitswap downloader", tag)
 	}
 	if err := bs.SetStatus(root_, codanet.Partial); err != nil {
-		bitswapLogger.Debugf("Skipping download request for %s due to status: %w", codanet.BlockHashToCidSuffix(root_), err)
+		bitswapLogger.Debugf("Skipping download request for %s due to status: %s", codanet.BlockHashToCidSuffix(root_), err)
 		status, err := bs.GetStatus(root_)
 		if err == nil && status == codanet.Full {
 			bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root_)
@@ -131,7 +131,7 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 		remainingNodeCounter: 1,
 	}
 	handleError := func(err error) {
-		bitswapLogger.Errorf("Error initializing block download: %w", err)
+		bitswapLogger.Errorf("Error initializing block download: %s", err)
 		ClearRootDownloadState(bs, root_)
 	}
 	var rootBlock []byte
@@ -319,7 +319,7 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 			if err != (ipld.ErrNotFound{Cid: codanet.BlockHashToCid(link)}) {
 				// we still schedule blocks for downloading
 				// this case should rarely happen in practice
-				bitswapLogger.Warnf("Failed to retrieve block %s from storage: %w", childId, err)
+				bitswapLogger.Warnf("Failed to retrieve block %s from storage: %s", childId, err)
 			}
 			toDownload = append(toDownload, childId)
 		}

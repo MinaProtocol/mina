@@ -207,12 +207,12 @@ module Block_produced = struct
       find int breadcrumb_consensus_state [ "blockchain_length" ]
     in
     let%bind global_slot =
-      (* the associated field looks like "slot_number":["Since_hard_fork", 1] *)
+      (* the associated field looks like "slot_number":1 *)
       let%map global_slot_since_hard_fork =
-        find (list string) breadcrumb_consensus_state
+        find string breadcrumb_consensus_state
           [ "curr_global_slot"; "slot_number" ]
       in
-      List.nth_exn global_slot_since_hard_fork 1 |> Int.of_string
+      Int.of_string global_slot_since_hard_fork
     in
     let%map epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
     { block_height; global_slot; epoch; snarked_ledger_generated; state_hash }
@@ -230,7 +230,8 @@ module Breadcrumb_added = struct
 
   type t =
     { state_hash : State_hash.t
-    ; user_commands : User_command.Valid.t With_status.t list
+    ; transaction_hashes :
+        Mina_transaction.Transaction_hash.t With_status.t list
     }
   [@@deriving to_yojson]
 
@@ -244,11 +245,11 @@ module Breadcrumb_added = struct
     let state_hash =
       parser_from_of_yojson State_hash.of_yojson state_hash_json
     in
-    let%map user_commands =
+    let%map transaction_hashes =
       get_metadata message "user_commands"
-      >>= parse valid_commands_with_statuses
+      >>= parse transaction_hashes_with_statuses
     in
-    { state_hash; user_commands }
+    { state_hash; transaction_hashes }
 
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
@@ -378,8 +379,7 @@ module Gossip = struct
   end
 
   module Transactions = struct
-    type r =
-      { txns : Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t }
+    type r = { fee_payer_summaries : User_command.fee_payer_summary_t list }
     [@@deriving yojson, hash]
 
     type t = r With_direction.t [@@deriving yojson]
@@ -393,10 +393,10 @@ module Gossip = struct
     let parse_func message =
       match%bind parse id message with
       | Network_pool.Transaction_pool.Resource_pool.Diff.Transactions_received
-          { txns; sender = _ } ->
-          Ok ({ txns }, Direction.Received)
-      | Mina_networking.Gossip_transaction_pool_diff { txns } ->
-          Ok ({ txns }, Sent)
+          { fee_payer_summaries; sender = _ } ->
+          Ok ({ fee_payer_summaries }, Direction.Received)
+      | Mina_networking.Gossip_transaction_pool_diff { fee_payer_summaries } ->
+          Ok ({ fee_payer_summaries }, Sent)
       | _ ->
           bad_parse
 
@@ -864,10 +864,7 @@ let%test_unit "parse breadcrumb functions properly" =
                     "block_creator": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
                     "curr_global_slot": {
                       "slots_per_epoch": "480",
-                      "slot_number": [
-                        "Since_hard_fork",
-                        "14"
-                      ]
+                      "slot_number": "14"
                     },
                     "staking_epoch_data": {
                       "lock_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
@@ -905,10 +902,7 @@ let%test_unit "parse breadcrumb functions properly" =
                       "2"
                     ],
                     "total_currency": "730300000001000",
-                    "global_slot_since_genesis": [
-                      "Since_genesis",
-                      "14"
-                    ],
+                    "global_slot_since_genesis": "14",
                     "epoch_count": "0",
                     "min_window_density": "22",
                     "has_ancestor_in_same_checkpoint_window": true,
