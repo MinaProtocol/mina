@@ -286,19 +286,6 @@ let add_tests, get_tests =
   ( (fun name testcases -> tests := (name, testcases) :: !tests)
   , fun () -> List.rev !tests )
 
-let constraint_constants =
-  { Snark_keys_header.Constraint_constants.sub_windows_per_window = 0
-  ; ledger_depth = 0
-  ; work_delay = 0
-  ; block_window_duration_ms = 0
-  ; transaction_capacity = Log_2 0
-  ; pending_coinbase_depth = 0
-  ; coinbase_amount = Unsigned.UInt64.of_int 0
-  ; supercharged_coinbase_factor = 0
-  ; account_creation_fee = Unsigned.UInt64.of_int 0
-  ; fork = None
-  }
-
 let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
   if feature_flags.rot then main_rot () ;
   if feature_flags.xor then main_xor () ;
@@ -317,7 +304,6 @@ let register_test name feature_flags1 feature_flags2 =
       ~branches:(module Nat.N2)
       ~max_proofs_verified:(module Nat.N0)
       ~name:"optional_custom_gates"
-      ~constraint_constants (* TODO(mrmr1993): This was misguided.. Delete. *)
       ~choices:(fun ~self:_ ->
         [ { identifier = "main1"
           ; prevs = []

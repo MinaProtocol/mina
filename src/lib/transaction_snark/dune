@@ -66,6 +66,8 @@
    ppx_version.runtime
    logger
    zkapp_command_builder
+   snark_keys_header
+   mina_version
  )
  (preprocess
   (pps ppx_snarky ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
