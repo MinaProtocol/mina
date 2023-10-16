@@ -29,7 +29,7 @@ export PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:54
 
 # Mina Archive variables
 export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
-export MINA_ARCHIVE_SQL_SCHEMA_PATH=${MINA_ARCHIVE_SQL_SCHEMA_PATH:=/archive/create_schema.sql}
+export MINA_ARCHIVE_SQL_SCHEMA_PATH=${MINA_ARCHIVE_SQL_SCHEMA_PATH:=/etc/mina/rosetta/archive/create_schema.sql}
 
 # Mina Rosetta variables
 export MINA_ROSETTA_ONLINE_PORT=${MINA_ROSETTA_ONLINE_PORT:=3087}
