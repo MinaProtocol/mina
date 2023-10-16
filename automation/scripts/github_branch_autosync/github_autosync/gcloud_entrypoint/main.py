@@ -1,8 +1,9 @@
 ''' Main module for handling incoming github webhook event'''
 
 from .lib import GithubPayloadInfo, config, GithubApi, GithubException, verify_signature,is_push_event
+from typing import Optional 
 
-def handle_incoming_commit_push(request):
+def handle_request(request):
     """Responds to any HTTP request.
     Args:
         request (flask.Request): HTTP request object.
@@ -11,13 +12,34 @@ def handle_incoming_commit_push(request):
         Response object using
         `make_response <http://flask.pocoo.org/docs/1.0/api/#flask.Flask.make_response>`.
     """
-    verify_signature(request.data, config.github["secret"], request.headers['x-hub-signature-256'])
-    if not is_push_event(request):
+    event = WebHookEvent(request)
+
+    if not event.is_push_event():
         print("not a push event. skipping...")
         return
+    
+    repository_name = event.repo()
 
-    handle_incoming_commit_push_json(request.json,config=config)
+    if config.repo_fullname() == repository_name:
+        event.verify_signature(request.data, config.github.secret, request.headers['x-hub-signature-256'])
+        handle_incoming_commit_push(event,config=config)
+    
+    else:
+    
+        submodule = config.submodules_for_name(repository_name)
+
+        if submodule.is_none():
+            print("unknown source repository. skipping...")
+            return
+        else:
+            event.verify_signature(request.data, submodule.secret, request.headers['x-hub-signature-256'])
+            handle_incoming_commit_push_in_submodule(event,config=config)
+    
     print("done")
+    
+def handle_incoming_commit_from_submodule(event,config):
+    
+
     return
 
 def handle_incoming_commit_push_in_stable_branches(source_branch):

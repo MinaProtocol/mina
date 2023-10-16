@@ -21,12 +21,9 @@ class GithubApi:
     '''
 
     def __init__(self, config):
-        self.token = config["token"]
-        self.username = config["username"]
-        self.repo = config["repo"]
+        self.config = config
         self.github = Github(self.token)
         self.default_timeout = 60
-        self.dryrun = bool(config["dryrun"])
 
     def repository(self):
         '''
@@ -194,13 +191,13 @@ class GithubApi:
             Returns:
                 return PullRequest object
         """
-        title = config.pr["title_prefix"] + f" {source_branch} and {target_branch}"
-        assignee_tags = list(map(lambda x: "@" + x, config.pr["assignees"]))
+        title = config.pr.title_prefix + f"into {source_branch} from {target_branch}"
+        assignee_tags = list(map(lambda x: "@" + x, config.pr.assignees))
         separator = ", "
-        body = config.pr["body_prefix"] + "\n" + separator.join(assignee_tags)
+        body = config.pr.body_prefix + "\n" + separator.join(assignee_tags)
         base = target_branch
         head = new_branch
-        draft = bool(config.pr["draft"])
+        draft = config.pr.draft
         self.repository().create_pull(title=title,body=body,base=base,head=head,draft=draft,assignees=assignee_tags,labels=config.pr["labels"])
         return title
          
@@ -217,14 +214,14 @@ class GithubApi:
             Returns:
                 return PullRequest object
         """
-        title = config.pr["title_prefix"] + f"{source_branch} from {temp_branch} for commit {self.branch(source_branch).commit.sha[0:6]}"
-        assignee_tags = list(map(lambda x: "@" + x, config.pr["assignees"]))
+        title = config.pr.title_prefix + f"into {source_branch} from {temp_branch} for commit {self.branch(source_branch).commit.sha[0:6]}"
+        assignee_tags = list(map(lambda x: "@" + x, config.pr.assignees))
         separator = ", "
-        body = config.pr["body_prefix"] + "\n" + separator.join(assignee_tags)
+        body = config.pr.body_prefix + "\n" + separator.join(assignee_tags)
         base = temp_branch
         head = source_branch
-        draft = bool(config.pr["draft"])
-        self.repository().create_pull(title,body,base,head,draft,assignees=config.pr["assigness"],labels=config.pr["labels"])
+        draft = config.pr.draft
+        self.repository().create_pull(title,body,base,head,draft,assignees=config.pr["assigness"],labels=config.pr.labels)
         return title
     
     def branch_exists(self, branch):
@@ -243,7 +240,7 @@ class GithubApi:
             Parameters:
                 base (string): base branch name
                 head (string): head branch name
-                commit (string): commit message 
+                commit (string): commit message
 
         """
         self.repository().merge(base,head,message)
