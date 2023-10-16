@@ -8,9 +8,9 @@ make snarkyjs
 
 echo "Prepare SnarkyJS test module and pack into archive"
 npm pack src/lib/snarkyjs
-mv snarkyjs-*.tgz snarkyjs.tgz
+mv o1js-*.tgz o1js.tgz
 cd src/lib/snarkyjs/tests/integration
-npm i ../../../../../snarkyjs.tgz
+npm i ../../../../../o1js.tgz
 cp $(which node) ./node
 cd ../../../../..
 tar -chzf snarkyjs_test.tar.gz src/lib/snarkyjs/tests/integration
