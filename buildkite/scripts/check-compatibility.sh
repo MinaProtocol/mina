@@ -82,37 +82,22 @@ function boot_and_sync {
     # allow time to boot
     sleep 20
 
-    attempt_num=0
-
-    # 30 minutes
-    attempt_max=120
-
     SYNCED=0
-    
     REST_SERVER="http://127.0.0.1:$REST_PORT/graphql"
 
-    while [[ $SYNCED -eq 0 && $attempt_num -lt $attempt_max ]]; do
-        SYNC_STATUS=$(docker container exec -it $DAEMON_CONTAINER \
-                    curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
+    while [ $SYNCED -eq 0 ]; do
+	SYNC_STATUS=$(docker container exec -it $DAEMON_CONTAINER \
+			     curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
 
-        # print logs
-        docker container logs $DAEMON_CONTAINER --tail 10
+	# "connection refused" until GraphQL server up
+	GOT_SYNC_STATUS=$(echo ${SYNC_STATUS} | grep "syncStatus")
+	if [ ! -z $GOT_SYNC_STATUS ]; then
+	    echo "Sync status:" $GOT_SYNC_STATUS
+	fi
 
-        # "connection refused" until GraphQL server up
-        GOT_SYNC_STATUS=$(echo ${SYNC_STATUS} | grep "syncStatus")
-        if [ ! -z $GOT_SYNC_STATUS ]; then
-            echo $(date +'%Y-%m-%d %H:%M:%S') ". Sync status:" $GOT_SYNC_STATUS
-        fi
-
-        SYNCED=$(echo ${SYNC_STATUS} | grep -c "SYNCED")
-        sleep 5
-        attempt_num=$((attempt_num+1))
+	SYNCED=$(echo ${SYNC_STATUS} | grep -c "SYNCED")
+	sleep 5
     done
-
-    if [ $SYNCED -eq 0 ]; then
-        echo "Hit timeout for $IMAGE_ID to sync. exiting..."
-        exit 1
-    fi
 }
 
 function rm_docker_container {

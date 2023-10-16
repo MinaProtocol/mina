@@ -38,7 +38,8 @@ in Pipeline.build Pipeline.Config::{
       key = "develop-compatibilty-test",
       target = Size.XLarge,
       docker = None Docker.Type,
-      depends_on = dependsOn
+      depends_on = dependsOn,
+      timeout_in_minutes = Some 60
     }
   ]
 }
