@@ -10,6 +10,7 @@
    core_kernel
    yojson
    ;; local libraries
+   protocol_version
    mina_base.import
    pickles.backend
    kimchi_backend.pasta

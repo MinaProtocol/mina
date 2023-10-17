@@ -24,60 +24,7 @@ module Make (Input : Input_intf) = struct
 
   let memo = Signed_command_memo.create_from_string_exn test_description
 
-  let%test_unit "update a snapp account with signature" =
-    Quickcheck.test ~trials:1 U.gen_snapp_ledger
-      ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
-        let fee = Fee.of_nanomina_int_exn 1_000_000 in
-        let amount = Amount.of_mina_int_exn 10 in
-        let test_spec : Spec.t =
-          { sender = (new_kp, Mina_base.Account.Nonce.zero)
-          ; fee
-          ; fee_payer = None
-          ; receivers = []
-          ; amount
-          ; zkapp_account_keypairs = [ new_kp ]
-          ; memo
-          ; new_zkapp_account = false
-          ; snapp_update
-          ; current_auth = Permissions.Auth_required.Signature
-          ; call_data = Snark_params.Tick.Field.zero
-          ; events = []
-          ; actions = []
-          ; preconditions = None
-          }
-        in
-        U.test_snapp_update test_spec ~init_ledger ~vk ~zkapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key) )
-
-  let%test_unit "update a snapp account with proof" =
-    Quickcheck.test ~trials:1 U.gen_snapp_ledger
-      ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
-        let fee = Fee.of_nanomina_int_exn 1_000_000 in
-        let amount = Amount.of_mina_int_exn 10 in
-        let test_spec : Spec.t =
-          { sender = (new_kp, Mina_base.Account.Nonce.zero)
-          ; fee
-          ; fee_payer = None
-          ; receivers = []
-          ; amount
-          ; zkapp_account_keypairs = [ new_kp ]
-          ; memo
-          ; new_zkapp_account = false
-          ; snapp_update
-          ; current_auth = Permissions.Auth_required.Proof
-          ; call_data = Snark_params.Tick.Field.zero
-          ; events = []
-          ; actions = []
-          ; preconditions = None
-          }
-        in
-        U.test_snapp_update
-          ~snapp_permissions:
-            (U.permissions_from_update snapp_update ~auth:Proof)
-          test_spec ~init_ledger ~vk ~zkapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key) )
-
-  let%test_unit "update a snapp account with None permission" =
+  let mk_update_perm_check ~current_auth ~account_perm ?failure_expected () =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
       ~f:(fun ({ init_ledger; specs }, new_kp) ->
         let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -93,200 +40,78 @@ module Make (Input : Input_intf) = struct
           ; memo
           ; new_zkapp_account = false
           ; snapp_update
-          ; current_auth = Permissions.Auth_required.None
+          ; current_auth
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; actions = []
           ; preconditions = None
           }
         in
-        U.test_snapp_update
-          ~snapp_permissions:(U.permissions_from_update snapp_update ~auth:None)
+        U.test_snapp_update ?expected_failure:failure_expected
+          ~snapp_permissions:
+            (U.permissions_from_update snapp_update ~auth:account_perm)
           test_spec ~init_ledger ~vk ~zkapp_prover
           ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-  let%test_unit "update a snapp account with None permission and Signature auth"
+  let%test_unit "account update using None auth when perm is set to Either" =
+    mk_update_perm_check ~current_auth:None ~account_perm:Either
+      ~failure_expected ()
+
+  let%test_unit "account update using None auth when perm is set to Impossible"
       =
-    Quickcheck.test ~trials:1 U.gen_snapp_ledger
-      ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        let fee = Fee.of_nanomina_int_exn 1_000_000 in
-        let amount = Amount.of_mina_int_exn 10 in
-        let spec = List.hd_exn specs in
-        let test_spec : Spec.t =
-          { sender = spec.sender
-          ; fee
-          ; fee_payer = None
-          ; receivers = []
-          ; amount
-          ; zkapp_account_keypairs = [ new_kp ]
-          ; memo
-          ; new_zkapp_account = false
-          ; snapp_update
-          ; current_auth = Permissions.Auth_required.Signature
-          ; call_data = Snark_params.Tick.Field.zero
-          ; events = []
-          ; actions = []
-          ; preconditions = None
-          }
-        in
-        U.test_snapp_update
-          ~snapp_permissions:(U.permissions_from_update snapp_update ~auth:None)
-          test_spec ~init_ledger ~vk ~zkapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key) )
+    mk_update_perm_check ~current_auth:None ~account_perm:Impossible
+      ~failure_expected ()
 
-  let%test_unit "update a snapp account with None permission and Proof auth" =
-    Quickcheck.test ~trials:1 U.gen_snapp_ledger
-      ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        let fee = Fee.of_nanomina_int_exn 1_000_000 in
-        let amount = Amount.of_mina_int_exn 10 in
-        let spec = List.hd_exn specs in
-        let test_spec : Spec.t =
-          { sender = spec.sender
-          ; fee
-          ; fee_payer = None
-          ; receivers = []
-          ; amount
-          ; zkapp_account_keypairs = [ new_kp ]
-          ; memo
-          ; new_zkapp_account = false
-          ; snapp_update
-          ; current_auth = Permissions.Auth_required.Proof
-          ; call_data = Snark_params.Tick.Field.zero
-          ; events = []
-          ; actions = []
-          ; preconditions = None
-          }
-        in
-        U.test_snapp_update
-          ~snapp_permissions:(U.permissions_from_update snapp_update ~auth:None)
-          test_spec ~init_ledger ~vk ~zkapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key) )
+  let%test_unit "account update using None auth when perm is set to None" =
+    mk_update_perm_check ~current_auth:None ~account_perm:None ()
 
-  let%test_unit "update a snapp account with Either permission and Signature \
-                 auth" =
-    Quickcheck.test ~trials:1 U.gen_snapp_ledger
-      ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        let fee = Fee.of_nanomina_int_exn 1_000_000 in
-        let amount = Amount.of_mina_int_exn 10 in
-        let spec = List.hd_exn specs in
-        let test_spec : Spec.t =
-          { sender = spec.sender
-          ; fee
-          ; fee_payer = None
-          ; receivers = []
-          ; amount
-          ; zkapp_account_keypairs = [ new_kp ]
-          ; memo
-          ; new_zkapp_account = false
-          ; snapp_update
-          ; current_auth = Permissions.Auth_required.Signature
-          ; call_data = Snark_params.Tick.Field.zero
-          ; events = []
-          ; actions = []
-          ; preconditions = None
-          }
-        in
-        U.test_snapp_update
-          ~snapp_permissions:
-            (U.permissions_from_update snapp_update ~auth:Either)
-          test_spec ~init_ledger ~vk ~zkapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key) )
+  let%test_unit "account update using None auth when perm is set to Proof" =
+    mk_update_perm_check ~current_auth:None ~account_perm:Proof
+      ~failure_expected ()
 
-  let%test_unit "update a snapp account with Either permission and Proof auth" =
-    Quickcheck.test ~trials:1 U.gen_snapp_ledger
-      ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        let fee = Fee.of_nanomina_int_exn 1_000_000 in
-        let amount = Amount.of_mina_int_exn 10 in
-        let spec = List.hd_exn specs in
-        let test_spec : Spec.t =
-          { sender = spec.sender
-          ; fee
-          ; fee_payer = None
-          ; receivers = []
-          ; amount
-          ; zkapp_account_keypairs = [ new_kp ]
-          ; memo
-          ; new_zkapp_account = false
-          ; snapp_update
-          ; current_auth = Permissions.Auth_required.Proof
-          ; call_data = Snark_params.Tick.Field.zero
-          ; events = []
-          ; actions = []
-          ; preconditions = None
-          }
-        in
-        U.test_snapp_update
-          ~snapp_permissions:
-            (U.permissions_from_update snapp_update ~auth:Either)
-          test_spec ~init_ledger ~vk ~zkapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key) )
+  let%test_unit "account update using None auth when perm is set to Signature" =
+    mk_update_perm_check ~current_auth:None ~account_perm:Signature
+      ~failure_expected ()
 
-  let%test_unit "update a snapp account with Either permission and None auth" =
-    Quickcheck.test ~trials:1 U.gen_snapp_ledger
-      ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        let fee = Fee.of_nanomina_int_exn 1_000_000 in
-        let amount = Amount.of_mina_int_exn 10 in
-        let spec = List.hd_exn specs in
-        let test_spec : Spec.t =
-          { sender = spec.sender
-          ; fee
-          ; fee_payer = None
-          ; receivers = []
-          ; amount
-          ; zkapp_account_keypairs = [ new_kp ]
-          ; memo
-          ; new_zkapp_account = false
-          ; snapp_update
-          ; current_auth = Permissions.Auth_required.None
-          ; call_data = Snark_params.Tick.Field.zero
-          ; events = []
-          ; actions = []
-          ; preconditions = None
-          }
-        in
-        U.test_snapp_update ~expected_failure:failure_expected
-          ~snapp_permissions:
-            (U.permissions_from_update snapp_update ~auth:Either)
-          test_spec ~init_ledger ~vk ~zkapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key) )
+  let%test_unit "account update using Proof auth when perm is set to Either" =
+    mk_update_perm_check ~current_auth:Proof ~account_perm:Either ()
 
-  let%test_unit "Update when not permitted but transaction is applied" =
-    let open Mina_transaction_logic.For_tests in
-    Quickcheck.test ~trials:1 U.gen_snapp_ledger
-      ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-            let spec = List.hd_exn specs in
-            let fee = Fee.of_nanomina_int_exn 1_000_000 in
-            let amount = Amount.of_mina_int_exn 10 in
-            let test_spec : Spec.t =
-              { sender = spec.sender
-              ; fee
-              ; fee_payer = None
-              ; receivers = []
-              ; amount
-              ; zkapp_account_keypairs = [ new_kp ]
-              ; memo
-              ; new_zkapp_account = false
-              ; snapp_update
-              ; current_auth = Permissions.Auth_required.Signature
-              ; call_data = Snark_params.Tick.Field.zero
-              ; events = []
-              ; actions = []
-              ; preconditions = None
-              }
-            in
-            let snapp_pk = Public_key.compress new_kp.public_key in
-            Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-            (*Create snapp transaction*)
-            Transaction_snark.For_tests.create_trivial_zkapp_account
-              ~permissions:(U.permissions_from_update snapp_update ~auth:Proof)
-              ~vk ~ledger snapp_pk ;
-            (*Ledger.apply_transaction should be successful if fee payer update
-              is successful*)
-            U.test_snapp_update ~expected_failure:failure_expected
-              ~snapp_permissions:
-                (U.permissions_from_update snapp_update ~auth:Proof)
-              ~vk ~zkapp_prover test_spec ~init_ledger ~snapp_pk ) )
+  let%test_unit "account update using Proof auth when perm is set to Impossible"
+      =
+    mk_update_perm_check ~current_auth:Proof ~account_perm:Impossible
+      ~failure_expected ()
+
+  let%test_unit "account update using Proof auth when perm is set to None" =
+    mk_update_perm_check ~current_auth:Proof ~account_perm:Proof ()
+
+  let%test_unit "account update using Proof auth when perm is set to Proof" =
+    mk_update_perm_check ~current_auth:Proof ~account_perm:Proof ()
+
+  let%test_unit "account update using Proof auth when perm is set to Signature"
+      =
+    mk_update_perm_check ~current_auth:Proof ~account_perm:Signature
+      ~failure_expected ()
+
+  let%test_unit "account update using Signature auth when perm is set to Either"
+      =
+    mk_update_perm_check ~current_auth:Signature ~account_perm:Either ()
+
+  let%test_unit "account update using Signature auth when perm is set to \
+                 Impossible" =
+    mk_update_perm_check ~current_auth:Signature ~account_perm:Impossible
+      ~failure_expected ()
+
+  let%test_unit "account update using Signature auth when perm is set to None" =
+    mk_update_perm_check ~current_auth:Signature ~account_perm:None ()
+
+  let%test_unit "account update using Signature auth when perm is set to Proof"
+      =
+    mk_update_perm_check ~current_auth:Signature ~account_perm:Proof
+      ~failure_expected ()
+
+  let%test_unit "account update using Signature auth when perm is set to \
+                 Signature" =
+    mk_update_perm_check ~current_auth:Signature ~account_perm:Signature ()
 
   let test_non_zkapp_to_zkapp ?(new_account = true) test_spec init_ledger
       (zkapp_kp : Keypair.t) =
