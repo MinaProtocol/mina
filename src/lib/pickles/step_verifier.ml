@@ -854,8 +854,7 @@ struct
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
       ~(step_domains :
-         [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
-      ~zk_rows
+         [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] ) ~zk_rows
       ~(* TODO: Add "actual proofs verified" so that proofs don't
           carry around dummy "old bulletproof challenges" *)
        sponge ~(prev_challenges : (_, b) Vector.t)
