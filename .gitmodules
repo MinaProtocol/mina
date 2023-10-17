@@ -16,4 +16,5 @@
 	url = https://github.com/MinaProtocol/c-reference-signer.git
 [submodule "src/lib/snarky_js_bindings/snarkyjs"]
 	path = src/lib/snarkyjs
-	url = https://github.com/o1-labs/snarkyjs.git
+	url = https://github.com/lambdaclass/snarkyjs.git
+	branch = kzg_prover
