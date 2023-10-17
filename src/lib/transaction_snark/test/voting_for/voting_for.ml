@@ -29,7 +29,10 @@ let%test_module "Update account voting-for" =
 
     include Transaction_snark_tests.Test_zkapp_update.Make (Test_input)
 
-    (*let () =
-      Yojson.Safe.to_file "proof_cache.json.out"
-      @@ Pickles.Proof_cache.to_yojson proof_cache*)
+    let () =
+      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )
