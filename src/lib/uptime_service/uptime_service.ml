@@ -82,7 +82,6 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                 ; ("url", `String (Uri.to_string url))
                 ; ("http_code", `Int status_code)
                 ; ("http_error", `String status_string)
-                ; ("payload", json)
                 ]
           else if attempt >= max_attempts then
             let base_metadata =
@@ -90,7 +89,6 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
               ; ("url", `String (Uri.to_string url))
               ; ("http_code", `Int status_code)
               ; ("http_error", `String status_string)
-              ; ("payload", json)
               ]
             in
             let extra_metadata = metadata_of_body body in
@@ -121,7 +119,6 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
             ~metadata:
               [ ("state_hash", State_hash.to_yojson state_hash)
               ; ("url", `String (Uri.to_string url))
-              ; ("payload", json)
               ; ("error", `String (Exn.to_string exn))
               ] ;
           (* retry *)
@@ -134,10 +131,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
         [%log error]
           "In uptime service, POST of block with state hash $state_hash was \
            interrupted"
-          ~metadata:
-            [ ("state_hash", State_hash.to_yojson state_hash)
-            ; ("payload", json)
-            ] ;
+          ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
         (* interrupted, don't want to retry, claim success *)
         true
   in

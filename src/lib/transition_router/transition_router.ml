@@ -70,7 +70,7 @@ let is_transition_for_bootstrap ~context:(module Context : CONTEXT) frontier
           ~existing:root_consensus_state ~candidate:new_consensus_state
 
 let start_transition_frontier_controller ~context:(module Context : CONTEXT)
-    ~trust_system ~verifier ~network ~time_controller
+    ~trust_system ~verifier ~network ~time_controller ~get_completed_work
     ~producer_transition_reader_ref ~producer_transition_writer_ref
     ~verified_transition_writer ~clear_reader ~collected_transitions
     ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
@@ -103,7 +103,8 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
     Transition_frontier_controller.run
       ~context:(module Context)
       ~trust_system ~verifier ~network ~time_controller ~collected_transitions
-      ~frontier ~network_transition_reader:!transition_reader_ref
+      ~frontier ~get_completed_work
+      ~network_transition_reader:!transition_reader_ref
       ~producer_transition_reader ~clear_reader
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
@@ -113,10 +114,11 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
   |> don't_wait_for
 
 let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
-    ~verifier ~network ~time_controller ~producer_transition_reader_ref
-    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
-    ~transition_reader_ref ~transition_writer_ref ~consensus_local_state
-    ~frontier_w ~initial_root_transition ~persistent_root ~persistent_frontier
+    ~verifier ~network ~time_controller ~get_completed_work
+    ~producer_transition_reader_ref ~producer_transition_writer_ref
+    ~verified_transition_writer ~clear_reader ~transition_reader_ref
+    ~transition_writer_ref ~consensus_local_state ~frontier_w
+    ~initial_root_transition ~persistent_root ~persistent_frontier
     ~best_seen_transition ~catchup_mode =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
@@ -156,7 +158,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
       Strict_pipe.Writer.kill !transition_writer_ref ;
       start_transition_frontier_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller
+        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_reader_ref ~producer_transition_writer_ref
         ~verified_transition_writer ~clear_reader ~collected_transitions
         ~transition_reader_ref ~transition_writer_ref ~frontier_w new_frontier
@@ -329,11 +331,12 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
     ]
 
 let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
-    ~is_seed ~is_demo_mode ~verifier ~trust_system ~time_controller ~frontier_w
-    ~producer_transition_reader_ref ~producer_transition_writer_ref
-    ~clear_reader ~verified_transition_writer ~transition_reader_ref
-    ~transition_writer_ref ~most_recent_valid_block_writer ~persistent_root
-    ~persistent_frontier ~consensus_local_state ~catchup_mode ~notify_online =
+    ~is_seed ~is_demo_mode ~verifier ~trust_system ~time_controller
+    ~get_completed_work ~frontier_w ~producer_transition_reader_ref
+    ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
+    ~transition_reader_ref ~transition_writer_ref
+    ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
+    ~consensus_local_state ~catchup_mode ~notify_online =
   let open Context in
   [%log info] "Initializing transition router" ;
   let%bind () =
@@ -363,7 +366,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
       in
       start_bootstrap_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller
+        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_reader_ref ~producer_transition_writer_ref
         ~verified_transition_writer ~clear_reader ~transition_reader_ref
         ~consensus_local_state ~transition_writer_ref ~frontier_w
@@ -394,11 +397,12 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
           start_bootstrap_controller
             ~context:(module Context)
             ~trust_system ~verifier ~network ~time_controller
-            ~producer_transition_reader_ref ~producer_transition_writer_ref
-            ~verified_transition_writer ~clear_reader ~transition_reader_ref
-            ~consensus_local_state ~transition_writer_ref ~frontier_w
-            ~persistent_root ~persistent_frontier ~initial_root_transition
-            ~catchup_mode ~best_seen_transition:(Some best_tip)
+            ~get_completed_work ~producer_transition_reader_ref
+            ~producer_transition_writer_ref ~verified_transition_writer
+            ~clear_reader ~transition_reader_ref ~consensus_local_state
+            ~transition_writer_ref ~frontier_w ~persistent_root
+            ~persistent_frontier ~initial_root_transition ~catchup_mode
+            ~best_seen_transition:(Some best_tip)
       | _ ->
           if Option.is_some best_tip then
             [%log info]
@@ -453,9 +457,10 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
           start_transition_frontier_controller
             ~context:(module Context)
             ~trust_system ~verifier ~network ~time_controller
-            ~producer_transition_reader_ref ~producer_transition_writer_ref
-            ~verified_transition_writer ~clear_reader ~collected_transitions
-            ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier )
+            ~get_completed_work ~producer_transition_reader_ref
+            ~producer_transition_writer_ref ~verified_transition_writer
+            ~clear_reader ~collected_transitions ~transition_reader_ref
+            ~transition_writer_ref ~frontier_w frontier )
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -507,7 +512,7 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
     ~producer_transition_reader
     ~most_recent_valid_block:
       (most_recent_valid_block_reader, most_recent_valid_block_writer)
-    ~catchup_mode ~notify_online () =
+    ~get_completed_work ~catchup_mode ~notify_online () =
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
@@ -582,9 +587,9 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
         initialize ~sync_local_state
           ~context:(module Context)
           ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
-          ~persistent_frontier ~persistent_root ~time_controller ~frontier_w
-          ~producer_transition_reader_ref ~catchup_mode
-          ~producer_transition_writer_ref ~clear_reader
+          ~persistent_frontier ~persistent_root ~time_controller
+          ~get_completed_work ~frontier_w ~producer_transition_reader_ref
+          ~catchup_mode ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~transition_reader_ref
           ~transition_writer_ref ~most_recent_valid_block_writer
           ~consensus_local_state ~notify_online
@@ -647,7 +652,7 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
                         start_bootstrap_controller
                           ~context:(module Context)
                           ~trust_system ~verifier ~network ~time_controller
-                          ~producer_transition_reader_ref
+                          ~get_completed_work ~producer_transition_reader_ref
                           ~producer_transition_writer_ref
                           ~verified_transition_writer ~clear_reader
                           ~transition_reader_ref ~transition_writer_ref
