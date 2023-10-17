@@ -84,9 +84,9 @@ module "testworld-2-0" {
   watchdog_image              = "gcr.io/o1labs-192920/watchdog:0.4.13"
   use_embedded_runtime_config = true
 
-  archive_node_count            = 3
+  archive_node_count            = 2
   mina_archive_schema           = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/20a2b3ab80546d06a69996e6ad76e112b727b79b/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/20a2b3ab80546d06a69996e6ad76e112b727b79b/src/app/archive/zkapp_tables.sql"]
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/2.0.0rampup5/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/2.0.0rampup5/src/app/archive/zkapp_tables.sql"]
 
   archive_configs = [
     {
