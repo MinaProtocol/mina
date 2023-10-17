@@ -685,12 +685,12 @@ let profile_zkapps ~verifier ledger zkapp_commands =
         let%bind res =
           Verifier.verify_commands verifier
             [ { With_status.data =
-                  User_command.to_verifiable ~status:Applied
+                  User_command.to_verifiable ~failed:false
                     ~find_vk:
-                      (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
-                         ~get:Mina_ledger.Ledger.get
+                      (Zkapp_command.Verifiable.load_vk_from_ledger
+                         ~get:(Mina_ledger.Ledger.get ledger)
                          ~location_of_account:
-                           Mina_ledger.Ledger.location_of_account )
+                           (Mina_ledger.Ledger.location_of_account ledger) )
                     (Zkapp_command zkapp_command)
                   |> Or_error.ok_exn
               ; status = Applied

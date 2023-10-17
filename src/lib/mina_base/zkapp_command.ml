@@ -895,12 +895,12 @@ let fee_token (_t : t) = Token_id.default
 let fee_payer (t : t) =
   Account_id.create t.fee_payer.body.public_key (fee_token t)
 
-let extract_vks (t : t) : Verification_key_wire.t List.t =
+let extract_vks (t : t) : (Account_id.t * Verification_key_wire.t) List.t =
   account_updates t
   |> Call_forest.fold ~init:[] ~f:(fun acc (p : Account_update.t) ->
          match Account_update.verification_key_update_to_option p with
          | Zkapp_basic.Set_or_keep.Set (Some vk) ->
-             vk :: acc
+             (Account_update.account_id p, vk) :: acc
          | _ ->
              acc )
 
@@ -1039,47 +1039,60 @@ module Verifiable : sig
     end
   end]
 
-  val find_vk_via_ledger :
-       ledger:'a
-    -> get:('a -> 'b -> Account.t option)
-    -> location_of_account:('a -> Account_id.t -> 'b option)
+  val load_vk_from_ledger :
+       location_of_account:(Account_id.t -> 'loc option)
+    -> get:('loc -> Account.t option)
     -> Zkapp_basic.F.t
     -> Account_id.t
-    -> (Verification_key_wire.t, Error.t) Result.t
+    -> Verification_key_wire.t Or_error.t
+
+  val load_vks_from_ledger :
+       location_of_account_batch:
+         (Account_id.t list -> (Account_id.t * 'loc option) list)
+    -> get_batch:('loc list -> ('loc * Account.t option) list)
+    -> Account_id.t list
+    -> Verification_key_wire.t Account_id.Map.t Or_error.t
 
   val create :
        T.t
-    -> status:Transaction_status.t
+    -> failed:bool
     -> find_vk:
          (   Zkapp_basic.F.t
           -> Account_id.t
           -> (Verification_key_wire.t, Error.t) Result.t )
     -> t Or_error.t
 
-  module Any : sig
-    (** creates verifiables from a list of commands that caches verification
-        keys and permits _any_ vks that have been seen earlier in the list. *)
-    val create_all :
-         T.t With_status.t list
-      -> find_vk:
-           (   Zkapp_basic.F.t
-            -> Account_id.t
-            -> (Verification_key_wire.t, Error.t) Result.t )
-      -> t With_status.t list Or_error.t
+  module type Command_wrapper_intf = sig
+    type 'a t
+
+    val unwrap : 'a t -> 'a
+
+    val rewrap : 'a t -> 'b -> 'b t
+
+    val map : 'a t -> f:('a -> 'b) -> 'b t
+
+    val is_failed : 'a t -> bool
   end
 
-  module Last : sig
-    (** creates verifiables from a list of commands that caches verification
-        keys and permits only the _last_ vk that has been seen earlier in the
-        list. *)
+  module type Create_all_intf = sig
+    type cache
+
+    module Command_wrapper : Command_wrapper_intf
+
     val create_all :
-         T.t With_status.t list
-      -> find_vk:
-           (   Zkapp_basic.F.t
-            -> Account_id.t
-            -> (Verification_key_wire.t, Error.t) Result.t )
-      -> t With_status.t list Or_error.t
+      T.t Command_wrapper.t list -> cache -> t Command_wrapper.t list Or_error.t
   end
+
+  module From_unapplied_sequence :
+    Create_all_intf
+      with type 'a Command_wrapper.t = 'a
+       and type cache =
+        Verification_key_wire.t Zkapp_basic.F_map.Map.t Account_id.Map.t
+
+  module From_applied_sequence :
+    Create_all_intf
+      with type 'a Command_wrapper.t = 'a With_status.t
+       and type cache = Verification_key_wire.t Account_id.Map.t
 end = struct
   [%%versioned
   module Stable = struct
@@ -1110,12 +1123,12 @@ end = struct
            [%sexp_of: (string * Zkapp_basic.F.t) list] )
     else Ok got
 
-  let find_vk_via_ledger ~ledger ~get ~location_of_account expected_vk_hash
-      account_id =
+  let load_vk_from_ledger ~location_of_account ~get expected_vk_hash account_id
+      =
     match
       let open Option.Let_syntax in
-      let%bind location = location_of_account ledger account_id in
-      let%bind (account : Account.t) = get ledger location in
+      let%bind location = location_of_account account_id in
+      let%bind (account : Account.t) = get location in
       let%bind zkapp = account.zkapp in
       zkapp.verification_key
     with
@@ -1128,6 +1141,28 @@ end = struct
         in
         Error err
 
+  let load_vks_from_ledger ~location_of_account_batch ~get_batch account_ids =
+    let%map.Or_error locations =
+      location_of_account_batch account_ids
+      |> List.map ~f:(fun (account_id, loc) ->
+             Result.of_option loc
+               ~error:
+                 ( lazy
+                   (Error.createf
+                      !"failed to find account %{sexp: Account_id.t} in ledger"
+                      account_id ) ) )
+      |> Result.all
+      |> Result.map_error ~f:Lazy.force
+    in
+    get_batch locations
+    |> List.filter_map ~f:(fun ((_, account) : _ * Account.t option) ->
+           let open Option.Let_syntax in
+           let account = Option.value_exn account in
+           let%bind zkapp = account.zkapp in
+           let%map verification_key = zkapp.verification_key in
+           (Account.identifier account, verification_key) )
+    |> Account_id.Map.of_alist_exn
+
   (* Ensures that there's a verification_key available for all account_updates
    * and creates a valid command associating the correct keys with each
    * account_id.
@@ -1136,8 +1171,8 @@ end = struct
    * subsequent account_updates use the replaced key instead of looking in the
    * ledger for the key (ie set by a previous transaction).
    *)
-  let create ({ fee_payer; account_updates; memo } : T.t)
-      ~(status : Transaction_status.t) ~find_vk : t Or_error.t =
+  let create ({ fee_payer; account_updates; memo } : T.t) ~failed ~find_vk :
+      t Or_error.t =
     With_return.with_return (fun { return } ->
         let tbl = Account_id.Table.create () in
         let vks_overridden =
@@ -1164,11 +1199,8 @@ end = struct
                 | Error _ as err ->
                     return err
               in
-              match
-                ( p.body.authorization_kind
-                , phys_equal status Transaction_status.Applied )
-              with
-              | Proof vk_hash, true -> (
+              match (p.body.authorization_kind, failed) with
+              | Proof vk_hash, false -> (
                   let prioritized_vk =
                     (* only lookup _past_ vk setting, ie exclude the new one we
                      * potentially set in this account_update (use the non-'
@@ -1217,81 +1249,144 @@ end = struct
         in
         Ok { fee_payer; account_updates; memo } )
 
-  module Map_cache = struct
-    type 'a t = 'a Zkapp_basic.F_map.Map.t
+  module type Cache_intf = sig
+    type t
 
-    let empty = Zkapp_basic.F_map.Map.empty
+    val find :
+         t
+      -> account_id:Account_id.t
+      -> vk_hash:Zkapp_basic.F.t
+      -> Verification_key_wire.t option
 
-    let find = Zkapp_basic.F_map.Map.find
-
-    let set = Zkapp_basic.F_map.Map.set
+    val add : t -> account_id:Account_id.t -> vk:Verification_key_wire.t -> t
   end
 
-  module Singleton_cache = struct
-    type 'a t = (Zkapp_basic.F.t * 'a) option
-
-    let empty = None
-
-    let find t key =
-      match t with
-      | None ->
-          None
-      | Some (k, v) ->
-          if Zkapp_basic.F.equal key k then Some v else None
-
-    let set _ ~key ~data = Some (key, data)
-  end
-
-  module Make_create_all (Cache : sig
+  module type Command_wrapper_intf = sig
     type 'a t
 
-    val empty : 'a t
+    val unwrap : 'a t -> 'a
 
-    val find : 'a t -> Zkapp_basic.F.t -> 'a option
+    val rewrap : 'a t -> 'b -> 'b t
 
-    val set : 'a t -> key:Zkapp_basic.F.t -> data:'a -> 'a t
-  end) =
-  struct
-    let create_all (cmds : T.t With_status.t list)
-        ~(find_vk :
-              Zkapp_basic.F.t
-           -> Account_id.t
-           -> (Verification_key_wire.t, Error.t) Result.t ) :
-        t With_status.t list Or_error.t =
+    val map : 'a t -> f:('a -> 'b) -> 'b t
+
+    val is_failed : 'a t -> bool
+  end
+
+  module type Create_all_intf = sig
+    type cache
+
+    module Command_wrapper : Command_wrapper_intf
+
+    val create_all :
+      T.t Command_wrapper.t list -> cache -> t Command_wrapper.t list Or_error.t
+  end
+
+  module Make_create_all
+      (Cache : Cache_intf)
+      (Command_wrapper : Command_wrapper_intf) :
+    Create_all_intf
+      with module Command_wrapper := Command_wrapper
+       and type cache = Cache.t = struct
+    type cache = Cache.t
+
+    let create_all (wrapped_cmds : T.t Command_wrapper.t list)
+        (init_cache : Cache.t) : t Command_wrapper.t list Or_error.t =
       Or_error.try_with (fun () ->
           snd (* remove the helper cache we folded with *)
-            (List.fold_map cmds ~init:Cache.empty
-               ~f:(fun
-                    (running_cache : Verification_key_wire.t Cache.t)
-                    { data = cmd; status }
-                  ->
+            (List.fold_map wrapped_cmds ~init:init_cache
+               ~f:(fun running_cache wrapped_cmd ->
+                 let cmd = Command_wrapper.unwrap wrapped_cmd in
+                 let cmd_failed = Command_wrapper.is_failed wrapped_cmd in
                  let verified_cmd : t =
-                   create cmd ~status ~find_vk:(fun vk_hash account_id ->
+                   create cmd ~failed:cmd_failed
+                     ~find_vk:(fun vk_hash account_id ->
                        (* first we check if there's anything in the running
                           cache within this chunk so far *)
-                       match Cache.find running_cache vk_hash with
+                       match Cache.find running_cache ~account_id ~vk_hash with
                        | None ->
-                           (* before falling back to the find_vk *)
-                           find_vk vk_hash account_id
+                           Error
+                             (Error.of_string
+                                "verification key not found in cache" )
                        | Some vk ->
                            Ok vk )
                    |> Or_error.ok_exn
                  in
                  let running_cache' =
-                   List.fold (extract_vks cmd) ~init:running_cache
-                     ~f:(fun acc vk ->
-                       Cache.set acc ~key:(With_hash.hash vk) ~data:vk )
+                   (* update the cache if the command is not failed *)
+                   if not cmd_failed then
+                     List.fold (extract_vks cmd) ~init:running_cache
+                       ~f:(fun acc (account_id, vk) ->
+                         Cache.add acc ~account_id ~vk )
+                   else running_cache
                  in
-                 (running_cache', { With_status.data = verified_cmd; status }) )
-            ) )
+                 ( running_cache'
+                 , Command_wrapper.rewrap wrapped_cmd verified_cmd ) ) ) )
   end
 
-  module Any = struct
-    include Make_create_all (Map_cache)
+  (* There are 2 situations in which we are converting commands to their verifiable format:
+       - we are reasoning about the validity of commands when the sequence is not yet known
+       - we are reasoning about the validity of commands when the sequence (and by extension, status) is known
+  *)
+
+  module From_unapplied_sequence = struct
+    module Cache = struct
+      type t = Verification_key_wire.t Zkapp_basic.F_map.Map.t Account_id.Map.t
+
+      let find (t : t) ~account_id ~vk_hash =
+        let%bind.Option vks = Map.find t account_id in
+        Map.find vks vk_hash
+
+      let add (t : t) ~account_id ~(vk : Verification_key_wire.t) =
+        Map.update t account_id ~f:(fun vks_opt ->
+            let vks =
+              Option.value vks_opt ~default:Zkapp_basic.F_map.Map.empty
+            in
+            Map.set vks ~key:vk.hash ~data:vk )
+    end
+
+    module Command_wrapper : Command_wrapper_intf with type 'a t = 'a = struct
+      type 'a t = 'a
+
+      let unwrap t = t
+
+      let rewrap _ t = t
+
+      let map t ~f = f t
+
+      let is_failed _ = true
+    end
+
+    include Make_create_all (Cache) (Command_wrapper)
   end
 
-  module Last = struct
-    include Make_create_all (Singleton_cache)
+  module From_applied_sequence = struct
+    module Cache = struct
+      type t = Verification_key_wire.t Account_id.Map.t
+
+      let find (t : t) ~account_id ~vk_hash =
+        let%bind.Option vk = Map.find t account_id in
+        Option.some_if (Zkapp_basic.F.equal vk_hash vk.hash) vk
+
+      let add (t : t) ~account_id ~vk = Map.set t ~key:account_id ~data:vk
+    end
+
+    module Command_wrapper :
+      Command_wrapper_intf with type 'a t = 'a With_status.t = struct
+      type 'a t = 'a With_status.t
+
+      let unwrap = With_status.data
+
+      let rewrap { With_status.status; _ } data = { With_status.status; data }
+
+      let map { With_status.status; data } ~f =
+        { With_status.status; data = f data }
+
+      let is_failed { With_status.status; _ } =
+        match status with Applied -> false | Failed _ -> true
+    end
+
+    include Make_create_all (Cache) (Command_wrapper)
   end
 end
 
@@ -1376,7 +1471,7 @@ module type Valid_intf = sig
 
   val to_valid :
        T.t
-    -> status:Transaction_status.t
+    -> failed:bool
     -> find_vk:
          (   Zkapp_basic.F.t
           -> Account_id.t
@@ -1427,8 +1522,8 @@ struct
 
   let forget (t : t) : T.t = t.zkapp_command
 
-  let to_valid (t : T.t) ~status ~find_vk : t Or_error.t =
-    Verifiable.create t ~status ~find_vk |> Or_error.map ~f:of_verifiable
+  let to_valid (t : T.t) ~failed ~find_vk : t Or_error.t =
+    Verifiable.create t ~failed:false ~find_vk |> Or_error.map ~f:of_verifiable
 end
 
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]

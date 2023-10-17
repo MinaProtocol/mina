@@ -17,6 +17,7 @@
    async
    async_unix
    base.base_internalhash_types
+   integers
    ;; local libraries
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
@@ -58,6 +59,7 @@
    pickles
    pickles_types
    snark_params
+   snarky.backendless
    with_hash
    mina_generators
    random_oracle
@@ -67,6 +69,7 @@
    ppx_version.runtime
    mina_wire_types
    internal_tracing
+   cache_dir
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

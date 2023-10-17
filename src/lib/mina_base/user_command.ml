@@ -159,63 +159,61 @@ module Verifiable = struct
         Account_update.Fee_payer.account_id p.fee_payer
 end
 
-let to_verifiable (t : t) ~status ~find_vk : Verifiable.t Or_error.t =
+let to_verifiable (t : t) ~failed ~find_vk : Verifiable.t Or_error.t =
   match t with
   | Signed_command c ->
       Ok (Signed_command c)
   | Zkapp_command cmd ->
-      Zkapp_command.Verifiable.create ~status ~find_vk cmd
+      Zkapp_command.Verifiable.create ~failed ~find_vk cmd
       |> Or_error.map ~f:(fun cmd -> Zkapp_command cmd)
 
-module Make_to_all_verifiable (Strategy : sig
-  val create_all :
-       Zkapp_command.t With_status.t list
-    -> find_vk:
-         (   Zkapp_basic.F.t
-          -> Account_id.t
-          -> (Verification_key_wire.t, Error.t) Result.t )
-    -> Zkapp_command.Verifiable.t With_status.t list Or_error.t
-end) =
+module Make_to_all_verifiable
+    (Strategy : Zkapp_command.Verifiable.Create_all_intf) =
 struct
-  let to_all_verifiable (ts : t With_status.t list) ~find_vk :
-      Verifiable.t With_status.t list Or_error.t =
+  let to_all_verifiable (ts : t Strategy.Command_wrapper.t list) ~load_vk_cache
+      : Verifiable.t Strategy.Command_wrapper.t list Or_error.t =
     let open Or_error.Let_syntax in
     (* First we tag everything with its index *)
     let its = List.mapi ts ~f:(fun i x -> (i, x)) in
     (* then we partition out the zkapp commands *)
     let izk_cmds, is_cmds =
       List.partition_map its ~f:(fun (i, cmd) ->
-          match cmd.data with
+          match Strategy.Command_wrapper.unwrap cmd with
           | Zkapp_command c ->
-              First (i, { cmd with data = c })
+              First (i, Strategy.Command_wrapper.rewrap cmd c)
           | Signed_command c ->
-              Second (i, { cmd with data = c }) )
+              Second (i, Strategy.Command_wrapper.rewrap cmd c) )
     in
     (* then unzip the indices *)
     let ixs, zk_cmds = List.unzip izk_cmds in
     (* then we verify the zkapp commands *)
-    let%map vzk_cmds = Strategy.create_all ~find_vk zk_cmds in
+    (* TODO: we could optimize this by skipping the fee payer and non-proof authorizations *)
+    let accounts_referenced =
+      List.fold_left zk_cmds ~init:Account_id.Set.empty ~f:(fun set zk_cmd ->
+          Strategy.Command_wrapper.unwrap zk_cmd
+          |> Zkapp_command.accounts_referenced |> Account_id.Set.of_list
+          |> Set.union set )
+    in
+    let%bind vk_cache = load_vk_cache accounts_referenced in
+    let%map vzk_cmds = Strategy.create_all zk_cmds vk_cache in
     (* rezip indices *)
     let ivzk_cmds = List.zip_exn ixs vzk_cmds in
     (* Put them back in with a sort by index (un-partition) *)
     let ivs =
       List.map is_cmds ~f:(fun (i, cmd) ->
-          (i, { cmd with data = Signed_command cmd.data }) )
+          (i, Strategy.Command_wrapper.map cmd ~f:(fun c -> Signed_command c)) )
       @ List.map ivzk_cmds ~f:(fun (i, cmd) ->
-            (i, { cmd with data = Zkapp_command cmd.data }) )
+            (i, Strategy.Command_wrapper.map cmd ~f:(fun c -> Zkapp_command c)) )
       |> List.sort ~compare:(fun (i, _) (j, _) -> i - j)
     in
     (* Drop the indices *)
     List.unzip ivs |> snd
 end
 
-module Any = struct
-  include Make_to_all_verifiable (Zkapp_command.Verifiable.Any)
-end
-
-module Last = struct
-  include Make_to_all_verifiable (Zkapp_command.Verifiable.Last)
-end
+module Unapplied_sequence =
+  Make_to_all_verifiable (Zkapp_command.Verifiable.From_unapplied_sequence)
+module Applied_sequence =
+  Make_to_all_verifiable (Zkapp_command.Verifiable.From_applied_sequence)
 
 let of_verifiable (t : Verifiable.t) : t =
   match t with
@@ -264,7 +262,8 @@ let applicable_at_nonce (t : t) =
 
 let expected_target_nonce t = Account.Nonce.succ (applicable_at_nonce t)
 
-let extract_vks : t -> Verification_key_wire.t List.t = function
+let extract_vks : t -> (Account_id.t * Verification_key_wire.t) List.t =
+  function
   | Signed_command _ ->
       []
   | Zkapp_command cmd ->
@@ -326,8 +325,8 @@ let check_verifiable (t : Verifiable.t) : Valid.t Or_error.t =
   | Zkapp_command p ->
       Ok (Zkapp_command (Zkapp_command.Valid.of_verifiable p))
 
-let check ~status ~find_vk (t : t) : Valid.t Or_error.t =
-  to_verifiable ~status ~find_vk t |> Or_error.bind ~f:check_verifiable
+let check ~failed ~find_vk (t : t) : Valid.t Or_error.t =
+  to_verifiable ~failed ~find_vk t |> Or_error.bind ~f:check_verifiable
 
 let forget_check (t : Valid.t) : t =
   match t with

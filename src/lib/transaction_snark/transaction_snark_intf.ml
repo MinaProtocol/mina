@@ -380,7 +380,8 @@ module type Full = sig
       -> unit
 
     val create_trivial_snapp :
-         constraint_constants:Genesis_constants.Constraint_constants.t
+         ?unique_id:int
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> unit
       -> [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
          * [> `Prover of
