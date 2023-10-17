@@ -79,9 +79,7 @@ pub fn caml_pasta_fp_plonk_index_create(
         })
         .build()
     {
-        Err(e) => {
-            return Err(e.into())
-        }
+        Err(e) => return Err(e.into()),
         Ok(cs) => cs,
     };
 
