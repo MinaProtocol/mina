@@ -1051,15 +1051,13 @@ module Verifiable : sig
          (Account_id.t list -> (Account_id.t * 'loc option) list)
     -> get_batch:('loc list -> ('loc * Account.t option) list)
     -> Account_id.t list
-    -> Verification_key_wire.t Account_id.Map.t Or_error.t
+    -> Verification_key_wire.t Account_id.Map.t
 
   val create :
        T.t
     -> failed:bool
     -> find_vk:
-         (   Zkapp_basic.F.t
-          -> Account_id.t
-          -> (Verification_key_wire.t, Error.t) Result.t )
+         (Zkapp_basic.F.t -> Account_id.t -> Verification_key_wire.t Or_error.t)
     -> t Or_error.t
 
   module type Command_wrapper_intf = sig
@@ -1142,17 +1140,8 @@ end = struct
         Error err
 
   let load_vks_from_ledger ~location_of_account_batch ~get_batch account_ids =
-    let%map.Or_error locations =
-      location_of_account_batch account_ids
-      |> List.map ~f:(fun (account_id, loc) ->
-             Result.of_option loc
-               ~error:
-                 ( lazy
-                   (Error.createf
-                      !"failed to find account %{sexp: Account_id.t} in ledger"
-                      account_id ) ) )
-      |> Result.all
-      |> Result.map_error ~f:Lazy.force
+    let locations =
+      location_of_account_batch account_ids |> List.filter_map ~f:snd
     in
     get_batch locations
     |> List.filter_map ~f:(fun ((_, account) : _ * Account.t option) ->
@@ -1523,7 +1512,7 @@ struct
   let forget (t : t) : T.t = t.zkapp_command
 
   let to_valid (t : T.t) ~failed ~find_vk : t Or_error.t =
-    Verifiable.create t ~failed:false ~find_vk |> Or_error.map ~f:of_verifiable
+    Verifiable.create t ~failed ~find_vk |> Or_error.map ~f:of_verifiable
 end
 
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]

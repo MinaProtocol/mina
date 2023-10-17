@@ -194,7 +194,7 @@ struct
           |> Zkapp_command.accounts_referenced |> Account_id.Set.of_list
           |> Set.union set )
     in
-    let%bind vk_cache = load_vk_cache accounts_referenced in
+    let vk_cache = load_vk_cache accounts_referenced in
     let%map vzk_cmds = Strategy.create_all zk_cmds vk_cache in
     (* rezip indices *)
     let ivzk_cmds = List.zip_exn ixs vzk_cmds in
