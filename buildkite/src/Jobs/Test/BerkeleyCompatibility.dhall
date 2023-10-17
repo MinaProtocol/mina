@@ -39,7 +39,7 @@ in Pipeline.build Pipeline.Config::{
       target = Size.XLarge,
       docker = None Docker.Type,
       depends_on = dependsOn,
-      timeout_in_minutes = Some 60
+      timeout_in_minutes = Some +60
     }
   ]
 }
