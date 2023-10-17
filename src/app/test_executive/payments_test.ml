@@ -27,10 +27,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { account_name = "untimed-node-a-key"
           ; balance = "400000"
           ; timing = Untimed (* 400_000_000_000_000 *)
+          ; permissions = None
           }
         ; { account_name = "untimed-node-b-key"
           ; balance = "300000"
           ; timing = Untimed (* 300_000_000_000_000 *)
+          ; permissions = None
           }
         ; { account_name = "timed-node-c-key"
           ; balance = "30000"
@@ -39,11 +41,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ~cliff_amount:0 ~vesting_period:4
                 ~vesting_increment:5_000_000_000_000
               (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
+          ; permissions = None
           }
-        ; { account_name = "snark-node-key1"; balance = "0"; timing = Untimed }
-        ; { account_name = "snark-node-key2"; balance = "0"; timing = Untimed }
-        ; { account_name = "fish1"; balance = "100"; timing = Untimed }
-        ; { account_name = "fish2"; balance = "100"; timing = Untimed }
+        ; { account_name = "snark-node-key1"
+          ; balance = "0"
+          ; timing = Untimed
+          ; permissions = None
+          }
+        ; { account_name = "snark-node-key2"
+          ; balance = "0"
+          ; timing = Untimed
+          ; permissions = None
+          }
+        ; { account_name = "fish1"
+          ; balance = "100"
+          ; timing = Untimed
+          ; permissions = None
+          }
+        ; { account_name = "fish2"
+          ; balance = "100"
+          ; timing = Untimed
+          ; permissions = None
+          }
         ]
     ; block_producers =
         [ { node_name = "untimed-node-a"; account_name = "untimed-node-a-key" }

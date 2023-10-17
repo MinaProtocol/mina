@@ -29,6 +29,7 @@
    extlib
    sexp_diff_kernel
    ;; local libraries
+   protocol_version
    key_gen
    visualization
    timeout_lib

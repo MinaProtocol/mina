@@ -27,9 +27,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { Test_Account.account_name = "receiver-key"
           ; balance = "9999999"
           ; timing = Untimed
+          ; permissions = None
           }
-        ; { account_name = "empty-bp-key"; balance = "0"; timing = Untimed }
-        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
+        ; { account_name = "empty-bp-key"
+          ; balance = "0"
+          ; timing = Untimed
+          ; permissions = None
+          }
+        ; { account_name = "snark-node-key"
+          ; balance = "0"
+          ; timing = Untimed
+          ; permissions = None
+          }
         ]
         @ List.init num_extra_keys ~f:(fun i ->
               let i_str = Int.to_string i in
@@ -37,6 +46,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                   String.concat [ "sender-account"; i_str ]
               ; balance = "10000"
               ; timing = Untimed
+              ; permissions = None
               } )
     ; block_producers =
         [ { node_name = "receiver"; account_name = "receiver-key" }

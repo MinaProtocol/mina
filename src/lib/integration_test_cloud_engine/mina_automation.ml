@@ -178,7 +178,11 @@ module Network_config = struct
     let add_accounts accounts_and_keypairs =
       List.map accounts_and_keypairs
         ~f:(fun
-             ( { Test_config.Test_Account.balance; account_name; timing }
+             ( { Test_config.Test_Account.balance
+               ; account_name
+               ; timing
+               ; permissions
+               }
              , (pk, sk) )
            ->
           let timing = runtime_timing_of_timing timing in
@@ -192,6 +196,10 @@ module Network_config = struct
                 (* delegation currently unsupported *)
             ; delegate = None
             ; timing
+            ; permissions =
+                Option.map
+                  ~f:Runtime_config.Accounts.Single.Permissions.of_permissions
+                  permissions
             }
           in
           (account_name, account) )
@@ -266,7 +274,7 @@ module Network_config = struct
                   (epoch_accounts : Test_config.Test_Account.t list) =
                 let epoch_ledger_accounts =
                   List.map epoch_accounts
-                    ~f:(fun { account_name; balance; timing } ->
+                    ~f:(fun { account_name; balance; timing; permissions } ->
                       let balance = Balance.of_mina_string_exn balance in
                       let timing = runtime_timing_of_timing timing in
                       let genesis_account =
@@ -281,7 +289,15 @@ module Network_config = struct
                               "Epoch ledger account %s not in genesis ledger"
                               account_name ()
                       in
-                      { genesis_account with balance; timing } )
+                      { genesis_account with
+                        balance
+                      ; timing
+                      ; permissions =
+                          Option.map
+                            ~f:
+                              Runtime_config.Accounts.Single.Permissions
+                              .of_permissions permissions
+                      } )
                 in
                 (* because we run integration tests with Proof_level = Full, the winner account
                    gets added to the genesis ledger

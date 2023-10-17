@@ -250,7 +250,13 @@ module Graphql = struct
                       setPermissions
                       setZkappUri
                       setTokenSymbol
-                      setVerificationKey
+                      setVerificationKey { auth
+                                           version { transaction
+                                                     network
+                                                     patch 
+                                                   }
+
+                                         }
                       setVotingFor
                       setTiming
                     }
@@ -487,7 +493,10 @@ let permissions_of_account_permissions account_permissions :
   ; set_zkapp_uri = to_auth_required account_permissions.setZkappUri
   ; set_token_symbol = to_auth_required account_permissions.setTokenSymbol
   ; set_verification_key =
-      to_auth_required account_permissions.setVerificationKey
+      ( to_auth_required account_permissions.setVerificationKey.auth
+      , let version = account_permissions.setVerificationKey.version in
+        Protocol_version.create ~transaction:version.transaction
+          ~network:version.network ~patch:version.patch )
   ; set_voting_for = to_auth_required account_permissions.setVotingFor
   ; set_timing = to_auth_required account_permissions.setTiming
   }

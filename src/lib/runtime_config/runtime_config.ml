@@ -151,6 +151,28 @@ module Json_layout = struct
         let fields = Fields.names |> Array.of_list
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
+
+        let of_permissions (perm : Mina_base.Permissions.t) =
+          { edit_state = Auth_required.of_account_perm perm.edit_action_state
+          ; send = Auth_required.of_account_perm perm.send
+          ; receive = Auth_required.of_account_perm perm.receive
+          ; set_delegate = Auth_required.of_account_perm perm.set_delegate
+          ; set_permissions = Auth_required.of_account_perm perm.set_permissions
+          ; set_verification_key =
+              (let auth, version = perm.set_verification_key in
+               { auth = Auth_required.of_account_perm auth
+               ; version = Protocol_version.of_protocol_version version
+               } )
+          ; set_token_symbol =
+              Auth_required.of_account_perm perm.set_token_symbol
+          ; access = Auth_required.of_account_perm perm.access
+          ; edit_action_state =
+              Auth_required.of_account_perm perm.edit_action_state
+          ; set_zkapp_uri = Auth_required.of_account_perm perm.set_zkapp_uri
+          ; increment_nonce = Auth_required.of_account_perm perm.increment_nonce
+          ; set_timing = Auth_required.of_account_perm perm.set_timing
+          ; set_voting_for = Auth_required.of_account_perm perm.set_voting_for
+          }
       end
 
       module Zkapp_account = struct
@@ -303,41 +325,7 @@ module Json_layout = struct
                    a.receipt_chain_hash )
           ; voting_for =
               Some (Mina_base.State_hash.to_base58_check a.voting_for)
-          ; permissions =
-              Some
-                Permissions.
-                  { edit_state =
-                      Auth_required.of_account_perm a.permissions.edit_state
-                  ; send = Auth_required.of_account_perm a.permissions.send
-                  ; receive =
-                      Auth_required.of_account_perm a.permissions.receive
-                  ; set_delegate =
-                      Auth_required.of_account_perm a.permissions.set_delegate
-                  ; set_permissions =
-                      Auth_required.of_account_perm
-                        a.permissions.set_permissions
-                  ; set_verification_key =
-                      (let auth, version = a.permissions.set_verification_key in
-                       { auth = Auth_required.of_account_perm auth
-                       ; version = Protocol_version.of_protocol_version version
-                       } )
-                  ; set_token_symbol =
-                      Auth_required.of_account_perm
-                        a.permissions.set_token_symbol
-                  ; access = Auth_required.of_account_perm a.permissions.access
-                  ; edit_action_state =
-                      Auth_required.of_account_perm
-                        a.permissions.edit_action_state
-                  ; set_zkapp_uri =
-                      Auth_required.of_account_perm a.permissions.set_zkapp_uri
-                  ; increment_nonce =
-                      Auth_required.of_account_perm
-                        a.permissions.increment_nonce
-                  ; set_timing =
-                      Auth_required.of_account_perm a.permissions.set_timing
-                  ; set_voting_for =
-                      Auth_required.of_account_perm a.permissions.set_voting_for
-                  }
+          ; permissions = Some (Permissions.of_permissions a.permissions)
           }
     end
 
