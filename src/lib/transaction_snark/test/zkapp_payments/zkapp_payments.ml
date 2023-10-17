@@ -112,7 +112,7 @@ let%test_module "Zkapp payments tests" =
 
     let%test_unit "merkle_root_after_zkapp_command_exn_immutable" =
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets () in
+          let wallets = Quickcheck.random_value (U.Wallet.random_wallets ()) in
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Array.iter
                 (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))

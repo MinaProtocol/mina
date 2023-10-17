@@ -438,19 +438,27 @@ module Wallet = struct
   type t = { private_key : Private_key.t; account : Account.t }
 
   let random_wallets ?(n = min (Int.pow 2 ledger_depth) (1 lsl 10)) () =
-    let random_wallet () : t =
-      let private_key = Private_key.create () in
+    let open Quickcheck.Generator.Let_syntax in
+    let random_wallet : t Quickcheck.Generator.t =
+      let%bind private_key = Private_key.gen in
       let public_key =
         Public_key.compress (Public_key.of_private_key_exn private_key)
       in
       let account_id = Account_id.create public_key Token_id.default in
+      let%map amount = Int.gen_incl 0 99 in
       { private_key
       ; account =
-          Account.create account_id
-            (Balance.of_mina_int_exn (50 + Random.int 100))
+          Account.create account_id (Balance.of_mina_int_exn (50 + amount))
       }
     in
-    Array.init n ~f:(fun _ -> random_wallet ())
+    Quickcheck.Generator.create (fun ~size ~random ->
+        (* It appears that we should accumulate some state here, but [random]
+           does this internally for us as we call the generator. See e.g. the
+           definition of [Quickcheck.Generator.bind] for the general pattern that
+           we apply here.
+        *)
+        Array.init n ~f:(fun _ ->
+            Quickcheck.Generator.generate random_wallet ~size ~random ) )
 
   let user_command ~fee_payer ~receiver_pk amt fee nonce memo =
     let payload : Signed_command.Payload.t =
