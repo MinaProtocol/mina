@@ -1338,7 +1338,7 @@ end = struct
 
       let map t ~f = f t
 
-      let is_failed _ = true
+      let is_failed _ = false
     end
 
     include Make_create_all (Cache) (Command_wrapper)
