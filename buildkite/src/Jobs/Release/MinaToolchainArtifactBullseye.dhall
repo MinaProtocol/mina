@@ -4,6 +4,7 @@ let Cmd = ../../Lib/Cmds.dhall
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -28,7 +29,8 @@ Pipeline.build
           S.strictlyEnd (S.contains "rust-toolchain.toml")
         ],
         path = "Release",
-        name = "MinaToolchainArtifact"
+        name = "MinaToolchainArtifactBullseye",
+        tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
       },
     steps = [
 
@@ -42,19 +44,7 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep toolchainBullseyeSpec,
-
-      -- mina-toolchain Debian 10 "Buster" Toolchain
-      let toolchainBusterSpec = DockerImage.ReleaseSpec::{
-        service="mina-toolchain",
-        deb_codename="buster",
-        extra_args="--no-cache",
-        step_key="toolchain-buster-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep toolchainBusterSpec
+      DockerImage.generateStep toolchainBullseyeSpec
 
     ]
   }
