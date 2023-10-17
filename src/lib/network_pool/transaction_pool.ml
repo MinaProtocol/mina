@@ -1157,7 +1157,7 @@ struct
                   User_command.Unapplied_sequence.to_all_verifiable diff
                     ~load_vk_cache:(fun account_ids ->
                       let account_ids = Set.to_list account_ids in
-                      let%map.Or_error ledger_vks =
+                      let ledger_vks =
                         Zkapp_command.Verifiable.load_vks_from_ledger
                           ~location_of_account_batch:
                             (Base_ledger.location_of_account_batch ledger)
@@ -1813,15 +1813,13 @@ let%test_module _ =
       match
         User_command.Unapplied_sequence.to_all_verifiable zkapp_commands_fixed
           ~load_vk_cache:(fun account_ids ->
-            let account_ids = Set.to_list account_ids in
-            let%map.Or_error vks =
-              Zkapp_command.Verifiable.load_vks_from_ledger account_ids
-                ~get_batch:(Mina_ledger.Ledger.get_batch ledger)
-                ~location_of_account_batch:
-                  (Mina_ledger.Ledger.location_of_account_batch ledger)
-            in
-            Map.map vks ~f:(fun vk ->
-                Zkapp_basic.F_map.Map.singleton vk.hash vk ) )
+            Set.to_list account_ids
+            |> Zkapp_command.Verifiable.load_vks_from_ledger
+                 ~get_batch:(Mina_ledger.Ledger.get_batch ledger)
+                 ~location_of_account_batch:
+                   (Mina_ledger.Ledger.location_of_account_batch ledger)
+            |> Map.map ~f:(fun vk ->
+                   Zkapp_basic.F_map.Map.singleton vk.hash vk ) )
         |> Or_error.bind ~f:(fun xs ->
                List.map xs ~f:User_command.check_verifiable
                |> Or_error.combine_errors )

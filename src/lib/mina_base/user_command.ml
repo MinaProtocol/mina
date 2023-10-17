@@ -180,9 +180,9 @@ struct
       List.partition_map its ~f:(fun (i, cmd) ->
           match Strategy.Command_wrapper.unwrap cmd with
           | Zkapp_command c ->
-              First (i, Strategy.Command_wrapper.rewrap cmd c)
+              First (i, Strategy.Command_wrapper.map cmd ~f:(Fn.const c))
           | Signed_command c ->
-              Second (i, Strategy.Command_wrapper.rewrap cmd c) )
+              Second (i, Strategy.Command_wrapper.map cmd ~f:(Fn.const c)) )
     in
     (* then unzip the indices *)
     let ixs, zk_cmds = List.unzip izk_cmds in

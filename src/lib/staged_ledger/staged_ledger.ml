@@ -2233,6 +2233,10 @@ let%test_module "staged ledger tests" =
             ~pids:(Child_processes.Termination.create_pid_table ())
             () )
 
+    let find_vk ledger =
+      Zkapp_command.Verifiable.load_vk_from_ledger ~get:(Ledger.get ledger)
+        ~location_of_account:(Ledger.location_of_account ledger)
+
     let supercharge_coinbase ~ledger ~winner ~global_slot =
       (*using staged ledger to confirm coinbase amount is correctly generated*)
       let epoch_ledger =
@@ -2842,12 +2846,7 @@ let%test_module "staged ledger tests" =
               let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =
                 match
                   Zkapp_command.Valid.to_valid ~failed:false
-                    ~find_vk:
-                      (Zkapp_command.Verifiable.load_vk_from_ledger
-                         ~get:(Ledger.get ledger)
-                         ~location_of_account:
-                           (Ledger.location_of_account ledger) )
-                    zkapp_command_with_auths
+                    ~find_vk:(find_vk ledger) zkapp_command_with_auths
                 with
                 | Ok ps ->
                     ps
@@ -4395,11 +4394,7 @@ let%test_module "staged ledger tests" =
             in
             let valid_zkapp_command =
               Zkapp_command.Valid.to_valid ~failed:false
-                ~find_vk:
-                  (Zkapp_command.Verifiable.load_vk_from_ledger
-                     ~get:(Ledger.get ledger)
-                     ~location_of_account:(Ledger.location_of_account ledger) )
-                zkapp_command
+                ~find_vk:(find_vk ledger) zkapp_command
               |> Or_error.ok_exn
             in
             User_command.Zkapp_command valid_zkapp_command
@@ -4880,11 +4875,7 @@ let%test_module "staged ledger tests" =
                   let valid_zkapp_command =
                     Or_error.ok_exn
                       (Zkapp_command.Valid.to_valid ~failed:false
-                         ~find_vk:
-                           (Zkapp_command.Verifiable.load_vk_from_ledger
-                              ~get:(Ledger.get valid_against_ledger)
-                              ~location_of_account:
-                                (Ledger.location_of_account valid_against_ledger) )
+                         ~find_vk:(find_vk valid_against_ledger)
                          zkapp_command )
                   in
                   ignore
@@ -4901,12 +4892,7 @@ let%test_module "staged ledger tests" =
                   let failed_zkapp_command =
                     Or_error.ok_exn
                       (Zkapp_command.Valid.to_valid ~failed:true
-                         ~find_vk:
-                           (Zkapp_command.Verifiable.load_vk_from_ledger
-                              ~get:(Ledger.get ledger)
-                              ~location_of_account:
-                                (Ledger.location_of_account ledger) )
-                         zkapp_command )
+                         ~find_vk:(find_vk ledger) zkapp_command )
                   in
                   let current_state, current_state_view =
                     dummy_state_and_view ~global_slot ()
@@ -5023,12 +5009,7 @@ let%test_module "staged ledger tests" =
                   let invalid_zkapp_command =
                     Or_error.ok_exn
                       (Zkapp_command.Valid.to_valid ~failed:false
-                         ~find_vk:
-                           (Zkapp_command.Verifiable.load_vk_from_ledger
-                              ~get:(Ledger.get ledger)
-                              ~location_of_account:
-                                (Ledger.location_of_account ledger) )
-                         zkapp_command )
+                         ~find_vk:(find_vk ledger) zkapp_command )
                   in
                   let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
                   let global_slot =

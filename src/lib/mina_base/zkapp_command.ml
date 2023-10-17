@@ -1065,8 +1065,6 @@ module Verifiable : sig
 
     val unwrap : 'a t -> 'a
 
-    val rewrap : 'a t -> 'b -> 'b t
-
     val map : 'a t -> f:('a -> 'b) -> 'b t
 
     val is_failed : 'a t -> bool
@@ -1255,8 +1253,6 @@ end = struct
 
     val unwrap : 'a t -> 'a
 
-    val rewrap : 'a t -> 'b -> 'b t
-
     val map : 'a t -> f:('a -> 'b) -> 'b t
 
     val is_failed : 'a t -> bool
@@ -1310,7 +1306,8 @@ end = struct
                    else running_cache
                  in
                  ( running_cache'
-                 , Command_wrapper.rewrap wrapped_cmd verified_cmd ) ) ) )
+                 , Command_wrapper.map wrapped_cmd ~f:(Fn.const verified_cmd) ) )
+            ) )
   end
 
   (* There are 2 situations in which we are converting commands to their verifiable format:
@@ -1339,8 +1336,6 @@ end = struct
 
       let unwrap t = t
 
-      let rewrap _ t = t
-
       let map t ~f = f t
 
       let is_failed _ = true
@@ -1365,8 +1360,6 @@ end = struct
       type 'a t = 'a With_status.t
 
       let unwrap = With_status.data
-
-      let rewrap { With_status.status; _ } data = { With_status.status; data }
 
       let map { With_status.status; data } ~f =
         { With_status.status; data = f data }

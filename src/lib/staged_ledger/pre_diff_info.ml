@@ -281,21 +281,11 @@ let get_individual_info (type c) ~constraint_constants coinbase_parts ~receiver
     get_transaction_data ~constraint_constants coinbase_parts ~receiver
       ~coinbase_amount commands completed_works ~to_user_command
   in
-  Core_kernel.Printf.printf
-    !"number of coinbases = %d, number of fee transfers = %d\n%!"
-    (List.length coinbase_parts)
-    (List.length fee_transfers) ;
   let internal_commands =
     List.map coinbase_parts ~f:(fun t -> Transaction.Coinbase t)
     @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
   in
   let%map internal_commands_with_statuses =
-    Core_kernel.Printf.printf
-      !"number of internal commands = %d, number of internal command statuses \
-        = %d\n\
-        %!"
-      (List.length internal_commands)
-      (List.length internal_command_statuses) ;
     Or_error.try_with (fun () ->
         List.map2_exn internal_commands internal_command_statuses
           ~f:(fun cmd status ->

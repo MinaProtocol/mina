@@ -4124,24 +4124,28 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let set_proof_cache x = proof_cache := Some x
 
-    let create_trivial_snapp ?(unique_id = 0) ~constraint_constants () =
+    let create_trivial_snapp ?unique_id ~constraint_constants () =
       let tag, _, (module P), Pickles.Provers.[ trivial_prover ] =
         let trivial_rule : _ Pickles.Inductive_rule.t =
-          let trivial_main (tx_commitment : Zkapp_statement.Checked.t) :
-              unit Checked.t =
+          let trivial_main () : unit Checked.t =
             Impl.run_checked (dummy_constraints ()) ;
-            Zkapp_statement.Checked.Assert.equal tx_commitment tx_commitment ;
-            let unique_id' =
-              Impl.exists ~compute:(Fn.const (Field.of_int unique_id)) Typ.field
-            in
-            Field.Checked.Assert.equal unique_id'
-              (Field.Var.constant (Field.of_int unique_id))
+            match unique_id with
+            | None ->
+                Checked.return ()
+            | Some unique_id ->
+                let unique_id' =
+                  Impl.exists
+                    ~compute:(Fn.const (Field.of_int unique_id))
+                    Typ.field
+                in
+                Field.Checked.Assert.equal unique_id'
+                  (Field.Var.constant (Field.of_int unique_id))
           in
           { identifier = "trivial-rule"
           ; prevs = []
           ; main =
-              (fun { public_input = x } ->
-                let () = Impl.run_checked (trivial_main x) in
+              (fun { public_input = _ } ->
+                let () = Impl.run_checked (trivial_main ()) in
                 { previous_proof_statements = []
                 ; public_output = ()
                 ; auxiliary_output = ()
