@@ -50,4 +50,4 @@ healthcheck:
   initialDelaySeconds: 30
 
 nodeSelector:
-  preemptible: true
+  preemptible: false

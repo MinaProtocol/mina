@@ -56,8 +56,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name                    = "testworld-2-0-final"
-  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-berkeley-itn3-ledger-validate-25f9de2-focal-berkeley"
-  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-berkeley-itn3-ledger-validate-25f9de2-focal"
+  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup5-55b7818-focal-berkeley"
+  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup5-55b7818-focal"
   seed_region                     = "us-east4"
   seed_zone                       = "us-east4-b"
   make_report_discord_webhook_url = ""

@@ -269,6 +269,8 @@ spec:
           value: {{ $.Values.mina.privkeyPass | quote }}
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
+        - name: UPTIME_PRIVKEY_PASS
+          value: ""
         ports:
         - name: client-port
           protocol: TCP

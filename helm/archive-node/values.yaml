@@ -52,7 +52,7 @@ postgresql:
     database: "archive"
 
 nodeSelector:
-  preemptible: true
+  preemptible: false
 
 healthcheck:
   enabled: false

@@ -57,23 +57,23 @@ variable "plain_node_count" {
 
 locals {
   testnet_name                    = "testworld-2-0"
-  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-berkeley-itn3-ledger-validate-25f9de2-focal-berkeley"
-  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-berkeley-itn3-ledger-validate-25f9de2-focal"
-  seed_region                     = "us-central1"
-  seed_zone                       = "us-central1-b"
+  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup5-55b7818-focal-berkeley"
+  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup5-55b7818-focal"
+  seed_region                     = "us-east1"
+  seed_zone                       = "us-east1-b"
   make_report_discord_webhook_url = ""
   make_report_accounts            = ""
 }
 
 module "testworld-2-0" {
-  providers = { google.gke = google.google-us-central1 }
+  providers = { google.gke = google.google-us-east1 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-central1"
-  cluster_region = "us-central1"
-  k8s_context    = "gke_o1labs-192920_us-central1_coda-infra-central1"
+  cluster_name   = "coda-infra-east1"
+  cluster_region = "us-east1"
+  k8s_context    = "gke_o1labs-192920_us-east1_coda-infra-east"
   testnet_name   = local.testnet_name
 
   mina_image                  = local.mina_image
@@ -129,9 +129,9 @@ module "testworld-2-0" {
 
   snark_coordinators = [
     {
-      snark_worker_replicas        = 5
+      snark_worker_replicas        = 10
       snark_worker_fee             = "0.01"
-      snark_worker_public_key      = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
+      snark_worker_public_key      = "B62qoYvGSiLPAq2apjKQUAJSYRhcwbfmAyCDscXzDEtux6Fdgz3Smve"
       snark_coordinators_host_port = 10401
     }
   ]
