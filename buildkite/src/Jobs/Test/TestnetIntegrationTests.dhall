@@ -3,6 +3,8 @@ let S = ../../Lib/SelectFiles.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
@@ -28,6 +30,7 @@ in Pipeline.build Pipeline.Config::{
     ],
     path = "Test",
     name = "TestnetIntegrationTests",
+    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ],
     mode = PipelineMode.Type.Stable
   },
   steps = [
