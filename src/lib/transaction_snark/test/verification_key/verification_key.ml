@@ -32,7 +32,6 @@ let%test_module "Update account verification key" =
 
     let () = Transaction_snark.For_tests.set_proof_cache proof_cache
 
-
     let () =
       match Sys.getenv_opt "PROOF_CACHE_OUT" with
       | Some path ->
