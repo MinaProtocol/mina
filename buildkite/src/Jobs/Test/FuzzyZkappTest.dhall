@@ -6,8 +6,9 @@ let D = S.PathPattern
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineMode = ../../Pipeline/Mode.dhall
-let JobSpec = ../../Pipeline/JobSpec.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 
+let JobSpec = ../../Pipeline/JobSpec.dhall
 let Command = ../../Command/Base.dhall
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
@@ -46,9 +47,10 @@ Pipeline.build
         dirtyWhen = unitDirtyWhen,
         path = "Test",
         name = "FuzzyZkappTest",
+        tags = [ PipelineTag.Type.VeryLong, PipelineTag.Type.Test ],
         mode = PipelineMode.Type.Stable
       },
     steps = [
-      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" 3600 150 Size.Small
+      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" 4200 150 Size.Small
     ]
   }
