@@ -879,6 +879,8 @@ let wrap
                       ~public_input:public_inputs
                   with
                   | None ->
+                      if Option.is_some (Sys.getenv_opt "ERROR_ON_PROOF") then
+                        failwith "Regenerated proof" ;
                       let%map.Promise proof = create_proof () in
                       Proof_cache.set_wrap_proof proof_cache ~keypair:pk
                         ~public_input:public_inputs proof ;
