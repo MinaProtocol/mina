@@ -78,13 +78,7 @@ pub fn caml_pasta_fp_plonk_index_create(
         })
         .build()
     {
-        Err(_) => {
-            return Err(ocaml::Error::failwith(
-                "caml_pasta_fp_plonk_index_create: could not create constraint system",
-            )
-            .err()
-            .unwrap())
-        }
+        Err(e) => return Err(e.into()),
         Ok(cs) => cs,
     };
 
