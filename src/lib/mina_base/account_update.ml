@@ -89,7 +89,6 @@ module Authorization_kind = struct
 
     let deriver obj =
       let open Fields_derivers_zkapps in
-      let open Fields in
       let ( !. ) = ( !. ) ~t_fields_annots in
       let verification_key_hash =
         needs_custom_js ~js_type:field ~name:"VerificationKeyHash" field
@@ -977,7 +976,6 @@ module Account_precondition = struct
     (* we used to have 3 constructors, Full, Nonce, and Accept for the type t
        nowadays, the generator creates these 3 different kinds of values, but all mapped to t
     *)
-    let open Zkapp_basic in
     Quickcheck.Generator.variant3 Zkapp_precondition.Account.gen
       Account.Nonce.gen Unit.quickcheck_generator
     |> Quickcheck.Generator.map ~f:(function
@@ -1426,21 +1424,7 @@ module Body = struct
     }
 
   let to_fee_payer_exn (t : t) : Fee_payer.t =
-    let { public_key
-        ; token_id = _
-        ; update = _
-        ; balance_change
-        ; increment_nonce = _
-        ; events = _
-        ; actions = _
-        ; call_data = _
-        ; preconditions
-        ; use_full_commitment = _
-        ; may_use_token = _
-        ; authorization_kind = _
-        } =
-      t
-    in
+    let { public_key; preconditions; balance_change; _ } = t in
     let fee =
       Currency.Fee.of_uint64
         (balance_change.magnitude |> Currency.Amount.to_uint64)

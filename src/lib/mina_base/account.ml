@@ -702,7 +702,7 @@ let cliff_time Poly.{ timing; _ } =
 let cliff_amount Poly.{ timing; _ } =
   match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_amount
 
-let vesting_increment Poly.{ timing } =
+let vesting_increment Poly.{ timing; _ } =
   match timing with
   | Timing.Untimed ->
       None

@@ -18,9 +18,7 @@
     )
   (preprocessor_deps ../../config.mlh)
   (preprocess (pps ppx_version ppx_optcomp))
-  (instrumentation (backend bisect_ppx))
-  (flags -w -22) ; Allow using versioned types outside of ppx
-  )
+  (instrumentation (backend bisect_ppx)))
 
 ; Include index.mld in generated doc
 (documentation (package mina_wire_types))

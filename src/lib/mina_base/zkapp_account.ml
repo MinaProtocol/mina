@@ -447,7 +447,6 @@ let gen : t Quickcheck.Generator.t =
   in
   let%bind zkapp_version = Mina_numbers.Zkapp_version.gen in
   let%bind seq_state = Generator.list_with_length 5 Field.gen in
-  let%bind last_sequence_slot = Mina_numbers.Global_slot_since_genesis.gen in
   let%map zkapp_uri = gen_uri in
   let five = Pickles_types.Nat.(S (S (S (S (S Z))))) in
   { app_state

@@ -3,7 +3,6 @@
  (public_name mina_base)
  (inline_tests (flags -verbose -show-counts))
  (library_flags -linkall)
- (flags -w -22)
  (libraries
    ;; opam libraries
    async_kernel

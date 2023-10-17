@@ -178,62 +178,6 @@ let is_versioned_type_lident = function
   | _ ->
       false
 
-let rec core_types_misuses core_types =
-  List.concat_map core_types ~f:get_core_type_versioned_type_misuses
-
-and get_core_type_versioned_type_misuses core_type =
-  match core_type.ptyp_desc with
-  | Ptyp_arrow (_label, core_type1, core_type2) ->
-      core_types_misuses [ core_type1; core_type2 ]
-  | Ptyp_tuple core_types ->
-      core_types_misuses core_types
-  | Ptyp_constr (lident, core_types) ->
-      let core_type_errors = core_types_misuses core_types in
-      if is_versioned_type_lident lident.txt then
-        let err =
-          ( lident.loc
-          , "Versioned type used outside a versioned type declaration" )
-        in
-        err :: core_type_errors
-      else core_type_errors
-  | Ptyp_object (fields, _closed_flag) ->
-      let core_type_of_field field =
-        match field.pof_desc with
-        | Otag (_label, core_type) ->
-            core_type
-        | Oinherit core_type ->
-            core_type
-      in
-      let core_types = List.map fields ~f:core_type_of_field in
-      core_types_misuses core_types
-  | Ptyp_class (_lident, core_types) ->
-      core_types_misuses core_types
-  | Ptyp_alias (core_type, _label) ->
-      get_core_type_versioned_type_misuses core_type
-  | Ptyp_variant (row_fields, _closed_flag, _labels_opt) ->
-      let core_types_of_row_field field =
-        match field.prf_desc with
-        | Rtag (_label, _b, core_types) ->
-            core_types
-        | Rinherit core_type ->
-            [ core_type ]
-      in
-      let core_types = List.concat_map row_fields ~f:core_types_of_row_field in
-      core_types_misuses core_types
-  | Ptyp_poly (_labels, core_type) ->
-      get_core_type_versioned_type_misuses core_type
-  | Ptyp_package (_module, type_constraints) ->
-      let core_types =
-        List.map type_constraints ~f:(fun (_ty, core_type) -> core_type)
-      in
-      core_types_misuses core_types
-  | Ptyp_extension _ext ->
-      []
-  | Ptyp_any ->
-      []
-  | Ptyp_var _ ->
-      []
-
 let types_of_constructor_args args =
   match args with
   | Pcstr_tuple tys ->
@@ -258,20 +202,6 @@ let types_of_type_kind kind =
   | Ptype_open ->
       []
 
-let get_versioned_type_misuses type_decl =
-  let params_types =
-    List.map type_decl.ptype_params ~f:(fun (ty, _variance) -> ty)
-  in
-  let cstr_types =
-    List.concat_map type_decl.ptype_cstrs ~f:(fun (ty1, ty2, _loc) ->
-        [ ty1; ty2 ] )
-  in
-  let kind_types = types_of_type_kind type_decl.ptype_kind in
-  let manifest_types = Option.to_list type_decl.ptype_manifest in
-  List.concat_map
-    (params_types @ cstr_types @ kind_types @ manifest_types)
-    ~f:get_core_type_versioned_type_misuses
-
 let include_versioned_module_error loc =
   (loc, "Cannot include a stable versioned module")
 
@@ -292,10 +222,8 @@ let lint_ast =
 
     method! expression expr acc =
       match expr.pexp_desc with
-      | Pexp_extension (_, PTyp core_type) ->
-          (* misuses like [%bin_type_class: Foo.Stable.V1.t] *)
-          let errs = get_core_type_versioned_type_misuses core_type in
-          acc_with_accum_errors acc errs
+      | Pexp_extension _ ->
+          acc
       | Pexp_pack mod_expr -> (
           (* misuses like (module Foo.Stable.V1) *)
           match mod_expr.pmod_desc with
@@ -476,15 +404,6 @@ let lint_ast =
           acc_with_errors acc acc'.errors
       | Pstr_type (rec_flag, type_decls) ->
           let no_errors_fun _type_decl = [] in
-          let not_in_versioned_ext_fun type_decl =
-            let ty_name = type_decl.ptype_name.txt in
-            let err =
-              ( type_decl.ptype_loc
-              , "Versioned type must be in %%versioned extension" )
-            in
-            (* don't enforce %%versioned requirement for query, response types *)
-            if String.equal ty_name "t" then [ err ] else []
-          in
           let deriving_errors_fun =
             match rec_flag with
             | Nonrecursive ->
@@ -493,20 +412,10 @@ let lint_ast =
                 if acc.in_functor then validate_neither_bin_io_nor_version
                 else validate_version_if_bin_io
           in
-          let versioned_type_misuse_errors_fun =
-            if not @@ in_versioned_type_module acc.module_path then
-              get_versioned_type_misuses
-            else if not acc.in_versioned_ext then not_in_versioned_ext_fun
-            else no_errors_fun
-          in
           let deriving_errors =
             List.concat_map type_decls ~f:deriving_errors_fun
           in
-          let versioned_type_misuse_errors =
-            List.concat_map type_decls ~f:versioned_type_misuse_errors_fun
-          in
-          acc_with_accum_errors acc
-            (deriving_errors @ versioned_type_misuse_errors)
+          acc_with_accum_errors acc deriving_errors
       | Pstr_extension ((name, _payload), _attrs)
       (* %%versioned, %%versioned_binable inside functor *)
         when acc.in_functor

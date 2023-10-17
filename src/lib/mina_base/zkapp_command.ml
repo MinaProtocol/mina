@@ -205,6 +205,44 @@ module Call_forest = struct
          and type Forest.Stable.V1.t = T.Forest.V1.t
   end
 
+  module Make_digest_types = struct
+    module Account_update = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
+          [@@deriving sexp, compare, equal, hash, yojson]
+
+          let to_latest = Fn.id
+        end
+      end]
+    end
+
+    module Forest = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
+          [@@deriving sexp, compare, equal, hash, yojson]
+
+          let to_latest = Fn.id
+        end
+      end]
+    end
+
+    module Tree = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
+          [@@deriving sexp, compare, equal, hash, yojson]
+
+          let to_latest = Fn.id
+        end
+      end]
+    end
+  end
+
   module Make_digest_str
       (T : Mina_wire_types.Mina_base.Zkapp_command.Digest_concrete) :
     Make_digest_sig(T).S = struct
@@ -218,16 +256,7 @@ module Call_forest = struct
     end
 
     module Account_update = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
-          [@@deriving sexp, compare, equal, hash, yojson]
-
-          let to_latest = Fn.id
-        end
-      end]
-
+      include Make_digest_types.Account_update
       include M
 
       module Checked = struct
@@ -247,16 +276,7 @@ module Call_forest = struct
     end
 
     module Forest = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
-          [@@deriving sexp, compare, equal, hash, yojson]
-
-          let to_latest = Fn.id
-        end
-      end]
-
+      include Make_digest_types.Forest
       include M
 
       module Checked = struct
@@ -277,16 +297,7 @@ module Call_forest = struct
     end
 
     module Tree = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
-          [@@deriving sexp, compare, equal, hash, yojson]
-
-          let to_latest = Fn.id
-        end
-      end]
-
+      include Make_digest_types.Tree
       include M
 
       module Checked = struct

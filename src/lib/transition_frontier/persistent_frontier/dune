@@ -1,7 +1,6 @@
 (library
  (name persistent_frontier)
  (public_name transition_frontier_persistent_frontier)
- (flags -w -22)
  (libraries
    ;;opam libraries
    result

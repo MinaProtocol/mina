@@ -44,6 +44,8 @@ module Schema = struct
     end
   end
 
+  [@@@warning "-22"]
+
   type _ t =
     | Db_version : int t
     | Transition : State_hash.Stable.V1.t -> Mina_block.Stable.V2.t t
@@ -52,6 +54,8 @@ module Schema = struct
     | Best_tip : State_hash.Stable.V1.t t
     | Protocol_states_for_root_scan_state
         : Mina_state.Protocol_state.Value.Stable.V2.t list t
+
+  [@@@warning "+22"]
 
   let to_string : type a. a t -> string = function
     | Db_version ->
@@ -220,8 +224,6 @@ open Schema
 open Rocks
 
 type batch_t = Batch.t
-
-let mem db ~key = Option.is_some (get db ~key)
 
 let get_if_exists db ~default ~key =
   match get db ~key with Some x -> x | None -> default

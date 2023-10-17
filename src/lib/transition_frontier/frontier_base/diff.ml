@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Mina_block
 
 type full = Full
 
@@ -161,8 +160,13 @@ module Root_transition = struct
         module T_nonbinable = struct
           type nonrec t = t
 
-          let to_binable ({ new_root; garbage; just_emitted_a_proof } : t) :
-              Binable_arg.Stable.V4.t =
+          let to_binable
+              ({ new_root
+               ; garbage
+               ; just_emitted_a_proof
+               ; old_root_scan_state = Lite
+               } :
+                t ) : Binable_arg.Stable.V4.t =
             { new_root; garbage; just_emitted_a_proof }
 
           let of_binable
@@ -221,7 +225,8 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
         State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
     | New_node (Lite transition) ->
         State_hash.to_yojson (Mina_block.Validated.state_hash transition)
-    | Root_transitioned { new_root; garbage; just_emitted_a_proof } ->
+    | Root_transitioned
+        { new_root; garbage; just_emitted_a_proof; old_root_scan_state = _ } ->
         let garbage_hashes =
           match garbage with
           | Node_list.Full nodes ->

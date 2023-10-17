@@ -32,10 +32,7 @@ Account_id.Digest.
   , gen_non_default
   , to_field_unsafe
   , of_field
-  , to_string
-  , of_string
-  , comparator
-  , ( <> ) )]
+  , to_string )]
 
 let of_string s =
   try Account_id.Digest.of_string s

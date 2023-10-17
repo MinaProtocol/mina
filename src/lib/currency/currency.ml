@@ -1124,7 +1124,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     include Make_str (struct
-      type t = Unsigned_extended.UInt64.Stable.V1.t
+      type t = Unsigned_extended.UInt64.Stable.Latest.t
     end)
     (*include Wire_types.Make.Amount (Make_sig) (Make_str)*)
   end

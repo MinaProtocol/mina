@@ -120,8 +120,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
   end]
 
   (* type of signed commands, pre-Berkeley hard fork *)
-  type t_v1 = Stable.V1.t
-
   let (_ : (t, (Payload.t, Public_key.t, Signature.t) Poly.t) Type_equal.t) =
     Type_equal.T
 
@@ -206,7 +204,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       and fee =
         Int.gen_incl min_fee max_fee >>| Currency.Fee.of_nanomina_int_exn
       and memo = String.quickcheck_generator in
-      let%map body = create_body signer receiver in
+      let%map body = create_body receiver in
       let payload : Payload.t =
         Payload.create ~fee
           ~fee_payer_pk:(Public_key.compress signer.public_key)
@@ -224,7 +222,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
           ?nonce ?(min_amount = 1) ~max_amount ~fee_range () =
         gen_inner sign' ~key_gen ?nonce ~fee_range
-        @@ fun { public_key = signer; _ } { public_key = receiver; _ } ->
+        @@ fun { public_key = receiver; _ } ->
         let open Quickcheck.Generator.Let_syntax in
         let%map amount =
           Int.gen_incl min_amount max_amount
@@ -249,7 +247,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     module Stake_delegation = struct
       let gen ~key_gen ?nonce ~fee_range () =
         gen_inner For_tests.fake_sign ~key_gen ?nonce ~fee_range
-          (fun { public_key = signer; _ } { public_key = new_delegate; _ } ->
+          (fun { public_key = new_delegate; _ } ->
             Quickcheck.Generator.return
             @@ Signed_command_payload.Body.Stake_delegation
                  (Set_delegate
