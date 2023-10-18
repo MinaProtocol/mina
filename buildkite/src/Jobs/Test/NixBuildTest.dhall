@@ -30,7 +30,7 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [
-            Cmd.runInDocker Cmd.Docker::{image = ContainerImages.nixos} "./buildkite/scripts/test-nix.sh"
+            Cmd.runInDocker Cmd.Docker::{image = ContainerImages.nixos} "sudo ./buildkite/scripts/test-nix.sh"
           ],
           label = "nix build tests",
           key = "nix-build-tests",
