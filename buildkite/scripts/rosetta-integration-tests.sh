@@ -223,7 +223,11 @@ send_zkapp_transactions() {
     let ZKAPP_STATE++
   done
 }
-send_zkapp_transactions &
+
+# There is no point to generate transaction just for minimal mode
+if [[ "$MODE" == "full" ]]; then
+  send_zkapp_transactions &
+fi
 
 next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
 sleep_time=$((($next_block_time - $curr_time) / 1000))
@@ -237,7 +241,7 @@ rosetta-cli configuration:validate ${ROSETTA_CONFIGURATION_FILE}
 echo "========================= ROSETTA CLI: CHECK:SPEC ==========================="
 rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
-if [[ $MODE == "full" ]]; then
+if [[ "$MODE" == "full" ]]; then
 
   echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
   rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
