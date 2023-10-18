@@ -3,6 +3,8 @@ open Async
 open Block
 open Rosetta_lib
 
+let () = ()
+
 (* Rosetta_models.Currency shadows our Currency so we "save" it as MinaCurrency first *)
 module MinaCurrency = Currency
 open Rosetta_models
