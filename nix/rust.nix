@@ -141,7 +141,7 @@ in
         version = deps.wasm-bindgen.version;
         src = final.fetchCrate {
           inherit pname version;
-          sha256 = "sha256-0rK+Yx4/Jy44Fw5VwJ3tG243ZsyOIBBehYU54XP/JGk=";
+          sha256 = "sha256-0pTIzpu7dJM34CXmi83e8UV0E3N2bKJiOMw5WJQ2s/Y=";
         };
 
         cargoSha256 = "sha256-vcpxcRlW1OKoD64owFF6mkxSqmNrvY+y3Ckn5UwEQ50=";
