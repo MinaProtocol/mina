@@ -1449,8 +1449,8 @@ struct
       in
       Sponge.absorb sponge challenge_digest ;
       Sponge.absorb sponge ft_eval1 ;
-      Sponge.absorb sponge (fst evals.public_input) ;
-      Sponge.absorb sponge (snd evals.public_input) ;
+      Array.iter ~f:(Sponge.absorb sponge) (fst evals.public_input) ;
+      Array.iter ~f:(Sponge.absorb sponge) (snd evals.public_input) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
       (* This is a hacky, but much more efficient, version of the opt sponge.
          This uses the assumption that the sponge 'absorption state' will align
@@ -1538,7 +1538,7 @@ struct
       Plonk_checks.scalars_env
         (module Env_bool)
         (module Env_field)
-        ~srs_length_log2:Common.Max_degree.wrap_log2
+        ~srs_length_log2:Common.Max_degree.wrap_log2 ~zk_rows:3
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
         ~field_of_hex:(fun s ->
@@ -1590,7 +1590,7 @@ struct
               in
               let v =
                 List.append sg_evals
-                  ( [| Pickles_types.Opt.just x_hat |]
+                  ( Array.map ~f:Pickles_types.Opt.just x_hat
                   :: [| Pickles_types.Opt.just ft |]
                   :: a )
               in
