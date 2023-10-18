@@ -1,3 +1,4 @@
+open Core_kernel
 open Mina_base
 open Snark_params
 
@@ -118,7 +119,7 @@ val pending_coinbase_stack_target :
 module Wallet : sig
   type t = { private_key : Signature_lib.Private_key.t; account : Account.t }
 
-  val random_wallets : ?n:int -> unit -> t array
+  val random_wallets : ?n:int -> unit -> t array Quickcheck.Generator.t
 
   val user_command_with_wallet :
        t array

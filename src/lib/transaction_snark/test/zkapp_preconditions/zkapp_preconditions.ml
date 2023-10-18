@@ -5,8 +5,17 @@ module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Update_states_spec
 open Mina_base
 
+let proof_cache =
+  lazy
+    ( Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+    @@ Yojson.Safe.from_file "proof_cache.json" )
+
 let%test_module "Valid_while precondition tests" =
   ( module struct
+    let proof_cache = Lazy.force proof_cache
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let constraint_constants = U.constraint_constants
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
@@ -99,6 +108,10 @@ let%test_module "Valid_while precondition tests" =
 
 let%test_module "Protocol state precondition tests" =
   ( module struct
+    let proof_cache = Lazy.force proof_cache
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
@@ -402,6 +415,10 @@ let%test_module "Protocol state precondition tests" =
 
 let%test_module "Account precondition tests" =
   ( module struct
+    let proof_cache = Lazy.force proof_cache
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let zkapp_prover_and_vk = (zkapp_prover, vk)
@@ -696,7 +713,9 @@ let%test_module "Account precondition tests" =
       let account_creation_fee =
         Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
       in
-      Quickcheck.test ~trials:5 Signature_lib.Keypair.gen ~f:(fun new_kp ->
+      Quickcheck.test ~trials:5
+        (Quickcheck.Generator.tuple2 Signature_lib.Keypair.gen
+           Signature_lib.Keypair.gen ) ~f:(fun (new_kp, token_account) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let module Init_ledger =
@@ -715,7 +734,6 @@ let%test_module "Account precondition tests" =
                     Account_id.derive_token_id
                       ~owner:(Account_id.create token_owner_pk Token_id.default)
                   in
-                  let token_account = Keypair.create () in
                   let token_account_pk =
                     Public_key.compress token_account.public_key
                   in
@@ -993,4 +1011,11 @@ let%test_module "Account precondition tests" =
                   failwith
                     "Expected transaction to fail due to invalid account \
                      precondition in the fee payer" ) )
+
+    let () =
+      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )
