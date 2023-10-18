@@ -30,6 +30,7 @@ pub mod projective;
 pub mod srs;
 
 /// Indexes
+pub mod bn254_plonk_index;
 pub mod pasta_fp_plonk_index;
 pub mod pasta_fq_plonk_index;
 
