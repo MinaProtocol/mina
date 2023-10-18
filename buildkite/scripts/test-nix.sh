@@ -9,4 +9,4 @@ git config --global --add safe.directory /workdir
 
 nix build mina --accept-flake-config
 
-nix develop mina
+nix develop mina --accept-flake-config
