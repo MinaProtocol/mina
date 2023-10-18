@@ -1,16 +1,4 @@
-(* lint_version_syntax.ml -- static enforcement of syntactic items relating to proper versioning
-
-   - "deriving bin_io" and "deriving version" never appear in types defined inside functor bodies
-   - otherwise, "bin_io" may appear in a "deriving" attribute only if "version" also appears in that extension
-   - versioned types only appear in versioned type definitions
-   - versioned type definitions appear only in %%versioned... extensions
-   - packaged modules, like "(module Foo)", may not be stable-versioned (but allowed inside %%versioned for
-       legitimate uses)
-   - the constructs "include Stable.Latest" and "include Stable.Vn" are prohibited
-   - uses of Binable.Of... and Bin_prot.Utils.Make_binable functors are always in stable-versioned modules,
-       and always as an argument to "include"
-   - restrictions are not enforced in inline tests and inline test modules
-*)
+(* lint_version_syntax.ml -- static enforcement of syntactic items relating to proper versioning *)
 
 open Core_kernel
 open Ppxlib

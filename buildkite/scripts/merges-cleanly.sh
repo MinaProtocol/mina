@@ -8,8 +8,14 @@ echo 'Testing for conflicts between the current branch `'"${CURRENT}"'` and `'"$
 # The git merge-tree command shows the content of a 3-way merge without
 # touching the index, which we can then search for conflict markers.
 
-# Tell git where to find ssl certs
-git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt
+# Only execute in the CI. If the script is run locally, it messes us the user
+# config
+if [ "${BUILDKITE:-false}" == true ]
+then
+    # Tell git where to find ssl certs
+    git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt
+fi
+
 # Fetch a fresh copy of the repo
 git fetch origin
 git config --global user.email "hello@ci.com"

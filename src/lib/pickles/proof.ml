@@ -1,7 +1,6 @@
 open Core_kernel
 open Pickles_types
 open Import
-open Common
 open Backend
 
 let hash_fold_array = Pickles_types.Plonk_types.hash_fold_array
@@ -25,17 +24,8 @@ module Base = struct
           Types.Step.Statement.t
       ; index : int
       ; prev_evals : 'prev_evals
-      ; proof : Tick.Proof.t
+      ; proof : Tick.Proof.with_public_evals
       }
-  end
-
-  module Double = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type 'a t = 'a * 'a [@@deriving compare, sexp, yojson, hash, equal]
-      end
-    end]
   end
 
   module Wrap = struct
@@ -45,9 +35,6 @@ module Base = struct
 
       module V2 = struct
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
-              ( 'messages_for_next_wrap_proof
-              , 'messages_for_next_step_proof )
-              Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
@@ -77,9 +64,13 @@ module Base = struct
     end]
 
     type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
-          ( 'messages_for_next_wrap_proof
-          , 'messages_for_next_step_proof )
-          Stable.Latest.t =
+          (* NB: This should be on the *serialized type*. However, the actual
+             serialized type [Repr.t] is hidden by this module, so this alias is
+             effectively junk anyway..
+          *)
+      ( 'messages_for_next_wrap_proof
+      , 'messages_for_next_step_proof )
+      Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
       { statement :
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.t
@@ -126,7 +117,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
   let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
-  let lengths = Commitment_lengths.create ~of_int:Fn.id in
+  let lengths = Commitment_lengths.default ~num_chunks:1 (* TODO *) in
   T
     { statement =
         { proof_state =
@@ -140,7 +131,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                             N1
                         | S (S Z) ->
                             N2
-                        | _ ->
+                        | S _ ->
                             assert false )
                     ; domain_log2 =
                         Branch_data.Domain_log2.of_int_exn domain_log2
@@ -184,27 +175,28 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
               ; lookup = None
               }
           ; openings =
-              { proof =
-                  { lr =
-                      Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ ->
-                          (g0, g0) )
-                  ; z_1 = Ro.tock ()
-                  ; z_2 = Ro.tock ()
-                  ; delta = g0
-                  ; challenge_polynomial_commitment = g0
-                  }
-              ; evals = Dummy.evals.evals.evals
-              ; ft_eval1 = Dummy.evals.ft_eval1
-              }
+              (let evals = Lazy.force Dummy.evals in
+               { proof =
+                   { lr =
+                       Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ ->
+                           (g0, g0) )
+                   ; z_1 = Ro.tock ()
+                   ; z_2 = Ro.tock ()
+                   ; delta = g0
+                   ; challenge_polynomial_commitment = g0
+                   }
+               ; evals = evals.evals.evals
+               ; ft_eval1 = evals.ft_eval1
+               } )
           }
     ; prev_evals =
         (let e =
-           Plonk_types.Evals.map (Evaluation_lengths.create ~of_int:Fn.id)
-             ~f:(fun n -> (tick_arr n, tick_arr n))
+           Plonk_types.Evals.map Evaluation_lengths.default ~f:(fun n ->
+               (tick_arr n, tick_arr n) )
          in
          let ex =
            { Plonk_types.All_evals.With_public_input.public_input =
-               (tick (), tick ())
+               ([| tick () |], [| tick () |])
            ; evals = e
            }
          in
@@ -365,8 +357,43 @@ module Proofs_verified_2 = struct
 
     include T.Repr
 
-    (* Force the typechecker to verify that these types are equal. *)
-    let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
+    let to_binable
+        ({ statement
+         ; prev_evals = { evals = { public_input; evals }; ft_eval1 }
+         ; proof
+         } :
+          t ) : Stable.Latest.t =
+      { statement
+      ; prev_evals =
+          { evals =
+              { public_input =
+                  (let x1, x2 = public_input in
+                   (x1.(0), x2.(0)) )
+              ; evals
+              }
+          ; ft_eval1
+          }
+      ; proof
+      }
+
+    let of_binable
+        ({ statement
+         ; prev_evals = { evals = { public_input; evals }; ft_eval1 }
+         ; proof
+         } :
+          Stable.Latest.t ) : t =
+      { statement
+      ; prev_evals =
+          { evals =
+              { public_input =
+                  (let x1, x2 = public_input in
+                   ([| x1 |], [| x2 |]) )
+              ; evals
+              }
+          ; ft_eval1
+          }
+      ; proof
+      }
   end
 
   [%%versioned_binable
@@ -386,9 +413,9 @@ module Proofs_verified_2 = struct
           (struct
             type nonrec t = t
 
-            let to_binable = to_repr
+            let to_binable x = Repr.to_binable (to_repr x)
 
-            let of_binable = of_repr
+            let of_binable x = of_repr (Repr.of_binable x)
           end)
     end
   end]
@@ -435,8 +462,43 @@ module Proofs_verified_max = struct
 
     include T.Repr
 
-    (* Force the typechecker to verify that these types are equal. *)
-    let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
+    let to_binable
+        ({ statement
+         ; prev_evals = { evals = { public_input; evals }; ft_eval1 }
+         ; proof
+         } :
+          t ) : Stable.Latest.t =
+      { statement
+      ; prev_evals =
+          { evals =
+              { public_input =
+                  (let x1, x2 = public_input in
+                   (x1.(0), x2.(0)) )
+              ; evals
+              }
+          ; ft_eval1
+          }
+      ; proof
+      }
+
+    let of_binable
+        ({ statement
+         ; prev_evals = { evals = { public_input; evals }; ft_eval1 }
+         ; proof
+         } :
+          Stable.Latest.t ) : t =
+      { statement
+      ; prev_evals =
+          { evals =
+              { public_input =
+                  (let x1, x2 = public_input in
+                   ([| x1 |], [| x2 |]) )
+              ; evals
+              }
+          ; ft_eval1
+          }
+      ; proof
+      }
   end
 
   [%%versioned_binable
@@ -456,9 +518,9 @@ module Proofs_verified_max = struct
           (struct
             type nonrec t = t
 
-            let to_binable = to_repr
+            let to_binable x = Repr.to_binable (to_repr x)
 
-            let of_binable = of_repr
+            let of_binable x = of_repr (Repr.of_binable x)
           end)
     end
   end]

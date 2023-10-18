@@ -2,10 +2,7 @@ module SC = Scalar_challenge
 module P = Proof
 open Pickles_types
 open Hlist
-open Tuple_lib
 open Common
-open Core_kernel
-open Async_kernel
 open Import
 open Types
 open Backend
@@ -13,8 +10,7 @@ open Backend
 (* This contains the "wrap" prover *)
 
 let challenge_polynomial =
-  let open Backend.Tick.Field in
-  Wrap_verifier.challenge_polynomial ~add ~mul ~one
+  Wrap_verifier.challenge_polynomial (module Backend.Tick.Field)
 
 module Type1 =
   Plonk_checks.Make
@@ -25,7 +21,7 @@ module Type1 =
       let index_terms = Plonk_checks.Scalars.Tick.index_terms
     end)
 
-let vector_of_list (type a t)
+let _vector_of_list (type a t)
     (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
     (xs : a list) : t =
   let r = V.create () in
@@ -37,7 +33,7 @@ let tick_rounds = Nat.to_int Tick.Rounds.n
 let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
     ~actual_proofs_verified:
       (module AB : Nat.Add.Intf with type n = actual_proofs_verified)
-    (e : _ Plonk_types.All_evals.With_public_input.t)
+    (e : (_ array * _ array, _) Plonk_types.All_evals.With_public_input.t)
     ~(old_bulletproof_challenges : (_, actual_proofs_verified) Vector.t) ~r
     ~plonk ~xi ~zeta ~zetaw =
   let combined_evals =
@@ -65,7 +61,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
     let v : Tick.Field.t array list =
       List.append
         (List.map (Vector.to_list challenge_polys) ~f:(fun f -> [| f pt |]))
-        ([| f e.public_input |] :: [| ft |] :: a)
+        (f e.public_input :: [| ft |] :: a)
     in
     let open Tick.Field in
     Pcs_batch.combine_split_evaluations ~xi ~init:Fn.id
@@ -81,16 +77,14 @@ module Deferred_values = Types.Wrap.Proof_state.Deferred_values
 type scalar_challenge_constant = Challenge.Constant.t Scalar_challenge.t
 
 type deferred_values_and_hints =
-  { x_hat_evals : Backend.Tick.Field.t * Backend.Tick.Field.t
+  { x_hat_evals : Backend.Tick.Field.t array * Backend.Tick.Field.t array
   ; sponge_digest_before_evaluations : Tick.Field.t
   ; deferred_values :
       ( ( Challenge.Constant.t
         , scalar_challenge_constant
         , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
         , (Tick.Field.t Shifted_value.Type1.t, bool) Opt.t
-        , ( scalar_challenge_constant Deferred_values.Plonk.In_circuit.Lookup.t
-          , bool )
-          Opt.t
+        , (scalar_challenge_constant, bool) Opt.t
         , bool )
         Deferred_values.Plonk.In_circuit.t
       , scalar_challenge_constant
@@ -105,11 +99,12 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     ~actual_feature_flags
     ~(prev_challenges : ((Backend.Tick.Field.t, _) Vector.t, n) Vector.t)
     ~(step_vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
-    ~(public_input : Backend.Tick.Field.t list) ~(proof : Backend.Tick.Proof.t)
+    ~(public_input : Backend.Tick.Field.t list)
+    ~(proof : Backend.Tick.Proof.with_public_evals)
     ~(actual_proofs_verified : n Nat.t) : deferred_values_and_hints =
   let module O = Tick.Oracles in
   let o =
-    O.create step_vk
+    O.create_with_public_evals step_vk
       Vector.(
         map2 sgs prev_challenges ~f:(fun commitment cs ->
             { Tick.Proof.Challenge_polynomial.commitment
@@ -118,7 +113,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
         |> to_list)
       public_input proof
   in
-  let x_hat = O.(p_eval_1 o, p_eval_2 o) in
+  let x_hat = Option.value_exn proof.public_evals in
   let scalar_chal f =
     Scalar_challenge.map ~f:Challenge.Constant.of_tick_field (f o)
   in
@@ -165,7 +160,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
   let tick_combined_evals =
     Plonk_checks.evals_of_split_evals
       (module Tick.Field)
-      proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
+      proof.proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
       ~zeta:As_field.zeta ~zetaw
     |> Plonk_types.Evals.to_in_circuit
   in
@@ -200,7 +195,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
       (module Env_bool)
       (module Env_field)
       ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
-      ~srs_length_log2:Common.Max_degree.step_log2
+      ~zk_rows:step_vk.zk_rows ~srs_length_log2:Common.Max_degree.step_log2
       ~field_of_hex:(fun s ->
         Kimchi_pasta.Pasta.Bigint256.of_hex_string s
         |> Kimchi_pasta.Pasta.Fp.of_bigint )
@@ -209,8 +204,6 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
   let plonk =
     let module Field = struct
       include Tick.Field
-
-      type nonrec bool = bool
     end in
     Type1.derive_plonk
       (module Field)
@@ -244,10 +237,11 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
             As_field.(
               combined_inner_product (* Note: We do not pad here. *)
                 ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
-                { evals = proof.openings.evals; public_input = x_hat }
+                { evals = proof.proof.openings.evals; public_input = x_hat }
                 ~r ~xi ~zeta ~zetaw ~old_bulletproof_challenges:prev_challenges
                 ~env:tick_env ~domain:tick_domain
-                ~ft_eval1:proof.openings.ft_eval1 ~plonk:tick_plonk_minimal)
+                ~ft_eval1:proof.proof.openings.ft_eval1
+                ~plonk:tick_plonk_minimal)
       ; branch_data =
           { proofs_verified =
               ( match actual_proofs_verified with
@@ -257,7 +251,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
                   N1
               | S (S Z) ->
                   N2
-              | _ ->
+              | S _ ->
                   assert false )
           ; domain_log2 =
               Branch_data.Domain_log2.of_int_exn
@@ -269,13 +263,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
           ; alpha = plonk0.alpha
           ; beta = chal plonk0.beta
           ; gamma = chal plonk0.gamma
-          ; lookup =
-              Opt.map plonk.lookup ~f:(fun l ->
-                  { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                    .In_circuit
-                    .Lookup
-                    .joint_combiner = Option.value_exn plonk0.joint_combiner
-                  } )
+          ; joint_combiner = Opt.of_option plonk0.joint_combiner
           }
       }
   ; x_hat_evals = x_hat
@@ -309,13 +297,13 @@ let%test_module "gate finalization" =
       (* Set up a helper to convert actual feature flags composed of booleans into
          feature flags composed of Yes/No/Maybe options.
          @param actual_feature_flags The actual feature flags in terms of true/false
-         @param true_opt  Plonk_types.Opt type to use for true/enabled features
-         @param false_opt Plonk_types.Opt type to use for false/disabled features
+         @param true_opt  Opt type to use for true/enabled features
+         @param false_opt Opt type to use for false/disabled features
          @return Corresponding feature flags composed of Yes/No/Maybe values *)
       let compute_feature_flags
           (actual_feature_flags : Plonk_types.Features.flags)
-          (true_opt : Plonk_types.Opt.Flag.t)
-          (false_opt : Plonk_types.Opt.Flag.t) : Plonk_types.Features.options =
+          (true_opt : Opt.Flag.t) (false_opt : Opt.Flag.t) :
+          Plonk_types.Features.options =
         Plonk_types.Features.map actual_feature_flags ~f:(function
           | true ->
               true_opt
@@ -325,7 +313,7 @@ let%test_module "gate finalization" =
 
       (* Generate the 3 configurations of the actual feature flags using
          helper *)
-      let open Plonk_types.Opt.Flag in
+      let open Opt.Flag in
       { true_is_yes = compute_feature_flags actual_feature_flags Yes No
       ; true_is_maybe = compute_feature_flags actual_feature_flags Maybe No
       ; all_maybes = compute_feature_flags actual_feature_flags Maybe Maybe
@@ -346,7 +334,8 @@ let%test_module "gate finalization" =
         (feature_flags : Plonk_types.Features.options)
         (public_input : Pasta_bindings.Fp.t list)
         (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
-        (proof : Backend.Tick.Proof.t) : Impls.Step.Boolean.value =
+        (proof : Backend.Tick.Proof.with_public_evals) :
+        Impls.Step.Boolean.value =
       (* Constants helper - takes an OCaml value and converts it to a snarky value, where
                             all values here are constant literals.  N.b. this should be
                             encapsulated as Snarky internals, but it never got merged. *)
@@ -389,6 +378,10 @@ let%test_module "gate finalization" =
           ~step_vk:vk ~public_input ~proof ~actual_proofs_verified:Nat.N0.n
       in
 
+      let full_features =
+        Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
+      in
+
       (* Define Typ.t for Deferred_values.t -- A Type.t defines how to convert a value of some type
                                               in OCaml into a var in circuit/Snarky.
 
@@ -400,9 +393,8 @@ let%test_module "gate finalization" =
         let open Step_verifier in
         Wrap.Proof_state.Deferred_values.In_circuit.typ
           (module Impls.Step)
-          ~feature_flags ~challenge:Challenge.typ
+          ~feature_flags:full_features ~challenge:Challenge.typ
           ~scalar_challenge:Challenge.typ
-          ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
           ~dummy_scalar_challenge:
             (Kimchi_backend_common.Scalar_challenge.create
                Limb_vector.Challenge.Constant.zero )
@@ -420,16 +412,20 @@ let%test_module "gate finalization" =
           { deferred_values with
             plonk =
               { deferred_values.plonk with
-                lookup = Opt.to_option_unsafe deferred_values.plonk.lookup
+                joint_combiner =
+                  Opt.to_option_unsafe deferred_values.plonk.joint_combiner
               }
           }
       (* Prepare all of the evaluations (i.e. all of the columns in the proof that we open)
          for use in the circuit *)
       and evals =
         constant
-          (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
-          { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
-          ; ft_eval1 = proof.openings.ft_eval1
+          (Plonk_types.All_evals.typ ~num_chunks:1
+             (module Impls.Step)
+             full_features )
+          { evals =
+              { public_input = x_hat_evals; evals = proof.proof.openings.evals }
+          ; ft_eval1 = proof.proof.openings.ft_eval1
           }
       in
 
@@ -455,12 +451,11 @@ let%test_module "gate finalization" =
             (* Call finalisation with all of the required details *)
             Step_verifier.finalize_other_proof
               (module Nat.N0)
-              ~feature_flags
               ~step_domains:
                 (`Known
                   [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ]
                   )
-              ~sponge ~prev_challenges:[] deferred_values evals
+              ~zk_rows:3 ~sponge ~prev_challenges:[] deferred_values evals
           in
 
           (* Read the boolean result from the circuit and make it available
@@ -478,7 +473,7 @@ let%test_module "gate finalization" =
          * Pasta_bindings.Fp.t list
          * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
            , Pasta_bindings.Fp.t )
-           Kimchi_types.prover_proof
+           Kimchi_types.proof_with_public
 
     module type SETUP = sig
       val example : example
@@ -503,7 +498,7 @@ let%test_module "gate finalization" =
          snarky proof *)
       let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index
 
-      let proof = Backend.Tick.Proof.of_backend proof
+      let proof = Backend.Tick.Proof.of_backend_with_public_evals proof
 
       let test_feature_flags_configs =
         generate_test_feature_flag_configs S.actual_feature_flags
@@ -541,7 +536,7 @@ let%test_module "gate finalization" =
       ( module Make (struct
         let example =
           public_input_1 (fun srs ->
-              Kimchi_bindings.Protocol.Proof.Fp.example_with_lookup srs true )
+              Kimchi_bindings.Protocol.Proof.Fp.example_with_lookup srs )
 
         let actual_feature_flags =
           { Plonk_types.Features.none_bool with
@@ -550,7 +545,8 @@ let%test_module "gate finalization" =
           }
       end) )
 
-    (*let%test_module "foreign field multiplication" =
+    (*
+    let%test_module "foreign field multiplication" =
       ( module Make (struct
         let example =
           no_public_input
@@ -563,7 +559,8 @@ let%test_module "gate finalization" =
           ; foreign_field_add = true
           ; foreign_field_mul = true
           }
-      end) )*)
+      end) )
+      *)
 
     let%test_module "range check" =
       ( module Make (struct
@@ -637,7 +634,7 @@ let wrap
       Req ) :
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
-    ~actual_wrap_domains ~step_plonk_indices ~feature_flags
+    ~actual_wrap_domains ~step_plonk_indices:_ ~feature_flags
     ~actual_feature_flags ?tweak_statement pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
@@ -743,9 +740,9 @@ let wrap
         in
         k (M.f messages_for_next_wrap_proof)
     | Messages ->
-        k proof.messages
+        k proof.proof.messages
     | Openings_proof ->
-        k proof.openings.proof
+        k proof.proof.openings.proof
     | Proof_state ->
         k prev_statement_with_hashes.proof_state
     | Which_branch ->
@@ -767,10 +764,10 @@ let wrap
     | _ ->
         Snarky_backendless.Request.unhandled
   in
-  let module O = Tick.Oracles in
+
   let public_input =
     tick_public_input_of_statement ~max_proofs_verified
-      prev_statement_with_hashes ~feature_flags
+      prev_statement_with_hashes
   in
   let prev_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges
@@ -811,7 +808,7 @@ let wrap
     let messages_for_next_wrap_proof :
         _ P.Base.Messages_for_next_proof_over_same_field.Wrap.t =
       { challenge_polynomial_commitment =
-          proof.openings.proof.challenge_polynomial_commitment
+          proof.proof.openings.proof.challenge_polynomial_commitment
       ; old_bulletproof_challenges =
           Vector.map prev_statement.proof_state.unfinalized_proofs ~f:(fun t ->
               t.deferred_values.bulletproof_challenges )
@@ -859,7 +856,7 @@ let wrap
     |> Wrap_hack.pad_accumulator
   in
   let%map.Promise next_proof =
-    let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
+    let (T (input, conv, _conv_inv)) = Impls.Wrap.input ~feature_flags () in
     Common.time "wrap proof" (fun () ->
         [%log internal] "Wrap_generate_witness_conv" ;
         Impls.Wrap.generate_witness_conv
@@ -885,10 +882,12 @@ let wrap
                       then failwith "Regenerated proof" ;
                       let%map.Promise proof = create_proof () in
                       Proof_cache.set_wrap_proof proof_cache ~keypair:pk
-                        ~public_input:public_inputs proof ;
+                        ~public_input:public_inputs proof.proof ;
                       proof
                   | Some proof ->
-                      Promise.return proof )
+                      Promise.return
+                        ( { proof; public_evals = None }
+                          : Tock.Proof.with_public_evals ) )
             in
             [%log internal] "Backend_tock_proof_create_async_done" ;
             proof )
@@ -908,23 +907,24 @@ let wrap
                   { next_statement.proof_state.deferred_values with
                     plonk =
                       { next_statement.proof_state.deferred_values.plonk with
-                        lookup =
-                          (* TODO: This assumes wrap circuits do not use lookup *)
-                          None
+                        joint_combiner =
+                          Opt.to_option
+                            next_statement.proof_state.deferred_values.plonk
+                              .joint_combiner
                       }
                   }
               }
           } )
   in
   [%log internal] "Pickles_wrap_proof_done" ;
-  ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof
+  ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof.proof
     ; statement =
         Types.Wrap.Statement.to_minimal next_statement
           ~to_option:Opt.to_option_unsafe
     ; prev_evals =
         { Plonk_types.All_evals.evals =
-            { public_input = x_hat_evals; evals = proof.openings.evals }
-        ; ft_eval1 = proof.openings.ft_eval1
+            { public_input = x_hat_evals; evals = proof.proof.openings.evals }
+        ; ft_eval1 = proof.proof.openings.ft_eval1
         }
     }
     : _ P.Base.Wrap.t )

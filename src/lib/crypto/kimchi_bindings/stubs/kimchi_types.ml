@@ -98,6 +98,13 @@ type nonrec 'caml_g lookup_commitments =
   ; runtime : 'caml_g poly_comm option
   }
 
+type nonrec 'caml_f runtime_table_cfg =
+  { id : int32; first_column : 'caml_f array }
+
+type nonrec 'caml_f lookup_table = { id : int32; data : 'caml_f array array }
+
+type nonrec 'caml_f runtime_table = { id : int32; data : 'caml_f array }
+
 type nonrec 'caml_g prover_commitments =
   { w_comm :
       'caml_g poly_comm
@@ -127,6 +134,11 @@ type nonrec ('caml_g, 'caml_f) prover_proof =
   ; ft_eval1 : 'caml_f
   ; public : 'caml_f array
   ; prev_challenges : ('caml_g, 'caml_f) recursion_challenge array
+  }
+
+type nonrec ('caml_g, 'caml_f) proof_with_public =
+  { public_evals : 'caml_f array point_evaluations option
+  ; proof : ('caml_g, 'caml_f) prover_proof
   }
 
 type nonrec wire = { row : int; col : int }
@@ -225,6 +237,12 @@ module VerifierIndex = struct
     ; mul_comm : 'poly_comm
     ; emul_comm : 'poly_comm
     ; endomul_scalar_comm : 'poly_comm
+    ; xor_comm : 'poly_comm option
+    ; range_check0_comm : 'poly_comm option
+    ; range_check1_comm : 'poly_comm option
+    ; foreign_field_add_comm : 'poly_comm option
+    ; foreign_field_mul_comm : 'poly_comm option
+    ; rot_comm : 'poly_comm option
     }
 
   type nonrec ('fr, 'srs, 'poly_comm) verifier_index =
@@ -236,5 +254,6 @@ module VerifierIndex = struct
     ; evals : 'poly_comm verification_evals
     ; shifts : 'fr array
     ; lookup_index : 'poly_comm Lookup.t option
+    ; zk_rows : int
     }
 end

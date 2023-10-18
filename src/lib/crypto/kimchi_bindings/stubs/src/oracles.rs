@@ -2,7 +2,10 @@ use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
 use ark_ff::One;
 use kimchi::circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
 use kimchi::proof::ProverProof;
-use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
+use kimchi::{
+    prover::caml::{CamlProofWithPublic, CamlProverProof},
+    verifier_index::VerifierIndex,
+};
 use mina_poseidon::{
     self,
     constants::PlonkSpongeConstantsKimchi,
@@ -11,6 +14,8 @@ use mina_poseidon::{
 };
 use paste::paste;
 use poly_commitment::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
+use poly_commitment::evaluation_proof::OpeningProof;
+use poly_commitment::SRS;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlOracles<F> {
@@ -22,20 +27,19 @@ pub struct CamlOracles<F> {
 
 macro_rules! impl_oracles {
     ($CamlF: ty, $F: ty, $CamlG: ty, $G: ty, $index: ty, $curve_params: ty) => {
-
         paste! {
             #[ocaml_gen::func]
             #[ocaml::func]
             pub fn [<$F:snake _oracles_create>](
                 lgr_comm: Vec<CamlPolyComm<$CamlG>>,
                 index: $index,
-                proof: CamlProverProof<$CamlG, $CamlF>,
+                proof: CamlProofWithPublic<$CamlG, $CamlF>,
             ) -> Result<CamlOracles<$CamlF>, ocaml::Error> {
-                let index: VerifierIndex<$G> = index.into();
+                let index: VerifierIndex<$G, OpeningProof<$G>> = index.into();
 
                 let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
                     .into_iter()
-                    .take(proof.public.len())
+                    .take(proof.proof.public.len())
                     .map(Into::into)
                     .collect();
                 let lgr_comm_refs: Vec<_> = lgr_comm.iter().collect();
@@ -43,6 +47,7 @@ macro_rules! impl_oracles {
                 let p_comm = PolyComm::<$G>::multi_scalar_mul(
                     &lgr_comm_refs,
                     &proof
+                        .proof
                         .public
                         .iter()
                         .map(Into::<$F>::into)
@@ -61,10 +66,89 @@ macro_rules! impl_oracles {
                         .commitment
                 };
 
-                let (proof, public_input): (ProverProof<$G>, Vec<$F>) = proof.into();
+                let (proof, public_input): (ProverProof<$G, OpeningProof<$G>>, Vec<$F>) = proof.into();
 
                 let oracles_result =
-                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm, &public_input)?;
+                    proof.oracles::<
+                        DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>,
+                        DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>,
+                    >(&index, &p_comm, Some(&public_input))?;
+
+                let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
+                    oracles_result.fq_sponge,
+                    oracles_result.combined_inner_product,
+                    oracles_result.public_evals,
+                    oracles_result.digest,
+                    oracles_result.oracles,
+                );
+
+                sponge.absorb_fr(&[shift_scalar::<$G>(combined_inner_product)]);
+
+                let opening_prechallenges = proof
+                    .proof
+                    .prechallenges(&mut sponge)
+                    .into_iter()
+                    .map(|x| x.0.into())
+                    .collect();
+
+                Ok(CamlOracles {
+                    o: oracles.into(),
+                    p_eval: (p_eval[0][0].into(), p_eval[1][0].into()),
+                    opening_prechallenges,
+                    digest_before_evaluations: digest.into(),
+                })
+            }
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
+            pub fn [<$F:snake _oracles_create_no_public>](
+                lgr_comm: Vec<CamlPolyComm<$CamlG>>,
+                index: $index,
+                proof: CamlProverProof<$CamlG, $CamlF>,
+            ) -> Result<CamlOracles<$CamlF>, ocaml::Error> {
+                let proof = CamlProofWithPublic {
+                    proof,
+                    public_evals: None,
+                };
+
+                let index: VerifierIndex<$G, OpeningProof<$G>> = index.into();
+
+                let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
+                    .into_iter()
+                    .take(proof.proof.public.len())
+                    .map(Into::into)
+                    .collect();
+                let lgr_comm_refs: Vec<_> = lgr_comm.iter().collect();
+
+                let p_comm = PolyComm::<$G>::multi_scalar_mul(
+                    &lgr_comm_refs,
+                    &proof
+                        .proof
+                        .public
+                        .iter()
+                        .map(Into::<$F>::into)
+                        .map(|s| -s)
+                        .collect::<Vec<_>>(),
+                );
+
+                let p_comm = {
+                    index
+                        .srs()
+                        .mask_custom(
+                            p_comm.clone(),
+                            &p_comm.map(|_| $F::one()),
+                        )
+                        .unwrap()
+                        .commitment
+                };
+
+                let (proof, public_input): (ProverProof<$G, OpeningProof<$G>>, Vec<$F>) = proof.into();
+
+                let oracles_result =
+                    proof.oracles::<
+                        DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>,
+                        DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>,
+                    >(&index, &p_comm, Some(&public_input))?;
 
                 let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
                     oracles_result.fq_sponge,

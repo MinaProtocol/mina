@@ -65,6 +65,12 @@ module Verifier_index_json = struct
     ; mul_comm : 'polyComm
     ; emul_comm : 'polyComm
     ; endomul_scalar_comm : 'polyComm
+    ; xor_comm : 'polyComm option
+    ; range_check0_comm : 'polyComm option
+    ; range_check1_comm : 'polyComm option
+    ; foreign_field_add_comm : 'polyComm option
+    ; foreign_field_mul_comm : 'polyComm option
+    ; rot_comm : 'polyComm option
     }
   [@@deriving yojson]
 
@@ -78,6 +84,7 @@ module Verifier_index_json = struct
     ; evals : 'polyComm verification_evals
     ; shifts : 'fr array
     ; lookup_index : 'polyComm Lookup.t option
+    ; zk_rows : int
     }
   [@@deriving yojson]
 
@@ -144,7 +151,9 @@ module Stable = struct
       let t : Impls.Wrap.Verification_key.t =
         let log2_size = Int.ceil_log2 d.constraints in
         let public =
-          let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
+          let (T (input, _conv, _conv_inv)) =
+            Impls.Wrap.input ~feature_flags:Plonk_types.Features.Full.maybe ()
+          in
           let (Typ typ) = input in
           typ.size_in_field_elements
         in
@@ -171,9 +180,16 @@ module Stable = struct
              ; emul_comm = g c.emul_comm
              ; complete_add_comm = g c.complete_add_comm
              ; endomul_scalar_comm = g c.endomul_scalar_comm
+             ; xor_comm = None
+             ; range_check0_comm = None
+             ; range_check1_comm = None
+             ; foreign_field_add_comm = None
+             ; foreign_field_mul_comm = None
+             ; rot_comm = None
              } )
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None
+        ; zk_rows = 3
         }
       in
       { commitments = c; data = d; index = t }
@@ -205,6 +221,32 @@ let dummy_commitments g =
   ; mul_comm = g
   ; emul_comm = g
   ; endomul_scalar_comm = g
+  }
+
+let dummy_step_commitments g =
+  let open Plonk_types in
+  { Plonk_verification_key_evals.Step.sigma_comm =
+      Vector.init Permuts.n ~f:(fun _ -> g)
+  ; coefficients_comm = Vector.init Columns.n ~f:(fun _ -> g)
+  ; generic_comm = g
+  ; psm_comm = g
+  ; complete_add_comm = g
+  ; mul_comm = g
+  ; emul_comm = g
+  ; endomul_scalar_comm = g
+  ; xor_comm = None
+  ; range_check0_comm = None
+  ; range_check1_comm = None
+  ; foreign_field_add_comm = None
+  ; foreign_field_mul_comm = None
+  ; rot_comm = None
+  ; lookup_table_comm = Vector.init Lookup_sorted_minus_1.n ~f:(fun _ -> None)
+  ; lookup_table_ids = None
+  ; runtime_tables_selector = None
+  ; lookup_selector_lookup = None
+  ; lookup_selector_xor = None
+  ; lookup_selector_range_check = None
+  ; lookup_selector_ffmul = None
   }
 
 let dummy =

@@ -19,7 +19,6 @@
    mina_wire_types
    codable
    bignum_bigint
-   ppx_dhall_type
    random_oracle_input
    snark_params_nonconsensus
    random_oracle_nonconsensus
