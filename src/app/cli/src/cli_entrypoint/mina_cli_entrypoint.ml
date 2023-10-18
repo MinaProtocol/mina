@@ -542,7 +542,7 @@ let setup_daemon logger =
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
-               ~max_size:logrotate_max_size ~num_rotate:file_log_rotations ) ;
+               ~max_size:logrotate_max_size ~num_rotate:20 ) ;
         (* Consumer for `[%log internal]` logging used for internal tracing *)
         Itn_logger.set_message_postprocessor
           Internal_tracing.For_itn_logger.post_process_message ;
