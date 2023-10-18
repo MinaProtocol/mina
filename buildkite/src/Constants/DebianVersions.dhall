@@ -67,7 +67,7 @@ let minimalDirtyWhen = [
   S.exactly "scripts/rebuild-deb" "sh",
   S.exactly "scripts/release-docker" "sh",
   S.exactly "buildkite/scripts/build-artifact" "sh",
-  S.exactly "buildkite/scripts/check-compatibility" "sh"
+  S.exactly "buildkite/scripts/check-compatibility" "sh",
   -- Snark profiler dirtyWhen
   S.exactly "buildkite/src/Jobs/Test/RunSnarkProfiler" "dhall",
   S.exactly "buildkite/scripts/run-snark-transaction-profiler" "sh",
