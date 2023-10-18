@@ -87,6 +87,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (Balance.to_mina_string balance.locked)
   end
 
+  let older_version = Protocol_version.create ~transaction:1 ~network:1 ~patch:0
+
   let fork_config : Runtime_config.Fork_config.t =
     { previous_state_hash =
         "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
@@ -227,6 +229,26 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ; permissions = None
             ; zkapp = None
             }
+          ; { account_name = "vk-proof"
+            ; balance = "10000"
+            ; timing = Untimed
+            ; permissions =
+                Some
+                  { Permissions.user_default with
+                    set_verification_key = (Proof, older_version)
+                  }
+            ; zkapp = Some Zkapp_account.default
+            }
+          ; { account_name = "vk-impossible"
+            ; balance = "1000"
+            ; timing = Untimed
+            ; permissions =
+                Some
+                  { Permissions.user_default with
+                    set_verification_key = (Proof, older_version)
+                  }
+            ; zkapp = Some Zkapp_account.default
+            }
           ]
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
@@ -251,6 +273,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let run network t =
     let open Malleable_error.Let_syntax in
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.compiled
+    in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
@@ -278,6 +303,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let timed3 =
       Core.String.Map.find_exn (Network.genesis_keypairs network) "timed3"
+    in
+    let vk_proof =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "vk-proof"
+    in
+    let vk_impossible =
+      Core.String.Map.find_exn
+        (Network.genesis_keypairs network)
+        "vk-impossible"
     in
     let sender = fish2.keypair in
     let receiver = fish1.keypair in
@@ -321,7 +354,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Signed_command.sign_payload sender.private_key payload
       |> Signature.Raw.encode
     in
-    let%bind zkapp_command_create_accounts =
+    let zkapp_command_create_accounts =
       (* construct a Zkapp_command.t *)
       let zkapp_keypairs =
         List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
@@ -347,9 +380,56 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      return
-      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-           zkapp_command_spec
+      Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+        zkapp_command_spec
+    in
+
+    let%bind zkapp_command_update_vk_proof, zkapp_command_update_vk_impossible =
+      let snapp_update =
+        { Account_update.Update.dummy with
+          verification_key =
+            Zkapp_basic.Set_or_keep.Set
+              { data = Pickles.Side_loaded.Verification_key.dummy
+              ; hash = Zkapp_account.dummy_vk_hash ()
+              }
+        }
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let amount = Currency.Amount.of_mina_int_exn 10 in
+      let memo = Signed_command_memo.create_from_string_exn "update vk proof" in
+      let (spec_proof : Transaction_snark.For_tests.Update_states_spec.t) =
+        { sender = (fish1.keypair, Account.Nonce.one)
+        ; fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount
+        ; zkapp_account_keypairs = [ vk_proof.keypair ]
+        ; memo
+        ; new_zkapp_account = false
+        ; snapp_update
+        ; current_auth = Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      let spec_impossible =
+        { spec_proof with
+          zkapp_account_keypairs = [ vk_impossible.keypair ]
+        ; sender = (fish1.keypair, Account.Nonce.(succ one))
+        }
+      in
+      let%map vk_proof =
+        Malleable_error.lift
+        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+             spec_proof
+      and vk_impossible =
+        Malleable_error.lift
+        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+             spec_impossible
+      in
+      (vk_proof, vk_impossible)
     in
     let wait_for_zkapp zkapp_command =
       let with_timeout =
@@ -535,6 +615,34 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             genesis derived from hard fork config"
            (List.length blocks) ;
          return () )
+    in
+    let%bind () =
+      section_hard
+        "send a zkapp to update verification key using Signature while account \
+         permission is set to Proof with old version"
+      @@ send_zkapp ~logger
+           (Network.Node.get_ingress_uri node_a)
+           zkapp_command_update_vk_proof
+    in
+    let%bind () =
+      section_hard
+        "Wait for zkapp to update verification key to be included in \
+         transition frontier"
+      @@ wait_for_zkapp zkapp_command_update_vk_proof
+    in
+    let%bind () =
+      section_hard
+        "send a zkapp to update verification key using Signature while account \
+         permission is set to Impossible with old version"
+      @@ send_zkapp ~logger
+           (Network.Node.get_ingress_uri node_a)
+           zkapp_command_update_vk_impossible
+    in
+    let%bind () =
+      section_hard
+        "Wait for zkapp to update verification key to be included in \
+         transition frontier"
+      @@ wait_for_zkapp zkapp_command_update_vk_impossible
     in
     section_hard "running replayer"
       (let%bind logs =
