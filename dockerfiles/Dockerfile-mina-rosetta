@@ -12,6 +12,8 @@ ARG network=mainnet
 
 
 ARG psql_version=13
+# Golang version number used to detemine tarball name
+ARG GO_VERSION=1.19.11
 
 ARG MINA_DAEMON_PORT=10101
 ARG MINA_CONFIG_DIR=/data/.mina-config
@@ -47,6 +49,7 @@ RUN apt-get update --quiet --yes \
     apt-transport-https \
     curl \
     ca-certificates \
+    build-essential \
     dnsutils \
     dumb-init \
     gettext \
@@ -69,11 +72,14 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
 
 # --- Install rosetta-cli
 
+
+# --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
+RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
+
 # The following commands install rosetta-cli with an updated rosetta-sdk-go dependency, which supports delegation transactions.
 # Upstream PR to rosetta-sdk-go: https://github.com/coinbase/rosetta-sdk-go/pull/457
 # They can be replaced once there is a new release of rosetta-cli containing the above change by:
 #RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/${ROSETTA_CLI_VERSION}/scripts/install.sh | sh -s
-RUN apt-get install -y golang-go
 RUN export GOBIN="$(pwd)/bin" \
   && curl -L "https://github.com/coinbase/rosetta-cli/archive/refs/tags/v0.10.1.tar.gz" -o "/tmp/v0.10.1.tar.gz" \
   && tar xzf "/tmp/v0.10.1.tar.gz" -C "/tmp" \
@@ -81,7 +87,6 @@ RUN export GOBIN="$(pwd)/bin" \
   && /usr/lib/go/bin/go mod edit -replace github.com/coinbase/rosetta-sdk-go@v0.8.1=github.com/MinaProtocol/rosetta-sdk-go@stake-delegation-v1 \
   && /usr/lib/go/bin/go mod tidy \
   && /usr/lib/go/bin/go install
-
 
 # Rosetta-demo artifacts / build dir removal:
 # Make rosetta-crucial components and the generate_keypair tool
@@ -93,7 +98,7 @@ RUN export GOBIN="$(pwd)/bin" \
 #  && rm -rf _build
 
 # --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
-RUN locale-gen en_US.UTF-8
+#RUN locale-gen en_US.UTF-8
 
 # --- Set up sample/demo wallets and configuration
 RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
