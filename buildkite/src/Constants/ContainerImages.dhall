@@ -12,5 +12,6 @@
   elixirToolchain = "elixir:1.10-alpine",
   nodeToolchain = "node:14.13.1-stretch-slim",
   ubuntu2004 = "ubuntu:20.04",
-  xrefcheck = "serokell/xrefcheck@sha256:8fbb35a909abc353364f1bd3148614a1160ef3c111c0c4ae84e58fdf16019eeb"
+  xrefcheck = "serokell/xrefcheck@sha256:8fbb35a909abc353364f1bd3148614a1160ef3c111c0c4ae84e58fdf16019eeb",
+  nixos = "nixos/nix"
 }
