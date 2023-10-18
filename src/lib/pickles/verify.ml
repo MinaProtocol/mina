@@ -97,7 +97,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         Timer.clock __LOC__ ;
         let deferred_values =
-          Wrap_deferred_values.expand_deferred ~evals
+          Wrap_deferred_values.expand_deferred ~evals ~zk_rows:3
             ~old_bulletproof_challenges ~proof_state
         in
         Timer.clock __LOC__ ;

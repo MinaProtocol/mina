@@ -16,7 +16,7 @@ module Make
     (Auxiliary_value : T0) =
 struct
   let f_debug full_signature _num_choices choices_length ~feature_flags
-      ~max_proofs_verified =
+      ~num_chunks ~max_proofs_verified =
     let num_choices = Hlist.Length.to_nat choices_length in
     let dummy_step_domains =
       Vector.init num_choices ~f:(fun _ -> Fix_domains.rough_domains)
@@ -38,8 +38,9 @@ struct
     Timer.clock __LOC__ ;
     let srs = Backend.Tick.Keypair.load_urs () in
     let _, main =
-      Wrap_main.wrap_main ~feature_flags ~srs full_signature choices_length
-        dummy_step_keys dummy_step_widths dummy_step_domains max_proofs_verified
+      Wrap_main.wrap_main ~feature_flags ~num_chunks ~srs full_signature
+        choices_length dummy_step_keys dummy_step_widths dummy_step_domains
+        max_proofs_verified
     in
     Timer.clock __LOC__ ;
     let t =
@@ -51,7 +52,7 @@ struct
     in
     Timer.clock __LOC__ ; t
 
-  let f full_signature num_choices choices_length ~feature_flags
+  let f full_signature num_choices choices_length ~feature_flags ~num_chunks
       ~max_proofs_verified =
     let res =
       Common.wrap_domains
@@ -60,7 +61,7 @@ struct
     ( if debug then
       let res' =
         f_debug full_signature num_choices choices_length ~feature_flags
-          ~max_proofs_verified
+          ~num_chunks ~max_proofs_verified
       in
       [%test_eq: Domains.t] res res' ) ;
     res
