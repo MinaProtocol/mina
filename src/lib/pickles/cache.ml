@@ -27,11 +27,11 @@ module Step = struct
     [@@warning "-4"]
   end
 
-  type 'header storable =
-    ('header, Backend.Tick.Keypair.t) Key_cache.Sync.Disk_storable.t
+  type storable =
+    (Key.Proving.t, Backend.Tick.Keypair.t) Key_cache.Sync.Disk_storable.t
 
-  type 'header vk_storable =
-    ( 'header
+  type vk_storable =
+    ( Key.Verification.t
     , Kimchi_bindings.Protocol.VerifierIndex.Fp.t )
     Key_cache.Sync.Disk_storable.t
 
@@ -162,11 +162,11 @@ module Wrap = struct
     end
   end
 
-  type 'header storable =
-    ('header, Backend.Tock.Keypair.t) Key_cache.Sync.Disk_storable.t
+  type storable =
+    (Key.Proving.t, Backend.Tock.Keypair.t) Key_cache.Sync.Disk_storable.t
 
-  type 'header vk_storable =
-    ('header, Verification_key.t) Key_cache.Sync.Disk_storable.t
+  type vk_storable =
+    (Key.Verification.t, Verification_key.t) Key_cache.Sync.Disk_storable.t
 
   let storable =
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
@@ -278,12 +278,12 @@ module Wrap = struct
 end
 
 module Spec = struct
-  type ('step_pk_header, 'step_vk_header, 'wrap_pk_header, 'wrap_vk_header) t =
+  type t =
     { cache : Key_cache.Spec.t list
-    ; step_storable : 'step_pk_header Step.storable
-    ; step_vk_storable : 'step_vk_header Step.vk_storable
-    ; wrap_storable : 'wrap_pk_header Wrap.storable
-    ; wrap_vk_storable : 'wrap_vk_header Wrap.vk_storable
+    ; step_storable : Step.storable
+    ; step_vk_storable : Step.vk_storable
+    ; wrap_storable : Wrap.storable
+    ; wrap_vk_storable : Wrap.vk_storable
     }
 
   let default =

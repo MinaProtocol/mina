@@ -339,7 +339,7 @@ struct
   let compile :
       type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
          self:(var, value, max_proofs_verified, branches) Tag.t
-      -> cache:_ Cache.Spec.t
+      -> cache:Cache.Spec.t
       -> proof_cache:Proof_cache.t option
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
@@ -947,7 +947,7 @@ end
 let compile_with_wrap_main_override_promise :
     type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
        ?self:(var, value, max_proofs_verified, branches) Tag.t
-    -> ?cache:_ Cache.Spec.t
+    -> ?cache:Cache.Spec.t
     -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
