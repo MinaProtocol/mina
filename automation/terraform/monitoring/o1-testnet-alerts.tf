@@ -22,7 +22,7 @@ module "o1testnet_alerts" {
   alert_timeframe        = "1h"
   alert_duration         = "10m"
   pagerduty_alert_filter = "devnet2|mainnet"
-  berkeley_testnet       = "testnet=\"(berkeley|testworld-2-0)\""
+  berkeley_testnet       = "testnet=~\"(berkeley|testworld-2-0)\""
   synced_status_filter   = "syncStatus=\"SYNCED\""
 }
 

@@ -83,15 +83,15 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_proofs_verified branches prev_varss max_local_max_proofs_verifieds)
-    ~feature_flags
+    ~num_chunks ~feature_flags
     (full_signature :
       ( max_proofs_verified
       , branches
       , max_local_max_proofs_verifieds )
       Full_signature.t ) (pi_branches : (prev_varss, branches) Hlist.Length.t)
     (step_keys :
-      ( ( Wrap_main_inputs.Inner_curve.Constant.t
-        , Wrap_main_inputs.Inner_curve.Constant.t option )
+      ( ( Wrap_main_inputs.Inner_curve.Constant.t array
+        , Wrap_main_inputs.Inner_curve.Constant.t array option )
         Wrap_verifier.index'
       , branches )
       Vector.t
@@ -214,11 +214,11 @@ let wrap_main
                 (Vector.map (Lazy.force step_keys)
                    ~f:
                      (Plonk_verification_key_evals.Step.map
-                        ~f:Inner_curve.constant ~f_opt:(function
+                        ~f:(Array.map ~f:Inner_curve.constant) ~f_opt:(function
                        | None ->
                            Opt.nothing
                        | Some x ->
-                           Opt.just (Inner_curve.constant x) ) ) ) )
+                           Opt.just (Array.map ~f:Inner_curve.constant x) ) ) ) )
         in
         let prev_step_accs =
           with_label __LOC__ (fun () ->
@@ -390,7 +390,8 @@ let wrap_main
                      (module Impl)
                      Inner_curve.typ ~bool:Boolean.typ feature_flags
                      ~dummy:Inner_curve.Params.one
-                     ~commitment_lengths:Commitment_lengths.default )
+                     ~commitment_lengths:
+                       (Commitment_lengths.default ~num_chunks) )
                   ~request:(fun () -> Req.Messages) )
           in
           let sponge = Wrap_verifier.Opt.create sponge_params in

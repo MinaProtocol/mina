@@ -55,7 +55,11 @@ module Features : sig
     end
   end]
 
-  val to_full : or_:('bool -> 'bool -> 'bool) -> 'bool t -> 'bool Full.t
+  val to_full :
+       or_:('bool -> 'bool -> 'bool)
+    -> ?any:('bool list -> 'bool)
+    -> 'bool t
+    -> 'bool Full.t
 
   val of_full : 'a Full.t -> 'a t
 
@@ -385,18 +389,23 @@ module All_evals : sig
 
       include Sigs.Full.S2 with type ('a, 'b) t := ('a, 'b) t
     end
+
+    module Latest = V1
   end
 
   module In_circuit : sig
     type ('f, 'f_multi, 'bool) t =
       { evals :
-          ('f * 'f, 'f_multi * 'f_multi, 'bool) With_public_input.In_circuit.t
+          ( 'f_multi * 'f_multi
+          , 'f_multi * 'f_multi
+          , 'bool )
+          With_public_input.In_circuit.t
       ; ft_eval1 : 'f
       }
   end
 
-  type ('f, 'f_multi) t = ('f, 'f_multi) Stable.V1.t =
-    { evals : ('f * 'f, 'f_multi * 'f_multi) With_public_input.t
+  type ('f, 'f_multi) t =
+    { evals : ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.t
     ; ft_eval1 : 'f
     }
   [@@deriving sexp, compare, yojson, hash, equal]

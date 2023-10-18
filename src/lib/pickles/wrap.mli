@@ -8,7 +8,8 @@ val wrap :
          and type ns = 'max_local_max_proofs_verifieds )
   -> ('max_proofs_verified, 'max_local_max_proofs_verifieds) Requests.Wrap.t
   -> dlog_plonk_index:
-       Backend.Tock.Curve.Affine.t Pickles_types.Plonk_verification_key_evals.t
+       Backend.Tock.Curve.Affine.t array
+       Pickles_types.Plonk_verification_key_evals.t
   -> (   ( Impls.Wrap.Impl.Field.t
          , Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
          , Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
@@ -157,7 +158,7 @@ val combined_inner_product :
   -> ft_eval1:Backend.Tick.Field.t
   -> actual_proofs_verified:
        (module Pickles_types.Nat.Add.Intf with type n = 'actual_proofs_verified)
-  -> ( Backend.Tick.Field.t * Backend.Tick.Field.t
+  -> ( Backend.Tick.Field.t array * Backend.Tick.Field.t array
      , Backend.Tick.Field.t array * Backend.Tick.Field.t array )
      Pickles_types.Plonk_types.All_evals.With_public_input.t
   -> old_bulletproof_challenges:

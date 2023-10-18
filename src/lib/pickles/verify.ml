@@ -97,7 +97,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         Timer.clock __LOC__ ;
         let deferred_values =
-          Wrap_deferred_values.expand_deferred ~evals
+          Wrap_deferred_values.expand_deferred ~evals ~zk_rows:3
             ~old_bulletproof_challenges ~proof_state
         in
         Timer.clock __LOC__ ;
@@ -157,7 +157,10 @@ let verify_heterogenous (ts : Instance.t list) =
               Common.hash_messages_for_next_step_proof
                 ~app_state:A_value.to_field_elements
                 (Reduced_messages_for_next_proof_over_same_field.Step.prepare
-                   ~dlog_plonk_index:key.commitments
+                   ~dlog_plonk_index:
+                     (Plonk_verification_key_evals.map
+                        ~f:(fun x -> [| x |])
+                        key.commitments )
                    { t.statement.messages_for_next_step_proof with app_state } )
           ; proof_state =
               { deferred_values =

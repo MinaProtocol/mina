@@ -117,8 +117,8 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , 'max_local_max_proofs_verifieds )
          Full_signature.t
       -> ('prev_varss, 'branches) Hlist.Length.t
-      -> ( ( Wrap_main_inputs.Inner_curve.Constant.t
-           , Wrap_main_inputs.Inner_curve.Constant.t option )
+      -> ( ( Wrap_main_inputs.Inner_curve.Constant.t array
+           , Wrap_main_inputs.Inner_curve.Constant.t array option )
            Wrap_verifier.index'
          , 'branches )
          Vector.t
@@ -348,6 +348,7 @@ struct
       -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
       -> ?override_wrap_main:
            (max_proofs_verified, branches, prev_varss) wrap_main_generic
+      -> ?num_chunks:int
       -> branches:(module Nat.Intf with type n = branches)
       -> max_proofs_verified:
            (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -380,8 +381,9 @@ struct
          * _ =
    fun ~self ~cache ~proof_cache ?disk_keys
        ?(return_early_digest_exception = false) ?override_wrap_domain
-       ?override_wrap_main ~branches:(module Branches) ~max_proofs_verified
-       ~name ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
+       ?override_wrap_main ?(num_chunks = 1) ~branches:(module Branches)
+       ~max_proofs_verified ~name ~constraint_constants ~public_input
+       ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
@@ -454,7 +456,7 @@ struct
               (Auxiliary_value)
           in
           M.f full_signature prev_varss_n prev_varss_length ~max_proofs_verified
-            ~feature_flags
+            ~feature_flags ~num_chunks
       | Some override ->
           Common.wrap_domains
             ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
@@ -618,7 +620,7 @@ struct
       match override_wrap_main with
       | None ->
           let srs = Tick.Keypair.load_urs () in
-          Wrap_main.wrap_main ~feature_flags ~srs full_signature
+          Wrap_main.wrap_main ~num_chunks ~feature_flags ~srs full_signature
             prev_varss_length step_vks proofs_verifieds step_domains
             max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
@@ -727,7 +729,11 @@ struct
         let step handler next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
-            ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
+            ~self ~step_domains
+            ~self_dlog_plonk_index:
+              ((* TODO *) Plonk_verification_key_evals.map
+                 ~f:(fun x -> [| x |])
+                 wrap_vk.commitments )
             ~public_input ~auxiliary_typ ~feature_flags
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
             wrap_vk.index
@@ -739,7 +745,9 @@ struct
                            , return_value
                            , auxiliary_value
                            , actual_wrap_domains ) =
-            step ~proof_cache handler ~maxes:(module Maxes) next_state
+            step ~zk_rows:step_vk.zk_rows ~proof_cache handler
+              ~maxes:(module Maxes)
+              next_state
           in
           let proof =
             { proof with
@@ -771,8 +779,12 @@ struct
             Wrap.wrap ~proof_cache ~max_proofs_verified:Max_proofs_verified.n
               ~feature_flags ~actual_feature_flags:b.feature_flags
               full_signature.maxes wrap_requests ?tweak_statement
-              ~dlog_plonk_index:wrap_vk.commitments wrap_main ~typ ~step_vk
-              ~step_plonk_indices:(Lazy.force step_vks) ~actual_wrap_domains
+              ~dlog_plonk_index:
+                ((* TODO *) Plonk_verification_key_evals.map
+                   ~f:(fun x -> [| x |])
+                   wrap_vk.commitments )
+              wrap_main ~typ ~step_vk ~step_plonk_indices:(Lazy.force step_vks)
+              ~actual_wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
           in
@@ -819,7 +831,10 @@ struct
       ; proofs_verifieds
       ; max_proofs_verified
       ; public_input = typ
-      ; wrap_key = Lazy.map wrap_vk ~f:Verification_key.commitments
+      ; wrap_key =
+          Lazy.map wrap_vk ~f:(fun x ->
+              Plonk_verification_key_evals.map (Verification_key.commitments x)
+                ~f:(fun x -> [| x |]) )
       ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
       ; wrap_domains
       ; step_domains
@@ -847,7 +862,9 @@ module Side_loaded = struct
           ~log_2_domain_size:(Lazy.force d.wrap_vk).domain.log_size_of_group
       in
       { wrap_vk = Some (Lazy.force d.wrap_vk)
-      ; wrap_index = Lazy.force d.wrap_key
+      ; wrap_index =
+          Plonk_verification_key_evals.map (Lazy.force d.wrap_key) ~f:(fun x ->
+              x.(0) )
       ; max_proofs_verified =
           Pickles_base.Proofs_verified.of_nat (Nat.Add.n d.max_proofs_verified)
       ; actual_wrap_domain_size
@@ -933,6 +950,7 @@ let compile_with_wrap_main_override_promise :
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?override_wrap_main:
          (max_proofs_verified, branches, prev_varss) wrap_main_generic
+    -> ?num_chunks:int
     -> public_input:
          ( var
          , value
@@ -980,7 +998,7 @@ let compile_with_wrap_main_override_promise :
  *)
  fun ?self ?(cache = []) ?proof_cache ?disk_keys
      ?(return_early_digest_exception = false) ?override_wrap_domain
-     ?override_wrap_main ~public_input ~auxiliary_typ ~branches
+     ?override_wrap_main ?num_chunks ~public_input ~auxiliary_typ ~branches
      ~max_proofs_verified ~name ~constraint_constants ~choices () ->
   let self =
     match self with
@@ -1048,7 +1066,7 @@ let compile_with_wrap_main_override_promise :
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~return_early_digest_exception ~self ~proof_cache ~cache
-      ?disk_keys ?override_wrap_domain ?override_wrap_main ~branches
+      ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
       ~max_proofs_verified ~name ~public_input ~auxiliary_typ
       ~constraint_constants
       ~choices:(fun ~self -> conv_irs (choices ~self))

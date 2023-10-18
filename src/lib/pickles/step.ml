@@ -59,7 +59,7 @@ struct
           with type length = Max_proofs_verified.n
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
-      ~feature_flags ~self_dlog_plonk_index
+      ~zk_rows ~feature_flags ~self_dlog_plonk_index
       ~(public_input :
          ( var
          , value
@@ -121,7 +121,7 @@ struct
     let expand_proof :
         type var value local_max_proofs_verified m.
            Impls.Wrap.Verification_key.t
-        -> 'a
+        -> _ array Plonk_verification_key_evals.t
         -> value
         -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t
         -> (var, value, local_max_proofs_verified, m) Tag.t
@@ -204,7 +204,7 @@ struct
           Plonk_checks.scalars_env
             (module Env_bool)
             (module Env_field)
-            ~srs_length_log2:Common.Max_degree.step_log2
+            ~srs_length_log2:Common.Max_degree.step_log2 ~zk_rows:3
             ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
             ~field_of_hex:(fun s ->
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
@@ -237,7 +237,7 @@ struct
         Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
           ~old_bulletproof_challenges:
             statement.messages_for_next_step_proof.old_bulletproof_challenges
-          ~proof_state:statement.proof_state
+          ~zk_rows ~proof_state:statement.proof_state
       in
       let prev_statement_with_hashes :
           ( _
@@ -456,6 +456,7 @@ struct
           (module Env_bool)
           (module Env_field)
           ~domain:tock_domain ~srs_length_log2:Common.Max_degree.wrap_log2
+          ~zk_rows:3
           ~field_of_hex:(fun s ->
             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
             |> Kimchi_pasta.Pasta.Fq.of_bigint )
@@ -489,7 +490,7 @@ struct
           Plonk_checks.Type2.ft_eval0
             (module Tock.Field)
             ~domain:tock_domain ~env:tock_env tock_plonk_minimal
-            tock_combined_evals x_hat_1
+            tock_combined_evals [| x_hat_1 |]
         in
         let open Tock.Field in
         combine ~which_eval:`Fst ~ft_eval:ft_eval0 As_field.zeta
@@ -880,7 +881,7 @@ struct
       }
     in
     [%log internal] "Pickles_step_proof_done" ;
-    ( { Proof.Base.Step.proof = next_proof.proof
+    ( { Proof.Base.Step.proof = next_proof
       ; statement = next_statement
       ; index = branch_data.index
       ; prev_evals =
@@ -890,7 +891,11 @@ struct
                  Plonk_types.All_evals.
                    { ft_eval1
                    ; evals =
-                       { With_public_input.evals = es; public_input = x_hat }
+                       { With_public_input.evals = es
+                       ; public_input =
+                           (let x1, x2 = x_hat in
+                            ([| x1 |], [| x2 |]) )
+                       }
                    } ) )
             lte Max_proofs_verified.n (Lazy.force Dummy.evals)
       }

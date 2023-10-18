@@ -241,6 +241,13 @@ struct
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
           with_label "combined_polynomial" (fun () ->
               Pcs_batch.combine_split_commitments pcs_batch
+                ~reduce_without_degree_bound:Array.to_list
+                ~reduce_with_degree_bound:(fun { Plonk_types.Poly_comm
+                                                 .With_degree_bound
+                                                 .unshifted
+                                               ; shifted
+                                               } ->
+                  Array.to_list unshifted @ [ shifted ] )
                 ~scale_and_add:(fun ~(acc :
                                        [ `Maybe_finite of
                                          Boolean.var * Inner_curve.t
@@ -572,14 +579,11 @@ struct
           let without_degree_bound =
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
-              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
-              :: [| m.psm_comm |] :: [| m.complete_add_comm |]
-              :: [| m.mul_comm |] :: [| m.emul_comm |]
-              :: [| m.endomul_scalar_comm |]
+              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: m.generic_comm
+              :: m.psm_comm :: m.complete_add_comm :: m.mul_comm :: m.emul_comm
+              :: m.endomul_scalar_comm
               :: Vector.append w_comm
-                   (Vector.append
-                      (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
-                      (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                   (Vector.append m.coefficients_comm sigma_comm_init
                       (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
                    (snd
                       Plonk_types.(
@@ -919,8 +923,12 @@ struct
       in
       Sponge.absorb sponge (`Field challenge_digest) ;
       Sponge.absorb sponge (`Field ft_eval1) ;
-      Sponge.absorb sponge (`Field (fst evals.public_input)) ;
-      Sponge.absorb sponge (`Field (snd evals.public_input)) ;
+      Array.iter
+        ~f:(fun x -> Sponge.absorb sponge (`Field x))
+        (fst evals.public_input) ;
+      Array.iter
+        ~f:(fun x -> Sponge.absorb sponge (`Field x))
+        (snd evals.public_input) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
       (* This is a hacky, but much more efficient, version of the opt sponge.
          This uses the assumption that the sponge 'absorption state' will align
@@ -1008,7 +1016,7 @@ struct
           Plonk_checks.scalars_env
             (module Env_bool)
             (module Env_field)
-            ~srs_length_log2:Common.Max_degree.step_log2
+            ~srs_length_log2:Common.Max_degree.step_log2 ~zk_rows:(* TODO *) 3
             ~endo:(Impl.Field.constant Endo.Step_inner_curve.base)
             ~mds:sponge_params.mds
             ~field_of_hex:(fun s ->
@@ -1048,7 +1056,8 @@ struct
                      Array.map a ~f:(Opt.maybe b) )
           in
           let v =
-            List.append sg_evals ([| Opt.just x_hat |] :: [| Opt.just ft |] :: a)
+            List.append sg_evals
+              (Array.map ~f:Opt.just x_hat :: [| Opt.just ft |] :: a)
           in
           Common.combined_evaluation (module Impl) ~xi v
         in
@@ -1107,8 +1116,9 @@ struct
     let sponge = Sponge.create sponge_params in
     Array.iter
       (Types.index_to_field_elements
-         ~g:(fun (z : Inputs.Inner_curve.t) ->
-           List.to_array (Inner_curve.to_field_elements z) )
+         ~g:
+           (Array.concat_map ~f:(fun (z : Inputs.Inner_curve.t) ->
+                List.to_array (Inner_curve.to_field_elements z) ) )
          index )
       ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
     sponge

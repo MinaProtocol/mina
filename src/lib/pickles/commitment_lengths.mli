@@ -16,7 +16,8 @@
     length of vectors, and avoid runtime checks.
 *)
 val default :
-  ( int Pickles_types.Plonk_types.Columns_vec.t
-  , int
-  , int )
-  Pickles_types.Plonk_types.Messages.Poly.t
+     num_chunks:int
+  -> ( int Pickles_types.Plonk_types.Columns_vec.t
+     , int
+     , int )
+     Pickles_types.Plonk_types.Messages.Poly.t

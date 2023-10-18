@@ -1047,7 +1047,7 @@ struct
           in
           Deferred.return
           @@ Result.ok_if_true
-               (not (already_mem && not is_sender_local))
+               ((not already_mem) || is_sender_local)
                ~error:Recently_seen
         in
         let%bind () =
