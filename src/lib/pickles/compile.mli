@@ -278,6 +278,7 @@ val compile_with_wrap_main_override_promise :
   -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
   -> ?override_wrap_main:
        ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic
+  -> ?num_chunks:int
   -> public_input:
        ( 'var
        , 'value
