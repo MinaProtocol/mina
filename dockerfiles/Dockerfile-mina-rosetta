@@ -1,15 +1,9 @@
-#################################################################################################
-# The "production" Stage
-# - sets up the final container with built binaries and a running postgresql archive node setup
-#################################################################################################
-# Supports debian:buster-slim, debian:bullseye-slim, and ubuntu:focal
 ARG image=ubuntu:focal
 FROM ${image} AS production
 ARG deb_codename=focal
 ARG deb_version
 ARG deb_release=unstable
 ARG network=mainnet
-
 
 ARG psql_version=13
 # Golang version number used to detemine tarball name
@@ -70,12 +64,10 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
        postgresql-"$psql_version" \
        postgresql-client-"$psql_version"
 
-# --- Install rosetta-cli
-
-
 # --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
 RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
 
+# --- Install rosetta-cli
 # The following commands install rosetta-cli with an updated rosetta-sdk-go dependency, which supports delegation transactions.
 # Upstream PR to rosetta-sdk-go: https://github.com/coinbase/rosetta-sdk-go/pull/457
 # They can be replaced once there is a new release of rosetta-cli containing the above change by:
@@ -88,17 +80,8 @@ RUN export GOBIN="$(pwd)/bin" \
   && /usr/lib/go/bin/go mod tidy \
   && /usr/lib/go/bin/go install
 
-# Rosetta-demo artifacts / build dir removal:
-# Make rosetta-crucial components and the generate_keypair tool
-#  && dune build --profile=${DUNE_PROFILE} \
-#  && _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-#    --config-file src/app/rosetta/demo-config.json \
-#    --genesis-dir ${HOME}/demo-genesis \
-#  && mv _build/default/src/app $HOME/app \
-#  && rm -rf _build
-
 # --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
-#RUN locale-gen en_US.UTF-8
+RUN locale-gen en_US.UTF-8
 
 # --- Set up sample/demo wallets and configuration
 RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
