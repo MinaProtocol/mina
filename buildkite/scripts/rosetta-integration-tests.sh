@@ -57,7 +57,7 @@ ROSETTA_CLI_CONFIG_FILES=${ROSETTA_CLI_CONFIG_FILES:="config.json mina.ros"}
 ROSETTA_CLI_MAIN_CONFIG_FILE=${ROSETTA_CLI_MAIN_CONFIG_FILE:="config.json"}
 
 # Frequency (in seconds) at which payment operations will be sent
-TRANSACTION_FREQUENCY=60
+TRANSACTION_FREQUENCY=10
 
 # Libp2p Keypair
 echo "=========================== GENERATING KEYPAIR IN ${MINA_LIBP2P_KEYPAIR_PATH} ==========================="
@@ -91,11 +91,8 @@ cat <<EOF >"$MINA_CONFIG_FILE"
   "ledger": {
     "name": "${MINA_NETWORK}",
     "accounts": [
-      { "pk": "${BLOCK_PRODUCER_PK}", "balance": "101550000.000000000", "delegate": null, "sk": null },
-      { "pk": "${SNARK_PRODUCER_PK}", "balance": "605500.000000000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null },
-      { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "10055.000000000", "delegate": null, "sk": null },
-      { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "10055.000000000", "delegate": null, "sk": null },
-      { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "10055.000000000", "delegate": null, "sk": null }
+      { "pk": "${BLOCK_PRODUCER_PK}", "balance": "1000000", "delegate": null, "sk": null },
+      { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null }
     ]
   }
 }
