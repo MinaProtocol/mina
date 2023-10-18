@@ -1,50 +1,39 @@
 use crate::{
-    arkworks::{CamlFp, CamlGVesta},
-    field_vector::fp::CamlFpVector,
-    pasta_fp_plonk_index::{CamlPastaFpPlonkIndex, CamlPastaFpPlonkIndexPtr},
-    pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex,
-    srs::fp::CamlFpSrs,
+    arkworks::{CamlBN254Fp, CamlGBN254},
+    bn254_plonk_index::{BN254PlonkIndex, BN254PlonkIndexPtr},
+    field_vector::bn254::CamlBN254FpVector,
 };
-use ark_ec::AffineCurve;
-use ark_ff::One;
-use array_init::array_init;
 use groupmap::GroupMap;
-use kimchi::verifier::verify;
+use kimchi::circuits::polynomial::COLUMNS;
+use kimchi::prover::caml::CamlProofWithPublic;
 use kimchi::{
     circuits::lookup::runtime_tables::{caml::CamlRuntimeTable, RuntimeTable},
     prover_index::ProverIndex,
 };
-use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use kimchi::{
-    proof::{
-        PointEvaluations, ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge,
-    },
+    proof::{ProverProof, RecursionChallenge},
     verifier::Context,
 };
-use kimchi::{prover::caml::CamlProofWithPublic, verifier_index::VerifierIndex};
-use mina_curves::pasta::{Fp, Fq, VestaParameters};
+use mina_curves::bn254::{BN254Parameters, Fp, BN254};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
-use poly_commitment::commitment::{CommitmentCurve, PolyComm};
+use poly_commitment::commitment::PolyComm;
 use poly_commitment::evaluation_proof::OpeningProof;
-use std::array;
-use std::convert::TryInto;
 
-type BN254 = GroupAffine<ark_bn254::g1::Parameters>;
-type EFqSponge = DefaultFqSponge<ark_bn254::g1::Parameters, PlonkSpongeConstantsKimchi>;
+type EFqSponge = DefaultFqSponge<BN254Parameters, PlonkSpongeConstantsKimchi>;
 type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>;
 
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bn254_plonk_proof_create(
-    index: CamlPastaFpPlonkIndexPtr<'static>,
-    witness: Vec<CamlFpVector>,
-    runtime_tables: Vec<CamlRuntimeTable<CamlFp>>,
-    prev_challenges: Vec<CamlFp>,
-    prev_sgs: Vec<CamlGVesta>,
-) -> Result<CamlProofWithPublic<CamlGVesta, CamlFp>, ocaml::Error> {
+    index: BN254PlonkIndexPtr<'static>,
+    witness: Vec<CamlBN254FpVector>,
+    runtime_tables: Vec<CamlRuntimeTable<CamlBN254Fp>>,
+    prev_challenges: Vec<CamlBN254Fp>,
+    prev_sgs: Vec<CamlGBN254>,
+) -> Result<CamlProofWithPublic<CamlGBN254, CamlBN254Fp>, ocaml::Error> {
     {
         let ptr: &mut poly_commitment::srs::SRS<BN254> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -90,7 +79,7 @@ pub fn caml_bn254_plonk_proof_create(
 
     // Release the runtime lock so that other threads can run using it while we generate the proof.
     runtime.releasing_runtime(|| {
-        let group_map = GroupMap::<Fq>::setup();
+        let group_map = GroupMap::<BN254Parameters>::setup();
         let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
             &group_map,
             witness,

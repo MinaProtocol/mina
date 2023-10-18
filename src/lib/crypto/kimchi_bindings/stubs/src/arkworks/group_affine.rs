@@ -8,6 +8,7 @@ use mina_curves::pasta::{Pallas as AffinePallas, Vesta as AffineVesta};
 
 pub type CamlGVesta = CamlGroupAffine<CamlFq>;
 pub type CamlGPallas = CamlGroupAffine<CamlFp>;
+pub type CamlGBN254 = CamlGroupAffine<CamlFq>;
 
 //
 // GroupAffine<G> <-> CamlGroupAffine<F>

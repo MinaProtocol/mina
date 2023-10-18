@@ -6,7 +6,8 @@
 	url = https://github.com/MinaProtocol/ppx_optcomp
 [submodule "src/lib/crypto/proof-systems"]
 	path = src/lib/crypto/proof-systems
-	url = https://github.com/o1-labs/proof-systems.git
+	url = https://github.com/lambdaclass/proof-systems.git
+	branch = kzg_prover
 [submodule "src/external/prometheus"]
 	path = src/external/prometheus
 	url = https://github.com/MinaProtocol/prometheus.git
