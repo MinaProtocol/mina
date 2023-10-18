@@ -911,6 +911,25 @@ struct
             absorb sponge PC (Boolean.true_, x_hat) ) ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
+        let absorb_runtime_tables () =
+          match messages.lookup with
+          | Nothing
+          | Maybe (_, { runtime = Nothing; _ })
+          | Just { runtime = Nothing; _ } ->
+              ()
+          | Maybe (b_lookup, { runtime = Maybe (b_runtime, runtime); _ }) ->
+              let b = Boolean.( &&& ) b_lookup b_runtime in
+              let z = Array.map runtime ~f:(fun z -> (b, z)) in
+              absorb sponge Without_degree_bound z
+          | Maybe (b, { runtime = Just runtime; _ })
+          | Just { runtime = Maybe (b, runtime); _ } ->
+              let z = Array.map runtime ~f:(fun z -> (b, z)) in
+              absorb sponge Without_degree_bound z
+          | Just { runtime = Just runtime; _ } ->
+              let z = Array.map runtime ~f:(fun z -> (Boolean.true_, z)) in
+              absorb sponge Without_degree_bound z
+        in
+        absorb_runtime_tables () ;
         let joint_combiner =
           let compute_joint_combiner (l : _ Messages.Lookup.In_circuit.t) =
             let absorb_sorted_1 sponge =
