@@ -911,21 +911,29 @@ struct
             absorb sponge PC (Boolean.true_, x_hat) ) ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
-        let absorb_runtime_tables () =
+        let runtime_comm =
           match messages.lookup with
           | Nothing
           | Maybe (_, { runtime = Nothing; _ })
           | Just { runtime = Nothing; _ } ->
-              ()
+              Pickles_types.Opt.Nothing
           | Maybe (b_lookup, { runtime = Maybe (b_runtime, runtime); _ }) ->
               let b = Boolean.( &&& ) b_lookup b_runtime in
-              let z = Array.map runtime ~f:(fun z -> (b, z)) in
-              absorb sponge Without_degree_bound z
+              Pickles_types.Opt.Maybe (b, runtime)
           | Maybe (b, { runtime = Just runtime; _ })
           | Just { runtime = Maybe (b, runtime); _ } ->
+              Pickles_types.Opt.Maybe (b, runtime)
+          | Just { runtime = Just runtime; _ } ->
+              Pickles_types.Opt.Just runtime
+        in
+        let absorb_runtime_tables () =
+          match runtime_comm with
+          | Nothing ->
+              ()
+          | Maybe (b, runtime) ->
               let z = Array.map runtime ~f:(fun z -> (b, z)) in
               absorb sponge Without_degree_bound z
-          | Just { runtime = Just runtime; _ } ->
+          | Just runtime ->
               let z = Array.map runtime ~f:(fun z -> (Boolean.true_, z)) in
               absorb sponge Without_degree_bound z
         in
@@ -1263,7 +1271,7 @@ struct
           let _len_4, len_4_add = Nat.N6.add Plonk_types.Lookup_sorted.n in
           let len_5, len_5_add =
             (* NB: Using explicit 11 because we can't get add on len_4 *)
-            Nat.N11.add Nat.N7.n
+            Nat.N11.add Nat.N8.n
           in
           let len_6, len_6_add = Nat.N45.add len_5 in
           let num_commitments_without_degree_bound = len_6 in
@@ -1313,6 +1321,7 @@ struct
                            [ Pickles_types.Opt.map messages.lookup ~f:(fun l ->
                                  l.aggreg )
                            ; lookup_table_comm
+                           ; runtime_comm
                            ; m.runtime_tables_selector
                            ; m.lookup_selector_xor
                            ; m.lookup_selector_lookup
