@@ -8,6 +8,8 @@ module Step : sig
         * Snark_keys_header.t
         * int
         * Backend.Tick.R1CS_constraint_system.t
+
+      val to_string : t -> string
     end
 
     module Verification : sig
@@ -17,6 +19,8 @@ module Step : sig
         * Snark_keys_header.t
         * int
         * Core_kernel.Md5.t
+
+      val to_string : t -> string
     end
   end
 
@@ -57,6 +61,8 @@ module Wrap : sig
         Core_kernel.Type_equal.Id.Uid.t
         * Snark_keys_header.t
         * Backend.Tock.R1CS_constraint_system.t
+
+      val to_string : t -> string
     end
 
     module Verification : sig

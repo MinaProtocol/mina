@@ -16,6 +16,7 @@ module type S = sig
   module Step_verifier = Step_verifier
   module Common = Common
   module Proof_cache = Proof_cache
+  module Cache = Cache
 
   exception Return_digest of Md5.t
 

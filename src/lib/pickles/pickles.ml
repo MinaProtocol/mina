@@ -44,6 +44,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Step_main_inputs = Step_main_inputs
   module Step_verifier = Step_verifier
   module Proof_cache = Proof_cache
+  module Cache = Cache
 
   exception Return_digest = Compile.Return_digest
 
