@@ -269,7 +269,8 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
       to each inductive rule. *)
 val compile_with_wrap_main_override_promise :
      ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
-  -> ?cache:Cache.Spec.t
+  -> ?cache:Key_cache.Spec.t list
+  -> ?storables:Cache.Storables.t
   -> ?proof_cache:Proof_cache.t
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t

@@ -365,7 +365,8 @@ module type S = sig
       to each inductive rule. *)
   val compile_promise :
        ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
-    -> ?cache:Cache.Spec.t
+    -> ?cache:Key_cache.Spec.t list
+    -> ?storables:Cache.Storables.t
     -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
@@ -420,7 +421,8 @@ module type S = sig
       to each inductive rule. *)
   val compile :
        ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
-    -> ?cache:Cache.Spec.t
+    -> ?cache:Key_cache.Spec.t list
+    -> ?storables:Cache.Storables.t
     -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t

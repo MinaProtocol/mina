@@ -35,8 +35,10 @@ module Step : sig
   val read_or_generate :
        prev_challenges:int
     -> Key_cache.Spec.t list
-    -> Key.Proving.t lazy_t * storable
-    -> Key.Verification.t lazy_t * vk_storable
+    -> ?s_p:storable
+    -> Key.Proving.t lazy_t
+    -> ?s_v:vk_storable
+    -> Key.Verification.t lazy_t
     -> ('a, 'b) Impls.Step.Typ.t
     -> ('c, 'd) Impls.Step.Typ.t
     -> ('a -> unit -> 'c)
@@ -84,8 +86,10 @@ module Wrap : sig
   val read_or_generate :
        prev_challenges:Core_kernel.Int.t
     -> Key_cache.Spec.t list
-    -> Key.Proving.t lazy_t * storable
-    -> Key.Verification.t lazy_t * vk_storable
+    -> ?s_p:storable
+    -> Key.Proving.t lazy_t
+    -> ?s_v:vk_storable
+    -> Key.Verification.t lazy_t
     -> ('a, 'b) Impls.Wrap.Typ.t
     -> ('c, 'd) Impls.Wrap.Typ.t
     -> ('a -> unit -> 'c)
@@ -97,10 +101,9 @@ module Wrap : sig
          lazy_t
 end
 
-module Spec : sig
+module Storables : sig
   type t =
-    { cache : Key_cache.Spec.t list
-    ; step_storable : Step.storable
+    { step_storable : Step.storable
     ; step_vk_storable : Step.vk_storable
     ; wrap_storable : Wrap.storable
     ; wrap_vk_storable : Wrap.vk_storable

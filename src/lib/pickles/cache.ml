@@ -91,8 +91,8 @@ module Step = struct
                 (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path ) )
 
-  let read_or_generate ~prev_challenges cache (k_p, s_p) (k_v, s_v) typ
-      return_typ main =
+  let read_or_generate ~prev_challenges cache ?(s_p = storable) k_p
+      ?(s_v = vk_storable) k_v typ return_typ main =
     let open Impls.Step in
     let pk =
       lazy
@@ -227,8 +227,8 @@ module Wrap = struct
                          t ) ) )
               header path ) )
 
-  let read_or_generate ~prev_challenges cache (k_p, s_p) (k_v, s_v) typ
-      return_typ main =
+  let read_or_generate ~prev_challenges cache ?(s_p = storable) k_p
+      ?(s_v = vk_storable) k_v typ return_typ main =
     let module Vk = Verification_key in
     let open Impls.Wrap in
     let pk =
@@ -277,18 +277,16 @@ module Wrap = struct
     (pk, vk)
 end
 
-module Spec = struct
+module Storables = struct
   type t =
-    { cache : Key_cache.Spec.t list
-    ; step_storable : Step.storable
+    { step_storable : Step.storable
     ; step_vk_storable : Step.vk_storable
     ; wrap_storable : Wrap.storable
     ; wrap_vk_storable : Wrap.vk_storable
     }
 
   let default =
-    { cache = []
-    ; step_storable = Step.storable
+    { step_storable = Step.storable
     ; step_vk_storable = Step.vk_storable
     ; wrap_storable = Wrap.storable
     ; wrap_vk_storable = Wrap.vk_storable
