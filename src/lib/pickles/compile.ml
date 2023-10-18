@@ -348,6 +348,7 @@ struct
       -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
       -> ?override_wrap_main:
            (max_proofs_verified, branches, prev_varss) wrap_main_generic
+      -> ?num_chunks:int
       -> branches:(module Nat.Intf with type n = branches)
       -> max_proofs_verified:
            (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -380,8 +381,9 @@ struct
          * _ =
    fun ~self ~cache ~proof_cache ?disk_keys
        ?(return_early_digest_exception = false) ?override_wrap_domain
-       ?override_wrap_main ~branches:(module Branches) ~max_proofs_verified
-       ~name ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
+       ?override_wrap_main ?(num_chunks = 1) ~branches:(module Branches)
+       ~max_proofs_verified ~name ~constraint_constants ~public_input
+       ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
@@ -454,7 +456,7 @@ struct
               (Auxiliary_value)
           in
           M.f full_signature prev_varss_n prev_varss_length ~max_proofs_verified
-            ~feature_flags
+            ~feature_flags ~num_chunks
       | Some override ->
           Common.wrap_domains
             ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
@@ -618,7 +620,7 @@ struct
       match override_wrap_main with
       | None ->
           let srs = Tick.Keypair.load_urs () in
-          Wrap_main.wrap_main ~feature_flags ~srs full_signature
+          Wrap_main.wrap_main ~num_chunks ~feature_flags ~srs full_signature
             prev_varss_length step_vks proofs_verifieds step_domains
             max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
@@ -743,7 +745,9 @@ struct
                            , return_value
                            , auxiliary_value
                            , actual_wrap_domains ) =
-            step ~proof_cache handler ~maxes:(module Maxes) next_state
+            step ~zk_rows:step_vk.zk_rows ~proof_cache handler
+              ~maxes:(module Maxes)
+              next_state
           in
           let proof =
             { proof with
@@ -946,6 +950,7 @@ let compile_with_wrap_main_override_promise :
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?override_wrap_main:
          (max_proofs_verified, branches, prev_varss) wrap_main_generic
+    -> ?num_chunks:int
     -> public_input:
          ( var
          , value
@@ -993,7 +998,7 @@ let compile_with_wrap_main_override_promise :
  *)
  fun ?self ?(cache = []) ?proof_cache ?disk_keys
      ?(return_early_digest_exception = false) ?override_wrap_domain
-     ?override_wrap_main ~public_input ~auxiliary_typ ~branches
+     ?override_wrap_main ?num_chunks ~public_input ~auxiliary_typ ~branches
      ~max_proofs_verified ~name ~constraint_constants ~choices () ->
   let self =
     match self with
@@ -1061,7 +1066,7 @@ let compile_with_wrap_main_override_promise :
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~return_early_digest_exception ~self ~proof_cache ~cache
-      ?disk_keys ?override_wrap_domain ?override_wrap_main ~branches
+      ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
       ~max_proofs_verified ~name ~public_input ~auxiliary_typ
       ~constraint_constants
       ~choices:(fun ~self -> conv_irs (choices ~self))
