@@ -27,6 +27,14 @@ module Step = struct
     [@@warning "-4"]
   end
 
+  type 'header storable =
+    ('header, Backend.Tick.Keypair.t) Key_cache.Sync.Disk_storable.t
+
+  type 'header vk_storable =
+    ( 'header
+    , Kimchi_bindings.Protocol.VerifierIndex.Fp.t )
+    Key_cache.Sync.Disk_storable.t
+
   let storable =
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
       (fun (_, header, _, cs) ~path ->
@@ -83,9 +91,8 @@ module Step = struct
                 (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path ) )
 
-  let read_or_generate ~prev_challenges cache k_p k_v typ return_typ main =
-    let s_p = storable in
-    let s_v = vk_storable in
+  let read_or_generate ~prev_challenges cache (k_p, s_p) (k_v, s_v) typ
+      return_typ main =
     let open Impls.Step in
     let pk =
       lazy
@@ -155,6 +162,12 @@ module Wrap = struct
     end
   end
 
+  type 'header storable =
+    ('header, Backend.Tock.Keypair.t) Key_cache.Sync.Disk_storable.t
+
+  type 'header vk_storable =
+    ('header, Verification_key.t) Key_cache.Sync.Disk_storable.t
+
   let storable =
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
       (fun (_, header, cs) ~path ->
@@ -182,10 +195,42 @@ module Wrap = struct
                 (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
               header path ) )
 
-  let read_or_generate ~prev_challenges cache k_p k_v typ return_typ main =
+  let vk_storable =
+    Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
+      (fun (_, header, _cs) ~path ->
+        Or_error.try_with_join (fun () ->
+            let open Or_error.Let_syntax in
+            let%map header_read, index =
+              Snark_keys_header.read_with_header
+                ~read_data:(fun ~offset:_ path ->
+                  Binable.of_string
+                    (module Verification_key.Stable.Latest)
+                    (In_channel.read_all path) )
+                path
+            in
+            [%test_eq: int] header.header_version header_read.header_version ;
+            [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
+            [%test_eq: Snark_keys_header.Constraint_constants.t]
+              header.constraint_constants header_read.constraint_constants ;
+            [%test_eq: string] header.constraint_system_hash
+              header_read.constraint_system_hash ;
+            index ) )
+      (fun (_, header, _) t path ->
+        Or_error.try_with (fun () ->
+            Snark_keys_header.write_with_header
+              ~expected_max_size_log2:33 (* 8 GB should be enough *)
+              ~append_data:(fun path ->
+                Out_channel.with_file ~append:true path ~f:(fun file ->
+                    Out_channel.output_string file
+                      (Binable.to_string
+                         (module Verification_key.Stable.Latest)
+                         t ) ) )
+              header path ) )
+
+  let read_or_generate ~prev_challenges cache (k_p, s_p) (k_v, s_v) typ
+      return_typ main =
     let module Vk = Verification_key in
     let open Impls.Wrap in
-    let s_p = storable in
     let pk =
       lazy
         (let k = Lazy.force k_p in
@@ -209,40 +254,6 @@ module Wrap = struct
     let vk =
       lazy
         (let k_v = Lazy.force k_v in
-         let s_v =
-           Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
-             (fun (_, header, _cs) ~path ->
-               Or_error.try_with_join (fun () ->
-                   let open Or_error.Let_syntax in
-                   let%map header_read, index =
-                     Snark_keys_header.read_with_header
-                       ~read_data:(fun ~offset:_ path ->
-                         Binable.of_string
-                           (module Vk.Stable.Latest)
-                           (In_channel.read_all path) )
-                       path
-                   in
-                   [%test_eq: int] header.header_version
-                     header_read.header_version ;
-                   [%test_eq: Snark_keys_header.Kind.t] header.kind
-                     header_read.kind ;
-                   [%test_eq: Snark_keys_header.Constraint_constants.t]
-                     header.constraint_constants
-                     header_read.constraint_constants ;
-                   [%test_eq: string] header.constraint_system_hash
-                     header_read.constraint_system_hash ;
-                   index ) )
-             (fun (_, header, _) t path ->
-               Or_error.try_with (fun () ->
-                   Snark_keys_header.write_with_header
-                     ~expected_max_size_log2:33 (* 8 GB should be enough *)
-                     ~append_data:(fun path ->
-                       Out_channel.with_file ~append:true path ~f:(fun file ->
-                           Out_channel.output_string file
-                             (Binable.to_string (module Vk.Stable.Latest) t) )
-                       )
-                     header path ) )
-         in
          match Key_cache.Sync.read cache s_v k_v with
          | Ok (vk, d) ->
              (vk, d)
@@ -264,4 +275,22 @@ module Wrap = struct
              (vk, `Generated_something) )
     in
     (pk, vk)
+end
+
+module Spec = struct
+  type ('step_pk_header, 'step_vk_header, 'wrap_pk_header, 'wrap_vk_header) t =
+    { cache : Key_cache.Spec.t list
+    ; step_storable : 'step_pk_header Step.storable
+    ; step_vk_storable : 'step_vk_header Step.vk_storable
+    ; wrap_storable : 'wrap_pk_header Wrap.storable
+    ; wrap_vk_storable : 'wrap_vk_header Wrap.vk_storable
+    }
+
+  let default =
+    { cache = []
+    ; step_storable = Step.storable
+    ; step_vk_storable = Step.vk_storable
+    ; wrap_storable = Wrap.storable
+    ; wrap_vk_storable = Wrap.vk_storable
+    }
 end
