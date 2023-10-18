@@ -45,9 +45,16 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
+case "${DUNE_PROFILE}" in
+  devnet)
+    MINA_DEB_NAME="mina-berkeley"
+    ;;
+  *)
+    MINA_DEB_NAME="mina-berkeley-${DUNE_PROFILE}"
+    ;;
+esac
 
 BUILDDIR="deb_build"
-
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -266,11 +273,11 @@ echo "------------------------------------------------------------"
 echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
 mkdir -p "${BUILDDIR}/DEBIAN"
-create_control_file mina-berkeley "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
 copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
 
-build_deb mina-berkeley
+build_deb "${MINA_DEB_NAME}"
 
 ##################################### END BERKELEY PACKAGE #######################################
 

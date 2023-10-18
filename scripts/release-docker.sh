@@ -24,6 +24,7 @@ function usage() {
   echo "      --deb-codename        The debian codename (stretch or buster) to build the docker image from. Default=stretch"
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
+  echo "      --deb-profile         The profile string for the debian package to install"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -40,6 +41,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-codename) DEB_CODENAME="--build-arg deb_codename=$2"; shift;;
   --deb-release) DEB_RELEASE="--build-arg deb_release=$2"; shift;;
   --deb-version) DEB_VERSION="--build-arg deb_version=$2"; shift;;
+  --deb-profile) DEB_PROFILE="$2"; shift;;
   --extra-args) EXTRA=${@:2}; shift $((${#}-1));;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
@@ -55,9 +57,20 @@ case "${DEB_CODENAME##*=}" in
 esac
 IMAGE="--build-arg image=${IMAGE}"
 
+# Determina profile for mina name. To preserve backward compatibility standard profile is default. 
+case "${DEB_PROFILE}" in
+  standard)
+    DEB_PROFILE=""
+    ;;
+  *)
+    DEB_PROFILE="--build-arg deb_profile=${DEB_PROFILE}"
+    ;;
+esac
+
+
 # Debug prints for visability
 # Substring removal to cut the --build-arg arguments on the = so that the output is exactly the input flags https://wiki.bash-hackers.org/syntax/pe#substring_removal
-echo "--service ${SERVICE} --version ${VERSION} --branch ${BRANCH##*=} --deb-version ${DEB_VERSION##*=} --deb-release ${DEB_RELEASE##*=} --deb-codename ${DEB_CODENAME##*=}"
+echo "--service ${SERVICE} --version ${VERSION} --branch ${BRANCH##*=} --deb-version ${DEB_VERSION##*=} --deb-profile ${DEB_PROFILE##*=} --deb-release ${DEB_RELEASE##*=} --deb-codename ${DEB_CODENAME##*=}"
 echo ${EXTRA}
 echo "docker image: ${IMAGE}"
 
@@ -134,9 +147,9 @@ HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK#
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args -t "$TAG" -
+  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DEB_PROFILE $BRANCH $REPO $extra_build_args -t "$TAG" -
 else
-  docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
+  docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DEB_PROFILE $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then

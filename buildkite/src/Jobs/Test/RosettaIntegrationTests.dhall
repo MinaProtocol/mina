@@ -13,7 +13,8 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
 let DockerImage = ../../Command/DockerImage.dhall
-let DebianVersions = ../../Constants/DebianVersions.dhall
+let Profiles = ../../Constants/Profiles.dhall
+let Dockers = ../../Constants/DockerVersions.dhall
 
 let dirtyWhen = [ 
   S.strictlyStart (S.contains "src/app/rosetta"),
@@ -46,7 +47,7 @@ Pipeline.build
           label = "Rosetta integration tests Bullseye"
           , key = "rosetta-integration-tests-bullseye"
           , target = Size.Small
-          , depends_on = [ { name = "MinaArtifactBullseye", key = "rosetta-bullseye-docker-image" } ]
+          , depends_on = Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "rosetta"
         }
     ]
   }

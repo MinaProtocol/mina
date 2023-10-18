@@ -13,9 +13,11 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let dependsOn = [
-  { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" }
-]
+let Profiles = ../../Constants/Profiles.dhall
+let Dockers = ../../Constants/DockerVersions.dhall
+
+let dependsOn = 
+    Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "daemon-berkeley"
 
 in Pipeline.build Pipeline.Config::{
   spec =
