@@ -25,16 +25,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; balance = "700000"
           ; timing = Untimed
           ; permissions = None
+          ; zkapp = None
           }
         ; { account_name = "node-b-key"
           ; balance = "700000"
           ; timing = Untimed
           ; permissions = None
+          ; zkapp = None
           }
         ; { account_name = "node-c-key"
           ; balance = "800000"
           ; timing = Untimed
           ; permissions = None
+          ; zkapp = None
           }
         ]
     ; block_producers =

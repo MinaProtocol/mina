@@ -24,11 +24,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; balance = "8000000"
           ; timing = Untimed
           ; permissions = None
+          ; zkapp = None
           }
         ; { account_name = "extra-key"
           ; balance = "10"
           ; timing = Untimed
           ; permissions = None
+          ; zkapp = None
           }
         ]
     ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
