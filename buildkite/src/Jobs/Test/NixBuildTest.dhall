@@ -33,7 +33,7 @@ Pipeline.build
             Cmd.runInDocker Cmd.Docker::{image = ContainerImages.nixos} " buildkite/scripts/test-nix.sh"
           ],
           label = "nix build tests",
-          key = "nix build tests",
+          key = "nix-build-tests",
           target = Size.Small,
           docker = None Docker.Type
         }
