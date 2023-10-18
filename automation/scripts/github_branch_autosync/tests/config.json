@@ -15,13 +15,12 @@
         "token":"${WEBHOOK_APP_TOKEN}",
         "username":"${WEBHOOK_APP_USER}",
         "repo":"${WEBHOOK_APP_REPO}",
-        "secret":"${WEBHOOK_APP_GITHUB_SECRET}"
-    },
-
-    "branches":{
-        "compatible" : "rampup",
-        "rampup" : "berkeley",
-        "berkeley" : "develop"
+        "secret":"${WEBHOOK_APP_GITHUB_SECRET}",
+        "branches":{
+            "compatible" : "rampup",
+            "rampup" : "berkeley",
+            "berkeley" : "develop"
+        }
     },
     "pr": {
         "title_prefix": "[Branches auto sync failure] ",

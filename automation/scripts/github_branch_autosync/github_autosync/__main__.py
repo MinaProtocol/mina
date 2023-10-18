@@ -4,7 +4,7 @@ import json
 import argparse
 import os
 import sys
-from gcloud_entrypoint import handle_incoming_commit_push_json,config,verify_signature
+from gcloud_entrypoint import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--operation', "-o",type=str, help='debug operation to perform',required=True)

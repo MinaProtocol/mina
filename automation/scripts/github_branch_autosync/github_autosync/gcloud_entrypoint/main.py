@@ -1,9 +1,9 @@
 ''' Main module for handling incoming github webhook event'''
 
-from .lib import GithubPayloadInfo, config, GithubApi, GithubException, verify_signature,is_push_event
+from .lib import *
 from typing import Optional 
 
-config = config.load('../../tests/config.json')
+config = config.load('tests/config.json')
 
 def handle_request(request):
     """Responds to any HTTP request.
@@ -211,7 +211,7 @@ def handle_incoming_commit_push_json(json,config):
 
     source_branch = payload_info.incoming_branch
 
-    if not source_branch in config.branches:
+    if not source_branch in config.github.branches:
         handle_incoming_commit_push_in_personal_branches(source_branch)
     else:
         handle_incoming_commit_push_in_stable_branches(source_branch)
