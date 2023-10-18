@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -167,10 +168,18 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	blockHash := req.GetBlockDataHash()
 	ps := makePaths(submittedAt, blockHash, req.Submitter)
 
-	remoteAddr := r.Header.Get("X-Forwarded-For")
-	if remoteAddr == "" {
-		// If there is no X-Forwarded-For header, use the remote address
-		remoteAddr = r.RemoteAddr
+	remoteAddr := r.RemoteAddr
+	xForwardedAll := r.Header.Values("X-Forwarded-For")
+outerLoop:
+	for _, xForwarded := range xForwardedAll {
+		ipStrs := strings.Split(xForwarded, ",")
+		for _, ipStr := range ipStrs {
+			ipStr = strings.TrimSpace(ipStr)
+			if ip := net.ParseIP(ipStr); ip != nil && !isPrivateIP(ip) {
+				remoteAddr = ipStr
+				break outerLoop
+			}
+		}
 	}
 
 	metaBytes, err1 := req.MakeMetaToBeSaved(remoteAddr)
