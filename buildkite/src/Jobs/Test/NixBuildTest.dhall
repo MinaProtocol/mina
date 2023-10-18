@@ -23,7 +23,7 @@ Pipeline.build
           S.exactly "buildkite/src/Jobs/Test/NixBuild" "dhall"
         ],
         path = "Test",
-        name = "BuildNixTest",
+        name = "NixBuildTest",
         tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test ]
       },
     steps = [
