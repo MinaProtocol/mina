@@ -177,6 +177,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_pasta_fp_to_string => "to_string");
         decl_func!(w, env, caml_pasta_fp_of_string => "of_string");
         decl_func!(w, env, caml_pasta_fp_print => "print");
+        decl_func!(w, env, caml_pasta_fp_print_rust => "print_rust");
         decl_func!(w, env, caml_pasta_fp_copy => "copy");
         decl_func!(w, env, caml_pasta_fp_mut_add => "mut_add");
         decl_func!(w, env, caml_pasta_fp_mut_sub => "mut_sub");
@@ -213,6 +214,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_pasta_fq_to_string => "to_string");
         decl_func!(w, env, caml_pasta_fq_of_string => "of_string");
         decl_func!(w, env, caml_pasta_fq_print => "print");
+        decl_func!(w, env, caml_pasta_fq_print_rust => "print_rust");
         decl_func!(w, env, caml_pasta_fq_copy => "copy");
         decl_func!(w, env, caml_pasta_fq_mut_add => "mut_add");
         decl_func!(w, env, caml_pasta_fq_mut_sub => "mut_sub");
