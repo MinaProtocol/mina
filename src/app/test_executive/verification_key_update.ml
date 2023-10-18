@@ -36,22 +36,28 @@ struct
     }
 end
 
-let zkapp_kp = Keypair.create ()
+let invalid_version =
+  Protocol_version.(
+    create ~transaction:(transaction current + 1) ~network:1 ~patch:0)
 
-let zkapp_pk = Public_key.compress zkapp_kp.public_key
+let zkapp_kps = List.init 3 ~f:(fun _ -> Keypair.create ())
 
-let zkapp_account_id = Account_id.create zkapp_pk Token_id.default
+let[@warning "-8"] [ account_a_kp; account_b_kp; account_c_kp ] = zkapp_kps
+
+let account_a_pk = Public_key.compress account_a_kp.public_key
+
+let account_a_id = Account_id.create account_a_pk Token_id.default
 
 module Trivial_rule1 = Make_trivial_rule (struct
   let id = 1
 
-  let pk_compressed = zkapp_pk
+  let pk_compressed = account_a_pk
 end)
 
 module Trivial_rule2 = Make_trivial_rule (struct
   let id = 2
 
-  let pk_compressed = zkapp_pk
+  let pk_compressed = account_a_pk
 end)
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
@@ -66,6 +72,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   type node = Network.Node.t
 
   type dsl = Dsl.t
+
+  let `VK vk, `Prover prover =
+    Transaction_snark.For_tests.create_trivial_snapp
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
 
   let config =
     let open Test_config in
@@ -161,7 +171,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let update_vk (vk : Side_loaded_verification_key.t) : Account_update.t =
       let body (vk : Side_loaded_verification_key.t) : Account_update.Body.t =
         { Account_update.Body.dummy with
-          public_key = zkapp_pk
+          public_key = account_a_pk
         ; update =
             { Account_update.Update.dummy with
               verification_key =
@@ -204,7 +214,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (* TODO: This is a pain. *)
       { body = body vk; authorization = Signature Signature.dummy }
     in
-    let zkapp_command_create_account =
+    let zkapp_command_create_accounts =
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp create account"
       in
@@ -213,7 +223,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee = Currency.Fee.of_nanomina_int_exn 20_000_000
         ; fee_payer = None
         ; amount = Currency.Amount.of_mina_int_exn 100
-        ; zkapp_account_keypairs = [ zkapp_kp ]
+        ; zkapp_account_keypairs = zkapp_kps
         ; memo
         ; new_zkapp_account = true
         ; snapp_update = Account_update.Update.dummy
@@ -232,7 +242,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let fee_payer : Account_update.Fee_payer.t =
         { body =
             { Account_update.Body.Fee_payer.dummy with
-              public_key = zkapp_pk
+              public_key = account_a_pk
             ; nonce
             ; fee = Currency.Fee.(of_nanomina_int_exn 20_000_000)
             }
@@ -252,10 +262,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
-            when Public_key.Compressed.equal public_key zkapp_pk ->
+            when Public_key.Compressed.equal public_key account_a_pk ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign zkapp_kp.private_key
+                  Schnorr.Chunked.sign account_a_kp.private_key
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -267,7 +277,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                ; authorization = Signature _
                } as account_update :
                 Account_update.t )
-              when Public_key.Compressed.equal public_key zkapp_pk ->
+              when Public_key.Compressed.equal public_key account_a_pk ->
                 let commitment =
                   if use_full_commitment then full_commitment
                   else transaction_commitment
@@ -275,7 +285,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 { account_update with
                   authorization =
                     Signature
-                      (Schnorr.Chunked.sign zkapp_kp.private_key
+                      (Schnorr.Chunked.sign account_a_kp.private_key
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->
@@ -312,6 +322,162 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       call_forest_to_zkapp ~call_forest:call_forest_update_vk2
         ~nonce:Account.Nonce.(of_int 1)
     in
+    let%bind ( invalid_zkapp_command_set_vk_perm_proof
+             , invalid_zkapp_command_set_vk_perm_impossible
+             , zkapp_command_set_vk_perm_proof
+             , zkapp_command_set_vk_perm_impossible ) =
+      let invalid_snapp_update_proof =
+        { Account_update.Update.dummy with
+          permissions =
+            Zkapp_basic.Set_or_keep.Set
+              { Permissions.user_default with
+                set_verification_key = (Proof, invalid_version)
+              }
+        }
+      in
+      let invalid_snapp_update_impossible =
+        { Account_update.Update.dummy with
+          permissions =
+            Zkapp_basic.Set_or_keep.Set
+              { Permissions.user_default with
+                set_verification_key = (Impossible, invalid_version)
+              }
+        }
+      in
+      let snapp_update_proof =
+        { Account_update.Update.dummy with
+          permissions =
+            Zkapp_basic.Set_or_keep.Set
+              { Permissions.user_default with
+                set_verification_key = (Proof, Protocol_version.current)
+              }
+        }
+      in
+      let snapp_update_impossible =
+        { Account_update.Update.dummy with
+          permissions =
+            Zkapp_basic.Set_or_keep.Set
+              { Permissions.user_default with
+                set_verification_key = (Impossible, Protocol_version.current)
+              }
+        }
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let amount = Currency.Amount.of_mina_int_exn 10 in
+      let memo = Signed_command_memo.dummy in
+      let (spec_invalid_proof : Transaction_snark.For_tests.Update_states_spec.t)
+          =
+        { sender = (whale1_kp, Account.Nonce.one)
+        ; fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount
+        ; zkapp_account_keypairs = [ account_b_kp ]
+        ; memo
+        ; new_zkapp_account = false
+        ; snapp_update = invalid_snapp_update_proof
+        ; current_auth = Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      let spec_invalid_impossible =
+        { spec_invalid_proof with
+          snapp_update = invalid_snapp_update_impossible
+        }
+      and spec_proof =
+        { spec_invalid_proof with snapp_update = snapp_update_proof }
+      and spec_impossible =
+        { spec_invalid_proof with
+          sender = (whale1_kp, Account.Nonce.(succ one))
+        ; zkapp_account_keypairs = [ account_c_kp ]
+        ; snapp_update = snapp_update_impossible
+        }
+      in
+      let%map invalid_update_vk_perm_proof =
+        Malleable_error.lift
+        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+             spec_invalid_proof
+      and invalid_update_vk_perm_impossible =
+        Malleable_error.lift
+        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+             spec_invalid_impossible
+      and update_vk_perm_proof =
+        Malleable_error.lift
+        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+             spec_proof
+      and update_vk_perm_impossible =
+        Malleable_error.lift
+        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+             spec_impossible
+      in
+      ( invalid_update_vk_perm_proof
+      , invalid_update_vk_perm_impossible
+      , update_vk_perm_proof
+      , update_vk_perm_impossible )
+    in
+    let%bind ( failed_zkapp_command_set_vk_signature_1
+             , failed_zkapp_command_set_vk_signature_2
+             , zkapp_command_set_vk_proof ) =
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let amount = Currency.Amount.zero in
+      let memo = Signed_command_memo.dummy in
+      let (spec_failed_signature_1
+            : Transaction_snark.For_tests.Update_states_spec.t ) =
+        { sender = (whale1_kp, Account.Nonce.of_int 2)
+        ; fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount
+        ; zkapp_account_keypairs = [ account_b_kp ]
+        ; memo
+        ; new_zkapp_account = false
+        ; snapp_update =
+            { Account_update.Update.dummy with
+              verification_key =
+                Zkapp_basic.Set_or_keep.Set
+                  { data = Pickles.Side_loaded.Verification_key.dummy
+                  ; hash = Zkapp_account.dummy_vk_hash ()
+                  }
+            }
+        ; current_auth = Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      let spec_failed_signature_2 =
+        { spec_failed_signature_1 with
+          sender = (whale1_kp, Account.Nonce.of_int 3)
+        ; zkapp_account_keypairs = [ account_c_kp ]
+        }
+      in
+      let spec_proof =
+        { spec_failed_signature_1 with
+          sender = (whale1_kp, Account.Nonce.of_int 4)
+        ; current_auth = Proof
+        }
+      in
+      let%map failed_update_vk_signature_1 =
+        Malleable_error.lift
+        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+             spec_failed_signature_1
+      and failed_update_vk_signature_2 =
+        Malleable_error.lift
+        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+             spec_failed_signature_2
+      and update_vk_proof =
+        Malleable_error.lift
+        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+             spec_proof
+      in
+      ( failed_update_vk_signature_1
+      , failed_update_vk_signature_2
+      , update_vk_proof )
+    in
     let with_timeout =
       let soft_slots = 3 in
       let soft_timeout = Network_time_span.Slots soft_slots in
@@ -331,12 +497,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "Send a zkApp to create a zkApp account"
         (send_zkapp ~logger
            (Network.Node.get_ingress_uri whale1)
-           zkapp_command_create_account )
+           zkapp_command_create_accounts )
     in
     let%bind () =
       section
         "Wait for zkApp to create account to be included in transition frontier"
-        (wait_for_zkapp ~has_failures:false zkapp_command_create_account)
+        (wait_for_zkapp ~has_failures:false zkapp_command_create_accounts)
     in
     let%bind () =
       section
@@ -370,6 +536,84 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          transition frontier"
         (wait_for_zkapp ~has_failures:false zkapp_command_update_vk1)
     in
+    (* the following checks are testing vk update with versions *)
+    let%bind () =
+      section
+        "Send invalid zkApp to update vk permission to Proof with wrong \
+         protocol version"
+      @@ send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri whale1)
+           invalid_zkapp_command_set_vk_perm_proof "Incompatible version"
+    in
+    let%bind () =
+      section
+        "Send invalid zkApp to update vk permission to Impossible with wrong \
+         protocol version"
+      @@ send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri whale1)
+           invalid_zkapp_command_set_vk_perm_impossible "Incompatible version"
+    in
+    let%bind () =
+      section "Send zkApp to update vk permission to Proof for account B"
+      @@ send_zkapp ~logger
+           (Network.Node.get_ingress_uri whale1)
+           zkapp_command_set_vk_perm_proof
+    in
+    let%bind () =
+      section
+        "Wait for zkApp to update vk permission for account B to be included \
+         in transition frontier"
+      @@ wait_for_zkapp ~has_failures:false zkapp_command_set_vk_perm_proof
+    in
+    let%bind () =
+      section "Send zkApp to update vk permission to Impossible for account C"
+      @@ send_zkapp ~logger
+           (Network.Node.get_ingress_uri whale1)
+           zkapp_command_set_vk_perm_impossible
+    in
+    let%bind () =
+      section
+        "Wait for zkApp to update vk permission for account C to be included \
+         in transition frontier"
+      @@ wait_for_zkapp ~has_failures:false zkapp_command_set_vk_perm_impossible
+    in
+    let%bind () =
+      section "Send zkApp to update vk with Signature auth for account B"
+      @@ send_zkapp ~logger
+           (Network.Node.get_ingress_uri whale1)
+           failed_zkapp_command_set_vk_signature_1
+    in
+    let%bind () =
+      section
+        "wait for zkApp that updates vk with Signature auth for account B to \
+         fail"
+      @@ wait_for_zkapp ~has_failures:true
+           failed_zkapp_command_set_vk_signature_1
+    in
+    let%bind () =
+      section "Send zkApp to update vk with Signature auth for account C"
+      @@ send_zkapp ~logger
+           (Network.Node.get_ingress_uri whale1)
+           failed_zkapp_command_set_vk_signature_2
+    in
+    let%bind () =
+      section
+        "wait for zkApp that updates vk with Signature auth for account C to \
+         fail"
+      @@ wait_for_zkapp ~has_failures:true
+           failed_zkapp_command_set_vk_signature_2
+    in
+    let%bind () =
+      section "Send zkApp to update vk with Proof auth for account B"
+      @@ send_zkapp ~logger
+           (Network.Node.get_ingress_uri whale1)
+           zkapp_command_set_vk_proof
+    in
+    let%bind () =
+      section "wait for zkApp that updates vk with Proof auth for account B"
+      @@ wait_for_zkapp ~has_failures:false zkapp_command_set_vk_proof
+    in
+
     section
       "Wait for zkApp to upate to a new verification key v2 and then refers to \
        it to be included in transition frontier"
