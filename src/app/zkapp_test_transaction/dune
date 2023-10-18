@@ -13,6 +13,7 @@
    async
    async_unix
    ;;local libraries
+   protocol_version
    mina_graphql
    mina_numbers
    currency
