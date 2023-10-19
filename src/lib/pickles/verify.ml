@@ -121,7 +121,8 @@ let verify_heterogenous (ts : Instance.t list) =
                 x.Instance.zk_rows )
           in
           Wrap_deferred_values.expand_deferred ~evals ~zk_rows
-            ~old_bulletproof_challenges ~proof_state
+            ~override_ffadd:(* TODO *) false ~old_bulletproof_challenges
+            ~proof_state
         in
         Timer.clock __LOC__ ;
         let deferred_values = { deferred_values with bulletproof_challenges } in

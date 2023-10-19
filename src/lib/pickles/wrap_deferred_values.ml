@@ -10,9 +10,13 @@ module Plonk_checks = struct
   include Plonk_checks
   module Type1 =
     Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
+  module Type1_override_ffadd =
+    Plonk_checks.Make
+      (Shifted_value.Type1)
+      (Plonk_checks.Scalars.Tick_with_override)
 end
 
-let expand_deferred (type n most_recent_width) ~zk_rows
+let expand_deferred (type n most_recent_width) ~zk_rows ~override_ffadd
     ~(evals :
        ( Backend.Tick.Field.t
        , Backend.Tick.Field.t array )
@@ -112,7 +116,8 @@ let expand_deferred (type n most_recent_width) ~zk_rows
       let module Field = struct
         include Tick.Field
       end in
-      Plonk_checks.Type1.derive_plonk
+      ( if override_ffadd then Plonk_checks.Type1_override_ffadd.derive_plonk
+      else Plonk_checks.Type1.derive_plonk )
         (module Field)
         ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
     in
@@ -171,7 +176,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
   Timer.clock __LOC__ ;
   let combined_inner_product_actual =
     Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
-      ~domain:tick_domain ~ft_eval1:evals.ft_eval1
+      ~domain:tick_domain ~ft_eval1:evals.ft_eval1 ~override_ffadd
       ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
       evals.evals ~old_bulletproof_challenges ~r ~xi ~zeta ~zetaw
   in

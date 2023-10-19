@@ -235,6 +235,7 @@ struct
       in
       let deferred_values_computed =
         Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
+          ~override_ffadd:(* TODO *) false
           ~old_bulletproof_challenges:
             statement.messages_for_next_step_proof.old_bulletproof_challenges
           ~zk_rows:data.zk_rows ~proof_state:statement.proof_state

@@ -21,6 +21,15 @@ module Type1 =
       let index_terms = Plonk_checks.Scalars.Tick.index_terms
     end)
 
+module Type1_override_ffadd =
+  Plonk_checks.Make
+    (Shifted_value.Type1)
+    (struct
+      let constant_term = Plonk_checks.Scalars.Tick_with_override.constant_term
+
+      let index_terms = Plonk_checks.Scalars.Tick_with_override.index_terms
+    end)
+
 let _vector_of_list (type a t)
     (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
     (xs : a list) : t =
@@ -31,6 +40,7 @@ let _vector_of_list (type a t)
 let tick_rounds = Nat.to_int Tick.Rounds.n
 
 let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
+    ~override_ffadd
     ~actual_proofs_verified:
       (module AB : Nat.Add.Intf with type n = actual_proofs_verified)
     (e : (_ array * _ array, _) Plonk_types.All_evals.With_public_input.t)
@@ -42,7 +52,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       ~rounds:tick_rounds e.evals
   in
   let ft_eval0 : Tick.Field.t =
-    Type1.ft_eval0
+    (if override_ffadd then Type1_override_ffadd.ft_eval0 else Type1.ft_eval0)
       (module Tick.Field)
       plonk ~env ~domain
       (Plonk_types.Evals.to_in_circuit combined_evals)
@@ -211,7 +221,8 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     let module Field = struct
       include Tick.Field
     end in
-    Type1.derive_plonk
+    ( if step_vk.override_ffadd then Type1_override_ffadd.derive_plonk
+    else Type1.derive_plonk )
       (module Field)
       ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
   and new_bulletproof_challenges, b =
@@ -242,6 +253,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
           shift_value
             As_field.(
               combined_inner_product (* Note: We do not pad here. *)
+                ~override_ffadd:step_vk.override_ffadd
                 ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
                 { evals = proof.proof.openings.evals; public_input = x_hat }
                 ~r ~xi ~zeta ~zetaw ~old_bulletproof_challenges:prev_challenges

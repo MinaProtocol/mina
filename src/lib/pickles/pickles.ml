@@ -1590,6 +1590,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (* Note: We do not pad here. *)
                           ~actual_proofs_verified:
                             (Nat.Add.create actual_proofs_verified)
+                          ~override_ffadd:false
                           { evals = proof.proof.openings.evals
                           ; public_input =
                               (let x1, x2 = x_hat in

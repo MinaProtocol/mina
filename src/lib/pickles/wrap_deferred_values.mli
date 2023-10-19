@@ -4,6 +4,7 @@ open Backend
 
 val expand_deferred :
      zk_rows:int
+  -> override_ffadd:bool
   -> evals:
        (Pasta_bindings.Fp.t, Pasta_bindings.Fp.t array) Plonk_types.All_evals.t
   -> old_bulletproof_challenges:
