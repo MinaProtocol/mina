@@ -52,3 +52,5 @@ val set_wrap_proof :
   -> public_input:Kimchi_bindings.FieldVectors.Fq.t
   -> Backend.Tock.Proof.t
   -> unit
+
+val is_env_var_set_requesting_error_for_proofs : unit -> bool
