@@ -32,6 +32,12 @@ module FieldVectors = struct
 
     external set : t -> int -> elt -> unit = "caml_fq_vector_set"
   end
+
+  module BN254Fp = struct
+    type nonrec t
+
+    type nonrec elt = Pasta_bindings.BN254Fp.t
+  end
 end
 
 module Protocol = struct
@@ -258,6 +264,10 @@ module Protocol = struct
       external write : bool option -> t -> string -> unit
         = "caml_pasta_fq_plonk_index_write"
     end
+
+    module BN254Fp = struct
+      type nonrec t
+    end
   end
 
   module VerifierIndex = struct
@@ -403,6 +413,16 @@ module Protocol = struct
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
            , Pasta_bindings.Fp.t )
            Kimchi_types.proof_with_public = "caml_pasta_fp_plonk_proof_create"
+
+      external create_kzg :
+           Index.BN254Fp.t
+        -> FieldVectors.BN254Fp.t array
+        -> Pasta_bindings.BN254Fp.t Kimchi_types.runtime_table array
+        -> Pasta_bindings.BN254Fp.t array
+        -> Pasta_bindings.BN254Fq.t Kimchi_types.or_infinity array
+        -> ( Pasta_bindings.BN254Fq.t Kimchi_types.or_infinity
+           , Pasta_bindings.BN254Fp.t )
+           Kimchi_types.proof_with_public = "caml_bn254_plonk_proof_create"
 
       external create_and_verify :
            Index.Fp.t

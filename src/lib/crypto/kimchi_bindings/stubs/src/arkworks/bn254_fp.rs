@@ -1,8 +1,7 @@
 use crate::arkworks::CamlBigInteger256;
 use ark_ff::PrimeField;
+use mina_curves::bn254::Fp;
 use std::{convert::TryFrom, ops::Deref};
-
-type Fp = ark_bn254::Fr;
 
 #[derive(Clone, Copy, Debug, ocaml_gen::CustomType)]
 pub struct CamlBN254Fp(pub Fp);

@@ -37,7 +37,7 @@ groupmap = { path = "../../proof-systems/groupmap" }
 mina-curves = { path = "../../proof-systems/curves" }
 o1-utils = { path = "../../proof-systems/utils" }
 mina-poseidon = { path = "../../proof-systems/poseidon" }
-kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types"] }
+kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types", "bn254"] }
 
 # ocaml-specific
 ocaml = { version = "0.22.2", features = ["no-caml-startup"] }
