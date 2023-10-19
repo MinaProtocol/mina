@@ -96,7 +96,7 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
   && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
-  && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" "mina-archive=$deb_version"  \
+  && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" "mina-archive=$deb_version" "zkapp_test_transaction=$deb_version" \
   && rm -rf /var/lib/apt/lists/*
 
 # --- Set up postgres
