@@ -22,8 +22,9 @@ type t1 due to a change to a type t2 contained in t1. The
 difference will always also be reported for t2 directly.  The maximum
 depth should be set low enough to minimize such false positives.
 
-There are some special rules for the types associated with signed commands and zkApp commands.
-See `check_command_types` below.
+There are some special rules for the types associated with signed commands and zkApp commands;
+see `check_command_types`, below. There is also a special rule for RPC types; see
+`check_rpc_types`, below.
 """
 
 import subprocess
@@ -36,7 +37,7 @@ import sexpdata
 exit_code=0
 
 # type shape truncation depth
-max_depth = 12
+max_depth = 9
 
 def set_error():
   global exit_code
@@ -54,7 +55,7 @@ def branch_commit(branch):
 def download_type_shapes(role,branch,sha1) :
   file=type_shape_file(sha1)
   print ('Downloading type shape file',file,'for',role,'branch',branch,'at commit',sha1)
-  result=subprocess.run(['wget' ,f'https://storage.googleapis.com/mina-type-shapes/{file}'])
+  result=subprocess.run(['wget','--no-clobber',f'https://storage.googleapis.com/mina-type-shapes/{file}'])
 
 def type_shape_file(sha1) :
   # created by buildkite build-artifact script
@@ -62,7 +63,7 @@ def type_shape_file(sha1) :
   return sha1 + '-type_shape.txt'
 
 # truncate type shapes to avoid false positives
-def truncate_type_shape (sexp) :
+def truncate_type_shape (type_shape) :
   def truncate_at_depth (sexp,curr_depth) :
     if curr_depth >= max_depth :
       return sexpdata.Symbol('.')
@@ -72,8 +73,11 @@ def truncate_type_shape (sexp) :
       else :
         return sexp
   fp = io.StringIO()
+  sexp = sexpdata.loads(type_shape)
   sexpdata.dump(truncate_at_depth(sexp,0),fp)
-  return fp.getvalue ()
+  truncated = fp.getvalue ()
+  # remove double-quotes
+  return truncated[1:-1]
 
 def make_type_shape_dict(type_shape_file):
   shape_dict=dict()

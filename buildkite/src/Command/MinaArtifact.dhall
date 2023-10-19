@@ -99,8 +99,9 @@ let pipeline : DebianVersions.DebVersion -> PipelineMode.Type -> Pipeline.Config
 
         -- rosetta image
         let rosettaSpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion,
           service="mina-rosetta",
-          extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --cache-from ${DebianVersions.toolchainImage debVersion}",
+          network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
         }
