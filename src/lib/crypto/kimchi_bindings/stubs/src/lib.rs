@@ -44,6 +44,7 @@ pub mod pasta_fq_plonk_verifier_index;
 pub mod oracles;
 
 /// Proofs
+pub mod bn254_plonk_proof;
 pub mod pasta_fp_plonk_proof;
 pub mod pasta_fq_plonk_proof;
 

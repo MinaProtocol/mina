@@ -1,20 +1,17 @@
 use crate::{
     arkworks::{CamlBN254Fp, CamlGBN254},
-    bn254_plonk_index::{BN254PlonkIndex, BN254PlonkIndexPtr},
+    bn254_plonk_index::CamlBN254PlonkIndexPtr,
     field_vector::bn254::CamlBN254FpVector,
 };
 use groupmap::GroupMap;
 use kimchi::circuits::polynomial::COLUMNS;
+use kimchi::proof::{ProverProof, RecursionChallenge};
 use kimchi::prover::caml::CamlProofWithPublic;
 use kimchi::{
     circuits::lookup::runtime_tables::{caml::CamlRuntimeTable, RuntimeTable},
     prover_index::ProverIndex,
 };
-use kimchi::{
-    proof::{ProverProof, RecursionChallenge},
-    verifier::Context,
-};
-use mina_curves::bn254::{BN254Parameters, Fp, BN254};
+use mina_curves::bn254::{BN254Parameters, Fp, Fq, BN254};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
@@ -28,7 +25,7 @@ type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>;
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bn254_plonk_proof_create(
-    index: BN254PlonkIndexPtr<'static>,
+    index: CamlBN254PlonkIndexPtr<'static>,
     witness: Vec<CamlBN254FpVector>,
     runtime_tables: Vec<CamlRuntimeTable<CamlBN254Fp>>,
     prev_challenges: Vec<CamlBN254Fp>,
@@ -79,7 +76,7 @@ pub fn caml_bn254_plonk_proof_create(
 
     // Release the runtime lock so that other threads can run using it while we generate the proof.
     runtime.releasing_runtime(|| {
-        let group_map = GroupMap::<BN254Parameters>::setup();
+        let group_map = GroupMap::<Fq>::setup();
         let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
             &group_map,
             witness,
