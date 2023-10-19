@@ -185,7 +185,7 @@ send_zkapp_txn() {
 }
 
 echo "========================= ZKAPP ACCOUNT SETTING UP ==========================="
-ZKAPP_TXN_QUERY=$(zkapp_test_transaction create-zkapp-account --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce 0 --sender-key ${ZKAPP_SENDER_KEY} --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY} --fee 5 | sed 1,7d)
+ZKAPP_TXN_QUERY=$(mina-zkapp-test-transaction create-zkapp-account --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce 0 --sender-key ${ZKAPP_SENDER_KEY} --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY} --fee 5 | sed 1,7d)
 send_zkapp_txn "${ZKAPP_TXN_QUERY}"
 
 # Unlock Genesis Accounts
@@ -210,12 +210,12 @@ ZKAPP_SENDER_NONCE=1
 ZKAPP_STATE=0
 send_zkapp_transactions() {
   while true; do
-    ZKAPP_TXN_QUERY=$(zkapp_test_transaction transfer-funds-one-receiver --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce ${ZKAPP_FEE_PAYER_NONCE} --sender-key ${ZKAPP_SENDER_KEY} --sender-nonce ${ZKAPP_SENDER_NONCE} --receiver-amount 1 --fee 5 --receiver ${ZKAPP_ACCOUNT_PUB_KEY} | sed 1,5d)
+    ZKAPP_TXN_QUERY=$(mina-zkapp-test-transaction transfer-funds-one-receiver --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce ${ZKAPP_FEE_PAYER_NONCE} --sender-key ${ZKAPP_SENDER_KEY} --sender-nonce ${ZKAPP_SENDER_NONCE} --receiver-amount 1 --fee 5 --receiver ${ZKAPP_ACCOUNT_PUB_KEY} | sed 1,5d)
     send_zkapp_txn "${ZKAPP_TXN_QUERY}"
     let ZKAPP_FEE_PAYER_NONCE++
     let ZKAPP_SENDER_NONCE++
 
-    ZKAPP_TXN_QUERY=$(zkapp_test_transaction update-state --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce ${ZKAPP_FEE_PAYER_NONCE} --zkapp-account-key ${ZKAPP_SENDER_KEY} --zkapp-state ${ZKAPP_STATE} --fee 5 | sed 1,5d)
+    ZKAPP_TXN_QUERY=$(mina-zkapp-test-transaction update-state --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce ${ZKAPP_FEE_PAYER_NONCE} --zkapp-account-key ${ZKAPP_SENDER_KEY} --zkapp-state ${ZKAPP_STATE} --fee 5 | sed 1,5d)
     send_zkapp_txn "${ZKAPP_TXN_QUERY}"
     let ZKAPP_FEE_PAYER_NONCE++
     let ZKAPP_STATE++
