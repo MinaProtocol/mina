@@ -159,7 +159,7 @@ module Json = struct
     ; evals : 'poly_comm verification_evals
     ; shifts : 'fr array
     ; lookup_index : 'poly_comm lookup option
-    ; zk_rows : int
+    ; zk_rows : int [@default 3]
     }
   [@@deriving to_yojson]
 
