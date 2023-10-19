@@ -147,10 +147,72 @@ module Tick : S = struct
         a Env.t) =
 |ocaml}
 
-external fp_linearization : unit -> string * (string * string) array
+external fp_linearization : bool -> string * (string * string) array
   = "fp_linearization_strings"
 
-let fp_constant_term, fp_index_terms = fp_linearization ()
+let fp_constant_term, fp_index_terms = fp_linearization false
+
+let () = output_string fp_constant_term
+
+let () =
+  output_string
+    {ocaml|
+
+  let index_terms (type a) (_ : a Env.t) =
+    Column.Table.of_alist_exn
+    [
+|ocaml}
+
+let is_first = ref true
+
+let () =
+  Array.iter fp_index_terms ~f:(fun (col, expr) ->
+      if !is_first then is_first := false else output_string " ;\n" ;
+      output_string "(" ;
+      output_string col ;
+      output_string ", lazy (" ;
+      output_string expr ;
+      output_string "))" )
+
+let () = output_string {ocaml|
+      ]
+end
+|ocaml}
+
+let () =
+  output_string
+    {ocaml|
+(* The constraints are basically the same, but the literals in them differ. *)
+module Tick_with_override : S = struct
+  let constant_term (type a)
+      ({ add = ( + )
+       ; sub = ( - )
+       ; mul = ( * )
+       ; square
+       ; mds
+       ; endo_coefficient
+       ; pow
+       ; var
+       ; field
+       ; cell
+       ; alpha_pow
+       ; double
+       ; zk_polynomial = _
+       ; omega_to_minus_zk_rows = _
+       ; zeta_to_n_minus_1 = _
+       ; zeta_to_srs_length = _
+       ; srs_length_log2 = _
+       ; vanishes_on_zero_knowledge_and_previous_rows
+       ; joint_combiner
+       ; beta
+       ; gamma
+       ; unnormalized_lagrange_basis
+       ; if_feature
+       } :
+        a Env.t) =
+|ocaml}
+
+let fp_constant_term, fp_index_terms = fp_linearization true
 
 let () = output_string fp_constant_term
 
@@ -211,10 +273,10 @@ module Tock : S = struct
         a Env.t) =
 |ocaml}
 
-external fq_linearization : unit -> string * (string * string) array
+external fq_linearization : bool -> string * (string * string) array
   = "fq_linearization_strings"
 
-let fq_constant_term, fq_index_terms = fq_linearization ()
+let fq_constant_term, fq_index_terms = fq_linearization false
 
 let () = output_string fq_constant_term
 

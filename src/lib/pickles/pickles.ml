@@ -416,6 +416,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = ()
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -466,6 +467,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = Field.zero
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -548,6 +550,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = ()
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -669,6 +672,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = ()
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -805,6 +809,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = self
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -885,6 +890,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = Field.(add one) x
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -949,6 +955,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = result
                           ; auxiliary_output = blinding_value
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -1037,6 +1044,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ; auxiliary_output = ()
               } )
         ; feature_flags = Plonk_types.Features.none_bool
+        ; override_ffadd = false
         }
 
       module M = struct
@@ -1152,10 +1160,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let proofs_verifieds = Vector.singleton 2 in
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags ~num_chunks:1
-              ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
-              ~branches:Branches.n ~self ~public_input:(Input typ)
-              ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
-              rule ~wrap_domains ~proofs_verifieds
+              ~override_ffadd:false ~actual_feature_flags
+              ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
+              ~self ~public_input:(Input typ) ~auxiliary_typ:typ
+              A.to_field_elements A_value.to_field_elements rule ~wrap_domains
+              ~proofs_verifieds
           in
           let step_domains = Vector.singleton inner_step_data.domains in
           let step_keypair =
@@ -1200,7 +1209,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Cache.Step.read_or_generate
               ~prev_challenges:
                 (Nat.to_int (fst inner_step_data.proofs_verified))
-              [] k_p k_v
+              ~override_ffadd:false [] k_p k_v
               (Snarky_backendless.Typ.unit ())
               typ main
           in
@@ -1271,8 +1280,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
             in
             let r =
               Common.time "wrap read or generate " (fun () ->
-                  Cache.Wrap.read_or_generate ~prev_challenges:2 []
-                    disk_key_prover disk_key_verifier typ Typ.unit main )
+                  Cache.Wrap.read_or_generate ~prev_challenges:2
+                    ~override_ffadd:false [] disk_key_prover disk_key_verifier
+                    typ Typ.unit main )
             in
             (r, disk_key_verifier)
           in
@@ -1916,6 +1926,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = ()
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -2045,6 +2056,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = ()
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -2096,6 +2108,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = ()
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -2148,6 +2161,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = ()
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -2250,6 +2264,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = ()
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -2393,6 +2408,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = ()
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -2444,6 +2460,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = ()
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -2496,6 +2513,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = ()
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 
@@ -2601,6 +2619,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ; public_output = ()
                           ; auxiliary_output = ()
                           } )
+                    ; override_ffadd = false
                     }
                   ] ) )
 

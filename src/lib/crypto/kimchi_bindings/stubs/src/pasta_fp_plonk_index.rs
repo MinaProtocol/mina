@@ -49,6 +49,7 @@ pub fn caml_pasta_fp_plonk_index_create(
     runtime_tables: Vec<CamlRuntimeTableCfg<CamlFp>>,
     prev_challenges: ocaml::Int,
     srs: CamlFpSrs,
+    override_ffadd: bool,
 ) -> Result<CamlPastaFpPlonkIndex, ocaml::Error> {
     let gates: Vec<_> = gates
         .as_ref()
@@ -72,6 +73,7 @@ pub fn caml_pasta_fp_plonk_index_create(
         .prev_challenges(prev_challenges as usize)
         .max_poly_size(Some(srs.0.max_poly_size()))
         .lookup(lookup_tables)
+        .override_ffadd(override_ffadd)
         .runtime(if runtime_tables.is_empty() {
             None
         } else {
@@ -164,7 +166,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     )?;
     t.srs = srs.clone();
 
-    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true);
+    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true, t.cs.override_ffadd);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

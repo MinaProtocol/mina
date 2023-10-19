@@ -22,6 +22,7 @@ module Step : sig
 
   val read_or_generate :
        prev_challenges:int
+    -> override_ffadd:bool
     -> Key_cache.Spec.t list
     -> Key.Proving.t lazy_t
     -> Key.Verification.t lazy_t
@@ -61,6 +62,7 @@ module Wrap : sig
 
   val read_or_generate :
        prev_challenges:Core_kernel.Int.t
+    -> override_ffadd:bool
     -> Key_cache.Spec.t list
     -> Key.Proving.t Core_kernel.Lazy.t
     -> Key.Verification.t Core_kernel.Lazy.t

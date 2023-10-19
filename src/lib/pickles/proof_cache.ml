@@ -160,6 +160,7 @@ module Json = struct
     ; shifts : 'fr array
     ; lookup_index : 'poly_comm lookup option
     ; zk_rows : int [@default 3]
+    ; override_ffadd : bool [@default false]
     }
   [@@deriving to_yojson]
 

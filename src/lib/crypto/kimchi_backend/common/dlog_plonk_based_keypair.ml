@@ -76,6 +76,7 @@ module type Inputs_intf = sig
       -> Scalar_field.t Kimchi_types.runtime_table_cfg array
       -> int
       -> Urs.t
+      -> bool
       -> t
   end
 
@@ -172,7 +173,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (set_urs_info, load)
 
-  let create ~prev_challenges cs =
+  let create ~prev_challenges ~override_ffadd cs =
     let gates, fixed_lookup_tables, runtime_table_cfgs =
       Inputs.Constraint_system.finalize_and_get_gates cs
     in
@@ -190,7 +191,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let index =
       Inputs.Index.create gates public_input_size fixed_lookup_tables
-        runtime_table_cfgs prev_challenges (load_urs ())
+        runtime_table_cfgs prev_challenges (load_urs ()) override_ffadd
     in
     { index; cs }
 

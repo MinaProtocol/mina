@@ -56,6 +56,7 @@ type ( 'a_var
               and type return_value = 'ret_value
               and type statement = 'a_value )
       ; feature_flags : bool Plonk_types.Features.t
+      ; override_ffadd : bool
       }
       -> ( 'a_var
          , 'a_value
@@ -85,6 +86,7 @@ val create :
   -> wrap_domains:Import.Domains.t
   -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> num_chunks:int
+  -> override_ffadd:bool
   -> actual_feature_flags:bool Plonk_types.Features.t
   -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
   -> proofs_verifieds:(int, 'branches) Pickles_types.Vector.t

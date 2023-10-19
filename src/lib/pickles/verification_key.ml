@@ -85,6 +85,7 @@ module Verifier_index_json = struct
     ; shifts : 'fr array
     ; lookup_index : 'polyComm Lookup.t option
     ; zk_rows : int
+    ; override_ffadd : bool
     }
   [@@deriving yojson]
 
@@ -190,6 +191,7 @@ module Stable = struct
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None
         ; zk_rows = 3
+        ; override_ffadd = false
         }
       in
       { commitments = c; data = d; index = t }

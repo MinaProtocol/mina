@@ -116,6 +116,7 @@ type ( 'prev_vars
          'a_var main_input
       -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
   ; feature_flags : bool Pickles_types.Plonk_types.Features.t
+  ; override_ffadd : bool
   }
 
 module T

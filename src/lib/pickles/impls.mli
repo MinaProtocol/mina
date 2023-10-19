@@ -22,6 +22,7 @@ module Step : sig
 
     val generate :
          prev_challenges:int
+      -> override_ffadd:bool
       -> Kimchi_pasta_constraint_system.Vesta_constraint_system.t
       -> t
   end
@@ -110,6 +111,7 @@ module Wrap : sig
 
     val generate :
          prev_challenges:int
+      -> override_ffadd:bool
       -> Kimchi_pasta_constraint_system.Pallas_constraint_system.t
       -> t
   end

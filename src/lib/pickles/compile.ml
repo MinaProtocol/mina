@@ -510,6 +510,7 @@ struct
               let res =
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
+                      ~override_ffadd:rule.override_ffadd
                       ~actual_feature_flags:rule.feature_flags
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
@@ -600,7 +601,7 @@ struct
                 Common.time "step read or generate" (fun () ->
                     Cache.Step.read_or_generate
                       ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
-                      cache k_p k_v
+                      ~override_ffadd:b.override_ffadd cache k_p k_v
                       (Snarky_backendless.Typ.unit ())
                       typ main )
               in
@@ -676,7 +677,8 @@ struct
       let r =
         Common.time "wrap read or generate " (fun () ->
             Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
-              ~prev_challenges:2 cache disk_key_prover disk_key_verifier typ
+              ~prev_challenges:2 ~override_ffadd:false cache disk_key_prover
+              disk_key_verifier typ
               (Snarky_backendless.Typ.unit ())
               main )
       in
@@ -1306,6 +1308,7 @@ struct
           ; auxiliary_output = ()
           } )
     ; feature_flags = Plonk_types.Features.none_bool
+    ; override_ffadd = false
     }
 
   let override_wrap_main =
@@ -1393,6 +1396,7 @@ struct
                       ; public_output = ()
                       ; auxiliary_output = ()
                       } )
+                ; override_ffadd = false
                 }
               ] ) )
 
