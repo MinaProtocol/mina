@@ -130,7 +130,24 @@ copy_common_daemon_configs() {
 
   # Copy signature-based Binaries (based on signature type $2 passed into the function)
   cp ./default/src/app/cli/src/mina_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
+  
+  # Copy rosetta-based Binaries 
   cp ./default/src/app/rosetta/rosetta_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+  cp ./default/src/app/rosetta/ocaml-signer/signer_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
+ 
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/archive"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers"
+
+  # --- Copy artifacts
+  cp ../src/app/rosetta/*.conf "${BUILDDIR}/etc/mina/rosetta"
+  cp ../src/app/rosetta/*.sh "${BUILDDIR}/etc/mina/rosetta"
+
+  cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/rosetta/archive"
+  cp -r ../genesis_ledgers/* ${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/
 
   # Copy over Build Configs (based on $2)
   mkdir -p "${BUILDDIR}/etc/coda/build_config"
@@ -259,7 +276,7 @@ cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDD
 
 build_deb mina-zkapp-test-transaction
 
-##################################### END SNAPP TEST TXN PACKAGE #######################################
+##################################### END ZKAPP TEST TXN PACKAGE #######################################
 
 ##################################### BERKELEY PACKAGE #######################################
 echo "------------------------------------------------------------"
