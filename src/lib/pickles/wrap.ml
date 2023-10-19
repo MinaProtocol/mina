@@ -473,7 +473,8 @@ let%test_module "gate finalization" =
                 (`Known
                   [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ]
                   )
-              ~zk_rows:3 ~sponge ~prev_challenges:[] deferred_values evals
+              ~zk_rows:3 ~override_ffadd:false ~sponge ~prev_challenges:[]
+              deferred_values evals
           in
 
           (* Read the boolean result from the circuit and make it available

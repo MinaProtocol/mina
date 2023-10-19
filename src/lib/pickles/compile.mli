@@ -49,6 +49,7 @@ type chunking_data = Verify.Instance.chunking_data =
 
 val verify_promise :
      ?chunking_data:chunking_data
+  -> ?override_ffadd:bool
   -> (module Nat.Intf with type n = 'n)
   -> (module Statement_value_intf with type t = 'a)
   -> Verification_key.t

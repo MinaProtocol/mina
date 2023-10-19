@@ -42,8 +42,8 @@ let verify_one ~srs
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
-          ~zk_rows:d.zk_rows ~sponge ~prev_challenges deferred_values
-          prev_proof_evals )
+          ~zk_rows:d.zk_rows ~override_ffadd:d.override_ffadd ~sponge
+          ~prev_challenges deferred_values prev_proof_evals )
   in
   let branch_data = deferred_values.branch_data in
   let sponge_after_index, hash_messages_for_next_step_proof =
@@ -493,6 +493,7 @@ let step_main :
                     ; feature_flags = basic.feature_flags
                     ; num_chunks = basic.num_chunks
                     ; zk_rows = basic.zk_rows
+                    ; override_ffadd = basic.override_ffadd
                     }
                   in
                   let module M =

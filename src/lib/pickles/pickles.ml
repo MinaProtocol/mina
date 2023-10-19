@@ -253,6 +253,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Plonk_types.(Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags)
         ; num_chunks = 1
         ; zk_rows = 3
+        ; override_ffadd = false
         }
 
     module Proof = struct
@@ -296,7 +297,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     { constraints = 0 }
                 }
               in
-              Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
+              Verify.Instance.T
+                ( max_proofs_verified
+                , m
+                , None
+                , { override_ffadd = false }
+                , vk
+                , x
+                , p ) )
           |> Verify.verify_heterogenous )
 
     let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
@@ -1844,6 +1852,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ; step_domains
             ; num_chunks = 1
             ; zk_rows = 3
+            ; override_ffadd = false
             }
           in
           Types_map.add_exn self data ;

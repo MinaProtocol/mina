@@ -816,6 +816,16 @@ struct
 
           let index_terms = Plonk_checks.Scalars.Tick.index_terms
         end)
+
+    module Override_ffadd =
+      Plonk_checks.Make
+        (Shifted_value.Type1)
+        (struct
+          let constant_term =
+            Plonk_checks.Scalars.Tick_with_override.constant_term
+
+          let index_terms = Plonk_checks.Scalars.Tick_with_override.index_terms
+        end)
   end
 
   let domain_for_compiled (type branches)
@@ -855,6 +865,7 @@ struct
       (module Proofs_verified : Nat.Add.Intf with type n = b)
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] ) ~zk_rows
+      ~override_ffadd
       ~(* TODO: Add "actual proofs verified" so that proofs don't
           carry around dummy "old bulletproof challenges" *)
        sponge ~(prev_challenges : (_, b) Vector.t)
@@ -1031,7 +1042,8 @@ struct
       in
       let ft_eval0 : Field.t =
         with_label "ft_eval0" (fun () ->
-            Plonk_checks.ft_eval0
+            ( if override_ffadd then Plonk_checks.Override_ffadd.ft_eval0
+            else Plonk_checks.ft_eval0 )
               (module Field)
               ~env ~domain plonk_minimal combined_evals evals1.public_input )
       in

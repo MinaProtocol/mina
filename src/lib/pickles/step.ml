@@ -25,6 +25,8 @@ struct
   module Plonk_checks = struct
     include Plonk_checks
     module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars.Tick)
+    module Type1_override_ffadd =
+      Plonk_checks.Make (Shifted_value.Type1) (Scalars.Tick_with_override)
     module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars.Tock)
   end
 
@@ -220,7 +222,9 @@ struct
             let module Field = struct
               include Tick.Field
             end in
-            Plonk_checks.Type1.derive_plonk
+            ( if data.override_ffadd then
+              Plonk_checks.Type1_override_ffadd.derive_plonk
+            else Plonk_checks.Type1.derive_plonk )
               (module Field)
               ~env ~shift:Shifts.tick1 plonk_minimal combined_evals )
       in

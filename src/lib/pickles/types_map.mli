@@ -17,6 +17,7 @@ module Basic : sig
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
+    ; override_ffadd : bool
     }
 end
 
@@ -41,6 +42,7 @@ module Side_loaded : sig
       ; branches : 'n2 Pickles_types.Nat.t
       ; num_chunks : int
       ; zk_rows : int
+      ; override_ffadd : bool
       }
   end
 
@@ -65,6 +67,7 @@ module Compiled : sig
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
+    ; override_ffadd : bool
     }
 
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
@@ -84,6 +87,7 @@ module Compiled : sig
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
+    ; override_ffadd : bool
     }
 end
 
@@ -108,6 +112,7 @@ module For_step : sig
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
+    ; override_ffadd : bool
     }
 
   val of_side_loaded : ('a, 'b, 'c, 'd) Side_loaded.t -> ('a, 'b, 'c, 'd) t

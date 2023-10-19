@@ -450,6 +450,23 @@ struct
       in
       go choices
     in
+    let override_ffadd =
+      let rec go : type a b c d. (a, b, c, d) H4.T(IR).t -> bool =
+       fun rules ->
+        match rules with
+        | [] ->
+            false
+        | [ r ] ->
+            r.override_ffadd
+        | r :: rules ->
+            let acc = go rules in
+            if Bool.(acc <> r.override_ffadd) then
+              failwith
+                "Inconsistent values for override_ffadd across inductive rules" ;
+            acc
+      in
+      go choices
+    in
     let wrap_domains =
       match override_wrap_domain with
       | None ->
@@ -850,6 +867,7 @@ struct
           | num_chunks ->
               let permuts = 7 in
               ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts )
+      ; override_ffadd
       }
     in
     Timer.clock __LOC__ ;
@@ -897,6 +915,7 @@ module Side_loaded = struct
           Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
       ; num_chunks = 1
       ; zk_rows = 3
+      ; override_ffadd = false
       }
 
   module Proof = struct
@@ -939,7 +958,14 @@ module Side_loaded = struct
                   { constraints = 0 }
               }
             in
-            Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
+            Verify.Instance.T
+              ( max_proofs_verified
+              , m
+              , None
+              , { override_ffadd = false }
+              , vk
+              , x
+              , p ) )
         |> Verify.verify_heterogenous )
 
   let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
@@ -1103,12 +1129,12 @@ let compile_with_wrap_main_override_promise :
       let (Typ typ) = typ in
       fun x -> fst (typ.value_to_fields x)
   end in
+  let compiled = Types_map.lookup_compiled self.id in
   let chunking_data =
     match num_chunks with
     | None ->
         None
     | Some num_chunks ->
-        let compiled = Types_map.lookup_compiled self.id in
         let { h = Pow_2_roots_of_unity domain_size } =
           compiled.step_domains
           |> Vector.reduce_exn
@@ -1123,6 +1149,7 @@ let compile_with_wrap_main_override_promise :
           ; zk_rows = compiled.zk_rows
           }
   in
+  let override_ffadd = compiled.override_ffadd in
   let module P = struct
     type statement = value
 
@@ -1142,7 +1169,7 @@ let compile_with_wrap_main_override_promise :
     let verification_key = wrap_vk
 
     let verify_promise ts =
-      verify_promise ?chunking_data
+      verify_promise ?chunking_data ~override_ffadd
         ( module struct
           include Max_proofs_verified
         end )

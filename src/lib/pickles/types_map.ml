@@ -21,6 +21,7 @@ module Basic = struct
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
+    ; override_ffadd : bool
     }
 end
 
@@ -44,6 +45,7 @@ module Side_loaded = struct
       ; branches : 'n2 Nat.t
       ; num_chunks : int
       ; zk_rows : int
+      ; override_ffadd : bool
       }
   end
 
@@ -63,6 +65,7 @@ module Side_loaded = struct
           ; feature_flags
           ; num_chunks
           ; zk_rows
+          ; override_ffadd
           }
       ; ephemeral
       } =
@@ -87,6 +90,7 @@ module Side_loaded = struct
     ; feature_flags
     ; num_chunks
     ; zk_rows
+    ; override_ffadd
     }
 end
 
@@ -100,6 +104,7 @@ module Compiled = struct
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
+    ; override_ffadd : bool
     }
 
   (* This is the data associated to an inductive proof system with statement type
@@ -120,6 +125,7 @@ module Compiled = struct
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
+    ; override_ffadd : bool
     }
 
   type packed =
@@ -137,6 +143,7 @@ module Compiled = struct
       ; feature_flags
       ; num_chunks
       ; zk_rows
+      ; override_ffadd
       } =
     { Basic.max_proofs_verified
     ; wrap_domains
@@ -147,6 +154,7 @@ module Compiled = struct
     ; feature_flags
     ; num_chunks
     ; zk_rows
+    ; override_ffadd
     }
 end
 
@@ -167,6 +175,7 @@ module For_step = struct
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
+    ; override_ffadd : bool
     }
 
   let of_side_loaded (type a b c d)
@@ -178,6 +187,7 @@ module For_step = struct
            ; feature_flags
            ; num_chunks
            ; zk_rows
+           ; override_ffadd
            }
        } :
         (a, b, c, d) Side_loaded.t ) : (a, b, c, d) t =
@@ -202,6 +212,7 @@ module For_step = struct
     ; feature_flags
     ; num_chunks
     ; zk_rows
+    ; override_ffadd
     }
 
   let of_compiled
@@ -216,6 +227,7 @@ module For_step = struct
        ; wrap_vk = _
        ; num_chunks
        ; zk_rows
+       ; override_ffadd
        } :
         _ Compiled.t ) =
     { branches
@@ -231,6 +243,7 @@ module For_step = struct
     ; feature_flags
     ; num_chunks
     ; zk_rows
+    ; override_ffadd
     }
 end
 

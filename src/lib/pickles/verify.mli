@@ -3,11 +3,14 @@ open Core_kernel
 module Instance : sig
   type chunking_data = { num_chunks : int; domain_size : int; zk_rows : int }
 
+  type gate_overrides = { override_ffadd : bool }
+
   type t =
     | T :
         (module Pickles_types.Nat.Intf with type n = 'n)
         * (module Intf.Statement_value with type t = 'a)
         * chunking_data option
+        * gate_overrides
         * Verification_key.t
         * 'a
         * ('n, 'n) Proof.t
@@ -16,6 +19,7 @@ end
 
 val verify :
      ?chunking_data:Instance.chunking_data
+  -> ?override_ffadd:bool
   -> (module Pickles_types.Nat.Intf with type n = 'n)
   -> (module Intf.Statement_value with type t = 'a)
   -> Verification_key.t
