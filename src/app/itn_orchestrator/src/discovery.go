@@ -59,7 +59,7 @@ type nodeAddrEntriesAndCount struct {
 	count   int
 }
 
-func iterateSubmissions(config Config, startAfter string, handleAddress func(NodeAddress)) error {
+func iterateSubmissions(config Config, startAfter string, handleAddress func(string, NodeAddress)) error {
 	log := config.Log
 	ctx := config.Ctx
 	resp, err := config.AwsContext.ListObjects(ctx, startAfter, nil)
@@ -87,7 +87,7 @@ func iterateSubmissions(config Config, startAfter string, handleAddress func(Nod
 				colonIx = len(meta.RemoteAddr)
 			}
 			addr := NodeAddress(meta.RemoteAddr[:colonIx] + ":" + strconv.Itoa(int(meta.GraphqlControlPort)))
-			handleAddress(addr)
+			handleAddress(meta.Submitter, addr)
 		}
 		if resp.IsTruncated {
 			resp, err = config.AwsContext.ListObjects(ctx, startAfter, resp.NextContinuationToken)
@@ -138,24 +138,24 @@ func discoverParticipantsDo(config Config, params DiscoveryParams, output func(N
 		}
 		connectedResultChan <- nodeAddrEntriesAndCount{entries: entries, count: cnt}
 	}()
-	tryToConnect := func(addr NodeAddress) {
+	tryToConnect := func(pk string, addr NodeAddress) {
 		defer wg.Done()
 		entry, err := NewGqlClient(config, addr)
 		if err == nil {
 			connected <- nodeAddrEntry{addr: addr, entry: *entry, isNew: true}
 		} else {
-			log.Warnf("Error on auth for %s: %v", addr, err)
+			log.Warnf("Error on auth for %s (%s): %v", addr, pk, err)
 		}
 	}
 	connecting := make(map[NodeAddress]struct{})
-	iterateSubmissions(config, startAfter, func(addr NodeAddress) {
+	iterateSubmissions(config, startAfter, func(pk string, addr NodeAddress) {
 		if _, has := connecting[addr]; !has {
 			connecting[addr] = struct{}{}
 			if entry, has := config.NodeData[addr]; has {
 				connected <- nodeAddrEntry{addr: addr, entry: entry, isNew: false}
 			} else {
 				wg.Add(1)
-				go tryToConnect(addr)
+				go tryToConnect(pk, addr)
 			}
 		}
 	})
