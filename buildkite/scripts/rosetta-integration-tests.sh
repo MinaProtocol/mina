@@ -92,7 +92,10 @@ cat <<EOF >"$MINA_CONFIG_FILE"
     "name": "${MINA_NETWORK}",
     "accounts": [
       { "pk": "${BLOCK_PRODUCER_PK}", "balance": "1000000", "delegate": null, "sk": null },
-      { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null }
+      { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null },
+      { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
+      { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
+      { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null }
     ]
   }
 }
@@ -196,7 +199,7 @@ mina accounts unlock --public-key $SNARK_PRODUCER_PK
 
 # Start sending value transfer transactions
 send_value_transfer_txns() {
-  mina-dev client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -nonce 0 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
+  mina client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -nonce 0 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
   while true; do
     sleep $TRANSACTION_FREQUENCY
     mina client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
@@ -227,7 +230,7 @@ if [[ "$MODE" == "full" ]]; then
   send_zkapp_transactions &
 fi
 
-next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
+next_block_time=$(mina client status --json | jq '.next_block_production.timing[1].time' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
 sleep_time=$((($next_block_time - $curr_time) / 1000))
 echo "Sleeping for ${sleep_time}s until next block is created..."
 sleep ${sleep_time}
