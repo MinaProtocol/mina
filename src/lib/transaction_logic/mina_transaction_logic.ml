@@ -1303,7 +1303,7 @@ module Make (L : Ledger_intf.S) :
 
       let if_ = value_if
 
-      let equal_to_current t = Protocol_version.(equal t current)
+      let equal_to_current = Protocol_version.equal_to_current
 
       let older_than_current = Protocol_version.older_than_current
     end

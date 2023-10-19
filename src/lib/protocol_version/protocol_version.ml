@@ -72,19 +72,16 @@ module Make_str (A : Wire_types.Concrete) = struct
   *)
   let is_valid t = t.transaction >= 1 && t.network >= 1 && t.patch >= 0
 
-  let older_than_current t =
-    transaction t < transaction current
-    || (transaction t = transaction current && network t < network current)
-    || transaction t = transaction current
-       && network t = network current
-       && patch t < patch current
+  let equal_to_current t = transaction t = transaction current
+
+  let older_than_current t = transaction t < transaction current
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%map transaction = Quickcheck.Generator.small_non_negative_int
-    and network = Quickcheck.Generator.small_non_negative_int
+    let%map transaction = Quickcheck.Generator.small_positive_int
+    and network = Quickcheck.Generator.small_positive_int
     and patch = Quickcheck.Generator.small_non_negative_int in
-    { transaction = transaction + 1; network = network + 1; patch }
+    { transaction; network; patch }
 
   let deriver obj =
     let open Fields_derivers_zkapps.Derivers in
@@ -124,26 +121,9 @@ module Checked = struct
 
   let current = constant current
 
-  let equal_to_current t =
-    let open Snark_params.Tick in
-    let%bind transaction = N.Checked.equal t.transaction current.transaction
-    and network = N.Checked.equal t.network current.network
-    and patch = N.Checked.equal t.patch current.patch in
-    Boolean.all [ transaction; network; patch ]
+  let equal_to_current t = N.Checked.(t.transaction = current.transaction)
 
-  let older_than_current t =
-    let open Snark_params.Tick in
-    let open N.Checked in
-    let%bind transaction_older = t.transaction < current.transaction in
-    let%bind transaction_equal = t.transaction = current.transaction in
-    let%bind network_less = t.network < current.network in
-    let%bind network_older = Boolean.(transaction_equal && network_less) in
-    let%bind network_equal = t.network = current.network in
-    let%bind patch_less = t.patch < current.patch in
-    let%bind patch_older =
-      Boolean.all [ transaction_equal; network_equal; patch_less ]
-    in
-    Boolean.any [ transaction_older; network_older; patch_older ]
+  let older_than_current t = N.Checked.(t.transaction < current.transaction)
 
   type t = var
 end

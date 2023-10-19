@@ -32,6 +32,8 @@ module type Full = sig
   (** useful when deserializing, could contain negative integers *)
   val is_valid : t -> bool
 
+  val equal_to_current : t -> bool
+
   val older_than_current : t -> bool
 
   val gen : t Core_kernel.Quickcheck.Generator.t

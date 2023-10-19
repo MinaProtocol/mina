@@ -192,7 +192,8 @@ let update_of_id pool update_id =
                    ; access
                    ; set_delegate
                    ; set_permissions
-                   ; set_verification_key = verification_key_auth, version_id
+                   ; set_verification_key
+                   ; set_verification_key_version
                    ; set_zkapp_uri
                    ; edit_action_state
                    ; set_token_symbol
@@ -204,7 +205,7 @@ let update_of_id pool update_id =
           in
           let%map { transaction; network; patch } =
             query_db ~f:(fun db ->
-                Processor.Protocol_versions.load db version_id )
+                Processor.Protocol_versions.load db set_verification_key_version )
           in
           (* same fields, different types *)
           Some
@@ -215,7 +216,7 @@ let update_of_id pool update_id =
               ; set_delegate
               ; set_permissions
               ; set_verification_key =
-                  ( verification_key_auth
+                  ( set_verification_key
                   , Protocol_version.create ~transaction ~network ~patch )
               ; set_zkapp_uri
               ; edit_action_state
@@ -740,7 +741,8 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
              ; access
              ; set_delegate
              ; set_permissions
-             ; set_verification_key = verification_key_auth, version_id
+             ; set_verification_key
+             ; set_verification_key_version
              ; set_zkapp_uri
              ; edit_action_state
              ; set_token_symbol
@@ -751,7 +753,8 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       query_db ~f:(fun db -> Processor.Zkapp_permissions.load db permissions_id)
     in
     let%map { transaction; network; patch } =
-      query_db ~f:(fun db -> Processor.Protocol_versions.load db version_id)
+      query_db ~f:(fun db ->
+          Processor.Protocol_versions.load db set_verification_key_version )
     in
 
     ( { edit_state
@@ -761,7 +764,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       ; set_delegate
       ; set_permissions
       ; set_verification_key =
-          ( verification_key_auth
+          ( set_verification_key
           , Protocol_version.create ~transaction ~network ~patch )
       ; set_zkapp_uri
       ; edit_action_state

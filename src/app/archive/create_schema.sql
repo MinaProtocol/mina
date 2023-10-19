@@ -130,14 +130,6 @@ CREATE TABLE epoch_data
 , UNIQUE (seed, ledger_hash_id, total_currency, start_checkpoint, lock_checkpoint, epoch_length)
 );
 
-CREATE TABLE protocol_versions
-( id               serial PRIMARY KEY
-, transaction      int    NOT NULL
-, network          int    NOT NULL
-, patch            int    NOT NULL
-, UNIQUE (transaction,network,patch)
-);
-
 CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');
 
 /* last_vrf_output is a sequence of hex-digit pairs derived from a bitstring */

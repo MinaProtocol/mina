@@ -82,7 +82,7 @@ let%test_module "Update account verification key" =
 
     let older_version =
       let oldest = Protocol_version.create ~transaction:1 ~network:1 ~patch:0 in
-      if Protocol_version.(equal oldest current) then
+      if Protocol_version.equal_to_current oldest then
         failwith "already oldest version"
       else oldest
 

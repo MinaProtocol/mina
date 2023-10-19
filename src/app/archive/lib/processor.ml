@@ -574,13 +574,13 @@ module Protocol_versions = struct
       (module Conn)
       t
 
-  let find (module Conn : CONNECTION) ~major ~minor ~patch =
+  let find (module Conn : CONNECTION) ~transaction ~network ~patch =
     Conn.find
       (Caqti_request.find
          Caqti_type.(tup3 int int int)
          Caqti_type.int
          (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
-      (major, minor, patch)
+      (transaction, network, patch)
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -626,7 +626,8 @@ module Zkapp_permissions = struct
     ; access : Permissions.Auth_required.t
     ; set_delegate : Permissions.Auth_required.t
     ; set_permissions : Permissions.Auth_required.t
-    ; set_verification_key : Permissions.Auth_required.t * int
+    ; set_verification_key : Permissions.Auth_required.t
+    ; set_verification_key_version : int
     ; set_zkapp_uri : Permissions.Auth_required.t
     ; edit_action_state : Permissions.Auth_required.t
     ; set_token_symbol : Permissions.Auth_required.t
@@ -644,7 +645,8 @@ module Zkapp_permissions = struct
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
-      ; Caqti_type.(tup2 auth_required_typ int)
+      ; auth_required_typ
+      ; Caqti_type.int
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
@@ -672,8 +674,8 @@ module Zkapp_permissions = struct
       ; access = perms.access
       ; set_delegate = perms.set_delegate
       ; set_permissions = perms.set_permissions
-      ; set_verification_key =
-          (fst perms.set_verification_key, protocol_version_id)
+      ; set_verification_key = fst perms.set_verification_key
+      ; set_verification_key_version = protocol_version_id
       ; set_zkapp_uri = perms.set_zkapp_uri
       ; edit_action_state = perms.edit_action_state
       ; set_token_symbol = perms.set_token_symbol
