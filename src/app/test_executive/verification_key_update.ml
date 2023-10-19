@@ -391,7 +391,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { spec_invalid_proof with snapp_update = snapp_update_proof }
       and spec_impossible =
         { spec_invalid_proof with
-          sender = (whale1_kp, Account.Nonce.(succ one))
+          sender = (whale1_kp, Account.Nonce.of_int 2)
         ; zkapp_account_keypairs = [ account_c_kp ]
         ; snapp_update = snapp_update_impossible
         }
@@ -426,7 +426,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo = Signed_command_memo.dummy in
       let (spec_failed_signature_1
             : Transaction_snark.For_tests.Update_states_spec.t ) =
-        { sender = (whale1_kp, Account.Nonce.of_int 2)
+        { sender = (whale1_kp, Account.Nonce.of_int 3)
         ; fee
         ; fee_payer = None
         ; receivers = []
@@ -451,13 +451,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let spec_failed_signature_2 =
         { spec_failed_signature_1 with
-          sender = (whale1_kp, Account.Nonce.of_int 3)
+          sender = (whale1_kp, Account.Nonce.of_int 4)
         ; zkapp_account_keypairs = [ account_c_kp ]
         }
       in
       let spec_proof =
         { spec_failed_signature_1 with
-          sender = (whale1_kp, Account.Nonce.of_int 4)
+          sender = (whale1_kp, Account.Nonce.of_int 5)
         ; current_auth = Proof
         }
       in
@@ -536,6 +536,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          transition frontier"
         (wait_for_zkapp ~has_failures:false zkapp_command_update_vk1)
     in
+    let%bind () =
+      section
+        "Wait for zkApp to upate to a new verification key v2 and then refers \
+         to it to be included in transition frontier"
+        (wait_for_zkapp ~has_failures:false zkapp_command_update_vk2)
+    in
     (* the following checks are testing vk update with versions *)
     let%bind () =
       section
@@ -609,13 +615,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Network.Node.get_ingress_uri whale1)
            zkapp_command_set_vk_proof
     in
-    let%bind () =
-      section "wait for zkApp that updates vk with Proof auth for account B"
-      @@ wait_for_zkapp ~has_failures:false zkapp_command_set_vk_proof
-    in
 
-    section
-      "Wait for zkApp to upate to a new verification key v2 and then refers to \
-       it to be included in transition frontier"
-      (wait_for_zkapp ~has_failures:false zkapp_command_update_vk2)
+    section "wait for zkApp that updates vk with Proof auth for account B"
+    @@ wait_for_zkapp ~has_failures:false zkapp_command_set_vk_proof
 end

@@ -650,7 +650,14 @@ let%test_unit "json value" =
         send: "Signature",
         receive: "None",
         setDelegate: "Signature",
-        setPermissions: "Signature",
+        setPermissions: { 
+          "auth": "Signature",
+          "version": { 
+            "transaction": 3,
+            "network": 1,
+            "patch": 0,
+          },
+        }
         setVerificationKey: "Signature",
         setZkappUri: "Signature",
         editActionState: "Signature",
