@@ -30,6 +30,7 @@ type input =
   ; start_slot_since_genesis : int64 [@default 0L]
   ; genesis_ledger : Runtime_config.Ledger.t
   ; first_pass_ledger_hashes : Ledger_hash.t list [@default []]
+  ; last_snarked_ledger_hash : Ledger_hash.t option [@default None]
   }
 [@@deriving yojson]
 
@@ -148,10 +149,14 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
     List.sort elts ~compare:(fun (_h1, n1) (_h2, n2) -> Int.compare n1 n2)
     |> List.map ~f:(fun (h, _n) -> h)
   in
+  let last_snarked_ledger_hash =
+    Some (First_pass_ledger_hashes.get_last_snarked_hash ())
+  in
   { target_epoch_ledgers_state_hash = None
   ; start_slot_since_genesis
   ; genesis_ledger
   ; first_pass_ledger_hashes
+  ; last_snarked_ledger_hash
   }
 
 (* map from global slots (since genesis) to state hash, ledger hash, snarked ledger hash triples *)
@@ -681,8 +686,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               max_slot ;
             try_slot ~logger pool max_slot
       in
-      [%log info] "Populating set of first-pass ledger hashes" ;
-      List.iter input.first_pass_ledger_hashes ~f:First_pass_ledger_hashes.add ;
+      if not @@ List.is_empty input.first_pass_ledger_hashes then (
+        [%log info] "Populating set of first-pass ledger hashes" ;
+        List.iter input.first_pass_ledger_hashes ~f:First_pass_ledger_hashes.add
+        ) ;
+      Option.iter input.last_snarked_ledger_hash ~f:(fun h ->
+          [%log info] "Setting last snarked ledger hash" ;
+          First_pass_ledger_hashes.set_last_snarked_hash h ) ;
       [%log info]
         "Loading block information using target state hash and start slot" ;
       let%bind block_ids, oldest_block_id =
@@ -1272,7 +1282,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                         "Current snarked ledger hash not among first-pass \
                          ledger hashes, but we haven't yet found one. The \
                          transaction that created this ledger hash might have \
-                         been in a replayer run that created a checkpoint file" ;
+                         been in an older replayer run that created a \
+                         checkpoint file without saved first-pass ledger \
+                         hashes" ;
                       First_pass_ledger_hashes.set_last_snarked_hash
                         snarked_hash )
                     else
