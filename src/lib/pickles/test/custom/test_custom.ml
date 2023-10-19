@@ -25,7 +25,7 @@ let test () =
       ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
-      ~num_chunks:2 ~name:"custom"
+      ~name:"custom"
       ~constraint_constants (* TODO(mrmr1993): This was misguided.. Delete. *)
       ~choices:(fun ~self:_ ->
         [ { identifier = "custom"
