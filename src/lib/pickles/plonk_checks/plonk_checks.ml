@@ -216,6 +216,8 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
         get_eval (Opt.value_exn e.foreign_field_mul_lookup_selector)
     | LookupRuntimeSelector ->
         get_eval (Opt.value_exn e.runtime_lookup_table_selector)
+    | Z | Permutation _ ->
+        failwith "TODO"
   in
   let open F in
   let square x = x * x in

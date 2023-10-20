@@ -14,7 +14,7 @@ let () =
 (* turn off fragile pattern-matching warning from sexp ppx *)
 [@@@warning "-4"]
 
-type curr_or_next = Curr | Next
+type curr_or_next = Kimchi_types.curr_or_next = Curr | Next
 [@@deriving hash, eq, compare, sexp]
 
 module Gate_type = struct
@@ -63,16 +63,18 @@ module Column = struct
   open Core_kernel
 
   module T = struct
-    type t =
+    type t = Kimchi_types.Expr.column =
       | Witness of int
-      | Index of Gate_type.t
-      | Coefficient of int
-      | LookupTable
+      | Z
       | LookupSorted of int
       | LookupAggreg
+      | LookupTable
       | LookupKindIndex of Lookup_pattern.t
       | LookupRuntimeSelector
       | LookupRuntimeTable
+      | Index of Gate_type.t
+      | Coefficient of int
+      | Permutation of int
     [@@deriving hash, eq, compare, sexp]
   end
 
@@ -110,6 +112,98 @@ module Env = struct
     ; if_feature : Kimchi_types.feature_flag * (unit -> 'a) * (unit -> 'a) -> 'a
     }
 end
+
+let rec interpret
+    ({ add = ( + )
+     ; sub = ( - )
+     ; mul = ( * )
+     ; square = _
+     ; mds
+     ; endo_coefficient
+     ; pow
+     ; var
+     ; field
+     ; cell
+     ; alpha_pow
+     ; double = _
+     ; zk_polynomial = _
+     ; omega_to_minus_zk_rows = _
+     ; zeta_to_n_minus_1 = _
+     ; zeta_to_srs_length = _
+     ; srs_length_log2 = _
+     ; vanishes_on_zero_knowledge_and_previous_rows
+     ; joint_combiner
+     ; beta
+     ; gamma
+     ; unnormalized_lagrange_basis
+     ; if_feature = _
+     } as env :
+      _ Env.t ) (instructions : _ Kimchi_types.Expr.t list) stack =
+  match instructions with
+  | [] ->
+      stack
+  | Pow i :: Alpha :: instructions ->
+      interpret env instructions (alpha_pow i :: stack)
+  | Alpha :: instructions ->
+      interpret env instructions (alpha_pow 1 :: stack)
+  | Beta :: instructions ->
+      interpret env instructions (beta :: stack)
+  | Gamma :: instructions ->
+      interpret env instructions (gamma :: stack)
+  | JointCombiner :: instructions ->
+      interpret env instructions (joint_combiner :: stack)
+  | EndoCoefficient :: instructions ->
+      interpret env instructions (endo_coefficient :: stack)
+  | Mds { row; col } :: instructions ->
+      interpret env instructions (mds (row, col) :: stack)
+  | Literal f :: instructions ->
+      interpret env instructions (field f :: stack)
+  | Cell { col; row } :: instructions ->
+      interpret env instructions (cell (var (col, row)) :: stack)
+  | Dup :: instructions -> (
+      match stack with
+      | [] ->
+          assert false
+      | x :: stack ->
+          interpret env instructions (x :: x :: stack) )
+  | Pow i :: instructions -> (
+      match stack with
+      | [] ->
+          assert false
+      | x :: stack ->
+          interpret env instructions (pow (x, i) :: stack) )
+  | Add :: instructions -> (
+      match stack with
+      | [] | [ _ ] ->
+          assert false
+      | x :: y :: stack ->
+          interpret env instructions ((x + y) :: stack) )
+  | Mul :: instructions -> (
+      match stack with
+      | [] | [ _ ] ->
+          assert false
+      | x :: y :: stack ->
+          interpret env instructions ((x * y) :: stack) )
+  | Sub :: instructions -> (
+      match stack with
+      | [] | [ _ ] ->
+          assert false
+      | x :: y :: stack ->
+          interpret env instructions ((x - y) :: stack) )
+  | VanishesOnZeroKnowledgeAndPreviousRows :: instructions ->
+      interpret env instructions
+        (vanishes_on_zero_knowledge_and_previous_rows :: stack)
+  | UnnormalizedLagrangeBasis { zk_rows; offset } :: instructions ->
+      interpret env instructions
+        (unnormalized_lagrange_basis (zk_rows, Int32.to_int_exn offset) :: stack)
+  | Store :: _instructions ->
+      failwith "TODO"
+  | Load _ :: _instructions ->
+      failwith "TODO"
+  | SkipIf _ :: _instructions ->
+      failwith "TODO"
+  | SkipIfNot _ :: _instructions ->
+      failwith "TODO"
 
 module type S = sig
   val constant_term : 'a Env.t -> 'a
