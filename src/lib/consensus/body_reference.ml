@@ -4,7 +4,7 @@
     "Bitswap block" CID along with a signature attesting to ownership over
     this association (for punishment and manipuluation prevention). This will
     allow us to upgrade block gossip to happen over Bitswap in a future
-    soft fork release. *)
+    soft fork release.*)
 
 open Core_kernel
 open Snark_params.Tick
