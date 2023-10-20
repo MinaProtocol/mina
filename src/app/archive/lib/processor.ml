@@ -593,7 +593,8 @@ module Zkapp_permissions = struct
     ; access : Permissions.Auth_required.t
     ; set_delegate : Permissions.Auth_required.t
     ; set_permissions : Permissions.Auth_required.t
-    ; set_verification_key : Permissions.Auth_required.t
+    ; set_verification_key_auth : Permissions.Auth_required.t
+    ; set_verification_key_txn_version : int
     ; set_zkapp_uri : Permissions.Auth_required.t
     ; edit_action_state : Permissions.Auth_required.t
     ; set_token_symbol : Permissions.Auth_required.t
@@ -612,6 +613,7 @@ module Zkapp_permissions = struct
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
+      ; Caqti_type.int
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
@@ -630,7 +632,9 @@ module Zkapp_permissions = struct
       ; access = perms.access
       ; set_delegate = perms.set_delegate
       ; set_permissions = perms.set_permissions
-      ; set_verification_key = perms.set_verification_key
+      ; set_verification_key_auth = fst perms.set_verification_key
+      ; set_verification_key_txn_version =
+          Mina_numbers.Txn_version.to_int @@ snd perms.set_verification_key
       ; set_zkapp_uri = perms.set_zkapp_uri
       ; edit_action_state = perms.edit_action_state
       ; set_token_symbol = perms.set_token_symbol
