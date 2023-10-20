@@ -20,7 +20,8 @@ let Profiles = ../Constants/Profiles.dhall
 
 in
 
-let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type -> Pipeline.Config.Type = \(debVersion : DebianVersions.DebVersion) ->
+let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type -> Pipeline.Config.Type = 
+  \(debVersion : DebianVersions.DebVersion) ->
   \(profile: Profiles.Type) ->
   \(mode: PipelineMode.Type) -> 
     Pipeline.Config::{
@@ -102,14 +103,13 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
 
         -- rosetta image
         let rosettaSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
+          deps=DebianVersions.dependsOn debVersion profile,
           service="mina-rosetta",
           network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
         }
         in
-
         DockerImage.generateStep rosettaSpec,
 
         -- ZkApp test transaction image
