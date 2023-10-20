@@ -75,12 +75,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { account_name = "whale1-key"
           ; balance = "9000000000"
           ; timing = Untimed
+          ; permissions = None
           }
         ; { account_name = "whale2-key"
           ; balance = "1000000000"
           ; timing = Untimed
+          ; permissions = None
           }
-        ; { account_name = "snark-node-key"; balance = "100"; timing = Untimed }
+        ; { account_name = "snark-node-key"
+          ; balance = "100"
+          ; timing = Untimed
+          ; permissions = None
+          }
         ]
     ; block_producers =
         [ { node_name = "whale1"; account_name = "whale1-key" }
@@ -171,7 +177,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                   ; receive = Proof
                   ; set_delegate = Proof
                   ; set_permissions = Signature
-                  ; set_verification_key = Signature
+                  ; set_verification_key = (Signature, Mina_numbers.Txn_version.current)
                   ; set_zkapp_uri = Proof
                   ; edit_action_state = Proof
                   ; set_token_symbol = Proof

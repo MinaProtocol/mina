@@ -22,9 +22,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       k = 2
     ; requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node-c-key"; balance = "0"; timing = Untimed }
+        [ { account_name = "node-a-key"
+          ; balance = "1000"
+          ; timing = Untimed
+          ; permissions = None
+          }
+        ; { account_name = "node-b-key"
+          ; balance = "1000"
+          ; timing = Untimed
+          ; permissions = None
+          }
+        ; { account_name = "node-c-key"
+          ; balance = "0"
+          ; timing = Untimed
+          ; permissions = None
+          }
         ]
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
