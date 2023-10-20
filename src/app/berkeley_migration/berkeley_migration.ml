@@ -222,9 +222,7 @@ let user_commands_from_block_id ~mainnet_pool block_id =
 
 let first_batch = ref true
 
-(* from src/config/protocol_version/current.mlh in `compatible` *)
-let mainnet_protocol_version =
-  Protocol_version.create_exn ~major:2 ~minor:0 ~patch:0
+let mainnet_protocol_version = Protocol_version.current
 
 let mainnet_block_to_extensional ~logger ~mainnet_pool
     ~(genesis_block : Mina_block.t) (block : Sql.Mainnet.Block.t) =
@@ -445,8 +443,8 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
       }
       : Archive_lib.Extensional.Block.t )
 
-(* archive_uri is for the db to be migrated *)
-let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file () =
+let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+    ~end_global_slot () =
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -467,12 +465,11 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file () =
       (* use Processor to write to migrated db; separate code to read from mainnet db *)
       let query_mainnet_db ~f = Mina_caqti.query ~f mainnet_pool in
       let query_migrated_db ~f = Mina_caqti.query ~f migrated_pool in
-      (* dummy protocol version *)
-      Protocol_version.(set_current @@ create_exn ~major:1 ~minor:0 ~patch:0) ;
       let runtime_config =
         Yojson.Safe.from_file runtime_config_file
         |> Runtime_config.of_yojson |> Result.ok_or_failwith
       in
+      [%log info] "Getting precomputed values from runtime config" ;
       let proof_level = Genesis_constants.Proof_level.compiled in
       let%bind precomputed_values =
         match%map
@@ -485,20 +482,30 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file () =
             failwithf "Could not get precomputed values, error: %s"
               (Error.to_string_hum err) ()
       in
+      [%log info] "Got precomputed values from runtime config" ;
       let With_hash.{ data = genesis_block; _ }, _validation =
         Mina_block.genesis ~precomputed_values
       in
-      [%log info] "Querying mainnet canonical blocks" ;
       let%bind mainnet_block_ids =
-        query_mainnet_db ~f:(fun db -> Sql.Mainnet.Block.canonical_blocks db ())
+        match end_global_slot with
+        | None ->
+            [%log info] "Querying mainnet canonical blocks" ;
+            query_mainnet_db ~f:(fun db ->
+                Sql.Mainnet.Block.canonical_blocks db () )
+        | Some slot ->
+            [%log info]
+              "Querying mainnet blocks at or below global slot since genesis \
+               %d (but not orphaned blocks)"
+              slot ;
+            query_mainnet_db ~f:(fun db ->
+                Sql.Mainnet.Block.blocks_at_or_below db slot )
       in
+      [%log info] "Found %d mainnet blocks" (List.length mainnet_block_ids) ;
       let%bind mainnet_blocks_unsorted =
         Deferred.List.map mainnet_block_ids ~f:(fun id ->
             query_mainnet_db ~f:(fun db -> Sql.Mainnet.Block.load db ~id) )
       in
-      (* remove blocks we've already migrated
-         we don't migrate genesis block at height 1, the archive process will write that
-      *)
+      (* remove blocks we've already migrated *)
       let%bind greatest_migrated_height =
         let%bind count =
           query_migrated_db ~f:(fun db -> Sql.Berkeley.Block.count db ())
@@ -519,6 +526,8 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file () =
           List.filter mainnet_blocks_unsorted ~f:(fun block ->
               Int64.( > ) block.height greatest_migrated_height )
       in
+      [%log info] "Will migrate %d mainnet blocks"
+        (List.length mainnet_blocks_unmigrated) ;
       (* blocks in height order *)
       let mainnet_blocks_to_migrate =
         List.sort mainnet_blocks_unmigrated ~compare:(fun block1 block2 ->
@@ -569,6 +578,15 @@ let () =
          and runtime_config_file =
            Param.flag "--config-file" ~aliases:[ "-config-file" ]
              Param.(required string)
-             ~doc:"PATH to the configuration file containing the genesis ledger"
+             ~doc:
+               "PATH to the configuration file containing the berkeley genesis \
+                ledger"
+         and end_global_slot =
+           Param.flag "--end-global-slot" ~aliases:[ "-end-global-slot" ]
+             Param.(optional int)
+             ~doc:
+               "NN Last global slot since genesis to include in the migration \
+                (if omitted, only canonical blocks will be migrated)"
          in
-         main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file )))
+         main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+           ~end_global_slot )))

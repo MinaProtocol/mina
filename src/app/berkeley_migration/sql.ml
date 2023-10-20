@@ -1,4 +1,4 @@
-(* sql.ml -- for reading the mainnet database (no writing!) *)
+(* sql.ml -- for reading the mainnet and berkeley databases (no writing!) *)
 
 open Core
 open Caqti_async
@@ -66,7 +66,7 @@ module Mainnet = struct
     let id_from_state_hash (module Conn : CONNECTION) state_hash =
       Conn.find
         (Caqti_request.find Caqti_type.string Caqti_type.int
-           {sql| SELECT id 
+           {sql| SELECT id
                  FROM blocks
                  WHERE state_hash = ?
          |sql} )
@@ -76,27 +76,28 @@ module Mainnet = struct
       Conn.find
         (Caqti_request.find Caqti_type.int typ
            {sql| SELECT state_hash, parent_id, parent_hash, creator_id,
-                      block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id,
-                      next_epoch_data_id, ledger_hash, height, global_slot,
-                      global_slot_since_genesis, timestamp, chain_status FROM blocks
-               WHERE id = ?                                                                                                    |sql} )
+                        block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id,
+                        next_epoch_data_id, ledger_hash, height, global_slot,
+                        global_slot_since_genesis, timestamp, chain_status FROM blocks
+                 WHERE id = ?                                                                                                    |sql} )
         id
 
     let canonical_blocks (module Conn : CONNECTION) =
       Conn.collect_list
         (Caqti_request.collect Caqti_type.unit Caqti_type.int
            {sql| SELECT id
-               FROM blocks
-               WHERE chain_status = 'canonical'
+                 FROM blocks
+                 WHERE chain_status = 'canonical'
          |sql} )
 
-    let pending_blocks (module Conn : CONNECTION) =
+    let blocks_at_or_below (module Conn : CONNECTION) slot =
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.unit Caqti_type.int
-           {sql| SELECT id
-               FROM blocks
-               WHERE chain_status = 'pending'
-         |sql} )
+        (Caqti_request.collect Caqti_type.int Caqti_type.int
+           {sql| SELECT id,parent_id,global_slot_since_genesis FROM blocks
+                 WHERE global_slot_since_genesis <= $1
+                 AND chain_status <> 'orphaned'
+           |sql} )
+        slot
   end
 
   module Block_user_command = struct
@@ -144,9 +145,9 @@ module Mainnet = struct
                status,failure_reason,
                fee_payer_account_creation_fee_paid,
                receiver_account_creation_fee_paid,
-               created_token, 
-               fee_payer_balance, 
-               source_balance, 
+               created_token,
+               fee_payer_balance,
+               source_balance,
                receiver_balance
                FROM blocks_user_commands
                WHERE block_id = $1
