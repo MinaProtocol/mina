@@ -180,7 +180,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                   ; receive = Proof
                   ; set_delegate = Proof
                   ; set_permissions = Signature
-                  ; set_verification_key = (Signature, Mina_numbers.Txn_version.current)
+                  ; set_verification_key =
+                      (Signature, Mina_numbers.Txn_version.current)
                   ; set_zkapp_uri = Proof
                   ; edit_action_state = Proof
                   ; set_token_symbol = Proof
