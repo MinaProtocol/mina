@@ -87,7 +87,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (Balance.to_mina_string balance.locked)
   end
 
-  let older_version = Protocol_version.create ~transaction:1 ~network:1 ~patch:0
+  let older_version = Mina_numbers.Txn_version.of_int 1
 
   let fork_config : Runtime_config.Fork_config.t =
     { previous_state_hash =
@@ -463,6 +463,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          Balances.log logger ~name:"timed1" balance ;
          let expected = Balances.(make_unlocked @@ mina 10_000) in
          Balances.assert_equal ~expected balance )
+    in
+    let%bind () =
+      section "Wait a few slot before balance check"
+      @@ let%bind global_slot_since_hard_fork =
+           Integration_test_lib.Graphql_requests
+           .must_get_global_slot_since_hard_fork ~logger
+             (Network.Node.get_ingress_uri node_b)
+         in
+         match
+           Global_slot_since_hard_fork.to_int global_slot_since_hard_fork % 5
+         with
+         | 0 ->
+             Malleable_error.lift @@ Async.after @@ Time.Span.of_int_sec 30
+         | _ ->
+             Malleable_error.return ()
     in
     let%bind () =
       section "Check that timed2 account is partially vested"
