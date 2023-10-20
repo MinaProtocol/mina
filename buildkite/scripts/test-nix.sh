@@ -24,6 +24,7 @@ git config --global --add safe.directory /workdir
 #
 #       error: program 'git' failed with exit code 128
 # That is why we checkout branch explicitly
+git fetch
 git checkout $1
 
 ./nix/pin.sh
