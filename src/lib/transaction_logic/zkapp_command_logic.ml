@@ -504,6 +504,16 @@ module type Controller_intf = sig
   include Iffable
 
   val check : proof_verifies:bool -> signature_verifies:bool -> t -> bool
+
+  val fallback : t -> t
+end
+
+module type Txn_version_intf = sig
+  include Iffable
+
+  val equal_to_current : t -> bool
+
+  val older_than_current : t -> bool
 end
 
 module type Account_intf = sig
@@ -518,6 +528,8 @@ module type Account_intf = sig
   module Permissions : sig
     type controller
 
+    type txn_version
+
     val access : t -> controller
 
     val edit_state : t -> controller
@@ -530,7 +542,9 @@ module type Account_intf = sig
 
     val set_permissions : t -> controller
 
-    val set_verification_key : t -> controller
+    val set_verification_key_auth : t -> controller
+
+    val set_verification_key_txn_version : t -> txn_version
 
     val set_zkapp_uri : t -> controller
 
@@ -726,6 +740,8 @@ module type Inputs_intf = sig
 
   module Controller : Controller_intf with type bool := Bool.t
 
+  module Txn_version : Txn_version_intf with type bool := Bool.t
+
   module Global_slot_since_genesis :
     Global_slot_since_genesis_intf with type bool := Bool.t
 
@@ -763,6 +779,7 @@ module type Inputs_intf = sig
   and Account :
     (Account_intf
       with type Permissions.controller := Controller.t
+       and type Permissions.txn_version := Txn_version.t
        and type timing := Timing.t
        and type balance := Balance.t
        and type receipt_chain_hash := Receipt_chain_hash.t
@@ -1548,9 +1565,18 @@ module Make (Inputs : Inputs_intf) = struct
       let verification_key =
         Account_update.Update.verification_key account_update
       in
+      let older_than_current_version =
+        Txn_version.older_than_current
+          (Account.Permissions.set_verification_key_txn_version a)
+      in
+      let original_auth = Account.Permissions.set_verification_key_auth a in
+      let auth =
+        Controller.if_ older_than_current_version
+          ~then_:(Controller.fallback original_auth)
+          ~else_:original_auth
+      in
       let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.set_verification_key a)
+        Controller.check ~proof_verifies ~signature_verifies auth
       in
       let local_state =
         Local_state.add_check local_state Update_not_permitted_verification_key

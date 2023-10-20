@@ -57,7 +57,9 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
             ~permissions:
               ( if max_cost then
                 { Permissions.user_default with
-                  set_verification_key = Permissions.Auth_required.Proof
+                  set_verification_key =
+                    ( Permissions.Auth_required.Proof
+                    , Mina_numbers.Txn_version.current )
                 ; edit_state = Permissions.Auth_required.Proof
                 ; edit_action_state = Proof
                 }

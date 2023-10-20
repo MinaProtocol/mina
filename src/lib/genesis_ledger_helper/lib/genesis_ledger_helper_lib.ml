@@ -69,13 +69,21 @@ module Accounts = struct
               | Impossible ->
                   Impossible
             in
+            let verification_key_perm
+                { Runtime_config.Accounts.Single.Permissions
+                  .Verification_key_perm
+                  .auth
+                ; txn_version
+                } =
+              (auth_required auth, txn_version)
+            in
             { Mina_base.Permissions.Poly.edit_state = auth_required edit_state
             ; access = auth_required access
             ; send = auth_required send
             ; receive = auth_required receive
             ; set_delegate = auth_required set_delegate
             ; set_permissions = auth_required set_permissions
-            ; set_verification_key = auth_required set_verification_key
+            ; set_verification_key = verification_key_perm set_verification_key
             ; set_zkapp_uri = auth_required set_zkapp_uri
             ; edit_action_state = auth_required edit_action_state
             ; set_token_symbol = auth_required set_token_symbol
@@ -228,6 +236,12 @@ module Accounts = struct
             } =
           account.permissions
         in
+        let verification_key_perm (auth, txn_version) =
+          { Runtime_config.Accounts.Single.Permissions.Verification_key_perm
+            .auth = auth_required auth
+          ; txn_version
+          }
+        in
         Some
           { Runtime_config.Accounts.Single.Permissions.edit_state =
               auth_required edit_state
@@ -236,7 +250,7 @@ module Accounts = struct
           ; access = auth_required access
           ; set_delegate = auth_required set_delegate
           ; set_permissions = auth_required set_permissions
-          ; set_verification_key = auth_required set_verification_key
+          ; set_verification_key = verification_key_perm set_verification_key
           ; set_zkapp_uri = auth_required set_zkapp_uri
           ; edit_action_state = auth_required edit_action_state
           ; set_token_symbol = auth_required set_token_symbol

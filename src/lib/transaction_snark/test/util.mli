@@ -104,9 +104,12 @@ val test_snapp_update :
   -> unit
 
 val permissions_from_update :
-     Account_update.Update.t
-  -> auth:Permissions.Auth_required.t
-  -> Permissions.Auth_required.t Permissions.Poly.t
+     auth:Permissions.Auth_required.t
+  -> ?txn_version:Mina_numbers.Txn_version.t
+  -> Account_update.Update.t
+  -> ( Permissions.Auth_required.t
+     , Mina_numbers.Txn_version.t )
+     Permissions.Poly.t
 
 val pending_coinbase_stack_target :
      Mina_transaction.Transaction.Valid.t

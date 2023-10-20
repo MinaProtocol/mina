@@ -8,3 +8,4 @@ module Global_slot_since_hard_fork = Global_slot_since_hard_fork
 module Global_slot_span = Global_slot_span
 module Hd_index = Hd_index
 module Zkapp_version = Zkapp_version
+module Txn_version = Txn_version

@@ -97,19 +97,20 @@ CREATE TYPE zkapp_auth_required_type AS ENUM ('none', 'either', 'proof', 'signat
 
 CREATE TABLE zkapp_permissions
 ( id                       serial                PRIMARY KEY
-, edit_state               zkapp_auth_required_type    NOT NULL
-, send                     zkapp_auth_required_type    NOT NULL
-, receive                  zkapp_auth_required_type    NOT NULL
-, access                   zkapp_auth_required_type    NOT NULL
-, set_delegate             zkapp_auth_required_type    NOT NULL
-, set_permissions          zkapp_auth_required_type    NOT NULL
-, set_verification_key     zkapp_auth_required_type    NOT NULL
-, set_zkapp_uri            zkapp_auth_required_type    NOT NULL
-, edit_action_state      zkapp_auth_required_type    NOT NULL
-, set_token_symbol         zkapp_auth_required_type    NOT NULL
-, increment_nonce          zkapp_auth_required_type    NOT NULL
-, set_voting_for           zkapp_auth_required_type    NOT NULL
-, set_timing               zkapp_auth_required_type    NOT NULL
+, edit_state                       zkapp_auth_required_type    NOT NULL
+, send                             zkapp_auth_required_type    NOT NULL
+, receive                          zkapp_auth_required_type    NOT NULL
+, access                           zkapp_auth_required_type    NOT NULL
+, set_delegate                     zkapp_auth_required_type    NOT NULL
+, set_permissions                  zkapp_auth_required_type    NOT NULL
+, set_verification_key_auth        zkapp_auth_required_type    NOT NULL
+, set_verification_key_txn_version int                         NOT NULL
+, set_zkapp_uri                    zkapp_auth_required_type    NOT NULL
+, edit_action_state                zkapp_auth_required_type    NOT NULL
+, set_token_symbol                 zkapp_auth_required_type    NOT NULL
+, increment_nonce                  zkapp_auth_required_type    NOT NULL
+, set_voting_for                   zkapp_auth_required_type    NOT NULL
+, set_timing                       zkapp_auth_required_type    NOT NULL
 );
 
 CREATE TABLE zkapp_timing_info

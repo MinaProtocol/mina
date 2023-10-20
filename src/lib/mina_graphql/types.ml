@@ -997,6 +997,20 @@ module AccountObj = struct
         ; enum_value "Impossible" ~value:Impossible
         ]
 
+  let set_verification_key_perm =
+    obj "SetVerificationKeyPermission" ~fields:(fun _ ->
+        [ field "auth" ~typ:(non_null auth_required)
+            ~doc:
+              "Authorization required to set the verification key of the zkApp \
+               associated with the account"
+            ~args:Arg.[]
+            ~resolve:(fun _ (auth, _) -> auth)
+        ; field "txnVersion" ~typ:(non_null int)
+            ~args:Arg.[]
+            ~resolve:(fun _ (_, version) ->
+              Mina_numbers.Txn_version.to_int version )
+        ] )
+
   let account_permissions =
     obj "AccountPermissions" ~fields:(fun _ ->
         [ field "editState" ~typ:(non_null auth_required)
@@ -1025,7 +1039,8 @@ module AccountObj = struct
             ~args:Arg.[]
             ~resolve:(fun _ permission ->
               permission.Permissions.Poly.set_permissions )
-        ; field "setVerificationKey" ~typ:(non_null auth_required)
+        ; field "setVerificationKey"
+            ~typ:(non_null set_verification_key_perm)
             ~doc:
               "Authorization required to set the verification key of the zkApp \
                associated with the account"
