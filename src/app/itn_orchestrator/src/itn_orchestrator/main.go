@@ -10,7 +10,9 @@ import (
 	"os"
 	"time"
 
-	"cloud.google.com/go/storage"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/zap/zapcore"
 
@@ -45,16 +47,47 @@ func init() {
 
 }
 
+type AwsConfig struct {
+	Region    string `json:"region"`
+	AccountId string `json:"account_id"`
+	Prefix    string `json:"prefix"`
+}
+
+type AwsCredentials struct {
+	AccessKeyId     string `json:"access_key_id"`
+	SecretAccessKey string `json:"secret_access_key"`
+}
+
+func loadAwsCredentials(filename string, log logging.EventLogger) {
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatalf("Error loading credentials file: %s", err)
+	}
+	defer file.Close()
+	decoder := json.NewDecoder(file)
+	var credentials AwsCredentials
+	err = decoder.Decode(&credentials)
+	if err != nil {
+		log.Fatalf("Error loading credentials file: %s", err)
+	}
+	os.Setenv("AWS_ACCESS_KEY_ID", credentials.AccessKeyId)
+	os.Setenv("AWS_SECRET_ACCESS_KEY", credentials.SecretAccessKey)
+}
+
 type AppConfig struct {
 	LogLevel         zapcore.Level `json:",omitempty"`
 	LogFile          string        `json:",omitempty"`
 	Key              itn_json_types.Ed25519Privkey
-	UptimeBucket     string
-	FundDaemonPorts  []string `json:",omitempty"`
-	MinaExec         string   `json:",omitempty"`
+	Aws              AwsConfig `json:"aws"`
+	FundDaemonPorts  []string  `json:",omitempty"`
+	MinaExec         string    `json:",omitempty"`
 	SlotDurationMs   int
 	GenesisTimestamp itn_json_types.Time
 	ControlExec      string `json:",omitempty"`
+}
+
+func GetBucketName(config AppConfig) string {
+	return config.Aws.AccountId + "-block-producers-uptime"
 }
 
 func loadAppConfig() (res AppConfig) {
@@ -155,17 +188,21 @@ func main() {
 	log := logging.Logger("itn orchestrator")
 	log.Infof("Launching logging: %v", logging.GetSubsystems())
 
-	ctx := context.Background()
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		log.Errorf("Error creating Cloud client: %v", err)
-		os.Exit(4)
-		return
+	awsCredentialsFile := os.Getenv("AWS_CREDENTIALS_FILE")
+	if awsCredentialsFile != "" {
+		loadAwsCredentials(awsCredentialsFile, log)
 	}
+	ctx := context.Background()
+	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(appConfig.Aws.Region))
+	if err != nil {
+		log.Fatalf("Error loading AWS configuration: %v", err)
+	}
+	client := s3.NewFromConfig(awsCfg)
 	nodeData := make(map[lib.NodeAddress]lib.NodeEntry)
+	awsctx := lib.AwsContext{Client: client, BucketName: aws.String(GetBucketName(appConfig)), Prefix: appConfig.Aws.Prefix}
 	config := lib.Config{
 		Ctx:              ctx,
-		UptimeBucket:     client.Bucket(appConfig.UptimeBucket),
+		AwsContext:       awsctx,
 		Sk:               ed25519.PrivateKey(appConfig.Key),
 		Log:              log,
 		FundDaemonPorts:  appConfig.FundDaemonPorts,
