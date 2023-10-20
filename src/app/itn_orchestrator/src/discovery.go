@@ -1,6 +1,7 @@
 package itn_orchestrator
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/Khan/genqlient/graphql"
-	"google.golang.org/api/iterator"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 func prefixByTime(t time.Time) string {
@@ -32,55 +33,78 @@ type DiscoveryParams struct {
 	Exactly            bool `json:"exactly,omitempty"`
 }
 
+func (awsctx AwsContext) ListObjects(ctx context.Context, startAfter string, continuationToken *string) (*s3.ListObjectsV2Output, error) {
+	return awsctx.Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket:            awsctx.BucketName,
+		Prefix:            aws.String(awsctx.Prefix),
+		StartAfter:        aws.String(awsctx.Prefix + "/" + startAfter),
+		ContinuationToken: continuationToken,
+	})
+}
+func (awsctx AwsContext) ReadObject(ctx context.Context, key *string) (*s3.GetObjectOutput, error) {
+	return awsctx.Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: awsctx.BucketName,
+		Key:    key,
+	})
+}
+
 func discoverParticipantsDo(config Config, params DiscoveryParams, output func(NodeAddress)) error {
 	before := time.Now().Add(-time.Duration(params.OffsetMin) * time.Minute)
-	query := &storage.Query{StartOffset: prefixByTime(before)}
+	startAfter := prefixByTime(before)
 	log := config.Log
 	ctx := config.Ctx
-	it := config.UptimeBucket.Objects(ctx, query)
+
+	resp, err := config.AwsContext.ListObjects(ctx, startAfter, nil)
+	if err != nil {
+		return err
+	}
 	cache := make(map[NodeAddress]struct{})
 	for {
-		attrs, err := it.Next()
-		if err == iterator.Done {
-			break
+		for _, obj := range resp.Contents {
+			name := *obj.Key
+			r, err := config.AwsContext.ReadObject(ctx, obj.Key)
+			if err != nil {
+				log.Errorf("Error reading submission %s: %v", name, err)
+				continue
+			}
+			var meta MetaToBeSaved
+			d := json.NewDecoder(r.Body)
+			err = d.Decode(&meta)
+			if err != nil {
+				log.Errorf("Error decoding submission %s: %v", name, err)
+				continue
+			}
+			colonIx := strings.IndexRune(meta.RemoteAddr, ':')
+			if colonIx < 0 {
+				return fmt.Errorf("wrong remote address in submission %s: %s", name, meta.RemoteAddr)
+			}
+			addr := NodeAddress(meta.RemoteAddr[:colonIx] + ":" + strconv.Itoa(int(meta.GraphqlControlPort)))
+			if _, has := cache[addr]; has {
+				continue
+			}
+			_, _, err = GetGqlClient(config, addr)
+			if err != nil {
+				log.Errorf("Error on auth for %s: %v", addr, err)
+				continue
+			}
+			if config.NodeData[addr].IsBlockProducer && params.NoBlockProducers {
+				continue
+			}
+			if !config.NodeData[addr].IsBlockProducer && params.OnlyBlockProducers {
+				continue
+			}
+			cache[addr] = struct{}{}
+			output(addr)
+			if params.Limit > 0 && len(cache) >= params.Limit {
+				break
+			}
 		}
-		if err != nil {
-			return err
-		}
-		r, err := config.UptimeBucket.Object(attrs.Name).NewReader(ctx)
-		if err != nil {
-			log.Errorf("Error reading submission %s: %v", attrs.Name, err)
-			continue
-		}
-		var meta MetaToBeSaved
-		d := json.NewDecoder(r)
-		err = d.Decode(&meta)
-		if err != nil {
-			log.Errorf("Error decoding submission %s: %v", attrs.Name, err)
-			continue
-		}
-		colonIx := strings.IndexRune(meta.RemoteAddr, ':')
-		if colonIx < 0 {
-			return fmt.Errorf("wrong remote address in submission %s: %s", attrs.Name, meta.RemoteAddr)
-		}
-		addr := NodeAddress(meta.RemoteAddr[:colonIx] + ":" + strconv.Itoa(int(meta.GraphqlControlPort)))
-		if _, has := cache[addr]; has {
-			continue
-		}
-		_, _, err = GetGqlClient(config, addr)
-		if err != nil {
-			log.Errorf("Error on auth for %s: %v", addr, err)
-			continue
-		}
-		if config.NodeData[addr].IsBlockProducer && params.NoBlockProducers {
-			continue
-		}
-		if !config.NodeData[addr].IsBlockProducer && params.OnlyBlockProducers {
-			continue
-		}
-		cache[addr] = struct{}{}
-		output(addr)
-		if params.Limit > 0 && len(cache) >= params.Limit {
+		if resp.IsTruncated {
+			resp, err = config.AwsContext.ListObjects(ctx, startAfter, resp.NextContinuationToken)
+			if err != nil {
+				return err
+			}
+		} else {
 			break
 		}
 	}
