@@ -9,6 +9,7 @@ use kimchi::{
 
 /// Converts the linearization of the kimchi circuit polynomial into a printable string.
 pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
+    custom_gate_type: bool,
     uses_custom_gates: bool,
 ) -> (String, Vec<(String, String)>) {
     let features = if uses_custom_gates {
@@ -34,7 +35,7 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
         })
     };
     let evaluated_cols = linearization_columns::<F>(features.as_ref());
-    let (linearization, _powers_of_alpha) = constraints_expr::<F>(features.as_ref(), true);
+    let (linearization, _powers_of_alpha) = constraints_expr::<F>(custom_gate_type, features.as_ref(), true);
 
     let Linearization {
         constant_term,
@@ -55,11 +56,21 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
 }
 
 #[ocaml::func]
+pub fn fp_linearization_strings_plus(custom_gate_type: bool) -> (String, Vec<(String, String)>) {
+    linearization_strings::<mina_curves::pasta::Fp>(custom_gate_type, true)
+}
+
+#[ocaml::func]
+pub fn fq_linearization_strings_plus(custom_gate_type: bool) -> (String, Vec<(String, String)>) {
+    linearization_strings::<mina_curves::pasta::Fq>(custom_gate_type, false)
+}
+
+#[ocaml::func]
 pub fn fp_linearization_strings() -> (String, Vec<(String, String)>) {
-    linearization_strings::<mina_curves::pasta::Fp>(true)
+    linearization_strings::<mina_curves::pasta::Fp>(false, true)
 }
 
 #[ocaml::func]
 pub fn fq_linearization_strings() -> (String, Vec<(String, String)>) {
-    linearization_strings::<mina_curves::pasta::Fq>(false)
+    linearization_strings::<mina_curves::pasta::Fq>(false, false)
 }

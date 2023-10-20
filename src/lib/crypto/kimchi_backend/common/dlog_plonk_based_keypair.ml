@@ -77,6 +77,22 @@ module type Inputs_intf = sig
       -> int
       -> Urs.t
       -> t
+
+    (** [create_plus
+          gates
+          nb_public
+          runtime_tables_cfg
+          nb_prev_challanges
+          srs] *)
+    val create_plus :
+         bool
+      -> Gate_vector.t
+      -> int
+      -> Scalar_field.t Kimchi_types.lookup_table array
+      -> Scalar_field.t Kimchi_types.runtime_table_cfg array
+      -> int
+      -> Urs.t
+      -> t
   end
 
   module Curve : sig
@@ -191,6 +207,28 @@ module Make (Inputs : Inputs_intf) = struct
     let index =
       Inputs.Index.create gates public_input_size fixed_lookup_tables
         runtime_table_cfgs prev_challenges (load_urs ())
+    in
+    { index; cs }
+
+  let create_plus custom_gate_type ~prev_challenges cs =
+    let gates, fixed_lookup_tables, runtime_table_cfgs =
+      Inputs.Constraint_system.finalize_and_get_gates cs
+    in
+    let public_input_size =
+      Inputs.Constraint_system.get_primary_input_size cs
+    in
+    let prev_challenges =
+      match Inputs.Constraint_system.get_prev_challenges cs with
+      | None ->
+          Inputs.Constraint_system.set_prev_challenges cs prev_challenges ;
+          prev_challenges
+      | Some prev_challenges' ->
+          assert (prev_challenges = prev_challenges') ;
+          prev_challenges'
+    in
+    let index =
+      Inputs.Index.create_plus custom_gate_type gates public_input_size
+        fixed_lookup_tables runtime_table_cfgs prev_challenges (load_urs ())
     in
     { index; cs }
 

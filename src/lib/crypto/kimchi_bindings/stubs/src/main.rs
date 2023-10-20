@@ -390,6 +390,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_type!(w, env, CamlPastaFpPlonkIndex => "t");
 
                 decl_func!(w, env, caml_pasta_fp_plonk_index_create => "create");
+                decl_func!(w, env, caml_pasta_fp_plonk_index_create_plus => "create_plus");
                 decl_func!(w, env, caml_pasta_fp_plonk_index_max_degree => "max_degree");
                 decl_func!(w, env, caml_pasta_fp_plonk_index_public_inputs => "public_inputs");
                 decl_func!(w, env, caml_pasta_fp_plonk_index_domain_d1_size => "domain_d1_size");
@@ -403,6 +404,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_type!(w, env, CamlPastaFqPlonkIndex => "t");
 
                 decl_func!(w, env, caml_pasta_fq_plonk_index_create => "create");
+                decl_func!(w, env, caml_pasta_fq_plonk_index_create_plus => "create_plus");
                 decl_func!(w, env, caml_pasta_fq_plonk_index_max_degree => "max_degree");
                 decl_func!(w, env, caml_pasta_fq_plonk_index_public_inputs => "public_inputs");
                 decl_func!(w, env, caml_pasta_fq_plonk_index_domain_d1_size => "domain_d1_size");

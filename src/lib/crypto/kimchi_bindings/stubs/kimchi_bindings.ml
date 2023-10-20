@@ -204,6 +204,17 @@ module Protocol = struct
         -> t
         = "caml_pasta_fp_plonk_index_create_bytecode" "caml_pasta_fp_plonk_index_create"
 
+      external create_plus :
+           bool
+        -> Gates.Vector.Fp.t
+        -> int
+        -> Pasta_bindings.Fp.t Kimchi_types.lookup_table array
+        -> Pasta_bindings.Fp.t Kimchi_types.runtime_table_cfg array
+        -> int
+        -> SRS.Fp.t
+        -> t
+        = "caml_pasta_fp_plonk_index_create_plus_bytecode" "caml_pasta_fp_plonk_index_create_plus"
+
       external max_degree : t -> int = "caml_pasta_fp_plonk_index_max_degree"
 
       external public_inputs : t -> int
@@ -237,6 +248,17 @@ module Protocol = struct
         -> SRS.Fq.t
         -> t
         = "caml_pasta_fq_plonk_index_create_bytecode" "caml_pasta_fq_plonk_index_create"
+
+      external create_plus :
+           bool
+        -> Gates.Vector.Fq.t
+        -> int
+        -> Pasta_bindings.Fq.t Kimchi_types.lookup_table array
+        -> Pasta_bindings.Fq.t Kimchi_types.runtime_table_cfg array
+        -> int
+        -> SRS.Fq.t
+        -> t
+        = "caml_pasta_fq_plonk_index_create_plus_bytecode" "caml_pasta_fq_plonk_index_create_plus"
 
       external max_degree : t -> int = "caml_pasta_fq_plonk_index_max_degree"
 

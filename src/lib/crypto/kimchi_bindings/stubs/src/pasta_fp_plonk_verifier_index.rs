@@ -60,6 +60,7 @@ impl From<VerifierIndex<Vesta, OpeningProof<Vesta>>> for CamlPastaFpPlonkVerifie
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
             lookup_index: vi.lookup_index.map(Into::into),
             zk_rows: vi.zk_rows as isize,
+            custom_gate_type: vi.custom_gate_type,
         }
     }
 }
@@ -112,7 +113,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<V
 
         // TODO dummy_lookup_value ?
         let (linearization, powers_of_alpha) =
-            expr_linearization(Some(&feature_flags), true);
+            expr_linearization(index.custom_gate_type, Some(&feature_flags), true);
 
         VerifierIndex::<Vesta, OpeningProof<Vesta>> {
             domain,
@@ -161,6 +162,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<V
 
             lookup_index: index.lookup_index.map(Into::into),
             linearization,
+            custom_gate_type: index.custom_gate_type,
         }
     }
 }
@@ -280,6 +282,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
         lookup_index: None,
         zk_rows: 3,
+        custom_gate_type: false,
     }
 }
 

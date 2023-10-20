@@ -103,6 +103,72 @@ pub fn caml_pasta_fp_plonk_index_create(
     Ok(CamlPastaFpPlonkIndex(Box::new(index)))
 }
 
+
+#[ocaml_gen::func]
+#[ocaml::func]
+pub fn caml_pasta_fp_plonk_index_create_plus(
+    custom_gate_type: bool,
+    gates: CamlPastaFpPlonkGateVectorPtr,
+    public: ocaml::Int,
+    lookup_tables: Vec<CamlLookupTable<CamlFp>>,
+    runtime_tables: Vec<CamlRuntimeTableCfg<CamlFp>>,
+    prev_challenges: ocaml::Int,
+    srs: CamlFpSrs,
+) -> Result<CamlPastaFpPlonkIndex, ocaml::Error> {
+    let gates: Vec<_> = gates
+        .as_ref()
+        .0
+        .iter()
+        .map(|gate| CircuitGate::<Fp> {
+            typ: gate.typ,
+            wires: gate.wires,
+            coeffs: gate.coeffs.clone(),
+        })
+        .collect();
+
+    let runtime_tables: Vec<RuntimeTableCfg<Fp>> =
+        runtime_tables.into_iter().map(Into::into).collect();
+
+    let lookup_tables: Vec<LookupTable<Fp>> = lookup_tables.into_iter().map(Into::into).collect();
+
+    // create constraint system
+    let cs = match ConstraintSystem::<Fp>::create(gates)
+        .custom_gate_type(custom_gate_type)
+        .public(public as usize)
+        .prev_challenges(prev_challenges as usize)
+        .max_poly_size(Some(srs.0.max_poly_size()))
+        .lookup(lookup_tables)
+        .runtime(if runtime_tables.is_empty() {
+            None
+        } else {
+            Some(runtime_tables)
+        })
+        .build()
+    {
+        Err(e) => {
+            return Err(e.into())
+        }
+        Ok(cs) => cs,
+    };
+
+    // endo
+    let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
+
+    // Unsafe if we are in a multi-core ocaml
+    {
+        let ptr: &mut poly_commitment::srs::SRS<Vesta> =
+            unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+        ptr.add_lagrange_basis(cs.domain.d1);
+    }
+
+    // create index
+    let mut index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.clone());
+    // Compute and cache the verifier index digest
+    index.compute_verifier_index_digest::<DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>>();
+
+    Ok(CamlPastaFpPlonkIndex(Box::new(index)))
+}
+
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_max_degree(index: CamlPastaFpPlonkIndexPtr) -> ocaml::Int {
@@ -164,7 +230,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     )?;
     t.srs = srs.clone();
 
-    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true);
+    let (linearization, powers_of_alpha) = expr_linearization(t.cs.custom_gate_type, Some(&t.cs.feature_flags), true);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

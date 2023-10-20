@@ -255,5 +255,6 @@ module VerifierIndex = struct
     ; shifts : 'fr array
     ; lookup_index : 'poly_comm Lookup.t option
     ; zk_rows : int
+    ; custom_gate_type : bool
     }
 end

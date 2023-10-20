@@ -173,6 +173,7 @@ where
             lookup_info,
             runtime_tables_selector,
         } = li;
+        // TODO: update these.
         LookupVerifierIndex {
             joint_lookup_used,
             lookup_table: lookup_table.into_iter().map(From::from).collect(),
@@ -195,4 +196,5 @@ pub struct CamlPlonkVerifierIndex<Fr, SRS, PolyComm> {
     pub shifts: Vec<Fr>,
     pub lookup_index: Option<CamlLookupVerifierIndex<PolyComm>>,
     pub zk_rows: ocaml::Int,
+    pub custom_gate_type: bool,
 }
