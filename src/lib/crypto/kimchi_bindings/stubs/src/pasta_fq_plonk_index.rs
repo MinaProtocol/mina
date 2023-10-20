@@ -1,6 +1,7 @@
 use crate::arkworks::CamlFq;
 use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
+use kimchi::circuits::expr::PolishToken;
 use kimchi::circuits::lookup::runtime_tables::caml::CamlRuntimeTableCfg;
 use kimchi::circuits::lookup::runtime_tables::RuntimeTableCfg;
 use kimchi::circuits::lookup::tables::caml::CamlLookupTable;
@@ -49,7 +50,7 @@ pub fn caml_pasta_fq_plonk_index_create(
     runtime_tables: Vec<CamlRuntimeTableCfg<CamlFq>>,
     prev_challenges: ocaml::Int,
     srs: CamlFqSrs,
-    override_ffadd: bool,
+    override_ffadd: Option<Vec<PolishToken<CamlFq>>>,
 ) -> Result<CamlPastaFqPlonkIndex, ocaml::Error> {
     let gates: Vec<_> = gates
         .as_ref()
@@ -72,7 +73,7 @@ pub fn caml_pasta_fq_plonk_index_create(
         .public(public as usize)
         .prev_challenges(prev_challenges as usize)
         .lookup(lookup_tables)
-        .override_ffadd(override_ffadd)
+        .override_ffadd(override_ffadd.map(|x| x.into_iter().map(|x| x.map(Into::into)).collect::<Vec<_>>()))
         .runtime(if runtime_tables.is_empty() {
             None
         } else {
@@ -165,7 +166,7 @@ pub fn caml_pasta_fq_plonk_index_read(
     )?;
     t.srs = srs.clone();
 
-    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true, t.cs.override_ffadd);
+    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true, t.cs.override_ffadd.is_some());
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

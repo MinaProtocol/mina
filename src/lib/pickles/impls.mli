@@ -22,7 +22,7 @@ module Step : sig
 
     val generate :
          prev_challenges:int
-      -> override_ffadd:bool
+      -> override_ffadd:Backend.Tick.Field.t Kimchi_types.Expr.t array option
       -> Kimchi_pasta_constraint_system.Vesta_constraint_system.t
       -> t
   end
@@ -111,7 +111,7 @@ module Wrap : sig
 
     val generate :
          prev_challenges:int
-      -> override_ffadd:bool
+      -> override_ffadd:Backend.Tock.Field.t Kimchi_types.Expr.t array option
       -> Kimchi_pasta_constraint_system.Pallas_constraint_system.t
       -> t
   end

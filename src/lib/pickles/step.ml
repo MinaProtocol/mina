@@ -222,7 +222,7 @@ struct
             let module Field = struct
               include Tick.Field
             end in
-            ( if data.override_ffadd then
+            ( if Option.is_some data.override_ffadd then
               Plonk_checks.Type1_override_ffadd.derive_plonk
             else Plonk_checks.Type1.derive_plonk )
               (module Field)

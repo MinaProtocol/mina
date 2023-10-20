@@ -451,16 +451,16 @@ struct
       go choices
     in
     let override_ffadd =
-      let rec go : type a b c d. (a, b, c, d) H4.T(IR).t -> bool =
+      let rec go : type a b c d. (a, b, c, d) H4.T(IR).t -> Backend.Tick.Field.t Kimchi_types.Expr.t array option =
        fun rules ->
         match rules with
         | [] ->
-            false
+            None
         | [ r ] ->
             r.override_ffadd
-        | r :: rules ->
+        | _r :: rules ->
             let acc = go rules in
-            if Bool.(acc <> r.override_ffadd) then
+            if true (* TODO: Assert equality *)then
               failwith
                 "Inconsistent values for override_ffadd across inductive rules" ;
             acc
@@ -694,7 +694,7 @@ struct
       let r =
         Common.time "wrap read or generate " (fun () ->
             Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
-              ~prev_challenges:2 ~override_ffadd:false cache disk_key_prover
+              ~prev_challenges:2 ~override_ffadd:None cache disk_key_prover
               disk_key_verifier typ
               (Snarky_backendless.Typ.unit ())
               main )
@@ -915,7 +915,7 @@ module Side_loaded = struct
           Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
       ; num_chunks = 1
       ; zk_rows = 3
-      ; override_ffadd = false
+      ; override_ffadd = None
       }
 
   module Proof = struct
@@ -962,7 +962,7 @@ module Side_loaded = struct
               ( max_proofs_verified
               , m
               , None
-              , { override_ffadd = false }
+              , { override_ffadd = None }
               , vk
               , x
               , p ) )
@@ -1169,7 +1169,7 @@ let compile_with_wrap_main_override_promise :
     let verification_key = wrap_vk
 
     let verify_promise ts =
-      verify_promise ?chunking_data ~override_ffadd
+      verify_promise ?chunking_data ?override_ffadd
         ( module struct
           include Max_proofs_verified
         end )
@@ -1335,7 +1335,7 @@ struct
           ; auxiliary_output = ()
           } )
     ; feature_flags = Plonk_types.Features.none_bool
-    ; override_ffadd = false
+    ; override_ffadd = None
     }
 
   let override_wrap_main =
@@ -1423,7 +1423,7 @@ struct
                       ; public_output = ()
                       ; auxiliary_output = ()
                       } )
-                ; override_ffadd = false
+                ; override_ffadd = None
                 }
               ] ) )
 

@@ -22,7 +22,7 @@ module Step : sig
 
   val read_or_generate :
        prev_challenges:int
-    -> override_ffadd:bool
+    -> override_ffadd:Backend.Tick.Field.t Kimchi_types.Expr.t array option
     -> Key_cache.Spec.t list
     -> Key.Proving.t lazy_t
     -> Key.Verification.t lazy_t
@@ -62,7 +62,7 @@ module Wrap : sig
 
   val read_or_generate :
        prev_challenges:Core_kernel.Int.t
-    -> override_ffadd:bool
+    -> override_ffadd:Backend.Tock.Field.t Kimchi_types.Expr.t array option
     -> Key_cache.Spec.t list
     -> Key.Proving.t Core_kernel.Lazy.t
     -> Key.Verification.t Core_kernel.Lazy.t

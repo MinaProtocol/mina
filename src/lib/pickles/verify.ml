@@ -6,7 +6,7 @@ open Import
 module Instance = struct
   type chunking_data = { num_chunks : int; domain_size : int; zk_rows : int }
 
-  type gate_overrides = { override_ffadd : bool }
+  type gate_overrides = { override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option }
 
   type t =
     | T :
@@ -247,7 +247,7 @@ let verify_heterogenous (ts : Instance.t list) =
   Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
   result ()
 
-let verify (type a n) ?chunking_data ?(override_ffadd = false)
+let verify (type a n) ?chunking_data ?override_ffadd
     (max_proofs_verified : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =

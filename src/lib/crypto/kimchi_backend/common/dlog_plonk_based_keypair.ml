@@ -76,7 +76,7 @@ module type Inputs_intf = sig
       -> Scalar_field.t Kimchi_types.runtime_table_cfg array
       -> int
       -> Urs.t
-      -> bool
+      -> Scalar_field.t Kimchi_types.Expr.t array option
       -> t
   end
 

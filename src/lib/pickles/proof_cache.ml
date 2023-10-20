@@ -78,6 +78,30 @@ let of_yojson t =
    spell out the serialization explicitly.
 *)
 module Json = struct
+  type curr_or_next = Kimchi_types.curr_or_next = Curr | Next
+  [@@deriving yojson]
+
+  type gate_type = Kimchi_types.gate_type =
+    | Zero
+    | Generic
+    | Poseidon
+    | CompleteAdd
+    | VarBaseMul
+    | EndoMul
+    | EndoMulScalar
+    | Lookup
+    | CairoClaim
+    | CairoInstruction
+    | CairoFlags
+    | CairoTransition
+    | RangeCheck0
+    | RangeCheck1
+    | ForeignFieldAdd
+    | ForeignFieldMul
+    | Xor16
+    | Rot64
+  [@@deriving yojson]
+
   type 'f or_infinity = 'f Kimchi_types.or_infinity =
     | Infinity
     | Finite of ('f * 'f)
@@ -86,6 +110,13 @@ module Json = struct
   type 'caml_g poly_comm = 'caml_g Kimchi_types.poly_comm =
     { unshifted : 'caml_g array; shifted : 'caml_g option }
   [@@deriving to_yojson]
+
+    type lookup_pattern = Kimchi_types.lookup_pattern =
+      | Xor
+      | Lookup
+      | RangeCheck
+      | ForeignFieldMul
+    [@@deriving yojson]
 
   type lookup_patterns = Kimchi_types.lookup_patterns =
     { xor : bool; lookup : bool; range_check : bool; foreign_field_mul : bool }
@@ -126,6 +157,71 @@ module Json = struct
     }
   [@@deriving to_yojson]
 
+  type feature_flag = Kimchi_types.feature_flag =
+    | RangeCheck0
+    | RangeCheck1
+    | ForeignFieldAdd
+    | ForeignFieldMul
+    | Xor
+    | Rot
+    | LookupTables
+    | RuntimeLookupTables
+    | LookupPattern of lookup_pattern
+    | TableWidth of int
+    | LookupsPerRow of int
+  [@@deriving yojson]
+
+  module Expr = struct
+    type row_offset = Kimchi_types.Expr.row_offset =
+      { zk_rows : bool; offset : int32 }
+    [@@deriving yojson]
+
+    type mds_position = Kimchi_types.Expr.mds_position =
+      { row : int; col : int }
+    [@@deriving yojson]
+
+    type column = Kimchi_types.Expr.column =
+      | Witness of int
+      | Z
+      | LookupSorted of int
+      | LookupAggreg
+      | LookupTable
+      | LookupKindIndex of lookup_pattern
+      | LookupRuntimeSelector
+      | LookupRuntimeTable
+      | Index of gate_type
+      | Coefficient of int
+      | Permutation of int
+    [@@deriving yojson]
+
+    type variable = Kimchi_types.Expr.variable =
+      { col : column; row : curr_or_next }
+    [@@deriving yojson]
+
+    type 'f t = 'f Kimchi_types.Expr.t =
+      | Alpha
+      | Beta
+      | Gamma
+      | JointCombiner
+      | EndoCoefficient
+      | Mds of mds_position
+      | Literal of 'f
+      | Cell of variable
+      | Dup
+      | Pow of int
+      | Add
+      | Mul
+      | Sub
+      | VanishesOnZeroKnowledgeAndPreviousRows
+      | UnnormalizedLagrangeBasis of row_offset
+      | Store
+      | Load of int
+      | SkipIf of feature_flag * int
+      | SkipIfNot of feature_flag * int
+    [@@deriving yojson]
+  end
+
+
   type 'fr domain = 'fr Kimchi_types.VerifierIndex.domain =
     { log_size_of_group : int; group_gen : 'fr }
   [@@deriving to_yojson]
@@ -160,7 +256,7 @@ module Json = struct
     ; shifts : 'fr array
     ; lookup_index : 'poly_comm lookup option
     ; zk_rows : int [@default 3]
-    ; override_ffadd : bool [@default false]
+    ; override_ffadd : 'fr Expr.t array option [@default None]
     }
   [@@deriving to_yojson]
 

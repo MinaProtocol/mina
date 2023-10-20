@@ -156,7 +156,7 @@ val combined_inner_product :
      env:Backend.Tick.Field.t Plonk_checks.Scalars.Env.t
   -> domain:< shifts : Backend.Tick.Field.t array ; .. >
   -> ft_eval1:Backend.Tick.Field.t
-  -> override_ffadd:bool
+  -> override_ffadd:Backend.Tick.Field.t Kimchi_types.Expr.t array option
   -> actual_proofs_verified:
        (module Pickles_types.Nat.Add.Intf with type n = 'actual_proofs_verified)
   -> ( Backend.Tick.Field.t array * Backend.Tick.Field.t array

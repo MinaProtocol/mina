@@ -3,7 +3,7 @@ open Core_kernel
 module Instance : sig
   type chunking_data = { num_chunks : int; domain_size : int; zk_rows : int }
 
-  type gate_overrides = { override_ffadd : bool }
+  type gate_overrides = { override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option }
 
   type t =
     | T :
@@ -19,7 +19,7 @@ end
 
 val verify :
      ?chunking_data:Instance.chunking_data
-  -> ?override_ffadd:bool
+  -> ?override_ffadd:Backend.Tick.Field.t Kimchi_types.Expr.t array
   -> (module Pickles_types.Nat.Intf with type n = 'n)
   -> (module Intf.Statement_value with type t = 'a)
   -> Verification_key.t

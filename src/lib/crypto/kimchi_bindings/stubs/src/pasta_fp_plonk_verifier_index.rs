@@ -60,7 +60,7 @@ impl From<VerifierIndex<Vesta, OpeningProof<Vesta>>> for CamlPastaFpPlonkVerifie
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
             lookup_index: vi.lookup_index.map(Into::into),
             zk_rows: vi.zk_rows as isize,
-            override_ffadd: vi.override_ffadd,
+            override_ffadd: vi.override_ffadd.map(|x| x.into_iter().map(|x| x.map(Into::into)).collect::<Vec<_>>()),
         }
     }
 }
@@ -113,7 +113,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<V
 
         // TODO dummy_lookup_value ?
         let (linearization, powers_of_alpha) =
-            expr_linearization(Some(&feature_flags), true, index.override_ffadd);
+            expr_linearization(Some(&feature_flags), true, index.override_ffadd.is_some());
 
         VerifierIndex::<Vesta, OpeningProof<Vesta>> {
             domain,
@@ -124,7 +124,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<V
             srs: { Arc::clone(&index.srs.0) },
 
             zk_rows: index.zk_rows as u64,
-            override_ffadd: index.override_ffadd,
+            override_ffadd: index.override_ffadd.map(|x| x.into_iter().map(|x| x.map(Into::into)).collect::<Vec<_>>()),
 
             sigma_comm,
             coefficients_comm,
@@ -282,7 +282,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
         lookup_index: None,
         zk_rows: 3,
-        override_ffadd: false,
+        override_ffadd: None,
     }
 }
 

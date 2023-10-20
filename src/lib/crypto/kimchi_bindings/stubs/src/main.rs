@@ -124,6 +124,15 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CurrOrNext => "curr_or_next");
 
     decl_type!(w, env, CamlOracles<T1> => "oracles");
+
+    decl_module!(w, env, "Expr", {
+        decl_type!(w, env, RowOffset => "row_offset");
+        decl_type!(w, env, MdsPosition => "mds_position");
+        decl_type!(w, env, Column => "column");
+        decl_type!(w, env, Variable => "variable");
+        decl_type!(w, env, PolishToken<T1> => "t");
+    });
+
     decl_module!(w, env, "VerifierIndex", {
         decl_module!(w, env, "Lookup", {
             decl_type!(w, env, CamlLookupsUsed => "lookups_used");
@@ -134,14 +143,6 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_type!(w, env, CamlPlonkDomain<T1> => "domain");
         decl_type!(w, env, CamlPlonkVerificationEvals<T1> => "verification_evals");
         decl_type!(w, env, CamlPlonkVerifierIndex<T1, T2, T3> => "verifier_index");
-    });
-
-    decl_module!(w, env, "Expr", {
-        decl_type!(w, env, RowOffset => "row_offset");
-        decl_type!(w, env, MdsPosition => "mds_position");
-        decl_type!(w, env, Column => "column");
-        decl_type!(w, env, Variable => "variable");
-        decl_type!(w, env, PolishToken<T1> => "t");
     });
 
 }

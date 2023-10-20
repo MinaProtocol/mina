@@ -201,7 +201,7 @@ module Protocol = struct
         -> Pasta_bindings.Fp.t Kimchi_types.runtime_table_cfg array
         -> int
         -> SRS.Fp.t
-        -> bool
+        -> Pasta_bindings.Fp.t Kimchi_types.Expr.t array option
         -> t
         = "caml_pasta_fp_plonk_index_create_bytecode" "caml_pasta_fp_plonk_index_create"
 
@@ -236,7 +236,7 @@ module Protocol = struct
         -> Pasta_bindings.Fq.t Kimchi_types.runtime_table_cfg array
         -> int
         -> SRS.Fq.t
-        -> bool
+        -> Pasta_bindings.Fq.t Kimchi_types.Expr.t array option
         -> t
         = "caml_pasta_fq_plonk_index_create_bytecode" "caml_pasta_fq_plonk_index_create"
 

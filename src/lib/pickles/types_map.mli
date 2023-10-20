@@ -17,7 +17,7 @@ module Basic : sig
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
-    ; override_ffadd : bool
+    ; override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option
     }
 end
 
@@ -42,7 +42,7 @@ module Side_loaded : sig
       ; branches : 'n2 Pickles_types.Nat.t
       ; num_chunks : int
       ; zk_rows : int
-      ; override_ffadd : bool
+      ; override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option
       }
   end
 
@@ -67,7 +67,7 @@ module Compiled : sig
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
-    ; override_ffadd : bool
+    ; override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option
     }
 
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
@@ -87,7 +87,7 @@ module Compiled : sig
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
-    ; override_ffadd : bool
+    ; override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option
     }
 end
 
@@ -112,7 +112,7 @@ module For_step : sig
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
-    ; override_ffadd : bool
+    ; override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option
     }
 
   val of_side_loaded : ('a, 'b, 'c, 'd) Side_loaded.t -> ('a, 'b, 'c, 'd) t

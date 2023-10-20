@@ -4,6 +4,30 @@ open Import
 open Kimchi_pasta.Pasta
 
 module Verifier_index_json = struct
+  type curr_or_next = Kimchi_types.curr_or_next = Curr | Next
+  [@@deriving yojson]
+
+  type gate_type = Kimchi_types.gate_type =
+    | Zero
+    | Generic
+    | Poseidon
+    | CompleteAdd
+    | VarBaseMul
+    | EndoMul
+    | EndoMulScalar
+    | Lookup
+    | CairoClaim
+    | CairoInstruction
+    | CairoFlags
+    | CairoTransition
+    | RangeCheck0
+    | RangeCheck1
+    | ForeignFieldAdd
+    | ForeignFieldMul
+    | Xor16
+    | Rot64
+  [@@deriving yojson]
+
   module Lookup = struct
     type 't lookup_selectors =
           't Kimchi_types.VerifierIndex.Lookup.lookup_selectors =
@@ -51,6 +75,70 @@ module Verifier_index_json = struct
     [@@deriving yojson]
   end
 
+  type feature_flag = Kimchi_types.feature_flag =
+    | RangeCheck0
+    | RangeCheck1
+    | ForeignFieldAdd
+    | ForeignFieldMul
+    | Xor
+    | Rot
+    | LookupTables
+    | RuntimeLookupTables
+    | LookupPattern of Lookup.lookup_pattern
+    | TableWidth of int
+    | LookupsPerRow of int
+  [@@deriving yojson]
+
+  module Expr = struct
+    type row_offset = Kimchi_types.Expr.row_offset =
+      { zk_rows : bool; offset : int32 }
+    [@@deriving yojson]
+
+    type mds_position = Kimchi_types.Expr.mds_position =
+      { row : int; col : int }
+    [@@deriving yojson]
+
+    type column = Kimchi_types.Expr.column =
+      | Witness of int
+      | Z
+      | LookupSorted of int
+      | LookupAggreg
+      | LookupTable
+      | LookupKindIndex of Lookup.lookup_pattern
+      | LookupRuntimeSelector
+      | LookupRuntimeTable
+      | Index of gate_type
+      | Coefficient of int
+      | Permutation of int
+    [@@deriving yojson]
+
+    type variable = Kimchi_types.Expr.variable =
+      { col : column; row : curr_or_next }
+    [@@deriving yojson]
+
+    type 'f t = 'f Kimchi_types.Expr.t =
+      | Alpha
+      | Beta
+      | Gamma
+      | JointCombiner
+      | EndoCoefficient
+      | Mds of mds_position
+      | Literal of 'f
+      | Cell of variable
+      | Dup
+      | Pow of int
+      | Add
+      | Mul
+      | Sub
+      | VanishesOnZeroKnowledgeAndPreviousRows
+      | UnnormalizedLagrangeBasis of row_offset
+      | Store
+      | Load of int
+      | SkipIf of feature_flag * int
+      | SkipIfNot of feature_flag * int
+    [@@deriving yojson]
+  end
+
   type 'fr domain = 'fr Kimchi_types.VerifierIndex.domain =
     { log_size_of_group : int; group_gen : 'fr }
   [@@deriving yojson]
@@ -85,7 +173,7 @@ module Verifier_index_json = struct
     ; shifts : 'fr array
     ; lookup_index : 'polyComm Lookup.t option
     ; zk_rows : int
-    ; override_ffadd : bool
+    ; override_ffadd : 'fr Expr.t array option
     }
   [@@deriving yojson]
 
@@ -191,7 +279,7 @@ module Stable = struct
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None
         ; zk_rows = 3
-        ; override_ffadd = false
+        ; override_ffadd = None
         }
       in
       { commitments = c; data = d; index = t }

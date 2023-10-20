@@ -235,7 +235,7 @@ module type S = sig
              'a_var main_input
           -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
       ; feature_flags : bool Pickles_types.Plonk_types.Features.t
-      ; override_ffadd : bool
+      ; override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option
       }
   end
 
@@ -244,7 +244,7 @@ module type S = sig
 
   val verify_promise :
        ?chunking_data:chunking_data
-    -> ?override_ffadd:bool
+    -> ?override_ffadd:Backend.Tick.Field.t Kimchi_types.Expr.t array
     -> (module Nat.Intf with type n = 'n)
     -> (module Statement_value_intf with type t = 'a)
     -> Verification_key.t

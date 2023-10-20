@@ -116,7 +116,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows ~override_ffadd
       let module Field = struct
         include Tick.Field
       end in
-      ( if override_ffadd then Plonk_checks.Type1_override_ffadd.derive_plonk
+      ( if Option.is_some override_ffadd then Plonk_checks.Type1_override_ffadd.derive_plonk
       else Plonk_checks.Type1.derive_plonk )
         (module Field)
         ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals

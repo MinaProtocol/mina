@@ -21,7 +21,7 @@ module Basic = struct
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
-    ; override_ffadd : bool
+    ; override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option
     }
 end
 
@@ -45,7 +45,7 @@ module Side_loaded = struct
       ; branches : 'n2 Nat.t
       ; num_chunks : int
       ; zk_rows : int
-      ; override_ffadd : bool
+      ; override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option
       }
   end
 
@@ -104,7 +104,7 @@ module Compiled = struct
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
-    ; override_ffadd : bool
+    ; override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option
     }
 
   (* This is the data associated to an inductive proof system with statement type
@@ -125,7 +125,7 @@ module Compiled = struct
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
-    ; override_ffadd : bool
+    ; override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option
     }
 
   type packed =
@@ -175,7 +175,7 @@ module For_step = struct
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
-    ; override_ffadd : bool
+    ; override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option
     }
 
   let of_side_loaded (type a b c d)

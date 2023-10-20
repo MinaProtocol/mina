@@ -66,7 +66,7 @@ let test () =
               { Pickles_types.Plonk_types.Features.none_bool with
                 foreign_field_add = true
               }
-          ; override_ffadd = true
+          ; override_ffadd = Some [||]
           }
         ] )
       ()
@@ -111,7 +111,7 @@ let test () =
                 ; auxiliary_output = ()
                 } )
           ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
-          ; override_ffadd = true
+          ; override_ffadd = None
           }
         ] )
       ()

@@ -53,7 +53,7 @@ type ( 'a_var
               and type return_value = 'ret_value
               and type auxiliary_value = 'auxiliary_value )
       ; feature_flags : bool Plonk_types.Features.t
-      ; override_ffadd : bool
+      ; override_ffadd : Backend.Tick.Field.t Kimchi_types.Expr.t array option
       }
       -> ( 'a_var
          , 'a_value
