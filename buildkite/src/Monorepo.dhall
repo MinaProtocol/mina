@@ -11,12 +11,14 @@ let Docker = ./Command/Docker/Type.dhall
 let JobSpec = ./Pipeline/JobSpec.dhall
 let Pipeline = ./Pipeline/Dsl.dhall
 let PipelineMode = ./Pipeline/Mode.dhall
-let PipelineStage = ./Pipeline/Stage.dhall
+let PipelineFilter = ./Pipeline/Filter.dhall
+let PipelineTag = ./Pipeline/Tag.dhall
 let Size = ./Command/Size.dhall
 let triggerCommand = ./Pipeline/TriggerCommand.dhall
 
 let mode = env:BUILDKITE_PIPELINE_MODE as Text ? "PullRequest"
-let stage = env:BUILDKITE_PIPELINE_STAGE as Text ? "Test"
+let include_tags = env:BUILDKITE_PIPELINE_TAGS_INCL as Text ? "Fast"
+let exclude_tags = env:BUILDKITE_PIPELINE_TAGS_EXCL as Text ? ""
 
 let jobs : List JobSpec.Type =
   List/map
@@ -33,34 +35,36 @@ let prefixCommands = [
 
 
 -- Run a job if we touched a dirty path
-let commands: Text -> Text -> List Cmd.Type  =  \(targetStage: Text) -> \(targetMode: Text) ->
+let commands: PipelineFilter.Type -> PipelineMode.Type -> List Cmd.Type  =  \(filter: PipelineFilter.Type) -> \(mode: PipelineMode.Type) ->
   Prelude.List.map 
     JobSpec.Type 
     Cmd.Type 
     (\(job: JobSpec.Type) ->
       let jobMode = PipelineMode.capitalName job.mode
-      let jobStage = PipelineStage.capitalName job.stage
-
+      let targetMode = PipelineMode.capitalName mode
+      let targetTags = PipelineFilter.tags filter
+      let filter = PipelineFilter.show filter
+      let isIncluded = Prelude.Bool.show (PipelineTag.contains job.tags targetTags)
       let dirtyWhen = SelectFiles.compile job.dirtyWhen
       let trigger = triggerCommand "src/Jobs/${job.path}/${job.name}.dhall"
       let pipelineHandlers = {
         PullRequest = ''
           if [ "${targetMode}" == "PullRequest" ]; then
-            if [ "${jobStage}" == "${targetStage}" ]; then
+            if [ "${isIncluded}" == "True" ]; then
               if (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
                 echo "Triggering ${job.name} for reason:"
                 cat _computed_diff.txt | egrep '${dirtyWhen}'
                 ${Cmd.format trigger}
               fi
             else
-              echo "Skipping ${job.name} because this is a ${targetStage} stage"
+              echo "Skipping ${job.name} because this is a ${filter} stage"
             fi
           else 
-            if [ "${jobStage}" == "${targetStage}" ]; then
+            if [ "${isIncluded}" == "True" ]; then
               echo "Triggering ${job.name} because this is a stable buildkite run"
               ${Cmd.format trigger}
             else 
-              echo "Skipping ${job.name} because this is a ${targetStage} stage"
+              echo "Skipping ${job.name} because this is a ${filter} stage"
             fi
           fi
         '',
@@ -68,11 +72,11 @@ let commands: Text -> Text -> List Cmd.Type  =  \(targetStage: Text) -> \(target
           if [ "${targetMode}" == "PullRequest" ]; then
             echo "Skipping ${job.name} because this is a PR buildkite run"
           else 
-            if [ "${jobStage}" == "${targetStage}" ]; then
+            if [ "${isIncluded}" == "True" ]; then
               echo "Triggering ${job.name} because this is a stable buildkite run"
               ${Cmd.format trigger}
             else
-              echo "Skipping ${job.name} because this is a ${targetStage} stage"
+              echo "Skipping ${job.name} because this is a ${filter} stage"
             fi
           fi
         ''
@@ -81,23 +85,29 @@ let commands: Text -> Text -> List Cmd.Type  =  \(targetStage: Text) -> \(target
     ) 
     jobs
 
-in Pipeline.build Pipeline.Config::{
-  spec = JobSpec::{
-    name = "monorepo-triage",
-    -- TODO: Clean up this code so we don't need an unused dirtyWhen here
-    dirtyWhen = [ SelectFiles.everything ]
-  },
-  steps = [
-  Command.build
-    Command.Config::{
-      commands = prefixCommands # (commands stage mode),
-      label = "Monorepo triage ${stage}",
-      key = "cmds-${stage}",
-      target = Size.Small,
-      docker = Some Docker::{
-        image = (./Constants/ContainerImages.dhall).toolchainBase,
-        environment = ["BUILDKITE_AGENT_ACCESS_TOKEN", "BUILDKITE_INCREMENTAL"]
-      }
-    }
-  ]
-}
+in
+
+(\(args : { filter : PipelineFilter.Type, mode: PipelineMode.Type }) -> 
+  let pipelineType = Pipeline.build Pipeline.Config::{
+    spec = JobSpec::{
+      name = "monorepo-triage-${PipelineFilter.show args.filter}",
+      -- TODO: Clean up this code so we don't need an unused dirtyWhen here
+      dirtyWhen = [ SelectFiles.everything ]
+    },
+    steps = [
+      Command.build
+        Command.Config::{
+          commands = prefixCommands # (commands args.filter args.mode),
+          label = "Monorepo triage ${PipelineFilter.show args.filter}",
+          key = "cmds-${PipelineFilter.show args.filter}",
+          target = Size.Small,
+          docker = Some Docker::{
+            image = (./Constants/ContainerImages.dhall).toolchainBase,
+            environment = ["BUILDKITE_AGENT_ACCESS_TOKEN", "BUILDKITE_INCREMENTAL"]
+          }
+        }
+    ]
+  }
+  in pipelineType.pipeline
+)
+

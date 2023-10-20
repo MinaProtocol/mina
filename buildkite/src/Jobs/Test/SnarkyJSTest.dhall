@@ -2,6 +2,7 @@ let S = ../../Lib/SelectFiles.dhall
 let B = ../../External/Buildkite.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -24,7 +25,8 @@ Pipeline.build
           S.strictlyStart (S.contains "src/lib")
         ],
         path = "Test",
-        name = "SnarkyJSTest"
+        name = "SnarkyJSTest",
+        tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
       },
     steps = [
       Command.build
