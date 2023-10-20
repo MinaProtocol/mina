@@ -331,8 +331,7 @@ struct
             Option.map
               ~f:(Scalar_challenge.map ~f:Challenge.Constant.of_tock_field)
               (O.joint_combiner_chal o)
-        ; feature_flags =
-            t.statement.proof_state.deferred_values.plonk.feature_flags
+        ; feature_flags = Plonk_types.Features.none_bool
         }
       in
       let xi = scalar_chal O.v in
