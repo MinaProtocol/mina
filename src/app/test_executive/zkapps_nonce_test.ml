@@ -24,11 +24,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { account_name = "node-a-key"
           ; balance = "8000000000"
           ; timing = Untimed
+          ; permissions = None
           }
-        ; { account_name = "node-b-key"; balance = "1000000"; timing = Untimed }
-        ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
-        ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
-        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
+        ; { account_name = "node-b-key"
+          ; balance = "1000000"
+          ; timing = Untimed
+          ; permissions = None
+          }
+        ; { account_name = "fish1"
+          ; balance = "3000"
+          ; timing = Untimed
+          ; permissions = None
+          }
+        ; { account_name = "fish2"
+          ; balance = "3000"
+          ; timing = Untimed
+          ; permissions = None
+          }
+        ; { account_name = "snark-node-key"
+          ; balance = "0"
+          ; timing = Untimed
+          ; permissions = None
+          }
         ]
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }

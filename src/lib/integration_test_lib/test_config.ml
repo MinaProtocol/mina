@@ -15,6 +15,7 @@ module Test_Account = struct
     { account_name : string
     ; balance : string
     ; timing : Mina_base.Account_timing.t
+    ; permissions : Mina_base.Permissions.t option [@default None]
     }
 end
 

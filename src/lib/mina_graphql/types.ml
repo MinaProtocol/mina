@@ -998,7 +998,7 @@ module AccountObj = struct
         ]
 
   let set_verification_key_perm =
-    obj "SetVerificationKeyPermission" ~fields:(fun _ ->
+    obj "VerificationKeyPermission" ~fields:(fun _ ->
         [ field "auth" ~typ:(non_null auth_required)
             ~doc:
               "Authorization required to set the verification key of the zkApp \
