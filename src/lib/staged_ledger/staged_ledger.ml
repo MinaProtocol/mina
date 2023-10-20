@@ -4309,6 +4309,247 @@ let%test_module "staged ledger tests" =
       and global_slot = Quickcheck.Generator.small_positive_int in
       (test_spec, kp, global_slot)
 
+    let%test_unit "When creating diff, invalid commands would be skipped" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind spec_keypair_and_slot = gen_spec_keypair_and_global_slot in
+        let%map signed_commands_or_zkapps =
+          List.gen_with_length 7 Bool.quickcheck_generator
+        in
+        (spec_keypair_and_slot, signed_commands_or_zkapps |> List.to_array)
+      in
+      Async.Thread_safe.block_on_async_exn
+      @@ fun () ->
+      Async.Quickcheck.async_test ~trials:20 gen
+        ~f:(fun
+             ( ({ init_ledger; _ }, new_kp, global_slot)
+             , signed_commands_or_zkapps )
+           ->
+          let open Transaction_snark.For_tests in
+          let zkapp_pk = Public_key.compress new_kp.public_key in
+          let ledger =
+            Ledger.create ~depth:constraint_constants.ledger_depth ()
+          in
+          Mina_transaction_logic.For_tests.Init_ledger.init
+            (module Ledger.Ledger_inner)
+            init_ledger ledger ;
+          Transaction_snark.For_tests.create_trivial_zkapp_account
+            ~permissions:Permissions.user_default ~vk ~ledger zkapp_pk ;
+          let sl = Sl.create_exn ~constraint_constants ~ledger in
+          [%log info] "signed commands or zkapps"
+            ~metadata:
+              [ ( "signed_commands_or_zkapps"
+                , `List
+                    (List.map (Array.to_list signed_commands_or_zkapps)
+                       ~f:(fun b -> `Bool b) ) )
+              ] ;
+          let default_fee = Fee.of_nanomina_int_exn 2_000_000 in
+          let default_amount = Amount.of_mina_int_exn 1 in
+          let mk_signed_command ~(fee_payer : Keypair.t) ~(receiver : Keypair.t)
+              ?(amount = default_amount) ~(nonce : Account.Nonce.t) () =
+            let body =
+              Signed_command_payload.Body.Payment
+                Payment_payload.Poly.
+                  { receiver_pk = Public_key.compress receiver.public_key
+                  ; amount
+                  }
+            in
+            let payload =
+              Signed_command.Payload.create ~fee:default_fee
+                ~fee_payer_pk:Public_key.(compress fee_payer.public_key)
+                ~nonce ~memo:Signed_command_memo.dummy ~valid_until:None ~body
+            in
+            User_command.Signed_command (Signed_command.sign fee_payer payload)
+          in
+          let mk_zkapp_command ~(fee_payer : Keypair.t) ?(fee = default_fee)
+              ~(nonce : Account.Nonce.t) () =
+            let spec : Update_states_spec.t =
+              { sender = (new_kp, Account.Nonce.zero)
+              ; fee
+              ; fee_payer = Some (fee_payer, nonce)
+              ; receivers = []
+              ; amount = default_amount
+              ; zkapp_account_keypairs = [ new_kp ]
+              ; memo = Signed_command_memo.dummy
+              ; new_zkapp_account = false
+              ; snapp_update =
+                  { Account_update.Update.dummy with
+                    delegate = Zkapp_basic.Set_or_keep.Set zkapp_pk
+                  }
+              ; current_auth = Permissions.Auth_required.Signature
+              ; call_data = Snark_params.Tick.Field.zero
+              ; events = []
+              ; actions = []
+              ; preconditions = None
+              }
+            in
+            let%map zkapp_command =
+              Transaction_snark.For_tests.update_states
+                ~zkapp_prover_and_vk:(zkapp_prover, vk) ~constraint_constants
+                spec
+            in
+            let valid_zkapp_command =
+              Zkapp_command.Valid.to_valid ~status:Applied
+                ~find_vk:
+                  (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                     ~get:Ledger.get
+                     ~location_of_account:Ledger.location_of_account )
+                zkapp_command
+              |> Or_error.ok_exn
+            in
+            User_command.Zkapp_command valid_zkapp_command
+          in
+          let mk_user_command ~signed_command_or_zkapp ~fee_payer ~receiver
+              ?amount ~nonce () =
+            match signed_command_or_zkapp with
+            | true ->
+                return
+                @@ mk_signed_command ~fee_payer ~receiver ?amount ~nonce ()
+            | false ->
+                mk_zkapp_command ~fee_payer
+                  ?fee:
+                    (Option.map amount ~f:(fun amount -> Amount.to_fee amount))
+                  ~nonce ()
+          in
+          let fee_payer, _ = init_ledger.(0) in
+          let fee_payer1, _ = init_ledger.(2) in
+          let receiver, _ = init_ledger.(1) in
+          let%bind valid_command_1 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(0)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 0) ()
+          and valid_command_2 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(1)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 1) ()
+          and invalid_command_3 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(2)
+              ~fee_payer ~receiver ~amount:Amount.max_int
+              ~nonce:(Account.Nonce.of_int 2) ()
+          and invalid_command_4 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(3)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 3) ()
+          and valid_command_5 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(4)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 2) ()
+          and invalid_command_6 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(5)
+              ~fee_payer ~receiver ~nonce:(Account.Nonce.of_int 4) ()
+          and valid_command_7 =
+            mk_user_command
+              ~signed_command_or_zkapp:signed_commands_or_zkapps.(6)
+              ~fee_payer:fee_payer1 ~receiver ~nonce:(Account.Nonce.of_int 0) ()
+          in
+          let global_slot =
+            Mina_numbers.Global_slot_since_genesis.of_int global_slot
+          in
+          let current_state, current_state_view =
+            dummy_state_and_view ~global_slot ()
+          in
+          let state_and_body_hash =
+            let state_hashes = Mina_state.Protocol_state.hashes current_state in
+            ( state_hashes.state_hash
+            , state_hashes.state_body_hash |> Option.value_exn )
+          in
+          match
+            Sl.create_diff ~constraint_constants ~global_slot sl ~logger
+              ~current_state_view
+              ~transactions_by_fee:
+                (Sequence.of_list
+                   [ valid_command_1
+                   ; valid_command_2
+                   ; invalid_command_3
+                   ; invalid_command_4
+                   ; valid_command_5
+                   ; invalid_command_6
+                   ; valid_command_7
+                   ] )
+              ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
+              ~coinbase_receiver ~supercharge_coinbase:false
+          with
+          | Error e ->
+              Error.raise (Pre_diff_info.Error.to_error e)
+          | Ok (diff, invalid_txns) -> (
+              let valid_commands =
+                Staged_ledger_diff.With_valid_signatures_and_proofs.commands
+                  diff
+                |> List.map ~f:(fun { data; _ } ->
+                       User_command.forget_check data )
+              in
+              assert (
+                List.equal User_command.equal valid_commands
+                  ( [ valid_command_1
+                    ; valid_command_2
+                    ; valid_command_5
+                    ; valid_command_7
+                    ]
+                  |> List.map ~f:(fun cmd -> User_command.forget_check cmd) ) ) ;
+              assert (List.length invalid_txns = 3) ;
+              match%bind
+                Sl.apply ~constraint_constants ~global_slot sl
+                  (Staged_ledger_diff.forget diff)
+                  ~logger ~verifier ~get_completed_work:(Fn.const None)
+                  ~current_state_view ~state_and_body_hash ~coinbase_receiver
+                  ~supercharge_coinbase:false
+              with
+              | Ok _x -> (
+                  let valid_command_1_with_status =
+                    With_status.
+                      { data = valid_command_1
+                      ; status = Transaction_status.Applied
+                      }
+                  in
+                  let invalid_command_3_with_status =
+                    With_status.
+                      { data = invalid_command_3
+                      ; status = Transaction_status.Applied
+                      }
+                  in
+                  let invalid_command_4_with_status =
+                    With_status.
+                      { data = invalid_command_4
+                      ; status = Transaction_status.Applied
+                      }
+                  in
+                  let valid_command_7_with_status =
+                    With_status.
+                      { data = valid_command_7
+                      ; status = Transaction_status.Applied
+                      }
+                  in
+                  let f, s = diff.diff in
+                  let diff =
+                    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff =
+                        ( { f with
+                            commands =
+                              [ valid_command_1_with_status
+                              ; invalid_command_3_with_status
+                              ; invalid_command_4_with_status
+                              ; valid_command_7_with_status
+                              ]
+                          }
+                        , s )
+                    }
+                  in
+                  match%map
+                    Sl.apply ~constraint_constants ~global_slot sl
+                      (Staged_ledger_diff.forget diff)
+                      ~logger ~verifier ~get_completed_work:(Fn.const None)
+                      ~current_state_view ~state_and_body_hash
+                      ~coinbase_receiver ~supercharge_coinbase:false
+                  with
+                  | Ok _x ->
+                      assert false
+                  | Error _e ->
+                      assert true )
+              | Error e ->
+                  [%log info] "Error %s" (Staged_ledger_error.to_string e) ;
+                  assert false ) )
+
     let%test_unit "Mismatched verification keys in zkApp accounts and \
                    transactions" =
       let open Transaction_snark.For_tests in
