@@ -38,7 +38,7 @@ module type S = sig
     [%%versioned:
     module Stable : sig
       module V2 : sig
-        type t [@@deriving to_yojson]
+        type t [@@deriving to_yojson, of_yojson]
       end
     end]
 
