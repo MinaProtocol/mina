@@ -1,6 +1,7 @@
 let S = ../../Lib/SelectFiles.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
@@ -15,7 +16,8 @@ in Pipeline.build Pipeline.Config::{
       S.strictlyStart (S.contains ValidationService.rootPath)
     ],
     path = "Test",
-    name = "ValidationService"
+    name = "ValidationService",
+    tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test ]
   },
   steps = [
     Command.build Command.Config::{

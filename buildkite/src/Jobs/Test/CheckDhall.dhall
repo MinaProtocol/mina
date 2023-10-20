@@ -3,6 +3,7 @@ let D = S.PathPattern
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
@@ -23,7 +24,8 @@ Pipeline.build
         S.exactly "buildkite/scripts/generate-jobs" "sh"
       ],
       path = "Test",
-      name = "CheckDhall"
+      name = "CheckDhall", 
+      tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test ]
     },
     steps = [
     Command.build
