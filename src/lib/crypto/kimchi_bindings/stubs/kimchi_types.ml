@@ -258,3 +258,45 @@ module VerifierIndex = struct
     ; override_ffadd : bool
     }
 end
+
+module Expr = struct
+  type nonrec row_offset = { zk_rows : bool; offset : int32 }
+
+  type nonrec mds_position = { row : int; col : int }
+
+  type nonrec column =
+    | Witness of int
+    | Z
+    | LookupSorted of int
+    | LookupAggreg
+    | LookupTable
+    | LookupKindIndex of lookup_pattern
+    | LookupRuntimeSelector
+    | LookupRuntimeTable
+    | Index of gate_type
+    | Coefficient of int
+    | Permutation of int
+
+  type nonrec variable = { col : column; row : curr_or_next }
+
+  type nonrec 'f t =
+    | Alpha
+    | Beta
+    | Gamma
+    | JointCombiner
+    | EndoCoefficient
+    | Mds of mds_position
+    | Literal of 'f
+    | Cell of variable
+    | Dup
+    | Pow of int
+    | Add
+    | Mul
+    | Sub
+    | VanishesOnZeroKnowledgeAndPreviousRows
+    | UnnormalizedLagrangeBasis of row_offset
+    | Store
+    | Load of int
+    | SkipIf of feature_flag * int
+    | SkipIfNot of feature_flag * int
+end

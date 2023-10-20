@@ -1,5 +1,5 @@
 use kimchi::circuits::{
-    expr::FeatureFlag,
+    expr::{Column, FeatureFlag, MdsPosition, PolishToken, RowOffset, Variable},
     lookup::{
         lookups::{LookupFeatures, LookupPattern, LookupPatterns},
         runtime_tables::caml::{CamlRuntimeTable, CamlRuntimeTableCfg},
@@ -135,6 +135,15 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_type!(w, env, CamlPlonkVerificationEvals<T1> => "verification_evals");
         decl_type!(w, env, CamlPlonkVerifierIndex<T1, T2, T3> => "verifier_index");
     });
+
+    decl_module!(w, env, "Expr", {
+        decl_type!(w, env, RowOffset => "row_offset");
+        decl_type!(w, env, MdsPosition => "mds_position");
+        decl_type!(w, env, Column => "column");
+        decl_type!(w, env, Variable => "variable");
+        decl_type!(w, env, PolishToken<T1> => "t");
+    });
+
 }
 
 fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
