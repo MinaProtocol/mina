@@ -35,8 +35,8 @@ let test () =
                 let fresh_zero () =
                   exists Field.typ ~compute:(fun _ -> Field.Constant.zero)
                 in
-                let fresh_one () =
-                  exists Field.typ ~compute:(fun _ -> Field.Constant.one)
+                let fresh i =
+                  exists Field.typ ~compute:(fun _ -> Field.Constant.of_int i)
                 in
                 Impl.assert_
                   { basic =
@@ -46,7 +46,7 @@ let test () =
                         (Raw
                            { kind = ForeignFieldAdd
                            ; values =
-                               [| fresh_one ()
+                               [| fresh 2
                                 ; fresh_zero ()
                                 ; fresh_zero ()
                                 ; fresh_zero ()
@@ -66,7 +66,14 @@ let test () =
               { Pickles_types.Plonk_types.Features.none_bool with
                 foreign_field_add = true
               }
-          ; override_ffadd = Some [||]
+          ; override_ffadd =
+              Some
+                [| Cell { col = Witness 0; row = Curr }
+                 ; Literal (Field.Constant.of_int 2)
+                 ; Sub
+                 ; Cell { col = Index ForeignFieldAdd; row = Curr }
+                 ; Mul
+                |]
           }
         ] )
       ()

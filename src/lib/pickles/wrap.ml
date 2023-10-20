@@ -52,7 +52,9 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       ~rounds:tick_rounds e.evals
   in
   let ft_eval0 : Tick.Field.t =
-    (if Option.is_some override_ffadd then Type1_override_ffadd.ft_eval0 else Type1.ft_eval0)
+    ( if Option.is_some override_ffadd then Type1_override_ffadd.ft_eval0
+    else Type1.ft_eval0 )
+      ~constant:Fn.id ~optional_constraints:override_ffadd
       (module Tick.Field)
       plonk ~env ~domain
       (Plonk_types.Evals.to_in_circuit combined_evals)
@@ -221,7 +223,8 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     let module Field = struct
       include Tick.Field
     end in
-    ( if Option.is_some step_vk.override_ffadd then Type1_override_ffadd.derive_plonk
+    ( if Option.is_some step_vk.override_ffadd then
+      Type1_override_ffadd.derive_plonk
     else Type1.derive_plonk )
       (module Field)
       ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals

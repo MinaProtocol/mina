@@ -1042,8 +1042,10 @@ struct
       in
       let ft_eval0 : Field.t =
         with_label "ft_eval0" (fun () ->
-            ( if Option.is_some override_ffadd then Plonk_checks.Override_ffadd.ft_eval0
+            ( if Option.is_some override_ffadd then
+              Plonk_checks.Override_ffadd.ft_eval0
             else Plonk_checks.ft_eval0 )
+              ~constant:Field.constant ~optional_constraints:override_ffadd
               (module Field)
               ~env ~domain plonk_minimal combined_evals evals1.public_input )
       in

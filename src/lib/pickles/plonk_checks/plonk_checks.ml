@@ -344,8 +344,8 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (** Computes the ft evaluation at zeta.
   (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)
   *)
-  let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
-      ~(env : t Scalars.Env.t)
+  let ft_eval0 (type t) (module F : Field_intf with type t = t) ~constant
+      ~optional_constraints ~domain ~(env : t Scalars.Env.t)
       ({ alpha = _; beta; gamma; zeta; joint_combiner = _; feature_flags = _ } :
         _ Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0 =
     let open Plonk_types.Evals.In_circuit in
@@ -393,7 +393,15 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     in
     let denominator = (zeta - env.omega_to_minus_zk_rows) * (zeta - one) in
     let ft_eval0 = ft_eval0 + (nominator / denominator) in
-    let constant_term = Sc.constant_term env in
+    let constant_term =
+      match optional_constraints with
+      | None ->
+          Sc.constant_term env
+      | Some optional_constraints ->
+          let constant_term = Sc.constant_term env in
+          let optional = Scalars.interpret ~constant env optional_constraints in
+          constant_term + optional
+    in
     ft_eval0 - constant_term
 
   (** Computes the list of scalars used in the linearization. *)

@@ -1583,7 +1583,9 @@ struct
             with_label __LOC__ (fun () ->
                 Plonk_checks.ft_eval0
                   (module Field)
-                  ~env ~domain plonk_minimal combined_evals evals1.public_input )
+                  ~constant:(fun _ -> assert false)
+                  ~optional_constraints:None ~env ~domain plonk_minimal
+                  combined_evals evals1.public_input )
           in
           (* sum_i r^i sum_j xi^j f_j(beta_i) *)
           let actual_combined_inner_product =

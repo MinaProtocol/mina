@@ -492,6 +492,8 @@ struct
         in
         let ft_eval0 =
           Plonk_checks.Type2.ft_eval0
+            ~constant:(fun _ -> assert false)
+            ~optional_constraints:None
             (module Tock.Field)
             ~domain:tock_domain ~env:tock_env tock_plonk_minimal
             tock_combined_evals [| x_hat_1 |]

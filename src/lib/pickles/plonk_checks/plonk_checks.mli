@@ -91,6 +91,8 @@ val scalars_env :
 module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : sig
   val ft_eval0 :
        't field
+    -> constant:('f -> 't)
+    -> optional_constraints:'f Kimchi_types.Expr.t array option
     -> domain:< shifts : 't array ; .. >
     -> env:'t Scalars.Env.t
     -> ( 't

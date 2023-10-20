@@ -113,7 +113,7 @@ module Env = struct
     }
 end
 
-let rec interpret
+let rec interpret ~constant
     ({ add = ( + )
      ; sub = ( - )
      ; mul = ( * )
@@ -122,7 +122,7 @@ let rec interpret
      ; endo_coefficient
      ; pow
      ; var
-     ; field
+     ; field = _
      ; cell
      ; alpha_pow
      ; double = _
@@ -139,62 +139,63 @@ let rec interpret
      ; if_feature = _
      } as env :
       _ Env.t ) (instructions : _ Kimchi_types.Expr.t list) stack =
+  let interpret = interpret ~constant env in
   match instructions with
   | [] ->
       stack
   | Pow i :: Alpha :: instructions ->
-      interpret env instructions (alpha_pow i :: stack)
+      interpret instructions (alpha_pow i :: stack)
   | Alpha :: instructions ->
-      interpret env instructions (alpha_pow 1 :: stack)
+      interpret instructions (alpha_pow 1 :: stack)
   | Beta :: instructions ->
-      interpret env instructions (beta :: stack)
+      interpret instructions (beta :: stack)
   | Gamma :: instructions ->
-      interpret env instructions (gamma :: stack)
+      interpret instructions (gamma :: stack)
   | JointCombiner :: instructions ->
-      interpret env instructions (joint_combiner :: stack)
+      interpret instructions (joint_combiner :: stack)
   | EndoCoefficient :: instructions ->
-      interpret env instructions (endo_coefficient :: stack)
+      interpret instructions (endo_coefficient :: stack)
   | Mds { row; col } :: instructions ->
-      interpret env instructions (mds (row, col) :: stack)
+      interpret instructions (mds (row, col) :: stack)
   | Literal f :: instructions ->
-      interpret env instructions (field f :: stack)
+      interpret instructions (constant f :: stack)
   | Cell { col; row } :: instructions ->
-      interpret env instructions (cell (var (col, row)) :: stack)
+      interpret instructions (cell (var (col, row)) :: stack)
   | Dup :: instructions -> (
       match stack with
       | [] ->
           assert false
       | x :: stack ->
-          interpret env instructions (x :: x :: stack) )
+          interpret instructions (x :: x :: stack) )
   | Pow i :: instructions -> (
       match stack with
       | [] ->
           assert false
       | x :: stack ->
-          interpret env instructions (pow (x, i) :: stack) )
+          interpret instructions (pow (x, i) :: stack) )
   | Add :: instructions -> (
       match stack with
       | [] | [ _ ] ->
           assert false
-      | x :: y :: stack ->
-          interpret env instructions ((x + y) :: stack) )
+      | y :: x :: stack ->
+          interpret instructions ((x + y) :: stack) )
   | Mul :: instructions -> (
       match stack with
       | [] | [ _ ] ->
           assert false
-      | x :: y :: stack ->
-          interpret env instructions ((x * y) :: stack) )
+      | y :: x :: stack ->
+          interpret instructions ((x * y) :: stack) )
   | Sub :: instructions -> (
       match stack with
       | [] | [ _ ] ->
           assert false
-      | x :: y :: stack ->
-          interpret env instructions ((x - y) :: stack) )
+      | y :: x :: stack ->
+          interpret instructions ((x - y) :: stack) )
   | VanishesOnZeroKnowledgeAndPreviousRows :: instructions ->
-      interpret env instructions
+      interpret instructions
         (vanishes_on_zero_knowledge_and_previous_rows :: stack)
   | UnnormalizedLagrangeBasis { zk_rows; offset } :: instructions ->
-      interpret env instructions
+      interpret instructions
         (unnormalized_lagrange_basis (zk_rows, Int32.to_int_exn offset) :: stack)
   | Store :: _instructions ->
       failwith "TODO"
@@ -204,6 +205,11 @@ let rec interpret
       failwith "TODO"
   | SkipIfNot _ :: _instructions ->
       failwith "TODO"
+
+let interpret ~constant env instructions =
+  match interpret ~constant env (Array.to_list instructions) [] with
+  | [res] -> res
+  | _ -> assert false
 
 module type S = sig
   val constant_term : 'a Env.t -> 'a
