@@ -33,3 +33,7 @@ variable "postgres_version" {
 variable "db_spec" {
   default = "db-g1-small"
 }
+
+variable "service_label" {
+  default = "none"
+}

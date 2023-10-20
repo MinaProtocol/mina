@@ -21,6 +21,9 @@ resource "google_sql_database_instance" "postgres_instance" {
   region           = var.gcp_region
   settings {
     tier = var.db_spec
+    user_labels = {
+      service = var.service_label
+    }
   }
   deletion_protection = var.deletion_protection
 }
