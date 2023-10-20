@@ -28,16 +28,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; balance = "9999999"
           ; timing = Untimed
           ; permissions = None
+          ; zkapp = None
           }
         ; { account_name = "empty-bp-key"
           ; balance = "0"
           ; timing = Untimed
           ; permissions = None
+          ; zkapp = None
           }
         ; { account_name = "snark-node-key"
           ; balance = "0"
           ; timing = Untimed
           ; permissions = None
+          ; zkapp = None
           }
         ]
         @ List.init num_extra_keys ~f:(fun i ->
@@ -47,6 +50,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ; balance = "10000"
               ; timing = Untimed
               ; permissions = None
+              ; zkapp = None
               } )
     ; block_producers =
         [ { node_name = "receiver"; account_name = "receiver-key" }

@@ -101,21 +101,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; balance = "400000"
         ; timing = Untimed
         ; permissions = None
+        ; zkapp = None
         }
       ; { account_name = "node-b-key"
         ; balance = "300000"
         ; timing = Untimed
         ; permissions = None
+        ; zkapp = None
         }
       ; { account_name = "snark-node-key1"
         ; balance = "0"
         ; timing = Untimed
         ; permissions = None
+        ; zkapp = None
         }
       ; { account_name = "snark-node-key2"
         ; balance = "0"
         ; timing = Untimed
         ; permissions = None
+        ; zkapp = None
         }
       ]
     in
@@ -132,26 +136,31 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; balance = "200000"
         ; timing = Untimed
         ; permissions = None
+        ; zkapp = None
         }
       ; { account_name = "node-b-key"
         ; balance = "350000"
         ; timing = Untimed
         ; permissions = None
+        ; zkapp = None
         }
       ; { account_name = "snark-node-key1"
         ; balance = "0"
         ; timing = Untimed
         ; permissions = None
+        ; zkapp = None
         }
       ; { account_name = "snark-node-key2"
         ; balance = "0"
         ; timing = Untimed
         ; permissions = None
+        ; zkapp = None
         }
       ; { account_name = "fish1"
         ; balance = "100"
         ; timing = Untimed
         ; permissions = None
+        ; zkapp = None
         }
       ]
     in
@@ -172,16 +181,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ; balance = "100"
             ; timing = Untimed
             ; permissions = None
+            ; zkapp = None
             }
           ; { account_name = "fish2"
             ; balance = "100"
             ; timing = Untimed
             ; permissions = None
+            ; zkapp = None
             }
           ; { account_name = "fish3"
             ; balance = "1000"
             ; timing = Untimed
             ; permissions = None
+            ; zkapp = None
             }
             (* account fully vested before hard fork *)
           ; { account_name = "timed1"
@@ -191,6 +203,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                   ~cliff_amount:1_000_000_000_000 ~vesting_period:1000
                   ~vesting_increment:1_000_000_000_000
             ; permissions = None
+            ; zkapp = None
             }
             (* account starts vesting before hard fork, not fully vested after
                cliff is before hard fork
@@ -202,6 +215,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                   ~cliff_amount:2_000_000_000_000 ~vesting_period:5
                   ~vesting_increment:3_000_000_000_000
             ; permissions = None
+            ; zkapp = None
             }
             (* cliff at hard fork, vesting with each slot *)
           ; { account_name = "timed3"
@@ -211,6 +225,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                   ~cliff_amount:2_000_000_000_000 ~vesting_period:1
                   ~vesting_increment:1_000_000_000_000
             ; permissions = None
+            ; zkapp = None
             }
           ]
     ; block_producers =
