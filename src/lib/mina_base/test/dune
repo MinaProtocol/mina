@@ -12,6 +12,7 @@
   sexplib0
   yojson
   ;; local libraries
+  genesis_constants
   codable
   currency
   fields_derivers.zkapps
