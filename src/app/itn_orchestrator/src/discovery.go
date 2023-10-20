@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -76,7 +75,8 @@ func discoverParticipantsDo(config Config, params DiscoveryParams, output func(N
 			}
 			colonIx := strings.IndexRune(meta.RemoteAddr, ':')
 			if colonIx < 0 {
-				return fmt.Errorf("wrong remote address in submission %s: %s", name, meta.RemoteAddr)
+				// No port is specified in the address, hence we just take the whole remote address field
+				colonIx = len(meta.RemoteAddr)
 			}
 			addr := NodeAddress(meta.RemoteAddr[:colonIx] + ":" + strconv.Itoa(int(meta.GraphqlControlPort)))
 			if _, has := cache[addr]; has {
