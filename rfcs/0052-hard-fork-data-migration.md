@@ -134,9 +134,6 @@ here.
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-How do we limit the migration to the final block of mainnet? There could be
-flags to the migration apps to stop at a given state hash or height.
-
 The second application populates the `accounts_created` table, but the
 first application could do so, by examining the
 `...account_creation_fee_paid` columns of the `blocks_user_commands`
