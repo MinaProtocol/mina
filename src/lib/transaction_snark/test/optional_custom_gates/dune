@@ -1,0 +1,43 @@
+(library
+  (name zkapp_optional_custom_gates_tests)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   async
+   async_kernel
+   async_unix
+   core
+   core_kernel
+   result
+   base
+   base.caml
+   sexplib0
+   integers
+   ;; local libraries
+   mina_base.import
+   transaction_snark
+   mina_ledger
+   mina_base
+   mina_generators
+   currency
+   pickles
+   pickles_types
+   mina_numbers
+   zkapp_command_builder
+   signature_lib
+   genesis_constants
+   sgn
+   transaction_snark_tests
+   test_util
+   mina_transaction_logic
+   zkapps_examples
+   pickles_optional_custom_gates_circuits
+   snark_keys_header
+   snark_params
+   data_hash_lib
+   )
+  (library_flags -linkall)
+  (inline_tests (flags -verbose -show-counts))
+  (preprocess
+    (pps ppx_snarky ppx_version ppx_jane ppx_mina))
+  (instrumentation (backend bisect_ppx)))
