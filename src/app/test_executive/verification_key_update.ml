@@ -76,16 +76,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; balance = "9000000000"
           ; timing = Untimed
           ; permissions = None
+          ; zkapp = None
           }
         ; { account_name = "whale2-key"
           ; balance = "1000000000"
           ; timing = Untimed
           ; permissions = None
+          ; zkapp = None
           }
         ; { account_name = "snark-node-key"
           ; balance = "100"
           ; timing = Untimed
           ; permissions = None
+          ; zkapp = None
           }
         ]
     ; block_producers =

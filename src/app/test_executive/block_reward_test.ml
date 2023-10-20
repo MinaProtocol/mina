@@ -25,6 +25,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; balance = "1000"
           ; timing = Untimed
           ; permissions = None
+          ; zkapp = None
           }
         ]
     ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]

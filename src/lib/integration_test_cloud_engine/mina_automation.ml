@@ -182,6 +182,7 @@ module Network_config = struct
                ; account_name
                ; timing
                ; permissions
+               ; zkapp
                }
              , (pk, sk) )
            ->
@@ -200,6 +201,9 @@ module Network_config = struct
                 Option.map
                   ~f:Runtime_config.Accounts.Single.Permissions.of_permissions
                   permissions
+            ; zkapp =
+                Option.map
+                  ~f:Runtime_config.Accounts.Single.Zkapp_account.of_zkapp zkapp
             }
           in
           (account_name, account) )
@@ -274,7 +278,9 @@ module Network_config = struct
                   (epoch_accounts : Test_config.Test_Account.t list) =
                 let epoch_ledger_accounts =
                   List.map epoch_accounts
-                    ~f:(fun { account_name; balance; timing; permissions } ->
+                    ~f:(fun
+                         { account_name; balance; timing; permissions; zkapp }
+                       ->
                       let balance = Balance.of_mina_string_exn balance in
                       let timing = runtime_timing_of_timing timing in
                       let genesis_account =
@@ -297,6 +303,11 @@ module Network_config = struct
                             ~f:
                               Runtime_config.Accounts.Single.Permissions
                               .of_permissions permissions
+                      ; zkapp =
+                          Option.map
+                            ~f:
+                              Runtime_config.Accounts.Single.Zkapp_account
+                              .of_zkapp zkapp
                       } )
                 in
                 (* because we run integration tests with Proof_level = Full, the winner account
