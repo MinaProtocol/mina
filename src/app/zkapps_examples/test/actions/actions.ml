@@ -54,7 +54,8 @@ let%test_module "Actions test" =
                   ; access = None
                   ; set_delegate = Proof
                   ; set_permissions = Proof
-                  ; set_verification_key = Proof
+                  ; set_verification_key =
+                      (Proof, Mina_numbers.Txn_version.current)
                   ; set_zkapp_uri = Proof
                   ; edit_action_state = Proof
                   ; set_token_symbol = Proof
@@ -67,7 +68,7 @@ let%test_module "Actions test" =
         ; preconditions =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
-            ; account = Accept
+            ; account = Zkapp_precondition.Account.accept
             ; valid_while = Ignore
             }
         ; authorization_kind = Signature

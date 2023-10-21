@@ -506,7 +506,9 @@ let update_permissions =
            ; access = Util.auth_of_string access
            ; set_permissions = Util.auth_of_string set_permissions
            ; set_delegate = Util.auth_of_string set_delegate
-           ; set_verification_key = Util.auth_of_string set_verification_key
+           ; set_verification_key =
+               ( Util.auth_of_string set_verification_key
+               , Mina_numbers.Txn_version.current )
            ; set_zkapp_uri = Util.auth_of_string set_zkapp_uri
            ; edit_action_state = Util.auth_of_string edit_action_state
            ; set_token_symbol = Util.auth_of_string set_token_symbol
