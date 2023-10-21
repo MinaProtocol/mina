@@ -556,6 +556,46 @@ module Zkapp_verification_keys = struct
       id
 end
 
+module Protocol_versions = struct
+  type t = { transaction : int; network : int; patch : int }
+  [@@deriving hlist, fields]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; int ]
+
+  let table_name = "protocol_versions"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~transaction ~network
+      ~patch =
+    let t = { transaction; network; patch } in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      t
+
+  let find (module Conn : CONNECTION) ~transaction ~network ~patch =
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup3 int int int)
+         Caqti_type.int
+         (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
+      (transaction, network, patch)
+
+  let find_txn_version (module Conn : CONNECTION) ~transaction =
+    Conn.collect_list
+      (Caqti_request.collect Caqti_type.int Caqti_type.int
+         {sql| SELECT id FROM protocol_versions WHERE transaction = ?
+        |sql} )
+      transaction
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+      id
+end
+
 module Zkapp_permissions = struct
   let auth_required_typ =
     let encode = function
@@ -624,7 +664,23 @@ module Zkapp_permissions = struct
 
   let table_name = "zkapp_permissions"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (perms : Permissions.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION) (perms : Permissions.t)
+      ~logger =
+    let txn_version =
+      Mina_numbers.Txn_version.to_int @@ snd perms.set_verification_key
+    in
+    let%bind versions =
+      Protocol_versions.find_txn_version (module Conn) ~transaction:txn_version
+    in
+    ( match versions with
+    | Ok [] ->
+        [%log error]
+          ~metadata:[ ("perms", Permissions.to_yojson perms) ]
+          "No transaction version exists for the permission"
+    | Ok _ ->
+        ()
+    | Error _ ->
+        [%log error] "fail to query protocol_versions table" ) ;
     let value =
       { edit_state = perms.edit_state
       ; send = perms.send
@@ -757,7 +813,7 @@ module Zkapp_updates = struct
 
   let table_name = "zkapp_updates"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~logger
       (update : Account_update.Update.t) =
     let open Deferred.Result.Let_syntax in
     let%bind app_state_id =
@@ -776,7 +832,7 @@ module Zkapp_updates = struct
     in
     let%bind permissions_id =
       Mina_caqti.add_if_zkapp_set
-        (Zkapp_permissions.add_if_doesn't_exist (module Conn))
+        (Zkapp_permissions.add_if_doesn't_exist (module Conn) ~logger)
         update.permissions
     in
     let%bind timing_id =
@@ -1506,7 +1562,7 @@ module Zkapp_account_update_body = struct
 
   let table_name = "zkapp_account_update_body"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~logger
       (body : Account_update.Body.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let account_identifier = Account_id.create body.public_key body.token_id in
@@ -1514,7 +1570,7 @@ module Zkapp_account_update_body = struct
       Account_identifiers.add_if_doesn't_exist (module Conn) account_identifier
     in
     let%bind update_id =
-      Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
+      Zkapp_updates.add_if_doesn't_exist (module Conn) ~logger body.update
     in
     let increment_nonce = body.increment_nonce in
     let%bind events_id =
@@ -1619,13 +1675,13 @@ module Zkapp_account_update = struct
 
   let table_name = "zkapp_account_update"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~logger
       (account_update : Account_update.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let%bind body_id =
       Zkapp_account_update_body.add_if_doesn't_exist
         (module Conn)
-        account_update.body
+        ~logger account_update.body
     in
     let value = { body_id } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -1916,7 +1972,8 @@ module User_command = struct
         @@ Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names )
         id
 
-    let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Zkapp_command.t) =
+    let add_if_doesn't_exist (module Conn : CONNECTION) ~logger
+        (ps : Zkapp_command.t) =
       let open Deferred.Result.Let_syntax in
       let zkapp_command = Zkapp_command.to_simple ps in
       let%bind zkapp_fee_payer_body_id =
@@ -1926,7 +1983,7 @@ module User_command = struct
       in
       let%bind zkapp_account_updates_ids =
         Mina_caqti.deferred_result_list_map zkapp_command.account_updates
-          ~f:(Zkapp_account_update.add_if_doesn't_exist (module Conn))
+          ~f:(Zkapp_account_update.add_if_doesn't_exist (module Conn) ~logger)
         >>| Array.of_list
       in
       let memo = ps.memo |> Signed_command_memo.to_base58_check in
@@ -1949,12 +2006,12 @@ module User_command = struct
     | Zkapp_command _ ->
         `Zkapp_command
 
-  let add_if_doesn't_exist conn (t : User_command.t) =
+  let add_if_doesn't_exist conn ~logger (t : User_command.t) =
     match t with
     | Signed_command sc ->
         Signed_command.add_if_doesn't_exist conn ~via:(via t) sc
     | Zkapp_command ps ->
-        Zkapp_command.add_if_doesn't_exist conn ps
+        Zkapp_command.add_if_doesn't_exist conn ~logger ps
 
   let find conn ~(transaction_hash : Transaction_hash.t) =
     let open Deferred.Result.Let_syntax in
@@ -2539,7 +2596,7 @@ module Accounts_accessed = struct
             comma_cols table_name ) )
       (block_id, account_identifier_id)
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) block_id
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~logger block_id
       (ledger_index, (account : Account.t)) =
     let open Deferred.Result.Let_syntax in
     let account_id = Account_id.create account.public_key account.token_id in
@@ -2576,7 +2633,7 @@ module Accounts_accessed = struct
         let%bind permissions_id =
           Zkapp_permissions.add_if_doesn't_exist
             (module Conn)
-            account.permissions
+            ~logger account.permissions
         in
         let%bind zkapp_id =
           Mina_caqti.add_if_some
@@ -2604,11 +2661,11 @@ module Accounts_accessed = struct
           (module Conn)
           account_accessed
 
-  let add_accounts_if_don't_exist (module Conn : CONNECTION) block_id
+  let add_accounts_if_don't_exist (module Conn : CONNECTION) ~logger block_id
       (accounts : (int * Account.t) list) =
     let%map results =
       Deferred.List.map accounts ~f:(fun account ->
-          add_if_doesn't_exist (module Conn) block_id account )
+          add_if_doesn't_exist (module Conn) ~logger block_id account )
     in
     Result.all results
 
@@ -2661,39 +2718,6 @@ module Accounts_created = struct
                WHERE block_id = ?
          |sql} )
       block_id
-end
-
-module Protocol_versions = struct
-  type t = { transaction : int; network : int; patch : int }
-  [@@deriving hlist, fields]
-
-  let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int ]
-
-  let table_name = "protocol_versions"
-
-  let add_if_doesn't_exist (module Conn : CONNECTION) ~transaction ~network
-      ~patch =
-    let t = { transaction; network; patch } in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
-      (module Conn)
-      t
-
-  let find (module Conn : CONNECTION) ~major ~minor ~patch =
-    Conn.find
-      (Caqti_request.find
-         Caqti_type.(tup3 int int int)
-         Caqti_type.int
-         (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
-      (major, minor, patch)
-
-  let load (module Conn : CONNECTION) id =
-    Conn.find
-      (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
-      id
 end
 
 module Block = struct
@@ -2765,7 +2789,7 @@ module Block = struct
          (Mina_caqti.select_cols_from_id ~table_name:"blocks" ~cols:Fields.names) )
       id
 
-  let add_parts_if_doesn't_exist (module Conn : CONNECTION)
+  let add_parts_if_doesn't_exist (module Conn : CONNECTION) ~logger
       ~constraint_constants ~protocol_state ~staged_ledger_diff
       ~protocol_version ~proposed_protocol_version ~hash =
     let open Deferred.Result.Let_syntax in
@@ -2942,7 +2966,7 @@ module Block = struct
                 let%bind id =
                   User_command.add_if_doesn't_exist
                     (module Conn)
-                    user_command.data
+                    ~logger user_command.data
                 in
                 let%map () =
                   match command with
@@ -3178,7 +3202,7 @@ module Block = struct
       ~proposed_protocol_version:t.proposed_protocol_version
       ~hash:(Protocol_state.hashes t.protocol_state).state_hash
 
-  let add_from_extensional (module Conn : CONNECTION)
+  let add_from_extensional (module Conn : CONNECTION) ~logger
       (block : Extensional.Block.t) =
     let open Deferred.Result.Let_syntax in
     let%bind block_id =
@@ -3362,6 +3386,7 @@ module Block = struct
             let%map cmd_id =
               User_command.Zkapp_command.add_if_doesn't_exist
                 (module Conn)
+                ~logger
                 (Zkapp_command.of_simple { fee_payer; account_updates; memo })
             in
             (zkapp_cmd, cmd_id) :: acc )
@@ -3388,7 +3413,7 @@ module Block = struct
     let%bind _block_and_account_ids =
       Accounts_accessed.add_accounts_if_don't_exist
         (module Conn)
-        block_id block.accounts_accessed
+        ~logger block_id block.accounts_accessed
     in
     (* add accounts created *)
     let%bind _block_and_pk_ids =
@@ -3724,7 +3749,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                     (fun (module Conn : CONNECTION) ->
                       Accounts_accessed.add_accounts_if_don't_exist
                         (module Conn)
-                        block_id accounts_accessed )
+                        ~logger block_id accounts_accessed )
                     pool
                 with
                 | Error err ->
@@ -3782,7 +3807,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
 let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
     ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
-    ~add_block:(Block.add_from_precomputed ~constraint_constants)
+    ~add_block:(Block.add_from_precomputed ~constraint_constants ~logger)
     ~hash:(fun block ->
       (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash )
     ~accounts_accessed:block.Precomputed.accounts_accessed
@@ -3792,7 +3817,7 @@ let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
 (* used by `archive_blocks` app *)
 let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
-    ~add_block:Block.add_from_extensional
+    ~add_block:(Block.add_from_extensional ~logger)
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
     ~accounts_accessed:block.Extensional.Block.accounts_accessed
     ~accounts_created:block.Extensional.Block.accounts_created
@@ -3808,8 +3833,9 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash = State_hash.With_state_hashes.state_hash in
         match%bind
-          add_block_aux ~logger ~pool ~delete_older_than ~hash ~add_block
-            ~accounts_accessed ~accounts_created ~tokens_used block
+          add_block_aux ~logger ~pool ~delete_older_than ~hash
+            ~add_block:(add_block ~logger) ~accounts_accessed ~accounts_created
+            ~tokens_used block
         with
         | Error e ->
             let state_hash = hash block in
@@ -3889,7 +3915,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                 let%bind.Deferred.Result genesis_block_id =
                   Block.add_if_doesn't_exist
                     (module Conn)
-                    ~constraint_constants genesis_block
+                    ~logger ~constraint_constants genesis_block
                 in
                 let%bind.Deferred.Result { ledger_hash; _ } =
                   Block.load (module Conn) ~id:genesis_block_id
@@ -3953,7 +3979,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                           match%bind
                             Accounts_accessed.add_if_doesn't_exist
                               (module Conn)
-                              genesis_block_id (index, acct)
+                              ~logger genesis_block_id (index, acct)
                           with
                           | Ok _ ->
                               return ()
