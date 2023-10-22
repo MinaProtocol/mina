@@ -141,5 +141,5 @@ pub mod bn254 {
     use crate::arkworks::CamlBN254Fp;
     use mina_curves::bn254::Fp;
 
-    impl_vector_old!(CamlBN254FpVector, CamlBN254Fp, Fp);
+    impl_vector_old!(CamlBNFpVector, CamlBN254Fp, Fp);
 }

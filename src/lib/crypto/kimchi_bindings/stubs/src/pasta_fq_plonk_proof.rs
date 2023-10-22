@@ -25,7 +25,7 @@ use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
-use poly_commitment::commitment::{CommitmentCurve, PolyComm};
+use poly_commitment::commitment::{caml::CamlOpeningProof, CommitmentCurve, PolyComm};
 use poly_commitment::evaluation_proof::OpeningProof;
 use std::array;
 use std::convert::TryInto;
@@ -38,7 +38,10 @@ pub fn caml_pasta_fq_plonk_proof_create(
     runtime_tables: Vec<CamlRuntimeTable<CamlFq>>,
     prev_challenges: Vec<CamlFq>,
     prev_sgs: Vec<CamlGPallas>,
-) -> Result<CamlProofWithPublic<CamlGPallas, CamlFq>, ocaml::Error> {
+) -> Result<
+    CamlProofWithPublic<CamlGPallas, CamlFq, CamlOpeningProof<CamlGPallas, CamlFq>>,
+    ocaml::Error,
+> {
     {
         let ptr: &mut poly_commitment::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -99,7 +102,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_verify(
     index: CamlPastaFqPlonkVerifierIndex,
-    proof: CamlProofWithPublic<CamlGPallas, CamlFq>,
+    proof: CamlProofWithPublic<CamlGPallas, CamlFq, CamlOpeningProof<CamlGPallas, CamlFq>>,
 ) -> bool {
     let group_map = <Pallas as CommitmentCurve>::Map::setup();
 
@@ -124,7 +127,7 @@ pub fn caml_pasta_fq_plonk_proof_verify(
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_batch_verify(
     indexes: Vec<CamlPastaFqPlonkVerifierIndex>,
-    proofs: Vec<CamlProofWithPublic<CamlGPallas, CamlFq>>,
+    proofs: Vec<CamlProofWithPublic<CamlGPallas, CamlFq, CamlOpeningProof<CamlGPallas, CamlFq>>>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
@@ -157,7 +160,8 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
 
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProofWithPublic<CamlGPallas, CamlFq> {
+pub fn caml_pasta_fq_plonk_proof_dummy(
+) -> CamlProofWithPublic<CamlGPallas, CamlFq, CamlOpeningProof<CamlGPallas, CamlFq>> {
     fn comm() -> PolyComm<Pallas> {
         let g = Pallas::prime_subgroup_generator();
         PolyComm {
@@ -233,7 +237,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProofWithPublic<CamlGPallas, Cam
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_deep_copy(
-    x: CamlProofWithPublic<CamlGPallas, CamlFq>,
-) -> CamlProofWithPublic<CamlGPallas, CamlFq> {
+    x: CamlProofWithPublic<CamlGPallas, CamlFq, CamlOpeningProof<CamlGPallas, CamlFq>>,
+) -> CamlProofWithPublic<CamlGPallas, CamlFq, CamlOpeningProof<CamlGPallas, CamlFq>> {
     x
 }

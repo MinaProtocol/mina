@@ -1,23 +1,19 @@
 use crate::{
     arkworks::{CamlBN254Fp, CamlGBN254},
-    bn254_plonk_index::CamlBN254PlonkIndexPtr,
-    field_vector::bn254::CamlBN254FpVector,
+    bn254_plonk_index::{CamlBN254PlonkIndexPtr, KZGProverIndex},
+    field_vector::bn254::CamlBNFpVector,
 };
 use groupmap::GroupMap;
+use kimchi::circuits::lookup::runtime_tables::{caml::CamlRuntimeTable, RuntimeTable};
 use kimchi::circuits::polynomial::COLUMNS;
 use kimchi::proof::{ProverProof, RecursionChallenge};
 use kimchi::prover::caml::CamlProofWithPublic;
-use kimchi::{
-    circuits::lookup::runtime_tables::{caml::CamlRuntimeTable, RuntimeTable},
-    prover_index::ProverIndex,
-};
 use mina_curves::bn254::{BN254Parameters, Fp, Fq, BN254};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
-use poly_commitment::commitment::PolyComm;
-use poly_commitment::evaluation_proof::OpeningProof;
+use poly_commitment::commitment::{caml::CamlPairingProof, PolyComm};
 
 type EFqSponge = DefaultFqSponge<BN254Parameters, PlonkSpongeConstantsKimchi>;
 type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>;
@@ -26,11 +22,14 @@ type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>;
 #[ocaml::func]
 pub fn caml_bn254_plonk_proof_create(
     index: CamlBN254PlonkIndexPtr<'static>,
-    witness: Vec<CamlBN254FpVector>,
+    witness: Vec<CamlBNFpVector>,
     runtime_tables: Vec<CamlRuntimeTable<CamlBN254Fp>>,
     prev_challenges: Vec<CamlBN254Fp>,
     prev_sgs: Vec<CamlGBN254>,
-) -> Result<CamlProofWithPublic<CamlGBN254, CamlBN254Fp>, ocaml::Error> {
+) -> Result<
+    CamlProofWithPublic<CamlGBN254, CamlBN254Fp, CamlPairingProof<CamlGBN254, CamlBN254Fp>>,
+    ocaml::Error,
+> {
     {
         let ptr: &mut poly_commitment::srs::SRS<BN254> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -62,7 +61,7 @@ pub fn caml_bn254_plonk_proof_create(
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .map_err(|_| ocaml::Error::Message("the witness should be a column of 15 vectors"))?;
-    let index: &ProverIndex<BN254, OpeningProof<BN254>> = &index.as_ref().0;
+    let index: &KZGProverIndex = &index.as_ref().0;
     let runtime_tables: Vec<RuntimeTable<Fp>> =
         runtime_tables.into_iter().map(Into::into).collect();
 
