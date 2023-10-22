@@ -222,7 +222,8 @@ let user_commands_from_block_id ~mainnet_pool block_id =
 
 let first_batch = ref true
 
-let mainnet_protocol_version = Protocol_version.current
+let mainnet_protocol_version =
+  Protocol_version.create ~transaction:2 ~network:1 ~patch:0
 
 let mainnet_block_to_extensional ~logger ~mainnet_pool
     ~(genesis_block : Mina_block.t) (block : Sql.Mainnet.Block.t) =
