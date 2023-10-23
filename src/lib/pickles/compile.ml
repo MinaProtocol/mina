@@ -548,6 +548,7 @@ struct
                 ~wrap_rounds:Tock.Rounds.n
 
             let f (T b : _ Branch_data.t) =
+              (* TODO: this is the branch data / b.custom_gate_type *)
               let (T (typ, _conv, conv_inv)) = etyp in
               let main () () =
                 let res = b.main ~step_domains () in
@@ -596,9 +597,10 @@ struct
                        , index
                        , digest ) )
               in
+              (* Update here *)
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
-                    Cache.Step.read_or_generate
+                    Cache.Step.read_or_generate (* TODO: pass boolean here *)
                       ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
                       cache k_p k_v
                       (Snarky_backendless.Typ.unit ())
@@ -610,6 +612,7 @@ struct
           end)
       in
       M.f step_data
+      (* TODO: HERE applying function above *)
     in
     Timer.clock __LOC__ ;
     let step_vks =
@@ -1306,6 +1309,7 @@ struct
           ; auxiliary_output = ()
           } )
     ; feature_flags = Plonk_types.Features.none_bool
+    ; custom_gate_type = false; (* JES: TODO: This is fine? *)
     }
 
   let override_wrap_main =
@@ -1374,6 +1378,7 @@ struct
             ~choices:(fun ~self:_ ->
               [ { identifier = "main"
                 ; feature_flags = Plonk_types.Features.none_bool
+                ; custom_gate_type = false (* JES: TODO: This is fine? *)
                 ; prevs = [ tag; tag ]
                 ; main =
                     (fun { public_input = () } ->
