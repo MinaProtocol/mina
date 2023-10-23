@@ -99,7 +99,7 @@ get_mina_deployments() {
 }
 
 has_http_snark_coordinator() {
-    if $KUBECTL get deploy/snarker-http-coordinator 2>/dev/null; then
+    if $KUBECTL get deploy/snarker-http-coordinator >/dev/null 2>&1; then
         echo 'true'
     else
         echo 'false'

@@ -1,6 +1,6 @@
 testnetName: testnet
 mina:
-  image: tizoc/mina-daemon:5462a59380
+  image: openmina/mina:custom-tooling-snark-http-coordinator-rampup5-22
   snarkCoordinatorImage: binier/mina-snark-worker-rs:latest
   privkeyPass:
   exposeGraphql: true
@@ -24,7 +24,7 @@ healthcheck:
 
 plainNodesConfig:
   # the number of plain nodes
-  count: 8
+  count: 0
   namePrefix: node
 
 seedConfigs:
@@ -36,15 +36,7 @@ seedConfigs:
     libp2pSecret: seed2-libp2p-secret
 
 blockProducerConfigs:
-  - name: prod01
-    # see resources/key-01
-    keypairName: prod1-privkey-secret
-    isolated: false
-  - name: prod02
-    # see resources/key-01
-    keypairName: prod1-privkey-secret
-    isolated: false
-  - name: prod03
+  - name: prod1
     # see resources/key-01
     keypairName: prod1-privkey-secret
     isolated: false
@@ -56,41 +48,69 @@ blockProducerConfigs:
     # see resources/key-03
     keypairName: prod3-privkey-secret
     isolated: false
+  - name: prod4
+    # see resources/key-04
+    keypairName: prod4-privkey-secret
+    isolated: false
+  - name: prod5
+    # see resources/key-05
+    keypairName: prod5-privkey-secret
+    isolated: false
+  - name: prod6
+    # see resources/key-6
+    keypairName: prod6-privkey-secret
+    isolated: false
+  - name: prod7
+    # see resources/key-07
+    keypairName: prod7-privkey-secret
+    isolated: false
+  - name: prod8
+    # see resources/key-08
+    keypairName: prod8-privkey-secret
+    isolated: false
+  - name: prod9
+    # see resources/key-09
+    keypairName: prod9-privkey-secret
+    isolated: false
+  - name: prod10
+    # see resources/key-10
+    keypairName: prod10-privkey-secret
+    isolated: false
 
 httpCoordinatedSnarkersConfig:
   # the number of snark workers
-  count: 0
+  count: 70
   namePrefix: snarker
 
-minaSnarkCoordinatorsConfig:
-- name: snarker001
-  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
-  workSelectionAlgorithm: seq
-  workers: 20
-- name: snarker002
-  publicKey: B62qos2NxSras7juEwPVnkoV23YTFvWawyko8pgcf8S5nccTFCzVpdy
-  workSelectionAlgorithm: rand
-  workers: 20
-- name: snarker003
-  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
-  workSelectionAlgorithm: rand
-  workers: 20
-- name: snarker004
-  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
-  workSelectionAlgorithm: rand
-  workers: 10
-- name: snarker005
-  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
-  workSelectionAlgorithm: rand
-  workers: 10
-- name: snarker006
-  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
-  workSelectionAlgorithm: rand
-  workers: 10
-- name: snarker007
-  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
-  workSelectionAlgorithm: rand
-  workers: 10
+# minaSnarkCoordinatorsConfig:
+# - name: snarker001
+#   publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+#   workSelectionAlgorithm: seq
+#   workers: 20
+# - name: snarker002
+#   publicKey: B62qos2NxSras7juEwPVnkoV23YTFvWawyko8pgcf8S5nccTFCzVpdy
+#   workSelectionAlgorithm: rand
+#   workers: 20
+# - name: snarker003
+#   publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+#   workSelectionAlgorithm: rand
+#   workers: 20
+# - name: snarker004
+#   publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+#   workSelectionAlgorithm: rand
+#   workers: 10
+# - name: snarker005
+#   publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+#   workSelectionAlgorithm: rand
+#   workers: 10
+# - name: snarker006
+#   publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+#   workSelectionAlgorithm: rand
+#   workers: 10
+# - name: snarker007
+#   publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+#   workSelectionAlgorithm: rand
+#   workers: 10
 
 resources:
   enable: true
@@ -100,7 +120,7 @@ resources:
   memory: "100Mi"
 
 bpfDebugger:
-  enable: true
+  enable: false
   image: openmina/mina-network-debugger:0aa55313
   cpu: "1500m"
   memory: "4Gi"
