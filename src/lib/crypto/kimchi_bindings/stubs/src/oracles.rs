@@ -3,7 +3,7 @@ use ark_ff::One;
 use kimchi::circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
 use kimchi::proof::ProverProof;
 use kimchi::{
-    prover::caml::{CamlProofWithPublic, CamlProverProof},
+    prover::caml::{CamlPastaProofWithPublic, CamlProverPastaProof},
     verifier_index::VerifierIndex,
 };
 use mina_poseidon::{
@@ -13,12 +13,10 @@ use mina_poseidon::{
     FqSponge,
 };
 use paste::paste;
-use poly_commitment::commitment::{
-    caml::{CamlOpeningProof, CamlPolyComm},
-    shift_scalar, PolyComm,
-};
+use poly_commitment::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
 use poly_commitment::evaluation_proof::OpeningProof;
 use poly_commitment::SRS;
+use CamlOpeningProof;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlOracles<F> {
@@ -36,7 +34,7 @@ macro_rules! impl_oracles {
             pub fn [<$F:snake _oracles_create>](
                 lgr_comm: Vec<CamlPolyComm<$CamlG>>,
                 index: $index,
-                proof: CamlProofWithPublic<$CamlG, $CamlF, CamlOpeningProof<$CamlG, $CamlF>>,
+                proof: CamlPastaProofWithPublic<$CamlG, $CamlF>,
             ) -> Result<CamlOracles<$CamlF>, ocaml::Error> {
                 let index: VerifierIndex<$G, OpeningProof<$G>> = index.into();
 
@@ -107,9 +105,9 @@ macro_rules! impl_oracles {
             pub fn [<$F:snake _oracles_create_no_public>](
                 lgr_comm: Vec<CamlPolyComm<$CamlG>>,
                 index: $index,
-                proof: CamlProverProof<$CamlG, $CamlF, CamlOpeningProof<$CamlG, $CamlF>>,
+                proof: CamlProverPastaProof<$CamlG, $CamlF>,
             ) -> Result<CamlOracles<$CamlF>, ocaml::Error> {
-                let proof = CamlProofWithPublic {
+                let proof = CamlPastaProofWithPublic {
                     proof,
                     public_evals: None,
                 };

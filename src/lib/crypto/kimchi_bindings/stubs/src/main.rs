@@ -36,11 +36,12 @@ use wires_15_stubs::{
     CamlCircuitGate,
     CamlLookupCommitments,
     CamlOpeningProof,
+    CamlPairingProof,
+    CamlPastaProofWithPublic,
     CamlPolyComm,
     CamlProofEvaluations,
-    CamlProofWithPublic,
     CamlProverCommitments,
-    CamlProverProof,
+    CamlProverPastaProof,
     CamlRandomOracles,
     CamlScalarChallenge,
     CamlWire,
@@ -109,6 +110,7 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlPolyComm::<T1> => "poly_comm");
     decl_type!(w, env, CamlRecursionChallenge::<T1, T2> => "recursion_challenge");
     decl_type!(w, env, CamlOpeningProof::<T1, T2> => "opening_proof");
+    decl_type!(w, env, CamlPairingProof::<T1, T2> => "pairing_proof");
     decl_type!(w, env, CamlLookupCommitments::<T1> => "lookup_commitments");
 
     decl_type!(w, env, CamlRuntimeTableCfg::<T1> => "runtime_table_cfg");
@@ -116,8 +118,8 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlRuntimeTable::<T1> => "runtime_table");
     decl_type!(w, env, CamlProverCommitments::<T1> => "prover_commitments");
 
-    decl_type!(w, env, CamlProverProof<T1, T2, T3> => "prover_proof");
-    decl_type!(w, env, CamlProofWithPublic<T1, T2, T3> => "proof_with_public");
+    decl_type!(w, env, CamlProverPastaProof<T1, T2> => "prover_proof");
+    decl_type!(w, env, CamlPastaProofWithPublic<T1, T2> => "proof_with_public");
 
     decl_type!(w, env, CamlWire => "wire");
     decl_type!(w, env, GateType => "gate_type");
@@ -333,14 +335,14 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
         });
 
         decl_module!(w, env, "BN254Fp", {
-            decl_type!(w, env, CamlBNFpVector => "t");
+            decl_type!(w, env, CamlBnFpVector => "t");
             decl_type_alias!(w, env, "elt" => CamlBN254Fp);
 
-            decl_func!(w, env, caml_bn_vector_create => "create");
-            decl_func!(w, env, caml_bn_vector_length => "length");
-            decl_func!(w, env, caml_bn_vector_emplace_back => "emplace_back");
-            decl_func!(w, env, caml_bn_vector_get => "get");
-            decl_func!(w, env, caml_bn_vector_set => "set");
+            decl_func!(w, env, caml_bn_fp_vector_create => "create");
+            decl_func!(w, env, caml_bn_fp_vector_length => "length");
+            decl_func!(w, env, caml_bn_fp_vector_emplace_back => "emplace_back");
+            decl_func!(w, env, caml_bn_fp_vector_get => "get");
+            decl_func!(w, env, caml_bn_fp_vector_set => "set");
         });
     });
 
@@ -422,7 +424,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
             });
 
             decl_module!(w, env, "BN254Fp", {
-                decl_type!(w, env, CamlBNFpSrs => "t");
+                decl_type!(w, env, CamlBnFpSrs => "t");
 
                 decl_func!(w, env, caml_bn_fp_srs_create => "create");
             });

@@ -1,5 +1,5 @@
 use crate::arkworks::CamlBN254Fp;
-use crate::{gate_vector::bn254::CamlBN254PlonkGateVectorPtr, srs::bn254::CamlBN254FpSrs};
+use crate::{gate_vector::bn254::CamlBN254PlonkGateVectorPtr, srs::bn254::CamlBnFpSrs};
 use kimchi::circuits::lookup::runtime_tables::caml::CamlRuntimeTableCfg;
 use kimchi::circuits::lookup::runtime_tables::RuntimeTableCfg;
 use kimchi::circuits::lookup::tables::caml::CamlLookupTable;
@@ -44,7 +44,7 @@ pub fn caml_bn254_plonk_index_create(
     lookup_tables: Vec<CamlLookupTable<CamlBN254Fp>>,
     runtime_tables: Vec<CamlRuntimeTableCfg<CamlBN254Fp>>,
     prev_challenges: ocaml::Int,
-    srs: CamlBN254FpSrs,
+    srs: CamlBnFpSrs,
 ) -> Result<CamlBN254PlonkIndex, ocaml::Error> {
     let gates: Vec<_> = gates
         .as_ref()

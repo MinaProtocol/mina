@@ -1,19 +1,20 @@
 use crate::{
     arkworks::{CamlBN254Fp, CamlGBN254},
     bn254_plonk_index::{CamlBN254PlonkIndexPtr, KZGProverIndex},
-    field_vector::bn254::CamlBNFpVector,
+    field_vector::bn254::CamlBnFpVector,
+    CamlPairingProof,
 };
 use groupmap::GroupMap;
 use kimchi::circuits::lookup::runtime_tables::{caml::CamlRuntimeTable, RuntimeTable};
 use kimchi::circuits::polynomial::COLUMNS;
 use kimchi::proof::{ProverProof, RecursionChallenge};
-use kimchi::prover::caml::CamlProofWithPublic;
+use kimchi::prover::caml::CamlBN254ProofWithPublic;
 use mina_curves::bn254::{BN254Parameters, Fp, Fq, BN254};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
-use poly_commitment::commitment::{caml::CamlPairingProof, PolyComm};
+use poly_commitment::commitment::PolyComm;
 
 type EFqSponge = DefaultFqSponge<BN254Parameters, PlonkSpongeConstantsKimchi>;
 type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>;
@@ -22,14 +23,11 @@ type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>;
 #[ocaml::func]
 pub fn caml_bn254_plonk_proof_create(
     index: CamlBN254PlonkIndexPtr<'static>,
-    witness: Vec<CamlBNFpVector>,
+    witness: Vec<CamlBnFpVector>,
     runtime_tables: Vec<CamlRuntimeTable<CamlBN254Fp>>,
     prev_challenges: Vec<CamlBN254Fp>,
     prev_sgs: Vec<CamlGBN254>,
-) -> Result<
-    CamlProofWithPublic<CamlGBN254, CamlBN254Fp, CamlPairingProof<CamlGBN254, CamlBN254Fp>>,
-    ocaml::Error,
-> {
+) -> Result<CamlBN254ProofWithPublic<CamlGBN254, CamlBN254Fp>, ocaml::Error> {
     {
         let ptr: &mut poly_commitment::srs::SRS<BN254> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };

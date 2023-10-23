@@ -214,5 +214,5 @@ pub mod bn254 {
     use crate::arkworks::CamlBN254Fp;
     use mina_curves::bn254::{Fp, Pair};
 
-    impl_pairing_srs!(CamlBN254FpSrs, CamlBN254Fp, Fp, Pair);
+    impl_pairing_srs!(CamlBnFpSrs, CamlBN254Fp, Fp, Pair);
 }
