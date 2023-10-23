@@ -679,8 +679,10 @@ module Zkapp_permissions = struct
           "No transaction version exists for the permission"
     | Ok _ ->
         ()
-    | Error _ ->
-        [%log error] "fail to query protocol_versions table" ) ;
+    | Error e ->
+        [%log error]
+          ~metadata:[ ("error", `String (Caqti_error.show e)) ]
+          "fail to query protocol_versions table, see $error" ) ;
     let value =
       { edit_state = perms.edit_state
       ; send = perms.send
