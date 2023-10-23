@@ -105,7 +105,7 @@ let Config =
       , soft_fail : Optional B/SoftFail
       , skip: Optional B/Skip
       , `if` : Optional B/If
-      , timeout_in_minutes : Optional Natural
+      , timeout_in_minutes : Optional Integer
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -119,7 +119,7 @@ let Config =
     , soft_fail = None B/SoftFail
     , skip = None B/Skip
     , `if` = None B/If
-    , timeout_in_minutes = None Natural
+    , timeout_in_minutes = None Integer
     }
   }
 
@@ -156,6 +156,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                      else Some (B/ArtifactPaths.String (SelectFiles.compile c.artifact_paths)),
     key = Some c.key,
     label = Some c.label,
+    timeout_in_minutes = c.timeout_in_minutes,
     retry =
           Some {
               -- we only consider automatic retries
