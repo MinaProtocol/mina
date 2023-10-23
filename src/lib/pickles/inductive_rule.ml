@@ -116,6 +116,8 @@ type ( 'prev_vars
          'a_var main_input
       -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
   ; feature_flags : bool Pickles_types.Plonk_types.Features.t
+        (* TODO: custom_gate_type Add override gate (once this works, call pickles.compile (one commit) ) *)
+  ; custom_gate_type : bool
   }
 
 module T

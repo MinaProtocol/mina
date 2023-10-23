@@ -310,7 +310,7 @@ let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
     main_fixed_lookup_tables () ;
     main_fixed_lookup_tables_multiple_tables_multiple_lookups () )
 
-let register_test name feature_flags1 feature_flags2 =
+let register_test name feature_flags1 feature_flags2 custom_gate_type1 custom_gate_type2 =
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
@@ -329,6 +329,7 @@ let register_test name feature_flags1 feature_flags2 =
                 ; auxiliary_output = ()
                 } )
           ; feature_flags = feature_flags1
+          ; custom_gate_type = custom_gate_type1
           }
         ; { identifier = "main2"
           ; prevs = []
@@ -340,6 +341,7 @@ let register_test name feature_flags1 feature_flags2 =
                 ; auxiliary_output = ()
                 } )
           ; feature_flags = feature_flags2
+          ; custom_gate_type = custom_gate_type2
           }
         ] )
       ()
@@ -368,32 +370,32 @@ let register_test name feature_flags1 feature_flags2 =
     ; test_case "prove 2" `Quick test_prove2
     ]
 
-let register_feature_test (name, specific_feature_flags) =
-  (* Tests activating "on" logic*)
-  register_test name specific_feature_flags specific_feature_flags ;
+let register_feature_test (name, specific_feature_flags, custom_gate_type) =
+  (* Tests activating "on" logic *)
+  register_test name specific_feature_flags specific_feature_flags custom_gate_type custom_gate_type ;
   (* Tests activating "maybe on" logic *)
   register_test
     (Printf.sprintf "%s (maybe)" name)
-    specific_feature_flags Plonk_types.Features.none_bool
+    specific_feature_flags Plonk_types.Features.none_bool custom_gate_type custom_gate_type
 
 let () =
   let configurations =
-    [ ("xor", Plonk_types.Features.{ none_bool with xor = true })
+    [ ("xor", Plonk_types.Features.{ none_bool with xor = true }, false)
     ; ( "range check 0"
-      , Plonk_types.Features.{ none_bool with range_check0 = true } )
+      , Plonk_types.Features.{ none_bool with range_check0 = true }, false )
     ; ( "range check 1"
-      , Plonk_types.Features.{ none_bool with range_check1 = true } )
-    ; ("rot", Plonk_types.Features.{ none_bool with rot = true })
+      , Plonk_types.Features.{ none_bool with range_check1 = true }, false )
+    ; ("rot", Plonk_types.Features.{ none_bool with rot = true }, false)
     ; ( "foreign field addition"
-      , Plonk_types.Features.{ none_bool with foreign_field_add = true } )
+      , Plonk_types.Features.{ none_bool with foreign_field_add = true }, false )
     ; ( "foreign field multiplication"
-      , Plonk_types.Features.{ none_bool with foreign_field_mul = true } )
+      , Plonk_types.Features.{ none_bool with foreign_field_mul = true }, false )
     ; ( "Fixed lookup tables"
-      , Plonk_types.Features.{ none_bool with lookup = true } )
+      , Plonk_types.Features.{ none_bool with lookup = true }, false )
     ]
   in
   List.iter ~f:register_feature_test configurations ;
   register_test "different sizes of lookup"
     Plonk_types.Features.{ none_bool with foreign_field_mul = true }
-    Plonk_types.Features.{ none_bool with xor = true } ;
+    Plonk_types.Features.{ none_bool with xor = true } false false;
   Alcotest.run "Custom gates" (get_tests ())

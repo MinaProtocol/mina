@@ -1,3 +1,4 @@
+(* TODO update / clone ... only focus tests on changed behaviour of gate with various witnesses *)
 open Core_kernel
 open Pickles_types
 open Pickles.Impls.Step
@@ -72,6 +73,7 @@ let test () =
                 ; auxiliary_output = ()
                 } )
           ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+          ; custom_gate_type = false (* JES: TODO: This is fine? *)
           }
         ] )
       ()
@@ -116,6 +118,7 @@ let test () =
                 ; auxiliary_output = ()
                 } )
           ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+          ; custom_gate_type = false (* JES: TODO: This is fine? *)
           }
         ] )
       ()

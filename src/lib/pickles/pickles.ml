@@ -408,6 +408,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -459,6 +460,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; main =
                         (fun _ ->
                           dummy_constraints () ;
@@ -526,6 +528,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = [ self ]
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; main =
                         (fun { public_input = self } ->
                           let prev =
@@ -633,6 +636,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; prevs = [ No_recursion.tag; self ]
                     ; main =
                         (fun { public_input = self } ->
@@ -765,6 +769,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; prevs = [ No_recursion_return.tag; self ]
                     ; main =
                         (fun { public_input = () } ->
@@ -877,6 +882,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; prevs = []
                     ; main =
                         (fun { public_input = x } ->
@@ -930,6 +936,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; prevs = []
                     ; main =
                         (fun { public_input = input } ->
@@ -1037,6 +1044,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ; auxiliary_output = ()
               } )
         ; feature_flags = Plonk_types.Features.none_bool
+        ; custom_gate_type = false
         }
 
       module M = struct
@@ -1896,6 +1904,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; prevs = [ tag; tag ]
                     ; main =
                         (fun { public_input = () } ->
@@ -2037,6 +2046,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -2088,6 +2098,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -2140,6 +2151,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -2217,6 +2229,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = [ side_loaded_tag ]
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; main =
                         (fun { public_input = self } ->
                           let prev =
@@ -2385,6 +2398,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -2436,6 +2450,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -2488,6 +2503,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -2568,6 +2584,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = [ side_loaded_tag ]
                     ; feature_flags = Plonk_types.Features.none_bool
+                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
                     ; main =
                         (fun { public_input = self } ->
                           let prev =
