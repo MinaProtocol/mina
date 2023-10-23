@@ -5,6 +5,7 @@ let B = ../../External/Buildkite.dhall
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
@@ -36,6 +37,7 @@ in  Pipeline.build
           ]
         , path = "Lint"
         , name = "Fast"
+        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
         }
       , steps =
         [ Command.build
