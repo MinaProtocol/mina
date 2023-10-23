@@ -32,3 +32,11 @@
   (progn
    (run gen_scalars/gen_scalars.exe scalars.ml)
    (run ocamlformat -i scalars.ml))))
+
+(rule
+ (targets scalars_plus.ml)
+ (mode promote)
+ (action
+  (progn
+   (run gen_scalars/gen_scalars_plus.exe scalars_plus.ml)
+   (run ocamlformat -i scalars_plus.ml))))

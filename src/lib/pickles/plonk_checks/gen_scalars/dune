@@ -1,5 +1,5 @@
-(executable
- (name gen_scalars)
+(executables
+ (names gen_scalars gen_scalars_plus)
  (modes native)
  (flags
   (:standard
