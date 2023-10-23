@@ -21,7 +21,7 @@ let dirtyWhen = [
   S.strictlyStart (S.contains "src/app/archive"),
   S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall",
   S.exactly "buildkite/scripts/rosetta-integration-tests" "sh",
-  S.exactly "buildkite/scripts/rosetta-integration-tests-fast.sh" "sh"
+  S.exactly "buildkite/scripts/rosetta-integration-tests-full" "sh"
 ]
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
