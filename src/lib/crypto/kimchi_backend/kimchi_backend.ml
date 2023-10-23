@@ -10,4 +10,5 @@ module Pasta = struct
   module Pallas_based_plonk = Kimchi_pasta.Pallas_based_plonk
   module Pasta = Kimchi_pasta.Pasta
   module Vesta_based_plonk = Kimchi_pasta.Vesta_based_plonk
+  module Bn254_based_plonk = Kimchi_pasta.Bn254_based_plonk
 end

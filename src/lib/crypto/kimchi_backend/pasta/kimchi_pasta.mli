@@ -34,6 +34,23 @@ module Vesta_based_plonk : sig
   module Oracles = Vesta_based_plonk.Oracles
 end
 
+module Bn254_based_plonk : sig
+  module Field = Bn_based_plonk.Field
+  module Curve = Bn_based_plonk.Curve
+  module Bigint = Bn_based_plonk.Bigint
+
+  val field_size : Pasta_bindings.BigInt256.t
+
+  module Verification_key = Bn_based_plonk.Verification_key
+  module R1CS_constraint_system = Bn_based_plonk.R1CS_constraint_system
+  module Rounds_vector = Bn_based_plonk.Rounds_vector
+  module Rounds = Bn_based_plonk.Rounds
+  module Keypair = Bn_based_plonk.Keypair
+  module Proof = Bn_based_plonk.Proof
+  module Proving_key = Bn_based_plonk.Proving_key
+  module Oracles = Bn_based_plonk.Oracles
+end
+
 module Pasta : sig
   module Rounds = Basic.Rounds
   module Bigint256 = Basic.Bigint256

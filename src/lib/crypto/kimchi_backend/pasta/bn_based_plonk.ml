@@ -51,7 +51,7 @@ module Rounds_vector = Rounds.Step_vector
 module Rounds = Rounds.Step
 
 module Keypair = Dlog_plonk_based_keypair.Make (struct
-  let name = "vesta"
+  let name = "bn254"
 
   module Rounds = Rounds
   module Urs = Kimchi_bindings.Protocol.SRS.Fp
@@ -65,7 +65,7 @@ module Keypair = Dlog_plonk_based_keypair.Make (struct
 end)
 
 module Proof = Plonk_dlog_proof.Make (struct
-  let id = "pasta_vesta"
+  let id = "bn254"
 
   module Scalar_field = Field
   module Base_field = Fq

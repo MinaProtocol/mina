@@ -34,6 +34,23 @@ module Vesta_based_plonk = struct
   module Oracles = Vesta_based_plonk.Oracles
 end
 
+module Bn254_based_plonk = struct
+  module Field = Bn_based_plonk.Field
+  module Curve = Bn_based_plonk.Curve
+  module Bigint = Bn_based_plonk.Bigint
+
+  let field_size = Bn_based_plonk.field_size
+
+  module Verification_key = Bn_based_plonk.Verification_key
+  module R1CS_constraint_system = Bn_based_plonk.R1CS_constraint_system
+  module Rounds_vector = Bn_based_plonk.Rounds_vector
+  module Rounds = Bn_based_plonk.Rounds
+  module Keypair = Bn_based_plonk.Keypair
+  module Proof = Bn_based_plonk.Proof
+  module Proving_key = Bn_based_plonk.Proving_key
+  module Oracles = Bn_based_plonk.Oracles
+end
+
 module Pasta = struct
   module Rounds = Pasta.Rounds
   module Bigint256 = Pasta.Bigint256

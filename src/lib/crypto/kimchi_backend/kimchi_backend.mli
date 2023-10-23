@@ -205,4 +205,22 @@ module Pasta : sig
     module Proving_key = Kimchi_pasta.Vesta_based_plonk.Proving_key
     module Oracles = Kimchi_pasta.Vesta_based_plonk.Oracles
   end
+
+  module Bn254_based_plonk : sig
+    module Field = Kimchi_pasta.Bn254_based_plonk.Field
+    module Curve = Kimchi_pasta.Bn254_based_plonk.Curve
+    module Bigint = Kimchi_pasta.Bn254_based_plonk.Bigint
+
+    val field_size : Pasta_bindings.BigInt256.t
+
+    module Verification_key = Kimchi_pasta.Bn254_based_plonk.Verification_key
+    module R1CS_constraint_system =
+      Kimchi_pasta.Bn254_based_plonk.R1CS_constraint_system
+    module Rounds_vector = Kimchi_pasta.Bn254_based_plonk.Rounds_vector
+    module Rounds = Kimchi_pasta.Bn254_based_plonk.Rounds
+    module Keypair = Kimchi_pasta.Bn254_based_plonk.Keypair
+    module Proof = Kimchi_pasta.Bn254_based_plonk.Proof
+    module Proving_key = Kimchi_pasta.Bn254_based_plonk.Proving_key
+    module Oracles = Kimchi_pasta.Bn254_based_plonk.Oracles
+  end
 end
