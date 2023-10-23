@@ -243,6 +243,7 @@ module Stable = struct
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
               ; zk_rows = 3
+              ; custom_gate_type = false
               } )
         in
         { Poly.max_proofs_verified
