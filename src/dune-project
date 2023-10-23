@@ -163,6 +163,7 @@
 (package (name random_oracle_input))
 (package (name random_oracle))
 (package (name rc_pool))
+(package (name receipt_chain_hash_to_b58))
 (package (name replayer))
 (package (name rfc3339_time))
 (package (name rocksdb))
