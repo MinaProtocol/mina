@@ -67,7 +67,7 @@ module Wrap : sig
     -> ('a, 'b) Impls.Wrap.Typ.t
     -> ('c, 'd) Impls.Wrap.Typ.t
     -> ('a -> unit -> 'c)
-    -> ( Impls.Wrap.Keypair.t
+    -> ( Impls.Wrap.Proving_key.t
        * [> `Cache_hit | `Generated_something | `Locally_generated ] )
        lazy_t
        * ( Verification_key.Stable.V2.t

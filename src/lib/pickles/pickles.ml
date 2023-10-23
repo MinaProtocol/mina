@@ -1785,7 +1785,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     wrap_main A_value.to_field_elements ~pairing_vk
                     ~step_domains:b.domains
                     ~pairing_plonk_indices:(Lazy.force step_vks) ~wrap_domains
-                    (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
+                    (fst (Lazy.force wrap_pk))
                     proof
                 in
                 Proof.T

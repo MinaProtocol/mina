@@ -194,7 +194,7 @@ module Wrap = struct
                Key_cache.Sync.read cache s_p k )
          with
          | Ok (pk, d) ->
-             (Keypair.create ~pk ~vk:(Backend.Tock.Keypair.vk pk), d)
+             (pk, d)
          | Error _e ->
              let r =
                Common.time "wrapkeygen" (fun () ->
@@ -204,7 +204,7 @@ module Wrap = struct
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)
                  : unit Or_error.t ) ;
-             (r, `Generated_something) )
+             (Keypair.pk r, `Generated_something) )
     in
     let vk =
       lazy
@@ -247,9 +247,8 @@ module Wrap = struct
          | Ok (vk, d) ->
              (vk, d)
          | Error _e ->
-             let kp, _dirty = Lazy.force pk in
-             let vk = Keypair.vk kp in
-             let pk = Keypair.pk kp in
+             let pk, _dirty = Lazy.force pk in
+             let vk = Backend.Tock.Keypair.vk pk in
              let vk : Vk.t =
                { index = vk
                ; commitments =

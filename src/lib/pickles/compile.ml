@@ -781,7 +781,7 @@ struct
                    wrap_vk.commitments )
               wrap_main ~typ ~step_vk ~step_plonk_indices:(Lazy.force step_vks)
               ~actual_wrap_domains
-              (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
+              (fst (Lazy.force wrap_pk))
               proof
           in
           ( return_value
