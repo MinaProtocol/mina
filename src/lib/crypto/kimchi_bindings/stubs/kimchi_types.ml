@@ -129,18 +129,32 @@ type nonrec 'caml_g prover_commitments =
   ; lookup : 'caml_g lookup_commitments option
   }
 
-type nonrec ('caml_g, 'caml_f, 'caml_p) prover_proof =
+type nonrec ('caml_g, 'caml_f) prover_proof =
   { commitments : 'caml_g prover_commitments
-  ; proof : 'caml_p
+  ; proof : ('caml_g, 'caml_f) opening_proof
   ; evals : 'caml_f proof_evaluations
   ; ft_eval1 : 'caml_f
   ; public : 'caml_f array
   ; prev_challenges : ('caml_g, 'caml_f) recursion_challenge array
   }
 
-type nonrec ('caml_g, 'caml_f, 'caml_p) proof_with_public =
+type nonrec ('caml_g, 'caml_f) proof_with_public =
   { public_evals : 'caml_f array point_evaluations option
-  ; proof : ('caml_g, 'caml_f, 'caml_p) prover_proof
+  ; proof : ('caml_g, 'caml_f) prover_proof
+  }
+
+type nonrec ('caml_g, 'caml_f) bn254_prover_proof =
+  { commitments : 'caml_g prover_commitments
+  ; proof : ('caml_g, 'caml_f) pairing_proof
+  ; evals : 'caml_f proof_evaluations
+  ; ft_eval1 : 'caml_f
+  ; public : 'caml_f array
+  ; prev_challenges : ('caml_g, 'caml_f) recursion_challenge array
+  }
+
+type nonrec ('caml_g, 'caml_f) bn254_proof_with_public =
+  { public_evals : 'caml_f array point_evaluations option
+  ; proof : ('caml_g, 'caml_f) bn254_prover_proof
   }
 
 type nonrec wire = { row : int; col : int }

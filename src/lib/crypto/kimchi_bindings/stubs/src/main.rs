@@ -33,6 +33,7 @@ use wires_15_stubs::{
     },
     projective::{pallas::*, vesta::*},
     srs::{bn254::*, fp::*, fq::*},
+    CamlBN254ProofWithPublic,
     CamlCircuitGate,
     CamlLookupCommitments,
     CamlOpeningProof,
@@ -40,6 +41,7 @@ use wires_15_stubs::{
     CamlPastaProofWithPublic,
     CamlPolyComm,
     CamlProofEvaluations,
+    CamlProverBN254Proof,
     CamlProverCommitments,
     CamlProverPastaProof,
     CamlRandomOracles,
@@ -120,6 +122,9 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
     decl_type!(w, env, CamlProverPastaProof<T1, T2> => "prover_proof");
     decl_type!(w, env, CamlPastaProofWithPublic<T1, T2> => "proof_with_public");
+
+    decl_type!(w, env, CamlProverBN254Proof<T1, T2> => "bn254_prover_proof");
+    decl_type!(w, env, CamlBN254ProofWithPublic<T1, T2> => "bn254_proof_with_public");
 
     decl_type!(w, env, CamlWire => "wire");
     decl_type!(w, env, GateType => "gate_type");

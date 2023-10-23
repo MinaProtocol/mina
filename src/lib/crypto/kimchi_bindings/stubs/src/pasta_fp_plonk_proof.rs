@@ -27,7 +27,7 @@ use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
-use poly_commitment::commitment::{caml::CamlOpeningProof, CommitmentCurve, PolyComm};
+use poly_commitment::commitment::{CommitmentCurve, PolyComm};
 use poly_commitment::evaluation_proof::OpeningProof;
 use std::array;
 use std::convert::TryInto;

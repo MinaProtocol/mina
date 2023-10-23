@@ -2,7 +2,6 @@ use crate::{
     arkworks::{CamlBN254Fp, CamlGBN254},
     bn254_plonk_index::{CamlBN254PlonkIndexPtr, KZGProverIndex},
     field_vector::bn254::CamlBnFpVector,
-    CamlPairingProof,
 };
 use groupmap::GroupMap;
 use kimchi::circuits::lookup::runtime_tables::{caml::CamlRuntimeTable, RuntimeTable};

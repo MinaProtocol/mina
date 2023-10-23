@@ -387,10 +387,7 @@ module Protocol = struct
            )
            Kimchi_types.VerifierIndex.verifier_index
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fp.t
-           , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fp.t )
            Kimchi_types.prover_proof
         -> t = "fp_oracles_create_no_public"
 
@@ -403,10 +400,7 @@ module Protocol = struct
            )
            Kimchi_types.VerifierIndex.verifier_index
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fp.t
-           , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fp.t )
            Kimchi_types.proof_with_public
         -> t = "fp_oracles_create"
 
@@ -431,10 +425,7 @@ module Protocol = struct
            )
            Kimchi_types.VerifierIndex.verifier_index
         -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fq.t
-           , ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fq.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fq.t )
            Kimchi_types.prover_proof
         -> t = "fq_oracles_create_no_public"
 
@@ -447,10 +438,7 @@ module Protocol = struct
            )
            Kimchi_types.VerifierIndex.verifier_index
         -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fq.t
-           , ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fq.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fq.t )
            Kimchi_types.proof_with_public
         -> t = "fq_oracles_create"
 
@@ -473,10 +461,7 @@ module Protocol = struct
         -> Pasta_bindings.Fp.t array
         -> Pasta_bindings.Fq.t Kimchi_types.or_infinity array
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fp.t
-           , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fp.t )
            Kimchi_types.proof_with_public = "caml_pasta_fp_plonk_proof_create"
 
       external create_kzg :
@@ -486,11 +471,9 @@ module Protocol = struct
         -> Pasta_bindings.BN254Fp.t array
         -> Pasta_bindings.BN254Fq.t Kimchi_types.or_infinity array
         -> ( Pasta_bindings.BN254Fq.t Kimchi_types.or_infinity
-           , Pasta_bindings.BN254Fp.t
-           , ( Pasta_bindings.BN254Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.BN254Fp.t )
-             Kimchi_types.pairing_proof )
-           Kimchi_types.proof_with_public = "caml_bn254_plonk_proof_create"
+           , Pasta_bindings.BN254Fp.t )
+           Kimchi_types.bn254_proof_with_public
+        = "caml_bn254_plonk_proof_create"
 
       external create_and_verify :
            Index.Fp.t
@@ -499,10 +482,7 @@ module Protocol = struct
         -> Pasta_bindings.Fp.t array
         -> Pasta_bindings.Fq.t Kimchi_types.or_infinity array
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fp.t
-           , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fp.t )
            Kimchi_types.proof_with_public
         = "caml_pasta_fp_plonk_proof_create_and_verify"
 
@@ -511,10 +491,7 @@ module Protocol = struct
         -> Index.Fp.t
            * Pasta_bindings.Fp.t
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t
-             , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-               , Pasta_bindings.Fp.t )
-               Kimchi_types.opening_proof )
+             , Pasta_bindings.Fp.t )
              Kimchi_types.proof_with_public
         = "caml_pasta_fp_plonk_proof_example_with_lookup"
 
@@ -523,10 +500,7 @@ module Protocol = struct
         -> Index.Fp.t
            * Pasta_bindings.Fp.t
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t
-             , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-               , Pasta_bindings.Fp.t )
-               Kimchi_types.opening_proof )
+             , Pasta_bindings.Fp.t )
              Kimchi_types.proof_with_public
         = "caml_pasta_fp_plonk_proof_example_with_ffadd"
 
@@ -535,10 +509,7 @@ module Protocol = struct
         -> Index.Fp.t
            * (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t)
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t
-             , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-               , Pasta_bindings.Fp.t )
-               Kimchi_types.opening_proof )
+             , Pasta_bindings.Fp.t )
              Kimchi_types.proof_with_public
         = "caml_pasta_fp_plonk_proof_example_with_xor"
 
@@ -547,10 +518,7 @@ module Protocol = struct
         -> Index.Fp.t
            * (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t)
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t
-             , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-               , Pasta_bindings.Fp.t )
-               Kimchi_types.opening_proof )
+             , Pasta_bindings.Fp.t )
              Kimchi_types.proof_with_public
         = "caml_pasta_fp_plonk_proof_example_with_rot"
 
@@ -558,10 +526,7 @@ module Protocol = struct
            SRS.Fp.t
         -> Index.Fp.t
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t
-             , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-               , Pasta_bindings.Fp.t )
-               Kimchi_types.opening_proof )
+             , Pasta_bindings.Fp.t )
              Kimchi_types.proof_with_public
         = "caml_pasta_fp_plonk_proof_example_with_foreign_field_mul"
 
@@ -569,10 +534,7 @@ module Protocol = struct
            SRS.Fp.t
         -> Index.Fp.t
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t
-             , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-               , Pasta_bindings.Fp.t )
-               Kimchi_types.opening_proof )
+             , Pasta_bindings.Fp.t )
              Kimchi_types.proof_with_public
         = "caml_pasta_fp_plonk_proof_example_with_range_check"
 
@@ -580,10 +542,7 @@ module Protocol = struct
            SRS.Fp.t
         -> Index.Fp.t
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t
-             , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-               , Pasta_bindings.Fp.t )
-               Kimchi_types.opening_proof )
+             , Pasta_bindings.Fp.t )
              Kimchi_types.proof_with_public
         = "caml_pasta_fp_plonk_proof_example_with_range_check0"
 
@@ -594,10 +553,7 @@ module Protocol = struct
            )
            Kimchi_types.VerifierIndex.verifier_index
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fp.t
-           , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fp.t )
            Kimchi_types.proof_with_public
         -> bool = "caml_pasta_fp_plonk_proof_verify"
 
@@ -609,10 +565,7 @@ module Protocol = struct
            Kimchi_types.VerifierIndex.verifier_index
            array
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fp.t
-           , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fp.t )
            Kimchi_types.proof_with_public
            array
         -> bool = "caml_pasta_fp_plonk_proof_batch_verify"
@@ -620,24 +573,15 @@ module Protocol = struct
       external dummy :
            unit
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fp.t
-           , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fp.t )
            Kimchi_types.proof_with_public = "caml_pasta_fp_plonk_proof_dummy"
 
       external deep_copy :
            ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fp.t
-           , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fp.t )
            Kimchi_types.proof_with_public
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fp.t
-           , ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fp.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fp.t )
            Kimchi_types.proof_with_public
         = "caml_pasta_fp_plonk_proof_deep_copy"
     end
@@ -650,10 +594,7 @@ module Protocol = struct
         -> Pasta_bindings.Fq.t array
         -> Pasta_bindings.Fp.t Kimchi_types.or_infinity array
         -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fq.t
-           , ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fq.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fq.t )
            Kimchi_types.proof_with_public = "caml_pasta_fq_plonk_proof_create"
 
       external verify :
@@ -663,10 +604,7 @@ module Protocol = struct
            )
            Kimchi_types.VerifierIndex.verifier_index
         -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fq.t
-           , ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fq.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fq.t )
            Kimchi_types.proof_with_public
         -> bool = "caml_pasta_fq_plonk_proof_verify"
 
@@ -678,10 +616,7 @@ module Protocol = struct
            Kimchi_types.VerifierIndex.verifier_index
            array
         -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fq.t
-           , ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fq.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fq.t )
            Kimchi_types.proof_with_public
            array
         -> bool = "caml_pasta_fq_plonk_proof_batch_verify"
@@ -689,24 +624,15 @@ module Protocol = struct
       external dummy :
            unit
         -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fq.t
-           , ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fq.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fq.t )
            Kimchi_types.proof_with_public = "caml_pasta_fq_plonk_proof_dummy"
 
       external deep_copy :
            ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fq.t
-           , ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fq.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fq.t )
            Kimchi_types.proof_with_public
         -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fq.t
-           , ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-             , Pasta_bindings.Fq.t )
-             Kimchi_types.opening_proof )
+           , Pasta_bindings.Fq.t )
            Kimchi_types.proof_with_public
         = "caml_pasta_fq_plonk_proof_deep_copy"
     end

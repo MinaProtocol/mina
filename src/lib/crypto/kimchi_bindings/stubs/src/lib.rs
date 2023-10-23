@@ -64,8 +64,8 @@ pub use {
     },
     kimchi::proof::caml::CamlProofEvaluations,
     kimchi::prover::caml::{
-        CamlLookupCommitments, CamlPastaProofWithPublic, CamlProverCommitments,
-        CamlProverPastaProof,
+        CamlBN254ProofWithPublic, CamlLookupCommitments, CamlPastaProofWithPublic,
+        CamlProverBN254Proof, CamlProverCommitments, CamlProverPastaProof,
     },
     mina_poseidon::sponge::caml::CamlScalarChallenge,
     poly_commitment::commitment::caml::{CamlOpeningProof, CamlPairingProof, CamlPolyComm},
