@@ -94,8 +94,7 @@ module Step = struct
                 Key_cache.Sync.read cache s_p (Lazy.force k_p) )
           with
         | Ok (pk, dirty) ->
-            Common.time "step keypair create" (fun () ->
-                (Keypair.create ~pk ~vk:(Backend.Tick.Keypair.vk pk), dirty) )
+            Common.time "step keypair create" (fun () -> (pk, dirty))
         | Error _e ->
             let r =
               Common.time "stepkeygen" (fun () ->
@@ -106,7 +105,7 @@ module Step = struct
             ignore
               ( Key_cache.Sync.write cache s_p (Lazy.force k_p) (Keypair.pk r)
                 : unit Or_error.t ) ;
-            (r, `Generated_something) )
+            (Keypair.pk r, `Generated_something) )
     in
     let vk =
       lazy
@@ -119,7 +118,7 @@ module Step = struct
              (vk, `Cache_hit)
          | Error _e ->
              let pk, c = Lazy.force pk in
-             let vk = Keypair.vk pk in
+             let vk = Backend.Tick.Keypair.vk pk in
              ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
              (vk, c) )
     in

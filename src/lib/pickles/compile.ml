@@ -277,7 +277,7 @@ struct
 
   module Lazy_keys = struct
     type t =
-      (Impls.Step.Keypair.t * Dirty.t) Lazy.t
+      (Impls.Step.Proving_key.t * Dirty.t) Lazy.t
       * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Lazy.t
 
     (* TODO Think this is right.. *)
@@ -733,7 +733,7 @@ struct
                  ~f:(fun x -> [| x |])
                  wrap_vk.commitments )
             ~public_input ~auxiliary_typ ~feature_flags
-            (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
+            (fst (Lazy.force step_pk))
             wrap_vk.index
         in
         let step_vk = fst (Lazy.force step_vk) in
