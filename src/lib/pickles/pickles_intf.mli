@@ -17,8 +17,6 @@ module type S = sig
   module Common = Common
   module Proof_cache = Proof_cache
 
-  exception Return_digest of Md5.t
-
   module type Statement_intf = sig
     type field
 
@@ -374,7 +372,6 @@ module type S = sig
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
-    -> ?return_early_digest_exception:bool
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?num_chunks:int
     -> public_input:

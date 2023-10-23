@@ -15,8 +15,6 @@ open Poly_types
 open Hlist
 open Backend
 
-exception Return_digest of Md5.t
-
 let profile_constraints = false
 
 let verify_promise = Verify.verify
@@ -347,7 +345,6 @@ struct
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
            * Cache.Wrap.Key.Verification.t
-      -> ?return_early_digest_exception:bool
       -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
       -> ?override_wrap_main:
            (max_proofs_verified, branches, prev_varss) wrap_main_generic
@@ -382,8 +379,7 @@ struct
          * _
          * _
          * _ =
-   fun ~self ~cache ~proof_cache ?disk_keys
-       ?(return_early_digest_exception = false) ?override_wrap_domain
+   fun ~self ~cache ~proof_cache ?disk_keys ?override_wrap_domain
        ?override_wrap_main ?(num_chunks = 1) ~branches:(module Branches)
        ~max_proofs_verified ~name ~constraint_constants ~public_input
        ~auxiliary_typ ~choices () ->
@@ -555,13 +551,6 @@ struct
               in
               let () = if true then log_step main typ name b.index in
               let open Impls.Step in
-              (* HACK: TODO docs *)
-              if return_early_digest_exception then
-                raise
-                  (Return_digest
-                     ( constraint_system ~input_typ:Typ.unit ~return_typ:typ main
-                     |> R1CS_constraint_system.digest ) ) ;
-
               let k_p =
                 lazy
                   (let cs =
@@ -957,7 +946,6 @@ let compile_with_wrap_main_override_promise :
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
          * Cache.Wrap.Key.Verification.t
-    -> ?return_early_digest_exception:bool
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?override_wrap_main:
          (max_proofs_verified, branches, prev_varss) wrap_main_generic
@@ -1007,8 +995,7 @@ let compile_with_wrap_main_override_promise :
  (* This function is an adapter between the user-facing Pickles.compile API
     and the underlying Make(_).compile function which builds the circuits.
  *)
- fun ?self ?(cache = []) ?proof_cache ?disk_keys
-     ?(return_early_digest_exception = false) ?override_wrap_domain
+ fun ?self ?(cache = []) ?proof_cache ?disk_keys ?override_wrap_domain
      ?override_wrap_main ?num_chunks ~public_input ~auxiliary_typ ~branches
      ~max_proofs_verified ~name ~constraint_constants ~choices () ->
   let self =
@@ -1076,10 +1063,9 @@ let compile_with_wrap_main_override_promise :
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~return_early_digest_exception ~self ~proof_cache ~cache
-      ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
-      ~max_proofs_verified ~name ~public_input ~auxiliary_typ
-      ~constraint_constants
+    M.compile ~self ~proof_cache ~cache ?disk_keys ?override_wrap_domain
+      ?override_wrap_main ?num_chunks ~branches ~max_proofs_verified ~name
+      ~public_input ~auxiliary_typ ~constraint_constants
       ~choices:(fun ~self -> conv_irs (choices ~self))
       ()
   in
