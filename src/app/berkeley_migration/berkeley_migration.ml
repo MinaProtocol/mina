@@ -223,7 +223,13 @@ let user_commands_from_block_id ~mainnet_pool block_id =
 let first_batch = ref true
 
 let mainnet_protocol_version =
-  Protocol_version.create ~transaction:2 ~network:1 ~patch:0
+  (* It would be more accurate to posit distinct patches for each
+     mainnet release, but it's sufficient to have a protocol version
+     earlier than the berkeley hard fork protocol version. After the
+     hard fork, the replayer won't check ledger hashes for blocks with
+     an earlier protocol version.
+  *)
+  Protocol_version.create ~transaction:1 ~network:0 ~patch:0
 
 let mainnet_block_to_extensional ~logger ~mainnet_pool
     ~(genesis_block : Mina_block.t) (block : Sql.Mainnet.Block.t) =
