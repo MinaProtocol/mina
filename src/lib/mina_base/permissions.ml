@@ -658,10 +658,10 @@ let%test_unit "json value" =
         receive: "None",
         setDelegate: "Signature",
         setPermissions: "Signature",
-        setVerificationKey: { 
-          "auth": "Signature",
-          "txn_version": 3,
-        },
+        setVerificationKey: {
+          auth: "Signature",
+          txnVersion: "3"
+          },
         setZkappUri: "Signature",
         editActionState: "Signature",
         setTokenSymbol: "Signature",
