@@ -1,4 +1,6 @@
 let Prelude = ../External/Prelude.dhall
+let B = ../External/Buildkite.dhall
+let B/If = B.definitions/commandStep/properties/if/Type
 
 let Cmd = ../Lib/Cmds.dhall
 let S = ../Lib/SelectFiles.dhall
@@ -62,7 +64,7 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
           network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
           deb_profile="${Profiles.lowerName profile}",
-          step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
         }
 
         in
@@ -74,7 +76,8 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
           deps=DebianVersions.dependsOn debVersion profile,
           service="mina-test-executive",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image",
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard'"
         }
         in
         DockerImage.generateStep testExecutiveSpec,
@@ -85,7 +88,8 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
           service="mina-batch-txn",
           network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image",
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard'"
         }
         in
         DockerImage.generateStep batchTxnSpec,
@@ -96,7 +100,7 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
           service="mina-archive",
           deb_codename="${DebianVersions.lowerName debVersion}",
           deb_profile="${Profiles.lowerName profile}",
-          step_key="archive-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
         }
         in
         DockerImage.generateStep archiveSpec,
@@ -107,7 +111,8 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
           service="mina-rosetta",
           network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image",
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard'"
         }
         in
         DockerImage.generateStep rosettaSpec,
@@ -117,7 +122,8 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
           deps=DebianVersions.dependsOn debVersion profile,
           service="mina-zkapp-test-transaction",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard'"
         }
 
         in

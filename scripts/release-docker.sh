@@ -57,13 +57,15 @@ case "${DEB_CODENAME##*=}" in
 esac
 IMAGE="--build-arg image=${IMAGE}"
 
-# Determina profile for mina name. To preserve backward compatibility standard profile is default. 
+# Determine profile for mina name. To preserve backward compatibility standard profile is default. 
 case "${DEB_PROFILE}" in
   standard)
     DEB_PROFILE=""
+    SERVICE_SUFFIX=""
     ;;
   *)
     DEB_PROFILE="--build-arg deb_profile=${DEB_PROFILE}"
+    SERVICE_SUFFIX="-${DEB_PROFILE}"
     ;;
 esac
 
@@ -84,6 +86,7 @@ case "${SERVICE}" in
 mina-archive)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
   DOCKER_CONTEXT="dockerfiles/"
+  SERVICE=${SERVICE}${SERVICE_SUFFIX}
   ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"

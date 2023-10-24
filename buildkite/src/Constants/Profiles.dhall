@@ -32,6 +32,12 @@ let toSuffixLowercase = \(profile : Profile) ->
     , Lightnet = "lightnet"
   } profile
 
+let toLabelSegment = \(profile : Profile) ->
+  merge {
+    Standard = ""
+    , Lightnet = "-lightnet"
+  } profile
+
 
 
 in
@@ -43,4 +49,5 @@ in
   , duneProfile = duneProfile
   , toSuffixUppercase = toSuffixUppercase
   , toSuffixLowercase = toSuffixLowercase
+  , toLabelSegment = toLabelSegment
 }
