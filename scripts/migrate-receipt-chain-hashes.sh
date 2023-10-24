@@ -1,13 +1,17 @@
 #!/bin/bash
 
-if [ ! $# -eq 1 ] ; then
-    echo "Usage" $0 archive-db
+if [ $# -lt 1 ] || [ $# -gt 3 ]; then
+    echo "Usage" $0 archive-db [hashes_file] [update_script]
+    echo "'hashes_file' and 'update_script' are created when running this script"
     exit 0
 fi
 
 ARCHIVE_DB=$1
-HASHES_FILE=hashes_file.tmp
-UPDATE_SCRIPT=hashes_update.sql
+HASHES_FILE=${2:-hashes_file.tmp}
+UPDATE_SCRIPT=${3:-hashes_update.sql}
+
+echo "Migrating receipt chain hashes in account preconditions in archive db '"$ARCHIVE_DB"'"
+echo "Using temporary file '"$HASHES_FILE"' and creating SQL script '"$UPDATE_SCRIPT"'"
 
 rm -f $HASHES_FILE
 rm -f $UPDATE_SCRIPT
