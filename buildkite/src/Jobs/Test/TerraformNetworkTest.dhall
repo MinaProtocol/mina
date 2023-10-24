@@ -23,8 +23,8 @@ let buildTestCmd : Size -> Command.Type = \(cmd_target : Size) ->
   Command.build
     Command.Config::{
       commands = RunInToolchain.runInToolchain ([] : List Text) "buildkite/scripts/terraform-test.sh",
-      label = "terraform-network-tests",
-      key = "terraform network test",
+      label = "Terraform: Test",
+      key = "terraform-network-test",
       target = cmd_target,
       docker = None Docker.Type
     }
