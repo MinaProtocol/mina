@@ -913,7 +913,7 @@ module Zkapp_account_precondition = struct
     in
     let receipt_chain_hash =
       Zkapp_basic.Or_ignore.to_option acct.receipt_chain_hash
-      |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
+      |> Option.map ~f:Receipt.Chain_hash.to_base58_check
     in
     let proved_state = Zkapp_basic.Or_ignore.to_option acct.proved_state in
     let is_new = Zkapp_basic.Or_ignore.to_option acct.is_new in
