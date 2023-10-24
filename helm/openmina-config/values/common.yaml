@@ -5,11 +5,13 @@ mina:
   privkeyPass:
   exposeGraphql: true
   usePodIp: true
-  seedPeers:
-    # see resources/seed1.peerid
-    - /dns4/seed1/tcp/10001/p2p/12D3KooWBT8pyJAfWJhdeGYAtKvcaUmm78ExyZ6uo6BEimYNVat1
-    # see resources/seed2.peerid
-    - /dns4/seed2/tcp/10001/p2p/12D3KooWQ2gQb1uoDGymuxtoA8jPdb6SykyP94tEP6FVyXHcM9Ye
+  seedPeersURL: https://storage.googleapis.com/seed-lists/mainnet_seeds.txt
+  seedPeers: []
+  # seedPeers:
+  #   # see resources/seed1.peerid
+  #   - /dns4/seed1/tcp/10001/p2p/12D3KooWBT8pyJAfWJhdeGYAtKvcaUmm78ExyZ6uo6BEimYNVat1
+  #   # see resources/seed2.peerid
+  #   - /dns4/seed2/tcp/10001/p2p/12D3KooWQ2gQb1uoDGymuxtoA8jPdb6SykyP94tEP6FVyXHcM9Ye
   # memRequest: 4Gi
   # cpuRequest: 4
   # optimized: false
@@ -80,8 +82,10 @@ blockProducerConfigs:
 httpCoordinatedSnarkersConfig:
   # the number of snark workers
   count: 10
+  workers: 5
   namePrefix: snarker
   workSelectionAlgorithm: coordinated
+  publicKey: B62qpGpmn5JLLXqR6mci3cJ1PrJe8uRmxRaiEv7KXEgDqeQMCDmkU1P
 
 # minaSnarkCoordinatorsConfig:
 # - name: snarker001
