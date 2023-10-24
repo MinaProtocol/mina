@@ -1160,7 +1160,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let proofs_verifieds = Vector.singleton 2 in
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags ~num_chunks:1
-              ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
+              ~actual_feature_flags ~custom_gate_type:false (* JES: TODO: update *) ~max_proofs_verified:Max_proofs_verified.n
               ~branches:Branches.n ~self ~public_input:(Input typ)
               ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
               rule ~wrap_domains ~proofs_verifieds
