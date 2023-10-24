@@ -1,6 +1,6 @@
 testnetName: testnet
 mina:
-  image: openmina/mina:custom-tooling-snark-http-coordinator-rampup5-22
+  image: openmina/mina:custom-tooling-snark-http-coordinator-mainnet-1.4.0.1-latest
   snarkCoordinatorImage: binier/mina-snark-worker-rs:latest
   privkeyPass:
   exposeGraphql: true
@@ -48,38 +48,38 @@ blockProducerConfigs:
     # see resources/key-03
     keypairName: prod3-privkey-secret
     isolated: false
-  - name: prod4
-    # see resources/key-04
-    keypairName: prod4-privkey-secret
-    isolated: false
-  - name: prod5
-    # see resources/key-05
-    keypairName: prod5-privkey-secret
-    isolated: false
-  - name: prod6
-    # see resources/key-6
-    keypairName: prod6-privkey-secret
-    isolated: false
-  - name: prod7
-    # see resources/key-07
-    keypairName: prod7-privkey-secret
-    isolated: false
-  - name: prod8
-    # see resources/key-08
-    keypairName: prod8-privkey-secret
-    isolated: false
-  - name: prod9
-    # see resources/key-09
-    keypairName: prod9-privkey-secret
-    isolated: false
-  - name: prod10
-    # see resources/key-10
-    keypairName: prod10-privkey-secret
-    isolated: false
+  # - name: prod4
+  #   # see resources/key-04
+  #   keypairName: prod4-privkey-secret
+  #   isolated: false
+  # - name: prod5
+  #   # see resources/key-05
+  #   keypairName: prod5-privkey-secret
+  #   isolated: false
+  # - name: prod6
+  #   # see resources/key-6
+  #   keypairName: prod6-privkey-secret
+  #   isolated: false
+  # - name: prod7
+  #   # see resources/key-07
+  #   keypairName: prod7-privkey-secret
+  #   isolated: false
+  # - name: prod8
+  #   # see resources/key-08
+  #   keypairName: prod8-privkey-secret
+  #   isolated: false
+  # - name: prod9
+  #   # see resources/key-09
+  #   keypairName: prod9-privkey-secret
+  #   isolated: false
+  # - name: prod10
+  #   # see resources/key-10
+  #   keypairName: prod10-privkey-secret
+  #   isolated: false
 
 httpCoordinatedSnarkersConfig:
   # the number of snark workers
-  count: 70
+  count: 10
   namePrefix: snarker
   workSelectionAlgorithm: coordinated
 
@@ -133,7 +133,7 @@ logs:
   image: openmina/mina-logs-service:b5d32468
 
 internalTrace:
-  enable: true
+  enable: false
   image: openmina/mina-internal-trace-consumer:fec6545
 
 aggregator:
@@ -141,7 +141,7 @@ aggregator:
   ciRepo: openmina/mina-daily-testnet
 
 ciFrontend:
-  image: directcuteo/mina-ci-frontend:reports40
+  image: directcuteo/ocaml-based-fe:fc0c46f
   nodePort: 31309
 
 nodeSelector:

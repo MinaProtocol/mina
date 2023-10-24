@@ -1,2 +1,2 @@
 frontend:
-  image: directcuteo/mina-frontend:4332938
+  image: directcuteo/ocaml-based-fe:fc0c46f

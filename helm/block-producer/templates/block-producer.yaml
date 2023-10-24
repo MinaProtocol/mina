@@ -76,42 +76,6 @@ spec:
           requests:
             memory: {{ $.Values.mina.memRequest }}
             cpu: {{ $.Values.mina.cpuRequest }}
-      {{ if $config.libp2pSecret -}}
-      - name: libp2p-perms
-        image: {{ $.Values.mina.image | quote }}
-        command:
-        - bash
-        - -c
-        - /bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/
-        volumeMounts:
-        - name: libp2p-keys
-          mountPath: /libp2p-keys
-        - name: actual-libp2p
-          mountPath: /root/libp2p-keys
-        env:
-          - name: MINA_LIBP2P_PASS
-            value: {{ $config.privateKeyPW | quote }}
-      {{- else -}}
-      - name: libp2p-perms
-        image: {{ $.Values.mina.image | quote }}
-        command:
-        - bash
-        - -c
-        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
-        volumeMounts:
-        - name: actual-libp2p
-          mountPath: /root/libp2p-keys
-        env:
-          - name: MINA_LIBP2P_PASS
-            value: {{ $config.privateKeyPW | quote }}
-        resources:
-          limits:
-            memory: {{ $.Values.mina.memRequest }}
-            cpu: {{ $.Values.mina.cpuRequest }}
-          requests:
-            memory: {{ $.Values.mina.memRequest }}
-            cpu: {{ $.Values.mina.cpuRequest }}
-      {{- end }}
       containers:
       {{ include "sideCar.resources.containerSpec" (dict "resources" $.Values.resources) | nindent 6 }}
       {{ include "sideCar.bpfDebugger.containerSpec" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
@@ -240,7 +204,6 @@ spec:
           {{- if $config.enableGossipFlooding }}
           "-enable-flooding", "true",
           {{- end -}}
-          "-libp2p-keypair", "/root/libp2p-keys/key",
           {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}

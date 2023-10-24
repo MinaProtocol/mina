@@ -45,12 +45,6 @@ http {
            sub_filter '"ws://"' '(window.location.protocol == "https:" ? "wss://" : "ws://")';
            proxy_pass http://{{ $node.name }}-graphql.{{ $node.namespace }}.svc.cluster.local/graphql;
         }
-        location /{{ $node.name }}/internal-trace/graphql {
-           sub_filter_types *;
-           sub_filter '"http://"' '(window.location.protocol == "https:" ? "https://" : "http://")';
-           sub_filter '"ws://"' '(window.location.protocol == "https:" ? "wss://" : "ws://")';
-           proxy_pass http://{{ $node.name }}-internal-trace-graphql.{{ $node.namespace }}.svc.cluster.local/graphql;
-        }
         location /{{ $node.name }}/resources {
            proxy_pass http://{{ $node.name }}-resources.{{ $node.namespace }}.svc.cluster.local/resources;
         }
