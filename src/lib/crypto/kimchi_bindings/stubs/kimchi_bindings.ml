@@ -465,15 +465,14 @@ module Protocol = struct
            Kimchi_types.proof_with_public = "caml_pasta_fp_plonk_proof_create"
 
       external create_kzg :
-           Index.BN254Fp.t
-        -> FieldVectors.BN254Fp.t array
-        -> Pasta_bindings.BN254Fp.t Kimchi_types.runtime_table array
-        -> Pasta_bindings.BN254Fp.t array
-        -> Pasta_bindings.BN254Fq.t Kimchi_types.or_infinity array
+           Index.Fp.t
+        -> FieldVectors.Fp.t array
+        -> Pasta_bindings.Fp.t Kimchi_types.runtime_table array
+        -> Pasta_bindings.Fp.t array
+        -> Pasta_bindings.Fq.t Kimchi_types.or_infinity array
         -> ( Pasta_bindings.BN254Fq.t Kimchi_types.or_infinity
            , Pasta_bindings.BN254Fp.t )
-           Kimchi_types.bn254_proof_with_public
-        = "caml_bn254_plonk_proof_create"
+           Kimchi_types.proof_with_public = "caml_bn254_plonk_proof_create"
 
       external create_and_verify :
            Index.Fp.t
