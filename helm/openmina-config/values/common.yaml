@@ -6,6 +6,7 @@ mina:
   exposeGraphql: true
   usePodIp: true
   seedPeersURL: https://storage.googleapis.com/seed-lists/mainnet_seeds.txt
+  memRequest: "20.0Gi"
   seedPeers: []
   # seedPeers:
   #   # see resources/seed1.peerid
@@ -85,7 +86,7 @@ httpCoordinatedSnarkersConfig:
   workers: 5
   namePrefix: snarker
   workSelectionAlgorithm: coordinated
-  publicKey: B62qpGpmn5JLLXqR6mci3cJ1PrJe8uRmxRaiEv7KXEgDqeQMCDmkU1P
+  publicKey: B62qosqzHi58Czax2RXfqPhMDzLogBeDVzSpsRDTCN1xeYUfrVy2F8P
 
 # minaSnarkCoordinatorsConfig:
 # - name: snarker001

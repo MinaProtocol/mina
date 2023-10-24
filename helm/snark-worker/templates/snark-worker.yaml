@@ -40,15 +40,15 @@ spec:
         # {{- end }}
         command: [ mina ]
         args: [
-          "internal", 
-          "snark-worker", 
+          "internal",
+          "snark-worker",
           "-proof-level","full",
           "-shutdown-on-disconnect", "false", "-daemon-address",
           "{{ .name }}:{{ $.Values.coordinatorRpcPort }}"
         ]
         env:
           - name: "RAYON_NUM_THREADS"
-            value: "4"
+            value: "8"
         imagePullPolicy: Always
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
 {{ end }}

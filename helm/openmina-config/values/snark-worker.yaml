@@ -1,6 +1,6 @@
 mina:
   cpuRequest: 8
-  memRequest: "16.0Gi"
+  memRequest: "20.0Gi"
 
 healthcheck:
   enabled: true
@@ -8,8 +8,8 @@ healthcheck:
   periodSeconds: 10
   initialDelaySeconds: 60
 
-workerCpuRequest: 4
-workerMemRequest: 8Gi
+workerCpuRequest: 8
+workerMemRequest: 6Gi
 
 coordinatorName: snarker001
 workerReplicas: 8
