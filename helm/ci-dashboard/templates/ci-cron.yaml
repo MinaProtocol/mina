@@ -1,0 +1,69 @@
+{{- $root := . -}}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "ci-dashboard.fullname" . }}-queries
+  labels:
+    {{- include "ci-dashboard.labels" . | nindent 4 }}
+spec:
+  schedule: "*/60 * * * *"
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "ci-dashboard.labels" . | nindent 8 }}
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "ci-dashboard.labels" . | nindent 12 }}
+        spec:
+          restartPolicy: "Never"
+          containers:
+          - name: db-pusher
+            image: postgres:12-alpine
+            imagePullPolicy: IfNotPresent
+            tty: true
+            stdin: true
+            command: 
+            - /bin/bash
+            - -c
+            - '
+              echo "#####################";
+              echo "Setting DB Connection";
+              echo "#####################";
+              
+              LOCAL_DB_CONNECTION="postgresql://{{ $.Values.postgresql.auth.username }}:{{ $.Values.postgresql.auth.password }}@{{ include "ci-dashboard.fullname" . }}-postgresql:5432/{{ $.Values.postgresql.primary.name }}";
+              echo $LOCAL_DB_CONNECTION > /mnt/output/db-connection.txt;
+
+              
+              echo "#####################";
+              echo "Collecting metrics";
+              echo "#####################";
+              today_prs=`cat /mnt/output/github/today-pull-requests.dat`;
+              echo "Today PRs: $today_prs";
+              checks_per_pr=`cat /mnt/output/github/average-checks-per-pr.dat`;
+              echo "Average CheckSuites per PR: $checks_per_pr";
+
+
+              echo "#####################";
+              echo "Pushing to Database";
+              echo "#####################";
+              psql $LOCAL_DB_CONNECTION -c "INSERT INTO public.ci VALUES (current_timestamp, $today_prs, $checks_per_pr)";
+
+              sleep 3600;
+              '
+            volumeMounts:
+            - name: {{ .Values.outputEnv.name | quote }}
+              mountPath: {{ .Values.outputEnv.value | quote }}
+          initContainers:
+          {{- range $i, $retriever := .Values.retrievers -}}
+          {{- include "ci-dashboard.insertRetriever" (dict "root" $root "retriever" $retriever) | nindent 10 }}
+          {{- end }}
+          volumes:
+          {{- include "ci-dashboard.insertRetrieverVolumes" $root | nindent 10 }}
+  suspend: false
+  startingDeadlineSeconds: 100
+  concurrencyPolicy: Replace
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1

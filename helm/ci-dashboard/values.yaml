@@ -1,0 +1,101 @@
+######################################
+# Postgresql DB Configuration
+######################################
+postgresql:
+  primary:
+    name: "dashboard-db"
+    service:
+      type: LoadBalancer
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClass: ssd-delete
+    initdb:
+      user: "cidash"
+      password: "test"
+      scripts:
+        ci-table.sql: CREATE TABLE ci (time timestamp, today_prs INT, checks_per_pr REAL);
+  auth:
+    username: "cidash"
+    password: "test"
+    database: "dashboard-db"
+    enablePostgresUser: false
+
+
+######################################
+# Kubernetes Scheduling parameters
+# Specify NodeSelector terms:
+######################################
+nodeSelector:
+#   cloud.google.com/gke-spot: false
+
+
+#############################################
+# Sources endpoint and Token reference
+# A secret will be created for each token := {}
+#############################################
+sources:
+- name: "github"
+  apiUrl: &githubAPI "https://api.github.com/graphql"
+  token:
+    secretName: &githubTokenSecretName "github-token-secret"
+    secretValue: ""
+# - name: buildkite
+#   apiUrl: &buildkiteAPI "https://graphql.buildkite.com/v1"
+#   token:
+#     secretName: &buildkiteTokenSecretName "buildkite-token-secret"
+#     secretValue: ""
+
+
+#############################################
+# Output dir reference
+# The 'OUTPUTDIR' env will point to a volume
+# to be scrapped by DB Pusher container
+#############################################
+outputEnv:
+  name: outputdir # env name to inject into each retriever
+  value: "/mnt/output" # mountPath inside each retriever
+  volume: # type of volume
+    emptyDir:
+      medium: "Memory"
+      sizeLimit: "50Mi"
+
+
+######################################
+# Retriever Container
+# Define container image and other specs
+######################################
+retrievers:
+- name: "github" # this must be the same as folder under 'files/'
+  image:
+    name: "python"
+    tag: "3.9.18-slim"
+  env: # define envs as in K8s manifest
+  - name: GITHUB_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: *githubTokenSecretName
+        key: token
+  - name: GITHUB_API
+    value: *githubAPI
+  script:
+    name: "github.py"
+    configMap: # ConfigMap to be created with python script
+      name: "github-retriever-script"
+    mountPath: "/mnt/script"
+# - name: "buildkite"
+#   image:
+#     name: "python"
+#     tag: "3.9.18-slim"
+#   env:
+#   - name: BUILDKITE_TOKEN
+#     valueFrom:
+#       secretKeyRef:
+#         name: *buildkiteTokenSecretName
+#   - name: BUILDKITE_API
+#     value: *buildkiteAPI
+#   script:
+#     name: "main.py"
+#     configMap: # ConfigMap with python script
+#       name: "buildkite-retriever-script"
+#     mountPath: "/mnt/script"
