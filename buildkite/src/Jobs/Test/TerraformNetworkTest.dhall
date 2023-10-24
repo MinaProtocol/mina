@@ -35,7 +35,9 @@ Pipeline.build
     spec = 
       let unitDirtyWhen = [
         S.strictlyStart (S.contains "src/automation/terraform"),
-        S.strictlyStart (S.contains "src/helm")
+        S.strictlyStart (S.contains "src/helm"),
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Test/TerraformNetworkTest"),
+        S.strictlyStart (S.contains "buildkite/scripts/terraform-test.sh")
       ]
 
       in
