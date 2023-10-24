@@ -11,6 +11,7 @@ let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -45,7 +46,8 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = unitDirtyWhen,
         path = "Test",
-        name = "TerraformNetworkTest"
+        name = "TerraformNetworkTest",
+        tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test ]
       },
     steps = [
       buildTestCmd Size.Large
