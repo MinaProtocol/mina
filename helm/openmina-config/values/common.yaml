@@ -81,6 +81,7 @@ httpCoordinatedSnarkersConfig:
   # the number of snark workers
   count: 70
   namePrefix: snarker
+  workSelectionAlgorithm: coordinated
 
 # minaSnarkCoordinatorsConfig:
 # - name: snarker001

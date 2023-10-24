@@ -125,7 +125,7 @@ spec:
         - name: DAEMON_EXTERNAL_PORT
           value: {{ $.Values.mina.ports.p2p | quote }}
         - name: WORK_SELECTION
-          value: {{$.Values.workSelectionAlgorithm | quote }}
+          value: {{$.Values.httpCoordinatedSnarkersConfig.workSelectionAlgorithm | quote }}
         - name: MINA_LIBP2P_PASS
           value: {{ $.Values.mina.privkeyPass | quote }}
         {{ if $.Values.mina.optimized }}
