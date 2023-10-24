@@ -130,7 +130,6 @@ class EnvVarSubs:
             v = d.get(key)
             if isinstance(v, str):
                 m = re.match('\$\{([_a-zA-Z]+)\}', v, )
-                print(key, v)
                 if m:
                     env_name = m.group(1)
                     env_val = env_var_provider.get(env_name)

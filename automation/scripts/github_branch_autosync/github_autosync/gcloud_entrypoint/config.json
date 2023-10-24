@@ -7,7 +7,7 @@
                 "berkeley":"berkeley"
             },
             "pipeline":"Crypto Pipeline",
-            "token":"${WEBHOOK_PROOF_SYSTEM_TOKEN}"
+            "token":"${WEBHOOK_SUBMODULE_TOKEN}"
         }
     ],
     "github": {
