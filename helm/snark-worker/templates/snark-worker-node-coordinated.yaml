@@ -210,8 +210,32 @@ spec:
         env:
           - name: "RAYON_NUM_THREADS"
             value: "8"
+          - name: MINA_SNARK_COORDINATOR_URL
+            value: http://snarker-http-coordinator
         imagePullPolicy: Always
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+spec:
+  type: ClusterIP
+  # We want all pods to have their addresses published for the sake of the
+  # other testnet pods even before they're ready, since they
+  # have to be able to talk to each other in order to become ready.
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $name }}
+  ports:
+  - name: tcp-p2p
+    port: {{ $.Values.mina.ports.p2p }}
+    targetPort: external-port
+  - name: tcp-client
+    port: {{ $.Values.mina.ports.client }}
+    targetPort: client-port
 ---
 {{ include "sideCar.resources.service" (dict "name" $name "resources" $.Values.resources) }}
 {{ include "sideCar.bpfDebugger.service" (dict "name" $name "bpfDebugger" $.Values.bpfDebugger) }}
