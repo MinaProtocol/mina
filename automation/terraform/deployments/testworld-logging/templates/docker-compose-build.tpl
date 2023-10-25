@@ -3,11 +3,11 @@ cat > /root/docker-compose.yml <<- "SCRIPT"
 version: '3'
 services:
   internal-log-fetcher:
-    image: gcr.io/o1labs-192920/mina-internal-trace-consumer:1.2.5 # openmina/mina-internal-trace-consumer:2d3bc20
+    image: gcr.io/o1labs-192920/mina-internal-trace-consumer:1.2.6 # openmina/mina-internal-trace-consumer:2d3bc20
     # image: local/mina-internal-trace-consumer
     container_name: internal-log-fetcher
     restart: always
-    command: "fetcher -k /keys/secret_key -o /output --db-uri 'postgresql://postgres:secret_password_12345@postgres:5432' discovery"
+    command: "fetcher -k /keys/secret_key -o /output --db-uri 'postgresql://postgres:${password_value}@postgres:5432' discovery"
     ports:
       - 4000:4000
       - 11000-11700:11000-11700
@@ -17,8 +17,8 @@ services:
     environment:
       NETWORK: ITN
       INTERNAL_TRACE_CONSUMER_EXE: /internal_trace_consumer
-      AWS_ACCESS_KEY_ID: "AKIAZZO2AQDDG27MD7RA"
-      AWS_SECRET_ACCESS_KEY: "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"
+      AWS_ACCESS_KEY_ID: "${aws_id_value}"
+      AWS_SECRET_ACCESS_KEY: "${aws_key_value}"
       AWS_DEFAULT_REGION: us-west-2
       AWS_BUCKET: 673156464838-block-producers-uptime
       AWS_PREFIX: berkeley
@@ -54,7 +54,7 @@ services:
       - ./postgresql:/var/lib/postgresql/data
     environment:
       PGDATA: /var/lib/postgresql/data/pgdata
-      POSTGRES_PASSWORD: secret_password_12345
+      POSTGRES_PASSWORD: ${password_value}
     networks:
       - internal-log-fetcher-network
     
