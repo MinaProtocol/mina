@@ -22,7 +22,9 @@ let Size = ../../Command/Size.dhall
 let buildTestCmd : Size -> Command.Type = \(cmd_target : Size) ->
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchain ([] : List Text) "buildkite/scripts/terraform-test.sh",
+      commands = [
+        Cmd.run "buildkite/scripts/terraform-test.sh"
+      ],
       label = "Terraform: Test",
       key = "terraform-network-test",
       target = cmd_target,
