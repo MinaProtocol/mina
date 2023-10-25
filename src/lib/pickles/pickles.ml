@@ -45,8 +45,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Step_verifier = Step_verifier
   module Proof_cache = Proof_cache
 
-  exception Return_digest = Compile.Return_digest
-
   type chunking_data = Verify.Instance.chunking_data =
     { num_chunks : int; domain_size : int; zk_rows : int }
 
@@ -311,14 +309,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let compile_with_wrap_main_override_promise =
     Compile.compile_with_wrap_main_override_promise
 
-  let compile_promise ?self ?cache ?proof_cache ?disk_keys
-      ?return_early_digest_exception ?override_wrap_domain ?num_chunks
-      ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
-      ~constraint_constants ~choices () =
+  let compile_promise ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
+      ?num_chunks ~public_input ~auxiliary_typ ~branches ~max_proofs_verified
+      ~name ~constraint_constants ~choices () =
     compile_with_wrap_main_override_promise ?self ?cache ?proof_cache ?disk_keys
-      ?return_early_digest_exception ?override_wrap_domain ?num_chunks
-      ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
-      ~constraint_constants ~choices ()
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+      ~max_proofs_verified ~name ~constraint_constants ~choices ()
 
   let compile ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
       ?num_chunks ~public_input ~auxiliary_typ ~branches ~max_proofs_verified
