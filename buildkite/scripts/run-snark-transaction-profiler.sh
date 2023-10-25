@@ -9,7 +9,7 @@ apt-get update
 apt-get install -y git apt-transport-https ca-certificates tzdata curl python3
 
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-  rampup|berkeley|release/2.0.0|develop)
+  rampup|berkeley|release/2.0.0|develop|o1js-main)
     TESTNET_NAME="berkeley"
   ;;
   *)
@@ -17,7 +17,6 @@ case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
 esac
 
 git config --global --add safe.directory /workdir
-
 source buildkite/scripts/export-git-env-vars.sh
 
 echo "Installing mina daemon package: mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
