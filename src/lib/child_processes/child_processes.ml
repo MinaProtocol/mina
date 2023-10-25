@@ -270,11 +270,25 @@ let start_custom :
       Deferred.Or_error.try_with ~here:[%here] (fun () -> Process.wait process)
     in
     [%log trace] "child process %s died" name ;
-    don't_wait_for
-      (let%bind () = after (Time.Span.of_sec 1.) in
-       let%bind () = Writer.close @@ Process.stdin process in
-       let%bind () = Reader.close @@ Process.stdout process in
-       Reader.close @@ Process.stderr process ) ;
+    let%bind () =
+      Deferred.all_unit
+        [ Writer.close @@ Process.stdin process
+        ; ( match%bind
+              with_timeout (Time.Span.of_sec 2.0)
+                (Deferred.all_unit
+                   [ Reader.close_finished @@ Process.stdout process
+                   ; Reader.close_finished @@ Process.stderr process
+                   ] )
+            with
+          | `Result () ->
+              Deferred.unit
+          | `Timeout ->
+              Deferred.all_unit
+                [ Reader.close @@ Process.stdout process
+                ; Reader.close @@ Process.stderr process
+                ] )
+        ]
+    in
     let%bind () = Sys.remove lock_path in
     Ivar.fill terminated_ivar termination_status ;
     let log_bad_termination () =
