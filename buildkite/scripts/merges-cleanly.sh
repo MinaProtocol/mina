@@ -2,7 +2,7 @@
 
 BRANCH=$1
 CURRENT=$(git branch --show-current)
-echo 'Testing for conflicts between the current branch `'"${BUILDKITE_BRANCH}"'` and `'"${BRANCH}"'`...'
+echo 'Testing for conflicts between the current branch `'"${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"'` and `'"${BRANCH}"'`...'
 
 # Adapted from this stackoverflow answer: https://stackoverflow.com/a/10856937
 # The git merge-tree command shows the content of a 3-way merge without
@@ -33,7 +33,7 @@ if [ $RET -eq 0 ]; then
   exit 0
 else
   # exclude branches for which merging cleanly is not a hard requirement
-  if [ "${BUILDKITE_BRANCH}" == "o1js-main" ]; then
+  if [ "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" == "o1js-main" ]; then
     echo "Conflicts were found, but the current branch does not have to merge cleanly. Exiting with code 0."
     exit 0
   fi
