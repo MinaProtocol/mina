@@ -2,6 +2,8 @@
 
 function test_single_terraform_config {
 
+    cd $1
+
     terraform init
     terraform plan
 
@@ -14,6 +16,7 @@ function test_single_terraform_config {
         printf "[OK] $1 network deployment\n"
     fi
     
+    cd ../
 }
 
 cd automation/terraform/testnets
