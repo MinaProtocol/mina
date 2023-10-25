@@ -29,8 +29,6 @@ pub fn caml_bn254_plonk_proof_create(
     _index: CamlPastaFpPlonkIndexPtr<'static>,
     _witness: Vec<CamlFpVector>,
     _runtime_tables: Vec<CamlRuntimeTable<CamlFp>>,
-    _prev_challenges: Vec<CamlFp>,
-    _prev_sgs: Vec<CamlGVesta>,
 ) -> Result<CamlPastaProofWithPublic<CamlGBN254, CamlBN254Fp>, ocaml::Error> {
     let gates = create_circuit(0, 0);
 

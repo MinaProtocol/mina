@@ -194,7 +194,7 @@ module KZG_Proof = struct
 
     include Kimchi_bindings.Protocol.Proof.Fp
 
-    let create_aux (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
+    let create_aux (pk : Keypair.t) primary auxiliary =
       (* external values contains [1, primary..., auxiliary ] *)
       let external_values i =
         let open Field.Vector in
@@ -217,9 +217,9 @@ module KZG_Proof = struct
             done ;
             witness )
       in
-      create_kzg pk.index witness_cols runtime_tables prev_chals prev_comms
+      create_kzg pk.index witness_cols runtime_tables
 
-    let create (pk : Keypair.t) ~primary ~auxiliary ~prev_chals ~prev_comms =
-      create_aux pk primary auxiliary prev_chals prev_comms
+    let create (pk : Keypair.t) ~primary ~auxiliary =
+      create_aux pk primary auxiliary
   end
 end

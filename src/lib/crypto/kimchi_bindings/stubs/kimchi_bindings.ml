@@ -468,8 +468,6 @@ module Protocol = struct
            Index.Fp.t
         -> FieldVectors.Fp.t array
         -> Pasta_bindings.Fp.t Kimchi_types.runtime_table array
-        -> Pasta_bindings.Fp.t array
-        -> Pasta_bindings.Fq.t Kimchi_types.or_infinity array
         -> ( Pasta_bindings.BN254Fq.t Kimchi_types.or_infinity
            , Pasta_bindings.BN254Fp.t )
            Kimchi_types.proof_with_public = "caml_bn254_plonk_proof_create"
