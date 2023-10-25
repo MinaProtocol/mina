@@ -1397,6 +1397,7 @@ let start t =
     match t.config.node_status_url with
     | Some node_status_url ->
         Node_status_service.start ~logger:t.config.logger ~node_status_url
+          ~submitter_pubkey:t.config.status_submitter_pubkey
           ~network:t.components.net
           ~transition_frontier:t.components.transition_frontier
           ~sync_status:t.sync_status ~chain_id:t.config.chain_id

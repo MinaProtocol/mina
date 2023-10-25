@@ -442,6 +442,12 @@ let setup_daemon logger =
   and node_status_url =
     flag "--node-status-url" ~aliases:[ "node-status-url" ] (optional string)
       ~doc:"URL of the node status collection service"
+  and status_submitter_pubkey =
+    flag "--status-submitter-key" ~aliases:[ "status-submitter-key" ]
+      (optional string)
+      ~doc:
+        "PUBLICKEY Public key of the submitter to the Mina node status \
+         collection service"
   and node_error_url =
     flag "--node-error-url" ~aliases:[ "node-error-url" ] (optional string)
       ~doc:"URL of the node error collection service"
@@ -835,6 +841,23 @@ let setup_daemon logger =
           let node_status_url =
             maybe_from_config YJ.Util.to_string_option "node-status-url"
               node_status_url
+          in
+          let status_submitter_pubkey =
+            Option.map status_submitter_pubkey ~f:(fun pk ->
+                match Public_key.Compressed.of_base58_check pk with
+                | Ok pk -> (
+                    match Public_key.decompress pk with
+                    | Some pk ->
+                        pk
+                    | None ->
+                        Mina_user_error.raise
+                          "Invalid public key for node status collection \
+                           submitter (could not decompress)" )
+                | Error err ->
+                    Mina_user_error.raisef
+                      "Invalid public key %s for node status collection \
+                       submitter, %s"
+                      pk (Error.to_string_hum err) () )
           in
           (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
           let _max_concurrent_connections =
@@ -1371,7 +1394,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~node_status_url ~graphql_control_port:itn_graphql_port () )
+                 ~node_status_url ~status_submitter_pubkey
+                 ~graphql_control_port:itn_graphql_port () )
           in
           { mina
           ; client_trustlist

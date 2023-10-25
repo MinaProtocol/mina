@@ -64,6 +64,7 @@ type node_status_data =
   ; chain_id : string
   ; peer_id : string
   ; ip_address : string
+  ; submitter_pubkey : Signature_lib.Public_key.t option
   ; timestamp : string
   ; uptime_of_node : float
   ; peer_count : int
@@ -151,8 +152,9 @@ let reset_gauges () =
   Queue.clear Transition_frontier.validated_blocks ;
   Queue.clear Transition_frontier.rejected_blocks
 
-let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
-    ~network ~addrs_and_ports ~start_time ~slot_duration =
+let start ~logger ~node_status_url ~submitter_pubkey ~transition_frontier
+    ~sync_status ~chain_id ~network ~addrs_and_ports ~start_time ~slot_duration
+    =
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
   let five_slots = Time.Span.scale slot_duration 5. in
@@ -211,6 +213,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
             ; ip_address =
                 Node_addrs_and_ports.external_ip addrs_and_ports
                 |> Core.Unix.Inet_addr.to_string
+            ; submitter_pubkey
             ; timestamp = Rfc3339_time.get_rfc3339_time ()
             ; uptime_of_node =
                 Time.Span.to_sec @@ Time.diff (Time.now ()) start_time
