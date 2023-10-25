@@ -14,7 +14,7 @@ type node_state =
   ; block_height_at_best_tip : int option
   ; sync_status : Sync_status.t
   ; hardware_info : string list option
-  ; uptime_of_node : string
+  ; uptime_of_node : float
   }
 
 type node_error_report =
@@ -35,7 +35,7 @@ type node_error_report =
   ; block_height_at_best_tip : int option
   ; max_observed_block_height : int
   ; max_observed_unvalidated_block_height : int
-  ; uptime_of_node : string
+  ; uptime_of_node : float
   }
 [@@deriving to_yojson]
 

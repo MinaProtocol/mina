@@ -427,7 +427,7 @@ let get_node_state t =
   in
   let uptime_of_node =
     Time.(
-      Span.to_string_hum
+      Span.to_sec
       @@ Time.diff (now ())
            (Time_ns.to_time_float_round_nearest_microsecond daemon_start_time))
   in
