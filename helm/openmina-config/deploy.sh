@@ -258,7 +258,7 @@ if [ -n "$PRODUCERS" ]; then
 fi
 
 if [ -n "$SNARK_WORKERS" ]; then
-    operate snark-workers $SNARK_WORKER_CHART $HELM_ARGS  --values="$(values snark-worker)" --set-file=publicKey="$(resource key-99.pub)" "$@"
+    operate snark-workers $SNARK_WORKER_CHART $HELM_ARGS  --values="$(values snark-worker)" --set=publicKey="B62qosqzHi58Czax2RXfqPhMDzLogBeDVzSpsRDTCN1xeYUfrVy2F8P" "$@"
 fi
 
 if [ -n "$NODES" ]; then
