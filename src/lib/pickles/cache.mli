@@ -106,14 +106,3 @@ module Wrap : sig
          * [> `Cache_hit | `Generated_something | `Locally_generated ] )
          lazy_t
 end
-
-module Storables : sig
-  type t =
-    { step_storable : Step.storable
-    ; step_vk_storable : Step.vk_storable
-    ; wrap_storable : Wrap.storable
-    ; wrap_vk_storable : Wrap.vk_storable
-    }
-
-  val default : t
-end

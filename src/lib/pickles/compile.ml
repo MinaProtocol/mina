@@ -227,6 +227,22 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
           *)
   }
 
+module Storables = struct
+  type t =
+    { step_storable : Cache.Step.storable
+    ; step_vk_storable : Cache.Step.vk_storable
+    ; wrap_storable : Cache.Wrap.storable
+    ; wrap_vk_storable : Cache.Wrap.vk_storable
+    }
+
+  let default =
+    { step_storable = Cache.Step.storable
+    ; step_vk_storable = Cache.Step.vk_storable
+    ; wrap_storable = Cache.Wrap.storable
+    ; wrap_vk_storable = Cache.Wrap.vk_storable
+    }
+end
+
 module Make
     (Arg_var : Statement_var_intf)
     (Arg_value : Statement_value_intf)
@@ -340,7 +356,7 @@ struct
       type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
          self:(var, value, max_proofs_verified, branches) Tag.t
       -> cache:Key_cache.Spec.t list
-      -> storables:Cache.Storables.t
+      -> storables:Storables.t
       -> proof_cache:Proof_cache.t option
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
@@ -943,7 +959,7 @@ let compile_with_wrap_main_override_promise :
     type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
        ?self:(var, value, max_proofs_verified, branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
-    -> ?storables:Cache.Storables.t
+    -> ?storables:Storables.t
     -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
@@ -997,7 +1013,7 @@ let compile_with_wrap_main_override_promise :
  (* This function is an adapter between the user-facing Pickles.compile API
     and the underlying Make(_).compile function which builds the circuits.
  *)
- fun ?self ?(cache = []) ?(storables = Cache.Storables.default) ?proof_cache
+ fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
      ?disk_keys ?(return_early_digest_exception = false) ?override_wrap_domain
      ?override_wrap_main ~public_input ~auxiliary_typ ~branches
      ~max_proofs_verified ~name ~constraint_constants ~choices () ->

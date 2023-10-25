@@ -276,19 +276,3 @@ module Wrap = struct
     in
     (pk, vk)
 end
-
-module Storables = struct
-  type t =
-    { step_storable : Step.storable
-    ; step_vk_storable : Step.vk_storable
-    ; wrap_storable : Wrap.storable
-    ; wrap_vk_storable : Wrap.vk_storable
-    }
-
-  let default =
-    { step_storable = Step.storable
-    ; step_vk_storable = Step.vk_storable
-    ; wrap_storable = Wrap.storable
-    ; wrap_vk_storable = Wrap.vk_storable
-    }
-end
