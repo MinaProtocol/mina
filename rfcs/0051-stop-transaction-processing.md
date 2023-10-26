@@ -1,4 +1,4 @@
-# Stop processing transactions / stop the network after a certain slot
+A# Stop processing transactions / stop the network after a certain slot
 
 This PR describes the feature to stop processing transactions and to stop the
 network after a certain slot, to be used in the Berkeley hard fork.
@@ -46,8 +46,8 @@ blocks after a certain slot will be as follows:
   in blocks, and all fees are set to 0.
 * The block validator will reject blocks produced after the stop slot that
   contain any transaction or any non-zero fee.
-* The node should notify the user at each slot when transaction processing halts
-  in less than *TBD* slots.
+* The node should start notifying the user every 60 slots when transaction
+  processing halts in less than 480 slots.
 
 To stop the network after a certain slot, the procedure will be as described
 next:
@@ -59,8 +59,8 @@ next:
 * After the configured slot, the block producer will stop producing any blocks.
 * The block validator will reject any blocks received after the stop network
 * slot.
-* The node should notify the user at each slot when block production/validation
-  halts in less than *TBD* slots.
+* The node should start notifying the user every 60 slots when block
+  production/validation halts in less than 480 slots.
 
 Each of these procedures will be described in detail in the following sections.
 
@@ -74,32 +74,30 @@ configuration parameters will be optional and will default to `None`. If
 If `slot_chain_end` is set to `None`, the node will not stop producing or
 validating blocks.
 
-There will be four optional CLI flags that will override this configuration.
+There will be two optional CLI flags that will override this configuration.
 
-* `--enable-slot-tx-end <slot>` enables the stop transaction processing feature
-  and sets `<slot>` as the slot at which the node will stop processing
-  transactions.
-* `--disable-slot-tx-end` disables the previously mentioned feature and sets the
-  slot at which the node will stop processing transactions to `None`.
-* `--enable-slot-chain-end <slot>` enables the stop network feature and sets
-  `<slot>` as the slot at which the node will stop producing or validating
-  blocks.
-* `--disable-slot-tx-end` disables the previously mentioned feature and sets the
-  slot at which the node will stop producing or validating blocks to `None`.
+* `--slot-tx-end`: if set to `none`, disables the feature by setting the
+  slot at which the node will stop processing transactions to `None`. If set to
+  a slot, enables the stop transaction processing feature and sets the value
+  passed as the slot at which the node will stop processing transactions.
+* `--slot-network-end`: if set to `none`, disables the feature by setting the
+  slot at which the node will stop to `None`. If set to a slot, enables the stop
+  network feature and sets the value passed as the slot at which the node will
+  stop producing/validating blocks.
 
 ### Client submits transaction
 
 When a client sends a transaction to the node daemon, the node will check if
 the stop transaction slot configuration is set. If so, and the current global
 slot is less than the configured stop slot, the transaction will be accepted by
-the node and processed as usual. If the current global slot is equal or greater 
+the node and processed as usual. If the current global slot is equal or greater
 than the configured stop slot, the transaction will be rejected. The client will
 be notified of the rejection and the reason why the transaction was rejected.
 This improves user UX by rejecting transactions that will not be included in the
 ledger in the preceding network.
 
 This can be done by adding these checks and subsequent rejection messages to the
-`mina_commands.ml` functions that handle transactions from the client.
+GraphQL functions that receive and submit user commands.
 
 ### Block producer
 
@@ -114,13 +112,14 @@ any transactions and with fees set to 0. If the configured stop slot is not set
 or is greater than the current global slot, the block producer will produce
 blocks as usual.
 
-This can be done by adding these checks to block production logic, and, firstly,
-deciding whether or not blocks should be produced, depending on the current
-global slot and the value set for the stop network slot, and secondly, returning
-an empty staged ledger diff instead of the generated one when the configured
-stop transaction slot is defined and the current global slot is equal or greater
-than it, resulting in a block produced with no transactions, no internal
-commands, no completed snark work, and a coinbase fee of 0.
+This can be done by adding these checks to block production logic. First,
+decide whether or not blocks should be produced. If the stop network slot is set
+and the current global slot is equal or greater than it don't produce blocks. If
+the previous is false, return an empty staged ledger diff instead of the
+generated one whenever the stop transaction slot is defined and the current
+global slot is equal or greater than it, ultimately resulting in a block
+produced with no transactions, no internal commands, no completed snark work,
+and no coinbase transaction.
 
 ### Block validator
 
@@ -135,54 +134,59 @@ block as usual. If the stop transaction slot configuration is not set or is
 greater than the global slot of the block, the block validator will reject
 blocks that define a staged ledger diff different than the empty one.
 
+This can be done by adding these checks to the transition handler logic. First, reject any blocks if the stop network slot value is set and the current global
+slot is greater than it. Second, and if the previous is not true, check the
+staged ledger diff of the transition against the empty staged ledger diff
+instead doing the usual verification process when the configured stop transaction
+slot is defined and the global slot for which the block was produced is equal or greater than it.
+
 ## Test plan and functional requirements
 
-Unit tests will be added to test the behavior of the block producer and the
+Integration tests will be added to test the behavior of the block producer and the
 block validator. The following requirements should be tested:
 
 * Block producer
-  * The block producer produces blocks when the stop network slot configuration
-    is set to `None`.
-  * The block producer produces blocks when the stop network slot configuration
-    is set to `<slot>` and the current global slot is less than `<slot>`.
-  * The block producer doesn't produce blocks when the stop network slot
-    configuration is set to `<slot>` and the current global slot is greater or
-    equal to `<slot>`.
-  * The block producer processes transactions and fees as usual when the stop
-    transaction slot configuration is set to `None`.
-  * The block producer processes transactions and fees as usual when the stop
-    transaction slot configuration is set to `<slot>` and the current global
-    slot is less than `<slot>`.
-  * The block producer produces empty blocks (blocks with an empty staged ledger
-    diff) when the stop transaction slot configuration is set to `<slot>` and
-    the current global slot is greater or equal to `<slot>`.
+  * When the stop network slot configuration is set to `None`, the block
+    producer should produce blocks.
+  * When the stop network slot configuration is set to `<slot>` and the current
+    global slot is less than `<slot>`, the block producer should produce blocks.
+  * When the stop network slot configuration is set to `<slot>` and the current
+    global slot is greater or equal to `<slot>`, the block producer should not
+    produce blocks.
+  * When the stop transaction slot configuration is set to `None`, the block
+    producer processes transactions and fees as usual.
+  * When the stop transaction slot configuration is set to `<slot>` and the
+    current global slot is less than `<slot>`, the block producer processes
+    transactions and fees as usual.
+  * When the stop transaction slot configuration is set to `<slot>` and the
+    current global slot is greater or equal to `<slot>`, the block producer
+    produces empty blocks (blocks with an empty staged ledger diff).
 * Block validator
-  * The block validator validates blocks when the stop network slot
-    configuration is set to `None`.
-  * The block validator validates blocks when the stop network slot 
-    configuration is set to `<slot>` and the current global slot is less than
-    `<slot>`.
-  * The block validator always rejects blocks when the stop network slot
-    configuration is set to `<slot>` and the current global slot is greater or
-    equal to `<slot>`.
-  * The block validator validates blocks as usual when the stop transaction slot
-    configuration is set to `None`.
-  * The block validator validates blocks as usual when the stop transaction slot
-    configuration is set to `<slot>` and the global slot of the block is less
-    than `<slot>`.
-  * The block validator rejects blocks that define a staged ledger diff
-    differently than the empty one when the stop transaction slot configuration
-    is set to `<slot>` and the global slot of the block is greater or equal to
-    `<slot>`.
+  * When the stop network slot configuration is set to `None`, the block
+    validator validates blocks as usual.
+  * When the stop network slot configuration is set to `<slot>` and the current
+    global slot is less than `<slot>`, the block validator validates blocks as
+    usual.
+  * When the stop network slot configuration is set to `<slot>` and the current
+    global slot is greater or equal to `<slot>`, the block validator rejects all
+    blocks.
+  * When the stop transaction slot configuration is set to `None`, the block
+    validator validates blocks as usual.
+  * When the stop transaction slot configuration is set to `<slot>` and the
+    global slot of the block is less than `<slot>`, the block validator
+    validates blocks as usual.
+  * When the stop transaction slot configuration is set to `<slot>` and the
+    global slot of the block is greater or equal to `<slot>`, the block
+    validator rejects blocks that define a staged ledger diff differently than
+    the empty one.
 * Node/client
-  * The node processes transactions from clients as usual when the stop
-    transaction slot configuration is set to `None`.
-  * The node processes transactions from clients as usual when the stop
-    transaction slot configuration is set to `<slot>` and the current global
-    slot is less than `<slot>`.
-  * The node rejects transactions from clients when the stop transaction slot
-    configuration is set to `<slot>` and the current global slot is greater or
-    equal to `<slot>`.
+  * When the stop transaction slot configuration is set to `None`, the node
+    processes transactions from clients as usual.
+  * When the stop transaction slot configuration is set to `<slot>` and the
+    current global slot is less than `<slot>`, the node processes transactions
+    from clients as usual.
+  * When the stop transaction slot configuration is set to `<slot>` and the
+    current global slot is greater or equal to `<slot>`, the node rejects transactions from clients.
 
 ## Drawbacks
 
@@ -198,6 +202,8 @@ processed and included there. This might result in a bad UX, especially for user
 who send transactions to the network before the configured stop slot and don't
 see them included in the ledger and disappear from the transaction pool when the
 network restarts.
+Moreover, non-patched nodes will produce and process transactions as usual after
+the transaction stop slot, resulting in these nodes constantly attempting to fork.
 
 ## Rationale and alternatives
 
