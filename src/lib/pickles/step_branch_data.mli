@@ -84,6 +84,7 @@ val create :
   -> self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> wrap_domains:Import.Domains.t
   -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
+  -> num_chunks:int
   -> actual_feature_flags:bool Plonk_types.Features.t
   -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
   -> proofs_verifieds:(int, 'branches) Pickles_types.Vector.t

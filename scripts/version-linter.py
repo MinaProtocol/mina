@@ -2,6 +2,30 @@
 
 # version-linter.py -- makes sure serializations of versioned types don't change
 
+"""
+For the PR branch, PR base branch, and release branch, download the
+type shapes file from Google storage There should be a type shape file
+available for every commit in a PR branch.
+
+For each branch, store the type shape information in a Python dictionary, truncating
+the shapes at a maximum depth.
+
+For each type, compare the type shapes of each branch. If the shapes don't match, print an
+error message. The exact comparison rules are given in RFC 0047 (with some embellishments
+mentioned below).
+
+The maximum depth should be set high enough so that all differences are caught
+(no false negatives).
+
+There may be some false positives, where a difference is reported for
+type t1 due to a change to a type t2 contained in t1. The
+difference will always also be reported for t2 directly.  The maximum
+depth should be set low enough to minimize such false positives.
+
+There are some special rules for the types associated with signed commands and zkApp commands.
+See `check_command_types` below.
+"""
+
 import subprocess
 import os
 import io
