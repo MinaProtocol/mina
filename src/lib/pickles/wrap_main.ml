@@ -39,7 +39,7 @@ end
 let pack_statement max_proofs_verified t =
   let open Types.Step in
   Spec.pack
-    (module Impl)
+    (module Wrap_main_inputs.Impl)
     (Statement.spec max_proofs_verified Backend.Tock.Rounds.n)
     (Statement.to_data t)
 
@@ -169,7 +169,7 @@ let wrap_main
         in
         let actual_proofs_verified_mask =
           Util.ones_vector
-            (module Impl)
+            (module Wrap_main_inputs.Impl)
             ~first_zero:
               (Wrap_verifier.Pseudo.choose
                  (which_branch, step_widths)
@@ -183,11 +183,12 @@ let wrap_main
             , Vector.map ~f:(fun ds -> Domain.log2_size ds.h) step_domains )
             ~f:Field.of_int
         in
+        (* ---------------- *)
         let () =
           with_label __LOC__ (fun () ->
               (* Check that the branch_data public-input is correct *)
               Branch_data.Checked.pack
-                (module Impl)
+                (module Wrap_main_inputs.Impl)
                 { proofs_verified_mask =
                     Vector.extend_front_exn actual_proofs_verified_mask Nat.N2.n
                       Boolean.false_
@@ -200,7 +201,7 @@ let wrap_main
               let open Types.Step.Proof_state in
               let typ =
                 typ
-                  (module Impl)
+                  (module Wrap_main_inputs.Impl)
                   ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
                   (Vector.init Max_proofs_verified.n ~f:(fun _ ->
                        Plonk_types.Features.none ) )
@@ -263,7 +264,7 @@ let wrap_main
                 let ty =
                   let ty =
                     Plonk_types.All_evals.typ
-                      (module Impl)
+                      (module Wrap_main_inputs.Impl)
                       ~num_chunks:1 feature_flags
                   in
                   Vector.typ ty Max_proofs_verified.n
@@ -389,7 +390,7 @@ let wrap_main
             with_label __LOC__ (fun () ->
                 exists
                   (Plonk_types.Messages.typ
-                     (module Impl)
+                     (module Wrap_main_inputs.Impl)
                      Inner_curve.typ ~bool:Boolean.typ feature_flags
                      ~dummy:Inner_curve.Params.one
                      ~commitment_lengths:
