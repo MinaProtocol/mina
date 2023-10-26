@@ -1,4 +1,4 @@
-A# Stop processing transactions / stop the network after a certain slot
+# Stop processing transactions / stop the network after a certain slot
 
 This PR describes the feature to stop processing transactions and to stop the
 network after a certain slot, to be used in the Berkeley hard fork.
@@ -119,7 +119,9 @@ the previous is false, return an empty staged ledger diff instead of the
 generated one whenever the stop transaction slot is defined and the current
 global slot is equal or greater than it, ultimately resulting in a block
 produced with no transactions, no internal commands, no completed snark work,
-and no coinbase transaction.
+and no coinbase transaction. When doing these checks, the node will also check
+for the conditions to emit the info log messages at the timings and conditions
+expressed earlier.
 
 ### Block validator
 
@@ -138,7 +140,9 @@ This can be done by adding these checks to the transition handler logic. First, 
 slot is greater than it. Second, and if the previous is not true, check the
 staged ledger diff of the transition against the empty staged ledger diff
 instead doing the usual verification process when the configured stop transaction
-slot is defined and the global slot for which the block was produced is equal or greater than it.
+slot is defined and the global slot for which the block was produced is equal or greater than it. When doing these checks, the node will also check for the
+conditions to emit the info log messages at the timings and conditions expressed
+earlier.
 
 ## Test plan and functional requirements
 
