@@ -30,7 +30,6 @@ module Vesta_based_plonk : sig
   module Rounds = Vesta_based_plonk.Rounds
   module Keypair = Vesta_based_plonk.Keypair
   module Proof = Vesta_based_plonk.Proof
-  module KZG_Proof = Vesta_based_plonk.KZG_Proof
   module Proving_key = Vesta_based_plonk.Proving_key
   module Oracles = Vesta_based_plonk.Oracles
 end

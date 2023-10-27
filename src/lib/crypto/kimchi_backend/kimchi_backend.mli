@@ -202,7 +202,6 @@ module Pasta : sig
     module Rounds = Kimchi_pasta.Vesta_based_plonk.Rounds
     module Keypair = Kimchi_pasta.Vesta_based_plonk.Keypair
     module Proof = Kimchi_pasta.Vesta_based_plonk.Proof
-    module KZG_Proof = Kimchi_pasta.Vesta_based_plonk.KZG_Proof
     module Proving_key = Kimchi_pasta.Vesta_based_plonk.Proving_key
     module Oracles = Kimchi_pasta.Vesta_based_plonk.Oracles
   end
