@@ -74,18 +74,26 @@ genesis ledger.
 
 The generated genesis ledger is prone to malevolent manual
 modifications. Beyond containing the hash of the previous ledger, it's
-unprotected from tampering with. However, at the moment there is no
-mechanism which could improve the situation. The system considers
-genesis ledger the initial state of the blockchain, so there is no
-previous state it could refer to. Also, because we dump the **staged
-ledger**, it is never snarked. It can only be verified manually by end
-users, which is cumbersome at best.
+unprotected from tampering with.
 
-Some protection against tampering with the ledger we gain from the
+One way to improve this is to provide an external program, capable of
+computing hash of the ledger as it will be after the config is loaded
+into a node. Users will be able to obtain a raw fork config file from
+their nodes. Later, given the official config for the new network,
+they will be able to run the program against both files and compute
+ledger hashes. The reason why this is needed is that the configuration
+file will likely contain some manual updates. For instance the genesis
+ledger timestamp will need to be updated manually when the start time
+of the new network is known. Further changes may concern genesis
+constants and other network configuration. All these changes should be
+ignored during the hash computation and only the genesis ledger itself
+should be taken into consideration. This way a user seeing that the
+configuration file is not identical to the one they computed, still
+does not contain any changes to the genesis ledger.
+
+Further protection against tampering with the ledger we gain from the
 fact that all the nodes must use the same one, or they'll be kicked
-out from the network. This protects the ledger from node operators,
-but it doesn't exclude the possibility of tampering with it by the
-party which will generate the configuration.
+out from the network.
 
 ## Rationale and alternatives
 
