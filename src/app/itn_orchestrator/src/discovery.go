@@ -52,6 +52,7 @@ type nodeAddrEntry struct {
 	addr  NodeAddress
 	entry NodeEntry
 	isNew bool
+	pk    string
 }
 
 type nodeAddrEntriesAndCount struct {
@@ -133,6 +134,7 @@ func discoverParticipantsDo(config Config, params DiscoveryParams, output func(N
 			}
 			if params.Limit <= 0 || cnt < params.Limit {
 				output(p.addr)
+				log.Infof("Found participant %s (%s)", p.addr, p.pk)
 			}
 			cnt++
 		}
@@ -142,7 +144,7 @@ func discoverParticipantsDo(config Config, params DiscoveryParams, output func(N
 		defer wg.Done()
 		entry, err := NewGqlClient(config, addr)
 		if err == nil {
-			connected <- nodeAddrEntry{addr: addr, entry: *entry, isNew: true}
+			connected <- nodeAddrEntry{addr: addr, entry: *entry, isNew: true, pk: pk}
 		} else {
 			log.Warnf("Error on auth for %s (%s): %v", addr, pk, err)
 		}
@@ -152,7 +154,7 @@ func discoverParticipantsDo(config Config, params DiscoveryParams, output func(N
 		if _, has := connecting[addr]; !has {
 			connecting[addr] = struct{}{}
 			if entry, has := config.NodeData[addr]; has {
-				connected <- nodeAddrEntry{addr: addr, entry: entry, isNew: false}
+				connected <- nodeAddrEntry{addr: addr, entry: entry, isNew: false, pk: pk}
 			} else {
 				wg.Add(1)
 				go tryToConnect(pk, addr)
