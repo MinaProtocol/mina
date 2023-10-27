@@ -162,6 +162,14 @@ module Fq = struct
   external deep_copy : t -> t = "caml_pasta_fq_deep_copy"
 end
 
+module BN254Fp = struct
+  type nonrec t
+end
+
+module BN254Fq = struct
+  type nonrec t
+end
+
 module Vesta = struct
   module BaseField = struct
     type nonrec t = Fq.t

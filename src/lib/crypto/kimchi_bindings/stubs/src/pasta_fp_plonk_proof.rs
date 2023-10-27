@@ -21,7 +21,7 @@ use kimchi::{
     },
     verifier::Context,
 };
-use kimchi::{prover::caml::CamlProofWithPublic, verifier_index::VerifierIndex};
+use kimchi::{prover::caml::CamlPastaProofWithPublic, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fp, Fq, Pallas, Vesta, VestaParameters};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
@@ -43,7 +43,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     runtime_tables: Vec<CamlRuntimeTable<CamlFp>>,
     prev_challenges: Vec<CamlFp>,
     prev_sgs: Vec<CamlGVesta>,
-) -> Result<CamlProofWithPublic<CamlGVesta, CamlFp>, ocaml::Error> {
+) -> Result<CamlPastaProofWithPublic<CamlGVesta, CamlFp>, ocaml::Error> {
     {
         let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -111,7 +111,7 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
     runtime_tables: Vec<CamlRuntimeTable<CamlFp>>,
     prev_challenges: Vec<CamlFp>,
     prev_sgs: Vec<CamlGVesta>,
-) -> Result<CamlProofWithPublic<CamlGVesta, CamlFp>, ocaml::Error> {
+) -> Result<CamlPastaProofWithPublic<CamlGVesta, CamlFp>, ocaml::Error> {
     {
         let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -189,7 +189,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlFp,
-    CamlProofWithPublic<CamlGVesta, CamlFp>,
+    CamlPastaProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
@@ -294,7 +294,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     srs: CamlFpSrs,
 ) -> (
     CamlPastaFpPlonkIndex,
-    CamlProofWithPublic<CamlGVesta, CamlFp>,
+    CamlPastaProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
@@ -456,7 +456,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     srs: CamlFpSrs,
 ) -> (
     CamlPastaFpPlonkIndex,
-    CamlProofWithPublic<CamlGVesta, CamlFp>,
+    CamlPastaProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
@@ -525,7 +525,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
     srs: CamlFpSrs,
 ) -> (
     CamlPastaFpPlonkIndex,
-    CamlProofWithPublic<CamlGVesta, CamlFp>,
+    CamlPastaProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
@@ -601,7 +601,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlFp,
-    CamlProofWithPublic<CamlGVesta, CamlFp>,
+    CamlPastaProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
@@ -728,7 +728,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
 ) -> (
     CamlPastaFpPlonkIndex,
     (CamlFp, CamlFp),
-    CamlProofWithPublic<CamlGVesta, CamlFp>,
+    CamlPastaProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
@@ -817,7 +817,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
 ) -> (
     CamlPastaFpPlonkIndex,
     (CamlFp, CamlFp),
-    CamlProofWithPublic<CamlGVesta, CamlFp>,
+    CamlPastaProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
@@ -908,7 +908,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_verify(
     index: CamlPastaFpPlonkVerifierIndex,
-    proof: CamlProofWithPublic<CamlGVesta, CamlFp>,
+    proof: CamlPastaProofWithPublic<CamlGVesta, CamlFp>,
 ) -> bool {
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
 
@@ -933,7 +933,7 @@ pub fn caml_pasta_fp_plonk_proof_verify(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_batch_verify(
     indexes: Vec<CamlPastaFpPlonkVerifierIndex>,
-    proofs: Vec<CamlProofWithPublic<CamlGVesta, CamlFp>>,
+    proofs: Vec<CamlPastaProofWithPublic<CamlGVesta, CamlFp>>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
@@ -966,7 +966,7 @@ pub fn caml_pasta_fp_plonk_proof_batch_verify(
 
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProofWithPublic<CamlGVesta, CamlFp> {
+pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlPastaProofWithPublic<CamlGVesta, CamlFp> {
     fn comm() -> PolyComm<Vesta> {
         let g = Vesta::prime_subgroup_generator();
         PolyComm {
@@ -1042,7 +1042,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProofWithPublic<CamlGVesta, Caml
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_deep_copy(
-    x: CamlProofWithPublic<CamlGVesta, CamlFp>,
-) -> CamlProofWithPublic<CamlGVesta, CamlFp> {
+    x: CamlPastaProofWithPublic<CamlGVesta, CamlFp>,
+) -> CamlPastaProofWithPublic<CamlGVesta, CamlFp> {
     x
 }

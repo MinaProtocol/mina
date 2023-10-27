@@ -109,7 +109,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas, OpeningProof<
         };
 
         // TODO dummy_lookup_value ?
-        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true, 3);
+        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
         VerifierIndex::<Pallas, OpeningProof<Pallas>> {
             domain,
@@ -142,7 +142,8 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas, OpeningProof<
             shift,
             permutation_vanishing_polynomial_m: {
                 let res = once_cell::sync::OnceCell::new();
-                res.set(permutation_vanishing_polynomial(domain, 3)).unwrap();
+                res.set(permutation_vanishing_polynomial(domain, 3))
+                    .unwrap();
                 res
             },
             w: {

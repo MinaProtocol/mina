@@ -281,20 +281,20 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
       (fun i ->
         let w_to_i =
           match i with
-          | 0 ->
+          | false, 0 ->
               one
-          | 1 ->
+          | false, 1 ->
               domain#generator
-          | -1 ->
+          | false, -1 ->
               w1
-          | -2 ->
+          | false, -2 ->
               w2
-          | -3 ->
+          | false, -3 | true, 0 ->
               w3
-          | -4 ->
+          | false, -4 | true, -1 ->
               Lazy.force w4
-          | _ ->
-              failwith "TODO"
+          | b, i ->
+              failwithf "TODO: unnormalized_lagrange_basis(%b, %i)" b i ()
         in
         Lazy.force zeta_to_n_minus_1 / (zeta - w_to_i) )
   ; if_feature =

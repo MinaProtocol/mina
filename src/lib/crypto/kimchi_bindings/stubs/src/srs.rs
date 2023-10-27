@@ -1,6 +1,7 @@
 use ark_poly::UVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
 use paste::paste;
+use poly_commitment::pairing_proof::PairingSRS;
 use poly_commitment::SRS as _;
 use poly_commitment::{
     commitment::{b_poly_coefficients, caml::CamlPolyComm},
@@ -173,6 +174,21 @@ macro_rules! impl_srs {
     }
 }
 
+macro_rules! impl_pairing_srs {
+    ($name: ident, $CamlF: ty, $F: ty, $G: ty) => {
+
+        impl_shared_reference!($name => PairingSRS<$G>);
+
+        paste! {
+            #[ocaml_gen::func]
+            #[ocaml::func]
+            pub fn [<$name:snake _create>](x: $CamlF, depth: ocaml::Int) -> $name {
+                $name::new(PairingSRS::create($F::from(x), depth as usize))
+            }
+        }
+    }
+}
+
 //
 // Fp
 //
@@ -191,4 +207,12 @@ pub mod fq {
     use mina_curves::pasta::{Fq, Pallas};
 
     impl_srs!(CamlFqSrs, CamlFq, CamlGPallas, Fq, Pallas);
+}
+
+pub mod bn254 {
+    use super::*;
+    use crate::arkworks::CamlBN254Fp;
+    use mina_curves::bn254::{Fp, Pair};
+
+    impl_pairing_srs!(CamlBnFpSrs, CamlBN254Fp, Fp, Pair);
 }
