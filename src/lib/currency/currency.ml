@@ -474,10 +474,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type magnitude = Unsigned.t [@@deriving sexp, compare]
 
-      let create ~magnitude ~sgn =
-        { magnitude
-        ; sgn = (if Unsigned.(equal magnitude zero) then Sgn.Pos else sgn)
-        }
+      let create ~magnitude ~sgn = { magnitude; sgn }
 
       let sgn { sgn; _ } = sgn
 
