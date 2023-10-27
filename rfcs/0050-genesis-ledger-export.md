@@ -24,8 +24,10 @@ state hash of the block that we want to base the exported ledger on.
 This field, if asked for, contains a new runtime configuration,
 automatically updated with:
 
-* the dump of the current **staged ledger**, which will become the
-genesis ledger for the new network
+* the dump of the **staged ledger** as it was after the last block
+before the slot where no more transactions were accepted
+(transaction-stop slot). This ledger becomes the genesis ledger for
+the new network
 * updated values of `Fork_config`, i.e. previous state hash, previous
 blockchain length and previous global slot.
 * updated epoch data, in particular current and next epoch ledger and seed.
@@ -45,9 +47,11 @@ migration script which will adapt a `mainnet` config file to the
 format required by `berkeley`. The former solution would probably
 be better.
 
-The `fork_config` field has been added to GraphQL in [PR #13787](https://github.com/MinaProtocol/mina/pull/13787). It needs to be extended to return the blockchain state for
-a given block (height or state hash) so that we can export the
-desired ledger after the blockchain has moved on.
+The `fork_config` field has been added to GraphQL in [PR
+#13787](https://github.com/MinaProtocol/mina/pull/13787). It needs to
+be extended to return the blockchain state for a given block (height
+or state hash) so that we can export the desired ledger after the
+blockchain has moved on.
 
 ## Drawbacks
 
