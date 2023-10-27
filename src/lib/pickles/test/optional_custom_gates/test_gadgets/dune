@@ -1,5 +1,5 @@
-(tests
- (names test_fix_domains pickles_test_optional_custom_gates)
+(library
+ (name pickles_optional_custom_gates_circuits)
  (libraries
   ;; opam libraries
   alcotest
@@ -57,8 +57,7 @@
   logger
   internal_tracing.context_logger
   ppx_version.runtime
-  error_json
-  pickles_optional_custom_gates_circuits)
+  error_json)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

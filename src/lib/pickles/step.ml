@@ -331,8 +331,7 @@ struct
             Option.map
               ~f:(Scalar_challenge.map ~f:Challenge.Constant.of_tock_field)
               (O.joint_combiner_chal o)
-        ; feature_flags =
-            t.statement.proof_state.deferred_values.plonk.feature_flags
+        ; feature_flags = Plonk_types.Features.none_bool
         }
       in
       let xi = scalar_chal O.v in
@@ -827,6 +826,10 @@ struct
                               ~public_input:public_inputs
                           with
                           | None ->
+                              if
+                                Proof_cache
+                                .is_env_var_set_requesting_error_for_proofs ()
+                              then failwith "Regenerated proof" ;
                               let%map.Promise proof = create_proof () in
                               Proof_cache.set_step_proof proof_cache ~keypair:pk
                                 ~public_input:public_inputs proof.proof ;

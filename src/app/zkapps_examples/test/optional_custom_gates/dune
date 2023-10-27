@@ -1,5 +1,5 @@
 (library
-  (name zkapp_payments_tests)
+  (name zkapp_optional_custom_gates_tests)
  (libraries
    ;; opam libraries
    ppx_inline_test.config
@@ -7,38 +7,37 @@
    async_kernel
    async_unix
    core
-   base
    core_kernel
-   yojson
-   sexplib0
-   ppx_deriving_yojson.runtime
    result
+   base
+   base.caml
+   sexplib0
+   integers
    ;; local libraries
-   logger
    mina_base.import
-   pickles
-   pickles.backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
    transaction_snark
-   snark_params
    mina_ledger
    mina_base
+   mina_generators
    currency
-   mina_state
-   signature_lib
-   genesis_constants
-   transaction_protocol_state
+   pickles
    pickles_types
    mina_numbers
+   zkapp_command_builder
+   signature_lib
+   genesis_constants
    sgn
    transaction_snark_tests
    test_util
    mina_transaction_logic
-   mina_transaction
+   zkapps_examples
+   pickles_optional_custom_gates_circuits
+   snark_keys_header
+   snark_params
+   data_hash_lib
    )
   (library_flags -linkall)
-  (inline_tests (flags -verbose -show-counts) (deps proof_cache.json))
+  (inline_tests (flags -verbose -show-counts))
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane ppx_mina))
   (instrumentation (backend bisect_ppx)))
