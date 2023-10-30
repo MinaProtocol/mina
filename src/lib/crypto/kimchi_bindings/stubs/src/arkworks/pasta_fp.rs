@@ -209,6 +209,12 @@ pub fn caml_pasta_fp_print(x: ocaml::Pointer<CamlFp>) {
 
 #[ocaml_gen::func]
 #[ocaml::func]
+pub fn caml_pasta_fp_print_rust(x: ocaml::Pointer<CamlFp>) {
+    println!("{}", x.as_ref().0);
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
 pub fn caml_pasta_fp_copy(mut x: ocaml::Pointer<CamlFp>, y: ocaml::Pointer<CamlFp>) {
     *x.as_mut() = *y.as_ref()
 }

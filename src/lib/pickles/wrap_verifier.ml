@@ -911,6 +911,33 @@ struct
             absorb sponge PC (Boolean.true_, x_hat) ) ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
+        let runtime_comm =
+          match messages.lookup with
+          | Nothing
+          | Maybe (_, { runtime = Nothing; _ })
+          | Just { runtime = Nothing; _ } ->
+              Pickles_types.Opt.Nothing
+          | Maybe (b_lookup, { runtime = Maybe (b_runtime, runtime); _ }) ->
+              let b = Boolean.( &&& ) b_lookup b_runtime in
+              Pickles_types.Opt.Maybe (b, runtime)
+          | Maybe (b, { runtime = Just runtime; _ })
+          | Just { runtime = Maybe (b, runtime); _ } ->
+              Pickles_types.Opt.Maybe (b, runtime)
+          | Just { runtime = Just runtime; _ } ->
+              Pickles_types.Opt.Just runtime
+        in
+        let absorb_runtime_tables () =
+          match runtime_comm with
+          | Nothing ->
+              ()
+          | Maybe (b, runtime) ->
+              let z = Array.map runtime ~f:(fun z -> (b, z)) in
+              absorb sponge Without_degree_bound z
+          | Just runtime ->
+              let z = Array.map runtime ~f:(fun z -> (Boolean.true_, z)) in
+              absorb sponge Without_degree_bound z
+        in
+        absorb_runtime_tables () ;
         let joint_combiner =
           let compute_joint_combiner (l : _ Messages.Lookup.In_circuit.t) =
             let absorb_sorted_1 sponge =
@@ -1244,7 +1271,7 @@ struct
           let _len_4, len_4_add = Nat.N6.add Plonk_types.Lookup_sorted.n in
           let len_5, len_5_add =
             (* NB: Using explicit 11 because we can't get add on len_4 *)
-            Nat.N11.add Nat.N7.n
+            Nat.N11.add Nat.N8.n
           in
           let len_6, len_6_add = Nat.N45.add len_5 in
           let num_commitments_without_degree_bound = len_6 in
@@ -1294,6 +1321,7 @@ struct
                            [ Pickles_types.Opt.map messages.lookup ~f:(fun l ->
                                  l.aggreg )
                            ; lookup_table_comm
+                           ; runtime_comm
                            ; m.runtime_tables_selector
                            ; m.lookup_selector_xor
                            ; m.lookup_selector_lookup
@@ -1449,8 +1477,8 @@ struct
       in
       Sponge.absorb sponge challenge_digest ;
       Sponge.absorb sponge ft_eval1 ;
-      Sponge.absorb sponge (fst evals.public_input) ;
-      Sponge.absorb sponge (snd evals.public_input) ;
+      Array.iter ~f:(Sponge.absorb sponge) (fst evals.public_input) ;
+      Array.iter ~f:(Sponge.absorb sponge) (snd evals.public_input) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
       (* This is a hacky, but much more efficient, version of the opt sponge.
          This uses the assumption that the sponge 'absorption state' will align
@@ -1538,7 +1566,7 @@ struct
       Plonk_checks.scalars_env
         (module Env_bool)
         (module Env_field)
-        ~srs_length_log2:Common.Max_degree.wrap_log2
+        ~srs_length_log2:Common.Max_degree.wrap_log2 ~zk_rows:3
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
         ~field_of_hex:(fun s ->
@@ -1590,7 +1618,7 @@ struct
               in
               let v =
                 List.append sg_evals
-                  ( [| Pickles_types.Opt.just x_hat |]
+                  ( Array.map ~f:Pickles_types.Opt.just x_hat
                   :: [| Pickles_types.Opt.just ft |]
                   :: a )
               in

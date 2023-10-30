@@ -41,6 +41,7 @@ val finalize_other_proof :
   -> step_domains:
        [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
        | `Side_loaded ]
+  -> zk_rows:int
   -> sponge:Step_main_inputs.Sponge.t
   -> prev_challenges:
        ( (Step_main_inputs.Impl.Field.t, 'a) Pickles_types.Vector.t
