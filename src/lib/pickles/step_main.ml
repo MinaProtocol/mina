@@ -194,10 +194,10 @@ let step_main :
         Per_proof_witness.Constant.No_app_state.t )
       Typ.t
   end in
-  let feature_flags_and_num_chunks (d : _ Tag.t) =
-    if Type_equal.Id.same self.id d.id then
+  let feature_flags_and_num_chunks (d : _ Tag.t) = (* JES: TODO d is the tag *)
+    if Type_equal.Id.same self.id d.id then (* JES: TODO: this is a check for recusion *)
       (basic.feature_flags, basic.num_chunks)
-    else (Types_map.feature_flags d, Types_map.num_chunks d)
+    else (Types_map.feature_flags d, Types_map.num_chunks d) (* JES: TODO: Change to tripple? *)
   in
   let feature_flags_and_num_chunks =
     let rec go :
@@ -218,6 +218,7 @@ let step_main :
     in
     go rule.prevs proofs_verified
   in
+  (* JES: build snarky types / shape of proof the correspond to each subproof *)
   let prev_proof_typs =
     let rec join :
         type pvars pvals ns1 ns2 br.
@@ -254,6 +255,7 @@ let step_main :
     join rule.prevs local_signature local_branches proofs_verified
       local_signature_length local_branches_length feature_flags_and_num_chunks
   in
+  (* JES: map Typ.t list -> list Typ.t (list of shapes to a shape of list) single type instead of list of types *)
   let module Prev_typ =
     H4.Typ (Impls.Step) (Typ_with_max_proofs_verified)
       (Per_proof_witness.No_app_state)
@@ -343,7 +345,7 @@ let step_main :
               in
               go previous_proof_statements rule.prevs
             in
-            Req.Compute_prev_proof_parts previous_proof_statements ) ;
+            Req.Compute_prev_proof_parts previous_proof_statements ) ; (*  JES: This pops up in step.ml where Plonk_checks is called *)
         let dlog_plonk_index =
           let num_chunks = (* TODO *) 1 in
           exists

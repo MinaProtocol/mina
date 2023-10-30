@@ -143,6 +143,7 @@ let create
         ; wrap_domains
         ; step_domains
         ; feature_flags
+        (* JES: TODO: Probably need to pass custom_gate_type *)
         ; num_chunks
         ; zk_rows =
             ( match num_chunks with

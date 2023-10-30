@@ -1,5 +1,5 @@
-(test
- (name customizable_gate_test)
+(tests
+ (names test_customizable_gate)
  (libraries
   ;; opam libraries
   alcotest

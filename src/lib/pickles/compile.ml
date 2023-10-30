@@ -510,7 +510,7 @@ struct
               let res =
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
-                      ~actual_feature_flags:rule.feature_flags ~custom_gate_type:false (* JES: TODO: update *)
+                      ~actual_feature_flags:rule.feature_flags ~custom_gate_type:false (* JES: TODO: update (don't pass here) *)
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
                       Arg_var.to_field_elements Arg_value.to_field_elements rule
@@ -548,7 +548,6 @@ struct
                 ~wrap_rounds:Tock.Rounds.n
 
             let f (T b : _ Branch_data.t) =
-              (* JES: TODO: this is the branch data / b.custom_gate_type *)
               let (T (typ, _conv, conv_inv)) = etyp in
               let main () () =
                 let res = b.main ~step_domains () in
@@ -597,10 +596,10 @@ struct
                        , index
                        , digest ) )
               in
-              (* JES: TODO: Update here *)
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
-                    Cache.Step.read_or_generate (* JES: TODO: pass boolean here *)
+                    Cache.Step.read_or_generate
+                      ~custom_gate_type:b.custom_gate_type (* JES: TODO: passing boolean here *)
                       ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
                       cache k_p k_v
                       (Snarky_backendless.Typ.unit ())

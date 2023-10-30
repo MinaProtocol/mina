@@ -83,7 +83,7 @@ module Step = struct
                 (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path ) )
 
-  let read_or_generate ~prev_challenges cache k_p k_v typ return_typ main =
+  let read_or_generate ~(custom_gate_type: bool) ~prev_challenges cache k_p k_v typ return_typ main =
     let s_p = storable in
     let s_v = vk_storable in
     let open Impls.Step in
@@ -101,6 +101,7 @@ module Step = struct
               Common.time "stepkeygen" (fun () ->
                   constraint_system ~input_typ:typ ~return_typ main
                   |> Keypair.generate ~prev_challenges )
+              (* JES: TODO: Conditional here *)
             in
             Timer.clock __LOC__ ;
             ignore

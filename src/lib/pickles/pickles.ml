@@ -1206,6 +1206,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  , digest ) )
             in
             Cache.Step.read_or_generate
+              ~custom_gate_type:false (* JES: TODO: Update *)
               ~prev_challenges:
                 (Nat.to_int (fst inner_step_data.proofs_verified))
               [] k_p k_v

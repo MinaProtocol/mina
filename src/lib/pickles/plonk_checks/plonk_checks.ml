@@ -338,6 +338,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
 (see https://github.com/o1-labs/proof-systems/blob/516b16fc9b0fdcab5c608cd1aea07c0c66b6675d/kimchi/src/index.rs#L190) *)
 let perm_alpha0 : int = 21
 
+(* JES: TODO: pass other version of scalars here (git grep Plonk_checks.Make can ignore wrap_verifier) *)
 module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (** Computes the ft evaluation at zeta.
   (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)

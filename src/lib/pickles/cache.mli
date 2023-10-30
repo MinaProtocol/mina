@@ -21,7 +21,8 @@ module Step : sig
   end
 
   val read_or_generate :
-       prev_challenges:int
+       custom_gate_type:bool
+    -> prev_challenges:int
     -> Key_cache.Spec.t list
     -> Key.Proving.t lazy_t
     -> Key.Verification.t lazy_t

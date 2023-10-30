@@ -26,6 +26,7 @@ struct
     include Plonk_checks
     module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars.Tick)
     module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars.Tock)
+    (* module Type1Plus = Plonk_checks.Make (Shifted_value.Type1) (Scalars_plus.Tick) *) (* JES: TODO: expose Scalars_plus *)
   end
 
   (* The prover corresponding to the given inductive rule. *)
@@ -216,6 +217,7 @@ struct
                  ~domain_generator:Backend.Tick.Field.domain_generator )
             plonk_minimal combined_evals
         in
+        (* JES: TODO: branch on  custom_gate_type *)
         time "plonk_checks" (fun () ->
             let module Field = struct
               include Tick.Field
