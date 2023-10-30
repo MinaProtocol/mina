@@ -4,6 +4,7 @@
  (public_name receipt_chain_hash_to_b58)
  (libraries
    ;; opam libraries
+   core_kernel
    ;; local libraries
    mina_base
    kimchi_backend
