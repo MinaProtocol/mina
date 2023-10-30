@@ -83,7 +83,7 @@ let pipeline : DebianVersions.DebVersion ->
           service="mina-test-executive",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Bool/show buildOnlyDeamon}' == 'false'"
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Prelude.Bool.show buildOnlyDeamon}' == 'false'"
         }
         in
         DockerImage.generateStep testExecutiveSpec,
@@ -95,7 +95,7 @@ let pipeline : DebianVersions.DebVersion ->
           network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Bool/show buildOnlyDeamon}' == 'false'"
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Prelude.Bool.show buildOnlyDeamon}' == 'false'"
         }
         in
         DockerImage.generateStep batchTxnSpec,
@@ -118,7 +118,7 @@ let pipeline : DebianVersions.DebVersion ->
           network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Bool/show buildOnlyDeamon}' == 'false'"
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Prelude.Bool.show buildOnlyDeamon}' == 'false'"
         }
         in
         DockerImage.generateStep rosettaSpec,
@@ -129,7 +129,7 @@ let pipeline : DebianVersions.DebVersion ->
           service="mina-zkapp-test-transaction",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Bool/show buildOnlyDeamon}' == 'false'"
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Prelude.Bool.show buildOnlyDeamon}' == 'false'"
         }
 
         in
