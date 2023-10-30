@@ -1,6 +1,7 @@
 let Prelude = ../External/Prelude.dhall
 let RunInToolchain = ../Command/RunInToolchain.dhall
 let ContainerImages = ./ContainerImages.dhall
+let Profiles = ./Profiles.dhall
 let S = ../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
@@ -46,13 +47,15 @@ let toolchainImage = \(debVersion : DebVersion) ->
     , Focal = ContainerImages.minaToolchainBullseye
   } debVersion
 
-let dependsOn = \(debVersion : DebVersion) ->
+let dependsOn = \(debVersion : DebVersion) -> \(profile : Profiles.Type) ->
+  let profileSuffix = Profiles.toSuffixUppercase profile in
+  let prefix = "MinaArtifact" in
   merge {
-    Bookworm = [{ name = "MinaArtifactBookworm", key = "build-deb-pkg" }]
-    , Bullseye = [{ name = "MinaArtifactBullseye", key = "build-deb-pkg" }]
-    , Buster = [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }]
-    , Jammy = [{ name = "MinaArtifactJammy", key = "build-deb-pkg" }]
-    , Focal = [{ name = "MinaArtifactFocal", key = "build-deb-pkg" }]
+    Bookworm = [{ name = "${prefix}${profileSuffix}", key = "build-deb-pkg" }]
+    , Bullseye = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "build-deb-pkg" }]
+    , Buster = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "build-deb-pkg" }]
+    , Jammy = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "build-deb-pkg" }]
+    , Focal = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "build-deb-pkg" }]
   } debVersion
 
 -- Most debian builds are only used for public releases
