@@ -20,9 +20,12 @@ let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
 let Profiles = ../Constants/Profiles.dhall
 
-in
-
-let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type -> List Text -> Bool -> Pipeline.Config.Type = 
+let pipeline : DebianVersions.DebVersion -> 
+        Profiles.Type ->  
+        PipelineMode.Type -> 
+        List Text -> 
+        Bool -> 
+        Pipeline.Config.Type = 
   \(debVersion : DebianVersions.DebVersion) ->
   \(profile: Profiles.Type) ->
   \(mode: PipelineMode.Type) -> 
@@ -135,3 +138,5 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
 
       ]
     }
+
+in (pipeline)
