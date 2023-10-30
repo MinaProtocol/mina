@@ -3,4 +3,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 in
 
-Pipeline.build ArtifactPipelines.bullseye-lightnet
+Pipeline.build ArtifactPipelines.pipeline 
+    DebianVersions.DebVersion.Bullseye 
+    Profiles.Type.Lightnet 
+    PipelineMode.Type.PullRequest
+    False

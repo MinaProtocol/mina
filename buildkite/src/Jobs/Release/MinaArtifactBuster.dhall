@@ -3,4 +3,7 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 in
 
-Pipeline.build ArtifactPipelines.buster
+Pipeline.build ArtifactPipelines.pipeline 
+    DebianVersions.DebVersion.Buster 
+    Profiles.Type.Standard 
+    PipelineMode.Type.PullRequest

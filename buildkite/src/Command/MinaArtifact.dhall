@@ -22,10 +22,12 @@ let Profiles = ../Constants/Profiles.dhall
 
 in
 
-let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type -> Pipeline.Config.Type = 
+let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type -> List Text -> Bool -> Pipeline.Config.Type = 
   \(debVersion : DebianVersions.DebVersion) ->
   \(profile: Profiles.Type) ->
   \(mode: PipelineMode.Type) -> 
+  \(extraEnv: List Text) ->
+  \(buildOnlyDeamon: Bool) ->
     Pipeline.Config::{
       spec =
         JobSpec::{
@@ -46,7 +48,8 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
               "MINA_BRANCH=$BUILDKITE_BRANCH",
               "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
               "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
-            ] "./buildkite/scripts/build-artifact.sh",
+            ] # extraEnv 
+            "./buildkite/scripts/build-artifact.sh",
             label = "Build Mina for ${DebianVersions.capitalName debVersion} ${Profiles.toSuffixUppercase profile}",
             key = "build-deb-pkg",
             target = Size.XLarge,
@@ -77,7 +80,7 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
           service="mina-test-executive",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard'"
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Bool/show buildOnlyDeamon}' == 'false'"
         }
         in
         DockerImage.generateStep testExecutiveSpec,
@@ -89,7 +92,7 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
           network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard'"
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Bool/show buildOnlyDeamon}' == 'false'"
         }
         in
         DockerImage.generateStep batchTxnSpec,
@@ -112,7 +115,7 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
           network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard'"
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Bool/show buildOnlyDeamon}' == 'false'"
         }
         in
         DockerImage.generateStep rosettaSpec,
@@ -123,7 +126,7 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
           service="mina-zkapp-test-transaction",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard'"
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Bool/show buildOnlyDeamon}' == 'false'"
         }
 
         in
@@ -132,11 +135,3 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
 
       ]
     }
-
-in
-{
-  bullseye  = pipeline DebianVersions.DebVersion.Bullseye Profiles.Type.Standard PipelineMode.Type.PullRequest
-  , bullseye-lightnet  = pipeline DebianVersions.DebVersion.Bullseye Profiles.Type.Lightnet PipelineMode.Type.PullRequest
-  , buster  = pipeline DebianVersions.DebVersion.Buster Profiles.Type.Standard PipelineMode.Type.PullRequest
-  , focal   = pipeline DebianVersions.DebVersion.Focal Profiles.Type.Standard PipelineMode.Type.PullRequest
-  }
