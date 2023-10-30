@@ -618,7 +618,11 @@ module As_record = struct
   let deriver obj =
     let open Fields_derivers_zkapps.Derivers in
     let ( !. ) = ( !. ) ~t_fields_annots in
-    Fields.make_creator obj ~auth:!.auth_required ~txn_version:!.uint32
+    let transaction_version =
+      needs_custom_js ~js_type:uint32 ~name:"TransactionVersion" uint32
+    in
+    Fields.make_creator obj ~auth:!.auth_required
+      ~txn_version:!.transaction_version
     |> finish "VerificationKeyPermission" ~t_toplevel_annots
 end
 
@@ -629,6 +633,7 @@ let of_record { As_record.auth; txn_version } = (auth, txn_version)
 let deriver obj =
   let open Fields_derivers_zkapps.Derivers in
   let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
+
   Poly.Fields.make_creator obj ~edit_state:!.auth_required ~send:!.auth_required
     ~receive:!.auth_required ~set_delegate:!.auth_required
     ~set_permissions:!.auth_required
