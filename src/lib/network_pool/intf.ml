@@ -41,6 +41,39 @@ module type Resource_pool_base_intf = sig
     -> t
 end
 
+module Verification_error = struct
+  type t =
+    | Fee_higher
+    | Fee_equal
+    | Recently_seen
+    | Invalid of Error.t
+    | Failure of Error.t
+
+  let to_error = function
+    | Fee_equal ->
+        Error.of_string "fee equal to cheapest work we have"
+    | Fee_higher ->
+        Error.of_string "fee higher than cheapest work we have"
+    | Invalid err ->
+        Error.tag err ~tag:"invalid"
+    | Failure err ->
+        Error.tag err ~tag:"failure"
+    | Recently_seen ->
+        Error.of_string "recently seen"
+
+  let to_short_string = function
+    | Recently_seen ->
+        "recently_seen"
+    | Fee_equal ->
+        "fee_equal"
+    | Fee_higher ->
+        "fee_higher"
+    | Invalid _ ->
+        "invalid"
+    | Failure _ ->
+        "failure"
+end
+
 (** A [Resource_pool_diff_intf] is a representation of a mutation to
  *  perform on a [Resource_pool_base_intf]. It includes the logic for
  *  processing this mutation and applying it to an underlying
@@ -82,7 +115,7 @@ module type Resource_pool_diff_intf = sig
   val verify :
        pool
     -> t Envelope.Incoming.t
-    -> verified Envelope.Incoming.t Deferred.Or_error.t
+    -> (verified Envelope.Incoming.t, Verification_error.t) Deferred.Result.t
 
   (** Warning: Using this directly could corrupt the resource pool if it
       conincides with applying locally generated diffs or diffs from the network
@@ -97,10 +130,16 @@ module type Resource_pool_diff_intf = sig
   val is_empty : t -> bool
 
   val update_metrics :
-       t Envelope.Incoming.t
+       logger:Logger.t
+    -> log_gossip_heard:bool
+    -> t Envelope.Incoming.t
     -> Mina_net2.Validation_callback.t
-    -> Logger.t option
     -> unit
+
+  val log_internal :
+    ?reason:string -> logger:Logger.t -> string -> t Envelope.Incoming.t -> unit
+
+  val t_of_verified : verified -> t
 end
 
 (** A [Resource_pool_intf] ties together an associated pair of
@@ -248,7 +287,7 @@ module type Snark_resource_pool_intf = sig
          Transaction_snark_work.Statement.t
          * Ledger_proof.t One_or_two.t Priced_proof.t
     -> sender:Envelope.Sender.t
-    -> bool Deferred.t
+    -> (unit, Verification_error.t) Deferred.Result.t
 
   val snark_pool_json : t -> Yojson.Safe.t
 
@@ -272,7 +311,7 @@ module type Snark_pool_diff_intf = sig
   type verified = t [@@deriving compare, sexp]
 
   type compact =
-    { work : Transaction_snark_work.Statement.t
+    { work_ids : int One_or_two.t
     ; fee : Currency.Fee.t
     ; prover : Signature_lib.Public_key.Compressed.t
     }
@@ -327,7 +366,10 @@ module type Transaction_pool_diff_intf = sig
   end
 
   type Structured_log_events.t +=
-    | Transactions_received of { txns : t; sender : Envelope.Sender.t }
+    | Transactions_received of
+        { fee_payer_summaries : User_command.fee_payer_summary_t list
+        ; sender : Envelope.Sender.t
+        }
     [@@deriving register_event]
 
   include

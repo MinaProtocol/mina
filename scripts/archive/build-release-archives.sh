@@ -29,7 +29,21 @@ esac
 
 echo "--- Building Mina archive package"
 
-PROJECT="mina-archive"
+
+# Determina suffix for mina name. To preserve backward compatibility devnet profile won't have any suffix. 
+# For others profiles we are adding suffix. For example '-lightnet'
+case "${DUNE_PROFILE}" in
+  devnet)
+    PROJECT_SUFFIX=""
+    ;;
+  *)
+    PROJECT_SUFFIX="-${DUNE_PROFILE}"
+    ;;
+esac
+
+
+
+PROJECT="mina-archive${PROJECT_SUFFIX}"
 BUILD_DIR="deb_build"
 
 ###### archiver deb

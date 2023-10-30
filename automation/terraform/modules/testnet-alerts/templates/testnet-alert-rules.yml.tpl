@@ -255,6 +255,24 @@ groups:
       description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
       runbook: "https://www.notion.so/minaprotocol/FewBlocksPerHour-47a6356f093242d988b0d9527ce23478"
 
+  - alert: StuckInBootstrap
+    expr: count by (testnet) (increase(Coda_Runtime_process_uptime_ms_total{syncStatus = "BOOTSTRAP"}[2h]) >= 7200000) > 0
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical 
+    annotations:
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at bootstrap for more than 2 hours"
+
+  - alert: StuckInCatchup 
+    expr: count by (testnet) (increase(Coda_Runtime_process_uptime_ms_total{syncStatus = "CATCHUP"}[2h]) >= 7200000) > 0
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical 
+    annotations:
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at catchup for more than 2 hours"
+
 
 - name: Warnings
   rules:
@@ -610,28 +628,6 @@ groups:
       description: "No node has received transactions in their transaction pool in the last 2 slots (6 minutes) on network {{ $labels.testnet }}."
       runbook: "https://www.notion.so/minaprotocol/NoNewTransactions-27dbeafab8ea4d659ee6f748acb2fd6c"
 
-  - alert: HighUnparentedBlockCount
-    expr: max by (testnet) (Coda_Archive_unparented_blocks {${berkeley_testnet}}) > 30
-    for: ${alert_evaluation_duration}
-    labels:
-      testnet: "{{ $labels.testnet }}"
-      severity: critical
-    annotations:
-      summary: "{{ $labels.testnet }} has a critically high unparented block count"
-      description: "{{ $value }} Unparented block count is critically high on network {{ $labels.testnet }}."
-      runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
-
-  - alert: HighMissingBlockCount
-    expr: max by (testnet) (Coda_Archive_missing_blocks {${berkeley_testnet}}) > 30
-    for: ${alert_evaluation_duration}
-    labels:
-      testnet: "{{ $labels.testnet }}"
-      severity: critical
-    annotations:
-      summary: "{{ $labels.testnet }} has a critically high missing block count"
-      description: "{{ $value }} Missing block count is critically high on network {{ $labels.testnet }}."
-      runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
-
   - alert: FewBlocksPerHour
     expr: quantile by (testnet) (0.5, increase(Coda_Transition_frontier_max_blocklength_observed {${berkeley_testnet},${synced_status_filter}}  [30m])) < 1
     for: ${alert_evaluation_duration}
@@ -735,6 +731,40 @@ groups:
       description: "{{ $value }} blocks have been produced that contains an invalid blockchain snark proof in last hour"
       runbook: "https://www.notion.so/minaprotocol/LowInvalidProofPerHour-b6e88b9ae84f47169e7f86017ab9e340"
 
+  - alert: NodeRestarted
+    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total {${berkeley_testnet}} < 360000) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "At least one of the nodes on {{ $labels.testnet }} restarted"
+      description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
+      runbook: "https://www.notion.so/minaprotocol/NodeRestarted-99a1cf710ff14aa6930a9f12ad5813a5"
+
+- name: Berkeley archive node alerts
+  rules:
+  - alert: HighUnparentedBlockCount
+    expr: max by (testnet) (Coda_Archive_unparented_blocks {${berkeley_testnet}}) > 30
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has a critically high unparented block count"
+      description: "{{ $value }} Unparented block count is critically high on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
+
+  - alert: HighMissingBlockCount
+    expr: max by (testnet) (Coda_Archive_missing_blocks {${berkeley_testnet}}) > 30
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has a critically high missing block count"
+      description: "{{ $value }} Missing block count is critically high on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
+
   - alert: LowPostgresBlockHeightGrowth
     expr: min by (testnet) (increase(Coda_Archive_max_block_height {${berkeley_testnet}}  [${alert_timeframe}])) < 1
     for: ${alert_evaluation_duration}
@@ -745,16 +775,6 @@ groups:
       summary: "{{ $labels.testnet }} rate of archival of network blocks in Postgres DB is lower than expected"
       description: "The rate of {{ $value }} new blocks observed by archive postgres instances is low on network {{ $labels.testnet }}."
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
-
-  - alert: NodeRestarted
-    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total {${berkeley_testnet}} < 360000) > 0
-    labels:
-      testnet: "{{ $labels.testnet }}"
-      severity: warning
-    annotations:
-      summary: "At least one of the nodes on {{ $labels.testnet }} restarted"
-      description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
-      runbook: "https://www.notion.so/minaprotocol/NodeRestarted-99a1cf710ff14aa6930a9f12ad5813a5"
 
   - alert: UnparentedBlocksObserved
     expr: max by (testnet) (Coda_Archive_unparented_blocks {${berkeley_testnet}}) > 1

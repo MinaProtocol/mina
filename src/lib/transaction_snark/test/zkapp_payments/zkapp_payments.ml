@@ -9,6 +9,12 @@ open Mina_base
 
 let%test_module "Zkapp payments tests" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let memo = Signed_command_memo.create_from_string_exn "Zkapp payments tests"
 
     [@@@warning "-32"]
@@ -74,7 +80,7 @@ let%test_module "Zkapp payments tests" =
                   ; preconditions =
                       { Account_update.Preconditions.network =
                           Zkapp_precondition.Protocol_state.accept
-                      ; account = Accept
+                      ; account = Zkapp_precondition.Account.accept
                       ; valid_while = Ignore
                       }
                   ; use_full_commitment = false
@@ -97,7 +103,7 @@ let%test_module "Zkapp payments tests" =
                   ; preconditions =
                       { Account_update.Preconditions.network =
                           Zkapp_precondition.Protocol_state.accept
-                      ; account = Accept
+                      ; account = Zkapp_precondition.Account.accept
                       ; valid_while = Ignore
                       }
                   ; use_full_commitment = false
@@ -112,7 +118,7 @@ let%test_module "Zkapp payments tests" =
 
     let%test_unit "merkle_root_after_zkapp_command_exn_immutable" =
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets () in
+          let wallets = Quickcheck.random_value (U.Wallet.random_wallets ()) in
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Array.iter
                 (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
@@ -289,4 +295,11 @@ let%test_module "Zkapp payments tests" =
                     ~expected_failure:
                       (Transaction_status.Failure.Overflow, Pass_2)
                     ledger [ zkapp_command ] ) ) )
+
+    let () =
+      match Sys.getenv "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )

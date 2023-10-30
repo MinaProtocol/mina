@@ -24,6 +24,9 @@ cd "${SCRIPTPATH}/../_build"
 
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata"
+
+TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm"
+
 case "${MINA_DEB_CODENAME}" in
   bookworm|jammy)
     DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
@@ -42,9 +45,16 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
+case "${DUNE_PROFILE}" in
+  devnet)
+    MINA_DEB_NAME="mina-berkeley"
+    ;;
+  *)
+    MINA_DEB_NAME="mina-berkeley-${DUNE_PROFILE}"
+    ;;
+esac
 
 BUILDDIR="deb_build"
-
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -127,7 +137,24 @@ copy_common_daemon_configs() {
 
   # Copy signature-based Binaries (based on signature type $2 passed into the function)
   cp ./default/src/app/cli/src/mina_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
+  
+  # Copy rosetta-based Binaries 
   cp ./default/src/app/rosetta/rosetta_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+  cp ./default/src/app/rosetta/ocaml-signer/signer_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
+ 
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/archive"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers"
+
+  # --- Copy artifacts
+  cp ../src/app/rosetta/*.conf "${BUILDDIR}/etc/mina/rosetta"
+  cp ../src/app/rosetta/*.sh "${BUILDDIR}/etc/mina/rosetta"
+
+  cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/rosetta/archive"
+  cp -r ../genesis_ledgers/* ${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/
 
   # Copy over Build Configs (based on $2)
   mkdir -p "${BUILDDIR}/etc/coda/build_config"
@@ -185,45 +212,33 @@ fi # only builds on mainnet-like branches
 
 ##################################### LOGPROC PACKAGE #######################################
 
-mkdir -p "${BUILDDIR}/DEBIAN"
-cat << EOF > "${BUILDDIR}/DEBIAN/control"
-
-Package: mina-logproc
-Version: ${MINA_DEB_VERSION}
-License: Apache-2.0
-Vendor: none
-Architecture: amd64
-Maintainer: o(1)Labs <build@o1labs.org>
-Installed-Size:
-Depends: ${SHARED_DEPS}
-Section: base
-Priority: optional
-Homepage: https://minaprotocol.com/
-Description: Utility for processing mina-daemon log output
- Utility for processing mina-daemon log output
- Built from ${GITHASH} by ${BUILD_URL}
-EOF
-
-echo "------------------------------------------------------------"
-echo "Control File:"
-cat "${BUILDDIR}/DEBIAN/control"
+create_control_file mina-logproc "${SHARED_DEPS}" 'Utility for processing mina-daemon log output'
 
 # Binaries
-rm -rf "${BUILDDIR}/usr/local/bin"
-mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
 
-# echo contents of deb
-echo "------------------------------------------------------------"
-echo "Deb Contents:"
-find "${BUILDDIR}"
-
-# Build the package
-echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-logproc_${MINA_DEB_VERSION}.deb
-ls -lh mina*.deb
+build_deb mina-logproc
 
 ##################################### END LOGPROC PACKAGE #######################################
+
+
+##################################### GENERATE TEST_EXECUTIVE PACKAGE #######################################
+
+create_control_file mina-test-executive "${SHARED_DEPS}${TEST_EXECUTIVE_DEPS}" 'Tool to run automated tests against a full mina testnet with multiple nodes.'
+
+# Binaries
+cp ./default/src/app/test_executive/test_executive.exe "${BUILDDIR}/usr/local/bin/mina-test-executive"
+
+build_deb mina-test-executive
+
+##################################### GENERATE BATCH TXN TOOL PACKAGE #######################################
+
+create_control_file mina-batch-txn "${SHARED_DEPS}" 'Load transaction tool against a mina node.'
+
+# Binaries
+cp ./default/src/app/batch_txn_tool/batch_txn_tool.exe "${BUILDDIR}/usr/local/bin/mina-batch-txn"
+
+build_deb mina-batch-txn
 
 ##################################### MAINNET PACKAGE #######################################
 if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
@@ -268,18 +283,18 @@ cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDD
 
 build_deb mina-zkapp-test-transaction
 
-##################################### END SNAPP TEST TXN PACKAGE #######################################
+##################################### END ZKAPP TEST TXN PACKAGE #######################################
 
 ##################################### BERKELEY PACKAGE #######################################
 echo "------------------------------------------------------------"
 echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
 mkdir -p "${BUILDDIR}/DEBIAN"
-create_control_file mina-berkeley "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
 copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
 
-build_deb mina-berkeley
+build_deb "${MINA_DEB_NAME}"
 
 ##################################### END BERKELEY PACKAGE #######################################
 

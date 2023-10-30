@@ -14,7 +14,7 @@ ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.0.7
 
 # Golang version number used to detemine tarball name
-ARG GO_VERSION=1.18.2
+ARG GO_VERSION=1.19.11
 
 # Go Capnp Version (for capnpc dependency)
 ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
@@ -35,35 +35,35 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update --quiet \
   && apt-get upgrade --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes \
-    libboost-dev \
-    libboost-program-options-dev \
-    libbz2-dev \
-    libcap-dev \
-    libffi-dev \
-    libgflags-dev \
-    libgmp-dev \
-    libgmp3-dev \
-    libjemalloc-dev \
-    liblmdb-dev \
-    liblmdb0 \
-    libpq-dev \
-    libprocps-dev \
-    libsodium-dev \
-    libssl-dev \
-    build-essential \
-    ca-certificates \
-    capnproto \
-    cmake \
-    curl \
-    file \
-    git \
-    '(^lld-10$|^lld-11$)' \
-    m4 \
-    pkg-config \
-    rsync \
-    sudo \
-    unzip \
-    zlib1g-dev \
+  libboost-dev \
+  libboost-program-options-dev \
+  libbz2-dev \
+  libcap-dev \
+  libffi-dev \
+  libgflags-dev \
+  libgmp-dev \
+  libgmp3-dev \
+  libjemalloc-dev \
+  liblmdb-dev \
+  liblmdb0 \
+  libpq-dev \
+  libprocps-dev \
+  libsodium-dev \
+  libssl-dev \
+  build-essential \
+  ca-certificates \
+  capnproto \
+  cmake \
+  curl \
+  file \
+  git \
+  '(^lld-10$|^lld-11$)' \
+  m4 \
+  pkg-config \
+  rsync \
+  sudo \
+  unzip \
+  zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
 
 # Symlink image-specific lld version to a single lld executable
@@ -119,8 +119,8 @@ RUN git clone https://github.com/facebook/rocksdb \
   --depth 1 --shallow-submodules \
   -b "${ROCKSDB_VERSION}" /rocksdb \
   && test $(g++ -dumpversion | cut -c 1 -) -lt 9 \
-    && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
-    || make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
+  && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
+  || make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
   && cp /rocksdb/librocksdb.a /usr/local/lib/librocksdb_coda.a \
   && rm -rf /rocksdb \
   && strip -S /usr/local/lib/librocksdb_coda.a

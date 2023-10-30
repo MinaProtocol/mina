@@ -17,10 +17,13 @@ type Structured_log_events.t +=
 
 type Structured_log_events.t +=
   | Gossip_transaction_pool_diff of
-      { txns : Transaction_pool.Resource_pool.Diff.t }
+      { fee_payer_summaries : User_command.fee_payer_summary_t list }
   [@@deriving
     register_event
-      { msg = "Broadcasting transaction pool diff over gossip net" }]
+      { msg =
+          "Broadcasting transaction pool diff $fee_payer_summaries over gossip \
+           net"
+      }]
 
 type Structured_log_events.t +=
   | Gossip_snark_pool_diff of { work : Snark_pool.Resource_pool.Diff.compact }
@@ -1145,7 +1148,7 @@ let create (config : Config.t) ~sinks
                          (Header.current_protocol_version
                             (Mina_block.header external_transition) ) ) )
                 ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(to_string @@ get_current ()) )
+                  , `String Protocol_version.(to_string current) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -1468,38 +1471,27 @@ include struct
 end
 
 (* TODO: Have better pushback behavior *)
-let log_gossip logger ~log_msg msg =
-  [%str_log' trace logger]
-    ~metadata:[ ("message", Gossip_net.Message.msg_to_yojson msg) ]
-    log_msg
-
 let broadcast_state t state =
-  let msg = With_hash.data state in
-  log_gossip t.logger (Gossip_net.Message.New_state msg)
-    ~log_msg:
-      (Gossip_new_state
-         { state_hash = State_hash.With_state_hashes.state_hash state } ) ;
+  [%str_log' trace t.logger]
+    (Gossip_new_state
+       { state_hash = State_hash.With_state_hashes.state_hash state } ) ;
   Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
-  Gossip_net.Any.broadcast_state t.gossip_net msg
+  Gossip_net.Any.broadcast_state t.gossip_net (With_hash.data state)
 
 let broadcast_transaction_pool_diff ?nonce t diff =
-  log_gossip t.logger
-    (Gossip_net.Message.Transaction_pool_diff
-       { message = diff; nonce = Option.value ~default:0 nonce } )
-    ~log_msg:(Gossip_transaction_pool_diff { txns = diff }) ;
+  [%str_log' trace t.logger]
+    (Gossip_transaction_pool_diff
+       { fee_payer_summaries = List.map ~f:User_command.fee_payer_summary diff }
+    ) ;
   Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
   Gossip_net.Any.broadcast_transaction_pool_diff ?nonce t.gossip_net diff
 
 let broadcast_snark_pool_diff ?nonce t diff =
   Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_broadcasted) ;
-  log_gossip t.logger
-    (Gossip_net.Message.Snark_pool_diff
-       { message = diff; nonce = Option.value ~default:0 nonce } )
-    ~log_msg:
-      (Gossip_snark_pool_diff
-         { work =
-             Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
-         } ) ;
+  [%str_log' trace t.logger]
+    (Gossip_snark_pool_diff
+       { work = Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
+       } ) ;
   Gossip_net.Any.broadcast_snark_pool_diff ?nonce t.gossip_net diff
 
 let find_map xs ~f =
