@@ -7,8 +7,6 @@ open Async
    migrated database name
 *)
 
-(* TODO: table of old, new txn hashes *)
-
 let mainnet_transaction_failure_of_string s :
     Mina_base.Transaction_status.Failure.t =
   match s with
@@ -68,7 +66,7 @@ let internal_commands_from_block_id ~mainnet_pool block_id =
             Sql.Mainnet.Internal_command.load db
               ~id:block_internal_cmd.internal_command_id )
       in
-      (* some fields come from blocks_internal_commands, others from user_commands *)
+      (* some fields come from blocks_internal_commands, others from internal_commands *)
       let sequence_no = block_internal_cmd.sequence_no in
       let secondary_sequence_no = block_internal_cmd.secondary_sequence_no in
       let command_type = internal_cmd.typ in
@@ -77,27 +75,7 @@ let internal_commands_from_block_id ~mainnet_pool block_id =
         internal_cmd.fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
       in
       let hash =
-        match command_type with
-        | "coinbase" ->
-            let coinbase =
-              (* always valid, since fee transfer is None *)
-              let amount = Currency.Amount.of_fee fee in
-              Mina_base.Coinbase.create ~amount ~receiver ~fee_transfer:None
-              |> Or_error.ok_exn
-            in
-            Mina_transaction.Transaction_hash.hash_coinbase coinbase
-        | "fee_transfer" | "fee_transfer_via_coinbase" -> (
-            let fee_transfer =
-              Mina_base.Fee_transfer.create_single ~receiver_pk:receiver ~fee
-                ~fee_token:Mina_base.Token_id.default
-            in
-            match Mina_base.Fee_transfer.to_singles fee_transfer with
-            | `One single ->
-                Mina_transaction.Transaction_hash.hash_fee_transfer single
-            | `Two _ ->
-                failwith "Expected one single in fee transfer" )
-        | s ->
-            failwithf "Unknown command type %s" s ()
+        Mina_transaction.Transaction_hash.of_base58_check_exn internal_cmd.hash
       in
       let status = "applied" in
       let failure_reason = None in
@@ -163,34 +141,8 @@ let user_commands_from_block_id ~mainnet_pool block_id =
         Option.map block_user_cmd.failure_reason
           ~f:mainnet_transaction_failure_of_string
       in
-      (* a V2 signed command *)
-      let signed_cmd =
-        let payload =
-          let body =
-            match command_type with
-            | "payment" ->
-                let amount = Option.value_exn amount in
-                Mina_base.Signed_command_payload.Body.Payment
-                  { receiver_pk = receiver; amount }
-            | "delegation" ->
-                let set_delegate =
-                  Mina_base.Stake_delegation.Set_delegate
-                    { new_delegate = receiver }
-                in
-                Mina_base.Signed_command_payload.Body.Stake_delegation
-                  set_delegate
-            | s ->
-                failwithf "Unknown command type: %s" s ()
-          in
-          Mina_base.Signed_command_payload.create ~fee ~fee_payer_pk:fee_payer
-            ~nonce ~valid_until ~memo ~body
-        in
-        let signer = Signature_lib.Public_key.decompress_exn source in
-        let signature = Mina_base.Signature.dummy in
-        ({ payload; signer; signature } : Mina_base.Signed_command.t)
-      in
       let hash =
-        Mina_transaction.Transaction_hash.hash_signed_command signed_cmd
+        Mina_transaction.Transaction_hash.of_base58_check_exn user_cmd.hash
       in
       let cmd : Archive_lib.Extensional.User_command.t =
         { sequence_no
