@@ -46,7 +46,7 @@ module Step : sig
     -> ('a, 'b) Impls.Step.Typ.t
     -> ('c, 'd) Impls.Step.Typ.t
     -> ('a -> unit -> 'c)
-    -> ( Impls.Step.Keypair.t
+    -> ( Impls.Step.Proving_key.t
        * [> `Cache_hit | `Generated_something | `Locally_generated ] )
        lazy_t
        * ( Kimchi_bindings.Protocol.VerifierIndex.Fp.t
@@ -99,7 +99,7 @@ module Wrap : sig
     -> ('a, 'b) Impls.Wrap.Typ.t
     -> ('c, 'd) Impls.Wrap.Typ.t
     -> ('a -> unit -> 'c)
-    -> ( Impls.Wrap.Keypair.t
+    -> ( Impls.Wrap.Proving_key.t
        * [> `Cache_hit | `Generated_something | `Locally_generated ] )
        lazy_t
        * ( Verification_key.Stable.V2.t

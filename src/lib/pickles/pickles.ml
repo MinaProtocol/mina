@@ -1078,7 +1078,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         module Lazy_keys = struct
           type t =
-            (Impls.Step.Keypair.t * Dirty.t) Lazy.t
+            (Impls.Step.Proving_key.t * Dirty.t) Lazy.t
             * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Lazy.t
 
           (* TODO Think this is right.. *)
@@ -1299,7 +1299,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     ((* TODO *) Plonk_verification_key_evals.map
                        ~f:(fun x -> [| x |])
                        wrap_vk.commitments )
-                  (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
+                  (fst (Lazy.force step_pk))
                   wrap_vk.index
               in
               let pairing_vk = fst (Lazy.force step_vk) in
@@ -1787,7 +1787,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     wrap_main A_value.to_field_elements ~pairing_vk
                     ~step_domains:b.domains
                     ~pairing_plonk_indices:(Lazy.force step_vks) ~wrap_domains
-                    (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
+                    (fst (Lazy.force wrap_pk))
                     proof
                 in
                 Proof.T
