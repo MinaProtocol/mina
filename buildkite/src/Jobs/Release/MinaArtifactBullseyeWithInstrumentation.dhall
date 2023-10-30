@@ -6,5 +6,6 @@ in
 Pipeline.build (ArtifactPipelines.pipeline ArtifactPipelines.ArtifactSpec::{
     extraEnv =  ["DUNE_INSTRUMENT_WITH=bisect_ppx"],
     buildOnlyEssentialDockers = True,
-    extraSuffix =  "WithInstrumentation"
+    jobSuffix =  "WithInstrumentation",
+    stepSuffix = "-instrumented"
 })

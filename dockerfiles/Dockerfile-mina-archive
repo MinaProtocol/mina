@@ -6,14 +6,20 @@ ARG deb_version
 ARG deb_codename=bullseye
 ARG deb_release=unstable
 ARG deb_profile
+ARG build_profile
 
 # if --build-arg deb_profile is defined, add hypen at beginning.
-ENV SUFFIX=${deb_profile:+-${deb_profile}}
+ENV PROFILE_SUFFIX=${deb_profile:+-${deb_profile}}
+
+# if --build-arg build_profile is defined, add hypen at beginning.
+ENV INSTRUMENTATION_SUFFIX=${build_profile:+-${build_profile}}
+
 # construct mina debian package name based on network and suffix.
 # possible values:
 # - mina-archive
-# - mina-archive-lightnet etc.
-ENV MINA_DEB=mina-archive${SUFFIX}
+# - mina-archive-lightnet
+# - mina-berkeley-instrumented etc.
+ENV MINA_DEB=mina-archive${PROFILE_SUFFIX}${INSTRUMENTATION_SUFFIX}
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
