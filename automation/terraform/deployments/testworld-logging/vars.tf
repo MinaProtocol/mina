@@ -10,6 +10,10 @@ variable "gcp_zone" {
   default = "us-east4-b"
 }
 
+variable "billing_label" {
+  default = "itn3"
+}
+
 #####################################
 # Secret Vars
 #####################################

@@ -70,15 +70,16 @@ resource "google_compute_instance" "default" {
     network = "default"
 
     access_config {
-      // Include this section to give the VM an external ip address
+      # do not remove
+      # empty block required for ephemeral public IP
     }
   }
 
   labels = {
-    service = "itn3"
+    service = var.billing_label
   }
 
-  // depends_on = [google_sql_user.database_user]
+  # depends_on = [google_sql_user.database_user]
 }
 
 #####################################
