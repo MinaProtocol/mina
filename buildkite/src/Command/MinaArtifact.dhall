@@ -44,14 +44,14 @@ let pipeline : DebianVersions.DebVersion ->
         Libp2p.step debVersion,
         Command.build
           Command.Config::{
-            commands = DebianVersions.toolchainRunner debVersion [
+            commands = DebianVersions.toolchainRunner debVersion ([
               "DUNE_PROFILE=${Profiles.duneProfile profile}",
               "AWS_ACCESS_KEY_ID",
               "AWS_SECRET_ACCESS_KEY",
               "MINA_BRANCH=$BUILDKITE_BRANCH",
               "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
               "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
-            ] # extraEnv 
+            ] # extraEnv)
             "./buildkite/scripts/build-artifact.sh",
             label = "Build Mina for ${DebianVersions.capitalName debVersion} ${Profiles.toSuffixUppercase profile}",
             key = "build-deb-pkg",
