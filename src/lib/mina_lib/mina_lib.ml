@@ -462,6 +462,13 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
   let open Mina_incremental.Status in
   let restart_delay = Time.Span.of_min 5. in
   let offline_shutdown_delay = Time.Span.of_min 25. in
+  let after_genesis =
+    let genesis_timestamp =
+      Genesis_constants.(
+        genesis_timestamp_of_string genesis_state_timestamp_string)
+    in
+    fun () -> Time.(( >= ) (now ())) genesis_timestamp
+  in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -471,29 +478,31 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
         else
           match online_status with
           | `Offline ->
-              ( match !next_helper_restart with
-              | None ->
-                  next_helper_restart :=
-                    Some
-                      (Async.Clock.Event.run_after restart_delay
-                         (fun () ->
-                           [%log info]
-                             "Offline for too long; restarting libp2p_helper" ;
-                           Mina_networking.restart_helper net ;
-                           next_helper_restart := None ;
-                           match !offline_shutdown with
-                           | None ->
-                               offline_shutdown :=
-                                 Some
-                                   (Async.Clock.Event.run_after
-                                      offline_shutdown_delay
-                                      (fun () -> raise Offline_shutdown)
-                                      () )
-                           | Some _ ->
-                               () )
-                         () )
-              | Some _ ->
-                  () ) ;
+              (* nothing to do if offline before genesis *)
+              ( if after_genesis () then
+                match !next_helper_restart with
+                | None ->
+                    next_helper_restart :=
+                      Some
+                        (Async.Clock.Event.run_after restart_delay
+                           (fun () ->
+                             [%log info]
+                               "Offline for too long; restarting libp2p_helper" ;
+                             Mina_networking.restart_helper net ;
+                             next_helper_restart := None ;
+                             match !offline_shutdown with
+                             | None ->
+                                 offline_shutdown :=
+                                   Some
+                                     (Async.Clock.Event.run_after
+                                        offline_shutdown_delay
+                                        (fun () -> raise Offline_shutdown)
+                                        () )
+                             | Some _ ->
+                                 () )
+                           () )
+                | Some _ ->
+                    () ) ;
               let is_empty = function `Empty -> true | _ -> false in
               if is_empty first_connection then (
                 [%str_log info] Connecting ;
@@ -572,10 +581,12 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
       | Some _ ->
           ()
       | None ->
-          bootstrap_timeout :=
-            Some
-              (Timeout.create () bootstrap_timeout_duration
-                 ~f:log_bootstrap_error_and_restart )
+          (* don't check bootstrap timeout before genesis *)
+          if after_genesis () then
+            bootstrap_timeout :=
+              Some
+                (Timeout.create () bootstrap_timeout_duration
+                   ~f:log_bootstrap_error_and_restart )
     in
     let stop_bootstrap_timeout () =
       match !bootstrap_timeout with
@@ -585,7 +596,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
       | None ->
           ()
     in
-    let handle_status_change sync_status =
+    let handle_status_change (sync_status : Sync_status.t) =
       ( match sync_status with
       | `Offline ->
           start_offline_timeout ()

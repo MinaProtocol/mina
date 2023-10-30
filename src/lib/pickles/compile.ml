@@ -15,8 +15,6 @@ open Poly_types
 open Hlist
 open Backend
 
-exception Return_digest of Md5.t
-
 let profile_constraints = false
 
 let verify_promise = Verify.verify
@@ -24,6 +22,9 @@ let verify_promise = Verify.verify
 open Kimchi_backend
 module Proof_ = P.Base
 module Proof = P
+
+type chunking_data = Verify.Instance.chunking_data =
+  { num_chunks : int; domain_size : int; zk_rows : int }
 
 let pad_messages_for_next_wrap_proof
     (type local_max_proofs_verifieds max_local_max_proofs_verifieds
@@ -344,10 +345,10 @@ struct
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
            * Cache.Wrap.Key.Verification.t
-      -> ?return_early_digest_exception:bool
       -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
       -> ?override_wrap_main:
            (max_proofs_verified, branches, prev_varss) wrap_main_generic
+      -> ?num_chunks:int
       -> branches:(module Nat.Intf with type n = branches)
       -> max_proofs_verified:
            (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -378,10 +379,10 @@ struct
          * _
          * _
          * _ =
-   fun ~self ~cache ~proof_cache ?disk_keys
-       ?(return_early_digest_exception = false) ?override_wrap_domain
-       ?override_wrap_main ~branches:(module Branches) ~max_proofs_verified
-       ~name ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
+   fun ~self ~cache ~proof_cache ?disk_keys ?override_wrap_domain
+       ?override_wrap_main ?(num_chunks = 1) ~branches:(module Branches)
+       ~max_proofs_verified ~name ~constraint_constants ~public_input
+       ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
@@ -454,7 +455,7 @@ struct
               (Auxiliary_value)
           in
           M.f full_signature prev_varss_n prev_varss_length ~max_proofs_verified
-            ~feature_flags
+            ~feature_flags ~num_chunks
       | Some override ->
           Common.wrap_domains
             ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
@@ -504,7 +505,7 @@ struct
               Timer.clock __LOC__ ;
               let res =
                 Common.time "make step data" (fun () ->
-                    Step_branch_data.create ~index:!i ~feature_flags
+                    Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
                       ~actual_feature_flags:rule.feature_flags
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
@@ -550,13 +551,6 @@ struct
               in
               let () = if true then log_step main typ name b.index in
               let open Impls.Step in
-              (* HACK: TODO docs *)
-              if return_early_digest_exception then
-                raise
-                  (Return_digest
-                     ( constraint_system ~input_typ:Typ.unit ~return_typ:typ main
-                     |> R1CS_constraint_system.digest ) ) ;
-
               let k_p =
                 lazy
                   (let cs =
@@ -618,7 +612,7 @@ struct
       match override_wrap_main with
       | None ->
           let srs = Tick.Keypair.load_urs () in
-          Wrap_main.wrap_main ~feature_flags ~srs full_signature
+          Wrap_main.wrap_main ~num_chunks ~feature_flags ~srs full_signature
             prev_varss_length step_vks proofs_verifieds step_domains
             max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
@@ -835,6 +829,14 @@ struct
       ; wrap_domains
       ; step_domains
       ; feature_flags
+      ; num_chunks
+      ; zk_rows =
+          ( match num_chunks with
+          | 1 ->
+              3
+          | num_chunks ->
+              let permuts = 7 in
+              ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts )
       }
     in
     Timer.clock __LOC__ ;
@@ -880,6 +882,8 @@ module Side_loaded = struct
       ; branches = Verification_key.Max_branches.n
       ; feature_flags =
           Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
+      ; num_chunks = 1
+      ; zk_rows = 3
       }
 
   module Proof = struct
@@ -922,7 +926,7 @@ module Side_loaded = struct
                   { constraints = 0 }
               }
             in
-            Verify.Instance.T (max_proofs_verified, m, vk, x, p) )
+            Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
         |> Verify.verify_heterogenous )
 
   let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
@@ -942,10 +946,10 @@ let compile_with_wrap_main_override_promise :
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
          * Cache.Wrap.Key.Verification.t
-    -> ?return_early_digest_exception:bool
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?override_wrap_main:
          (max_proofs_verified, branches, prev_varss) wrap_main_generic
+    -> ?num_chunks:int
     -> public_input:
          ( var
          , value
@@ -991,9 +995,8 @@ let compile_with_wrap_main_override_promise :
  (* This function is an adapter between the user-facing Pickles.compile API
     and the underlying Make(_).compile function which builds the circuits.
  *)
- fun ?self ?(cache = []) ?proof_cache ?disk_keys
-     ?(return_early_digest_exception = false) ?override_wrap_domain
-     ?override_wrap_main ~public_input ~auxiliary_typ ~branches
+ fun ?self ?(cache = []) ?proof_cache ?disk_keys ?override_wrap_domain
+     ?override_wrap_main ?num_chunks ~public_input ~auxiliary_typ ~branches
      ~max_proofs_verified ~name ~constraint_constants ~choices () ->
   let self =
     match self with
@@ -1060,10 +1063,9 @@ let compile_with_wrap_main_override_promise :
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~return_early_digest_exception ~self ~proof_cache ~cache
-      ?disk_keys ?override_wrap_domain ?override_wrap_main ~branches
-      ~max_proofs_verified ~name ~public_input ~auxiliary_typ
-      ~constraint_constants
+    M.compile ~self ~proof_cache ~cache ?disk_keys ?override_wrap_domain
+      ?override_wrap_main ?num_chunks ~branches ~max_proofs_verified ~name
+      ~public_input ~auxiliary_typ ~constraint_constants
       ~choices:(fun ~self -> conv_irs (choices ~self))
       ()
   in
@@ -1085,6 +1087,26 @@ let compile_with_wrap_main_override_promise :
       let (Typ typ) = typ in
       fun x -> fst (typ.value_to_fields x)
   end in
+  let chunking_data =
+    match num_chunks with
+    | None ->
+        None
+    | Some num_chunks ->
+        let compiled = Types_map.lookup_compiled self.id in
+        let { h = Pow_2_roots_of_unity domain_size } =
+          compiled.step_domains
+          |> Vector.reduce_exn
+               ~f:(fun
+                    { h = Pow_2_roots_of_unity d1 }
+                    { h = Pow_2_roots_of_unity d2 }
+                  -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
+        in
+        Some
+          { Verify.Instance.num_chunks
+          ; domain_size
+          ; zk_rows = compiled.zk_rows
+          }
+  in
   let module P = struct
     type statement = value
 
@@ -1104,7 +1126,7 @@ let compile_with_wrap_main_override_promise :
     let verification_key = wrap_vk
 
     let verify_promise ts =
-      verify_promise
+      verify_promise ?chunking_data
         ( module struct
           include Max_proofs_verified
         end )
