@@ -20,12 +20,8 @@ let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
 let Profiles = ../Constants/Profiles.dhall
 
-let pipeline : DebianVersions.DebVersion -> 
-        Profiles.Type ->  
-        PipelineMode.Type -> 
-        List Text -> 
-        Bool -> 
-        Pipeline.Config.Type = 
+in {
+  pipeline =  
   \(debVersion : DebianVersions.DebVersion) ->
   \(profile: Profiles.Type) ->
   \(mode: PipelineMode.Type) -> 
@@ -83,7 +79,7 @@ let pipeline : DebianVersions.DebVersion ->
           service="mina-test-executive",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Prelude.Bool.show buildOnlyDeamon}' == 'false'"
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Prelude.Bool.show buildOnlyDeamon}' == 'False'"
         }
         in
         DockerImage.generateStep testExecutiveSpec,
@@ -95,7 +91,7 @@ let pipeline : DebianVersions.DebVersion ->
           network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Prelude.Bool.show buildOnlyDeamon}' == 'false'"
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Prelude.Bool.show buildOnlyDeamon}' == 'False'"
         }
         in
         DockerImage.generateStep batchTxnSpec,
@@ -118,7 +114,7 @@ let pipeline : DebianVersions.DebVersion ->
           network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Prelude.Bool.show buildOnlyDeamon}' == 'false'"
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Prelude.Bool.show buildOnlyDeamon}' == 'False'"
         }
         in
         DockerImage.generateStep rosettaSpec,
@@ -129,7 +125,7 @@ let pipeline : DebianVersions.DebVersion ->
           service="mina-zkapp-test-transaction",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Prelude.Bool.show buildOnlyDeamon}' == 'false'"
+          `if`=Some "'${Profiles.lowerName profile}' == 'standard' && '${Prelude.Bool.show buildOnlyDeamon}' == 'False'"
         }
 
         in
@@ -138,5 +134,4 @@ let pipeline : DebianVersions.DebVersion ->
 
       ]
     }
-
-in (pipeline)
+}
