@@ -5,11 +5,11 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineMode = ../../Pipeline/Mode.dhall
 let PipelineTag = ../../Pipeline/Tag.dhall
 let TestExecutive = ../../Command/TestExecutive.dhall
+let Profiles = ../../Constants/Profiles.dhall
+let Dockers = ../../Constants/DockerVersions.dhall
 
-let dependsOn = [
-    { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
-    { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
-]
+let dependsOn = Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "daemon-berkeley"
+  # Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
 
 in Pipeline.build Pipeline.Config::{
   spec =
