@@ -1,9 +1,6 @@
 open Cmdliner
 
-type t =
-  { mina_automation_location : string
-  ; generate_code_coverage : bool
-  }
+type t = { mina_automation_location : string; generate_code_coverage : bool }
 
 let term =
   let mina_automation_location =
