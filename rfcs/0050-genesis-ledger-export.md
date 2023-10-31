@@ -148,3 +148,29 @@ transferred into a berkeley node, the latter cannot load them, because
 Base58check fails to decode them. This is a problem we need to overcome
 or decide that we won't export the epoch ledgers and assume they're
 the same as the genesis ledger for the purpose of hard fork.
+
+## Testing
+
+An automatic integration test will be written to check that the data is
+being exported properly. The procedure is to start a fresh network and
+generate a couple of transactions. Then the transactions are stopped.
+Finally the ledger export is performed and the test compares the
+exported state to the current state of the blockchain as obtained
+through GraphQL. These checks must take into account the fact, that
+it has changed slightly since the transaction stop (a couple additional
+blocks might have been produced). However, all balances should definitely
+be the same (after the transaction stop no transactions are allowed, there
+are no fees of coinbase rewards anymore).
+
+The procedure can also be tested manually as follows:
+* Sync up with the mainnet.
+* Export the genesis ledger at any point in time.
+* The program mentioned in a previous section can be
+used to verify the exported ledger.
+* Possibly add an account you control and change everyone's
+delegation to point at that account so that you can produce
+blocks.
+* Start a new network with the exported state.
+* The new network should be able to produce blocks.
+* All the accounts should have the same balances and
+delegates as on the mainnet at the moment of export.
