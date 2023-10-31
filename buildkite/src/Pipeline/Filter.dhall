@@ -13,7 +13,7 @@ let tags: Filter -> List Tag.Type = \(filter: Filter) ->
     , LongAndVeryLong = [ Tag.Type.Long, Tag.Type.VeryLong ]
     , Long = [ Tag.Type.Long ]
     , TearDownOnly = [ Tag.Type.TearDown ]
-    , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
+    , AllTests = [ Tag.Type.Fast, Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
   } filter
 
 let show: Filter -> Text = \(filter: Filter) -> 
