@@ -1,0 +1,7 @@
+(executable
+ (name proof_parser)
+ (public_name proof_parser)
+ (package proof_parser)
+ (preprocess
+  (pps ppx_deriving_yojson))
+ (libraries core_kernel core stdio mina_block mina_base))
