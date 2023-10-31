@@ -53,7 +53,7 @@ type ( 'a_var
               and type return_value = 'ret_value
               and type auxiliary_value = 'auxiliary_value )
       ; feature_flags : bool Plonk_types.Features.t
-      ; custom_gate_type: bool
+      ; custom_gate_type : bool
       }
       -> ( 'a_var
          , 'a_value
@@ -74,8 +74,8 @@ let create
     (type branches max_proofs_verified var value a_var a_value ret_var ret_value)
     ~index ~(self : (var, value, max_proofs_verified, branches) Tag.t)
     ~wrap_domains ~(feature_flags : Opt.Flag.t Plonk_types.Features.Full.t)
-    ~(custom_gate_type : bool)
-    ~num_chunks ~(actual_feature_flags : bool Plonk_types.Features.t)
+    ~(custom_gate_type : bool) ~num_chunks
+    ~(actual_feature_flags : bool Plonk_types.Features.t)
     ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
     ~(public_input :
@@ -142,8 +142,7 @@ let create
         ; proofs_verifieds
         ; wrap_domains
         ; step_domains
-        ; feature_flags
-        (* JES: TODO: Probably need to pass custom_gate_type *)
+        ; feature_flags (* JES: TODO: Probably need to pass custom_gate_type *)
         ; num_chunks
         ; zk_rows =
             ( match num_chunks with
@@ -185,5 +184,5 @@ let create
     ; main = step
     ; requests
     ; feature_flags = actual_feature_flags
-    ; custom_gate_type = custom_gate_type
+    ; custom_gate_type
     }

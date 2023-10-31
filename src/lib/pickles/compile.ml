@@ -347,6 +347,7 @@ struct
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
            * Cache.Wrap.Key.Verification.t
+      -> ?custom_gate_type:bool
       -> ?return_early_digest_exception:bool
       -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
       -> ?override_wrap_main:
@@ -382,7 +383,7 @@ struct
          * _
          * _
          * _ =
-   fun ~self ~cache ~proof_cache ?disk_keys
+   fun ~self ~cache ~proof_cache ?disk_keys ?(custom_gate_type = false)
        ?(return_early_digest_exception = false) ?override_wrap_domain
        ?override_wrap_main ?(num_chunks = 1) ~branches:(module Branches)
        ~max_proofs_verified ~name ~constraint_constants ~public_input
@@ -510,7 +511,9 @@ struct
               let res =
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
-                      ~actual_feature_flags:rule.feature_flags ~custom_gate_type:false (* JES: TODO: update (don't pass here) *)
+                      ~actual_feature_flags:rule.feature_flags
+                      ~custom_gate_type
+                        (* JES: TODO: update (don't pass here) *)
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
                       Arg_var.to_field_elements Arg_value.to_field_elements rule
@@ -599,7 +602,7 @@ struct
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
                     Cache.Step.read_or_generate
-                      ~custom_gate_type:b.custom_gate_type (* JES: TODO: passing boolean here *)
+                      ~custom_gate_type:b.custom_gate_type
                       ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
                       cache k_p k_v
                       (Snarky_backendless.Typ.unit ())
@@ -611,7 +614,6 @@ struct
           end)
       in
       M.f step_data
-      (* JES: TODO: HERE applying function above *)
     in
     Timer.clock __LOC__ ;
     let step_vks =
@@ -1308,7 +1310,7 @@ struct
           ; auxiliary_output = ()
           } )
     ; feature_flags = Plonk_types.Features.none_bool
-    ; custom_gate_type = false; (* JES: TODO: This is fine? *)
+    ; custom_gate_type = false (* JES: TODO: This is fine? *)
     }
 
   let override_wrap_main =

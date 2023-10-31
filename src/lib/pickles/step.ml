@@ -26,7 +26,8 @@ struct
     include Plonk_checks
     module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars.Tick)
     module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars.Tock)
-    (* module Type1Plus = Plonk_checks.Make (Shifted_value.Type1) (Scalars_plus.Tick) *) (* JES: TODO: expose Scalars_plus *)
+    (* module Type1Plus = Plonk_checks.Make (Shifted_value.Type1) (Scalars_plus.Tick) *)
+    (* JES: TODO: fix *)
   end
 
   (* The prover corresponding to the given inductive rule. *)

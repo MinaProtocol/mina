@@ -19,7 +19,7 @@ module Basic = struct
     ; wrap_key : Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
-    (* JES: TODO: (I) propagate custom_gate_type here (probably required) *)
+          (* JES: TODO: (I) propagate custom_gate_type here (probably required) *)
     ; num_chunks : int
     ; zk_rows : int
     }

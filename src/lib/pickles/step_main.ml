@@ -194,10 +194,13 @@ let step_main :
         Per_proof_witness.Constant.No_app_state.t )
       Typ.t
   end in
-  let feature_flags_and_num_chunks (d : _ Tag.t) = (* JES: TODO d is the tag *)
-    if Type_equal.Id.same self.id d.id then (* JES: TODO: this is a check for recusion *)
+  let feature_flags_and_num_chunks (d : _ Tag.t) =
+    (* JES: TODO d is the tag *)
+    if Type_equal.Id.same self.id d.id then
+      (* JES: TODO: this is a check for recusion *)
       (basic.feature_flags, basic.num_chunks)
-    else (Types_map.feature_flags d, Types_map.num_chunks d) (* JES: TODO: Change to tripple? *)
+    else (Types_map.feature_flags d, Types_map.num_chunks d)
+    (* JES: TODO: Change to tripple? -> NO *)
   in
   let feature_flags_and_num_chunks =
     let rec go :
@@ -345,7 +348,8 @@ let step_main :
               in
               go previous_proof_statements rule.prevs
             in
-            Req.Compute_prev_proof_parts previous_proof_statements ) ; (*  JES: This pops up in step.ml where Plonk_checks is called *)
+            Req.Compute_prev_proof_parts previous_proof_statements ) ;
+        (*  JES: This pops up in step.ml where Plonk_checks is called *)
         let dlog_plonk_index =
           let num_chunks = (* TODO *) 1 in
           exists
