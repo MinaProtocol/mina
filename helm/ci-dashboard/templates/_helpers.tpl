@@ -65,7 +65,7 @@ Create the name of the service account to use
 {{/*
 Create a standard "retriever" container. It includes:
 - envs
-- volumeMounts: scripts in ConfigMaps
+- volumeMounts: scripts in Secrets
     - Passed as {name: n, mountPath: p}
 */}}
 {{- define "ci-dashboard.insertRetriever" -}}
@@ -83,7 +83,7 @@ Create a standard "retriever" container. It includes:
     value: {{ $outputPath | quote }}
   volumeMounts:
   {{- with .retriever.script }}
-  - name: {{ .configMap.name | quote }}
+  - name: {{ .secret.name | quote }}
     mountPath: {{ .mountPath | quote }}
   {{- end }}
   - name: {{ $outputEnvName | quote }}
@@ -100,16 +100,15 @@ Create a standard "retriever" container. It includes:
 {{- end }}
 
 {{/*
-Inserting automatically created ConfigMaps to Retriever Pod
+Inserting automatically created Secrets to Retriever Pod
 Also adding .Values.outputEnv Volume to Pod
 */}}
 {{- define "ci-dashboard.insertRetrieverVolumes" -}}
 {{- range $i, $retriever := .Values.retrievers -}}
-{{- with $retriever.script.configMap -}}
+{{- with $retriever.script.secret }}
 - name: {{ .name | quote }}
-  configMap:
-    name: {{ .name | quote }}
-    defaultMode: 0644
+  secret:
+    secretName: {{ .name | quote }}
 {{- end }}
 {{- end }}
 {{- with .Values.outputEnv }}

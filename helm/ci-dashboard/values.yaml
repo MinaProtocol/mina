@@ -1,4 +1,10 @@
 ######################################
+# CronJob Schedule
+######################################
+schedule: "*/5 * * * *"
+
+
+######################################
 # Postgresql DB Configuration
 ######################################
 postgresql:
@@ -14,7 +20,7 @@ postgresql:
       user: "cidash"
       password: "test"
       scripts:
-        ci-table.sql: CREATE TABLE ci (time timestamp, today_prs INT, checks_per_pr REAL);
+        ci-table.sql: CREATE TABLE ci (time timestamp, today_prs INT, checks_per_pr REAL, reliability REAL, ci_builds INT, avg_time_per_build_hours REAL);
   auth:
     username: "cidash"
     password: "test"
@@ -40,11 +46,10 @@ sources:
   token:
     secretName: &githubTokenSecretName "github-token-secret"
     secretValue: ""
-# - name: buildkite
-#   apiUrl: &buildkiteAPI "https://graphql.buildkite.com/v1"
-#   token:
-#     secretName: &buildkiteTokenSecretName "buildkite-token-secret"
-#     secretValue: ""
+- name: buildkite
+  token:
+    secretName: &buildkiteTokenSecretName "buildkite-token-secret"
+    secretValue: ""
 
 
 #############################################
@@ -80,22 +85,21 @@ retrievers:
     value: *githubAPI
   script:
     name: "github.py"
-    configMap: # ConfigMap to be created with python script
+    secret: # Secret to be created with python script
       name: "github-retriever-script"
     mountPath: "/mnt/script"
-# - name: "buildkite"
-#   image:
-#     name: "python"
-#     tag: "3.9.18-slim"
-#   env:
-#   - name: BUILDKITE_TOKEN
-#     valueFrom:
-#       secretKeyRef:
-#         name: *buildkiteTokenSecretName
-#   - name: BUILDKITE_API
-#     value: *buildkiteAPI
-#   script:
-#     name: "main.py"
-#     configMap: # ConfigMap with python script
-#       name: "buildkite-retriever-script"
-#     mountPath: "/mnt/script"
+- name: "buildkite"
+  image:
+    name: "python"
+    tag: "3.9.18-slim"
+  env:
+  - name: BUILDKITE_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: *buildkiteTokenSecretName
+        key: token
+  script:
+    name: "buildkite.py"
+    secret: # Secret with python script
+      name: "buildkite-retriever-script"
+    mountPath: "/mnt/script"
