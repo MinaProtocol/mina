@@ -79,6 +79,7 @@
 (package (name kimchi_backend))
 (package (name kimchi_bindings))
 (package (name kimchi_types))
+(package (name last_vrf_output_to_b64))
 (package (name ledger_catchup))
 (package (name ledger_proof))
 (package (name libp2p_ipc))
