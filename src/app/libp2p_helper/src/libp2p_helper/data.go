@@ -15,9 +15,9 @@ import (
 	"codanet"
 
 	capnp "capnproto.org/go/capnp/v3"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	net "github.com/libp2p/go-libp2p/core/network"
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
 type app struct {

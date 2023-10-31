@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -263,9 +264,12 @@ func TestLibp2pMetrics(t *testing.T) {
 	require.NoError(t, err)
 
 	var streamIdx uint64 = 0
+	var streamMutex sync.Mutex
 	handler := func(stream net.Stream) {
+		streamMutex.Lock()
 		handleStreamReads(appB, stream, streamIdx)
 		streamIdx++
+		streamMutex.Unlock()
 	}
 
 	appB.P2p.Host.SetStreamHandler(testProtocol, handler)

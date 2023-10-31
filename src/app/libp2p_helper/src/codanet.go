@@ -10,12 +10,17 @@ import (
 	"sync"
 	"time"
 
-  "github.com/ipfs/boxo/bitswap"
+	"github.com/ipfs/boxo/bitswap"
 	bitnet "github.com/ipfs/boxo/bitswap/network"
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log/v2"
 	p2p "github.com/libp2p/go-libp2p"
 
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-kad-dht/dual"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	record "github.com/libp2p/go-libp2p-record"
+	p2pconfig "github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/control"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -25,14 +30,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p-kad-dht/dual"
-	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoreds"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	record "github.com/libp2p/go-libp2p-record"
-	p2pconfig "github.com/libp2p/go-libp2p/config"
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	discovery "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoreds"
 	libp2pyamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	p2pconnmgr "github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
@@ -89,9 +89,11 @@ func isPrivateAddr(addr ma.Multiaddr) bool {
 }
 
 type CodaConnectionManager struct {
-	p2pManager   *p2pconnmgr.BasicConnMgr
-	OnConnect    func(network.Network, network.Conn)
-	OnDisconnect func(network.Network, network.Conn)
+	p2pManager        *p2pconnmgr.BasicConnMgr
+	onConnectMutex    sync.Mutex
+	onConnect         func(network.Network, network.Conn)
+	onDisconnectMutex sync.Mutex
+	onDisconnect      func(network.Network, network.Conn)
 	// protectedMirror is a map of protected peer ids/tags, mirroring the structure in
 	// BasicConnMgr which is not accessible from CodaConnectionManager
 	protectedMirror     map[peer.ID]map[string]interface{}
@@ -99,19 +101,23 @@ type CodaConnectionManager struct {
 }
 
 func (cm *CodaConnectionManager) AddOnConnectHandler(f func(network.Network, network.Conn)) {
-	prevOnConnect := cm.OnConnect
-	cm.OnConnect = func(net network.Network, c network.Conn) {
+	cm.onConnectMutex.Lock()
+	prevOnConnect := cm.onConnect
+	cm.onConnect = func(net network.Network, c network.Conn) {
 		prevOnConnect(net, c)
 		f(net, c)
 	}
+	cm.onConnectMutex.Unlock()
 }
 
 func (cm *CodaConnectionManager) AddOnDisconnectHandler(f func(network.Network, network.Conn)) {
-	prevOnDisconnect := cm.OnDisconnect
-	cm.OnDisconnect = func(net network.Network, c network.Conn) {
+	cm.onDisconnectMutex.Lock()
+	prevOnDisconnect := cm.onDisconnect
+	cm.onDisconnect = func(net network.Network, c network.Conn) {
 		prevOnDisconnect(net, c)
 		f(net, c)
 	}
+	cm.onDisconnectMutex.Unlock()
 }
 
 func newCodaConnectionManager(minConnections, maxConnections int, grace time.Duration) (*CodaConnectionManager, error) {
@@ -122,8 +128,8 @@ func newCodaConnectionManager(minConnections, maxConnections int, grace time.Dur
 	}
 	return &CodaConnectionManager{
 		p2pManager:      connmgr,
-		OnConnect:       noop,
-		OnDisconnect:    noop,
+		onConnect:       noop,
+		onDisconnect:    noop,
 		protectedMirror: make(map[peer.ID]map[string]interface{}),
 	}, nil
 }
@@ -193,12 +199,16 @@ func (cm *CodaConnectionManager) ListenClose(net network.Network, addr ma.Multia
 }
 func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) {
 	logger.Debugf("%s connected to %s", c.LocalPeer(), c.RemotePeer())
-	cm.OnConnect(net, c)
+	cm.onConnectMutex.Lock()
+	cm.onConnect(net, c)
+	cm.onConnectMutex.Unlock()
 	cm.p2pManager.Notifee().Connected(net, c)
 }
 
 func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Conn) {
-	cm.OnDisconnect(net, c)
+	cm.onDisconnectMutex.Lock()
+	cm.onDisconnect(net, c)
+	cm.onDisconnectMutex.Unlock()
 	cm.p2pManager.Notifee().Disconnected(net, c)
 }
 
@@ -274,7 +284,9 @@ func (ms *MessageStats) GetStats() *safeStats {
 }
 
 func (h *Helper) ResetGatingConfigTrustedAddrFilters() {
-	h.gatingState.TrustedAddrFilters = ma.NewFilters()
+	h.gatingState.trustedAddrFiltersMutex.Lock()
+	h.gatingState.trustedAddrFilters = ma.NewFilters()
+	h.gatingState.trustedAddrFiltersMutex.Unlock()
 }
 
 // this type implements the ConnectionGating interface
@@ -283,10 +295,14 @@ func (h *Helper) ResetGatingConfigTrustedAddrFilters() {
 type CodaGatingState struct {
 	logger                  logging.EventLogger
 	KnownPrivateAddrFilters *ma.Filters
-	BannedAddrFilters       *ma.Filters
-	TrustedAddrFilters      *ma.Filters
-	BannedPeers             map[peer.ID]struct{}
-	TrustedPeers            map[peer.ID]struct{}
+	bannedAddrFiltersMutex  sync.Mutex
+	bannedAddrFilters       *ma.Filters
+	trustedAddrFiltersMutex sync.Mutex
+	trustedAddrFilters      *ma.Filters
+	bannedPeersMutex        sync.Mutex
+	bannedPeers             map[peer.ID]struct{}
+	trustedPeersMutex       sync.Mutex
+	trustedPeers            map[peer.ID]struct{}
 }
 
 type CodaGatingConfig struct {
@@ -322,11 +338,11 @@ func NewCodaGatingState(config *CodaGatingConfig, knownPrivateAddrFilters *ma.Fi
 
 	return &CodaGatingState{
 		logger:                  logger,
-		BannedAddrFilters:       bannedAddrFilters,
-		TrustedAddrFilters:      trustedAddrFilters,
+		bannedAddrFilters:       bannedAddrFilters,
+		trustedAddrFilters:      trustedAddrFilters,
 		KnownPrivateAddrFilters: knownPrivateAddrFilters,
-		BannedPeers:             bannedPeers,
-		TrustedPeers:            trustedPeers,
+		bannedPeers:             bannedPeers,
+		trustedPeers:            trustedPeers,
 	}
 }
 
@@ -335,10 +351,10 @@ func (h *Helper) GatingState() *CodaGatingState {
 }
 
 func (h *Helper) SetGatingState(gs *CodaGatingConfig) {
-	h.gatingState.TrustedPeers = gs.TrustedPeers
-	h.gatingState.BannedPeers = gs.BannedPeers
-	h.gatingState.TrustedAddrFilters = gs.TrustedAddrFilters
-	h.gatingState.BannedAddrFilters = gs.BannedAddrFilters
+	h.gatingState.trustedPeers = gs.TrustedPeers
+	h.gatingState.bannedPeers = gs.BannedPeers
+	h.gatingState.trustedAddrFilters = gs.TrustedAddrFilters
+	h.gatingState.bannedAddrFilters = gs.BannedAddrFilters
 	for _, c := range h.Host.Network().Conns() {
 		pid := c.RemotePeer()
 		maddr := c.RemoteMultiaddr()
@@ -350,6 +366,12 @@ func (h *Helper) SetGatingState(gs *CodaGatingConfig) {
 			}()
 		}
 	}
+}
+
+func (gs *CodaGatingState) TrustPeer(p peer.ID) {
+	gs.trustedPeersMutex.Lock()
+	gs.trustedPeers[p] = struct{}{}
+	gs.trustedPeersMutex.Unlock()
 }
 
 func (gs *CodaGatingState) MarkPrivateAddrAsKnown(addr ma.Multiaddr) {
@@ -397,7 +419,9 @@ func (c connectionAllowance) isDeny() bool {
 }
 
 func (gs *CodaGatingState) checkPeerTrusted(p peer.ID) connectionAllowance {
-  _, isTrusted := gs.TrustedPeers[p]
+	gs.trustedPeersMutex.Lock()
+	_, isTrusted := gs.trustedPeers[p]
+	gs.trustedPeersMutex.Unlock()
 	if isTrusted {
 		return Accept
 	}
@@ -405,7 +429,9 @@ func (gs *CodaGatingState) checkPeerTrusted(p peer.ID) connectionAllowance {
 }
 
 func (gs *CodaGatingState) checkPeerBanned(p peer.ID) connectionAllowance {
-  _, isBanned := gs.BannedPeers[p]
+	gs.bannedPeersMutex.Lock()
+	_, isBanned := gs.bannedPeers[p]
+	gs.bannedPeersMutex.Unlock()
 	if isBanned {
 		return DenyBannedPeer
 	}
@@ -440,14 +466,18 @@ func (gs *CodaGatingState) checkAllowedPeer(p peer.ID) connectionAllowance {
 }
 
 func (gs *CodaGatingState) checkAddrTrusted(addr ma.Multiaddr) connectionAllowance {
-	if !gs.TrustedAddrFilters.AddrBlocked(addr) {
+	gs.trustedAddrFiltersMutex.Lock()
+	defer gs.trustedAddrFiltersMutex.Unlock()
+	if !gs.trustedAddrFilters.AddrBlocked(addr) {
 		return Accept
 	}
 	return Undecided
 }
 
 func (gs *CodaGatingState) checkAddrBanned(addr ma.Multiaddr) connectionAllowance {
-	if gs.BannedAddrFilters.AddrBlocked(addr) {
+	gs.bannedAddrFiltersMutex.Lock()
+	defer gs.bannedAddrFiltersMutex.Unlock()
+	if gs.bannedAddrFilters.AddrBlocked(addr) {
 		return DenyBannedAddress
 	}
 	return Undecided

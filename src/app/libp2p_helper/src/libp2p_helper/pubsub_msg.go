@@ -8,8 +8,8 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
-	peer "github.com/libp2p/go-libp2p/core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 type ValidationPushT = ipc.Libp2pHelperInterface_Validation
