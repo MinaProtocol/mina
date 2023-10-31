@@ -37,7 +37,7 @@ module Engine = struct
       -> test_name:string
       -> cli_inputs:Cli_inputs.t
       -> debug:bool
-      -> generate_code_coverage:bool 
+      -> generate_code_coverage:bool
       -> test_config:Test_config.t
       -> images:Test_config.Container_images.t
       -> t

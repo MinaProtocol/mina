@@ -1,6 +1,6 @@
 open Cmdliner
 
-type t = { mina_automation_location : string  }
+type t = { mina_automation_location : string }
 
 let term =
   let mina_automation_location =
@@ -16,4 +16,4 @@ let term =
           ~env ~docv:"MINA_AUTOMATION_LOCATION" ~doc)
   in
   let cons_inputs mina_automation_location = { mina_automation_location } in
-  Term.(const cons_inputs $ mina_automation_location )
+  Term.(const cons_inputs $ mina_automation_location)
