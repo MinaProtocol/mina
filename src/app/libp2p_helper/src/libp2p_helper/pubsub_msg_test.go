@@ -117,15 +117,11 @@ func TestValidationPush(t *testing.T) {
 	}
 
 	for i := 0; i < len(ipcValResults); i++ {
-		result := ValidationUnknown
 		seqno := uint64(i)
 		status := &validationStatus{
 			Completion: make(chan pubsub.ValidationResult),
 		}
 		testApp.Validators[seqno] = status
-		go func() {
-			result = <-status.Completion
-		}()
 		_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 		require.NoError(t, err)
 		m, err := ipc.NewRootLibp2pHelperInterface_Validation(seg)
@@ -135,6 +131,7 @@ func TestValidationPush(t *testing.T) {
 		m.SetResult(ipcValResults[i])
 		ValidationPush(m).handle(testApp)
 		require.NoError(t, err)
+		result := <-status.Completion
 		require.Equal(t, pubsubValResults[i], result)
 		_, has := testApp.Validators[seqno]
 		require.False(t, has)

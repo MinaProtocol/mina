@@ -37,7 +37,9 @@ func TestTrustedPrivateConnectionGating(t *testing.T) {
 	allowed := gs.InterceptAddrDial(testInfo.ID, testMa)
 	require.False(t, allowed)
 
-	gs.TrustedPeers[testInfo.ID] = struct{}{}
+	gs.trustedPeersMutex.Lock()
+	gs.trustedPeers[testInfo.ID] = struct{}{}
+	gs.trustedPeersMutex.Unlock()
 	allowed = gs.InterceptAddrDial(testInfo.ID, testMa)
 	require.True(t, allowed)
 }

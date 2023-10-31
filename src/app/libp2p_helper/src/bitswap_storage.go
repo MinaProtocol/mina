@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ipfs/boxo/blockstore"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/boxo/blockstore"
 	"github.com/ledgerwatch/lmdb-go/lmdb"
 	"github.com/multiformats/go-multihash"
 	lmdbbs "github.com/o1-labs/go-bs-lmdb"
