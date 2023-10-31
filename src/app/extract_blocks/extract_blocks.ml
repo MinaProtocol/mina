@@ -49,8 +49,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let%bind creator = pk_of_id block.creator_id in
   let%bind block_winner = pk_of_id block.block_winner_id in
   let last_vrf_output =
-    (* keep hex encoding *)
-    block.last_vrf_output
+    Base64.decode_exn ~alphabet:Base64.uri_safe_alphabet block.last_vrf_output
   in
   let%bind snarked_ledger_hash_str =
     query_db ~f:(fun db ->
