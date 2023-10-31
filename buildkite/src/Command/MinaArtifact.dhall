@@ -67,7 +67,7 @@ let pipeline =
               "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
             ] # spec.extraEnv)
             "./buildkite/scripts/build-artifact.sh",
-            label = "Build Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile}${spec.extraSuffix}",
+            label = "Build Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile}${spec.jobSuffix}",
             key = "build-deb-pkg",
             target = Size.XLarge,
             retries = [
