@@ -1,11 +1,18 @@
+(** Testing
+    -------
+    Component:  Mina base
+    Invocation: dune exec src/lib/mina_base/test/main.exe -- \
+                  test '^zero vesting period$'
+    Subject:    Test zero vesting period detection
+ *)
+
 open Core_kernel
 open Mina_base
 
-let%test_module "zero_vesting" =
-  ( module struct
-    let mk_zkapp_with_vesting_period n =
-      sprintf
-        {json|
+let mk_zkapp_with_vesting_period n =
+  let res =
+    sprintf
+      {json|
 {
   "fee_payer": {
     "body": {
@@ -112,7 +119,25 @@ let%test_module "zero_vesting" =
                   "epoch_length": [ "Ignore" ]
                 }
               },
-              "account": [ "Accept" ],
+              "account": {
+                "balance": [ "Ignore" ],
+                "nonce": [ "Ignore" ],
+                "receipt_chain_hash": [ "Ignore" ],
+                "delegate": [ "Ignore" ],
+                "state": [
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ]
+                ],
+                "action_state": [ "Ignore" ],
+                "proved_state": [ "Ignore" ],
+                "is_new": [ "Ignore" ]
+              },
               "valid_while": [ "Ignore" ]
             },
             "use_full_commitment": true,
@@ -202,7 +227,25 @@ let%test_module "zero_vesting" =
                   "epoch_length": [ "Ignore" ]
                 }
               },
-              "account": [ "Accept" ],
+              "account": {
+                "balance": [ "Ignore" ],
+                "nonce": [ "Ignore" ],
+                "receipt_chain_hash": [ "Ignore" ],
+                "delegate": [ "Ignore" ],
+                "state": [
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ]
+                ],
+                "action_state": [ "Ignore" ],
+                "proved_state": [ "Ignore" ],
+                "is_new": [ "Ignore" ]
+              },
               "valid_while": [ "Ignore" ]
             },
             "use_full_commitment": false,
@@ -224,33 +267,37 @@ let%test_module "zero_vesting" =
 }
 
       |json}
-        n
-      |> Yojson.Safe.from_string |> Zkapp_command.of_yojson
-      |> Result.ok_or_failwith
+      n
+    |> Yojson.Safe.from_string |> Zkapp_command.of_yojson
+  in
+  match res with
+  | Ppx_deriving_yojson_runtime.Result.Ok zkapp ->
+      zkapp
+  | Ppx_deriving_yojson_runtime.Result.Error err ->
+      failwith err
 
-    let zkapp_zero_vesting_period = mk_zkapp_with_vesting_period 0
+let zkapp_zero_vesting_period = mk_zkapp_with_vesting_period 0
 
-    let%test "zero vesting period is error" =
-      match
-        User_command.check_well_formedness
-          ~genesis_constants:Genesis_constants.for_unit_tests
-          (Zkapp_command zkapp_zero_vesting_period)
-      with
-      | Error [ Zero_vesting_period ] ->
-          true
-      | Ok _ | Error _ ->
-          false
+let zero_vesting_period_is_error () =
+  match
+    User_command.check_well_formedness
+      ~genesis_constants:Genesis_constants.for_unit_tests
+      (Zkapp_command zkapp_zero_vesting_period)
+  with
+  | Error [ Zero_vesting_period ] ->
+      ()
+  | Ok _ | Error _ ->
+      assert false
 
-    let zkapp_nonzero_vesting_period = mk_zkapp_with_vesting_period 1
+let zkapp_nonzero_vesting_period = mk_zkapp_with_vesting_period 1
 
-    let%test "nonzero vesting period is ok" =
-      match
-        User_command.check_well_formedness
-          ~genesis_constants:Genesis_constants.for_unit_tests
-          (Zkapp_command zkapp_nonzero_vesting_period)
-      with
-      | Ok () ->
-          true
-      | Error errs ->
-          false
-  end )
+let nonzero_vesting_period_ok () =
+  match
+    User_command.check_well_formedness
+      ~genesis_constants:Genesis_constants.for_unit_tests
+      (Zkapp_command zkapp_nonzero_vesting_period)
+  with
+  | Ok () ->
+      ()
+  | Error _ ->
+      assert false
