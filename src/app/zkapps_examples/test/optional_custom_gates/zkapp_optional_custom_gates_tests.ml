@@ -74,7 +74,9 @@ let%test_module "Zkapp with optional custom gates" =
     module Circuits = Circuits (Account_info)
 
     let account_update =
-      lazy (fst (Async.Thread_safe.block_on_async_exn (fun () -> Circuits.prove ())))
+      lazy
+        (fst
+           (Async.Thread_safe.block_on_async_exn (fun () -> Circuits.prove ())) )
 
     open Transaction_snark_tests.Util
 
@@ -93,8 +95,9 @@ let%test_module "Zkapp with optional custom gates" =
       in
       loc
 
-    let%test_unit "Generate a zkapp using a combination of optional custom gates" =
-      ignore ((Lazy.force account_update) : _ Zkapp_command.Call_forest.Tree.t)
+    let%test_unit "Generate a zkapp using a combination of optional custom \
+                   gates" =
+      ignore (Lazy.force account_update : _ Zkapp_command.Call_forest.Tree.t)
 
     let%test_unit "Zkapp using a combination of optional custom gates verifies"
         =

@@ -56,7 +56,7 @@ type ( 'a_var
               and type return_value = 'ret_value
               and type statement = 'a_value )
       ; feature_flags : bool Plonk_types.Features.t
-      ; custom_gate_type: bool
+      ; custom_gate_type : bool
       }
       -> ( 'a_var
          , 'a_value

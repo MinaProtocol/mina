@@ -42,9 +42,7 @@ let domains (type field gates) ?feature_flags
             feature_flags
           in
           let combined_lookup_table_length =
-            let range_check_table_used =
-              range_check0 || range_check1 || rot
-            in
+            let range_check_table_used = range_check0 || range_check1 || rot in
             let range_check_table_used_again =
               (* FIXME: This is a hack around a bug in proof-systems. *)
               foreign_field_mul

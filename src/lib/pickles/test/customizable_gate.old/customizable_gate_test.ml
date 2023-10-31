@@ -63,7 +63,8 @@ let constraint_constants =
 let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
   if feature_flags.foreign_field_add then main_foreign_field_add ()
 
-let register_test name feature_flags1 feature_flags2 custom_gate_type1 custom_gate_type2 =
+let register_test name feature_flags1 feature_flags2 custom_gate_type1
+    custom_gate_type2 =
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
@@ -125,18 +126,22 @@ let register_test name feature_flags1 feature_flags2 custom_gate_type1 custom_ga
 
 let register_feature_test (name, specific_feature_flags, custom_gate_type) =
   (* Tests activating "on" logic *)
-  register_test name specific_feature_flags specific_feature_flags custom_gate_type custom_gate_type ;
+  register_test name specific_feature_flags specific_feature_flags
+    custom_gate_type custom_gate_type ;
   (* Tests activating "maybe on" logic *)
   register_test
     (Printf.sprintf "%s (maybe)" name)
-    specific_feature_flags Plonk_types.Features.none_bool custom_gate_type custom_gate_type
+    specific_feature_flags Plonk_types.Features.none_bool custom_gate_type
+    custom_gate_type
 
 let () =
   let configurations =
     [ ( "foreign field addition (ffadd)"
-      , Plonk_types.Features.{ none_bool with foreign_field_add = true }, false )
-      ; ( "foreign field addition (conditional)"
-      , Plonk_types.Features.{ none_bool with foreign_field_add = true }, true )
+      , Plonk_types.Features.{ none_bool with foreign_field_add = true }
+      , false )
+    ; ( "foreign field addition (conditional)"
+      , Plonk_types.Features.{ none_bool with foreign_field_add = true }
+      , true )
     ]
   in
   List.iter ~f:register_feature_test configurations ;

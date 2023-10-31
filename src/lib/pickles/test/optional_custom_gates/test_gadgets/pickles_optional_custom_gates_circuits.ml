@@ -185,4 +185,4 @@ let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
   if feature_flags.range_check0 then main_range_check0 () ;
   if feature_flags.range_check1 then main_range_check1 () ;
   if feature_flags.foreign_field_add then main_foreign_field_add () ;
-  if feature_flags.foreign_field_mul then main_foreign_field_mul () ;
+  if feature_flags.foreign_field_mul then main_foreign_field_mul ()
