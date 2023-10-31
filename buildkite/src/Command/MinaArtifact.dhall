@@ -84,7 +84,7 @@ let pipeline =
           network="berkeley",
           deb_codename="${DebianVersions.lowerName spec.debVersion}",
           deb_profile="${Profiles.lowerName spec.profile}",
-          step_key="daemon-berkeley-${DebianVersions.lowerName spec.debVersion}${Profiles.toLabelSegment spec.profile}${spec.stepSuffix}-docker-image$"
+          step_key="daemon-berkeley-${DebianVersions.lowerName spec.debVersion}${Profiles.toLabelSegment spec.profile}${spec.stepSuffix}-docker-image"
         }
 
         in
