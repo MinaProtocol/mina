@@ -59,7 +59,7 @@ struct
           with type length = Max_proofs_verified.n
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
-      ~zk_rows ~feature_flags ~self_dlog_plonk_index
+      ~feature_flags ~self_dlog_plonk_index
       ~(public_input :
          ( var
          , value
@@ -204,7 +204,7 @@ struct
           Plonk_checks.scalars_env
             (module Env_bool)
             (module Env_field)
-            ~srs_length_log2:Common.Max_degree.step_log2 ~zk_rows:3
+            ~srs_length_log2:Common.Max_degree.step_log2 ~zk_rows:data.zk_rows
             ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
             ~field_of_hex:(fun s ->
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
@@ -237,7 +237,7 @@ struct
         Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
           ~old_bulletproof_challenges:
             statement.messages_for_next_step_proof.old_bulletproof_challenges
-          ~zk_rows ~proof_state:statement.proof_state
+          ~zk_rows:data.zk_rows ~proof_state:statement.proof_state
       in
       let prev_statement_with_hashes :
           ( _
@@ -827,6 +827,10 @@ struct
                               ~public_input:public_inputs
                           with
                           | None ->
+                              if
+                                Proof_cache
+                                .is_env_var_set_requesting_error_for_proofs ()
+                              then failwith "Regenerated proof" ;
                               let%map.Promise proof = create_proof () in
                               Proof_cache.set_step_proof proof_cache ~keypair:pk
                                 ~public_input:public_inputs proof.proof ;

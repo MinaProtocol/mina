@@ -159,7 +159,7 @@ module Json = struct
     ; evals : 'poly_comm verification_evals
     ; shifts : 'fr array
     ; lookup_index : 'poly_comm lookup option
-    ; zk_rows : int
+    ; zk_rows : int [@default 3]
     }
   [@@deriving to_yojson]
 
@@ -250,3 +250,10 @@ let set_wrap_proof t ~keypair ~public_input proof =
   in
   let proof_json = Backend.Tock.Proof.to_yojson proof in
   set_proof t ~verification_key ~public_input proof_json
+
+let is_env_var_set_requesting_error_for_proofs () =
+  match Sys.getenv_opt "ERROR_ON_PROOF" with
+  | Some ("true" | "t" (* insert whatever value is okay here *)) ->
+      true
+  | None | Some _ ->
+      false

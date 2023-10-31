@@ -113,7 +113,13 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
         |> to_list)
       public_input proof
   in
-  let x_hat = Option.value_exn proof.public_evals in
+  let x_hat =
+    match proof.public_evals with
+    | Some x ->
+        x
+    | None ->
+        O.([| p_eval_1 o |], [| p_eval_2 o |])
+  in
   let scalar_chal f =
     Scalar_challenge.map ~f:Challenge.Constant.of_tick_field (f o)
   in
@@ -420,7 +426,9 @@ let%test_module "gate finalization" =
          for use in the circuit *)
       and evals =
         constant
-          (Plonk_types.All_evals.typ (module Impls.Step) full_features)
+          (Plonk_types.All_evals.typ ~num_chunks:1
+             (module Impls.Step)
+             full_features )
           { evals =
               { public_input = x_hat_evals; evals = proof.proof.openings.evals }
           ; ft_eval1 = proof.proof.openings.ft_eval1
@@ -453,7 +461,7 @@ let%test_module "gate finalization" =
                 (`Known
                   [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ]
                   )
-              ~sponge ~prev_challenges:[] deferred_values evals
+              ~zk_rows:3 ~sponge ~prev_challenges:[] deferred_values evals
           in
 
           (* Read the boolean result from the circuit and make it available
@@ -874,6 +882,10 @@ let wrap
                       ~public_input:public_inputs
                   with
                   | None ->
+                      if
+                        Proof_cache.is_env_var_set_requesting_error_for_proofs
+                          ()
+                      then failwith "Regenerated proof" ;
                       let%map.Promise proof = create_proof () in
                       Proof_cache.set_wrap_proof proof_cache ~keypair:pk
                         ~public_input:public_inputs proof.proof ;
