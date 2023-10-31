@@ -44,6 +44,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Step_main_inputs = Step_main_inputs
   module Step_verifier = Step_verifier
   module Proof_cache = Proof_cache
+  module Cache = Cache
+  module Storables = Compile.Storables
 
   exception Return_digest = Compile.Return_digest
 
@@ -306,22 +308,22 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let compile_with_wrap_main_override_promise =
     Compile.compile_with_wrap_main_override_promise
 
-  let compile_promise ?self ?cache ?proof_cache ?disk_keys
+  let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
       ?return_early_digest_exception ?override_wrap_domain ~public_input
       ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
       ~choices () =
-    compile_with_wrap_main_override_promise ?self ?cache ?proof_cache ?disk_keys
-      ?return_early_digest_exception ?override_wrap_domain ~public_input
-      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
-      ~choices ()
-
-  let compile ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
+    compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
+      ?disk_keys ?return_early_digest_exception ?override_wrap_domain
       ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
-      ~constraint_constants ~choices () =
+      ~constraint_constants ~choices ()
+
+  let compile ?self ?cache ?storables ?proof_cache ?disk_keys
+      ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
+      ~max_proofs_verified ~name ~constraint_constants ~choices () =
     let self, cache_handle, proof_module, provers =
-      compile_promise ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
-        ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
-        ~constraint_constants ~choices ()
+      compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
+        ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
+        ~max_proofs_verified ~name ~constraint_constants ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
