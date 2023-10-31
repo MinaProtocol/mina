@@ -24,17 +24,21 @@ state hash of the block that we want to base the exported ledger on.
 This field, if asked for, contains a new runtime configuration,
 automatically updated with:
 
-* the dump of the **staged ledger** as it was after the last block
-before the slot where no more transactions were accepted
-(transaction-stop slot). This ledger becomes the genesis ledger for
-the new network
+* the dump of the **staged ledger** at the fork point
 * updated values of `Fork_config`, i.e. previous state hash, previous
-blockchain length and previous global slot.
-* updated epoch data, in particular current and next epoch ledger and seed.
+blockchain length and previous global slot;
+* Current epoch ledger;
+* Current epoch data (total currency and seed);
+* Next epoch ledger;
+* Next epoch data (total currency and seed);
+* Protocol state at the fork point;
 
 **IMPORTANT**: as of now the `genesis_ledger_timestamp` is **not**
 being updated and must be manually set to the right value (which is at
 the moment unknown).
+
+By the fork point above we mean the last block before the slot where
+no more transactions were accepted (transaction-stop slot).
 
 Thus generated configuration can be saved to a file, modified if
 needed and fed directly into a new node, running a different protocol
