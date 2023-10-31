@@ -109,7 +109,7 @@ module Network_config = struct
     in
     assoc
 
-  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
+  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool) ~(generate_code_coverage : bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
     let { requires_graphql
