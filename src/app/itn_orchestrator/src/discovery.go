@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Khan/genqlient/graphql"
@@ -47,30 +48,37 @@ func (awsctx AwsContext) ReadObject(ctx context.Context, key *string) (*s3.GetOb
 	})
 }
 
-func discoverParticipantsDo(config Config, params DiscoveryParams, output func(NodeAddress)) error {
-	before := time.Now().Add(-time.Duration(params.OffsetMin) * time.Minute)
-	startAfter := prefixByTime(before)
+type nodeAddrEntry struct {
+	addr  NodeAddress
+	entry NodeEntry
+	isNew bool
+}
+
+type nodeAddrEntriesAndCount struct {
+	entries []nodeAddrEntry
+	count   int
+}
+
+func iterateSubmissions(config Config, startAfter string, handleAddress func(string, NodeAddress)) error {
 	log := config.Log
 	ctx := config.Ctx
-
 	resp, err := config.AwsContext.ListObjects(ctx, startAfter, nil)
 	if err != nil {
 		return err
 	}
-	cache := make(map[NodeAddress]struct{})
 	for {
 		for _, obj := range resp.Contents {
 			name := *obj.Key
 			r, err := config.AwsContext.ReadObject(ctx, obj.Key)
 			if err != nil {
-				log.Errorf("Error reading submission %s: %v", name, err)
+				log.Warnf("Error reading submission %s: %v", name, err)
 				continue
 			}
 			var meta MetaToBeSaved
 			d := json.NewDecoder(r.Body)
 			err = d.Decode(&meta)
 			if err != nil {
-				log.Errorf("Error decoding submission %s: %v", name, err)
+				log.Warnf("Error decoding submission %s: %v", name, err)
 				continue
 			}
 			colonIx := strings.IndexRune(meta.RemoteAddr, ':')
@@ -79,25 +87,7 @@ func discoverParticipantsDo(config Config, params DiscoveryParams, output func(N
 				colonIx = len(meta.RemoteAddr)
 			}
 			addr := NodeAddress(meta.RemoteAddr[:colonIx] + ":" + strconv.Itoa(int(meta.GraphqlControlPort)))
-			if _, has := cache[addr]; has {
-				continue
-			}
-			_, _, err = GetGqlClient(config, addr)
-			if err != nil {
-				log.Errorf("Error on auth for %s: %v", addr, err)
-				continue
-			}
-			if config.NodeData[addr].IsBlockProducer && params.NoBlockProducers {
-				continue
-			}
-			if !config.NodeData[addr].IsBlockProducer && params.OnlyBlockProducers {
-				continue
-			}
-			cache[addr] = struct{}{}
-			output(addr)
-			if params.Limit > 0 && len(cache) >= params.Limit {
-				break
-			}
+			handleAddress(meta.Submitter, addr)
 		}
 		if resp.IsTruncated {
 			resp, err = config.AwsContext.ListObjects(ctx, startAfter, resp.NextContinuationToken)
@@ -105,13 +95,80 @@ func discoverParticipantsDo(config Config, params DiscoveryParams, output func(N
 				return err
 			}
 		} else {
-			break
+			return nil
 		}
 	}
-	if len(cache) != params.Limit && params.Exactly {
+}
+
+func discoverParticipantsDo(config Config, params DiscoveryParams, output func(NodeAddress)) error {
+	before := time.Now().Add(-time.Duration(params.OffsetMin) * time.Minute)
+	startAfter := prefixByTime(before)
+	log := config.Log
+	// This function has the following concurrency architecture:
+	// 1. There is a goroutine that reads discovered nodes and outputs them, at the end
+	//    it returns count of discovered nodes and node entries for new connections
+	// 2. There is a goroutine for every node to which we're not connected but which we
+	//    found in uptime data
+	// 3. Main thread iterates through submissions, eithewr launching a new connection grouroutine (2)
+	//    or directly submitting a node to outputting goroutine (1). After iteration main thread waits for
+	//    all of connection goroutines (2) to finish and then triggers end of goroutine (1). After that it reads
+	//    result of outputting goroutine (1) and updates the connection cache in config.
+	var wg sync.WaitGroup
+	connected := make(chan nodeAddrEntry)
+	connectedResultChan := make(chan nodeAddrEntriesAndCount)
+	go func() {
+		// Goroutine that is responsible for outputing the participants
+		// immediately after they're discovered
+		entries := make([]nodeAddrEntry, 0)
+		cnt := 0
+		for p := range connected {
+			if p.isNew {
+				entries = append(entries, p)
+			}
+			if p.entry.IsBlockProducer && params.NoBlockProducers {
+				continue
+			}
+			if !p.entry.IsBlockProducer && params.OnlyBlockProducers {
+				continue
+			}
+			if params.Limit <= 0 || cnt < params.Limit {
+				output(p.addr)
+			}
+			cnt++
+		}
+		connectedResultChan <- nodeAddrEntriesAndCount{entries: entries, count: cnt}
+	}()
+	tryToConnect := func(pk string, addr NodeAddress) {
+		defer wg.Done()
+		entry, err := NewGqlClient(config, addr)
+		if err == nil {
+			connected <- nodeAddrEntry{addr: addr, entry: *entry, isNew: true}
+		} else {
+			log.Warnf("Error on auth for %s (%s): %v", addr, pk, err)
+		}
+	}
+	connecting := make(map[NodeAddress]struct{})
+	iterateSubmissions(config, startAfter, func(pk string, addr NodeAddress) {
+		if _, has := connecting[addr]; !has {
+			connecting[addr] = struct{}{}
+			if entry, has := config.NodeData[addr]; has {
+				connected <- nodeAddrEntry{addr: addr, entry: entry, isNew: false}
+			} else {
+				wg.Add(1)
+				go tryToConnect(pk, addr)
+			}
+		}
+	})
+	wg.Wait()
+	close(connected)
+	connectedResult := <-connectedResultChan
+	for _, p := range connectedResult.entries {
+		config.NodeData[p.addr] = p.entry
+	}
+	if connectedResult.count < params.Limit && params.Exactly {
 		return errors.New("failed to discover the exact number of nodes")
 	}
-	if len(cache) == 0 {
+	if connectedResult.count == 0 {
 		return errors.New("didn't find any participants")
 	}
 	return nil
