@@ -2575,7 +2575,7 @@ let schema_limited =
   Graphql_async.Schema.(
     schema
       [ Queries.daemon_status; Queries.block; Queries.version ]
-      ~mutations:[] ~subscriptions:[])
+      ~mutations:[ Mutations.send_payment ] ~subscriptions:[])
 
 let schema_itn : (bool * Mina_lib.t) Schema.schema =
   if Mina_compile_config.itn_features then
