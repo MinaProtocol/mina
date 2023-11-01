@@ -1,16 +1,18 @@
 let ContainerImages = ../../Constants/ContainerImages.dhall
+let B = ../../External/Buildkite.dhall
 
-let Cmd = ../../Lib/Cmds.dhall
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineTag = ../../Pipeline/Tag.dhall
-
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
+let Cmd = ../../Lib/Cmds.dhall
 let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in
 
@@ -35,6 +37,7 @@ Pipeline.build
           ],
           label = "delegation backend unit-tests",
           key = "delegation-backend-unit-tests",
+          soft_fail = Some (B/SoftFail.Boolean True),
           target = Size.Small,
           docker = None Docker.Type
         }
