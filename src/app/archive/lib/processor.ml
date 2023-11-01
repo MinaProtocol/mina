@@ -1845,7 +1845,7 @@ module User_command = struct
             (Caqti_request.find typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
-                    | "typ" -> Some "user_command_type" | _ -> None )
+                    | "command_type" -> Some "user_command_type" | _ -> None )
                   ~cols:Fields.names () ) )
             { command_type = user_cmd.command_type
             ; fee_payer_id
@@ -1994,7 +1994,8 @@ module Internal_command = struct
           (Caqti_request.find typ Caqti_type.int
              (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                 ~tannot:(function
-                  | "typ" -> Some "internal_command_type" | _ -> None )
+                  | "command_type" -> Some "internal_command_type" | _ -> None
+                  )
                 ~cols:Fields.names () ) )
           { command_type = internal_cmd.command_type
           ; receiver_id
@@ -2767,9 +2768,9 @@ module Block = struct
             (Consensus.Data.Consensus_state.block_stake_winner consensus_state)
         in
         let last_vrf_output =
-          (* encode as hex, Postgresql won't accept arbitrary bitstrings *)
+          (* encode as base64, same as in precomputed blocks JSON *)
           Consensus.Data.Consensus_state.last_vrf_output consensus_state
-          |> Hex.Safe.to_hex
+          |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
         in
         let%bind snarked_ledger_hash_id =
           Snarked_ledger_hash.add_if_doesn't_exist
@@ -3173,8 +3174,9 @@ module Block = struct
             Public_key.add_if_doesn't_exist (module Conn) block.block_winner
           in
           let last_vrf_output =
-            (* already encoded as hex *)
+            (* encode as base64, same as in precomputed blocks JSON *)
             block.last_vrf_output
+            |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
           in
           let%bind snarked_ledger_hash_id =
             Snarked_ledger_hash.add_if_doesn't_exist
@@ -3214,19 +3216,15 @@ module Block = struct
           in
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               {sql| INSERT INTO blocks
-                     (state_hash, parent_id, parent_hash,
-                      creator_id, block_winner_id,last_vrf_output,
-                      snarked_ledger_hash_id, staking_epoch_data_id,
-                      next_epoch_data_id,
-                      min_window_density, sub_window_densities, total_currency,
-                      ledger_hash, height,
-                      global_slot_since_hard_fork, global_slot_since_genesis,
-                      protocol_version, proposed_protocol_version,
-                      timestamp, chain_status)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::bigint[], ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
-                     RETURNING id
-               |sql} )
+               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                  ~tannot:(function
+                    | "sub_window_densities" ->
+                        Some "bigint[]"
+                    | "chain_status" ->
+                        Some "chain_status_type"
+                    | _ ->
+                        None )
+                  ~cols:Fields.names () ) )
             { state_hash = block.state_hash |> State_hash.to_base58_check
             ; parent_id
             ; parent_hash = block.parent_hash |> State_hash.to_base58_check
