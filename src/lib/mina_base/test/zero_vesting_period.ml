@@ -17,7 +17,7 @@ let mk_zkapp_with_vesting_period n =
   "fee_payer": {
     "body": {
       "public_key": "B62qkb7Sed1VVsogq7qXzi79JNx9MkcbRihwwuSphUtBiEFPNTQfzNR",
-      "fee": "0.01",
+      "fee": "2.0",
       "valid_until": null,
       "nonce": "0"
     },
