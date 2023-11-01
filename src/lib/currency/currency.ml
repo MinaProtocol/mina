@@ -479,6 +479,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; sgn = (if Unsigned.(equal magnitude zero) then Sgn.Pos else sgn)
         }
 
+      let create_preserve_zero_sign ~magnitude ~sgn = { magnitude; sgn }
+
       let sgn { sgn; _ } = sgn
 
       let magnitude { magnitude; _ } = magnitude
