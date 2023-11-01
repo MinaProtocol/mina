@@ -22,8 +22,11 @@ type mina_initialization =
   ; itn_graphql_port : int option
   }
 
+(* keep this code in sync with Client.chain_id_inputs, Mina_commands.chain_id_inputs, and
+   Daemon_rpcs.Chain_id_inputs
+*)
 let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
-    ~protocol_major_version =
+    ~protocol_transaction_version ~protocol_network_version =
   (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
@@ -31,19 +34,21 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
     List.map constraint_system_digests ~f:(fun (_, digest) -> Md5.to_hex digest)
     |> String.concat ~sep:""
   in
-  let protocol_version_digest =
-    Int.to_string protocol_major_version |> Md5.digest_string |> Md5.to_hex
+  let version_digest v = Int.to_string v |> Md5.digest_string |> Md5.to_hex in
+  let protocol_transaction_version_digest =
+    version_digest protocol_transaction_version
+  in
+  let protocol_network_version_digest =
+    version_digest protocol_network_version
   in
   let b2 =
     Blake2.digest_string
       ( genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash
-      ^ protocol_version_digest )
+      ^ protocol_transaction_version_digest ^ protocol_network_version_digest )
   in
   Blake2.to_hex b2
 
 [%%inject "daemon_expiry", daemon_expiry]
-
-[%%inject "compile_time_current_protocol_version", current_protocol_version]
 
 [%%if plugins]
 
@@ -364,13 +369,6 @@ let setup_daemon logger =
     flag "--peer-list-url" ~aliases:[ "peer-list-url" ]
       ~doc:"URL URL of seed peer list file. Will be polled periodically."
       (optional string)
-  and curr_protocol_version =
-    flag "--current-protocol-version"
-      ~aliases:[ "current-protocol-version" ]
-      (optional string)
-      ~doc:
-        "NN.NN.NN Current protocol version, only blocks with the same version \
-         accepted"
   and proposed_protocol_version =
     flag "--proposed-protocol-version"
       ~aliases:[ "proposed-protocol-version" ]
@@ -541,7 +539,7 @@ let setup_daemon logger =
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
-               ~max_size:logrotate_max_size ~num_rotate:file_log_rotations ) ;
+               ~max_size:logrotate_max_size ~num_rotate:20 ) ;
         (* Consumer for `[%log internal]` logging used for internal tracing *)
         Itn_logger.set_message_postprocessor
           Internal_tracing.For_itn_logger.post_process_message ;
@@ -1213,18 +1211,21 @@ let setup_daemon logger =
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let chain_id =
-            let protocol_major_version =
-              Protocol_version.of_string_exn
-                compile_time_current_protocol_version
-              |> Protocol_version.major
+            let protocol_transaction_version =
+              Protocol_version.(transaction current)
+            in
+            let protocol_network_version =
+              Protocol_version.(transaction current)
             in
             chain_id ~genesis_state_hash
               ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_system_digests:
                 (Lazy.force precomputed_values.constraint_system_digests)
-              ~protocol_major_version
+              ~protocol_transaction_version ~protocol_network_version
           in
           [%log info] "Daemon will use chain id %s" chain_id ;
+          [%log info] "Daemon running protocol version %s"
+            Protocol_version.(to_string current) ;
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout = Time.Span.of_sec 3.
@@ -1275,11 +1276,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let coinbase_receiver : Consensus.Coinbase_receiver.t =
             Option.value_map coinbase_receiver_flag ~default:`Producer
               ~f:(fun pk -> `Other pk)
-          in
-          let current_protocol_version =
-            Mina_run.get_current_protocol_version
-              ~compile_time_current_protocol_version ~conf_dir ~logger
-              curr_protocol_version
           in
           let proposed_protocol_version_opt =
             Mina_run.get_proposed_protocol_version_opt ~conf_dir ~logger
@@ -1352,9 +1348,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
                  ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
-                 ~gossip_net_params
-                 ~initial_protocol_version:current_protocol_version
-                 ~proposed_protocol_version_opt
+                 ~gossip_net_params ~proposed_protocol_version_opt
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method )

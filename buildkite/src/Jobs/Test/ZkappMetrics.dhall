@@ -2,6 +2,7 @@ let Prelude =  ../../External/Prelude.dhall
 let S = ../../Lib/SelectFiles.dhall
 let Cmd =  ../../Lib/Cmds.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let Command = ../../Command/Base.dhall
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 let WithCargo = ../../Command/WithCargo.dhall
@@ -20,6 +21,7 @@ Pipeline.build
           ]
         , path = "Test"
         , name = "ZkappMetrics"
+        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test ]
         }
     , steps =
       [ Command.build

@@ -2133,7 +2133,8 @@ let chain_id_inputs =
              ( genesis_state_hash
              , genesis_constants
              , snark_keys
-             , protocol_major_version ) ->
+             , protocol_transaction_version
+             , protocol_network_version ) ->
              let open Format in
              printf
                "@[<v>Genesis state hash: %s@,\
@@ -2144,7 +2145,8 @@ let chain_id_inputs =
                 @]@,\
                 @[<v 2>Snark keys:@,\
                 %a@]@,\
-                Protocol major version: %d@]@."
+                Protocol transaction version: %u@,\
+                Protocol network version: %u@]@."
                (State_hash.to_base58_check genesis_state_hash)
                Yojson.Safe.pp
                (Genesis_constants.Protocol.to_yojson genesis_constants.protocol)
@@ -2154,7 +2156,7 @@ let chain_id_inputs =
                   pp_print_int )
                genesis_constants.num_accounts
                (pp_print_list ~pp_sep:pp_print_cut pp_print_string)
-               snark_keys protocol_major_version
+               snark_keys protocol_transaction_version protocol_network_version
          | Error err ->
              Format.eprintf "Could not get chain id inputs: %s@."
                (Error.to_string_hum err) ) )

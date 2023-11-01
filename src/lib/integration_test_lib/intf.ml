@@ -48,7 +48,7 @@ module Engine = struct
 
       val id : t -> string
 
-      val app_id : t -> string
+      val infra_id : t -> string
 
       val network_keypair : t -> Network_keypair.t option
 
@@ -89,13 +89,15 @@ module Engine = struct
 
     val seeds : t -> Node.t Core.String.Map.t
 
-    val all_non_seed_pods : t -> Node.t Core.String.Map.t
+    val all_non_seed_nodes : t -> Node.t Core.String.Map.t
 
     val block_producers : t -> Node.t Core.String.Map.t
 
     val snark_coordinators : t -> Node.t Core.String.Map.t
 
     val archive_nodes : t -> Node.t Core.String.Map.t
+
+    val all_mina_nodes : t -> Node.t Core.String.Map.t
 
     val all_nodes : t -> Node.t Core.String.Map.t
 

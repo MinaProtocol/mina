@@ -3,19 +3,20 @@ let S = ../../Lib/SelectFiles.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineMode = ../../Pipeline/Mode.dhall
-let TestExecutive = ../../Command/TestExecutive.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 
-let dependsOn = [
-    { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
-    { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
-]
-let dependsOnJs = [
-    { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "TestnetIntegrationTests", key = "build-js-tests" },
-    { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
-    { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
-]
+let TestExecutive = ../../Command/TestExecutive.dhall
+let Profiles = ../../Constants/Profiles.dhall
+let Dockers = ../../Constants/DockerVersions.dhall
+
+let dependsOn = 
+    Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "daemon-berkeley"
+    # Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
+in
+
+let dependsOnJs = [{ name = "TestnetIntegrationTests", key = "build-js-tests" }]
+    # Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "daemon-berkeley"
+    # Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
 
 in Pipeline.build Pipeline.Config::{
   spec =
@@ -30,10 +31,10 @@ in Pipeline.build Pipeline.Config::{
     ],
     path = "Test",
     name = "TestnetIntegrationTests",
+    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ],
     mode = PipelineMode.Type.Stable
   },
   steps = [
-    TestExecutive.build "integration_tests",
     TestExecutive.buildJs "integration_tests",
     TestExecutive.execute "peers-reliability" dependsOn,
     TestExecutive.execute "chain-reliability" dependsOn,

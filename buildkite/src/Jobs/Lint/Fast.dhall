@@ -5,6 +5,7 @@ let B = ../../External/Buildkite.dhall
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
@@ -32,12 +33,11 @@ in  Pipeline.build
             S.strictly (S.contains "Makefile"),
             S.strictlyStart (S.contains "src/"),
             S.strictlyStart (S.contains "rfcs/"),
-            S.exactly "scripts/compare_ci_diff_types" "sh",
-            S.exactly "scripts/compare_ci_diff_binables" "sh",
             S.exactly "scripts/check-snarky-submodule" "sh"
           ]
         , path = "Lint"
         , name = "Fast"
+        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
         }
       , steps =
         [ Command.build
@@ -50,32 +50,6 @@ in  Pipeline.build
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
-            }
-        , Command.build
-            Command.Config::{
-            , commands =
-                RunInToolchain.runInToolchain
-                  [ "CI=true"
-                  , "BASE_BRANCH_NAME=\$BUILDKITE_PULL_REQUEST_BASE_BRANCH"
-                  ]
-                  "./scripts/compare_ci_diff_types.sh"
-            , label = "Versions compatibility linter"
-            , key = "lint-types"
-            , target = Size.Medium
-            , docker = None Docker.Type
-            }
-        , Command.build
-            Command.Config::{
-            , commands =
-                RunInToolchain.runInToolchain
-                  [ "CI=true"
-                  , "BASE_BRANCH_NAME=\$BUILDKITE_PULL_REQUEST_BASE_BRANCH"
-                  ]
-                  "./scripts/compare_ci_diff_binables.sh"
-            , label = "Binable compatibility linter"
-            , key = "lint-binable"
-            , target = Size.Medium
-            , docker = None Docker.Type
             }
         ]
       }

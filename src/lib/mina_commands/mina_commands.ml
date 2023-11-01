@@ -202,8 +202,7 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
      Receipt.Chain_hash.cons_zkapp_command_commitment fee_payer_index elt parent_hash *)
 end)
 
-[%%inject "compile_time_current_protocol_version", current_protocol_version]
-
+(* keep this code in sync with Mina_cli_entrypoint.chain_id *)
 let chain_id_inputs (t : Mina_lib.t) =
   (* these are the inputs to Blake2.digest_string in Mina.chain_id *)
   let config = Mina_lib.config t in
@@ -216,11 +215,16 @@ let chain_id_inputs (t : Mina_lib.t) =
     Lazy.force precomputed_values.constraint_system_digests
     |> List.map ~f:(fun (_, digest) -> Md5.to_hex digest)
   in
-  let protocol_major_version =
-    Protocol_version.of_string_exn compile_time_current_protocol_version
-    |> Protocol_version.major
+  let protocol_version = Protocol_version.current in
+  let protocol_transaction_version =
+    Protocol_version.transaction protocol_version
   in
-  (genesis_state_hash, genesis_constants, snark_keys, protocol_major_version)
+  let protocol_network_version = Protocol_version.network protocol_version in
+  ( genesis_state_hash
+  , genesis_constants
+  , snark_keys
+  , protocol_transaction_version
+  , protocol_network_version )
 
 let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
     (init_receipt, proof) =
@@ -462,6 +466,13 @@ let get_status ~flag t =
       ; transactions_added_to_pool =
           Float.to_int
           @@ Counter.value Transaction_pool.transactions_added_to_pool
+      ; snark_pool_diff_received =
+          Float.to_int @@ Gauge.value Network.snark_pool_diff_received
+      ; snark_pool_diff_broadcasted =
+          Float.to_int @@ Gauge.value Network.snark_pool_diff_broadcasted
+      ; snark_pool_size = Float.to_int @@ Gauge.value Snark_work.snark_pool_size
+      ; pending_snark_work =
+          Float.to_int @@ Gauge.value Snark_work.pending_snark_work
       }
   in
   { Daemon_rpcs.Types.Status.num_accounts
