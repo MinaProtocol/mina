@@ -36,9 +36,9 @@ Overall, the Chart deploys the following Kubernetes workloads:
 Retrievers are a collection of Python scripts with a `requirements.txt` file and a main *script file*. Each script is mapped to a `retriever`, which is its container. The schema of a `retriever` in a `values.yaml` is the following:
 
 ```yaml
-####################################
+#####################################
 # Proposed YAML schema for retrievers
-####################################
+#####################################
 retrievers:
 - name: "myRetriever" # must be unique among retrievers
   image: # retriever container image
@@ -49,7 +49,7 @@ retrievers:
       value: MY_EXAMPLE_VALUE
   script: # python script to be executed by the retriever
     name: "example.py"
-    configMap: # Automatically created ConfigMap with script.name contents
+    secret: # Automatically created Secret with script.name contents
       name: "my-retriever-script"
     mountPath: "/mnt/my-scripts" # mountPath inside retriever container
 ```

@@ -34,7 +34,7 @@ spec:
               echo "#####################";
               
               LOCAL_DB_CONNECTION="postgresql://{{ $.Values.postgresql.auth.username }}:{{ $.Values.postgresql.auth.password }}@{{ include "ci-dashboard.fullname" . }}-postgresql:5432/{{ $.Values.postgresql.primary.name }}";
-              echo $LOCAL_DB_CONNECTION > /mnt/output/db-connection.txt;
+              echo $LOCAL_DB_CONNECTION;
 
               
               echo "#####################";
