@@ -107,7 +107,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           step_key="delegation-backend-${DebianVersions.lowerName debVersion}-docker-image"
         }
         in
-        DockerImage.generateStep delegationBackendSpec
+        DockerImage.generateStep delegationBackendSpec,
 
         -- delegation backend image
         let delegationBackendToolchainSpec = DockerImage.ReleaseSpec::{
