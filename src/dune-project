@@ -6,6 +6,7 @@
 (package (name base58_check))
 (package (name bash_colors))
 (package (name berkeley_account_tables))
+(package (name berkeley_migration))
 (package (name best_tip_merger))
 (package (name best_tip_prover))
 (package (name bignum_bigint))

@@ -47,6 +47,7 @@
    kimchi_bindings
    kimchi_types
    pasta_bindings
+   ppx_deriving_yojson.runtime
    ppx_version.runtime
  )
  (inline_tests (flags -verbose -show-counts))
