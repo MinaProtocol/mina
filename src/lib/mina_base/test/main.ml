@@ -140,9 +140,16 @@ let () =
           ] )
     ; Signature_test.
         ( "signatures"
-        , [ test_case "Signature decode after encode i identity" `Quick
+        , [ test_case "Signature decode after encode is identity" `Quick
               signature_decode_after_encode_is_identity
           ; test_case "Base58check is stable" `Quick base58Check_stable
+          ] )
+    ; Zero_vesting_period.
+        ( "zero vesting period"
+        , [ test_case "Zero vesting period is error" `Quick
+              zero_vesting_period_is_error
+          ; test_case "Nonzero vesting period is OK" `Quick
+              nonzero_vesting_period_ok
           ] )
     ; Zkapp_command_test.
         ( "zkApp commands"
