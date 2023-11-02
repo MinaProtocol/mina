@@ -56,11 +56,15 @@ spec:
               echo "Num CI Builds: $ci_builds";
               avg_time_per_build_hours=`cat $buildkite_dir/avg-time-per-build-hours.dat`;
               echo "Avg. Time per build (hours): $avg_time_per_build_hours";
+              executions=`cat $buildkite_dir/executions.dat`;
+              echo "Number of executions: $executions";
+              retries_per_passed_test=`cat $buildkite_dir/retries-per-passed-test.dat`;
+              echo "Average number of retrieds per passed test: $retries_per_passed_test";
 
               echo "#####################";
               echo "Pushing to Database";
               echo "#####################";
-              psql $LOCAL_DB_CONNECTION -c "INSERT INTO public.ci VALUES (current_timestamp, $today_prs, $checks_per_pr, $reliability, $ci_builds, $avg_time_per_build_hours)";
+              psql $LOCAL_DB_CONNECTION -c "INSERT INTO public.ci VALUES (current_timestamp, $today_prs, $checks_per_pr, $reliability, $ci_builds, $avg_time_per_build_hours, $executions, $retries_per_passed_test)";
               '
             volumeMounts:
             - name: {{ .Values.outputEnv.name | quote }}

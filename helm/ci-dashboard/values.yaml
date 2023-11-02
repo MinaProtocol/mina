@@ -20,7 +20,7 @@ postgresql:
       user: "cidash"
       password: "test"
       scripts:
-        ci-table.sql: CREATE TABLE ci (time timestamp, today_prs INT, checks_per_pr REAL, reliability REAL, ci_builds INT, avg_time_per_build_hours REAL);
+        ci-table.sql: CREATE TABLE ci (time timestamp, today_prs INT, checks_per_pr REAL, reliability REAL, ci_builds INT, avg_time_per_build_hours REAL, executions INT, retries_per_passed_test REAL);
   auth:
     username: "cidash"
     password: "test"

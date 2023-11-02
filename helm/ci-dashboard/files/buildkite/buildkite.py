@@ -315,10 +315,17 @@ def ciMetricsDashboard(results: dict) -> None:
     Computes metrics to be pushed to the CI Metrics Dashboard
     """
 
+    passedWithRetries = results["all"]["jobs"]["passed"]["retried"]
+    retries = []
+    for _,stat in passedWithRetries["stats"].items():
+        retries.append(int(stat["('name', 'count')"]))
+
     ciMetrics = {
         "reliability.dat": results["all"]["reliability"],
-        "ci-builds.dat": results["all"]["jobs"]["executions"],
+        "ci-builds.dat": results["all"]["number_of_builds"],
         "avg-time-per-build-hours.dat": results["all"]["average_build_time_in_hours"],
+        "executions.dat" : results["all"]["jobs"]["executions"],
+        "retries-per-passed-test.dat": pd.Series(retries).mean(),
     }
 
     for k, v in ciMetrics.items():
