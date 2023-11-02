@@ -941,39 +941,46 @@ module State = struct
             match job with Job.Merge a -> f_merge a | Base d -> f_base d )
       in
       Mina_stdlib.Nonempty_list.iter trees ~f:(fun tree ->
-          let w_to_string { Weight.base = b; merge = m } =
-            Int.to_string b ^ Int.to_string m
+          let add_weight_to_hash { Weight.base = b; merge = m } =
+            add_string @@ Int.to_string b ;
+            add_string @@ Int.to_string m
           in
-          let w_to_string' (w1, w2) = w_to_string w1 ^ w_to_string w2 in
+          let add_weight_pair_to_hash (w1, w2) =
+            add_weight_to_hash w1 ; add_weight_to_hash w2
+          in
           let f_merge = function
             | w, Merge.Job.Empty ->
-                add_string (w_to_string' w ^ "Empty")
+                add_weight_pair_to_hash w ; add_string "Empty"
             | w, Merge.Job.Full { left; right; status; seq_no } ->
-                add_string
-                  ( w_to_string' w ^ "Full" ^ Int.to_string seq_no
-                  ^ Job_status.to_string status ) ;
+                add_weight_pair_to_hash w ;
+                add_string "Full" ;
+                add_string @@ Int.to_string seq_no ;
+                add_string @@ Job_status.to_string status ;
                 add_string (f_merge left) ;
                 add_string (f_merge right)
             | w, Merge.Job.Part j ->
-                add_string (w_to_string' w ^ "Part") ;
+                add_weight_pair_to_hash w ;
+                add_string "Part" ;
                 add_string (f_merge j)
           in
           let f_base = function
             | w, Base.Job.Empty ->
-                add_string (w_to_string w ^ "Empty")
+                add_weight_to_hash w ; add_string "Empty"
             | w, Base.Job.Full { job; status; seq_no } ->
-                add_string
-                  ( w_to_string w ^ "Full" ^ Int.to_string seq_no
-                  ^ Job_status.to_string status ) ;
+                add_weight_to_hash w ;
+                add_string "Full" ;
+                add_string @@ Int.to_string seq_no ;
+                add_string @@ Job_status.to_string status ;
                 add_string (f_base job)
           in
           tree_hash tree f_merge f_base )
     in
-    let acc_string =
-      Option.value_map acc ~default:"None" ~f:(fun (a, d_lst) ->
-          f_merge a ^ List.fold ~init:"" d_lst ~f:(fun acc d -> acc ^ f_base d) )
-    in
-    add_string acc_string ;
+    ( match acc with
+    | Some (a, d_lst) ->
+        add_string (f_merge a) ;
+        List.iter d_lst ~f:(fun d -> add_string (f_base d))
+    | None ->
+        add_string "None" ) ;
     add_string (Int.to_string curr_job_seq_no) ;
     add_string (Int.to_string max_base_jobs) ;
     add_string (Int.to_string delay) ;

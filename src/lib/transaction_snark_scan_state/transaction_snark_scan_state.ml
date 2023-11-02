@@ -181,20 +181,19 @@ module Stable = struct
         t.previous_incomplete_zkapp_updates
       in
       let incomplete_updates =
-        List.fold ~init:"" previous_incomplete_zkapp_updates ~f:(fun acc t ->
-            acc
-            ^ Binable.to_string (module Transaction_with_witness.Stable.V2) t )
-        |> Digestif.SHA256.digest_string
+        List.fold ~init:(Digestif.SHA256.init ())
+          previous_incomplete_zkapp_updates ~f:(fun h t ->
+            Digestif.SHA256.feed_string h
+            @@ Binable.to_string (module Transaction_with_witness.Stable.V2) t )
+        |> Digestif.SHA256.get
       in
       let continue_in_next_tree =
         Digestif.SHA256.digest_string (Bool.to_string continue_in_next_tree)
       in
-      Staged_ledger_hash.Aux_hash.of_sha256
-        Digestif.SHA256.(
-          digest_string
-            ( to_raw_string state_hash
-            ^ to_raw_string incomplete_updates
-            ^ to_raw_string continue_in_next_tree ))
+      [ state_hash; incomplete_updates; continue_in_next_tree ]
+      |> List.fold ~init:(Digestif.SHA256.init ()) ~f:(fun h t ->
+             Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string t) )
+      |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
   end
 end]
 
