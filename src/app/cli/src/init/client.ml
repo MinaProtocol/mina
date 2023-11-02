@@ -1041,17 +1041,7 @@ let pending_snark_work =
                               Currency.Amount.Signed.of_fee
                                 (to_signed_fee_exn fee_excess_left.sign
                                    fee_excess_left.feeMagnitude )
-                          ; supply_change =
-                              (let sgn : Sgn.t =
-                                 match w.supply_change.sign with
-                                 | `PLUS ->
-                                     Pos
-                                 | `MINUS ->
-                                     Neg
-                               in
-                               Currency.Amount.Signed.create
-                                 ~magnitude:w.supply_change.amountMagnitude ~sgn
-                              )
+                          ; supply_increase = w.supply_increase
                           ; source_first_pass_ledger_hash =
                               w.source_first_pass_ledger_hash
                           ; target_first_pass_ledger_hash =

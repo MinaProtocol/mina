@@ -20,7 +20,7 @@ module Pending_snark_work = struct
     type t =
       { work_id : int
       ; fee_excess : Currency.Amount.Signed.t
-      ; supply_change : Currency.Amount.Signed.t
+      ; supply_increase : Currency.Amount.t
       ; source_first_pass_ledger_hash : Mina_base.Frozen_ledger_hash.t
       ; target_first_pass_ledger_hash : Mina_base.Frozen_ledger_hash.t
       ; source_second_pass_ledger_hash : Mina_base.Frozen_ledger_hash.t

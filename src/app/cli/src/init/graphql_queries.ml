@@ -120,17 +120,12 @@ query pendingSnarkWork {
           feeMagnitude
         }
       }
-      supply_change : supplyChange {
-          sign
-          amountMagnitude
-      }
+      supply_increase : supplyIncrease
       work_id: workId
       }
     }
   }
 |}]
-
-module Foo = Pending_snark_work
 
 module Set_coinbase_receiver =
 [%graphql
