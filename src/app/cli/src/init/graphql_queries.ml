@@ -120,15 +120,17 @@ query pendingSnarkWork {
           feeMagnitude
         }
       }
-      supply_change: supplyChange {
-        sign
-        fee_magnitude: feeMagnitude
+      supply_change : supplyChange {
+          sign
+          amountMagnitude
       }
       work_id: workId
       }
     }
   }
 |}]
+
+module Foo = Pending_snark_work
 
 module Set_coinbase_receiver =
 [%graphql
