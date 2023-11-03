@@ -47,6 +47,7 @@
    o1trace
    pickles
    pickles_base
+   proof_cache_tag
    random_oracle_input
    pickles_types
    coda_genesis_ledger

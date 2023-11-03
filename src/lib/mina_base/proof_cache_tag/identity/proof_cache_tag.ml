@@ -1,4 +1,7 @@
-type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t [@@deriving sexp, compare, yojson]
+open Core_kernel
+
+type t = Pickles.Proof.Proofs_verified_2.t
+[@@deriving compare, equal, sexp, yojson, hash]
 
 let unwrap = Fn.id
 

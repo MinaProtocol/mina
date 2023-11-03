@@ -1,5 +1,5 @@
 type t [@@deriving compare, equal, sexp, yojson, hash]
 
-val unwrap : t -> Proof.t
+val unwrap : t -> Mina_base.Proof.t
 
-val generate : Proof.t -> t
+val generate : Mina_base.Proof.t -> t

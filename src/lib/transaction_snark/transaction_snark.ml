@@ -73,16 +73,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    module Cache_tag = struct
-      type value = t [@@deriving compare, equal, sexp, yojson, hash]
-
-      type t = value
-      (* TODO: Write to disk *) [@@deriving compare, equal, sexp, yojson, hash]
-
-      let unwrap (x : t) : value = x
-
-      let generate (x : value) : t = x
-    end
+    module Cache_tag = Proof_cache_tag
   end
 
   [%%versioned

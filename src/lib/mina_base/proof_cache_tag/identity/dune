@@ -2,4 +2,23 @@
  (public_name proof_cache_tag.identity)
  (name proof_cache_tag_identity)
  (implements proof_cache_tag)
- (libraries pickles))
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   base.base_internalhash_types
+   bin_prot.shape
+   sexplib0
+   core_kernel
+   base.md5
+   base.caml
+   splittable_random
+   ;; local libraries
+   mina_base
+   mina_wire_types
+   pickles)
+ (preprocess
+  (pps ppx_annot ppx_snarky ppx_here ppx_mina ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord ppx_deriving.make
+       ppx_base base_quickcheck.ppx_quickcheck ppx_bench ppx_let ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test h_list.ppx
+ ))
+ (instrumentation (backend bisect_ppx))
+ )
