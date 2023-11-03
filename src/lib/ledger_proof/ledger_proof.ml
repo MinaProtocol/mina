@@ -34,12 +34,12 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
   module Cache_tag = struct
     type value = t [@@deriving compare, equal, sexp, yojson, hash]
 
-    type t = value
-    (* TODO: Write to disk *) [@@deriving compare, equal, sexp, yojson, hash]
+    type t = Transaction_snark.Cache_tag.t
+    [@@deriving compare, equal, sexp, yojson, hash]
 
-    let unwrap (x : t) : value = x
+    let unwrap (x : t) : value = Transaction_snark.Cache_tag.unwrap x
 
-    let generate (x : value) : t = x
+    let generate (x : value) : t = Transaction_snark.Cache_tag.generate x
   end
 end
 
