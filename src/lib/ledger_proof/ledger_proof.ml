@@ -30,6 +30,17 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
 
   let create ~statement ~sok_digest ~proof =
     Transaction_snark.create ~statement:{ statement with sok_digest } ~proof
+
+  module Cache_tag = struct
+    type value = t [@@deriving compare, equal, sexp, yojson, hash]
+
+    type t = value
+    (* TODO: Write to disk *) [@@deriving compare, equal, sexp, yojson, hash]
+
+    let unwrap (x : t) : value = x
+
+    let generate (x : value) : t = x
+  end
 end
 
 include Prod

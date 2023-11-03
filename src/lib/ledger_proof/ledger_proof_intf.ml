@@ -42,4 +42,14 @@ module type S = sig
   val sok_digest : t -> Sok_message.Digest.t
 
   val underlying_proof : t -> Proof.t
+
+  module Cache_tag : sig
+    type value := t
+
+    type t [@@deriving compare, equal, sexp, yojson, hash]
+
+    val unwrap : t -> value
+
+    val generate : value -> t
+  end
 end
