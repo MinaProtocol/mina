@@ -60,3 +60,15 @@ let slot_tx_end = None
 let slot_tx_end = Some slot_tx_end
 
 [%%endif]
+
+[%%ifndef slot_chain_end]
+
+let slot_chain_end = None
+
+[%%else]
+
+[%%inject "slot_chain_end", slot_chain_end]
+
+let slot_chain_end = Some slot_chain_end
+
+[%%endif]
