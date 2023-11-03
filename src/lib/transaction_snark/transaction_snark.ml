@@ -72,6 +72,17 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    module Cache_tag = struct
+      type value = t [@@deriving compare, equal, sexp, yojson, hash]
+
+      type t = value
+      (* TODO: Write to disk *) [@@deriving compare, equal, sexp, yojson, hash]
+
+      let unwrap (x : t) : value = x
+
+      let generate (x : value) : t = x
+    end
   end
 
   [%%versioned
@@ -90,12 +101,17 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Cache_tag = struct
     type value = t [@@deriving compare, equal, sexp, yojson, hash]
 
-    type t = value
-    (* TODO: Write to disk *) [@@deriving compare, equal, sexp, yojson, hash]
+    type t =
+      { statement : Mina_state.Snarked_ledger_state.With_sok.t
+      ; proof : Proof.Cache_tag.t
+      }
+    [@@deriving compare, equal, sexp, yojson, hash]
 
-    let unwrap (x : t) : value = x
+    let unwrap ({ statement; proof } : t) : value =
+      { statement; proof = Proof.Cache_tag.unwrap proof }
 
-    let generate (x : value) : t = x
+    let generate ({ statement; proof } : value) : t =
+      { statement; proof = Proof.Cache_tag.generate proof }
   end
 
   let proof t = t.proof
