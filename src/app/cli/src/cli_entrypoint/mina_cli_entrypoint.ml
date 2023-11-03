@@ -430,23 +430,24 @@ let setup_daemon logger =
          for the associated private key that is being tracked by this daemon. \
          You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
-  and enable_slot_tx_end =
-    flag "--enable-slot-tx-end" ~aliases:[ "enable-slot-tx-end" ]
+  and slot_tx_end =
+    flag "--slot-tx-end" ~aliases:[ "slot-tx-end" ]
       ~doc:
         (sprintf
-           "SLOT Slot after which the node will stop accepting transactions. \
-            (default: %s)"
+           "SLOT Slot after which the node will stop accepting transactions, or\n\
+           \           `none` to disable the feature. (default: %s)"
            (Option.value_map Mina_compile_config.slot_tx_end ~default:"none"
               ~f:string_of_int ) )
-      (optional int)
-  and disable_slot_tx_end =
-    flag "--slot-tx-end" ~aliases:[ "slot-tx-end" ] no_arg
+      (optional string)
+  and slot_chain_end =
+    flag "--slot-network-end" ~aliases:[ "slot-network-end" ]
       ~doc:
         (sprintf
-           "Disable feature to stop accepting transactions. (this feature is \
-            %s by default)"
-           (Option.value_map Mina_compile_config.slot_tx_end ~default:"disable"
-              ~f:(fun slot -> "enabled at slot " ^ string_of_int slot) ) )
+           "SLOT Slot after which the node will stop producing/validating \
+            blocks, or `none` to disable the feature. (default: %s)"
+           (Option.value_map Mina_compile_config.slot_chain_end ~default:"none"
+              ~f:string_of_int ) )
+      (optional string)
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -1288,17 +1289,22 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                    submitter keyfile"
           in
           let slot_tx_end =
-            match (enable_slot_tx_end, disable_slot_tx_end) with
-            | Some slot, false ->
-                Some (Mina_numbers.Global_slot.of_int slot)
-            | None, true ->
+            match slot_tx_end with
+            | Some "none" ->
                 None
-            | None, false ->
+            | Some slot ->
+                Some (Mina_numbers.Global_slot.of_string slot)
+            | None ->
                 Mina_compile_config.slot_tx_end
-            | Some _, true ->
-                failwith
-                  "Cannot provide both --enable-slot-tx-end and \
-                   --disable-slot-tx-end"
+          in
+          let _slot_chain_end =
+            match slot_chain_end with
+            | Some "none" ->
+                None
+            | Some slot ->
+                Some (Mina_numbers.Global_slot.of_string slot)
+            | None ->
+                Mina_compile_config.slot_chain_end
           in
           let start_time = Time.now () in
           let%map coda =
