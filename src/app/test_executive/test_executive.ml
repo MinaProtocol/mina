@@ -61,6 +61,7 @@ let tests : test list =
   ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
   ; ( "block-prod-prio"
     , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
+  ; ("slot-tx-end", (module Slot_tx_end_test.Make : Intf.Test.Functor_intf))
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
