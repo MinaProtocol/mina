@@ -57,7 +57,7 @@ let slot_tx_end = None
 
 [%%inject "slot_tx_end", slot_tx_end]
 
-let slot_tx_end = Some slot_tx_end
+let slot_tx_end = Some (Mina_numbers.Global_slot.of_int slot_tx_end)
 
 [%%endif]
 
@@ -69,6 +69,6 @@ let slot_chain_end = None
 
 [%%inject "slot_chain_end", slot_chain_end]
 
-let slot_chain_end = Some slot_chain_end
+let slot_chain_end = Some (Mina_numbers.Global_slot.of_int slot_chain_end)
 
 [%%endif]

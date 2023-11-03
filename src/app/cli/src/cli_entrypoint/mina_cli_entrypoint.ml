@@ -437,7 +437,7 @@ let setup_daemon logger =
            "SLOT Slot after which the node will stop accepting transactions, or\n\
            \           `none` to disable the feature. (default: %s)"
            (Option.value_map Mina_compile_config.slot_tx_end ~default:"none"
-              ~f:string_of_int ) )
+              ~f:Mina_numbers.Global_slot.to_string ) )
       (optional string)
   and slot_chain_end =
     flag "--slot-network-end" ~aliases:[ "slot-network-end" ]
@@ -446,7 +446,7 @@ let setup_daemon logger =
            "SLOT Slot after which the node will stop producing/validating \
             blocks, or `none` to disable the feature. (default: %s)"
            (Option.value_map Mina_compile_config.slot_chain_end ~default:"none"
-              ~f:string_of_int ) )
+              ~f:Mina_numbers.Global_slot.to_string ) )
       (optional string)
   in
   let to_pubsub_topic_mode_option =
