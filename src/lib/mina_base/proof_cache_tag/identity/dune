@@ -1,0 +1,5 @@
+(library
+ (public_name proof_cache_tag.identity)
+ (name proof_cache_tag_identity)
+ (implements proof_cache_tag)
+ (libraries pickles))
