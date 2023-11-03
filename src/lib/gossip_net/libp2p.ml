@@ -217,7 +217,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         | Mina_net2.Libp2p_helper_died_unexpectedly ->
             on_unexpected_termination ()
         | _ ->
-            raise exn
+            Exn.reraise exn "Mina_net2 raised an exception"
       in
       let%bind seeds_from_url =
         match config.seed_peer_list_url with
