@@ -16,7 +16,7 @@ let toNatural: Tag -> Natural = \(tag: Tag) ->
     , Lint = 5
     , Release = 6
     , Test = 7
-    , Toolchain
+    , Toolchain = 8
   } tag
 
 let equal: Tag -> Tag -> Bool = \(left: Tag) -> \(right: Tag) ->
