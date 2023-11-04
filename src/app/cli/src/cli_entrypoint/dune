@@ -72,6 +72,7 @@
    ppx_version.runtime
    internal_tracing
    itn_logger
+   proof_cache_tag.filesystem
  )
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))
