@@ -19,7 +19,7 @@ module Worker_state = struct
 
     val verify_commands :
          Mina_base.User_command.Verifiable.t With_status.t list
-      -> [ `Valid of Mina_base.User_command.Valid.t
+      -> [ `Valid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
            * Mina_base.Zkapp_statement.t
@@ -94,10 +94,10 @@ module Worker_state = struct
                  Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
                in
                List.map cs ~f:(function
-                 | `Valid c ->
-                     `Valid c
-                 | `Valid_assuming (c, xs) ->
-                     if Or_error.is_ok all_verified then `Valid c
+                 | `Valid _ ->
+                     `Valid
+                 | `Valid_assuming (_, xs) ->
+                     if Or_error.is_ok all_verified then `Valid
                      else `Valid_assuming xs
                  | `Invalid_keys keys ->
                      `Invalid_keys keys
@@ -173,10 +173,10 @@ module Worker_state = struct
              let verify_commands cs =
                List.map cs ~f:(fun c ->
                    match Common.check c with
-                   | `Valid c ->
-                       `Valid c
-                   | `Valid_assuming (c, _) ->
-                       `Valid c
+                   | `Valid _ ->
+                       `Valid
+                   | `Valid_assuming (_, _) ->
+                       `Valid
                    | `Invalid_keys keys ->
                        `Invalid_keys keys
                    | `Invalid_signature keys ->
@@ -232,7 +232,7 @@ module Worker = struct
       ; verify_commands :
           ( 'w
           , User_command.Verifiable.t With_status.t list
-          , [ `Valid of User_command.Valid.t
+          , [ `Valid
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
               * Mina_base.Zkapp_statement.t
@@ -316,7 +316,7 @@ module Worker = struct
                   With_status.Stable.Latest.t
                   list]
               , [%bin_type_class:
-                  [ `Valid of User_command.Valid.Stable.Latest.t
+                  [ `Valid
                   | `Valid_assuming of
                     ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
                     * Mina_base.Zkapp_statement.Stable.Latest.t
@@ -657,13 +657,32 @@ let verify_transaction_snarks =
   wrap_verify_snarks_with_trace ~checkpoint_before:"Verify_transaction_snarks"
     ~checkpoint_after:"Verify_transaction_snarks_done" verify_transaction_snarks
 
+(* Injects validated command back into `Validated results *)
+let adjust_valid_results ts rs =
+  List.map2_exn ts rs ~f:(fun c r ->
+      match r with
+      | #invalid as invalid ->
+          invalid
+      | `Valid_assuming x ->
+          `Valid_assuming x
+      | `Valid ->
+          (* We know that the result matches the input, and that it is valid.
+             Since the response has been changed to avoid allocating duplicated proofs,
+             we need to add the command back here *)
+          let (`If_this_is_used_it_should_have_a_comment_justifying_it c) =
+            User_command.to_valid_unsafe
+              (User_command.of_verifiable (With_status.data c))
+          in
+          `Valid c )
+
 let verify_commands { worker; logger } ts =
   O1trace.thread "dispatch_user_command_verification" (fun () ->
       with_retry ~logger (fun () ->
           let%bind { connection; _ } = Ivar.read !worker in
           Worker.Connection.run connection ~f:Worker.functions.verify_commands
             ~arg:ts
-          |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )
+          |> Deferred.Or_error.map ~f:(fun rs ->
+                 `Continue (adjust_valid_results ts rs) ) ) )
 
 let verify_commands t ts =
   let logger = t.logger in
