@@ -75,8 +75,6 @@ module type S = sig
 
   val find_index : t -> account_id -> int option
 
-  val find_index_exn : t -> account_id -> int
-
   val add_path :
     t -> [ `Left of hash | `Right of hash ] list -> account_id -> account -> t
 
@@ -198,18 +196,6 @@ end = struct
 
   let find_index (t : t) aid =
     List.Assoc.find t.indexes ~equal:Account_id.equal aid
-
-  let find_index_exn (t : t) aid =
-    match find_index t aid with
-    | Some x ->
-        x
-    | None ->
-        failwithf
-          !"Sparse_ledger.find_index_exn: %{sexp:Account_id.t} not in %{sexp: \
-            Account_id.t list}"
-          aid
-          (List.map t.indexes ~f:fst)
-          ()
 
   let allocate_index ({ T.current_location; indexes; _ } as t) account_id =
     let new_location =

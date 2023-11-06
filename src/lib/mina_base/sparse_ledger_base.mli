@@ -46,8 +46,6 @@ val allocate_index : t -> Account_id.t -> int * t
 
 val find_index : t -> Account_id.t -> int option
 
-val find_index_exn : t -> Account_id.t -> int
-
 val of_root : depth:int -> current_location:int option -> Ledger_hash.t -> t
 
 (** Create a new 'empty' ledger.
