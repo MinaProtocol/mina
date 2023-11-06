@@ -766,7 +766,13 @@ module Make_str (A : Wire_types.Concrete) = struct
             Type_equal.t ) =
         Type_equal.T
 
-      module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id) (Stack)
+      module M =
+        Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id)
+          (struct
+            include Stack
+
+            let empty = lazy empty
+          end)
 
       [%%define_locally
       M.(of_hash, get_exn, path_exn, set_exn, find_index, add_path, merkle_root)]

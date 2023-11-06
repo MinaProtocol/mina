@@ -100,6 +100,8 @@ end) (Account : sig
   type t [@@deriving equal, sexp, yojson]
 
   val data_hash : t -> Hash.t
+
+  val empty : t Lazy.t
 end) : sig
   include
     S
@@ -109,6 +111,14 @@ end) : sig
 
   val hash : (Hash.t, Account.t) Tree.t -> Hash.t
 end = struct
+  let empty_hash =
+    lazy
+      (Empty_hashes.extensible_cache
+         (module Hash)
+         ~init_hash:(Account.data_hash (Lazy.force Account.empty)) )
+
+  let empty_hash i = (Lazy.force empty_hash) i
+
   type t = (Hash.t, Account_id.t, Account.t) T.t [@@deriving sexp, yojson]
 
   let of_hash ~depth ~current_location (hash : Hash.t) =
@@ -215,6 +225,8 @@ end = struct
       | false, Node (_, l, r) ->
           let go_right = ith_bit idx i in
           if go_right then go (i - 1) r else go (i - 1) l
+      | _, Hash h when Hash.equal h (empty_hash i) ->
+          Lazy.force Account.empty
       | _ ->
           let expected_kind = if i < 0 then "n account" else " node" in
           let kind =
@@ -244,6 +256,14 @@ end = struct
             if go_right then (l, go (i - 1) r) else (go (i - 1) l, r)
           in
           Node (Hash.merge ~height:i (hash l) (hash r), l, r)
+      | false, Hash h when Hash.equal h (empty_hash i) ->
+          let inner =
+            if i > 0 then Tree.Hash (empty_hash (i - 1))
+            else Tree.Account (Lazy.force Account.empty)
+          in
+          go i (Node (h, inner, inner))
+      | true, Hash h when Hash.equal h (empty_hash i) ->
+          Tree.Account acct
       | _ ->
           let expected_kind = if i < 0 then "n account" else " node" in
           let kind =
@@ -269,6 +289,12 @@ end = struct
         match tree with
         | Tree.Account _ ->
             failwithf "Sparse_ledger.path: Bad depth at index %i." idx ()
+        | Hash h when Hash.equal h (empty_hash i) ->
+            let inner =
+              if i > 0 then Tree.Hash (empty_hash (i - 1))
+              else Tree.Account (Lazy.force Account.empty)
+            in
+            go acc i (Tree.Node (h, inner, inner))
         | Hash _ ->
             failwithf "Sparse_ledger.path: Dead end at index %i." idx ()
         | Node (_, l, r) ->
@@ -283,6 +309,27 @@ type ('hash, 'key, 'account) t = ('hash, 'key, 'account) T.t [@@deriving yojson]
 
 let%test_module "sparse-ledger-test" =
   ( module struct
+    module Account = struct
+      module T = struct
+        type t = { name : string; favorite_number : int }
+        [@@deriving bin_io, equal, sexp, yojson]
+      end
+
+      include T
+
+      let key { name; _ } = name
+
+      let data_hash t = Md5.digest_string (Binable.to_string (module T) t)
+
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%map name = String.quickcheck_generator
+        and favorite_number = Int.quickcheck_generator in
+        { name; favorite_number }
+
+      let empty = lazy { name = ""; favorite_number = 0 }
+    end
+
     module Hash = struct
       type t = Core_kernel.Md5.t [@@deriving sexp, compare]
 
@@ -305,25 +352,6 @@ let%test_module "sparse-ledger-test" =
       let gen =
         Quickcheck.Generator.map String.quickcheck_generator
           ~f:Md5.digest_string
-    end
-
-    module Account = struct
-      module T = struct
-        type t = { name : string; favorite_number : int }
-        [@@deriving bin_io, equal, sexp, yojson]
-      end
-
-      include T
-
-      let key { name; _ } = name
-
-      let data_hash t = Md5.digest_string (Binable.to_string (module T) t)
-
-      let gen =
-        let open Quickcheck.Generator.Let_syntax in
-        let%map name = String.quickcheck_generator
-        and favorite_number = Int.quickcheck_generator in
-        { name; favorite_number }
     end
 
     module Account_id = struct

@@ -28,6 +28,8 @@ module Account = struct
   include Account
 
   let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
+
+  let empty = lazy empty
 end
 
 module Global_state = struct
@@ -68,9 +70,10 @@ module L = struct
 
   let location_of_account : t -> Account_id.t -> location option =
    fun t id ->
-     match M.find_index !t id with
-     | None -> None
-     | Some loc ->
+    match M.find_index !t id with
+    | None ->
+        None
+    | Some loc ->
         let account = M.get_exn !t loc in
         if Public_key.Compressed.(equal empty account.public_key) then None
         else Some loc
@@ -96,7 +99,7 @@ module L = struct
     | None ->
         let loc, new_t = M.allocate_index !t id in
         t := new_t ;
-        let account' = create_account loc Account.empty in
+        let account' = create_account loc (Lazy.force Account.empty) in
         (`Added, account', loc)
     | Some loc ->
         let account = M.get_exn !t loc in
@@ -227,7 +230,9 @@ let handler t =
                 index
             | None ->
                 let index, new_ledger = allocate_index !ledger pk in
-                let new_ledger = set_exn new_ledger index Account.empty in
+                let new_ledger =
+                  set_exn new_ledger index (Lazy.force Account.empty)
+                in
                 ledger := new_ledger ;
                 index
           in
