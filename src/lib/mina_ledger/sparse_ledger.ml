@@ -8,10 +8,11 @@ let of_ledger_root ledger =
 
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let ledger = Ledger.copy oledger in
+  let locations = Ledger.location_of_account_batch ledger keys in
   let _, sparse =
-    List.fold keys
-      ~f:(fun (new_keys, sl) key ->
-        match Ledger.location_of_account ledger key with
+    List.fold locations
+      ~f:(fun (new_keys, sl) (key, loc) ->
+        match loc with
         | Some loc ->
             ( new_keys
             , add_path sl
