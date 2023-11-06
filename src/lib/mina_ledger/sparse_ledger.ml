@@ -25,8 +25,7 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
                 ( Ledger.get ledger loc
                 |> Option.value_exn ?here:None ?error:None ?message:None ) )
         | None ->
-            let path, acct = Ledger.create_empty_exn ledger key in
-            (key :: new_keys, add_path sl path key acct) )
+            (new_keys, sl) )
       ~init:([], of_ledger_root ledger)
   in
   Debug_assert.debug_assert (fun () ->
