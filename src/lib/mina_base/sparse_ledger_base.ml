@@ -152,6 +152,7 @@ M.
   , get_exn
   , path_exn
   , set_exn
+  , allocate_index
   , find_index
   , find_index_exn
   , add_path

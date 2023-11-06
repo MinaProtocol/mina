@@ -65,6 +65,8 @@ module type S = sig
 
   val of_hash : depth:int -> current_location:int option -> hash -> t
 
+  val allocate_index : t -> account_id -> int * t
+
   val get_exn : t -> int -> account
 
   val path_exn : t -> int -> [ `Left of hash | `Right of hash ] list
@@ -208,6 +210,16 @@ end = struct
           aid
           (List.map t.indexes ~f:fst)
           ()
+
+  let allocate_index ({ T.current_location; indexes; _ } as t) account_id =
+    let new_location =
+      match current_location with None -> 0 | Some x -> x + 1
+    in
+    ( new_location
+    , { t with
+        current_location = Some new_location
+      ; indexes = (account_id, new_location) :: indexes
+      } )
 
   let get_exn ({ T.tree; depth; _ } as t) idx =
     let rec go i tree =
