@@ -5,7 +5,7 @@
 let Prelude = ../External/Prelude.dhall
 let Tag = ./Tag.dhall
 
-let Filter : Type = < FastOnly | Long | LongAndVeryLong | TearDownOnly | Toolchains | AllTests >
+let Filter : Type = < FastOnly | Long | LongAndVeryLong | TearDownOnly | ToolchainsOnly | AllTests >
 
 let tags: Filter -> List Tag.Type = \(filter: Filter) -> 
   merge {
