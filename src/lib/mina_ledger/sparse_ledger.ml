@@ -4,7 +4,12 @@ include Sparse_ledger_base
 module GS = Global_state
 
 let of_ledger_root ledger =
-  of_root ~depth:(Ledger.depth ledger) (Ledger.merkle_root ledger)
+  of_root ~depth:(Ledger.depth ledger)
+    ~current_location:
+      ( Option.map ~f:(fun x ->
+            Ledger.Location.Addr.to_int @@ Ledger.Location.to_path_exn x )
+      @@ Ledger.last_filled ledger )
+    (Ledger.merkle_root ledger)
 
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let ledger = Ledger.copy oledger in
@@ -35,6 +40,10 @@ let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
     ~init:
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
+         ~current_location:
+           ( Option.map ~f:(fun x ->
+                 Ledger.Location.Addr.to_int @@ Ledger.Location.to_path_exn x )
+           @@ Ledger.Any_ledger.M.last_filled ledger )
          (Ledger.Any_ledger.M.merkle_root ledger) )
     ~f:(fun acc i ->
       let account = Ledger.Any_ledger.M.get_at_index_exn ledger i in

@@ -44,7 +44,7 @@ val path_exn :
 
 val find_index_exn : t -> Account_id.t -> int
 
-val of_root : depth:int -> Ledger_hash.t -> t
+val of_root : depth:int -> current_location:int option -> Ledger_hash.t -> t
 
 (** Create a new 'empty' ledger.
     This ledger has an invalid root hash, and cannot be used except as a

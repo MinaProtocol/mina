@@ -1055,7 +1055,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let root_hash = hash_at_level depth in
       { Poly.tree =
-          make_tree (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
+          make_tree
+            (Merkle_tree.of_hash ~depth root_hash
+               ~current_location:(* Hack: unused*) None )
+            Stack_id.zero
       ; pos_list = []
       ; new_pos = Stack_id.zero
       }

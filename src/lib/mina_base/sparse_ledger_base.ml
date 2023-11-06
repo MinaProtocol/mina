@@ -50,7 +50,8 @@ type account_state = [ `Added | `Existed ] [@@deriving equal]
     This ledger has an invalid root hash, and cannot be used except as a
     placeholder.
 *)
-let empty ~depth () = M.of_hash ~depth Outside_hash_image.t
+let empty ~depth () =
+  M.of_hash ~depth ~current_location:None Outside_hash_image.t
 
 module L = struct
   type t = M.t ref
@@ -156,8 +157,9 @@ M.
   , merkle_root
   , iteri )]
 
-let of_root ~depth (h : Ledger_hash.t) =
-  of_hash ~depth (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
+let of_root ~depth ~current_location (h : Ledger_hash.t) =
+  of_hash ~depth ~current_location
+    (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
 
 let get_or_initialize_exn account_id t idx =
   let account = get_exn t idx in

@@ -39,6 +39,7 @@ module T = struct
         { indexes : ('key * int) list
         ; depth : int
         ; tree : ('hash, 'account) Tree.Stable.V1.t
+        ; current_location : int option
         }
       [@@deriving sexp, yojson]
     end
@@ -48,6 +49,7 @@ module T = struct
     { indexes : ('key * int) list
     ; depth : int
     ; tree : ('hash, 'account) Tree.t
+    ; current_location : int option
     }
   [@@deriving sexp, yojson]
 end
@@ -61,7 +63,7 @@ module type S = sig
 
   type t = (hash, account_id, account) T.t [@@deriving sexp, yojson]
 
-  val of_hash : depth:int -> hash -> t
+  val of_hash : depth:int -> current_location:int option -> hash -> t
 
   val get_exn : t -> int -> account
 
@@ -83,7 +85,8 @@ end
 
 let tree { T.tree; _ } = tree
 
-let of_hash ~depth h = { T.indexes = []; depth; tree = Hash h }
+let of_hash ~depth ~current_location h =
+  { T.indexes = []; depth; tree = Hash h; current_location }
 
 module Make (Hash : sig
   type t [@@deriving equal, sexp, yojson, compare]
@@ -106,7 +109,8 @@ end) : sig
 end = struct
   type t = (Hash.t, Account_id.t, Account.t) T.t [@@deriving sexp, yojson]
 
-  let of_hash ~depth (hash : Hash.t) = of_hash ~depth hash
+  let of_hash ~depth ~current_location (hash : Hash.t) =
+    of_hash ~depth ~current_location hash
 
   let hash : (Hash.t, Account.t) Tree.t -> Hash.t = function
     | Account a ->
@@ -364,7 +368,12 @@ let%test_module "sparse-ledger-test" =
       in
       let%bind depth = Int.gen_incl 0 16 in
       let%map tree = gen depth >>| prune_hash_branches in
-      { T.tree; depth; indexes = indexes depth tree }
+      let current_location =
+        (* Except with negligible probability, every hash and account will be
+           non-empty, so we behave as if the ledger is full. *)
+        Some ((1 lsl depth) - 1)
+      in
+      { T.tree; depth; indexes = indexes depth tree; current_location }
 
     let%test_unit "iteri consistent indices with t.indexes" =
       Quickcheck.test gen ~f:(fun t ->
