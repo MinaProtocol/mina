@@ -42,6 +42,8 @@ val set_exn : t -> int -> Account.t -> t
 val path_exn :
   t -> int -> [ `Left of Ledger_hash.t | `Right of Ledger_hash.t ] list
 
+val find_index : t -> Account_id.t -> int option
+
 val find_index_exn : t -> Account_id.t -> int
 
 val of_root : depth:int -> current_location:int option -> Ledger_hash.t -> t

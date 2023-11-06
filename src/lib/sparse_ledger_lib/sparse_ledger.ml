@@ -71,6 +71,8 @@ module type S = sig
 
   val set_exn : t -> int -> account -> t
 
+  val find_index : t -> account_id -> int option
+
   val find_index_exn : t -> account_id -> int
 
   val add_path :
@@ -192,8 +194,11 @@ end = struct
 
   let ith_bit idx i = (idx lsr i) land 1 = 1
 
+  let find_index (t : t) aid =
+    List.Assoc.find t.indexes ~equal:Account_id.equal aid
+
   let find_index_exn (t : t) aid =
-    match List.Assoc.find t.indexes ~equal:Account_id.equal aid with
+    match find_index t aid with
     | Some x ->
         x
     | None ->
