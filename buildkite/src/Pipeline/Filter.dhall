@@ -13,7 +13,7 @@ let tags: Filter -> List Tag.Type = \(filter: Filter) ->
     , LongAndVeryLong = [ Tag.Type.Long, Tag.Type.VeryLong ]
     , Long = [ Tag.Type.Long ]
     , TearDownOnly = [ Tag.Type.TearDown ]
-    , Toolchains = [ Tag.Type.Toolchain ]
+    , ToolchainsOnly = [ Tag.Type.Toolchain ]
     , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
   } filter
 
@@ -22,7 +22,7 @@ let show: Filter -> Text = \(filter: Filter) ->
     FastOnly = "FastOnly"
     , LongAndVeryLong = "LongAndVeryLong"
     , Long = "Long"
-    , Toolchains = "Toolchain"
+    , ToolchainsOnly = "Toolchain"
     , TearDownOnly = "TearDownOnly"
     , AllTests = "AllTests"
   } filter
