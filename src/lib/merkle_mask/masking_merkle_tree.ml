@@ -244,6 +244,16 @@ module Make (Inputs : Inputs_intf.S) = struct
       let parent_merkle_path = Base.merkle_path (get_parent t) location in
       fixup_merkle_path t parent_merkle_path address
 
+    let merkle_path_batch t locations =
+      assert_is_attached t ;
+      let addresses = List.map ~f:Location.to_path_exn locations in
+      let parent_merkle_paths =
+        Base.merkle_path_batch (get_parent t) locations
+      in
+      List.map2_exn
+        ~f:(fun path address -> fixup_merkle_path t path address)
+        parent_merkle_paths addresses
+
     (* given a Merkle path corresponding to a starting address, calculate
        addresses and hashes for each node affected by the starting hash; that is,
        along the path from the account address to root *)
