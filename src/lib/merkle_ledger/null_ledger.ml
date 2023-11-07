@@ -64,6 +64,8 @@ end = struct
     in
     loop location
 
+  let merkle_path_batch t locations = List.map ~f:(merkle_path t) locations
+
   let merkle_root t = empty_hash_at_height t.depth
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
