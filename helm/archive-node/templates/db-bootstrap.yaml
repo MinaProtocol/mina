@@ -9,7 +9,7 @@ spec:
       containers:
       {{- if .Values.archive.initFromDump }}
       - name: import-dump
-        image: gcr.io/o1labs-192920/postgresql-curl:latest
+        image: postgres:15-alpine
         env:
         - name: PGPASSWORD
           valueFrom:
@@ -37,7 +37,7 @@ spec:
         -c "ALTER DATABASE {{ .Values.postgresql.auth.database }} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE;"'
       {{- else }}
       - name: import-schema
-        image: gcr.io/o1labs-192920/postgresql-curl:latest
+        image: 
         env:
         - name: PGPASSWORD
           valueFrom:
