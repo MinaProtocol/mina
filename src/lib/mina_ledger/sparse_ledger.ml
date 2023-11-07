@@ -13,20 +13,27 @@ let of_ledger_root ledger =
 
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let ledger = Ledger.copy oledger in
-  let _, sparse =
+  let sparse =
     List.fold keys
-      ~f:(fun (new_keys, sl) key ->
+      ~f:(fun sl key ->
         match Ledger.location_of_account ledger key with
         | Some loc ->
-            ( new_keys
-            , add_path sl
-                (Ledger.merkle_path ledger loc)
-                key
-                ( Ledger.get ledger loc
-                |> Option.value_exn ?here:None ?error:None ?message:None ) )
-        | None ->
-            (new_keys, sl) )
-      ~init:([], of_ledger_root ledger)
+            add_path sl
+              (Ledger.merkle_path ledger loc)
+              key
+              ( Ledger.get ledger loc
+              |> Option.value_exn ?here:None ?error:None ?message:None )
+        | None -> (
+            match Ledger.last_filled ledger with
+            | Some loc ->
+                add_path sl
+                  (Ledger.merkle_path ledger loc)
+                  key
+                  ( Ledger.get ledger loc
+                  |> Option.value_exn ?here:None ?error:None ?message:None )
+            | None ->
+                sl ) )
+      ~init:(of_ledger_root ledger)
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
