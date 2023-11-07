@@ -9,21 +9,32 @@ let of_ledger_root ledger =
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let ledger = Ledger.copy oledger in
   let locations = Ledger.location_of_account_batch ledger keys in
+  let non_empty_locations = List.filter_map ~f:snd locations in
+  let accounts = Ledger.get_batch ledger non_empty_locations in
   let _, sparse =
-    List.fold locations
-      ~f:(fun (new_keys, sl) (key, loc) ->
-        match loc with
-        | Some loc ->
-            ( new_keys
-            , add_path sl
-                (Ledger.merkle_path ledger loc)
-                key
-                ( Ledger.get ledger loc
-                |> Option.value_exn ?here:None ?error:None ?message:None ) )
-        | None ->
-            let path, acct = Ledger.create_empty_exn ledger key in
-            (key :: new_keys, add_path sl path key acct) )
-      ~init:([], of_ledger_root ledger)
+    let rec go (new_keys, sl) locations accounts =
+      match locations with
+      | [] ->
+          (new_keys, sl)
+      | (key, Some loc) :: locations -> (
+          match accounts with
+          | (_, account) :: accounts ->
+              go
+                ( new_keys
+                , add_path sl
+                    (Ledger.merkle_path ledger loc)
+                    key
+                    ( account
+                    |> Option.value_exn ?here:None ?error:None ?message:None )
+                )
+                locations accounts
+          | _ ->
+              assert false )
+      | (key, None) :: locations ->
+          let path, acct = Ledger.create_empty_exn ledger key in
+          go (key :: new_keys, add_path sl path key acct) locations accounts
+    in
+    go ([], of_ledger_root ledger) locations accounts
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
