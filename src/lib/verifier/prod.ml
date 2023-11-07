@@ -72,6 +72,10 @@ module Worker_state = struct
                let proof_level = proof_level
              end)
 
+             (* [verify_commands cs] verifies user commands, maintaining their input order in its output.
+                This ordering is vital as it allows the parent process to inject verified commands back
+                into the workflow without re-decoding a copy of the command in the result, thus avoiding
+                proof duplication and reducing memory overhead. *)
              let verify_commands
                  (cs : User_command.Verifiable.t With_status.t list) :
                  _ list Deferred.t =
@@ -657,23 +661,28 @@ let verify_transaction_snarks =
   wrap_verify_snarks_with_trace ~checkpoint_before:"Verify_transaction_snarks"
     ~checkpoint_after:"Verify_transaction_snarks_done" verify_transaction_snarks
 
-(* Injects validated command back into `Validated results *)
-let adjust_valid_results ts rs =
-  List.map2_exn ts rs ~f:(fun c r ->
-      match r with
+(* Reinjects the original user commands into the validation results,
+   assuming that the orders of commands and results are synchronized.
+   This avoids duplicating proof data by not sending it back from the subprocess. *)
+let reinject_valid_user_commands_into_valid_results commands results =
+  List.map2_exn commands results ~f:(fun command result ->
+      match result with
       | #invalid as invalid ->
-          invalid
+          invalid (* Directly return invalid results *)
       | `Valid_assuming x ->
           `Valid_assuming x
       | `Valid ->
-          (* We know that the result matches the input, and that it is valid.
-             Since the response has been changed to avoid allocating duplicated proofs,
-             we need to add the command back here *)
-          let (`If_this_is_used_it_should_have_a_comment_justifying_it c) =
+          (* Since we have stripped the transaction from the result to save memory,
+             we reconstruct it here knowing the result is valid and the ordering is
+             maintained.
+             The use of to_valid_unsafe is justified because a [`Valid] result for this
+             command means that it has indeed been validated. *)
+          let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                command_valid ) =
             User_command.to_valid_unsafe
-              (User_command.of_verifiable (With_status.data c))
+              (User_command.of_verifiable (With_status.data command))
           in
-          `Valid c )
+          `Valid command_valid )
 
 let verify_commands { worker; logger } ts =
   O1trace.thread "dispatch_user_command_verification" (fun () ->
@@ -682,7 +691,8 @@ let verify_commands { worker; logger } ts =
           Worker.Connection.run connection ~f:Worker.functions.verify_commands
             ~arg:ts
           |> Deferred.Or_error.map ~f:(fun rs ->
-                 `Continue (adjust_valid_results ts rs) ) ) )
+                 `Continue
+                   (reinject_valid_user_commands_into_valid_results ts rs) ) ) )
 
 let verify_commands t ts =
   let logger = t.logger in
