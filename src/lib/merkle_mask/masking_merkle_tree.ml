@@ -545,16 +545,44 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let location_of_account_batch t account_ids =
       assert_is_attached t ;
-      let found_locations, leftover_account_ids =
-        List.partition_map account_ids ~f:(fun account_id ->
-            match self_find_location t account_id with
-            | Some location ->
-                Either.first (account_id, Some location)
-            | None ->
-                Either.second account_id )
+      let account_ids_with_locations_rev, leftover_account_ids_rev =
+        let rec go account_ids account_ids_with_locations_rev
+            leftover_account_ids_rev =
+          match account_ids with
+          | [] ->
+              (account_ids_with_locations_rev, leftover_account_ids_rev)
+          | account_id :: account_ids -> (
+              match self_find_location t account_id with
+              | None ->
+                  go account_ids
+                    ((account_id, None) :: account_ids_with_locations_rev)
+                    (account_id :: leftover_account_ids_rev)
+              | Some loc ->
+                  go account_ids
+                    ((account_id, Some loc) :: account_ids_with_locations_rev)
+                    leftover_account_ids_rev )
+        in
+        go account_ids [] []
       in
-      found_locations
-      @ Base.location_of_account_batch (get_parent t) leftover_account_ids
+      let leftover_account_id_locs_rev =
+        Base.location_of_account_batch (get_parent t) leftover_account_ids_rev
+      in
+      let rec go account_ids_with_locations_rev leftover_account_ids_rev locs =
+        match (account_ids_with_locations_rev, leftover_account_ids_rev) with
+        | [], _ ->
+            locs
+        | ( (account_id, None) :: account_ids_with_locations_rev
+          , (_account_id, loc) :: leftover_account_ids_rev ) ->
+            go account_ids_with_locations_rev leftover_account_ids_rev
+              ((account_id, loc) :: locs)
+        | ( (account_id, Some loc) :: account_ids_with_locations_rev
+          , leftover_account_ids_rev ) ->
+            go account_ids_with_locations_rev leftover_account_ids_rev
+              ((account_id, Some loc) :: locs)
+        | _ :: _, [] ->
+            assert false
+      in
+      go account_ids_with_locations_rev leftover_account_id_locs_rev []
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for t =
