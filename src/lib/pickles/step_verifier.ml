@@ -609,6 +609,7 @@ struct
           ; zeta = plonk.zeta
           ; joint_combiner
           ; feature_flags = plonk.feature_flags
+          ; custom_gate_type = plonk.custom_gate_type
           }
           { alpha
           ; beta
@@ -616,6 +617,7 @@ struct
           ; zeta
           ; joint_combiner
           ; feature_flags = plonk.feature_flags
+          ; custom_gate_type = plonk.custom_gate_type
           } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
@@ -808,7 +810,7 @@ struct
   module Plonk_checks = struct
     include Plonk_checks
 
-    include
+    module Type1 =
       Plonk_checks.Make
         (Shifted_value.Type1)
         (struct
@@ -816,6 +818,9 @@ struct
 
           let index_terms = Plonk_checks.Scalars.Tick.index_terms
         end)
+
+    module Type1Plus =
+      Plonk_checks.Make (Shifted_value.Type1) (Scalars.TickPlus)
   end
 
   let domain_for_compiled (type branches)
@@ -853,6 +858,7 @@ struct
      Meaning it needs opt sponge. *)
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
+      ?(custom_gate_type = false)
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] ) ~zk_rows
       ~(* TODO: Add "actual proofs verified" so that proofs don't
@@ -1031,10 +1037,16 @@ struct
       in
       let ft_eval0 : Field.t =
         with_label "ft_eval0" (fun () ->
-            Plonk_checks.ft_eval0
-              (module Field)
-              ~env ~domain plonk_minimal combined_evals evals1.public_input )
+            if custom_gate_type then
+              Plonk_checks.Type1Plus.ft_eval0
+                (module Field)
+                ~env ~domain plonk_minimal combined_evals evals1.public_input
+            else
+              Plonk_checks.Type1.ft_eval0
+                (module Field)
+                ~env ~domain plonk_minimal combined_evals evals1.public_input )
       in
+
       print_fp "ft_eval0" ft_eval0 ;
       print_fp "ft_eval1" ft_eval1 ;
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
@@ -1096,9 +1108,14 @@ struct
     in
     let plonk_checks_passed =
       with_label "plonk_checks_passed" (fun () ->
-          Plonk_checks.checked
-            (module Impl)
-            ~env ~shift:shift1 plonk combined_evals )
+          if custom_gate_type then
+            Plonk_checks.Type1Plus.checked
+              (module Impl)
+              ~env ~shift:shift1 plonk combined_evals
+          else
+            Plonk_checks.Type1.checked
+              (module Impl)
+              ~env ~shift:shift1 plonk combined_evals )
     in
     print_bool "xi_correct" xi_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;

@@ -153,7 +153,7 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
 let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     (module F : Field_with_if_intf with type t = t and type bool = boolean)
     ~endo ~mds ~field_of_hex ~domain ~zk_rows ~srs_length_log2
-    ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+    ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags; _ } :
       (t, _, boolean) Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
     =
   let feature_flags = expand_feature_flags (module B) feature_flags in
@@ -338,14 +338,13 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
 (see https://github.com/o1-labs/proof-systems/blob/516b16fc9b0fdcab5c608cd1aea07c0c66b6675d/kimchi/src/index.rs#L190) *)
 let perm_alpha0 : int = 21
 
-(* JES: TODO: pass other version of scalars here (can ignore wrap_verifier) *)
 module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (** Computes the ft evaluation at zeta.
   (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)
   *)
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
       ~(env : t Scalars.Env.t)
-      ({ alpha = _; beta; gamma; zeta; joint_combiner = _; feature_flags = _ } :
+      ({ alpha = _; beta; gamma; zeta; joint_combiner = _; feature_flags = _; _ } :
         _ Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0 =
     let open Plonk_types.Evals.In_circuit in
     let e0 field = fst (field e) in

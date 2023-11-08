@@ -33,7 +33,8 @@ let expand_deferred (type n most_recent_width) ~zk_rows
        , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
          Step_bp_vec.t
        , Branch_data.t )
-       Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t ) :
+       Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t )
+    ~custom_gate_type :
     _ Types.Wrap.Proof_state.Deferred_values.t =
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
@@ -174,6 +175,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
       ~domain:tick_domain ~ft_eval1:evals.ft_eval1
       ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
       evals.evals ~old_bulletproof_challenges ~r ~xi ~zeta ~zetaw
+      ~custom_gate_type
   in
   Timer.clock __LOC__ ;
   let bulletproof_challenges =

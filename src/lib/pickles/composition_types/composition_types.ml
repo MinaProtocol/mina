@@ -82,6 +82,7 @@ module Wrap = struct
               ; zeta : 'scalar_challenge
               ; joint_combiner : ('scalar_challenge, 'bool) Opt.t
               ; feature_flags : 'bool Plonk_types.Features.t
+
               }
           end
         end
@@ -148,8 +149,7 @@ module Wrap = struct
               ; fp
               ; fp
               ; Plonk_types.Features.typ
-                  ~feature_flags:(Plonk_types.Features.of_full feature_flags)
-                  bool
+                  ~feature_flags:(Plonk_types.Features.of_full feature_flags) bool
               ; Opt.typ Impl.Boolean.typ uses_lookups
                   ~dummy:dummy_scalar_challenge
                   (Scalar_challenge.typ scalar_challenge)

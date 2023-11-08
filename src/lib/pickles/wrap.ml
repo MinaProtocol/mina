@@ -21,6 +21,15 @@ module Type1 =
       let index_terms = Plonk_checks.Scalars.Tick.index_terms
     end)
 
+module Type1Plus =
+  Plonk_checks.Make
+    (Shifted_value.Type1)
+    (struct
+      let constant_term = Plonk_checks.Scalars.TickPlus.constant_term
+
+      let index_terms = Plonk_checks.Scalars.TickPlus.index_terms
+    end)
+
 let _vector_of_list (type a t)
     (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
     (xs : a list) : t =
@@ -35,18 +44,25 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       (module AB : Nat.Add.Intf with type n = actual_proofs_verified)
     (e : (_ array * _ array, _) Plonk_types.All_evals.With_public_input.t)
     ~(old_bulletproof_challenges : (_, actual_proofs_verified) Vector.t) ~r
-    ~plonk ~xi ~zeta ~zetaw =
+    ~plonk ~xi ~zeta ~zetaw ~custom_gate_type =
   let combined_evals =
     Plonk_checks.evals_of_split_evals ~zeta ~zetaw
       (module Tick.Field)
       ~rounds:tick_rounds e.evals
   in
   let ft_eval0 : Tick.Field.t =
-    Type1.ft_eval0
-      (module Tick.Field)
-      plonk ~env ~domain
-      (Plonk_types.Evals.to_in_circuit combined_evals)
-      (fst e.public_input)
+    if custom_gate_type then
+      Type1Plus.ft_eval0
+        (module Tick.Field)
+        plonk ~env ~domain
+        (Plonk_types.Evals.to_in_circuit combined_evals)
+        (fst e.public_input)
+    else
+      Type1.ft_eval0
+        (module Tick.Field)
+        plonk ~env ~domain
+        (Plonk_types.Evals.to_in_circuit combined_evals)
+        (fst e.public_input)
   in
   let T = AB.eq in
   let challenge_polys =
@@ -96,7 +112,7 @@ type deferred_values_and_hints =
   }
 
 let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
-    ~actual_feature_flags
+    ~actual_feature_flags ~custom_gate_type
     ~(prev_challenges : ((Backend.Tick.Field.t, _) Vector.t, n) Vector.t)
     ~(step_vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
     ~(public_input : Backend.Tick.Field.t list)
@@ -247,7 +263,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
                 ~r ~xi ~zeta ~zetaw ~old_bulletproof_challenges:prev_challenges
                 ~env:tick_env ~domain:tick_domain
                 ~ft_eval1:proof.proof.openings.ft_eval1
-                ~plonk:tick_plonk_minimal)
+                ~plonk:tick_plonk_minimal ~custom_gate_type)
       ; branch_data =
           { proofs_verified =
               ( match actual_proofs_verified with
@@ -337,7 +353,7 @@ let%test_module "gate finalization" =
     *)
     let run_recursive_proof_test
         (actual_feature_flags : Plonk_types.Features.flags)
-        (feature_flags : Plonk_types.Features.options)
+        (feature_flags : Plonk_types.Features.options) custom_gate_type
         (public_input : Pasta_bindings.Fp.t list)
         (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
         (proof : Backend.Tick.Proof.with_public_evals) :
@@ -382,8 +398,10 @@ let%test_module "gate finalization" =
       let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
         deferred_values ~actual_feature_flags ~sgs:[] ~prev_challenges:[]
           ~step_vk:vk ~public_input ~proof ~actual_proofs_verified:Nat.N0.n
+          ~custom_gate_type
       in
 
+      (* JES: What's this doing *)
       let full_features =
         Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
       in
@@ -392,7 +410,7 @@ let%test_module "gate finalization" =
                                               in OCaml into a var in circuit/Snarky.
 
          This complex function is called with two sets of inputs: once for the step circuit and
-         once for the wrap circuit.  It was decided not to use a functor for this. *)
+         once for the wrap circuit.  It was decided not to use a functor for this. *) (* JES: Question: Why not use a functor? *)
       let deferred_values_typ =
         let open Impls.Step in
         let open Step_main_inputs in
@@ -401,6 +419,7 @@ let%test_module "gate finalization" =
           (module Impls.Step)
           ~feature_flags:full_features ~challenge:Challenge.typ
           ~scalar_challenge:Challenge.typ
+          ~bool:Boolean.typ
           ~dummy_scalar_challenge:
             (Kimchi_backend_common.Scalar_challenge.create
                Limb_vector.Challenge.Constant.zero )
@@ -509,16 +528,21 @@ let%test_module "gate finalization" =
       let test_feature_flags_configs =
         generate_test_feature_flag_configs S.actual_feature_flags
 
-      let runtest feature_flags =
+      let runtest feature_flags custom_gate_type =
         run_recursive_proof_test S.actual_feature_flags feature_flags
-          public_input vk proof
+          custom_gate_type public_input vk proof
 
-      let%test "true -> yes" = runtest test_feature_flags_configs.true_is_yes
+      let%test "true -> yes" =
+        runtest test_feature_flags_configs.true_is_yes false
+      (* JES: Custom gate type *)
 
       let%test "true -> maybe" =
-        runtest test_feature_flags_configs.true_is_maybe
+        runtest test_feature_flags_configs.true_is_maybe false
+      (* JES: Custom gate type *)
 
-      let%test "all maybes" = runtest test_feature_flags_configs.all_maybes
+      let%test "all maybes" =
+        runtest test_feature_flags_configs.all_maybes false
+      (* JES: Custom gate type *)
     end
 
     (* Small combinators to lift gate example signatures to the expected
@@ -641,7 +665,7 @@ let wrap
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
     ~actual_wrap_domains ~step_plonk_indices:_ ~feature_flags
-    ~actual_feature_flags ?tweak_statement pk
+    ~actual_feature_flags (* ?(custom_gate_type = false) *) ?tweak_statement pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
       , _
@@ -807,7 +831,7 @@ let wrap
   [%log internal] "Wrap_compute_deferred_values" ;
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~sgs ~prev_challenges ~step_vk ~public_input ~proof
-      ~actual_proofs_verified ~actual_feature_flags
+      ~actual_proofs_verified ~actual_feature_flags (* ~custom_gate_type *)
   in
   [%log internal] "Wrap_compute_deferred_values_done" ;
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =

@@ -26,8 +26,7 @@ struct
     include Plonk_checks
     module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars.Tick)
     module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars.Tock)
-    (* module Type1Plus = Plonk_checks.Make (Shifted_value.Type1) (Scalars_plus.Tick) *)
-    (* JES: TODO: fix *)
+    (* module Type1Plus = Plonk_checks.Make (Shifted_value.Type1) (Scalars.TickPlus) *)
   end
 
   (* The prover corresponding to the given inductive rule. *)
@@ -61,7 +60,9 @@ struct
           with type length = Max_proofs_verified.n
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
-      ~feature_flags ~self_dlog_plonk_index
+      ~feature_flags
+      ~(* TODO: JES: custom_gate_type here? *)
+       self_dlog_plonk_index
       ~(public_input :
          ( var
          , value
@@ -179,7 +180,8 @@ struct
           ; beta = Challenge.Constant.to_tick_field plonk0.beta
           ; gamma = Challenge.Constant.to_tick_field plonk0.gamma
           ; joint_combiner = Option.map ~f:to_field plonk0.joint_combiner
-          ; feature_flags = plonk0.feature_flags
+          ; feature_flags =
+              plonk0.feature_flags (* JES: TODO: need custom_gate_type here? *)
           }
         in
         let env =

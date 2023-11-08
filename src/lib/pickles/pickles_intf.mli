@@ -340,6 +340,7 @@ module type S = sig
          name:string
       -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
       -> feature_flags:Opt.Flag.t Plonk_types.Features.t
+      -> custom_gate_type:bool
       -> typ:('var, 'value) Impls.Step.Typ.t
       -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 

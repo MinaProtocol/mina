@@ -19,6 +19,7 @@ module Basic = struct
     ; wrap_key : Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+    ; custom_gate_type : bool
           (* JES: TODO: (I) propagate custom_gate_type here (probably required) *)
     ; num_chunks : int
     ; zk_rows : int
@@ -42,6 +43,7 @@ module Side_loaded = struct
       { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
       ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+      ; custom_gate_type : bool
       ; branches : 'n2 Nat.t
       ; num_chunks : int
       ; zk_rows : int
@@ -62,6 +64,7 @@ module Side_loaded = struct
           ; public_input
           ; branches
           ; feature_flags
+          ; custom_gate_type
           ; num_chunks
           ; zk_rows
           }
@@ -86,6 +89,7 @@ module Side_loaded = struct
     ; wrap_domains = Common.wrap_domains ~proofs_verified
     ; wrap_key
     ; feature_flags
+    ; custom_gate_type
     ; num_chunks
     ; zk_rows
     }
@@ -99,6 +103,7 @@ module Compiled = struct
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+    ; custom_gate_type : bool
     ; num_chunks : int
     ; zk_rows : int
     }
@@ -119,6 +124,7 @@ module Compiled = struct
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+    ; custom_gate_type : bool
     ; num_chunks : int
     ; zk_rows : int
     }
@@ -136,6 +142,7 @@ module Compiled = struct
       ; step_domains
       ; wrap_key
       ; feature_flags
+      ; custom_gate_type
       ; num_chunks
       ; zk_rows
       } =
@@ -146,6 +153,7 @@ module Compiled = struct
     ; wrap_key = Lazy.force wrap_key
     ; wrap_vk = Lazy.force wrap_vk
     ; feature_flags
+    ; custom_gate_type
     ; num_chunks
     ; zk_rows
     }
@@ -166,6 +174,7 @@ module For_step = struct
           Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+    ; custom_gate_type : bool
     ; num_chunks : int
     ; zk_rows : int
     }
@@ -177,6 +186,7 @@ module For_step = struct
            ; max_proofs_verified
            ; public_input
            ; feature_flags
+           ; custom_gate_type
            ; num_chunks
            ; zk_rows
            }
@@ -202,6 +212,7 @@ module For_step = struct
     ; step_domains = `Side_loaded
     ; feature_flags
     ; num_chunks
+    ; custom_gate_type
     ; zk_rows
     }
 
@@ -214,6 +225,7 @@ module For_step = struct
        ; wrap_domains
        ; step_domains
        ; feature_flags
+       ; custom_gate_type
        ; wrap_vk = _
        ; num_chunks
        ; zk_rows
@@ -230,6 +242,7 @@ module For_step = struct
     ; wrap_domain = `Known wrap_domains.h
     ; step_domains = `Known step_domains
     ; feature_flags
+    ; custom_gate_type
     ; num_chunks
     ; zk_rows
     }

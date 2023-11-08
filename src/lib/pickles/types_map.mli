@@ -4,6 +4,7 @@ type inner_curve_var =
   Backend.Tick.Field.t Snarky_backendless.Cvar.t
   * Backend.Tick.Field.t Snarky_backendless.Cvar.t
 
+(* JES: TODO: Basic wrap function metadata *)
 module Basic : sig
   type ('var, 'value, 'n1, 'n2) t =
     { max_proofs_verified : (module Pickles_types.Nat.Add.Intf with type n = 'n1)
@@ -15,6 +16,7 @@ module Basic : sig
         Pickles_types.Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+    ; custom_gate_type : bool
     ; num_chunks : int
     ; zk_rows : int
     }
@@ -38,6 +40,7 @@ module Side_loaded : sig
           (module Pickles_types.Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
       ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+      ; custom_gate_type : bool
       ; branches : 'n2 Pickles_types.Nat.t
       ; num_chunks : int
       ; zk_rows : int
@@ -63,6 +66,7 @@ module Compiled : sig
     ; wrap_domains : Import.Domains.t
     ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+    ; custom_gate_type : bool
     ; num_chunks : int
     ; zk_rows : int
     }
@@ -82,6 +86,7 @@ module Compiled : sig
     ; wrap_domains : Import.Domains.t
     ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+    ; custom_gate_type : bool
     ; num_chunks : int
     ; zk_rows : int
     }
@@ -106,6 +111,7 @@ module For_step : sig
         [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
         | `Side_loaded ]
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+    ; custom_gate_type : bool
     ; num_chunks : int
     ; zk_rows : int
     }

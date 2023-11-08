@@ -348,6 +348,13 @@ module Wrap : sig
                  Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                snarky_typ
           -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+          (* -> bool:
+          ( ('f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
+             as
+             'boolean )
+          , bool
+          , 'f )
+          Snarky_backendless.Typ.t *) (* JES: TODO: Would be great to remove this *)
           -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
           -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
           -> ( 'g

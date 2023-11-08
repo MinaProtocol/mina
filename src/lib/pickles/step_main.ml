@@ -18,7 +18,7 @@ let _one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
   let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
   Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
 
-let verify_one ~srs
+let verify_one ?(custom_gate_type = false) ~srs
     ({ app_state
      ; wrap_proof
      ; proof_state
@@ -41,9 +41,9 @@ let verify_one ~srs
           sponge
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
-        finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
-          ~zk_rows:d.zk_rows ~sponge ~prev_challenges deferred_values
-          prev_proof_evals )
+        finalize_other_proof ~custom_gate_type d.max_proofs_verified
+          ~step_domains:d.step_domains ~zk_rows:d.zk_rows ~sponge
+          ~prev_challenges deferred_values prev_proof_evals )
   in
   let branch_data = deferred_values.branch_data in
   let sponge_after_index, hash_messages_for_next_step_proof =
@@ -182,6 +182,7 @@ let step_main :
  fun (module Req) max_proofs_verified ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length
      ~proofs_verified ~lte ~public_input ~auxiliary_typ ~basic ~self rule ->
+  (* JES: TODO: What is basic here? *)
   let module Typ_with_max_proofs_verified = struct
     type ('var, 'value, 'local_max_proofs_verified, 'local_branches) t =
       ( ( 'var
@@ -462,8 +463,8 @@ let step_main :
                           ()
                     in
                     let chals, v =
-                      verify_one ~srs p d messages_for_next_wrap_proof
-                        unfinalized should_verify
+                      verify_one ~custom_gate_type:basic.custom_gate_type ~srs p
+                        d messages_for_next_wrap_proof unfinalized should_verify
                     in
                     let chalss, vs =
                       go proofs datas messages_for_next_wrap_proofs unfinalizeds
@@ -497,6 +498,7 @@ let step_main :
                     ; step_domains = `Known basic.step_domains
                     ; wrap_key = dlog_plonk_index
                     ; feature_flags = basic.feature_flags
+                    ; custom_gate_type = basic.custom_gate_type
                     ; num_chunks = basic.num_chunks
                     ; zk_rows = basic.zk_rows
                     }

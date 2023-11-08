@@ -142,7 +142,8 @@ let create
         ; proofs_verifieds
         ; wrap_domains
         ; step_domains
-        ; feature_flags (* JES: TODO: Probably need to pass custom_gate_type *)
+        ; feature_flags
+        ; custom_gate_type
         ; num_chunks
         ; zk_rows =
             ( match num_chunks with

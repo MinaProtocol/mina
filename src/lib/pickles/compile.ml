@@ -844,6 +844,7 @@ struct
       ; wrap_domains
       ; step_domains
       ; feature_flags
+      ; custom_gate_type
       ; num_chunks
       ; zk_rows =
           ( match num_chunks with
@@ -890,13 +891,14 @@ module Side_loaded = struct
 
   let in_prover tag vk = Types_map.set_ephemeral tag { index = `In_prover vk }
 
-  let create ~name ~max_proofs_verified ~feature_flags ~typ =
+  let create ~name ~max_proofs_verified ~feature_flags ~custom_gate_type ~typ =
     Types_map.add_side_loaded ~name
       { max_proofs_verified
       ; public_input = typ
       ; branches = Verification_key.Max_branches.n
       ; feature_flags =
           Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
+      ; custom_gate_type
       ; num_chunks = 1
       ; zk_rows = 3
       }

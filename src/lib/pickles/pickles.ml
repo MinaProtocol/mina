@@ -244,13 +244,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     let in_prover tag vk = Types_map.set_ephemeral tag { index = `In_prover vk }
 
-    let create ~name ~max_proofs_verified ~feature_flags ~typ =
+    let create ~name ~max_proofs_verified ~feature_flags ~custom_gate_type ~typ
+        =
       Types_map.add_side_loaded ~name
         { max_proofs_verified
         ; public_input = typ
         ; branches = Verification_key.Max_branches.n
         ; feature_flags =
             Plonk_types.(Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags)
+        ; custom_gate_type
         ; num_chunks = 1
         ; zk_rows = 3
         }
@@ -1044,7 +1046,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ; auxiliary_output = ()
               } )
         ; feature_flags = Plonk_types.Features.none_bool
-        ; custom_gate_type = false
+        ; custom_gate_type = false (* JES: TODO *)
         }
 
       module M = struct
@@ -1133,6 +1135,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let feature_flags = Plonk_types.Features.Full.none in
           let actual_feature_flags = Plonk_types.Features.none_bool in
+          let custom_gate_type = false in
+          (* JES: TODO: FIX *)
           let wrap_domains =
             let module M =
               Wrap_domains.Make (A) (A_value) (A) (A_value) (A) (A_value)
@@ -1600,7 +1604,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ~old_bulletproof_challenges:prev_challenges
                           ~env:tick_env ~domain:tick_domain
                           ~ft_eval1:proof.proof.openings.ft_eval1
-                          ~plonk:tick_plonk_minimal
+                          ~plonk:tick_plonk_minimal ~custom_gate_type
                       in
                       let chal = Challenge.Constant.of_tick_field in
                       let sg_new, new_bulletproof_challenges, b =
@@ -1830,6 +1834,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let data : _ Types_map.Compiled.t =
             { branches = Branches.n
             ; feature_flags
+            ; custom_gate_type
             ; proofs_verifieds
             ; max_proofs_verified = (module Max_proofs_verified)
             ; public_input = typ
@@ -2206,7 +2211,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let side_loaded_tag =
           Side_loaded.create ~name:"foo"
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
-            ~feature_flags:Plonk_types.Features.none ~typ:Field.typ
+            ~feature_flags:Plonk_types.Features.none ~custom_gate_type:false
+            ~typ:Field.typ
+        (* JES: TODO: FIX *)
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
@@ -2561,7 +2568,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let side_loaded_tag =
           Side_loaded.create ~name:"foo"
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
-            ~feature_flags:maybe_features ~typ:Field.typ
+            ~feature_flags:maybe_features ~custom_gate_type:false ~typ:Field.typ
+        (* JES: TODO: FIX *)
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->

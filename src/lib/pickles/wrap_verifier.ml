@@ -642,6 +642,7 @@ struct
       ; zeta = zeta_0
       ; joint_combiner = joint_combiner_0
       ; feature_flags = _
+      ; custom_gate_type = _
       }
       { Plonk.Minimal.In_circuit.alpha = alpha_1
       ; beta = beta_1
@@ -649,6 +650,7 @@ struct
       ; zeta = zeta_1
       ; joint_combiner = joint_combiner_1
       ; feature_flags = _
+      ; custom_gate_type = _
       } =
     with_label __LOC__ (fun () ->
         match[@warning "-4"] (joint_combiner_0, joint_combiner_1) with
@@ -1348,6 +1350,7 @@ struct
           ; zeta = plonk.zeta
           ; joint_combiner = plonk.joint_combiner
           ; feature_flags = plonk.feature_flags
+          ; custom_gate_type = plonk.custom_gate_type
           }
           { alpha
           ; beta
@@ -1355,6 +1358,7 @@ struct
           ; zeta
           ; joint_combiner
           ; feature_flags = plonk.feature_flags
+          ; custom_gate_type = plonk.custom_gate_type
           } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
@@ -1534,6 +1538,8 @@ struct
       plonk |> Plonk.to_minimal
       |> Plonk.Minimal.to_wrap
            ~feature_flags:Features.(map ~f:Boolean.var_of_value none_bool)
+           ~custom_gate_type:(Boolean.var_of_value false)
+      (* JES: TODO: not sure *)
     in
     let combined_evals =
       let n = Common.Max_degree.wrap_log2 in
