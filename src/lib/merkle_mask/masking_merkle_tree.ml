@@ -185,15 +185,44 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let get_batch t locations =
       assert_is_attached t ;
-      let found_accounts, leftover_locations =
-        List.partition_map locations ~f:(fun location ->
-            match self_find_account t location with
-            | Some account ->
-                Either.first (location, Some account)
-            | None ->
-                Either.second location )
+      let locations_with_locations_rev, leftover_locations_rev =
+        let rec go locations locations_with_locations_rev leftover_locations_rev
+            =
+          match locations with
+          | [] ->
+              (locations_with_locations_rev, leftover_locations_rev)
+          | location :: locations -> (
+              match self_find_account t location with
+              | None ->
+                  go locations
+                    ((location, None) :: locations_with_locations_rev)
+                    (location :: leftover_locations_rev)
+              | Some account ->
+                  go locations
+                    ((location, Some account) :: locations_with_locations_rev)
+                    leftover_locations_rev )
+        in
+        go locations [] []
       in
-      found_accounts @ Base.get_batch (get_parent t) leftover_locations
+      let leftover_location_accounts_rev =
+        Base.get_batch (get_parent t) leftover_locations_rev
+      in
+      let rec go locations_with_locations_rev leftover_locations_rev accounts =
+        match (locations_with_locations_rev, leftover_locations_rev) with
+        | [], _ ->
+            accounts
+        | ( (location, None) :: locations_with_locations_rev
+          , (_location, account) :: leftover_locations_rev ) ->
+            go locations_with_locations_rev leftover_locations_rev
+              ((location, account) :: accounts)
+        | ( (location, Some account) :: locations_with_locations_rev
+          , leftover_locations_rev ) ->
+            go locations_with_locations_rev leftover_locations_rev
+              ((location, Some account) :: accounts)
+        | _ :: _, [] ->
+            assert false
+      in
+      go locations_with_locations_rev leftover_location_accounts_rev []
 
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
