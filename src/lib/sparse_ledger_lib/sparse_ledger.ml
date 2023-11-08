@@ -225,7 +225,7 @@ end = struct
       | false, Node (_, l, r) ->
           let go_right = ith_bit idx i in
           if go_right then go (i - 1) r else go (i - 1) l
-      | _, Hash h when Hash.equal h (empty_hash i) ->
+      | _, Hash h when Hash.equal h (empty_hash (i + 1)) ->
           Lazy.force Account.empty
       | _ ->
           let expected_kind = if i < 0 then "n account" else " node" in
@@ -256,13 +256,13 @@ end = struct
             if go_right then (l, go (i - 1) r) else (go (i - 1) l, r)
           in
           Node (Hash.merge ~height:i (hash l) (hash r), l, r)
-      | false, Hash h when Hash.equal h (empty_hash i) ->
+      | false, Hash h when Hash.equal h (empty_hash (i + 1)) ->
           let inner =
-            if i > 0 then Tree.Hash (empty_hash (i - 1))
+            if i > 0 then Tree.Hash (empty_hash i)
             else Tree.Account (Lazy.force Account.empty)
           in
           go i (Node (h, inner, inner))
-      | true, Hash h when Hash.equal h (empty_hash i) ->
+      | true, Hash h when Hash.equal h (empty_hash (i + 1)) ->
           Tree.Account acct
       | _ ->
           let expected_kind = if i < 0 then "n account" else " node" in
@@ -289,9 +289,9 @@ end = struct
         match tree with
         | Tree.Account _ ->
             failwithf "Sparse_ledger.path: Bad depth at index %i." idx ()
-        | Hash h when Hash.equal h (empty_hash i) ->
+        | Hash h when Hash.equal h (empty_hash (i + 1)) ->
             let inner =
-              if i > 0 then Tree.Hash (empty_hash (i - 1))
+              if i > 0 then Tree.Hash (empty_hash i)
               else Tree.Account (Lazy.force Account.empty)
             in
             go acc i (Tree.Node (h, inner, inner))
