@@ -26,11 +26,14 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
         | None -> (
             match Ledger.last_filled ledger with
             | Some loc ->
+                let account =
+                  Ledger.get ledger loc
+                  |> Option.value_exn ?here:None ?error:None ?message:None
+                in
                 add_path sl
                   (Ledger.merkle_path ledger loc)
-                  key
-                  ( Ledger.get ledger loc
-                  |> Option.value_exn ?here:None ?error:None ?message:None )
+                  (Account.identifier account)
+                  account
             | None ->
                 sl ) )
       ~init:(of_ledger_root ledger)
