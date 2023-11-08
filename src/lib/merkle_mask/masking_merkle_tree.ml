@@ -183,17 +183,33 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.get (get_parent t) location
 
-    let get_batch t locations =
+    let self_find_or_batch_lookup self_find lookup_parent t ids =
       assert_is_attached t ;
-      let found_accounts, leftover_locations =
-        List.partition_map locations ~f:(fun location ->
-            match self_find_account t location with
-            | Some account ->
-                Either.first (location, Some account)
-            | None ->
-                Either.second location )
+      let self_found_or_none =
+        List.map ids ~f:(fun id -> (id, self_find t id))
       in
-      found_accounts @ Base.get_batch (get_parent t) leftover_locations
+      let not_found =
+        List.filter_map self_found_or_none ~f:(function
+          | id, None ->
+              Some id
+          | _ ->
+              None )
+      in
+      let from_parent = lookup_parent (get_parent t) not_found in
+      let _, res =
+        List.fold_map self_found_or_none ~init:from_parent
+          ~f:(fun from_parent (id, self_found) ->
+            match (self_found, from_parent) with
+            | None, r :: rest ->
+                (rest, r)
+            | Some _, _ ->
+                (from_parent, (id, self_found))
+            | _ ->
+                failwith "unexpected number of results from DB" )
+      in
+      res
+
+    let get_batch = self_find_or_batch_lookup self_find_account Base.get_batch
 
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
@@ -533,46 +549,9 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.location_of_account (get_parent t) account_id
 
-    let location_of_account_batch t account_ids =
-      assert_is_attached t ;
-      let account_ids_with_locations_rev, leftover_account_ids_rev =
-        let rec go account_ids account_ids_with_locations_rev
-            leftover_account_ids_rev =
-          match account_ids with
-          | [] ->
-              (account_ids_with_locations_rev, leftover_account_ids_rev)
-          | account_id :: account_ids -> (
-              match self_find_location t account_id with
-              | None ->
-                  go account_ids
-                    ((account_id, None) :: account_ids_with_locations_rev)
-                    (account_id :: leftover_account_ids_rev)
-              | Some loc ->
-                  go account_ids
-                    ((account_id, Some loc) :: account_ids_with_locations_rev)
-                    leftover_account_ids_rev )
-        in
-        go account_ids [] []
-      in
-      let leftover_account_id_locs_rev =
-        Base.location_of_account_batch (get_parent t) leftover_account_ids_rev
-      in
-      let rec go account_ids_with_locations_rev leftover_account_ids_rev locs =
-        match (account_ids_with_locations_rev, leftover_account_ids_rev) with
-        | [], _ ->
-            locs
-        | ( (account_id, None) :: account_ids_with_locations_rev
-          , (_account_id, loc) :: leftover_account_ids_rev ) ->
-            go account_ids_with_locations_rev leftover_account_ids_rev
-              ((account_id, loc) :: locs)
-        | ( (account_id, Some loc) :: account_ids_with_locations_rev
-          , leftover_account_ids_rev ) ->
-            go account_ids_with_locations_rev leftover_account_ids_rev
-              ((account_id, Some loc) :: locs)
-        | _ :: _, [] ->
-            assert false
-      in
-      go account_ids_with_locations_rev leftover_account_id_locs_rev []
+    let location_of_account_batch =
+      self_find_or_batch_lookup self_find_location
+        Base.location_of_account_batch
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for t =
