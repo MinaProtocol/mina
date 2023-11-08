@@ -19,6 +19,8 @@ spec:
         command: ["bash", "-c"]
         args:
         - 'sleep 30
+        && sudo apt update
+        && sudo apt install -y curl
         && cd /tmp
         && curl https://storage.googleapis.com/mina-archive-dumps/{{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql.tar.gz -o {{ .Values.testnetName }}-archive-dump.tar.gz
         && tar -xvf {{ .Values.testnetName }}-archive-dump.tar.gz
@@ -47,6 +49,8 @@ spec:
         command: ["bash", "-c"]
         args:
         - 'sleep 30
+        && sudo apt update
+        && sudo apt install -y curl
         && cd /tmp
         && {{ range .Values.archive.remoteSchemaAuxFiles }} curl -O {{.}} && {{ end }}
         psql
