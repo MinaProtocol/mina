@@ -11,6 +11,24 @@ open Signature_lib
 module Ledger = Mina_ledger.Ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
 
+let time label f =
+  let start_time = Time.now () in
+  let x = f () in
+  let time_elapsed = Time.abs_diff (Time.now ()) start_time in
+  [%log' info (Logger.create ())]
+    "TIME(%s) = $time_elapsed" label
+    ~metadata:[ ("time_elapsed", `Float (Time.Span.to_ms time_elapsed)) ] ;
+  x
+
+let time' label f =
+  let start_time = Time.now () in
+  let%map x = f () in
+  let time_elapsed = Time.abs_diff (Time.now ()) start_time in
+  [%log' info (Logger.create ())]
+    "TIME(%s) = $time_elapsed" label
+    ~metadata:[ ("time_elapsed", `Float (Time.Span.to_ms time_elapsed)) ] ;
+  x
+
 (* TODO: measure these operations and tune accordingly *)
 let transaction_application_scheduler_batch_size = 10
 
@@ -1016,9 +1034,10 @@ module T = struct
       Int.pow 2 t.constraint_constants.transaction_capacity_log_2
     in
     let spots_available, proofs_waiting =
-      let jobs = Scan_state.all_work_statements_exn t.scan_state in
-      ( Int.min (Scan_state.free_space t.scan_state) max_throughput
-      , List.length jobs )
+      time "scan_state_all_work_statements" (fun () ->
+          let jobs = Scan_state.all_work_statements_exn t.scan_state in
+          ( Int.min (Scan_state.free_space t.scan_state) max_throughput
+          , List.length jobs ) )
     in
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
@@ -1046,14 +1065,19 @@ module T = struct
              , stack_update_in_snark
              , stack_update
              , `First_pass_ledger_end first_pass_ledger_end ) =
-      O1trace.thread "update_coinbase_stack_start_time" (fun () ->
-          update_coinbase_stack_and_get_data ~logger ~constraint_constants
-            ~global_slot t.scan_state new_ledger t.pending_coinbase_collection
-            transactions current_state_view state_and_body_hash )
+      time' "update_coinbase_stack_and_get_data" (fun () ->
+          O1trace.thread "update_coinbase_stack_start_time" (fun () ->
+              update_coinbase_stack_and_get_data ~logger ~constraint_constants
+                ~global_slot t.scan_state new_ledger
+                t.pending_coinbase_collection transactions current_state_view
+                state_and_body_hash ) )
     in
     let slots = List.length data in
     let work_count = List.length works in
-    let required_pairs = Scan_state.work_statements_for_new_diff t.scan_state in
+    let required_pairs =
+      time "scan_state_wrk_statements_for_new_diff" (fun () ->
+          Scan_state.work_statements_for_new_diff t.scan_state )
+    in
     [%log internal] "Check_for_sufficient_snark_work"
       ~metadata:
         [ ("required_pairs", `Int (List.length required_pairs))
@@ -1062,71 +1086,85 @@ module T = struct
         ; ("free_space", `Int (Scan_state.free_space t.scan_state))
         ] ;
     let%bind () =
-      O1trace.thread "check_for_sufficient_snark_work" (fun () ->
-          let required = List.length required_pairs in
-          if
-            work_count < required
-            && List.length data
-               > Scan_state.free_space t.scan_state - required + work_count
-          then
-            Deferred.Result.fail
-              (Staged_ledger_error.Insufficient_work
-                 (sprintf
-                    !"Insufficient number of transaction snark work (slots \
-                      occupying: %d)  required %d, got %d"
-                    slots required work_count ) )
-          else Deferred.Result.return () )
+      time' "check_for_sufficient_snark_work" (fun () ->
+          O1trace.thread "check_for_sufficient_snark_work" (fun () ->
+              let required = List.length required_pairs in
+              if
+                work_count < required
+                && List.length data
+                   > Scan_state.free_space t.scan_state - required + work_count
+              then
+                Deferred.Result.fail
+                  (Staged_ledger_error.Insufficient_work
+                     (sprintf
+                        !"Insufficient number of transaction snark work (slots \
+                          occupying: %d)  required %d, got %d"
+                        slots required work_count ) )
+              else Deferred.Result.return () ) )
     in
     [%log internal] "Check_zero_fee_excess" ;
-    let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
+    let%bind () =
+      time' "check_zero_fee_excess" (fun () ->
+          Deferred.return (check_zero_fee_excess t.scan_state data) )
+    in
     [%log internal] "Fill_work_and_enqueue_transactions" ;
     let%bind res_opt, scan_state' =
-      O1trace.thread "fill_work_and_enqueue_transactions" (fun () ->
-          let r =
-            Scan_state.fill_work_and_enqueue_transactions t.scan_state ~logger
-              data works
-          in
-          Or_error.iter_error r ~f:(fun e ->
-              let data_json =
-                `List
-                  (List.map data
-                     ~f:(fun
-                          { Scan_state.Transaction_with_witness.statement; _ }
-                        -> Transaction_snark.Statement.to_yojson statement ) )
+      time' "fill_work_and_enqueue_transactions" (fun () ->
+          O1trace.thread "fill_work_and_enqueue_transactions" (fun () ->
+              let r =
+                Scan_state.fill_work_and_enqueue_transactions t.scan_state
+                  ~logger data works
               in
-              [%log error]
-                ~metadata:
-                  [ ( "scan_state"
-                    , `String (Scan_state.snark_job_list_json t.scan_state) )
-                  ; ("data", data_json)
-                  ; ("error", Error_json.error_to_yojson e)
-                  ; ("prefix", `String log_prefix)
-                  ]
-                !"$prefix: Unexpected error when applying diff data $data to \
-                  the scan_state $scan_state: $error" ) ;
-          Deferred.return (to_staged_ledger_or_error r) )
+              Or_error.iter_error r ~f:(fun e ->
+                  let data_json =
+                    `List
+                      (List.map data
+                         ~f:(fun
+                              { Scan_state.Transaction_with_witness.statement
+                              ; _
+                              }
+                            -> Transaction_snark.Statement.to_yojson statement )
+                      )
+                  in
+                  [%log error]
+                    ~metadata:
+                      [ ( "scan_state"
+                        , `String (Scan_state.snark_job_list_json t.scan_state)
+                        )
+                      ; ("data", data_json)
+                      ; ("error", Error_json.error_to_yojson e)
+                      ; ("prefix", `String log_prefix)
+                      ]
+                    !"$prefix: Unexpected error when applying diff data $data \
+                      to the scan_state $scan_state: $error" ) ;
+              Deferred.return (to_staged_ledger_or_error r) ) )
     in
     let%bind () = yield_result () in
     [%log internal] "Update_pending_coinbase_collection" ;
     let%bind updated_pending_coinbase_collection' =
-      O1trace.thread "update_pending_coinbase_collection" (fun () ->
-          update_pending_coinbase_collection
-            ~depth:t.constraint_constants.pending_coinbase_depth
-            t.pending_coinbase_collection stack_update ~is_new_stack
-            ~ledger_proof:res_opt
-          |> Deferred.return )
+      time' "update_pending_coinbase_collection" (fun () ->
+          O1trace.thread "update_pending_coinbase_collection" (fun () ->
+              update_pending_coinbase_collection
+                ~depth:t.constraint_constants.pending_coinbase_depth
+                t.pending_coinbase_collection stack_update ~is_new_stack
+                ~ledger_proof:res_opt
+              |> Deferred.return ) )
     in
     let%bind () = yield_result () in
     let%bind coinbase_amount =
-      Deferred.return (coinbase_for_blockchain_snark coinbases)
+      time' "coinbase_for_blockchain_snark" (fun () ->
+          Deferred.return (coinbase_for_blockchain_snark coinbases) )
     in
     let%bind latest_pending_coinbase_stack =
-      Pending_coinbase.latest_stack ~is_new_stack:false
-        updated_pending_coinbase_collection'
-      |> to_staged_ledger_or_error |> Deferred.return
+      time' "pending_coinbase_latest_stack" (fun () ->
+          Pending_coinbase.latest_stack ~is_new_stack:false
+            updated_pending_coinbase_collection'
+          |> to_staged_ledger_or_error |> Deferred.return )
     in
     let%bind () = yield_result () in
     let%map () =
+      time' "verify_scan_state_after_apply"
+      @@ fun () ->
       if skip_verification || List.is_empty data then Deferred.return (Ok ())
       else (
         [%log internal] "Verify_scan_state_after_apply" ;
@@ -1163,7 +1201,9 @@ module T = struct
       }
     in
     [%log internal] "Hash_new_staged_ledger" ;
-    let staged_ledger_hash = hash new_staged_ledger in
+    let staged_ledger_hash =
+      time "hash_new_staged_ledger" (fun () -> hash new_staged_ledger)
+    in
     [%log internal] "Hash_new_staged_ledger_done" ;
     ( `Hash_after_applying staged_ledger_hash
     , `Ledger_proof res_opt
@@ -1235,36 +1275,41 @@ module T = struct
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
-      O1trace.thread "check_completed_works" (fun () ->
-          match skip_verification with
-          | Some `All | Some `Proofs ->
-              return ()
-          | None ->
-              [%log internal] "Check_completed_works"
-                ~metadata:[ ("work_count", `Int (List.length work)) ] ;
-              check_completed_works ~get_completed_work ~logger ~verifier
-                t.scan_state work )
+      time' "check_completed_works" (fun () ->
+          O1trace.thread "check_completed_works" (fun () ->
+              match skip_verification with
+              | Some `All | Some `Proofs ->
+                  return ()
+              | None ->
+                  [%log internal] "Check_completed_works"
+                    ~metadata:[ ("work_count", `Int (List.length work)) ] ;
+                  check_completed_works ~get_completed_work ~logger ~verifier
+                    t.scan_state work ) )
     in
     [%log internal] "Prediff" ;
     let%bind prediff =
-      Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
-        ~supercharge_coinbase
-        ~check:(check_commands t.ledger ~verifier)
-      |> Deferred.map
-           ~f:
-             (Result.map_error ~f:(fun error ->
-                  Staged_ledger_error.Pre_diff error ) )
+      time' "get_pre_diff_info" (fun () ->
+          Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
+            ~supercharge_coinbase ~check:(fun cmds ->
+              time' "check_commands" (fun () ->
+                  check_commands t.ledger ~verifier cmds ) )
+          |> Deferred.map
+               ~f:
+                 (Result.map_error ~f:(fun error ->
+                      Staged_ledger_error.Pre_diff error ) ) )
     in
     let apply_diff_start_time = Core.Time.now () in
     [%log internal] "Apply_diff" ;
     let%map ((_, _, `Staged_ledger new_staged_ledger, _) as res) =
-      apply_diff
-        ~skip_verification:
-          ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
-        ~constraint_constants ~global_slot t
-        (forget_prediff_info prediff)
-        ~logger ~current_state_view ~state_and_body_hash
-        ~log_prefix:"apply_diff"
+      time' "apply_diff" (fun () ->
+          apply_diff
+            ~skip_verification:
+              ([%equal: [ `All | `Proofs ] option] skip_verification
+                 (Some `All) )
+            ~constraint_constants ~global_slot t
+            (forget_prediff_info prediff)
+            ~logger ~current_state_view ~state_and_body_hash
+            ~log_prefix:"apply_diff" )
     in
     [%log internal] "Diff_applied" ;
     [%log debug]
@@ -1289,15 +1334,17 @@ module T = struct
       ~supercharge_coinbase =
     let open Deferred.Result.Let_syntax in
     let%bind prediff =
-      Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
-      @@ Pre_diff_info.get_unchecked ~constraint_constants ~coinbase_receiver
-           ~supercharge_coinbase sl_diff
-      |> Deferred.return
+      time' "get_pre_diff_info_unchecked" (fun () ->
+          Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
+          @@ Pre_diff_info.get_unchecked ~constraint_constants
+               ~coinbase_receiver ~supercharge_coinbase sl_diff
+          |> Deferred.return )
     in
-    apply_diff t
-      (forget_prediff_info prediff)
-      ~constraint_constants ~global_slot ~logger ~current_state_view
-      ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
+    time' "apply_diff_unchecked" (fun () ->
+        apply_diff t
+          (forget_prediff_info prediff)
+          ~constraint_constants ~global_slot ~logger ~current_state_view
+          ~state_and_body_hash ~log_prefix:"apply_diff_unchecked" )
 
   module Resources = struct
     module Discarded = struct
