@@ -121,7 +121,7 @@ let rec poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
   poll_node_for_logs_in_background ~log_filter ~logger ~event_writer node
 
 let poll_for_logs_in_background ~log_filter ~logger ~network ~event_writer =
-  Abstract_network.all_pods network
+  Abstract_network.all_nodes network
   |> Core.String.Map.data
   |> Deferred.Or_error.List.iter ~how:`Parallel
        ~f:(poll_node_for_logs_in_background ~log_filter ~logger ~event_writer)

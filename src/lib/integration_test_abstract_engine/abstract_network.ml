@@ -24,6 +24,7 @@ module Node = struct
     ; node_type : Node_type.t
     ; password : string
     ; graphql_uri : string
+    ; mutable should_be_running : bool
     }
 
   let id { node_id; _ } = node_id
@@ -32,12 +33,18 @@ module Node = struct
 
   let get_ingress_uri node = Uri.of_string node.graphql_uri
 
-  let start ~fresh_state t : unit Malleable_error.t =
+  let should_be_running { should_be_running; _ } = should_be_running
+
+  (* TODO: check if there is any infra id that could be used *)
+  let infra_id _node = ""
+
+  let start ~fresh_state node : unit Malleable_error.t =
     try
+      node.should_be_running <- true ;
       let args =
         [ ("fresh_state", `Bool fresh_state)
-        ; ("network_id", `String t.network_id)
-        ; ("node_id", `String t.node_id)
+        ; ("network_id", `String node.network_id)
+        ; ("node_id", `String node.node_id)
         ]
       in
       let%bind () =
@@ -53,10 +60,13 @@ module Node = struct
       Malleable_error.return ()
     with Failure err -> Malleable_error.hard_error_string err
 
-  let stop t =
+  let stop node =
     try
+      node.should_be_running <- false ;
       let args =
-        [ ("network_id", `String t.network_id); ("node_id", `String t.node_id) ]
+        [ ("network_id", `String node.network_id)
+        ; ("node_id", `String node.node_id)
+        ]
       in
       let%bind () =
         match%map
@@ -84,6 +94,7 @@ module Node = struct
       ; node_type = node_info.node_type
       ; password = "naughty blue worm"
       ; graphql_uri = Option.value node_info.graphql_uri ~default:""
+      ; should_be_running = false (* TODO: check if it should be false *)
       }
 
     open Network_deployed
@@ -292,8 +303,9 @@ let snark_workers { snark_workers; _ } = snark_workers
 
 let archive_nodes { archive_nodes; _ } = archive_nodes
 
-(* all_nodes returns all *actual* mina nodes; note that a snark_worker is a pod within the network but not technically a mina node, therefore not included here.  snark coordinators on the other hand ARE mina nodes *)
-let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
+(* all_mina_nodes returns all *actual* mina nodes; that is, any node running an actual mina daemon. Note that a snark_worker is a node within the network but not technically a *mina* node because it runs no mina daemon, therefore not included here. snark_coordinators on the other hand are mina nodes running actual mina daemons. *)
+let all_mina_nodes
+    { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
   List.concat
     [ Core.String.Map.to_alist seeds
     ; Core.String.Map.to_alist block_producers
@@ -302,7 +314,9 @@ let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
     ]
   |> Core.String.Map.of_alist_exn
 
-let all_pods t =
+(* all_nodes returns everything in the network.  Remember that snark_workers will never initialize and will never sync, and aren't supposed to. *)
+(* TODO snark workers and snark coordinators have the same key name, but different workload ids*)
+let all_nodes t =
   List.concat
     [ Core.String.Map.to_alist t.seeds
     ; Core.String.Map.to_alist t.block_producers
@@ -312,8 +326,8 @@ let all_pods t =
     ]
   |> Core.String.Map.of_alist_exn
 
-(* all_non_seed_pods returns everything in the network except seed nodes *)
-let all_non_seed_pods t =
+(* all_non_seed_nodes returns everything in the network except seed nodes *)
+let all_non_seed_nodes t =
   List.concat
     [ Core.String.Map.to_alist t.block_producers
     ; Core.String.Map.to_alist t.snark_coordinators
@@ -325,7 +339,7 @@ let all_non_seed_pods t =
 let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
 
 let all_node_id t =
-  let pods = all_pods t |> Core.Map.to_alist in
-  List.fold pods ~init:[] ~f:(fun acc (_, node) -> node.node_id :: acc)
+  let nodes = all_nodes t |> Core.Map.to_alist in
+  List.fold nodes ~init:[] ~f:(fun acc (_, node) -> node.node_id :: acc)
 
 let[@warning "-27"] initialize_infra ~logger network = Malleable_error.return ()
