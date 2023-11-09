@@ -1,13 +1,22 @@
 package itn_orchestrator
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
+	"os"
+	"os/exec"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
+
+	logging "github.com/ipfs/go-log/v2"
 )
 
 type WaitParams struct {
@@ -204,4 +213,117 @@ func selectNodes(tps, minTps float64, nodes []NodeAddress) (float64, []NodeAddre
 		nodes[i], nodes[j] = nodes[j], nodes[i]
 	})
 	return tps / nodesF, nodes[:nodesMax]
+}
+
+func retryOnMultipleServers(servers []string, serverIx int, commandName string, log logging.StandardLogger, try func(string) error) (err error) {
+	server := ""
+	if len(servers) > 0 {
+		server = servers[serverIx]
+	}
+	for retryPause := 1; retryPause <= 16; retryPause = retryPause * 2 {
+		err = try(server)
+		if err == nil {
+			break
+		}
+		if retryPause <= 8 {
+			log.Warnf("Failed to run %s command, retrying in %d minutes: %s", commandName, retryPause, err)
+			time.Sleep(time.Duration(retryPause) * time.Minute)
+		}
+		if len(servers) > 0 {
+			serverIx = (serverIx + 1) % len(servers)
+			server = servers[serverIx]
+		}
+	}
+	return
+}
+
+func listKeyfiles(dir string) ([]string, error) {
+	keyFiles := []string{}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range entries {
+		fname := e.Name()
+		if strings.HasSuffix(fname, ".pub") {
+			continue
+		}
+		keyFiles = append(keyFiles, dir+string(os.PathSeparator)+fname)
+	}
+	return keyFiles, nil
+}
+
+var pow10s []uint64
+
+func init() {
+	pow10s = []uint64{1, 10, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8}
+}
+
+func parseMina(str string) (uint64, error) {
+	ix := strings.IndexRune(str, '.')
+	if ix == -1 {
+		u, err := strconv.ParseUint(str, 10, 64)
+		return u * 1e9, err
+	}
+	var base uint64
+	{
+		var err error
+		if base, err = strconv.ParseUint(str[:ix], 10, 64); err != nil {
+			return 0, err
+		}
+	}
+	base *= 1e9
+	remlen := len(str) - ix - 1
+	if remlen == 0 {
+		return base, nil
+	}
+	if remlen > 9 {
+		return 0, errors.New("too many digits after . in mina amount")
+	}
+	var rem uint64
+	{
+		var err error
+		if rem, err = strconv.ParseUint(str[ix+1:], 10, 64); err != nil {
+			return 0, err
+		}
+	}
+	rem *= pow10s[9-remlen]
+	return base + rem, nil
+}
+
+func execMina(ctx context.Context, minaExec string, args, env []string) error {
+	ctx, cancelF := context.WithCancel(ctx)
+	defer cancelF()
+	cmd := exec.CommandContext(ctx, minaExec, args...)
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	cmd.Env = env
+	return cmd.Run()
+}
+
+func execScanMina(ctx context.Context, minaExec string, args, env []string, scan func(*bufio.Scanner) error) error {
+	ctx, cancelF := context.WithCancel(ctx)
+	defer cancelF()
+	cmd := exec.CommandContext(ctx, minaExec, args...)
+	var stdout io.ReadCloser
+	{
+		var err error
+		if stdout, err = cmd.StdoutPipe(); err != nil {
+			return err
+		}
+	}
+	cmd.Stderr = os.Stderr
+	cmd.Env = env
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(stdout)
+	scanner.Split(bufio.ScanWords)
+	if err := scan(scanner); err != nil {
+		return err
+	}
+	if err := stdout.Close(); err != nil {
+		return err
+	}
+	return cmd.Wait()
 }

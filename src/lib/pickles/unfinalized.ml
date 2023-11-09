@@ -87,7 +87,7 @@ module Constant = struct
          Plonk_checks.scalars_env
            (module Env_bool)
            (module Env_field)
-           ~srs_length_log2:Common.Max_degree.wrap_log2
+           ~srs_length_log2:Common.Max_degree.wrap_log2 ~zk_rows:3
            ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
            ~field_of_hex:
              (Core_kernel.Fn.compose Tock.Field.of_bigint (fun x ->
@@ -126,7 +126,6 @@ let typ ~wrap_rounds:_ : (t, Constant.t) Typ.t =
     (module Impl)
     (Shifted_value.typ Other_field.typ)
     ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
-    ~zero:Common.Lookup_parameters.tick_zero
 
 let dummy : unit -> t =
   Memo.unit (fun () ->

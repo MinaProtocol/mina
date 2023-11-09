@@ -120,7 +120,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (List.filter
               ~f:(fun n ->
                 String.(Network.Node.id n <> Network.Node.id first_bp) )
-              (Core.String.Map.data (Network.all_nodes network)) ) )
+              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
     in
     let keymap =
       List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
@@ -142,7 +142,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
-                     ; account = Nonce (Account.Nonce.of_int 1)
+                     ; account =
+                         Zkapp_precondition.Account.nonce
+                           (Account.Nonce.of_int 1)
                      ; valid_while = Ignore
                      } )
                 []
@@ -167,7 +169,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
-                     ; account = Nonce (Account.Nonce.of_int 2)
+                     ; account =
+                         Zkapp_precondition.Account.nonce
+                           (Account.Nonce.of_int 2)
                      ; valid_while = Ignore
                      } )
                 []

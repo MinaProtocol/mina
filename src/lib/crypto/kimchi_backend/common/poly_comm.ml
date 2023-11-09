@@ -128,7 +128,9 @@ module Make (Inputs : Inputs_intf) = struct
         `Without_degree_bound
           (Array.map unshifted ~f:(function
             | Infinity ->
-                assert false
+                failwith
+                  "Pickles cannot handle point at infinity. Commitments must \
+                   be representable in affine coordinates"
             | Finite (x, y) ->
                 (x, y) ) )
     | _ ->

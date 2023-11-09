@@ -27,25 +27,24 @@ module Account_update_under_construction = struct
         let default =
           var_of_t
             (Account_update.Account_precondition.typ ())
-            (Full
-               { balance = Ignore
-               ; nonce = Ignore
-               ; receipt_chain_hash = Ignore
-               ; delegate = Ignore
-               ; state =
-                   [ Ignore
-                   ; Ignore
-                   ; Ignore
-                   ; Ignore
-                   ; Ignore
-                   ; Ignore
-                   ; Ignore
-                   ; Ignore
-                   ]
-               ; action_state = Ignore
-               ; proved_state = Ignore
-               ; is_new = Ignore
-               } )
+            { balance = Ignore
+            ; nonce = Ignore
+            ; receipt_chain_hash = Ignore
+            ; delegate = Ignore
+            ; state =
+                [ Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ]
+            ; action_state = Ignore
+            ; proved_state = Ignore
+            ; is_new = Ignore
+            }
         in
         let proved_state =
           (* TODO: This is not great. *)
@@ -750,7 +749,7 @@ module Deploy_account_update = struct
     ; preconditions =
         { Account_update.Preconditions.network =
             Zkapp_precondition.Protocol_state.accept
-        ; account = Accept
+        ; account = Zkapp_precondition.Account.accept
         ; valid_while = Ignore
         }
     ; authorization_kind = Signature

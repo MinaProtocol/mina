@@ -1,5 +1,3 @@
-open Pickles_types
-
 val wrap_domains : proofs_verified:int -> Import.Domains.Stable.V2.t
 
 val actual_wrap_domain_size :
@@ -15,7 +13,7 @@ val actual_wrap_domain_size :
 val when_profiling : 'a -> 'a -> 'a
 
 (** [time label f] times function [f] and prints the measured time to [stdout]
-    prepended with [label], when profiling is set (see {!val:when_profiling}). 
+    prepended with [label], when profiling is set (see {!val:when_profiling}).
 
     Otherwise, it just runs [f].
  *)
@@ -38,22 +36,22 @@ val bits_to_bytes : bool list -> string
 val finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a
 
 val ft_comm :
-     add:('a -> 'a -> 'a)
-  -> scale:('a -> 'b -> 'a)
-  -> endoscale:('a -> 'c -> 'a)
-  -> negate:('a -> 'a)
-  -> verification_key:'a Pickles_types.Plonk_verification_key_evals.t
+     add:('comm -> 'comm -> 'comm)
+  -> scale:('comm -> 'scalar -> 'comm)
+  -> endoscale:('comm -> 'c -> 'comm)
+  -> negate:('comm -> 'comm)
+  -> verification_key:'comm array Pickles_types.Plonk_verification_key_evals.t
   -> alpha:'c
   -> plonk:
        ( 'd
        , 'e
-       , 'b
+       , 'scalar
        , 'g
        , 'f
        , 'bool )
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
-  -> t_comm:'a array
-  -> 'a
+  -> t_comm:'comm array
+  -> 'comm
 
 val dlog_pcs_batch :
      'total Pickles_types.Nat.t
@@ -98,6 +96,7 @@ module Lookup_parameters : sig
   val tock_zero : (Impls.Wrap.Field.t, Impls.Wrap.Field.t) zero_value
 end
 
+(** Inner Product Argument *)
 module Ipa : sig
   type 'a challenge :=
     ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -146,7 +145,7 @@ end
 
 val hash_messages_for_next_step_proof :
      app_state:('a -> Kimchi_pasta.Basic.Fp.Stable.Latest.t Core_kernel.Array.t)
-  -> ( Backend.Tock.Curve.Affine.t
+  -> ( Backend.Tock.Curve.Affine.t array
      , 'a
      , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
          * Kimchi_pasta.Basic.Fp.Stable.Latest.t
@@ -160,7 +159,6 @@ val hash_messages_for_next_step_proof :
 
 val tick_public_input_of_statement :
      max_proofs_verified:'a Pickles_types.Nat.t
-  -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> ( ( ( Impls.Step.Challenge.Constant.t
          , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
          , Impls.Step.Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
