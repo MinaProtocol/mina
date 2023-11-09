@@ -14,6 +14,10 @@ module Test_inputs = struct
 
   module Ledger_proof = struct
     type t = Fee.t [@@deriving hash, compare, sexp]
+
+    module Cache_tag = struct
+      type t = Fee.t [@@deriving hash, compare, sexp]
+    end
   end
 
   module Transaction_snark_work = struct

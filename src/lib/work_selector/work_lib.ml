@@ -27,7 +27,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
     type t =
       { mutable available_jobs :
-          (Inputs.Transaction_witness.t, Inputs.Ledger_proof.t) Work_spec.t
+          ( Inputs.Transaction_witness.t
+          , Inputs.Ledger_proof.Cache_tag.t )
+          Work_spec.t
           One_or_two.t
           list
       ; mutable jobs_seen : Job_status.t Seen_key.Map.t

@@ -63,15 +63,27 @@ module type Work_S = sig
 
   type ledger_proof
 
+  type ledger_proof_cache_tag
+
   module Single : sig
     module Spec : sig
       type t = (Transaction_witness.t, ledger_proof) Work.Single.Spec.t
       [@@deriving sexp, yojson]
+
+      module Cache_tag : sig
+        type t =
+          (Transaction_witness.t, ledger_proof_cache_tag) Work.Single.Spec.t
+        [@@deriving sexp, yojson]
+      end
     end
   end
 
   module Spec : sig
     type t = Single.Spec.t Work.Spec.t [@@deriving sexp, yojson]
+
+    module Cache_tag : sig
+      type t = Single.Spec.Cache_tag.t Work.Spec.t [@@deriving sexp, yojson]
+    end
   end
 
   module Result : sig
@@ -129,7 +141,12 @@ end
 module type S0 = sig
   type ledger_proof
 
-  module Work : Work_S with type ledger_proof := ledger_proof
+  type ledger_proof_cache_tag
+
+  module Work :
+    Work_S
+      with type ledger_proof := ledger_proof
+       and type ledger_proof_cache_tag := ledger_proof_cache_tag
 
   module Rpcs : sig
     module Get_work :
@@ -151,7 +168,9 @@ module type S0 = sig
   end
 
   val command_from_rpcs :
-       (module Rpcs_versioned_S with type Work.ledger_proof = ledger_proof)
+       (module Rpcs_versioned_S
+          with type Work.ledger_proof = ledger_proof
+           and type Work.ledger_proof_cache_tag = ledger_proof_cache_tag )
     -> Command.t
 
   val arguments :
@@ -166,7 +185,9 @@ module type S = sig
   include S0
 
   module Rpcs_versioned :
-    Rpcs_versioned_S with type Work.ledger_proof = ledger_proof
+    Rpcs_versioned_S
+      with type Work.ledger_proof = ledger_proof
+       and type Work.ledger_proof_cache_tag = ledger_proof_cache_tag
 
   val command : Command.t
 end

@@ -17,6 +17,8 @@ module Worker = struct
     module Work = struct
       type ledger_proof = Inputs.Ledger_proof.t
 
+      type ledger_proof_cache_tag = Inputs.Ledger_proof.Cache_tag.t
+
       include Work
     end
 

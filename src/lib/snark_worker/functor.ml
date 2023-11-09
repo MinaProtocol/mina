@@ -58,7 +58,9 @@ type Structured_log_events.t +=
       }]
 
 module Make (Inputs : Intf.Inputs_intf) :
-  Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
+  Intf.S0
+    with type ledger_proof := Inputs.Ledger_proof.t
+     and type ledger_proof_cache_tag := Inputs.Ledger_proof.Cache_tag.t = struct
   open Inputs
   module Rpcs = Rpcs.Make (Inputs)
 
@@ -75,6 +77,12 @@ module Make (Inputs : Intf.Inputs_intf) :
               w.Transaction_witness.transaction )
 
         let statement = Work.Single.Spec.statement
+
+        module Cache_tag = struct
+          type t =
+            (Transaction_witness.t, Ledger_proof.Cache_tag.t) Work.Single.Spec.t
+          [@@deriving sexp, yojson]
+        end
       end
     end
 
@@ -82,12 +90,16 @@ module Make (Inputs : Intf.Inputs_intf) :
       type t = Single.Spec.t Work.Spec.t [@@deriving sexp, yojson]
 
       let instances = Work.Spec.instances
+
+      module Cache_tag = struct
+        type t = Single.Spec.Cache_tag.t Work.Spec.t [@@deriving sexp, yojson]
+      end
     end
 
     module Result = struct
       type t = (Spec.t, Ledger_proof.t) Work.Result.t
 
-      let transactions (t : t) =
+      let transactions (t : (Spec.t, _) Work.Result.t) =
         One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
     end
   end
@@ -344,7 +356,9 @@ module Make (Inputs : Intf.Inputs_intf) :
 
   let command_from_rpcs
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
+        with type Work.ledger_proof = Inputs.Ledger_proof.t
+         and type Work.ledger_proof_cache_tag = Inputs.Ledger_proof.Cache_tag.t
+      ) =
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =

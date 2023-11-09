@@ -416,9 +416,9 @@ module For_tests = struct
         |> Blockchain_state.ledger_proof_statement
       in
       let ledger_proof_statement =
-        Option.value_map ledger_proof_opt
-          ~f:(fun (proof, _) -> Ledger_proof.statement proof)
-          ~default:previous_ledger_proof_stmt
+        Option.value_map ledger_proof_opt ~default:previous_ledger_proof_stmt
+          ~f:(fun (proof, _) ->
+            Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof )
       in
       let genesis_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state

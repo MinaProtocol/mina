@@ -6,7 +6,11 @@ module type Selection_method_intf =
     with type snark_pool := Network_pool.Snark_pool.t
      and type staged_ledger := Staged_ledger.t
      and type work :=
-      (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+      ( Transaction_witness.t
+      , Ledger_proof.Cache_tag.t )
+      Snark_work_lib.Work.Single.Spec.t
+     and type 'a work_poly :=
+      (Transaction_witness.t, 'a) Snark_work_lib.Work.Single.Spec.t
      and type transition_frontier := Transition_frontier.t
      and module State := State
 

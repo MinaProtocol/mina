@@ -30,6 +30,12 @@ module Single = struct
 
     let statement = function Transition (s, _) -> s | Merge (s, _, _) -> s
 
+    let map_proof ~f = function
+      | Transition (stmt, witness) ->
+          Transition (stmt, witness)
+      | Merge (stmt, p1, p2) ->
+          Merge (stmt, f p1, f p2)
+
     let gen :
            'witness Quickcheck.Generator.t
         -> 'ledger_proof Quickcheck.Generator.t
@@ -81,6 +87,9 @@ module Spec = struct
   type 'single t = 'single Stable.Latest.t =
     { instances : 'single One_or_two.t; fee : Currency.Fee.t }
   [@@deriving fields, sexp, yojson]
+
+  let map ~f { instances; fee } =
+    { instances = One_or_two.map ~f instances; fee }
 end
 
 module Result = struct

@@ -523,7 +523,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
             |> Lazy.force |> Mina_ledger.Ledger.merkle_root
             |> Frozen_ledger_hash.of_ledger_hash )
     | Some (proof, _) ->
-        target_hash_of_ledger_proof proof
+        target_hash_of_ledger_proof (Ledger_proof.Cache_tag.unwrap proof)
   in
   let maybe_errors =
     Option.all

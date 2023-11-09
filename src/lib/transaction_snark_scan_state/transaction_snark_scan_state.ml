@@ -72,7 +72,7 @@ end
 
 module Available_job = struct
   type t =
-    ( Ledger_proof_with_sok_message.t
+    ( Ledger_proof.Cache_tag.t * Sok_message.t
     , Transaction_with_witness.t )
     Parallel_scan.Available_job.t
   [@@deriving sexp]
@@ -154,47 +154,100 @@ type job = Available_job.t [@@deriving sexp]
 (*Scan state and any zkapp updates that were applied to the to the most recent
    snarked ledger but are from the tree just before the tree corresponding to
    the snarked ledger*)
-[%%versioned
+module Repr = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t =
+        { scan_state :
+            ( Ledger_proof_with_sok_message.Stable.V2.t
+            , Transaction_with_witness.Stable.V2.t )
+            Parallel_scan.State.Stable.V1.t
+        ; previous_incomplete_zkapp_updates :
+            Transaction_with_witness.Stable.V2.t list
+            * [ `Border_block_continued_in_the_next_tree of bool ]
+        }
+      [@@deriving sexp]
+
+      let to_latest = Fn.id
+
+      let hash (t : t) =
+        let state_hash =
+          Parallel_scan.State.hash t.scan_state
+            (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
+            (Binable.to_string (module Transaction_with_witness.Stable.V2))
+        in
+        let ( previous_incomplete_zkapp_updates
+            , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
+          t.previous_incomplete_zkapp_updates
+        in
+        let incomplete_updates =
+          List.fold ~init:"" previous_incomplete_zkapp_updates ~f:(fun acc t ->
+              acc
+              ^ Binable.to_string (module Transaction_with_witness.Stable.V2) t )
+          |> Digestif.SHA256.digest_string
+        in
+        let continue_in_next_tree =
+          Digestif.SHA256.digest_string (Bool.to_string continue_in_next_tree)
+        in
+        Staged_ledger_hash.Aux_hash.of_sha256
+          Digestif.SHA256.(
+            digest_string
+              ( to_raw_string state_hash
+              ^ to_raw_string incomplete_updates
+              ^ to_raw_string continue_in_next_tree ))
+    end
+  end]
+
+  [%%define_locally Stable.Latest.(hash)]
+end
+
+[%%versioned_binable
 module Stable = struct
   module V2 = struct
     type t =
       { scan_state :
-          ( Ledger_proof_with_sok_message.Stable.V2.t
-          , Transaction_with_witness.Stable.V2.t )
-          Parallel_scan.State.Stable.V1.t
+          ( Ledger_proof.Cache_tag.t * Sok_message.t
+          , Transaction_with_witness.t )
+          Parallel_scan.State.t
       ; previous_incomplete_zkapp_updates :
-          Transaction_with_witness.Stable.V2.t list
+          Transaction_with_witness.t list
           * [ `Border_block_continued_in_the_next_tree of bool ]
       }
     [@@deriving sexp]
 
+    let to_repr ({ scan_state; previous_incomplete_zkapp_updates } : t) : Repr.t
+        =
+      { scan_state =
+          Parallel_scan.State.map
+            ~f1:(fun (p, m) -> (Ledger_proof.Cache_tag.unwrap p, m))
+            ~f2:Fn.id scan_state
+      ; previous_incomplete_zkapp_updates
+      }
+
+    let of_repr ({ scan_state; previous_incomplete_zkapp_updates } : Repr.t) : t
+        =
+      { scan_state =
+          Parallel_scan.State.map
+            ~f1:(fun (p, m) -> (Ledger_proof.Cache_tag.generate p, m))
+            ~f2:Fn.id scan_state
+      ; previous_incomplete_zkapp_updates
+      }
+
+    include
+      Binable.Of_binable
+        (Repr.Stable.V2)
+        (struct
+          type nonrec t = t
+
+          let to_binable = to_repr
+
+          let of_binable = of_repr
+        end)
+
     let to_latest = Fn.id
 
-    let hash (t : t) =
-      let state_hash =
-        Parallel_scan.State.hash t.scan_state
-          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
-          (Binable.to_string (module Transaction_with_witness.Stable.V2))
-      in
-      let ( previous_incomplete_zkapp_updates
-          , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
-        t.previous_incomplete_zkapp_updates
-      in
-      let incomplete_updates =
-        List.fold ~init:"" previous_incomplete_zkapp_updates ~f:(fun acc t ->
-            acc
-            ^ Binable.to_string (module Transaction_with_witness.Stable.V2) t )
-        |> Digestif.SHA256.digest_string
-      in
-      let continue_in_next_tree =
-        Digestif.SHA256.digest_string (Bool.to_string continue_in_next_tree)
-      in
-      Staged_ledger_hash.Aux_hash.of_sha256
-        Digestif.SHA256.(
-          digest_string
-            ( to_raw_string state_hash
-            ^ to_raw_string incomplete_updates
-            ^ to_raw_string continue_in_next_tree ))
+    let hash (t : t) = Repr.hash (to_repr t)
   end
 end]
 
@@ -297,18 +350,23 @@ let create_expected_statement ~constraint_constants
   }
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
-    Ledger_proof_with_sok_message.t Or_error.t =
+    (Ledger_proof.Cache_tag.t * Sok_message.t) Or_error.t =
   let sok_digest = Ledger_proof.sok_digest current_proof
   and proof = Ledger_proof.underlying_proof current_proof in
   match job with
   | Base { statement; _ } ->
-      let ledger_proof = Ledger_proof.create ~statement ~sok_digest ~proof in
+      let ledger_proof =
+        Ledger_proof.Cache_tag.generate
+        @@ Ledger_proof.create ~statement ~sok_digest ~proof
+      in
       Ok (ledger_proof, Sok_message.create ~fee ~prover)
   | Merge ((p, _), (p', _)) ->
       let open Or_error.Let_syntax in
-      let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
+      let s = Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p
+      and s' = Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p' in
       let%map statement = Transaction_snark.Statement.merge s s' in
-      ( Ledger_proof.create ~statement ~sok_digest ~proof
+      ( Ledger_proof.Cache_tag.generate
+        @@ Ledger_proof.create ~statement ~sok_digest ~proof
       , Sok_message.create ~fee ~prover )
 
 let total_proofs (works : Transaction_snark_work.t list) =
@@ -317,7 +375,7 @@ let total_proofs (works : Transaction_snark_work.t list) =
 (*************exposed functions*****************)
 
 module P = struct
-  type t = Ledger_proof_with_sok_message.t
+  type t = Ledger_proof.Cache_tag.t * Sok_message.t
 end
 
 module Make_statement_scanner (Verifier : sig
@@ -446,16 +504,22 @@ struct
     let fold_step_a (acc_statement, acc_pc) job =
       match job with
       | Parallel_scan.Merge.Job.Part (proof, message) ->
-          let statement = Ledger_proof.statement proof in
           let%map acc_stmt =
+            let statement =
+              Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof
+            in
             merge_acc ~proofs:[ (proof, message) ] acc_statement statement
           in
           (acc_stmt, acc_pc)
       | Empty | Full { status = Parallel_scan.Job_status.Done; _ } ->
           return (acc_statement, acc_pc)
       | Full { left = proof_1, message_1; right = proof_2, message_2; _ } ->
-          let stmt1 = Ledger_proof.statement proof_1 in
-          let stmt2 = Ledger_proof.statement proof_2 in
+          let stmt1 =
+            Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof_1
+          in
+          let stmt2 =
+            Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof_2
+          in
           let%bind merged_statement =
             Timer.time timer (sprintf "merge:%s" __LOC__) (fun () ->
                 Deferred.return (Transaction_snark.Statement.merge stmt1 stmt2) )
@@ -642,8 +706,8 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
       Some statement
   | Merge ((p1, _), (p2, _)) ->
       Transaction_snark.Statement.merge
-        (Ledger_proof.statement p1)
-        (Ledger_proof.statement p2)
+        (Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p1)
+        (Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p2)
       |> Result.ok
 
 let create ~work_delay ~transaction_capacity_log_2 : t =
@@ -1220,8 +1284,8 @@ let extract_from_job (job : job) =
 
 let snark_job_list_json t =
   let all_jobs : Job_view.t list list =
-    let fa (a : Ledger_proof_with_sok_message.t) =
-      Ledger_proof.statement (fst a)
+    let fa (a : Ledger_proof.Cache_tag.t * Sok_message.t) =
+      Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap (fst a)
     in
     let fd (d : Transaction_with_witness.t) = d.statement in
     Parallel_scan.view_jobs_with_position t.scan_state fa fd
@@ -1266,7 +1330,9 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
 
 let all_work_pairs t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
-    (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+    ( Transaction_witness.t
+    , Ledger_proof.Cache_tag.t )
+    Snark_work_lib.Work.Single.Spec.t
     One_or_two.t
     list
     Or_error.t =
@@ -1312,8 +1378,8 @@ let all_work_pairs t
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge
-            (Ledger_proof.statement p1)
-            (Ledger_proof.statement p2)
+            (Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p1)
+            (Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p2)
         in
         Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
   in
@@ -1338,7 +1404,7 @@ let update_metrics t = Parallel_scan.update_metrics t.scan_state
 let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
   let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
-      : (Ledger_proof.t * Sok_message.t) list Or_error.t =
+      : (Ledger_proof.Cache_tag.t * Sok_message.t) list Or_error.t =
     let next_jobs =
       List.(
         take
@@ -1380,14 +1446,16 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
              } ) )
       proof_opt
       ~f:(fun ((proof, _), _txns_with_witnesses) ->
-        let curr_stmt = Ledger_proof.statement proof in
+        let curr_stmt =
+          Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof
+        in
         let prev_stmt, incomplete_zkapp_updates_from_old_proof =
           Option.value_map
             ~default:
               (curr_stmt, ([], `Border_block_continued_in_the_next_tree false))
             old_proof_and_incomplete_zkapp_updates
             ~f:(fun ((p', _), incomplete_zkapp_updates_from_old_proof) ->
-              ( Ledger_proof.statement p'
+              ( Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p'
               , incomplete_zkapp_updates_from_old_proof ) )
         in
         (*prev_target is connected to curr_source- Order of the arguments is

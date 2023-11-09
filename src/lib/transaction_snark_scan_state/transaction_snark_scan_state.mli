@@ -48,7 +48,7 @@ module Make_statement_scanner (Verifier : sig
 
   val verify :
        verifier:t
-    -> Ledger_proof_with_sok_message.t list
+    -> (Ledger_proof.Cache_tag.t * Sok_message.t) list
     -> unit Or_error.t Deferred.Or_error.t
 end) : sig
   val scan_statement :
@@ -97,7 +97,7 @@ val fill_work_and_enqueue_transactions :
   -> logger:Logger.t
   -> Transaction_with_witness.t list
   -> Transaction_snark_work.t list
-  -> ( ( Ledger_proof.t
+  -> ( ( Ledger_proof.Cache_tag.t
        * ( Transaction.t With_status.t
          * State_hash.t
          * Mina_numbers.Global_slot_since_genesis.t )
@@ -109,7 +109,7 @@ val fill_work_and_enqueue_transactions :
 
 val latest_ledger_proof :
      t
-  -> ( Ledger_proof_with_sok_message.t
+  -> ( (Ledger_proof.Cache_tag.t * Sok_message.t)
      * ( Transaction.t With_status.t
        * State_hash.t
        * Mina_numbers.Global_slot_since_genesis.t )
@@ -266,7 +266,9 @@ val check_required_protocol_states :
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+  -> ( Transaction_witness.t
+     , Ledger_proof.Cache_tag.t )
+     Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
      Or_error.t

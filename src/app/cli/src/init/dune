@@ -121,6 +121,8 @@
    string_sign
    zkapp_command_builder
    internal_tracing
+   transaction_witness
+   ledger_proof
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh
