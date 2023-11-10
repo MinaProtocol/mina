@@ -15,31 +15,39 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let _num_extra_keys = 1000
+  let num_extra_keys = 100
 
   let slot_tx_end = Mina_compile_config.slot_tx_end
 
   let slot_chain_end = Mina_compile_config.slot_chain_end
+
+  let sender_account_prefix = "sender-account-"
 
   let config =
     let open Test_config in
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { Test_Account.account_name = "bp-1-key"
+        [ { Test_Account.account_name = "bp-receiver-key"
           ; balance = "9999999"
           ; timing = Untimed
           }
-        ; { account_name = "bp-2-key"; balance = "9999999"; timing = Untimed }
+        ; { account_name = "bp-sender-key-1"; balance = "0"; timing = Untimed }
+        ; { account_name = "bp-sender-key-2"; balance = "0"; timing = Untimed }
+        ; { account_name = "bp-sender-key-3"; balance = "0"; timing = Untimed }
         ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
-        ; { account_name = "receiver-key"; balance = "0"; timing = Untimed }
-        ; { account_name = "sender-key"; balance = "9999999"; timing = Untimed }
-        ; { account_name = "fish-key"; balance = "100"; timing = Untimed }
         ]
+        @ List.init num_extra_keys ~f:(fun i ->
+              { Test_Account.account_name =
+                  sprintf "%s-%d" sender_account_prefix i
+              ; balance = "1000"
+              ; timing = Untimed
+              } )
     ; block_producers =
-        [ { node_name = "bp-1"; account_name = "bp-1-key" }
-        ; { node_name = "bp-2"; account_name = "bp-2-key" }
-        ; { node_name = "fish"; account_name = "fish-key" }
+        [ { node_name = "bp-receiver"; account_name = "bp-receiver-key" }
+        ; { node_name = "bp-sender-1"; account_name = "bp-sender-key-1" }
+        ; { node_name = "bp-sender-2"; account_name = "bp-sender-key-2" }
+        ; { node_name = "bp-sender-3"; account_name = "bp-sender-key-3" }
         ]
     ; snark_coordinator =
         Some
@@ -48,7 +56,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; worker_nodes = 4
           }
     ; txpool_max_size = 10_000_000
-    ; snark_worker_fee = "0.0001"
+    ; snark_worker_fee = "0.0002"
+    ; num_archive_nodes = 0
     ; proof_config =
         { proof_config_default with
           work_delay = Some 1
@@ -61,7 +70,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let amount = Currency.Amount.of_int 10_000_000
 
-  let tx_delay_ms = 500
+  let tx_delay_ms = 5000
 
   let run network t =
     let open Malleable_error.Let_syntax in
@@ -78,12 +87,33 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         | Some slot, None | None, Some slot | Some _, Some slot ->
             Mina_numbers.Global_slot.to_int slot + 5
       in
-      let fish = String.Map.find_exn (Network.block_producers network) "fish" in
-      let%bind fish_pub_key = pub_key_of_node fish in
-      let fish_kp =
-        String.Map.find_exn (Network.genesis_keypairs network) "sender-key"
+      let receiver =
+        String.Map.find_exn (Network.block_producers network) "bp-receiver"
       in
-      let fish_priv_key = fish_kp.keypair.private_key in
+      let%bind receiver_pub_key = pub_key_of_node receiver in
+      let bp_senders =
+        String.Map.remove (Network.block_producers network) "bp-receiver"
+        |> String.Map.data
+      in
+      let sender_kps =
+        String.Map.fold (Network.genesis_keypairs network) ~init:[]
+          ~f:(fun ~key ~data acc ->
+            if String.is_prefix key ~prefix:sender_account_prefix then
+              data :: acc
+            else acc )
+      in
+      let sender_priv_keys =
+        List.map sender_kps ~f:(fun kp -> kp.keypair.private_key)
+      in
+      let pk_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
+      [%log info] "receiver: %s" (pk_to_string receiver_pub_key) ;
+      let%bind () =
+        Malleable_error.List.iter sender_kps ~f:(fun s ->
+            let pk =
+              s.keypair.public_key |> Signature_lib.Public_key.compress
+            in
+            return ([%log info] "sender: %s" (pk_to_string pk)) )
+      in
       let window_ms =
         (Network.constraint_constants network).block_window_duration_ms
       in
@@ -105,15 +135,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (let num_payments = num_slots * window_ms / tx_delay_ms in
            let repeat_count = Unsigned.UInt32.of_int num_payments in
            let repeat_delay_ms = Unsigned.UInt32.of_int tx_delay_ms in
-           let keys_per_sender = 1 in
+           let num_sender_keys = List.length sender_priv_keys in
+           let n_bp_senders = List.length bp_senders in
+           let keys_per_sender = num_sender_keys / n_bp_senders in
            [%log info]
              "will now send %d payments from as many accounts.  %d nodes will \
               send %d payments each from distinct keys"
-             num_payments 1 keys_per_sender ;
-           Integration_test_lib.Graphql_requests.must_send_test_payments
-             ~repeat_count ~repeat_delay_ms ~logger ~senders:[ fish_priv_key ]
-             ~receiver_pub_key:fish_pub_key ~amount ~fee
-             (Network.Node.get_ingress_uri fish) )
+             num_payments n_bp_senders keys_per_sender ;
+           Malleable_error.List.fold ~init:sender_priv_keys bp_senders
+             ~f:(fun keys node ->
+               let keys0, rest = List.split_n keys keys_per_sender in
+               Integration_test_lib.Graphql_requests.must_send_test_payments
+                 ~repeat_count ~repeat_delay_ms ~logger ~senders:keys0
+                 ~receiver_pub_key ~amount ~fee
+                 (Network.Node.get_ingress_uri node)
+               >>| const rest )
+           >>| const () )
       in
       let%bind () =
         section "wait for payments to be processed"
@@ -140,13 +177,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let ok_if_true s =
         Malleable_error.ok_if_true ~error:(Error.of_string s) ~error_type:`Soft
       in
-
       section "checked produced blocks"
         (let%bind blocks =
            Integration_test_lib.Graphql_requests
            .must_get_best_chain_for_slot_end_test ~max_length:(2 * num_slots)
              ~logger
-             (Network.Node.get_ingress_uri fish)
+             (Network.Node.get_ingress_uri receiver)
          in
          let%bind () =
            Malleable_error.List.iter blocks ~f:(fun block ->
