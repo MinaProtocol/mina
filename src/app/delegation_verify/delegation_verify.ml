@@ -2,19 +2,6 @@ open Mina_base
 open Core
 open Async
 
-type error =
-  [ `Path_is_invalid
-  | `Fail_to_load_metadata
-  | `Fail_to_decode_metadata of string
-  | `Fail_to_load_block
-  | `Fail_to_decode_block
-  | `Invalid_proof
-  | `Fail_to_decode_snark_work
-  | `Invalid_snark_work
-  ]
-
-let unify_error e = (e :> error)
-
 let get_filenames =
   let open In_channel in
   function
@@ -28,38 +15,33 @@ let verify_block ~verify_blockchain_snarks ~block =
   let open Mina_block.Header in
   verify_blockchain_snarks
     [ (protocol_state header, protocol_state_proof header) ]
-  |> Deferred.Result.map_error ~f:(const `Invalid_proof)
 
 let verify_snark_work ~verify_transaction_snarks ~proof ~message =
   verify_transaction_snarks [ (proof, message) ]
-  |> Deferred.Result.map_error ~f:(const `Invalid_snark_work)
 
-module Validator(Sub : Submission.S) = struct
-  let validate ~no_checks ~verify_blockchain_snarks ~verify_transaction_snarks submission =
+module Validator (Sub : Submission.S) = struct
+  let validate ~no_checks ~verify_blockchain_snarks ~verify_transaction_snarks
+      submission =
     let open Deferred.Result.Let_syntax in
-    let%bind block =
-      Sub.block submission
-      |> Result.map_error ~f:unify_error
-      |> Deferred.return
-    in
+    let%bind block = Sub.block submission |> Deferred.return in
     let%bind () =
       if no_checks then return ()
       else verify_block ~verify_blockchain_snarks ~block
-           |> Deferred.Result.map_error ~f:unify_error
     in
     let%map () =
       if no_checks then return ()
       else
         match Sub.snark_work submission with
         | None ->
-           Deferred.Result.return ()
-        | Some Uptime_service.Proof_data.
-               { proof; proof_time = _; snark_work_fee } ->
-           let message =
-             Mina_base.Sok_message.create ~fee:snark_work_fee ~prover:(Sub.submitter submission)
-           in
-           verify_snark_work ~verify_transaction_snarks ~proof ~message
-           |> Deferred.Result.map_error ~f:unify_error
+            Deferred.Result.return ()
+        | Some
+            Uptime_service.Proof_data.{ proof; proof_time = _; snark_work_fee }
+          ->
+            let message =
+              Mina_base.Sok_message.create ~fee:snark_work_fee
+                ~prover:(Sub.submitter submission)
+            in
+            verify_snark_work ~verify_transaction_snarks ~proof ~message
     in
     let header = Mina_block.header block in
     let protocol_state = Mina_block.Header.protocol_state header in
@@ -70,7 +52,8 @@ module Validator(Sub : Submission.S) = struct
       |> State_hash.State_hashes.state_hash
     , Mina_state.Protocol_state.previous_state_hash protocol_state
     , Consensus.Data.Consensus_state.blockchain_length consensus_state
-    , Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state )
+    , Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state
+    )
 end
 
 type valid_payload =
@@ -144,36 +127,8 @@ let instantiate_verify_functions ~logger = function
       in
       Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
 
-let handle_error = function
-  | `Path_is_invalid ->
-     display_error "path for metadata is invalid" ;
-     exit 1
-  | `Fail_to_load_metadata ->
-     display_error "fail to load metadata" ;
-     exit 2
-  | `Fail_to_decode_metadata e ->
-     display_error ("fail to decode metadata: " ^ e) ;
-     exit 2
-  | `Fail_to_load_block ->
-     display_error "fail to load block" ;
-     exit 3
-  | `Fail_to_decode_block ->
-     display_error "fail to decode block" ;
-     Deferred.unit
-  | `Invalid_proof ->
-     display_error
-       "fail to verify the protocol state proof inside the block" ;
-     Deferred.unit
-  | `Fail_to_decode_snark_work ->
-     display_error "fail to decode snark work" ;
-     Deferred.unit
-  | `Invalid_snark_work ->
-     display_error "fail to verify the snark work" ;
-     Deferred.unit
-
-let command =
-  Command.async
-    ~summary:"A tool for verifying JSON payload submitted by the uptime service"
+let filesystem_command =
+  Command.async ~summary:"Verify submissions and block read from the filesystem"
     Command.Let_syntax.(
       let%map_open block_dir = block_dir_flag
       and inputs = anon (sequence ("filename" %: Filename.arg_type))
@@ -192,7 +147,6 @@ let command =
               ( let open Deferred.Result.Let_syntax in
                 let%bind submission =
                   Submission.JSON.load ~block_dir path
-                  |> Result.map_error ~f:unify_error
                   |> Deferred.return
                 in
                 V.validate ~no_checks ~verify_blockchain_snarks ~verify_transaction_snarks submission)
@@ -201,6 +155,7 @@ let command =
                 display { state_hash; parent; height; slot } ;
                 Deferred.unit
             | Error e ->
-               handle_error e))
+               display_error @@ Error.to_string_hum e ;
+               Deferred.unit))
 
 let () = Async.Command.run command
