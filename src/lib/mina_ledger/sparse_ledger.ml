@@ -43,6 +43,14 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
         ((merkle_root sparse :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) ) ;
   sparse
 
+let sparse_ledger_subset_exn (oledger : t) keys =
+  let ledger = of_root ~depth:(depth oledger) (merkle_root oledger) in
+  List.fold ~init:ledger keys ~f:(fun ledger key ->
+      let index = find_index_exn ledger key in
+      let path = path_exn ledger index in
+      let account = get_exn ledger index in
+      add_path ledger path key account )
+
 let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
   List.fold indexes
     ~init:

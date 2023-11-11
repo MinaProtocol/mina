@@ -26,7 +26,8 @@ let yield_result_every ~n =
 
 module Pre_statement = struct
   type t =
-    { partially_applied_transaction : Ledger.Transaction_partially_applied.t
+    { partially_applied_transaction :
+        Sparse_ledger.T.Transaction_partially_applied.t
     ; expected_status : Transaction_status.t
     ; accounts_accessed : Account_id.t list
     ; fee_excess : Fee_excess.t
@@ -530,10 +531,10 @@ module T = struct
     let%bind fee_excess =
       to_staged_ledger_or_error (Transaction.fee_excess txn)
     in
-    let source_ledger_hash = Ledger.merkle_root ledger in
+    let source_ledger_hash = Sparse_ledger.merkle_root !ledger in
     let ledger_witness =
       O1trace.sync_thread "create_ledger_witness" (fun () ->
-          Sparse_ledger.of_ledger_subset_exn ledger accounts_accessed )
+          Sparse_ledger.sparse_ledger_subset_exn !ledger accounts_accessed )
     in
     let pending_coinbase_target =
       push_coinbase pending_coinbase_stack_state.pc.target txn
@@ -541,12 +542,13 @@ module T = struct
     let new_init_stack =
       push_coinbase pending_coinbase_stack_state.init_stack txn
     in
-    let%map partially_applied_transaction =
+    let%map new_ledger, partially_applied_transaction =
       to_staged_ledger_or_error
-        (Ledger.apply_transaction_first_pass ~constraint_constants ~global_slot
-           ~txn_state_view ledger txn )
+        (Sparse_ledger.apply_transaction_first_pass ~constraint_constants
+           ~global_slot ~txn_state_view !ledger txn )
     in
-    let target_ledger_hash = Ledger.merkle_root ledger in
+    ledger := new_ledger ;
+    let target_ledger_hash = Sparse_ledger.merkle_root !ledger in
     ( { Pre_statement.partially_applied_transaction
       ; expected_status
       ; accounts_accessed
@@ -569,25 +571,27 @@ module T = struct
       state_and_body_hash ~global_slot (pre_stmt : Pre_statement.t) =
     let open Result.Let_syntax in
     let empty_local_state = Mina_state.Local_state.empty () in
-    let second_pass_ledger_source_hash = Ledger.merkle_root ledger in
+    let second_pass_ledger_source_hash = Sparse_ledger.merkle_root !ledger in
     let ledger_witness =
       O1trace.sync_thread "create_ledger_witness" (fun () ->
           (* TODO: for zkapps, we should actually narrow this by segments *)
-          Sparse_ledger.of_ledger_subset_exn ledger pre_stmt.accounts_accessed )
+          Sparse_ledger.sparse_ledger_subset_exn !ledger
+            pre_stmt.accounts_accessed )
     in
-    let%bind applied_txn =
+    let%bind new_ledger, applied_txn =
       to_staged_ledger_or_error
-        (Ledger.apply_transaction_second_pass ledger
+        (Sparse_ledger.apply_transaction_second_pass !ledger
            pre_stmt.partially_applied_transaction )
     in
-    let second_pass_ledger_target_hash = Ledger.merkle_root ledger in
+    ledger := new_ledger ;
+    let second_pass_ledger_target_hash = Sparse_ledger.merkle_root !ledger in
     let%bind supply_increase =
       to_staged_ledger_or_error
-        (Ledger.Transaction_applied.supply_increase applied_txn)
+        (Sparse_ledger.T.Transaction_applied.supply_increase applied_txn)
     in
     let%map () =
       let actual_status =
-        Ledger.Transaction_applied.transaction_status applied_txn
+        Sparse_ledger.T.Transaction_applied.transaction_status applied_txn
       in
       if Transaction_status.equal pre_stmt.expected_status actual_status then
         return ()
@@ -595,7 +599,7 @@ module T = struct
         let txn_with_expected_status =
           { With_status.data =
               With_status.data
-                (Ledger.Transaction_applied.transaction applied_txn)
+                (Sparse_ledger.T.Transaction_applied.transaction applied_txn)
           ; status = pre_stmt.expected_status
           }
         in
@@ -661,7 +665,7 @@ module T = struct
   let apply_transactions_second_pass ~yield ~global_slot ledger
       state_and_body_hash pre_stmts =
     let open Deferred.Result.Let_syntax in
-    let connecting_ledger = Ledger.merkle_root ledger in
+    let connecting_ledger = Sparse_ledger.merkle_root !ledger in
     Mina_stdlib.Deferred.Result.List.map pre_stmts ~f:(fun pre_stmt ->
         let%bind result =
           apply_single_transaction_second_pass ~connecting_ledger ~global_slot
@@ -704,7 +708,7 @@ module T = struct
           in
           apply_first_pass ~yield current_stack2 ts
     in
-    let first_pass_ledger_end = Ledger.merkle_root ledger in
+    let first_pass_ledger_end = Sparse_ledger.merkle_root !ledger in
     let%map txns_with_witnesses =
       apply_transactions_second_pass ~yield ~global_slot ledger
         state_and_body_hash (pre_stmts1 @ pre_stmts2)
@@ -939,7 +943,7 @@ module T = struct
            , []
            , Pending_coinbase.Update.Action.Update_none
            , `Update_none
-           , `First_pass_ledger_end (Ledger.merkle_root ledger) ) ) )
+           , `First_pass_ledger_end (Sparse_ledger.merkle_root !ledger) ) ) )
 
   (*update the pending_coinbase tree with the updated/new stack and delete the oldest stack if a proof was emitted*)
   let update_pending_coinbase_collection ~depth pending_coinbase_collection
@@ -1016,9 +1020,14 @@ module T = struct
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
-    let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
-    let new_ledger = Ledger.register_mask t.ledger new_mask in
     let transactions, works, commands_count, coinbases = pre_diff_info in
+    let account_ids =
+      List.fold ~init:[] transactions ~f:(fun acc txn ->
+          Transaction.accounts_referenced (With_status.data txn) @ acc )
+    in
+    let new_ledger =
+      ref (Sparse_ledger.of_ledger_subset_exn t.ledger account_ids)
+    in
     [%log internal] "Update_coinbase_stack"
       ~metadata:
         [ ("transactions", `Int (List.length transactions))
@@ -1124,7 +1133,7 @@ module T = struct
                 ~first_pass_ledger_end
                 ~second_pass_ledger_end:
                   (Frozen_ledger_hash.of_ledger_hash
-                     (Ledger.merkle_root new_ledger) )
+                     (Sparse_ledger.merkle_root !new_ledger) )
                 ~pending_coinbase_stack:latest_pending_coinbase_stack
                 scan_state'
               >>| to_staged_ledger_or_error) ) )
@@ -1143,9 +1152,22 @@ module T = struct
       \      Coinbase parts:$coinbase_count Spots\n\
       \      available:$spots_available Pending work in the \
        scan-state:$proof_bundles_waiting Work included:$work_count" ;
+    let final_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
+    let final_ledger = Ledger.register_mask t.ledger final_mask in
+    (* TODO: This recomputes the intermediate hashes inside of [set]. We should
+       really write the updated hashes and accounts directly to the mask,
+       without doing any further computation.
+    *)
+    Sparse_ledger.iteri !new_ledger ~f:(fun idx account ->
+        Ledger.set final_ledger
+          (Ledger.Location.Account
+             (Ledger.Addr.of_int_exn
+                ~ledger_depth:(Sparse_ledger.depth !new_ledger)
+                idx ) )
+          account ) ;
     let new_staged_ledger =
       { scan_state = scan_state'
-      ; ledger = new_ledger
+      ; ledger = final_ledger
       ; constraint_constants = t.constraint_constants
       ; pending_coinbase_collection = updated_pending_coinbase_collection'
       }
