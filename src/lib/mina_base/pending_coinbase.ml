@@ -766,17 +766,16 @@ module Make_str (A : Wire_types.Concrete) = struct
             Type_equal.t ) =
         Type_equal.T
 
-      module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id) (Stack)
+      module M =
+        Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id)
+          (struct
+            include Stack
+
+            let empty = lazy empty
+          end)
 
       [%%define_locally
-      M.
-        ( of_hash
-        , get_exn
-        , path_exn
-        , set_exn
-        , find_index_exn
-        , add_path
-        , merkle_root )]
+      M.(of_hash, get_exn, path_exn, set_exn, find_index, add_path, merkle_root)]
     end
 
     module Checked = struct
@@ -1055,7 +1054,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let root_hash = hash_at_level depth in
       { Poly.tree =
-          make_tree (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
+          make_tree
+            (Merkle_tree.of_hash ~depth root_hash
+               ~current_location:(* Hack: unused*) None )
+            Stack_id.zero
       ; pos_list = []
       ; new_pos = Stack_id.zero
       }
@@ -1073,7 +1075,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       try_with (fun () -> Merkle_tree.path_exn t.tree index)
 
     let find_index (t : t) key =
-      try_with (fun () -> Merkle_tree.find_index_exn t.tree key)
+      try_with (fun () -> Option.value_exn @@ Merkle_tree.find_index t.tree key)
 
     let next_index ~depth (t : t) =
       if
@@ -1110,7 +1112,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         Option.value ~default:Stack_id.zero (curr_stack_id t)
       in
       Or_error.try_with (fun () ->
-          let index = Merkle_tree.find_index_exn t.tree prev_stack_id in
+          let index =
+            Option.value_exn @@ Merkle_tree.find_index t.tree prev_stack_id
+          in
           Merkle_tree.get_exn t.tree index )
 
     let latest_stack (t : t) ~is_new_stack =
@@ -1118,7 +1122,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let key = latest_stack_id t ~is_new_stack in
       let%bind res =
         Or_error.try_with (fun () ->
-            let index = Merkle_tree.find_index_exn t.tree key in
+            let index = Option.value_exn @@ Merkle_tree.find_index t.tree key in
             Merkle_tree.get_exn t.tree index )
       in
       if is_new_stack then

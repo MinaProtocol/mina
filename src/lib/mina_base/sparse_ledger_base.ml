@@ -28,6 +28,8 @@ module Account = struct
   include Account
 
   let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
+
+  let empty = lazy empty
 end
 
 module Global_state = struct
@@ -50,7 +52,8 @@ type account_state = [ `Added | `Existed ] [@@deriving equal]
     This ledger has an invalid root hash, and cannot be used except as a
     placeholder.
 *)
-let empty ~depth () = M.of_hash ~depth Outside_hash_image.t
+let empty ~depth () =
+  M.of_hash ~depth ~current_location:None Outside_hash_image.t
 
 module L = struct
   type t = M.t ref
@@ -67,12 +70,13 @@ module L = struct
 
   let location_of_account : t -> Account_id.t -> location option =
    fun t id ->
-    try
-      let loc = M.find_index_exn !t id in
-      let account = M.get_exn !t loc in
-      if Public_key.Compressed.(equal empty account.public_key) then None
-      else Some loc
-    with _ -> None
+    match M.find_index !t id with
+    | None ->
+        None
+    | Some loc ->
+        let account = M.get_exn !t loc in
+        if Public_key.Compressed.(equal empty account.public_key) then None
+        else Some loc
 
   let set : t -> location -> Account.t -> unit =
    fun t loc a -> t := M.set_exn !t loc a
@@ -80,9 +84,7 @@ module L = struct
   let get_or_create_exn :
       t -> Account_id.t -> account_state * Account.t * location =
    fun t id ->
-    let loc = M.find_index_exn !t id in
-    let account = M.get_exn !t loc in
-    if Public_key.Compressed.(equal empty account.public_key) then (
+    let create_account loc account =
       let public_key = Account_id.public_key id in
       let account' : Account.t =
         { account with
@@ -91,9 +93,20 @@ module L = struct
         ; token_id = Account_id.token_id id
         }
       in
-      set t loc account' ;
-      (`Added, account', loc) )
-    else (`Existed, account, loc)
+      set t loc account' ; account'
+    in
+    match M.find_index !t id with
+    | None ->
+        let loc, new_t = M.allocate_index !t id in
+        t := new_t ;
+        let account' = create_account loc (Lazy.force Account.empty) in
+        (`Added, account', loc)
+    | Some loc ->
+        let account = M.get_exn !t loc in
+        if Public_key.Compressed.(equal empty account.public_key) then
+          let account' = create_account loc account in
+          (`Added, account', loc)
+        else (`Existed, account, loc)
 
   let get_or_create t id = Or_error.try_with (fun () -> get_or_create_exn t id)
 
@@ -101,12 +114,18 @@ module L = struct
       t -> Account_id.t -> Account.t -> (account_state * location) Or_error.t =
    fun t id to_set ->
     Or_error.try_with (fun () ->
-        let loc = M.find_index_exn !t id in
-        let a = M.get_exn !t loc in
-        if Public_key.Compressed.(equal empty a.public_key) then (
-          set t loc to_set ;
-          (`Added, loc) )
-        else (`Existed, loc) )
+        match M.find_index !t id with
+        | None ->
+            let loc, new_ledger = M.allocate_index !t id in
+            t := new_ledger ;
+            set t loc to_set ;
+            (`Added, loc)
+        | Some loc ->
+            let a = M.get_exn !t loc in
+            if Public_key.Compressed.(equal empty a.public_key) then (
+              set t loc to_set ;
+              (`Added, loc) )
+            else (`Existed, loc) )
 
   let create_new_account t id to_set =
     get_or_create_account t id to_set |> Or_error.map ~f:ignore
@@ -151,13 +170,15 @@ M.
   , get_exn
   , path_exn
   , set_exn
-  , find_index_exn
+  , allocate_index
+  , find_index
   , add_path
   , merkle_root
   , iteri )]
 
-let of_root ~depth (h : Ledger_hash.t) =
-  of_hash ~depth (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
+let of_root ~depth ~current_location (h : Ledger_hash.t) =
+  of_hash ~depth ~current_location
+    (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
 
 let get_or_initialize_exn account_id t idx =
   let account = get_exn t idx in
@@ -177,9 +198,12 @@ let get_or_initialize_exn account_id t idx =
   else (`Existed, account)
 
 let has_locked_tokens_exn ~global_slot ~account_id t =
-  let idx = find_index_exn t account_id in
-  let _, account = get_or_initialize_exn account_id t idx in
-  Account.has_locked_tokens ~global_slot account
+  match find_index t account_id with
+  | Some idx ->
+      let _, account = get_or_initialize_exn account_id t idx in
+      Account.has_locked_tokens ~global_slot account
+  | None ->
+      false
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
@@ -203,7 +227,18 @@ let handler t =
           ledger := set_exn !ledger idx account ;
           respond (Provide ())
       | Ledger_hash.Find_index pk ->
-          let index = find_index_exn !ledger pk in
+          let index =
+            match find_index !ledger pk with
+            | Some index ->
+                index
+            | None ->
+                let index, new_ledger = allocate_index !ledger pk in
+                let new_ledger =
+                  set_exn new_ledger index (Lazy.force Account.empty)
+                in
+                ledger := new_ledger ;
+                index
+          in
           respond (Provide index)
       | _ ->
           unhandled )

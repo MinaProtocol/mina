@@ -39,6 +39,7 @@ module T = struct
         { indexes : ('key * int) list
         ; depth : int
         ; tree : ('hash, 'account) Tree.Stable.V1.t
+        ; current_location : int option
         }
       [@@deriving sexp, yojson]
     end
@@ -48,6 +49,7 @@ module T = struct
     { indexes : ('key * int) list
     ; depth : int
     ; tree : ('hash, 'account) Tree.t
+    ; current_location : int option
     }
   [@@deriving sexp, yojson]
 end
@@ -61,7 +63,9 @@ module type S = sig
 
   type t = (hash, account_id, account) T.t [@@deriving sexp, yojson]
 
-  val of_hash : depth:int -> hash -> t
+  val of_hash : depth:int -> current_location:int option -> hash -> t
+
+  val allocate_index : t -> account_id -> int * t
 
   val get_exn : t -> int -> account
 
@@ -69,7 +73,7 @@ module type S = sig
 
   val set_exn : t -> int -> account -> t
 
-  val find_index_exn : t -> account_id -> int
+  val find_index : t -> account_id -> int option
 
   val add_path :
     t -> [ `Left of hash | `Right of hash ] list -> account_id -> account -> t
@@ -83,7 +87,8 @@ end
 
 let tree { T.tree; _ } = tree
 
-let of_hash ~depth h = { T.indexes = []; depth; tree = Hash h }
+let of_hash ~depth ~current_location h =
+  { T.indexes = []; depth; tree = Hash h; current_location }
 
 module Make (Hash : sig
   type t [@@deriving equal, sexp, yojson, compare]
@@ -95,6 +100,8 @@ end) (Account : sig
   type t [@@deriving equal, sexp, yojson]
 
   val data_hash : t -> Hash.t
+
+  val empty : t Lazy.t
 end) : sig
   include
     S
@@ -104,9 +111,18 @@ end) : sig
 
   val hash : (Hash.t, Account.t) Tree.t -> Hash.t
 end = struct
+  let empty_hash =
+    lazy
+      (Empty_hashes.extensible_cache
+         (module Hash)
+         ~init_hash:(Account.data_hash (Lazy.force Account.empty)) )
+
+  let empty_hash i = (Lazy.force empty_hash) i
+
   type t = (Hash.t, Account_id.t, Account.t) T.t [@@deriving sexp, yojson]
 
-  let of_hash ~depth (hash : Hash.t) = of_hash ~depth hash
+  let of_hash ~depth ~current_location (hash : Hash.t) =
+    of_hash ~depth ~current_location hash
 
   let hash : (Hash.t, Account.t) Tree.t -> Hash.t = function
     | Account a ->
@@ -188,17 +204,18 @@ end = struct
 
   let ith_bit idx i = (idx lsr i) land 1 = 1
 
-  let find_index_exn (t : t) aid =
-    match List.Assoc.find t.indexes ~equal:Account_id.equal aid with
-    | Some x ->
-        x
-    | None ->
-        failwithf
-          !"Sparse_ledger.find_index_exn: %{sexp:Account_id.t} not in %{sexp: \
-            Account_id.t list}"
-          aid
-          (List.map t.indexes ~f:fst)
-          ()
+  let find_index (t : t) aid =
+    List.Assoc.find t.indexes ~equal:Account_id.equal aid
+
+  let allocate_index ({ T.current_location; indexes; _ } as t) account_id =
+    let new_location =
+      match current_location with None -> 0 | Some x -> x + 1
+    in
+    ( new_location
+    , { t with
+        current_location = Some new_location
+      ; indexes = (account_id, new_location) :: indexes
+      } )
 
   let get_exn ({ T.tree; depth; _ } as t) idx =
     let rec go i tree =
@@ -208,6 +225,8 @@ end = struct
       | false, Node (_, l, r) ->
           let go_right = ith_bit idx i in
           if go_right then go (i - 1) r else go (i - 1) l
+      | _, Hash h when Hash.equal h (empty_hash (i + 1)) ->
+          Lazy.force Account.empty
       | _ ->
           let expected_kind = if i < 0 then "n account" else " node" in
           let kind =
@@ -237,6 +256,14 @@ end = struct
             if go_right then (l, go (i - 1) r) else (go (i - 1) l, r)
           in
           Node (Hash.merge ~height:i (hash l) (hash r), l, r)
+      | false, Hash h when Hash.equal h (empty_hash (i + 1)) ->
+          let inner =
+            if i > 0 then Tree.Hash (empty_hash i)
+            else Tree.Account (Lazy.force Account.empty)
+          in
+          go i (Node (h, inner, inner))
+      | true, Hash h when Hash.equal h (empty_hash (i + 1)) ->
+          Tree.Account acct
       | _ ->
           let expected_kind = if i < 0 then "n account" else " node" in
           let kind =
@@ -262,6 +289,12 @@ end = struct
         match tree with
         | Tree.Account _ ->
             failwithf "Sparse_ledger.path: Bad depth at index %i." idx ()
+        | Hash h when Hash.equal h (empty_hash (i + 1)) ->
+            let inner =
+              if i > 0 then Tree.Hash (empty_hash i)
+              else Tree.Account (Lazy.force Account.empty)
+            in
+            go acc i (Tree.Node (h, inner, inner))
         | Hash _ ->
             failwithf "Sparse_ledger.path: Dead end at index %i." idx ()
         | Node (_, l, r) ->
@@ -276,6 +309,27 @@ type ('hash, 'key, 'account) t = ('hash, 'key, 'account) T.t [@@deriving yojson]
 
 let%test_module "sparse-ledger-test" =
   ( module struct
+    module Account = struct
+      module T = struct
+        type t = { name : string; favorite_number : int }
+        [@@deriving bin_io, equal, sexp, yojson]
+      end
+
+      include T
+
+      let key { name; _ } = name
+
+      let data_hash t = Md5.digest_string (Binable.to_string (module T) t)
+
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%map name = String.quickcheck_generator
+        and favorite_number = Int.quickcheck_generator in
+        { name; favorite_number }
+
+      let empty = lazy { name = ""; favorite_number = 0 }
+    end
+
     module Hash = struct
       type t = Core_kernel.Md5.t [@@deriving sexp, compare]
 
@@ -298,25 +352,6 @@ let%test_module "sparse-ledger-test" =
       let gen =
         Quickcheck.Generator.map String.quickcheck_generator
           ~f:Md5.digest_string
-    end
-
-    module Account = struct
-      module T = struct
-        type t = { name : string; favorite_number : int }
-        [@@deriving bin_io, equal, sexp, yojson]
-      end
-
-      include T
-
-      let key { name; _ } = name
-
-      let data_hash t = Md5.digest_string (Binable.to_string (module T) t)
-
-      let gen =
-        let open Quickcheck.Generator.Let_syntax in
-        let%map name = String.quickcheck_generator
-        and favorite_number = Int.quickcheck_generator in
-        { name; favorite_number }
     end
 
     module Account_id = struct
@@ -364,7 +399,12 @@ let%test_module "sparse-ledger-test" =
       in
       let%bind depth = Int.gen_incl 0 16 in
       let%map tree = gen depth >>| prune_hash_branches in
-      { T.tree; depth; indexes = indexes depth tree }
+      let current_location =
+        (* Except with negligible probability, every hash and account will be
+           non-empty, so we behave as if the ledger is full. *)
+        Some ((1 lsl depth) - 1)
+      in
+      { T.tree; depth; indexes = indexes depth tree; current_location }
 
     let%test_unit "iteri consistent indices with t.indexes" =
       Quickcheck.test gen ~f:(fun t ->

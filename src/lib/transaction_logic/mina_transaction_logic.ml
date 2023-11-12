@@ -1225,11 +1225,11 @@ module Make (L : Ledger_intf.S) :
 
       type inclusion_proof = [ `Existing of location | `New ]
 
-      let get_account p l =
+      let get_or_initialize_account p l =
         let loc, acct =
           Or_error.ok_exn (get_with_location l (Account_update.account_id p))
         in
-        (acct, loc)
+        (l, acct, loc)
 
       let set_account l (a, loc) =
         Or_error.ok_exn (set_with_location l loc a) ;

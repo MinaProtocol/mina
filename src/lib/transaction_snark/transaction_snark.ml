@@ -1468,7 +1468,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ( Ledger_hash.var_of_t (Sparse_ledger.merkle_root t)
               , V.create (fun () -> t) )
 
-            let idx ledger id = Sparse_ledger.find_index_exn ledger id
+            let idx ledger id = Sparse_ledger.find_index ledger id
 
             let body_id (body : Account_update.Body.Checked.t) =
               let open As_prover in
@@ -1476,10 +1476,19 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (read Signature_lib.Public_key.Compressed.typ body.public_key)
                 (read Mina_base.Token_id.typ body.token_id)
 
-            let get_account { account_update; _ } ((_root, ledger) : t) =
-              let idx =
-                V.map ledger ~f:(fun l -> idx l (body_id account_update.data))
+            let get_or_initialize_account { account_update; _ }
+                ((root, ledger) : t) =
+              let idx_and_ledger =
+                V.map ledger ~f:(fun l ->
+                    let account_id = body_id account_update.data in
+                    match idx l account_id with
+                    | None ->
+                        Sparse_ledger.allocate_index l account_id
+                    | Some idx ->
+                        (idx, As_prover.read (V.typ ()) ledger) )
               in
+              let idx = V.map ~f:fst idx_and_ledger in
+              let ledger = V.map ~f:snd idx_and_ledger in
               let account =
                 exists Mina_base.Account.Checked.Unhashed.typ
                   ~compute:(fun () ->
@@ -1501,7 +1510,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                         | `Right h ->
                             (true, h) ) )
               in
-              (account, incl)
+              ((root, ledger), account, incl)
 
             let set_account ((_root, ledger) : t) ((a, incl) : Account.t * _) :
                 t =
@@ -1513,7 +1522,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                         let a : Mina_base.Account.t =
                           read Mina_base.Account.Checked.Unhashed.typ a.data
                         in
-                        let idx = idx ledger (Mina_base.Account.identifier a) in
+                        let idx =
+                          Option.value_exn
+                          @@ idx ledger (Mina_base.Account.identifier a)
+                        in
                         Sparse_ledger.set_exn ledger idx a) )
 
             let check_inclusion ((root, _) : t) (account, incl) =
@@ -3982,7 +3994,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let account : Account.t =
           Sparse_ledger.(
             get_exn witness.local_state_init.ledger
-              (find_index_exn witness.local_state_init.ledger account_id))
+              ( Option.value_exn
+              @@ find_index witness.local_state_init.ledger account_id ))
         in
         match
           Option.value_map ~default:None account.zkapp ~f:(fun s ->

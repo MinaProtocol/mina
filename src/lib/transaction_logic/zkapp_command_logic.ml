@@ -490,7 +490,8 @@ module type Ledger_intf = sig
 
   val empty : depth:int -> unit -> t
 
-  val get_account : account_update -> t -> account * inclusion_proof
+  val get_or_initialize_account :
+    account_update -> t -> t * account * inclusion_proof
 
   val set_account : t -> account * inclusion_proof -> t
 
@@ -1165,9 +1166,13 @@ module Make (Inputs : Inputs_intf) = struct
             Local_state.add_check local_state Token_owner_not_caller
               default_token_or_token_owner_was_caller )
       in
-      let ((a, inclusion_proof) as acct) =
-        with_label ~label:"get account" (fun () ->
-            Inputs.Ledger.get_account account_update local_state.ledger )
+      let local_state, ((a, inclusion_proof) as acct) =
+        let ledger, a, inclusion_proof =
+          with_label ~label:"get account" (fun () ->
+              Inputs.Ledger.get_or_initialize_account account_update
+                local_state.ledger )
+        in
+        ({ local_state with ledger }, (a, inclusion_proof))
       in
       Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
       let transaction_commitment, full_transaction_commitment =

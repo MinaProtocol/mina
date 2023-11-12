@@ -4,7 +4,12 @@ include Sparse_ledger_base
 module GS = Global_state
 
 let of_ledger_root ledger =
-  of_root ~depth:(Ledger.depth ledger) (Ledger.merkle_root ledger)
+  of_root ~depth:(Ledger.depth ledger)
+    ~current_location:
+      ( Option.map ~f:(fun x ->
+            Ledger.Location.Addr.to_int @@ Ledger.Location.to_path_exn x )
+      @@ Ledger.last_filled ledger )
+    (Ledger.merkle_root ledger)
 
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let ledger = Ledger.copy oledger in
@@ -12,16 +17,16 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let non_empty_locations = List.filter_map ~f:snd locations in
   let accounts = Ledger.get_batch ledger non_empty_locations in
   let merkle_paths = Ledger.merkle_path_batch ledger non_empty_locations in
-  let _, sparse =
-    let rec go (new_keys, sl) locations accounts merkle_paths =
+  let uses_last, sparse =
+    let rec go (uses_last, sl) locations accounts merkle_paths =
       match locations with
       | [] ->
-          (new_keys, sl)
+          (uses_last, sl)
       | (key, Some _loc) :: locations -> (
           match (accounts, merkle_paths) with
           | (_, account) :: accounts, merkle_path :: merkle_paths ->
               go
-                ( new_keys
+                ( uses_last
                 , add_path sl merkle_path key
                     ( account
                     |> Option.value_exn ?here:None ?error:None ?message:None )
@@ -29,13 +34,29 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
                 locations accounts merkle_paths
           | _ ->
               assert false )
-      | (key, None) :: locations ->
-          let path, acct = Ledger.create_empty_exn ledger key in
-          go
-            (key :: new_keys, add_path sl path key acct)
-            locations accounts merkle_paths
+      | (_, None) :: locations ->
+          go (true, sl) locations accounts merkle_paths
     in
-    go ([], of_ledger_root ledger) locations accounts merkle_paths
+    go (false, of_ledger_root ledger) locations accounts merkle_paths
+  in
+  (* TODO: With some care over the external contract this satisfies, this could
+     be batched with the account and path reads above.
+  *)
+  let sparse =
+    if uses_last then
+      match Ledger.last_filled ledger with
+      | Some loc ->
+          let account =
+            Ledger.get ledger loc
+            |> Option.value_exn ?here:None ?error:None ?message:None
+          in
+          add_path sparse
+            (Ledger.merkle_path ledger loc)
+            (Account.identifier account)
+            account
+      | None ->
+          sparse
+    else sparse
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
@@ -44,18 +65,44 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
   sparse
 
 let sparse_ledger_subset_exn (oledger : t) keys =
-  let ledger = of_root ~depth:(depth oledger) (merkle_root oledger) in
-  List.fold ~init:ledger keys ~f:(fun ledger key ->
-      let index = find_index_exn ledger key in
-      let path = path_exn ledger index in
-      let account = get_exn ledger index in
-      add_path ledger path key account )
+  let ledger =
+    of_root ~depth:(depth oledger) ~current_location:oledger.current_location
+      (merkle_root oledger)
+  in
+  let uses_last, ledger =
+    List.fold ~init:(false, ledger) keys ~f:(fun (uses_last, ledger) key ->
+        match find_index ledger key with
+        | Some index ->
+            let path = path_exn ledger index in
+            let account = get_exn ledger index in
+            (uses_last, add_path ledger path key account)
+        | None ->
+            (uses_last, ledger) )
+  in
+  let ledger =
+    if uses_last then
+      match ledger.current_location with
+      | Some loc ->
+          let account = Mina_base.Sparse_ledger_base.get_exn ledger loc in
+          add_path ledger
+            (Mina_base.Sparse_ledger_base.path_exn ledger loc)
+            (Account.identifier account)
+            account
+      | None ->
+          ledger
+    else ledger
+  in
+  ledger
 
 let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
   List.fold indexes
     ~init:
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
+         ~current_location:
+           ( Option.map ~f:(fun x ->
+                 Ledger.Location.Addr.to_int @@ Ledger.Location.to_path_exn x )
+           @@ Ledger.Any_ledger.M.last_filled ledger )
          (Ledger.Any_ledger.M.merkle_root ledger) )
     ~f:(fun acc i ->
       let account = Ledger.Any_ledger.M.get_at_index_exn ledger i in
