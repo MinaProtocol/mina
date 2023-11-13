@@ -53,9 +53,11 @@ let decode_block str =
 let verify_block ~verify_blockchain_snarks ~block =
   let header = Mina_block.header block in
   let open Mina_block.Header in
-  verify_blockchain_snarks
-    [ (protocol_state header, protocol_state_proof header) ]
-  |> Deferred.Result.map_error ~f:(const `Invalid_proof)
+  let%map result =
+    verify_blockchain_snarks
+      [ (protocol_state header, protocol_state_proof header) ]
+  in
+  if result then Ok () else Error `Invalid_proof
 
 let decode_snark_work str =
   match Base64.decode str with
@@ -66,8 +68,8 @@ let decode_snark_work str =
       Error `Fail_to_decode_snark_work
 
 let verify_snark_work ~verify_transaction_snarks ~proof ~message =
-  verify_transaction_snarks [ (proof, message) ]
-  |> Deferred.Result.map_error ~f:(const `Invalid_snark_work)
+  let%map result = verify_transaction_snarks [ (proof, message) ] in
+  if result then Ok () else Error `Invalid_snark_work
 
 let validate_submission ~block_dir ~metadata_path ~no_checks
     (verify_blockchain_snarks, verify_transaction_snarks) =
@@ -112,8 +114,8 @@ let validate_submission ~block_dir ~metadata_path ~no_checks
 type valid_payload =
   { state_hash : State_hash.t
   ; parent : State_hash.t
-  ; height : Unsigned.uint32
-  ; slot : Mina_numbers.Global_slot_since_genesis.t
+  ; height : Mina_numbers.Length.t
+  ; slot : Mina_numbers.Global_slot.t
   }
 
 let valid_payload_to_yojson { state_hash; parent; height; slot } : Yojson.Safe.t
@@ -121,8 +123,8 @@ let valid_payload_to_yojson { state_hash; parent; height; slot } : Yojson.Safe.t
   `Assoc
     [ ("state_hash", State_hash.to_yojson state_hash)
     ; ("parent", State_hash.to_yojson parent)
-    ; ("height", `Int (Unsigned.UInt32.to_int height))
-    ; ("slot", `Int (Mina_numbers.Global_slot_since_genesis.to_int slot))
+    ; ("height", `Int (Mina_numbers.Length.to_int height))
+    ; ("slot", `Int (Mina_numbers.Global_slot.to_int slot))
     ]
 
 let display valid_payload =

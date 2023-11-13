@@ -24,23 +24,20 @@
    uptime_service
    currency
    ledger_proof
-   mina_base_import
    mina_state
    mina_wire_types
    consensus
    data_hash_lib
    mina_numbers
    snark_params
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
-   pasta_bindings
    pickles
    pickles_types
    pickles.backend
    genesis_ledger_helper
-   mina_runtime_config
+   runtime_config
    precomputed_values
+   coda_genesis_proof
    logger
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx)))
+ (preprocess (pps ppx_coda ppx_version ppx_jane ppx_custom_printf h_list.ppx)))
