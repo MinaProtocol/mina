@@ -9,7 +9,7 @@ spec:
       containers:
       {{- if .Values.archive.initFromDump }}
       - name: import-dump
-        image: postgres:15-alpine
+        image: gcr.io/o1labs-192920/mina-rosetta:2.0.0rampup4-14047c5-bullseye
         env:
         - name: PGPASSWORD
           valueFrom:
@@ -19,7 +19,6 @@ spec:
         command: ["bash", "-c"]
         args:
         - 'sleep 30
-        && apt install -y curl
         && cd /tmp
         && curl https://storage.googleapis.com/mina-archive-dumps/{{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql.tar.gz -o {{ .Values.testnetName }}-archive-dump.tar.gz
         && tar -xvf {{ .Values.testnetName }}-archive-dump.tar.gz
@@ -38,7 +37,7 @@ spec:
         -c "ALTER DATABASE {{ .Values.postgresql.auth.database }} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE;"'
       {{- else }}
       - name: import-schema
-        image: postgres:15-alpine
+        image: gcr.io/o1labs-192920/mina-rosetta:2.0.0rampup4-14047c5-bullseye
         env:
         - name: PGPASSWORD
           valueFrom:
@@ -48,7 +47,6 @@ spec:
         command: ["bash", "-c"]
         args:
         - 'sleep 30
-        && apt install -y curl
         && cd /tmp
         && {{ range .Values.archive.remoteSchemaAuxFiles }} curl -O {{.}} && {{ end }}
         psql
