@@ -1,0 +1,13 @@
+(library
+ (name bindings_js)
+ (js_of_ocaml
+  (javascript_files
+   bindings.js
+   bindings-bigint256.js
+   bindings-field.js
+   bindings-curve.js
+   bindings-vector.js))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
