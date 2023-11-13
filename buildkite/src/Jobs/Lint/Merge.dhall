@@ -3,6 +3,7 @@ let Prelude = ../../External/Prelude.dhall
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
@@ -17,7 +18,8 @@ Pipeline.build
     spec = JobSpec::{
       dirtyWhen = [ SelectFiles.everything ],
       path = "Lint",
-      name = "Merge"
+      name = "Merge",
+      tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
     },
     steps = [
       Command.build

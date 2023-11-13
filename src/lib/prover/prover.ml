@@ -191,7 +191,6 @@ module Worker_state = struct
                let verify _ _ = Deferred.return true
              end : S )
        in
-       Memory_stats.log_memory_stats logger ~process:"prover" ;
        m )
 
   let get = Fn.id
