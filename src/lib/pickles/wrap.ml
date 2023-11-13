@@ -112,7 +112,8 @@ type deferred_values_and_hints =
   }
 
 let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
-    ~actual_feature_flags ~custom_gate_type
+    ~actual_feature_flags
+    ~custom_gate_type
     ~(prev_challenges : ((Backend.Tick.Field.t, _) Vector.t, n) Vector.t)
     ~(step_vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
     ~(public_input : Backend.Tick.Field.t list)
@@ -419,7 +420,6 @@ let%test_module "gate finalization" =
           (module Impls.Step)
           ~feature_flags:full_features ~challenge:Challenge.typ
           ~scalar_challenge:Challenge.typ
-          ~bool:Boolean.typ
           ~dummy_scalar_challenge:
             (Kimchi_backend_common.Scalar_challenge.create
                Limb_vector.Challenge.Constant.zero )
@@ -831,7 +831,7 @@ let wrap
   [%log internal] "Wrap_compute_deferred_values" ;
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~sgs ~prev_challenges ~step_vk ~public_input ~proof
-      ~actual_proofs_verified ~actual_feature_flags (* ~custom_gate_type *)
+      ~actual_proofs_verified ~actual_feature_flags ~custom_gate_type: false (* JES: TODO: Need to get from where? *)
   in
   [%log internal] "Wrap_compute_deferred_values_done" ;
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =

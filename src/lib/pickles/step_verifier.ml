@@ -609,7 +609,6 @@ struct
           ; zeta = plonk.zeta
           ; joint_combiner
           ; feature_flags = plonk.feature_flags
-          ; custom_gate_type = plonk.custom_gate_type
           }
           { alpha
           ; beta
@@ -617,7 +616,6 @@ struct
           ; zeta
           ; joint_combiner
           ; feature_flags = plonk.feature_flags
-          ; custom_gate_type = plonk.custom_gate_type
           } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 

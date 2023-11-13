@@ -61,8 +61,7 @@ struct
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
       ~feature_flags
-      ~(* TODO: JES: custom_gate_type here? *)
-       self_dlog_plonk_index
+      ~self_dlog_plonk_index
       ~(public_input :
          ( var
          , value
@@ -181,7 +180,7 @@ struct
           ; gamma = Challenge.Constant.to_tick_field plonk0.gamma
           ; joint_combiner = Option.map ~f:to_field plonk0.joint_combiner
           ; feature_flags =
-              plonk0.feature_flags (* JES: TODO: need custom_gate_type here? *)
+              plonk0.feature_flags
           }
         in
         let env =
@@ -220,7 +219,6 @@ struct
                  ~domain_generator:Backend.Tick.Field.domain_generator )
             plonk_minimal combined_evals
         in
-        (* JES: TODO: branch on  custom_gate_type *)
         time "plonk_checks" (fun () ->
             let module Field = struct
               include Tick.Field
@@ -242,7 +240,7 @@ struct
         Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
           ~old_bulletproof_challenges:
             statement.messages_for_next_step_proof.old_bulletproof_challenges
-          ~zk_rows:data.zk_rows ~proof_state:statement.proof_state
+          ~zk_rows:data.zk_rows ~proof_state:statement.proof_state ~custom_gate_type:data.custom_gate_type (* JES: PLACE1 *)
       in
       let prev_statement_with_hashes :
           ( _
