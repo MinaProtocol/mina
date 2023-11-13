@@ -82,4 +82,3 @@ module JSON = struct
     in
     { submitter; snark_work; block_hash = meta.block_hash; block_dir }
 end
-

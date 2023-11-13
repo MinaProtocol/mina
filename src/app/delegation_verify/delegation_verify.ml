@@ -95,6 +95,17 @@ let block_dir_flag =
     ~doc:"the path to the directory containing blocks for the submission"
     (required Filename.arg_type)
 
+let cassandra_executable_flag =
+  let open Command.Param in
+  flag "--executable"
+    ~aliases:[ "-executable"; "--cqlsh"; "-cqlsh" ]
+    ~doc:"the path to the cqlsh executable"
+    (optional Filename.arg_type)
+
+let timestamp =
+  let open Command.Param in
+  anon ("timestamp" %: string)
+
 let instantiate_verify_functions ~logger = function
   | None ->
       Deferred.return
@@ -136,26 +147,56 @@ let filesystem_command =
       and config_file = config_flag in
       fun () ->
         let logger = Logger.create () in
-        let%bind.Deferred (verify_blockchain_snarks, verify_transaction_snarks) =
+        let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file
         in
         let open Deferred.Let_syntax in
         let metadata_paths = get_filenames inputs in
-        let module V = Validator(Submission.JSON) in
+        let module V = Validator (Submission.JSON) in
         Deferred.List.iter metadata_paths ~f:(fun path ->
             match%bind
-              ( let open Deferred.Result.Let_syntax in
-                let%bind submission =
-                  Submission.JSON.load ~block_dir path
-                  |> Deferred.return
-                in
-                V.validate ~no_checks ~verify_blockchain_snarks ~verify_transaction_snarks submission)
+              let open Deferred.Result.Let_syntax in
+              let%bind submission =
+                Submission.JSON.load ~block_dir path |> Deferred.return
+              in
+              V.validate ~no_checks ~verify_blockchain_snarks
+                ~verify_transaction_snarks submission
             with
             | Ok (state_hash, parent, height, slot) ->
                 display { state_hash; parent; height; slot } ;
                 Deferred.unit
             | Error e ->
-               display_error @@ Error.to_string_hum e ;
-               Deferred.unit))
+                display_error @@ Error.to_string_hum e ;
+                Deferred.unit ))
+
+let cassandra_command =
+  Command.async ~summary:"Verify submissions and block read from Cassandra"
+    Command.Let_syntax.(
+      let%map_open cqlsh = cassandra_executable_flag
+      and _period_start = timestamp
+      and _period_end = timestamp in
+      fun () ->
+        let open Deferred.Let_syntax in
+        match%bind
+          Cassandra.exec ?cqlsh ~keyspace:"bpu_integration_dev"
+          @@ Cassandra.query
+               "SELECT JSON created_at, peer_id, snark_work, remote_addr, \
+                submitter, block_hash, graphql_control_port FROM submissions;"
+        with
+        | Ok subs ->
+            List.iter subs
+              ~f:
+                (Async.printf "submission: '%a'\n" (fun () s ->
+                     Submission.JSON.raw_to_yojson s
+                     |> Yojson.Safe.pretty_to_string ) ) ;
+            Deferred.unit
+        | Error e ->
+            display_error @@ Error.to_string_hum e ;
+            Deferred.unit)
+
+let command =
+  Command.group
+    ~summary:"A tool for verifying JSON payload submitted by the uptime service"
+    [ ("fs", filesystem_command); ("cassandra", cassandra_command) ]
 
 let () = Async.Command.run command
