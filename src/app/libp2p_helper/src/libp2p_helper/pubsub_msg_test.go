@@ -27,7 +27,7 @@ func testPublishDo(t *testing.T, app *app, topic string, data []byte, rpcSeqno u
 	_, err = respSuccess.Publish()
 	require.NoError(t, err)
 
-	_, has := app.Topics[topic]
+	_, has := app._topics[topic]
 	require.True(t, has)
 }
 
@@ -55,9 +55,9 @@ func testSubscribeDo(t *testing.T, app *app, topic string, subId uint64, rpcSeqn
 	_, err = respSuccess.Subscribe()
 	require.NoError(t, err)
 
-	_, has := app.Topics[topic]
+	_, has := app._topics[topic]
 	require.True(t, has)
-	_, has = app.Subs[subId]
+	_, has = app._subs[subId]
 	require.True(t, has)
 }
 
@@ -97,7 +97,7 @@ func TestUnsubscribe(t *testing.T) {
 	_, err = respSuccess.Unsubscribe()
 	require.NoError(t, err)
 
-	_, has := testApp.Subs[idx]
+	_, has := testApp._subs[idx]
 	require.False(t, has)
 }
 
@@ -121,7 +121,7 @@ func TestValidationPush(t *testing.T) {
 		status := &validationStatus{
 			Completion: make(chan pubsub.ValidationResult),
 		}
-		testApp.Validators[seqno] = status
+		testApp._validators[seqno] = status
 		_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 		require.NoError(t, err)
 		m, err := ipc.NewRootLibp2pHelperInterface_Validation(seg)
@@ -133,7 +133,7 @@ func TestValidationPush(t *testing.T) {
 		require.NoError(t, err)
 		result := <-status.Completion
 		require.Equal(t, pubsubValResults[i], result)
-		_, has := testApp.Validators[seqno]
+		_, has := testApp._validators[seqno]
 		require.False(t, has)
 	}
 }

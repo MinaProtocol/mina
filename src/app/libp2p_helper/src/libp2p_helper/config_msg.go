@@ -36,7 +36,7 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
 	app.SetConnectionHandlers()
-	for _, info := range app.AddedPeers {
+	for _, info := range app.GetAddedPeers() {
 		app.P2p.Logger.Debug("Trying to connect to: ", info)
 		err := app.P2p.Host.Connect(app.Ctx, info)
 		if err != nil {
@@ -334,7 +334,7 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	app.AddedPeers = append(app.AddedPeers, seeds...)
+	app.AddPeers(seeds...)
 
 	directPeersMaList, err := m.DirectPeers()
 	if err != nil {
@@ -372,12 +372,12 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
-	gatingConfig, err := readGatingConfig(gc, app.AddedPeers)
+	gatingConfig, err := readGatingConfig(gc, app.GetAddedPeers())
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 	if gc.CleanAddedPeers() {
-		app.AddedPeers = nil
+		app.ResetAddedPeers()
 	}
 
 	stateDir, err := m.Statedir()
@@ -593,13 +593,13 @@ func (m SetGatingConfigReq) handle(app *app, seqno uint64) *capnp.Message {
 	var gatingConfig *codanet.CodaGatingConfig
 	gc, err := SetGatingConfigReqT(m).GatingConfig()
 	if err == nil {
-		gatingConfig, err = readGatingConfig(gc, app.AddedPeers)
+		gatingConfig, err = readGatingConfig(gc, app.GetAddedPeers())
 	}
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 	if gc.CleanAddedPeers() {
-		app.AddedPeers = nil
+		app.ResetAddedPeers()
 	}
 	app.P2p.SetGatingState(gatingConfig)
 

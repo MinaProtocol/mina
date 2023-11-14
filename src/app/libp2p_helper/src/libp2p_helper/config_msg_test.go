@@ -40,7 +40,7 @@ func TestDHTDiscovery_TwoNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	appB, _ := newTestApp(t, appAInfos, true)
-	appB.AddedPeers = appAInfos
+	appB.AddPeers(appAInfos...)
 	appB.NoMDNS = true
 
 	// begin appB and appA's DHT advertising

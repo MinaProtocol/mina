@@ -76,7 +76,7 @@ func testOpenStreamDo(t *testing.T, appA *app, appBHost host.Host, appBPort uint
 
 	require.Equal(t, appA.counter, respStreamId)
 
-	_, has := appA.Streams[respStreamId]
+	_, has := appA._streams[respStreamId]
 	require.True(t, has)
 
 	return respStreamId
@@ -110,7 +110,7 @@ func testCloseStreamDo(t *testing.T, app *app, streamId uint64, rpcSeqno uint64)
 	_, err = respSuccess.CloseStream()
 	require.NoError(t, err)
 
-	_, has := app.Streams[streamId]
+	_, has := app._streams[streamId]
 	require.False(t, has)
 }
 
@@ -173,7 +173,7 @@ func testResetStreamDo(t *testing.T, app *app, streamId uint64, rpcSeqno uint64)
 	_, err = respSuccess.ResetStream()
 	require.NoError(t, err)
 
-	_, has := app.Streams[streamId]
+	_, has := app._streams[streamId]
 	require.False(t, has)
 }
 
@@ -201,7 +201,7 @@ func testSendStreamDo(t *testing.T, app *app, streamId uint64, msgBytes []byte, 
 	_, err = respSuccess.SendStream()
 	require.NoError(t, err)
 
-	_, has := app.Streams[streamId]
+	_, has := app._streams[streamId]
 	require.True(t, has)
 }
 
