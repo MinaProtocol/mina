@@ -1,5 +1,6 @@
 (library
  (name bindings_js)
+ (public_name bindings_js)
  (js_of_ocaml
   (javascript_files
    bindings.js
