@@ -40,6 +40,7 @@ var pushMesssageExtractors = map[ipc.Libp2pHelperInterface_PushMessage_Which]ext
 	ipc.Libp2pHelperInterface_PushMessage_Which_heartbeatPeer:    fromHeartbeatPeerPush,
 }
 
+// Handles messages coming from the OCaml process
 func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {
 	if msg.HasRpcRequest() {
 		resp, err := func() (*capnp.Message, error) {

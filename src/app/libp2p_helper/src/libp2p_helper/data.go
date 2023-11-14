@@ -23,16 +23,19 @@ import (
 type app struct {
 	P2p                      *codanet.Helper
 	Ctx                      context.Context
-	Subs                     map[uint64]subscription
-	Topics                   map[string]*pubsub.Topic
-	Validators               map[uint64]*validationStatus
-	ValidatorMutex           *sync.Mutex
-	Streams                  map[uint64]net.Stream
-	StreamsMutex             sync.Mutex
+	_subs                    map[uint64]subscription
+	subsMutex                sync.Mutex
+	_topics                  map[string]*pubsub.Topic
+	topicsMutex              sync.RWMutex
+	_validators              map[uint64]*validationStatus
+	validatorMutex           sync.Mutex
+	_streams                 map[uint64]net.Stream
+	streamsMutex             sync.Mutex
 	Out                      *bufio.Writer
 	OutChan                  chan *capnp.Message
 	Bootstrapper             io.Closer
-	AddedPeers               []peer.AddrInfo
+	addedPeersMutex          sync.RWMutex
+	_addedPeers              []peer.AddrInfo
 	UnsafeNoTrustIP          bool
 	MetricsRefreshTime       time.Duration
 	metricsCollectionStarted bool
@@ -54,8 +57,6 @@ type app struct {
 
 type subscription struct {
 	Sub    *pubsub.Subscription
-	Idx    uint64
-	Ctx    context.Context
 	Cancel context.CancelFunc
 }
 

@@ -8,7 +8,6 @@ import (
 	"math"
 	"os"
 	"strconv"
-	"sync"
 	"time"
 
 	ipc "libp2p_ipc"
@@ -29,14 +28,13 @@ func newApp() *app {
 	return &app{
 		P2p:                      nil,
 		Ctx:                      ctx,
-		Subs:                     make(map[uint64]subscription),
-		Topics:                   make(map[string]*pubsub.Topic),
-		ValidatorMutex:           &sync.Mutex{},
-		Validators:               make(map[uint64]*validationStatus),
-		Streams:                  make(map[uint64]net.Stream),
+		_subs:                    make(map[uint64]subscription),
+		_topics:                  make(map[string]*pubsub.Topic),
+		_validators:              make(map[uint64]*validationStatus),
+		_streams:                 make(map[uint64]net.Stream),
 		OutChan:                  outChan,
 		Out:                      bufio.NewWriter(os.Stdout),
-		AddedPeers:               []peer.AddrInfo{},
+		_addedPeers:              []peer.AddrInfo{},
 		MetricsRefreshTime:       time.Minute,
 		metricsCollectionStarted: false,
 		metricsServer:            nil,
@@ -62,6 +60,151 @@ func (app *app) NextId() uint64 {
 	defer app.counterMutex.Unlock()
 	app.counter = app.counter + 1
 	return app.counter
+}
+
+func (app *app) AddPeers(infos ...peer.AddrInfo) {
+	app.addedPeersMutex.Lock()
+	app._addedPeers = append(app._addedPeers, infos...)
+	app.addedPeersMutex.Unlock()
+}
+
+func (app *app) GetAddedPeers() []peer.AddrInfo {
+	app.addedPeersMutex.RLock()
+	copyOfAddedPeers := make([]peer.AddrInfo, len(app._addedPeers))
+	copy(copyOfAddedPeers, app._addedPeers)
+	app.addedPeersMutex.RUnlock()
+	return copyOfAddedPeers
+}
+
+func (app *app) ResetAddedPeers() {
+	app.addedPeersMutex.Lock()
+	app._addedPeers = nil
+	app.addedPeersMutex.Unlock()
+}
+
+func (app *app) AddStream(stream net.Stream) uint64 {
+	streamIdx := app.NextId()
+	app.streamsMutex.Lock()
+	app._streams[streamIdx] = stream
+	app.streamsMutex.Unlock()
+	return streamIdx
+}
+
+func (app *app) CloseStream(streamId uint64) error {
+	app.streamsMutex.Lock()
+	defer app.streamsMutex.Unlock()
+	if stream, ok := app._streams[streamId]; ok {
+		delete(app._streams, streamId)
+		err := stream.Close()
+		if err != nil {
+			return badp2p(err)
+		}
+		return nil
+	}
+	return badRPC(errors.New("unknown stream_idx"))
+}
+
+func (app *app) ResetStream(streamId uint64) error {
+	app.streamsMutex.Lock()
+	defer app.streamsMutex.Unlock()
+	if stream, ok := app._streams[streamId]; ok {
+		delete(app._streams, streamId)
+		err := stream.Reset()
+		if err != nil {
+			return badp2p(err)
+		}
+		return nil
+	}
+	return badRPC(errors.New("unknown stream_idx"))
+}
+
+func (app *app) StreamWrite(streamId uint64, data []byte) error {
+	// TODO Consider using a more fine-grained locking strategy,
+	// not using a global mutex to lock on a message sending
+	app.streamsMutex.Lock()
+	defer app.streamsMutex.Unlock()
+	if stream, ok := app._streams[streamId]; ok {
+		n, err := stream.Write(data)
+		if err != nil {
+			// TODO check that it's correct to error out, not repeat writing
+			delete(app._streams, streamId)
+			close_err := stream.Close()
+			if close_err != nil {
+				app.P2p.Logger.Errorf("failed to close stream %d after encountering write failure (%s): %s", streamId, err.Error(), close_err.Error())
+			}
+			return wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data)))
+		}
+		return nil
+	}
+	return badRPC(errors.New("unknown stream_idx"))
+}
+
+func (app *app) AddValidator() (uint64, chan pubsub.ValidationResult) {
+	seqno := app.NextId()
+	ch := make(chan pubsub.ValidationResult)
+	app.validatorMutex.Lock()
+	app._validators[seqno] = new(validationStatus)
+	app._validators[seqno].Completion = ch
+	app.validatorMutex.Unlock()
+	return seqno, ch
+}
+
+func (app *app) RemoveValidator(seqno uint64) {
+	app.validatorMutex.Lock()
+	delete(app._validators, seqno)
+	app.validatorMutex.Unlock()
+}
+
+func (app *app) TimeoutValidator(seqno uint64) {
+	now := time.Now()
+	app.validatorMutex.Lock()
+	app._validators[seqno].TimedOutAt = &now
+	app.validatorMutex.Unlock()
+}
+
+func (app *app) FinishValidator(seqno uint64, finish func(st *validationStatus)) bool {
+	app.validatorMutex.Lock()
+	defer app.validatorMutex.Unlock()
+	if st, ok := app._validators[seqno]; ok {
+		finish(st)
+		delete(app._validators, seqno)
+		return true
+	} else {
+		return false
+	}
+}
+
+func (app *app) AddTopic(topicName string, topic *pubsub.Topic) {
+	app.topicsMutex.Lock()
+	app._topics[topicName] = topic
+	app.topicsMutex.Unlock()
+}
+
+func (app *app) GetTopic(topicName string) (*pubsub.Topic, bool) {
+	app.topicsMutex.RLock()
+	topic, has := app._topics[topicName]
+	app.topicsMutex.RUnlock()
+	return topic, has
+}
+
+func (app *app) AddSubscription(subId uint64, sub subscription) {
+	app.subsMutex.Lock()
+	app._subs[subId] = sub
+	app.subsMutex.Unlock()
+}
+
+func (app *app) CancelSubscription(subId uint64) bool {
+	app.subsMutex.Lock()
+	defer app.subsMutex.Unlock()
+
+	if sub, ok := app._subs[subId]; ok {
+		sub.Sub.Cancel()
+		sub.Cancel()
+		delete(app._subs, subId)
+		return true
+	}
+
+	return false
 }
 
 func parseMultiaddrWithID(ma multiaddr.Multiaddr, id peer.ID) (*codaPeerInfo, error) {
@@ -96,6 +239,7 @@ func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
 	return info, nil
 }
 
+// Writes a message back to the OCaml node
 func (app *app) writeMsg(msg *capnp.Message) {
 	if app.NoUpcalls {
 		return

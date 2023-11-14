@@ -40,7 +40,7 @@ func (m AddPeerReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	app.AddedPeers = append(app.AddedPeers, *info)
+	app.AddPeers(*info)
 	app.P2p.GatingState().TrustPeer(info.ID)
 
 	if app.Bootstrapper != nil {
@@ -50,7 +50,7 @@ func (m AddPeerReq) handle(app *app, seqno uint64) *capnp.Message {
 	app.P2p.Logger.Info("addPeer Trying to connect to: ", info)
 
 	if AddPeerReqT(m).IsSeed() {
-		app.P2p.Seeds = append(app.P2p.Seeds, *info)
+		app.P2p.AddSeeds(*info)
 	}
 
 	err = app.P2p.Host.Connect(app.Ctx, *info)
