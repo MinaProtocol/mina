@@ -1,5 +1,6 @@
 (library
  (name web_backend)
+ (public_name bindings_js.web_backend)
  (js_of_ocaml
   (flags
    (:include flags.sexp))
