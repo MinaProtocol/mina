@@ -46,21 +46,26 @@ let read_json_line chan =
   | `Ok line -> (
       try
         let j = Yojson.Safe.from_string line in
-        match Submission.JSON.raw_of_yojson j with
+        match Submission.raw_of_yojson j with
         | Ppx_deriving_yojson_runtime.Result.Ok s ->
             Ok s
         | Ppx_deriving_yojson_runtime.Result.Error e ->
             Or_error.error_string e
       with Yojson.Json_error e -> Or_error.error_string e )
 
+let skip_line chan =
+  let open Deferred.Let_syntax in
+  let%map _ = Reader.read_line chan in
+  Ok ()
+
 let rec read_json_output acc chan =
   let open Deferred.Or_error.Let_syntax in
   (* skip empty line *)
-  let%bind _ = Reader.read_line chan |> Deferred.map ~f:Or_error.return in
+  let%bind () = skip_line chan in
   (* [json] header *)
-  let%bind _ = Reader.read_line chan |> Deferred.map ~f:Or_error.return in
-  (* [json] header *)
-  let%bind _ = Reader.read_line chan |> Deferred.map ~f:Or_error.return in
+  let%bind () = skip_line chan in
+  (* separator line *)
+  let%bind () = skip_line chan in
   match%bind read_json_line chan |> Deferred.map ~f:Or_error.return with
   | Ok s ->
       read_json_output (s :: acc) chan

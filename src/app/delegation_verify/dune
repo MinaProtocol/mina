@@ -14,6 +14,8 @@
    base64
    integers
    async.async_command
+   sexplib0
+   sexplib
    ; mina libs
    signature_lib
    mina_block
