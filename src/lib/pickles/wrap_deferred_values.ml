@@ -34,8 +34,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
          Step_bp_vec.t
        , Branch_data.t )
        Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t )
-    ~custom_gate_type :
-    _ Types.Wrap.Proof_state.Deferred_values.t =
+    ~custom_gate_type : _ Types.Wrap.Proof_state.Deferred_values.t =
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
   Timer.start __LOC__ ;

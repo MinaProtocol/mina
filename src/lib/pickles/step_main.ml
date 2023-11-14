@@ -18,7 +18,7 @@ let _one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
   let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
   Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
 
-let verify_one ?(custom_gate_type = false) ~srs
+let verify_one ~custom_gate_type ~srs
     ({ app_state
      ; wrap_proof
      ; proof_state
@@ -40,6 +40,7 @@ let verify_one ?(custom_gate_type = false) ~srs
           Sponge.absorb sponge (`Field sponge_digest) ;
           sponge
         in
+        printf "step_mail.ml verify_one custom_gate_type = %b\n" custom_gate_type ;
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof ~custom_gate_type d.max_proofs_verified
           ~step_domains:d.step_domains ~zk_rows:d.zk_rows ~sponge
@@ -458,6 +459,7 @@ let step_main :
                       | `Side_loaded _ ->
                           ()
                     in
+                    printf "step_main.ml step_mail basic.custom_gate_type = %b\n" basic.custom_gate_type ;
                     let chals, v =
                       verify_one ~custom_gate_type:basic.custom_gate_type ~srs p
                         d messages_for_next_wrap_proof unfinalized should_verify

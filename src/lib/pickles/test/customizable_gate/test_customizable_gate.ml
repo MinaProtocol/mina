@@ -80,7 +80,7 @@ let test () =
               Pickles_types.Plonk_types.Features.
                 { none_bool with foreign_field_add = true }
           ; custom_gate_type =
-              false (* JES: TODO: vary this for tests as well as witness *)
+              true (* JES: TODO: vary this for tests as well as witness *)
           }
         ] )
       ()
@@ -129,9 +129,6 @@ let test () =
                 } )
           ; feature_flags =
               Pickles_types.Plonk_types.Features.none_bool
-              (* JES: TODO: Do I need to pass feature flags here for deferred values and next step? *)
-              (* Pickles_types.Plonk_types.Features.
-                 { none_bool with foreign_field_add = true } *)
           ; custom_gate_type = false (* JES: TODO *)
           }
         ] )

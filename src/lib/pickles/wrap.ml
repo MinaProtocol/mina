@@ -50,6 +50,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       (module Tick.Field)
       ~rounds:tick_rounds e.evals
   in
+  printf "wrap.ml combined_inner_product custom_gate_type = %b\n" custom_gate_type ;
   let ft_eval0 : Tick.Field.t =
     if custom_gate_type then
       Type1Plus.ft_eval0
@@ -112,8 +113,7 @@ type deferred_values_and_hints =
   }
 
 let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
-    ~actual_feature_flags
-    ~custom_gate_type
+    ~actual_feature_flags ~custom_gate_type
     ~(prev_challenges : ((Backend.Tick.Field.t, _) Vector.t, n) Vector.t)
     ~(step_vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
     ~(public_input : Backend.Tick.Field.t list)
@@ -411,7 +411,8 @@ let%test_module "gate finalization" =
                                               in OCaml into a var in circuit/Snarky.
 
          This complex function is called with two sets of inputs: once for the step circuit and
-         once for the wrap circuit.  It was decided not to use a functor for this. *) (* JES: Question: Why not use a functor? *)
+         once for the wrap circuit.  It was decided not to use a functor for this. *)
+      (* JES: Question: Why not use a functor? *)
       let deferred_values_typ =
         let open Impls.Step in
         let open Step_main_inputs in
@@ -665,7 +666,7 @@ let wrap
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
     ~actual_wrap_domains ~step_plonk_indices:_ ~feature_flags
-    ~actual_feature_flags (* ?(custom_gate_type = false) *) ?tweak_statement pk
+    ~actual_feature_flags ?(* ?(custom_gate_type = false) *) tweak_statement pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
       , _
@@ -831,7 +832,8 @@ let wrap
   [%log internal] "Wrap_compute_deferred_values" ;
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~sgs ~prev_challenges ~step_vk ~public_input ~proof
-      ~actual_proofs_verified ~actual_feature_flags ~custom_gate_type: false (* JES: TODO: Need to get from where? *)
+      ~actual_proofs_verified ~actual_feature_flags ~custom_gate_type:false
+    (* JES: TODO: Need to get from where? *)
   in
   [%log internal] "Wrap_compute_deferred_values_done" ;
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =

@@ -1033,6 +1033,7 @@ struct
       let evals1, evals2 =
         All_evals.With_public_input.In_circuit.factor evals
       in
+      printf "step_verifier.ml finalize_other_proof ft_eval0 custom_gate_type = %b\n" custom_gate_type ;
       let ft_eval0 : Field.t =
         with_label "ft_eval0" (fun () ->
             if custom_gate_type then
@@ -1104,6 +1105,7 @@ struct
           in
           equal b_used b_actual )
     in
+    printf "step_verifier.ml finalize_other_proof checked custom_gate_type = %b\n" custom_gate_type ;
     let plonk_checks_passed =
       with_label "plonk_checks_passed" (fun () ->
           if custom_gate_type then

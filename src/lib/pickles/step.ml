@@ -60,8 +60,7 @@ struct
           with type length = Max_proofs_verified.n
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
-      ~feature_flags
-      ~self_dlog_plonk_index
+      ~feature_flags ~self_dlog_plonk_index
       ~(public_input :
          ( var
          , value
@@ -179,8 +178,7 @@ struct
           ; beta = Challenge.Constant.to_tick_field plonk0.beta
           ; gamma = Challenge.Constant.to_tick_field plonk0.gamma
           ; joint_combiner = Option.map ~f:to_field plonk0.joint_combiner
-          ; feature_flags =
-              plonk0.feature_flags
+          ; feature_flags = plonk0.feature_flags
           }
         in
         let env =
@@ -240,7 +238,9 @@ struct
         Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
           ~old_bulletproof_challenges:
             statement.messages_for_next_step_proof.old_bulletproof_challenges
-          ~zk_rows:data.zk_rows ~proof_state:statement.proof_state ~custom_gate_type:data.custom_gate_type (* JES: PLACE1 *)
+          ~zk_rows:data.zk_rows ~proof_state:statement.proof_state
+          ~custom_gate_type:data.custom_gate_type
+        (* JES: PLACE1 *)
       in
       let prev_statement_with_hashes :
           ( _
