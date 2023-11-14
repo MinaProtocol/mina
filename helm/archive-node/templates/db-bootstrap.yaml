@@ -49,8 +49,8 @@ spec:
         command: ["bash", "-c"]
         args:
         - 'sleep 30
-        && apt-get update
-        && apt-get install -y curl
+        && apt update
+        && apt install -y curl
         && cd /tmp
         && {{ range .Values.archive.remoteSchemaAuxFiles }} curl -O {{.}} && {{ end }}
         psql
