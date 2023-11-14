@@ -10,51 +10,8 @@ let get_filenames =
   | filenames ->
       filenames
 
-let verify_block ~verify_blockchain_snarks ~block =
-  let header = Mina_block.header block in
-  let open Mina_block.Header in
-  verify_blockchain_snarks
-    [ (protocol_state header, protocol_state_proof header) ]
-
 let verify_snark_work ~verify_transaction_snarks ~proof ~message =
   verify_transaction_snarks [ (proof, message) ]
-
-module Validator (Sub : Submission.S) = struct
-  let validate ~no_checks ~verify_blockchain_snarks ~verify_transaction_snarks
-      submission =
-    let open Deferred.Result.Let_syntax in
-    let%bind block = Sub.block submission |> Deferred.return in
-    let%bind () =
-      if no_checks then return ()
-      else verify_block ~verify_blockchain_snarks ~block
-    in
-    let%map () =
-      if no_checks then return ()
-      else
-        match Sub.snark_work submission with
-        | None ->
-            Deferred.Result.return ()
-        | Some
-            Uptime_service.Proof_data.{ proof; proof_time = _; snark_work_fee }
-          ->
-            let message =
-              Mina_base.Sok_message.create ~fee:snark_work_fee
-                ~prover:(Sub.submitter submission)
-            in
-            verify_snark_work ~verify_transaction_snarks ~proof ~message
-    in
-    let header = Mina_block.header block in
-    let protocol_state = Mina_block.Header.protocol_state header in
-    let consensus_state =
-      Mina_state.Protocol_state.consensus_state protocol_state
-    in
-    ( Mina_state.Protocol_state.hashes protocol_state
-      |> State_hash.State_hashes.state_hash
-    , Mina_state.Protocol_state.previous_state_hash protocol_state
-    , Consensus.Data.Consensus_state.blockchain_length consensus_state
-    , Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state
-    )
-end
 
 type valid_payload =
   { state_hash : State_hash.t
@@ -138,6 +95,66 @@ let instantiate_verify_functions ~logger = function
       in
       Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
 
+module Make_verifier (Source : Submission.Data_source) = struct
+  let verify_transaction_snarks = Source.verify_transaction_snarks
+
+  let verify_blockchain_snarks = Source.verify_blockchain_snarks
+
+  let intialize_submission ?validate (src : Source.t) (sub : Submission.t) =
+    if Known_blocks.is_known sub.block_hash then ()
+    else
+      Known_blocks.add ?validate ~verify_blockchain_snarks
+        ~block_hash:sub.block_hash
+        (Source.load_block src ~block_hash:sub.block_hash)
+
+  let verify ~validate (submission : Submission.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind block = Known_blocks.get submission.block_hash in
+    let%bind () = Known_blocks.is_valid submission.block_hash in
+    let%map () =
+      if validate then
+        match submission.snark_work with
+        | None ->
+            Deferred.Result.return ()
+        | Some
+            Uptime_service.Proof_data.{ proof; proof_time = _; snark_work_fee }
+          ->
+            let message =
+              Mina_base.Sok_message.create ~fee:snark_work_fee
+                ~prover:submission.submitter
+            in
+            verify_snark_work ~verify_transaction_snarks ~proof ~message
+      else return ()
+    in
+    let header = Mina_block.header block in
+    let protocol_state = Mina_block.Header.protocol_state header in
+    let consensus_state =
+      Mina_state.Protocol_state.consensus_state protocol_state
+    in
+    ( Mina_state.Protocol_state.hashes protocol_state
+      |> State_hash.State_hashes.state_hash
+    , Mina_state.Protocol_state.previous_state_hash protocol_state
+    , Consensus.Data.Consensus_state.blockchain_length consensus_state
+    , Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state
+    )
+
+  let validate_and_display_results ~validate submission =
+    let open Deferred.Let_syntax in
+    match%map verify ~validate submission with
+    | Ok (state_hash, parent, height, slot) ->
+        display { state_hash; parent; height; slot }
+    | Error e ->
+        display_error @@ Error.to_string_hum e
+
+  let process ?(validate = true) (src : Source.t) =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind submissions = Source.load_submissions src in
+    List.iter submissions ~f:(intialize_submission ~validate src) ;
+    List.map submissions ~f:(validate_and_display_results ~validate)
+    |> Deferred.all_unit
+    |> Deferred.map ~f:Or_error.return
+end
+
 let filesystem_command =
   Command.async ~summary:"Verify submissions and block read from the filesystem"
     Command.Let_syntax.(
@@ -150,24 +167,23 @@ let filesystem_command =
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file
         in
+        let submission_paths = get_filenames inputs in
+        let module V = Make_verifier (struct
+          include Submission.Filesystem
+
+          let verify_blockchain_snarks = verify_blockchain_snarks
+
+          let verify_transaction_snarks = verify_transaction_snarks
+        end) in
         let open Deferred.Let_syntax in
-        let metadata_paths = get_filenames inputs in
-        let module V = Validator (Submission.JSON) in
-        Deferred.List.iter metadata_paths ~f:(fun path ->
-            match%bind
-              let open Deferred.Result.Let_syntax in
-              let%bind submission =
-                Submission.JSON.load ~block_dir path |> Deferred.return
-              in
-              V.validate ~no_checks ~verify_blockchain_snarks
-                ~verify_transaction_snarks submission
-            with
-            | Ok (state_hash, parent, height, slot) ->
-                display { state_hash; parent; height; slot } ;
-                Deferred.unit
-            | Error e ->
-                display_error @@ Error.to_string_hum e ;
-                Deferred.unit ))
+        match%bind
+          V.process ~validate:(not no_checks) { submission_paths; block_dir }
+        with
+        | Ok () ->
+            Deferred.unit
+        | Error e ->
+            display_error @@ Error.to_string_hum e ;
+            exit 1)
 
 let cassandra_command =
   Command.async ~summary:"Verify submissions and block read from Cassandra"
@@ -187,8 +203,8 @@ let cassandra_command =
             List.iter subs
               ~f:
                 (Async.printf "submission: '%a'\n" (fun () s ->
-                     Submission.JSON.raw_to_yojson s
-                     |> Yojson.Safe.pretty_to_string ) ) ;
+                     Submission.raw_to_yojson s |> Yojson.Safe.pretty_to_string )
+                ) ;
             Deferred.unit
         | Error e ->
             display_error @@ Error.to_string_hum e ;
