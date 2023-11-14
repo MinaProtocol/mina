@@ -71,21 +71,21 @@ let sparse_ledger_subset_exn (oledger : t) keys =
   in
   let uses_last, ledger =
     List.fold ~init:(false, ledger) keys ~f:(fun (uses_last, ledger) key ->
-        match find_index ledger key with
+        match find_index oledger key with
         | Some index ->
-            let path = path_exn ledger index in
-            let account = get_exn ledger index in
+            let path = path_exn oledger index in
+            let account = get_exn oledger index in
             (uses_last, add_path ledger path key account)
         | None ->
-            (uses_last, ledger) )
+            (true, ledger) )
   in
   let ledger =
     if uses_last then
       match ledger.current_location with
       | Some loc ->
-          let account = Mina_base.Sparse_ledger_base.get_exn ledger loc in
+          let account = Mina_base.Sparse_ledger_base.get_exn oledger loc in
           add_path ledger
-            (Mina_base.Sparse_ledger_base.path_exn ledger loc)
+            (Mina_base.Sparse_ledger_base.path_exn oledger loc)
             (Account.identifier account)
             account
       | None ->
