@@ -1159,12 +1159,22 @@ module T = struct
        without doing any further computation.
     *)
     Sparse_ledger.iteri !new_ledger ~f:(fun idx account ->
-        Ledger.set final_ledger
-          (Ledger.Location.Account
-             (Ledger.Addr.of_int_exn
-                ~ledger_depth:(Sparse_ledger.depth !new_ledger)
-                idx ) )
-          account ) ;
+        let is_empty =
+          Signature_lib.Public_key.Compressed.(equal empty account.public_key)
+        in
+        if not is_empty then (
+          let account_id = Account.identifier account in
+          let _, loc =
+            Ledger.get_or_create_account final_ledger account_id account
+            |> Or_error.ok_exn
+          in
+          (* Sanity check: Confirm that the location is equal in both trees. *)
+          [%test_eq: Ledger.Location.t] loc
+            (Ledger.Location.Account
+               (Ledger.Addr.of_int_exn
+                  ~ledger_depth:(Sparse_ledger.depth !new_ledger)
+                  idx ) ) ;
+          Ledger.set final_ledger loc account ) ) ;
     let new_staged_ledger =
       { scan_state = scan_state'
       ; ledger = final_ledger
