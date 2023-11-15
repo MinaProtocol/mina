@@ -10,12 +10,22 @@ type t [@@deriving sexp]
 module Scan_state : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t [@@deriving sexp]
 
       val hash : t -> Staged_ledger_hash.Aux_hash.t
     end
+
+    module V2 : sig
+      type t [@@deriving sexp]
+
+      val to_latest : t -> V3.t
+
+      val hash : t -> Staged_ledger_hash.Aux_hash.t
+    end
   end]
+
+  val v3_to_v2 : t -> Stable.V2.t
 
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]

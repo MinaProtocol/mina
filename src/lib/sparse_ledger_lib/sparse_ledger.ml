@@ -32,9 +32,7 @@ end
 module T = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V2 = struct
+    module V3 = struct
       type ('hash, 'key, 'account) t =
         { indexes : ('key * int) list
         ; depth : int
@@ -42,8 +40,29 @@ module T = struct
         ; current_location : int option
         }
       [@@deriving sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+
+    module V2 = struct
+      type ('hash, 'key, 'account) t =
+        { indexes : ('key * int) list
+        ; depth : int
+        ; tree : ('hash, 'account) Tree.Stable.V1.t
+        }
+      [@@deriving sexp, yojson]
+
+      let to_latest (t : _ t) : _ V3.t =
+        { indexes = t.indexes
+        ; depth = t.depth
+        ; tree = t.tree
+        ; current_location = None
+        }
     end
   end]
+
+  let v3_to_v2 (t : _ Stable.V3.t) : _ Stable.V2.t =
+    { indexes = t.indexes; depth = t.depth; tree = t.tree }
 
   type ('hash, 'key, 'account) t = ('hash, 'key, 'account) Stable.Latest.t =
     { indexes : ('key * int) list

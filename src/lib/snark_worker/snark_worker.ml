@@ -27,7 +27,7 @@ module Worker = struct
           type query = unit
 
           type response =
-            ( ( Transaction_witness.Stable.V2.t
+            ( ( Transaction_witness.Stable.V3.t
               , Inputs.Ledger_proof.Stable.V2.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
@@ -57,7 +57,7 @@ module Worker = struct
       module V2 = struct
         module T = struct
           type query =
-            ( ( Transaction_witness.Stable.V2.t
+            ( ( Transaction_witness.Stable.V3.t
               , Ledger_proof.Stable.V2.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
@@ -88,7 +88,7 @@ module Worker = struct
         module T = struct
           type query =
             Core_kernel.Error.Stable.V2.t
-            * ( Transaction_witness.Stable.V2.t
+            * ( Transaction_witness.Stable.V3.t
               , Inputs.Ledger_proof.Stable.V2.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t

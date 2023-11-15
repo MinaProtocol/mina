@@ -543,6 +543,17 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Merkle_tree_versioned = struct
     [%%versioned
     module Stable = struct
+      module V3 = struct
+        type t =
+          ( Hash_versioned.Stable.V1.t
+          , Stack_id.Stable.V1.t
+          , Stack_versioned.Stable.V1.t )
+          Sparse_ledger_lib.Sparse_ledger.T.Stable.V3.t
+        [@@deriving sexp, to_yojson]
+
+        let to_latest = Fn.id
+      end
+
       module V2 = struct
         type t =
           ( Hash_versioned.Stable.V1.t
@@ -551,9 +562,12 @@ module Make_str (A : Wire_types.Concrete) = struct
           Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
         [@@deriving sexp, to_yojson]
 
-        let to_latest = Fn.id
+        let to_latest = Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.to_latest
       end
     end]
+
+    let v3_to_v2 (t : t) : Stable.V2.t =
+      Sparse_ledger_lib.Sparse_ledger.T.v3_to_v2 t
 
     let (_ :
           ( t
@@ -1279,7 +1293,17 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
+    module V3 = struct
+      type t =
+        ( Merkle_tree_versioned.Stable.V3.t
+        , Stack_id.Stable.V1.t )
+        Poly_versioned.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+
+      (*let (_ : (t, T.t) Type_equal.t) = Type_equal.T*)
+
+      let to_latest = Fn.id
+    end
 
     module V2 = struct
       type t =
@@ -1288,13 +1312,25 @@ module Make_str (A : Wire_types.Concrete) = struct
         Poly_versioned.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let (_ : (t, T.t) Type_equal.t) = Type_equal.T
+      (*let (_ : (t, T.t) Type_equal.t) = Type_equal.T*)
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : V3.t =
+        { tree = Merkle_tree_versioned.Stable.V2.to_latest t.tree
+        ; pos_list = t.pos_list
+        ; new_pos = t.new_pos
+        }
     end
   end]
 
-  let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
+  (*let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T*)
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+
+  let v3_to_v2 (t : t) : Stable.V2.t =
+    { tree = Sparse_ledger_lib.Sparse_ledger.T.v3_to_v2 t.tree
+    ; pos_list = t.pos_list
+    ; new_pos = t.new_pos
+    }
 
   let%test_unit "add stack + remove stack = initial tree " =
     let constraint_constants =

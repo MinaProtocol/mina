@@ -160,6 +160,38 @@ module Rpcs = struct
       include Master
     end)
 
+    module V3 = struct
+      module T = struct
+        type query = State_hash.Stable.V1.t
+
+        type response =
+          ( Staged_ledger.Scan_state.Stable.V3.t
+          * Ledger_hash.Stable.V1.t
+          * Pending_coinbase.Stable.V3.t
+          * Mina_state.Protocol_state.Value.Stable.V2.t list )
+          option
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io
+          (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+
     module V2 = struct
       module T = struct
         type query = State_hash.Stable.V1.t
@@ -175,9 +207,25 @@ module Rpcs = struct
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model = Fn.id
+        let response_of_callee_model = function
+          | None ->
+              None
+          | Some (scan_state, ledger_hash, pending_coinbase, ps) ->
+              Some
+                ( Staged_ledger.Scan_state.v3_to_v2 scan_state
+                , ledger_hash
+                , Pending_coinbase.v3_to_v2 pending_coinbase
+                , ps )
 
-        let caller_model_of_response = Fn.id
+        let caller_model_of_response = function
+          | None ->
+              None
+          | Some (scan_state, ledger_hash, pending_coinbase, ps) ->
+              Some
+                ( Staged_ledger.Scan_state.Stable.V2.to_latest scan_state
+                , ledger_hash
+                , Pending_coinbase.Stable.V2.to_latest pending_coinbase
+                , ps )
       end
 
       module T' =

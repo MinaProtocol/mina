@@ -18,15 +18,23 @@ open Signature_lib
 open Currency
 
 module type S = sig
-  type t [@@deriving sexp, to_yojson]
-
   module Stable : sig
-    module V2 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, to_yojson, version]
+    module V3 : sig
+      type t [@@deriving bin_io, sexp, to_yojson, version]
     end
 
-    module Latest = V2
+    module V2 : sig
+      type t [@@deriving bin_io, sexp, to_yojson, version]
+
+      val to_latest : t -> V3.t
+    end
+
+    module Latest = V3
   end
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+
+  val v3_to_v2 : t -> Stable.V2.t
 
   module Coinbase_data : sig
     module Stable : sig

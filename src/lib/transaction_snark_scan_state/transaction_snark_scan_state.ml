@@ -33,6 +33,29 @@ end
 module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      (* TODO: The statement is redundant here - it can be computed from the
+         witness and the transaction
+      *)
+      type t =
+        { transaction_with_info :
+            Mina_transaction_logic.Transaction_applied.Stable.V2.t
+        ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
+        ; statement : Transaction_snark.Statement.Stable.V2.t
+        ; init_stack :
+            Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
+            .t
+        ; first_pass_ledger_witness :
+            (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
+        ; second_pass_ledger_witness :
+            (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
+        ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        }
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
@@ -53,9 +76,33 @@ module Transaction_with_witness = struct
         }
       [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : V3.t =
+        { transaction_with_info = t.transaction_with_info
+        ; state_hash = t.state_hash
+        ; statement = t.statement
+        ; init_stack = t.init_stack
+        ; block_global_slot = t.block_global_slot
+        ; first_pass_ledger_witness =
+            Mina_ledger.Sparse_ledger.Stable.V2.to_latest
+              t.first_pass_ledger_witness
+        ; second_pass_ledger_witness =
+            Mina_ledger.Sparse_ledger.Stable.V2.to_latest
+              t.second_pass_ledger_witness
+        }
     end
   end]
+
+  let v3_to_v2 (t : Stable.V3.t) : Stable.V2.t =
+    { transaction_with_info = t.transaction_with_info
+    ; state_hash = t.state_hash
+    ; statement = t.statement
+    ; init_stack = t.init_stack
+    ; block_global_slot = t.block_global_slot
+    ; first_pass_ledger_witness =
+        Mina_ledger.Sparse_ledger.v3_to_v2 t.first_pass_ledger_witness
+    ; second_pass_ledger_witness =
+        Mina_ledger.Sparse_ledger.v3_to_v2 t.second_pass_ledger_witness
+    }
 end
 
 module Ledger_proof_with_sok_message = struct
@@ -156,6 +203,59 @@ type job = Available_job.t [@@deriving sexp]
    the snarked ledger*)
 [%%versioned
 module Stable = struct
+  module V3 = struct
+    type t =
+      { scan_state :
+          ( Ledger_proof_with_sok_message.Stable.V2.t
+          , Transaction_with_witness.Stable.V3.t )
+          Parallel_scan.State.Stable.V1.t
+      ; previous_incomplete_zkapp_updates :
+          Transaction_with_witness.Stable.V3.t list
+          * [ `Border_block_continued_in_the_next_tree of bool ]
+      }
+    [@@deriving sexp]
+
+    let to_latest = Fn.id
+
+    let hash (t : t) =
+      (* use v2 to match the hashes of the network*)
+      let scan_state :
+          ( Ledger_proof_with_sok_message.Stable.V2.t
+          , Transaction_with_witness.Stable.V2.t )
+          Parallel_scan.State.Stable.V1.t =
+        Parallel_scan.State.map t.scan_state ~f1:Fn.id
+          ~f2:Transaction_with_witness.v3_to_v2
+      in
+      let txns, x = t.previous_incomplete_zkapp_updates in
+      let previous_incomplete_zkapp_updates =
+        (List.map txns ~f:Transaction_with_witness.v3_to_v2, x)
+      in
+      let state_hash =
+        Parallel_scan.State.hash scan_state
+          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
+          (Binable.to_string (module Transaction_with_witness.Stable.V2))
+      in
+      let ( previous_incomplete_zkapp_updates
+          , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
+        previous_incomplete_zkapp_updates
+      in
+      let incomplete_updates =
+        List.fold ~init:"" previous_incomplete_zkapp_updates ~f:(fun acc t ->
+            acc
+            ^ Binable.to_string (module Transaction_with_witness.Stable.V2) t )
+        |> Digestif.SHA256.digest_string
+      in
+      let continue_in_next_tree =
+        Digestif.SHA256.digest_string (Bool.to_string continue_in_next_tree)
+      in
+      Staged_ledger_hash.Aux_hash.of_sha256
+        Digestif.SHA256.(
+          digest_string
+            ( to_raw_string state_hash
+            ^ to_raw_string incomplete_updates
+            ^ to_raw_string continue_in_next_tree ))
+  end
+
   module V2 = struct
     type t =
       { scan_state :
@@ -168,7 +268,14 @@ module Stable = struct
       }
     [@@deriving sexp]
 
-    let to_latest = Fn.id
+    let to_latest (t : t) : V3.t =
+      let txns, x = t.previous_incomplete_zkapp_updates in
+      { scan_state =
+          Parallel_scan.State.map t.scan_state ~f1:Fn.id
+            ~f2:Transaction_with_witness.Stable.V2.to_latest
+      ; previous_incomplete_zkapp_updates =
+          (List.map txns ~f:Transaction_with_witness.Stable.V2.to_latest, x)
+      }
 
     let hash (t : t) =
       let state_hash =
@@ -197,6 +304,20 @@ module Stable = struct
             ^ to_raw_string continue_in_next_tree ))
   end
 end]
+
+let v3_to_v2 (t : t) : Stable.V2.t =
+  let scan_state :
+      ( Ledger_proof_with_sok_message.Stable.V2.t
+      , Transaction_with_witness.Stable.V2.t )
+      Parallel_scan.State.Stable.V1.t =
+    Parallel_scan.State.map t.scan_state ~f1:Fn.id
+      ~f2:Transaction_with_witness.v3_to_v2
+  in
+  let txns, x = t.previous_incomplete_zkapp_updates in
+  let previous_incomplete_zkapp_updates =
+    (List.map txns ~f:Transaction_with_witness.v3_to_v2, x)
+  in
+  { scan_state; previous_incomplete_zkapp_updates }
 
 [%%define_locally Stable.Latest.(hash)]
 
