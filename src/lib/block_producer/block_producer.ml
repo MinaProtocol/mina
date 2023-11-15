@@ -151,8 +151,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             in
             match slot_tx_end with
             | Some slot_tx_end'
-              when Mina_numbers.Global_slot.(current_global_slot > slot_tx_end')
-              ->
+              when Mina_numbers.Global_slot.(
+                     current_global_slot >= slot_tx_end') ->
                 Ok
                   Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
             | None | Some _ -> (
