@@ -9,6 +9,7 @@
    stdio
    base
    base.caml
+   hex
    ppx_deriving_yojson.runtime
    yojson
    base64

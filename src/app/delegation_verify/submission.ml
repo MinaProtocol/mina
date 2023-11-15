@@ -21,6 +21,29 @@ type raw =
   }
 [@@deriving yojson]
 
+let decode_snark_work str =
+  match Base64.decode str with
+  | Ok str -> (
+      try Ok (Binable.of_string (module Uptime_service.Proof_data) str)
+      with _ -> Error (Error.of_string "Fail to decode snark work") )
+  | Error _ ->
+      Error (Error.of_string "Fail to decode snark work")
+
+let of_raw meta =
+  let open Result.Let_syntax in
+  let%bind.Result submitter =
+    Public_key.Compressed.of_base58_check meta.submitter
+  in
+  let%map snark_work =
+    match meta.snark_work with
+    | None ->
+        Ok None
+    | Some s ->
+        let%map snark_work = decode_snark_work s in
+        Some snark_work
+  in
+  { submitter; snark_work; block_hash = meta.block_hash }
+
 module type Data_source = sig
   type t
 
@@ -41,14 +64,6 @@ end
 module Filesystem = struct
   type t = { block_dir : string; submission_paths : string list }
 
-  let decode_snark_work str =
-    match Base64.decode str with
-    | Ok str -> (
-        try Ok (Binable.of_string (module Uptime_service.Proof_data) str)
-        with _ -> Error (Error.of_string "Fail to decode snark work") )
-    | Error _ ->
-        Error (Error.of_string "Fail to decode snark work")
-
   let load_submissions { submission_paths; _ } =
     Deferred.create (fun ivar ->
         List.fold_right submission_paths ~init:(Ok []) ~f:(fun filename acc ->
@@ -65,18 +80,8 @@ module Filesystem = struct
               | Ppx_deriving_yojson_runtime.Result.Error e ->
                   Error (Error.of_string e)
             in
-            let%bind.Result submitter =
-              Public_key.Compressed.of_base58_check meta.submitter
-            in
-            let%map snark_work =
-              match meta.snark_work with
-              | None ->
-                  Ok None
-              | Some s ->
-                  let%map snark_work = decode_snark_work s in
-                  Some snark_work
-            in
-            { submitter; snark_work; block_hash = meta.block_hash } :: acc )
+            let%map t = of_raw meta in
+            t :: acc )
         |> Ivar.fill ivar )
 
   let load_block ~block_hash { block_dir; _ } =
@@ -85,4 +90,58 @@ module Filesystem = struct
         ( try Ok (In_channel.read_all block_path)
           with _ -> Error (Error.of_string "Fail to load block") )
         |> Ivar.fill ivar )
+end
+
+module Cassandra = struct
+  type t =
+    { executable : string option
+    ; keyspace : string
+    ; period_start : string
+    ; period_end : string
+    }
+
+  type block_data = { raw_block : string } [@@deriving yojson]
+
+  let load_submissions { executable; keyspace; period_start; period_end } =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind raw =
+      Cassandra.select ?executable ~parse:raw_of_yojson ~keyspace
+        ~fields:
+          [ "created_at"
+          ; "peer_id"
+          ; "snark_work"
+          ; "remote_addr"
+          ; "submitter"
+          ; "block_hash"
+          ; "graphql_control_port"
+          ]
+        ~where:
+          (sprintf
+             "submitted_at_date = '%s' AND submitted_at >= '%s' AND \
+              submitted_at <= '%s'"
+             (List.hd_exn @@ String.split ~on:' ' period_start)
+             period_start period_end )
+        "submissions"
+    in
+    List.fold_right raw ~init:(Ok []) ~f:(fun sub acc ->
+        let open Result.Let_syntax in
+        let%bind l = acc in
+        printf "sub: '%s'\n" (Yojson.Safe.to_string @@ raw_to_yojson sub) ;
+        let%map s = of_raw sub in
+        s :: l )
+    |> Deferred.return
+
+  let load_block ~block_hash { executable; keyspace; _ } =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind block_data =
+      Cassandra.select ?executable ~parse:block_data_of_yojson ~keyspace
+        ~fields:[ "raw_block" ]
+        ~where:(sprintf "block_hash = '%s'" block_hash)
+        "blocks"
+    in
+    match List.hd block_data with
+    | None ->
+        Deferred.Or_error.error_string "Cassandra: Block not found"
+    | Some b ->
+        Hex.Safe.of_hex b.raw_block |> Option.value_exn |> return
 end
