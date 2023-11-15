@@ -1213,7 +1213,7 @@ let start t =
       ~precomputed_values:t.config.precomputed_values
       ~block_reward_threshold:t.config.block_reward_threshold
       ~block_produced_bvar:t.components.block_produced_bvar
-      ~slot_tx_end:t.config.slot_tx_end ;
+      ~slot_tx_end:t.config.slot_tx_end ~slot_chain_end:t.config.slot_chain_end ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with

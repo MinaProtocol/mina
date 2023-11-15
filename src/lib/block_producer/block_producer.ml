@@ -112,220 +112,238 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
     ~log_block_creation ~block_reward_threshold ~consensus_constants
-    ~slot_tx_end =
+    ~slot_tx_end ~slot_chain_end =
   let open Interruptible.Let_syntax in
-  let previous_protocol_state_body_hash =
-    Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
+  let current_global_slot =
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:consensus_constants
+           (Block_time.now time_controller) ))
   in
-  let previous_protocol_state_hash =
-    (Protocol_state.hashes_with_body
-       ~body_hash:previous_protocol_state_body_hash previous_protocol_state )
-      .state_hash
-  in
-  let previous_state_view =
-    Protocol_state.body previous_protocol_state
-    |> Mina_state.Protocol_state.Body.view
-  in
-  let supercharge_coinbase =
-    let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
-    let global_slot =
-      Consensus.Data.Block_data.global_slot_since_genesis block_data
-    in
-    Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
-      ~epoch_ledger ~global_slot
-  in
-  let%bind res =
-    Interruptible.uninterruptible
-      (let open Deferred.Let_syntax in
-      let coinbase_receiver =
-        Consensus.Data.Block_data.coinbase_receiver block_data
-      in
-
-      let diff =
-        O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
-            let current_global_slot =
-              Consensus.Data.Consensus_time.(
-                to_global_slot
-                  (of_time_exn ~constants:consensus_constants
-                     (Block_time.now time_controller) ))
-            in
-            match slot_tx_end with
-            | Some slot_tx_end'
-              when Mina_numbers.Global_slot.(
-                     current_global_slot >= slot_tx_end') ->
-                Ok
-                  Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
-            | None | Some _ -> (
-                let diff =
-                  Staged_ledger.create_diff ~constraint_constants staged_ledger
-                    ~coinbase_receiver ~logger
-                    ~current_state_view:previous_state_view
-                    ~transactions_by_fee:transactions ~get_completed_work
-                    ~log_block_creation ~supercharge_coinbase
-                  |> Result.map_error ~f:(fun err ->
-                         Staged_ledger.Staged_ledger_error.Pre_diff err )
-                in
-                match (diff, block_reward_threshold) with
-                | Ok d, Some threshold ->
-                    let net_return =
-                      Option.value ~default:Currency.Amount.zero
-                        (Staged_ledger_diff.net_return ~constraint_constants
-                           ~supercharge_coinbase
-                           (Staged_ledger_diff.forget d) )
-                    in
-                    if Currency.Amount.(net_return >= threshold) then diff
-                    else (
-                      [%log info]
-                        "Block reward $reward is less than the \
-                         min-block-reward $threshold, creating empty block"
-                        ~metadata:
-                          [ ("threshold", Currency.Amount.to_yojson threshold)
-                          ; ("reward", Currency.Amount.to_yojson net_return)
-                          ] ;
-                      Ok
-                        Staged_ledger_diff.With_valid_signatures_and_proofs
-                        .empty_diff )
-                | _ ->
-                    diff ) )
-      in
-      match%map
-        let%bind.Deferred.Result diff = return diff in
-        Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
-          diff ~logger ~current_state_view:previous_state_view
-          ~state_and_body_hash:
-            (previous_protocol_state_hash, previous_protocol_state_body_hash)
-          ~coinbase_receiver ~supercharge_coinbase
-      with
-      | Ok
-          ( `Hash_after_applying next_staged_ledger_hash
-          , `Ledger_proof ledger_proof_opt
-          , `Staged_ledger transitioned_staged_ledger
-          , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) )
-        ->
-          (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
-          ignore
-          @@ Ledger.unregister_mask_exn ~loc:__LOC__
-               (Staged_ledger.ledger transitioned_staged_ledger) ;
-          Some
-            ( (match diff with Ok diff -> diff | Error _ -> assert false)
-            , next_staged_ledger_hash
-            , ledger_proof_opt
-            , is_new_stack
-            , pending_coinbase_update )
-      | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
-          [%log error] "Failed to apply the diff: $error"
-            ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-          None
-      | Error e ->
-          ( match diff with
-          | Ok diff ->
-              [%log error]
-                ~metadata:
-                  [ ( "error"
-                    , `String (Staged_ledger.Staged_ledger_error.to_string e) )
-                  ; ( "diff"
-                    , Staged_ledger_diff.With_valid_signatures_and_proofs
-                      .to_yojson diff )
-                  ]
-                "Error applying the diff $diff: $error"
-          | Error e ->
-              [%log error] "Error building the diff: $error"
-                ~metadata:
-                  [ ( "error"
-                    , `String (Staged_ledger.Staged_ledger_error.to_string e) )
-                  ] ) ;
-          None)
-  in
-  match res with
-  | None ->
+  match slot_chain_end with
+  | Some slot_chain_end'
+    when Mina_numbers.Global_slot.(current_global_slot >= slot_chain_end') ->
       Interruptible.return None
-  | Some
-      ( diff
-      , next_staged_ledger_hash
-      , ledger_proof_opt
-      , is_new_stack
-      , pending_coinbase_update ) ->
-      let%bind protocol_state, consensus_transition_data =
-        lift_sync (fun () ->
-            let previous_ledger_hash =
-              previous_protocol_state |> Protocol_state.blockchain_state
-              |> Blockchain_state.snarked_ledger_hash
-            in
-            let next_ledger_hash =
-              Option.value_map ledger_proof_opt
-                ~f:(fun (proof, _) ->
-                  Ledger_proof.statement proof |> Ledger_proof.statement_target
-                  )
-                ~default:previous_ledger_hash
-            in
-            let snarked_next_available_token =
-              match ledger_proof_opt with
-              | Some (proof, _) ->
-                  (Ledger_proof.statement proof).next_available_token_after
-              | None ->
-                  previous_protocol_state |> Protocol_state.blockchain_state
-                  |> Blockchain_state.snarked_next_available_token
-            in
-            let genesis_ledger_hash =
-              previous_protocol_state |> Protocol_state.blockchain_state
-              |> Blockchain_state.genesis_ledger_hash
-            in
-            let supply_increase =
-              Option.value_map ledger_proof_opt
-                ~f:(fun (proof, _) ->
-                  (Ledger_proof.statement proof).supply_increase )
-                ~default:Currency.Amount.zero
-            in
-            let blockchain_state =
-              (* We use the time of the beginning of the slot because if things
-                 are slower than expected, we may have entered the next slot and
-                 putting the **current** timestamp rather than the expected one
-                 will screw things up.
-
-                 [generate_transition] will log an error if the [current_time]
-                 has a different slot from the [scheduled_time]
-              *)
-              Blockchain_state.create_value ~timestamp:scheduled_time
-                ~snarked_ledger_hash:next_ledger_hash ~genesis_ledger_hash
-                ~snarked_next_available_token
-                ~staged_ledger_hash:next_staged_ledger_hash
-            in
-            let current_time =
-              Block_time.now time_controller
-              |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
-            in
-            O1trace.sync_thread "generate_consensus_transition" (fun () ->
-                Consensus_state_hooks.generate_transition
-                  ~previous_protocol_state ~blockchain_state ~current_time
-                  ~block_data ~supercharge_coinbase
-                  ~snarked_ledger_hash:previous_ledger_hash ~genesis_ledger_hash
-                  ~supply_increase ~logger ~constraint_constants ) )
+  | None | Some _ -> (
+      let previous_protocol_state_body_hash =
+        Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
       in
-      lift_sync (fun () ->
-          let snark_transition =
-            O1trace.sync_thread "generate_snark_transition" (fun () ->
-                Snark_transition.create_value
-                  ~blockchain_state:
-                    (Protocol_state.blockchain_state protocol_state)
-                  ~consensus_transition:consensus_transition_data
-                  ~pending_coinbase_update () )
+      let previous_protocol_state_hash =
+        (Protocol_state.hashes_with_body
+           ~body_hash:previous_protocol_state_body_hash previous_protocol_state )
+          .state_hash
+      in
+      let previous_state_view =
+        Protocol_state.body previous_protocol_state
+        |> Mina_state.Protocol_state.Body.view
+      in
+      let supercharge_coinbase =
+        let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
+        let global_slot =
+          Consensus.Data.Block_data.global_slot_since_genesis block_data
+        in
+        Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
+          ~epoch_ledger ~global_slot
+      in
+      let%bind res =
+        Interruptible.uninterruptible
+          (let open Deferred.Let_syntax in
+          let coinbase_receiver =
+            Consensus.Data.Block_data.coinbase_receiver block_data
           in
-          let internal_transition =
-            O1trace.sync_thread "generate_internal_transition" (fun () ->
-                Internal_transition.create ~snark_transition
-                  ~prover_state:
-                    (Consensus.Data.Block_data.prover_state block_data)
-                  ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
-                  ~ledger_proof:
-                    (Option.map ledger_proof_opt ~f:(fun (proof, _) -> proof)) )
+
+          let diff =
+            O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
+                let current_global_slot =
+                  Consensus.Data.Consensus_time.(
+                    to_global_slot
+                      (of_time_exn ~constants:consensus_constants
+                         (Block_time.now time_controller) ))
+                in
+                match slot_tx_end with
+                | Some slot_tx_end'
+                  when Mina_numbers.Global_slot.(
+                         current_global_slot >= slot_tx_end') ->
+                    Ok
+                      Staged_ledger_diff.With_valid_signatures_and_proofs
+                      .empty_diff
+                | None | Some _ -> (
+                    let diff =
+                      Staged_ledger.create_diff ~constraint_constants
+                        staged_ledger ~coinbase_receiver ~logger
+                        ~current_state_view:previous_state_view
+                        ~transactions_by_fee:transactions ~get_completed_work
+                        ~log_block_creation ~supercharge_coinbase
+                      |> Result.map_error ~f:(fun err ->
+                             Staged_ledger.Staged_ledger_error.Pre_diff err )
+                    in
+                    match (diff, block_reward_threshold) with
+                    | Ok d, Some threshold ->
+                        let net_return =
+                          Option.value ~default:Currency.Amount.zero
+                            (Staged_ledger_diff.net_return ~constraint_constants
+                               ~supercharge_coinbase
+                               (Staged_ledger_diff.forget d) )
+                        in
+                        if Currency.Amount.(net_return >= threshold) then diff
+                        else (
+                          [%log info]
+                            "Block reward $reward is less than the \
+                             min-block-reward $threshold, creating empty block"
+                            ~metadata:
+                              [ ( "threshold"
+                                , Currency.Amount.to_yojson threshold )
+                              ; ("reward", Currency.Amount.to_yojson net_return)
+                              ] ;
+                          Ok
+                            Staged_ledger_diff.With_valid_signatures_and_proofs
+                            .empty_diff )
+                    | _ ->
+                        diff ) )
           in
-          let witness =
-            { Pending_coinbase_witness.pending_coinbases =
-                Staged_ledger.pending_coinbase_collection staged_ledger
-            ; is_new_stack
-            }
+          match%map
+            let%bind.Deferred.Result diff = return diff in
+            Staged_ledger.apply_diff_unchecked staged_ledger
+              ~constraint_constants diff ~logger
+              ~current_state_view:previous_state_view
+              ~state_and_body_hash:
+                (previous_protocol_state_hash, previous_protocol_state_body_hash)
+              ~coinbase_receiver ~supercharge_coinbase
+          with
+          | Ok
+              ( `Hash_after_applying next_staged_ledger_hash
+              , `Ledger_proof ledger_proof_opt
+              , `Staged_ledger transitioned_staged_ledger
+              , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
+              ) ->
+              (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
+              ignore
+              @@ Ledger.unregister_mask_exn ~loc:__LOC__
+                   (Staged_ledger.ledger transitioned_staged_ledger) ;
+              Some
+                ( (match diff with Ok diff -> diff | Error _ -> assert false)
+                , next_staged_ledger_hash
+                , ledger_proof_opt
+                , is_new_stack
+                , pending_coinbase_update )
+          | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
+              [%log error] "Failed to apply the diff: $error"
+                ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+              None
+          | Error e ->
+              ( match diff with
+              | Ok diff ->
+                  [%log error]
+                    ~metadata:
+                      [ ( "error"
+                        , `String
+                            (Staged_ledger.Staged_ledger_error.to_string e) )
+                      ; ( "diff"
+                        , Staged_ledger_diff.With_valid_signatures_and_proofs
+                          .to_yojson diff )
+                      ]
+                    "Error applying the diff $diff: $error"
+              | Error e ->
+                  [%log error] "Error building the diff: $error"
+                    ~metadata:
+                      [ ( "error"
+                        , `String
+                            (Staged_ledger.Staged_ledger_error.to_string e) )
+                      ] ) ;
+              None)
+      in
+      match res with
+      | None ->
+          Interruptible.return None
+      | Some
+          ( diff
+          , next_staged_ledger_hash
+          , ledger_proof_opt
+          , is_new_stack
+          , pending_coinbase_update ) ->
+          let%bind protocol_state, consensus_transition_data =
+            lift_sync (fun () ->
+                let previous_ledger_hash =
+                  previous_protocol_state |> Protocol_state.blockchain_state
+                  |> Blockchain_state.snarked_ledger_hash
+                in
+                let next_ledger_hash =
+                  Option.value_map ledger_proof_opt
+                    ~f:(fun (proof, _) ->
+                      Ledger_proof.statement proof
+                      |> Ledger_proof.statement_target )
+                    ~default:previous_ledger_hash
+                in
+                let snarked_next_available_token =
+                  match ledger_proof_opt with
+                  | Some (proof, _) ->
+                      (Ledger_proof.statement proof).next_available_token_after
+                  | None ->
+                      previous_protocol_state |> Protocol_state.blockchain_state
+                      |> Blockchain_state.snarked_next_available_token
+                in
+                let genesis_ledger_hash =
+                  previous_protocol_state |> Protocol_state.blockchain_state
+                  |> Blockchain_state.genesis_ledger_hash
+                in
+                let supply_increase =
+                  Option.value_map ledger_proof_opt
+                    ~f:(fun (proof, _) ->
+                      (Ledger_proof.statement proof).supply_increase )
+                    ~default:Currency.Amount.zero
+                in
+                let blockchain_state =
+                  (* We use the time of the beginning of the slot because if things
+                     are slower than expected, we may have entered the next slot and
+                     putting the **current** timestamp rather than the expected one
+                     will screw things up.
+
+                     [generate_transition] will log an error if the [current_time]
+                     has a different slot from the [scheduled_time]
+                  *)
+                  Blockchain_state.create_value ~timestamp:scheduled_time
+                    ~snarked_ledger_hash:next_ledger_hash ~genesis_ledger_hash
+                    ~snarked_next_available_token
+                    ~staged_ledger_hash:next_staged_ledger_hash
+                in
+                let current_time =
+                  Block_time.now time_controller
+                  |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
+                in
+                O1trace.sync_thread "generate_consensus_transition" (fun () ->
+                    Consensus_state_hooks.generate_transition
+                      ~previous_protocol_state ~blockchain_state ~current_time
+                      ~block_data ~supercharge_coinbase
+                      ~snarked_ledger_hash:previous_ledger_hash
+                      ~genesis_ledger_hash ~supply_increase ~logger
+                      ~constraint_constants ) )
           in
-          Some (protocol_state, internal_transition, witness) )
+          lift_sync (fun () ->
+              let snark_transition =
+                O1trace.sync_thread "generate_snark_transition" (fun () ->
+                    Snark_transition.create_value
+                      ~blockchain_state:
+                        (Protocol_state.blockchain_state protocol_state)
+                      ~consensus_transition:consensus_transition_data
+                      ~pending_coinbase_update () )
+              in
+              let internal_transition =
+                O1trace.sync_thread "generate_internal_transition" (fun () ->
+                    Internal_transition.create ~snark_transition
+                      ~prover_state:
+                        (Consensus.Data.Block_data.prover_state block_data)
+                      ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
+                      ~ledger_proof:
+                        (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
+                             proof ) ) )
+              in
+              let witness =
+                { Pending_coinbase_witness.pending_coinbases =
+                    Staged_ledger.pending_coinbase_collection staged_ledger
+                ; is_new_stack
+                }
+              in
+              Some (protocol_state, internal_transition, witness) ) )
 
 module Precomputed = struct
   type t = Precomputed.t =
@@ -556,7 +574,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
     ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
     ~(precomputed_values : Precomputed_values.t) ~block_reward_threshold
-    ~block_produced_bvar ~slot_tx_end =
+    ~block_produced_bvar ~slot_tx_end ~slot_chain_end =
   O1trace.sync_thread "produce_blocks" (fun () ->
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants = precomputed_values.consensus_constants in
@@ -682,7 +700,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk ~block_reward_threshold ~consensus_constants
-                ~slot_tx_end
+                ~slot_tx_end ~slot_chain_end
             in
             match next_state_opt with
             | None ->

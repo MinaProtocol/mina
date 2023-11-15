@@ -1297,7 +1297,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             | None ->
                 Mina_compile_config.slot_tx_end
           in
-          let _slot_chain_end =
+          let slot_chain_end =
             match slot_chain_end with
             | Some "none" ->
                 None
@@ -1337,7 +1337,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~stop_time ~node_status_url
-                 ~slot_tx_end () )
+                 ~slot_tx_end ~slot_chain_end () )
           in
           { Coda_initialization.coda
           ; client_trustlist
