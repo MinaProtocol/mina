@@ -64,29 +64,29 @@ func (app *app) NextId() uint64 {
 
 func (app *app) AddPeers(infos ...peer.AddrInfo) {
 	app.addedPeersMutex.Lock()
+	defer app.addedPeersMutex.Unlock()
 	app._addedPeers = append(app._addedPeers, infos...)
-	app.addedPeersMutex.Unlock()
 }
 
 func (app *app) GetAddedPeers() []peer.AddrInfo {
 	app.addedPeersMutex.RLock()
+	defer app.addedPeersMutex.RUnlock()
 	copyOfAddedPeers := make([]peer.AddrInfo, len(app._addedPeers))
 	copy(copyOfAddedPeers, app._addedPeers)
-	app.addedPeersMutex.RUnlock()
 	return copyOfAddedPeers
 }
 
 func (app *app) ResetAddedPeers() {
 	app.addedPeersMutex.Lock()
+	defer app.addedPeersMutex.Unlock()
 	app._addedPeers = nil
-	app.addedPeersMutex.Unlock()
 }
 
 func (app *app) AddStream(stream net.Stream) uint64 {
 	streamIdx := app.NextId()
 	app.streamsMutex.Lock()
+	defer app.streamsMutex.Unlock()
 	app._streams[streamIdx] = stream
-	app.streamsMutex.Unlock()
 	return streamIdx
 }
 
@@ -143,23 +143,23 @@ func (app *app) AddValidator() (uint64, chan pubsub.ValidationResult) {
 	seqno := app.NextId()
 	ch := make(chan pubsub.ValidationResult)
 	app.validatorMutex.Lock()
+	defer app.validatorMutex.Unlock()
 	app._validators[seqno] = new(validationStatus)
 	app._validators[seqno].Completion = ch
-	app.validatorMutex.Unlock()
 	return seqno, ch
 }
 
 func (app *app) RemoveValidator(seqno uint64) {
 	app.validatorMutex.Lock()
+	defer app.validatorMutex.Unlock()
 	delete(app._validators, seqno)
-	app.validatorMutex.Unlock()
 }
 
 func (app *app) TimeoutValidator(seqno uint64) {
 	now := time.Now()
 	app.validatorMutex.Lock()
+	defer app.validatorMutex.Unlock()
 	app._validators[seqno].TimedOutAt = &now
-	app.validatorMutex.Unlock()
 }
 
 func (app *app) FinishValidator(seqno uint64, finish func(st *validationStatus)) bool {
@@ -176,21 +176,21 @@ func (app *app) FinishValidator(seqno uint64, finish func(st *validationStatus))
 
 func (app *app) AddTopic(topicName string, topic *pubsub.Topic) {
 	app.topicsMutex.Lock()
+	defer app.topicsMutex.Unlock()
 	app._topics[topicName] = topic
-	app.topicsMutex.Unlock()
 }
 
 func (app *app) GetTopic(topicName string) (*pubsub.Topic, bool) {
 	app.topicsMutex.RLock()
+	defer app.topicsMutex.RUnlock()
 	topic, has := app._topics[topicName]
-	app.topicsMutex.RUnlock()
 	return topic, has
 }
 
 func (app *app) AddSubscription(subId uint64, sub subscription) {
 	app.subsMutex.Lock()
+	defer app.subsMutex.Unlock()
 	app._subs[subId] = sub
-	app.subsMutex.Unlock()
 }
 
 func (app *app) CancelSubscription(subId uint64) bool {
