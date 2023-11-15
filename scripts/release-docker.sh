@@ -120,8 +120,8 @@ itn-orchestrator)
 esac
 
 
-REPO="--build-arg MINA_REPO=${BUILDKITE_PULL_REQUEST_REPO}"
-if [[ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
+REPO="--build-arg MINA_REPO=${BUILDKITE_REPO}"
+if [[ -z "${BUILDKITE_REPO}" ]]; then
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
 fi
 
