@@ -1,10 +1,15 @@
 open Async
-open Core
 
-include Monad.S
+type 'a parser = Yojson.Safe.t -> 'a Ppx_deriving_yojson_runtime.error_or
 
-val lift : 'a Deferred.Or_error.t -> 'a t
+val query :
+  ?executable:string -> parse:'a parser -> string -> 'a list Deferred.Or_error.t
 
-val exec : ?cqlsh:string -> keyspace:string -> 'a t -> 'a Deferred.Or_error.t
-
-val query : string -> Submission.raw list t
+val select :
+     ?executable:string
+  -> keyspace:string
+  -> parse:'a parser
+  -> fields:string list
+  -> ?where:string
+  -> string
+  -> 'a list Deferred.Or_error.t

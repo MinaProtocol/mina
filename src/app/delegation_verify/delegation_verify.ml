@@ -189,26 +189,37 @@ let cassandra_command =
   Command.async ~summary:"Verify submissions and block read from Cassandra"
     Command.Let_syntax.(
       let%map_open cqlsh = cassandra_executable_flag
-      and _period_start = timestamp
-      and _period_end = timestamp in
+      and no_checks = no_checks_flag
+      and config_file = config_flag
+      and period_start = timestamp
+      and period_end = timestamp in
       fun () ->
         let open Deferred.Let_syntax in
-        match%bind
-          Cassandra.exec ?cqlsh ~keyspace:"bpu_integration_dev"
-          @@ Cassandra.query
-               "SELECT JSON created_at, peer_id, snark_work, remote_addr, \
-                submitter, block_hash, graphql_control_port FROM submissions;"
-        with
-        | Ok subs ->
-            List.iter subs
-              ~f:
-                (Async.printf "submission: '%a'\n" (fun () s ->
-                     Submission.raw_to_yojson s |> Yojson.Safe.pretty_to_string )
-                ) ;
+        let logger = Logger.create () in
+        let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
+          instantiate_verify_functions ~logger config_file
+        in
+        let module V = Make_verifier (struct
+          include Submission.Cassandra
+
+          let verify_blockchain_snarks = verify_blockchain_snarks
+
+          let verify_transaction_snarks = verify_transaction_snarks
+        end) in
+        let src =
+          Submission.Cassandra.
+            { executable = cqlsh
+            ; keyspace = "bpu_integration_dev"
+            ; period_start
+            ; period_end
+            }
+        in
+        match%bind V.process ~validate:(not no_checks) src with
+        | Ok () ->
             Deferred.unit
         | Error e ->
             display_error @@ Error.to_string_hum e ;
-            Deferred.unit)
+            exit 1)
 
 let command =
   Command.group
