@@ -65,7 +65,8 @@ module type Data_source = sig
        (Ledger_proof.t * Mina_base.Sok_message.t) list
     -> (unit, Error.t) Deferred.Result.t
 
-  val output : t -> submission -> Output.t Or_error.t -> unit Deferred.Or_error.t
+  val output :
+    t -> submission -> Output.t Or_error.t -> unit Deferred.Or_error.t
 end
 
 module Filesystem = struct
@@ -100,9 +101,8 @@ module Filesystem = struct
 
   let output _ (_submission : submission) = function
     | Ok payload ->
-       Output.display payload ;
-       Deferred.Or_error.return ()
-
+        Output.display payload ;
+        Deferred.Or_error.return ()
     | Error e ->
         Output.display_error @@ Error.to_string_hum e ;
         Deferred.Or_error.return ()
@@ -166,5 +166,29 @@ module Cassandra = struct
         String.chop_prefix_exn b.raw_block ~prefix:"0x"
         |> Hex.Safe.of_hex |> Option.value_exn |> return
 
-  let output = Filesystem.output
+  let output src (submission : submission) = function
+    | Ok payload ->
+        Output.display payload ;
+        Cassandra.update ?executable:src.executable ~keyspace:src.keyspace
+          ~table:"submissions"
+          ~where:
+            (sprintf
+               "submitted_at_date = '%s' and submitted_at = '%s' and submitter \
+                = '%s'"
+               (List.hd_exn @@ String.split ~on:' ' submission.created_at)
+               submission.created_at
+               (Public_key.Compressed.to_base58_check submission.submitter) )
+          Output.(valid_payload_to_cassandra_updates payload)
+    | Error e ->
+        Output.display_error @@ Error.to_string_hum e ;
+        Cassandra.update ?executable:src.executable ~keyspace:src.keyspace
+          ~table:"submissions"
+          ~where:
+            (sprintf
+               "submitted_at_date = '%s' and submitted_at = '%s' and submitter \
+                = '%s'"
+               (List.hd_exn @@ String.split ~on:' ' submission.created_at)
+               submission.created_at
+               (Public_key.Compressed.to_base58_check submission.submitter) )
+          [ ("validation_error", sprintf "'%s'" (Error.to_string_hum e)) ]
 end

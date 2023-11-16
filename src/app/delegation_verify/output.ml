@@ -20,6 +20,14 @@ let valid_payload_to_yojson (p : t) : Yojson.Safe.t =
     ; ("slot", `Int (Mina_numbers.Global_slot_since_genesis.to_int p.slot))
     ]
 
+let valid_payload_to_cassandra_updates (p : t) =
+  [ ("height", Unsigned.UInt32.to_string p.height)
+  ; ("slot", Mina_numbers.Global_slot_since_genesis.to_string p.slot)
+  ; ("parent", Printf.sprintf "'%s'" @@ State_hash.to_base58_check p.parent)
+  ; ( "state_hash"
+    , Printf.sprintf "'%s'" @@ State_hash.to_base58_check p.state_hash )
+  ]
+
 let display valid_payload =
   printf "%s\n" @@ Yojson.Safe.to_string
   @@ valid_payload_to_yojson valid_payload
