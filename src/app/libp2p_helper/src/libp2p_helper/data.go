@@ -20,6 +20,24 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
+// Stream with mutex
+type stream struct {
+	mutex  sync.Mutex
+	stream net.Stream
+}
+
+func (s *stream) Reset() error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.stream.Reset()
+}
+
+func (s *stream) Close() error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.stream.Close()
+}
+
 type app struct {
 	P2p                      *codanet.Helper
 	Ctx                      context.Context
@@ -29,8 +47,8 @@ type app struct {
 	topicsMutex              sync.RWMutex
 	_validators              map[uint64]*validationStatus
 	validatorMutex           sync.Mutex
-	_streams                 map[uint64]net.Stream
-	streamsMutex             sync.Mutex
+	_streams                 map[uint64]*stream
+	streamsMutex             sync.RWMutex
 	Out                      *bufio.Writer
 	OutChan                  chan *capnp.Message
 	Bootstrapper             io.Closer

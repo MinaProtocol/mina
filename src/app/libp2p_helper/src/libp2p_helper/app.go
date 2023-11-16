@@ -31,7 +31,7 @@ func newApp() *app {
 		_subs:                    make(map[uint64]subscription),
 		_topics:                  make(map[string]*pubsub.Topic),
 		_validators:              make(map[uint64]*validationStatus),
-		_streams:                 make(map[uint64]net.Stream),
+		_streams:                 make(map[uint64]*stream),
 		OutChan:                  outChan,
 		Out:                      bufio.NewWriter(os.Stdout),
 		_addedPeers:              []peer.AddrInfo{},
@@ -83,15 +83,15 @@ func (app *app) ResetAddedPeers() {
 	app._addedPeers = nil
 }
 
-func (app *app) AddStream(stream net.Stream) uint64 {
+func (app *app) AddStream(stream_ net.Stream) uint64 {
 	streamIdx := app.NextId()
 	app.streamsMutex.Lock()
 	defer app.streamsMutex.Unlock()
-	app._streams[streamIdx] = stream
+	app._streams[streamIdx] = &stream{stream: stream_}
 	return streamIdx
 }
 
-func (app *app) RemoveStream(streamId uint64) (net.Stream, bool) {
+func (app *app) RemoveStream(streamId uint64) (*stream, bool) {
 	app.streamsMutex.Lock()
 	defer app.streamsMutex.Unlock()
 	stream, ok := app._streams[streamId]
@@ -99,19 +99,28 @@ func (app *app) RemoveStream(streamId uint64) (net.Stream, bool) {
 	return stream, ok
 }
 
-func (app *app) StreamWrite(streamId uint64, data []byte) error {
-	// TODO Consider using a more fine-grained locking strategy,
-	// not using a global mutex to lock on a message sending
-	app.streamsMutex.Lock()
-	defer app.streamsMutex.Unlock()
-	if stream, ok := app._streams[streamId]; ok {
-		n, err := stream.Write(data)
-		if err != nil {
+func (app *app) getStream(streamId uint64) (*stream, bool) {
+	app.streamsMutex.RLock()
+	defer app.streamsMutex.RUnlock()
+	s, has := app._streams[streamId]
+	return s, has
+}
+
+func (app *app) WriteStream(streamId uint64, data []byte) error {
+	if stream, ok := app.getStream(streamId); ok {
+		stream.mutex.Lock()
+		defer stream.mutex.Unlock()
+
+		if n, err := stream.stream.Write(data); err != nil {
 			// TODO check that it's correct to error out, not repeat writing
-			delete(app._streams, streamId)
-			close_err := stream.Close()
-			if close_err != nil {
-				app.P2p.Logger.Errorf("failed to close stream %d after encountering write failure (%s): %s", streamId, err.Error(), close_err.Error())
+			_, has := app.RemoveStream(streamId)
+			if has {
+				// If stream is no longer in the *app, it means it is closed or soon to be closed by
+				// another goroutine
+				close_err := stream.stream.Close()
+				if close_err != nil {
+					app.P2p.Logger.Errorf("failed to close stream %d after encountering write failure (%s): %s", streamId, err.Error(), close_err.Error())
+				}
 			}
 			return wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data)))
 		}

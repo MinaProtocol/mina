@@ -224,7 +224,7 @@ func (m SendStreamReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	}
 	streamId := sid.Id()
 
-	err = app.StreamWrite(streamId, data)
+	err = app.WriteStream(streamId, data)
 
 	if err != nil {
 		return mkRpcRespError(seqno, err)
