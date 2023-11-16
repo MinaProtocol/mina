@@ -243,8 +243,6 @@ type Helper struct {
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
 	MsgStats          *MessageStats
-	_seeds            []peer.AddrInfo
-	seedsMutex        sync.RWMutex
 	NodeStatus        []byte
 	HeartbeatPeer     func(peer.ID)
 }
@@ -394,13 +392,6 @@ func (h *Helper) SetGatingState(gs *CodaGatingConfig) {
 			}()
 		}
 	}
-}
-
-func (h *Helper) AddSeeds(infos ...peer.AddrInfo) {
-	// TODO: this "_seeds" field is never read anywhere, is it needed?
-	h.seedsMutex.Lock()
-	h._seeds = append(h._seeds, infos...)
-	h.seedsMutex.Unlock()
 }
 
 func (gs *CodaGatingState) TrustPeer(p peer.ID) {
@@ -786,7 +777,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
 		MsgStats:          &MessageStats{min: math.MaxUint64},
-		_seeds:            seeds,
 		HeartbeatPeer: func(p peer.ID) {
 			lanPatcher.Heartbeat(p)
 			wanPatcher.Heartbeat(p)

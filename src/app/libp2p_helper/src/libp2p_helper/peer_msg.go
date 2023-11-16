@@ -48,11 +48,6 @@ func (m AddPeerReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	}
 
 	app.P2p.Logger.Info("addPeer Trying to connect to: ", info)
-
-	if AddPeerReqT(m).IsSeed() {
-		app.P2p.AddSeeds(*info)
-	}
-
 	err = app.P2p.Host.Connect(app.Ctx, *info)
 	if err != nil {
 		return mkRpcRespError(seqno, badp2p(err))
