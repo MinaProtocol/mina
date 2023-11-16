@@ -19,7 +19,7 @@ func testPublishDo(t *testing.T, app *app, topic string, data []byte, rpcSeqno u
 	require.NoError(t, m.SetTopic(topic))
 	require.NoError(t, m.SetData(data))
 
-	resMsg := PublishReq(m).handle(app, rpcSeqno)
+	resMsg, _ := PublishReq(m).handle(app, rpcSeqno)
 	require.NoError(t, err)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "publish")
 	require.Equal(t, seqno, rpcSeqno)
@@ -47,7 +47,7 @@ func testSubscribeDo(t *testing.T, app *app, topic string, subId uint64, rpcSeqn
 	require.NoError(t, err)
 	sid.SetId(subId)
 
-	resMsg := SubscribeReq(m).handle(app, rpcSeqno)
+	resMsg, _ := SubscribeReq(m).handle(app, rpcSeqno)
 	require.NoError(t, err)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "subscribe")
 	require.Equal(t, seqno, rpcSeqno)
@@ -89,7 +89,7 @@ func TestUnsubscribe(t *testing.T) {
 	require.NoError(t, err)
 	sid.SetId(idx)
 
-	resMsg := UnsubscribeReq(m).handle(testApp, 7739)
+	resMsg, _ := UnsubscribeReq(m).handle(testApp, 7739)
 	require.NoError(t, err)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "unsubscribe")
 	require.Equal(t, seqno, uint64(7739))

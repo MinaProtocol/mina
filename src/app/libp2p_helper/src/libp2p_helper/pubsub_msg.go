@@ -66,7 +66,7 @@ func fromPublishReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.Publish()
 	return PublishReq(i), err
 }
-func (m PublishReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m PublishReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -111,7 +111,7 @@ func fromSubscribeReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.Subscribe()
 	return SubscribeReq(i), err
 }
-func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m SubscribeReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -244,7 +244,7 @@ func fromUnsubscribeReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.Unsubscribe()
 	return UnsubscribeReq(i), err
 }
-func (m UnsubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m UnsubscribeReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}

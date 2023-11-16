@@ -22,7 +22,7 @@ func fromAddPeerReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.AddPeer()
 	return AddPeerReq(i), err
 }
-func (m AddPeerReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m AddPeerReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -71,7 +71,7 @@ func fromGetPeerNodeStatusReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.GetPeerNodeStatus()
 	return GetPeerNodeStatusReq(i), err
 }
-func (m GetPeerNodeStatusReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m GetPeerNodeStatusReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	ctx, cancel := context.WithTimeout(app.Ctx, codanet.NodeStatusTimeout)
 	defer cancel()
 	pma, err := GetPeerNodeStatusReqT(m).Peer()
@@ -147,7 +147,7 @@ func fromListPeersReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.ListPeers()
 	return ListPeersReq(i), err
 }
-func (msg ListPeersReq) handle(app *app, seqno uint64) *capnp.Message {
+func (msg ListPeersReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}

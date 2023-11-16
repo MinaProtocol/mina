@@ -19,7 +19,7 @@ func fromAddStreamHandlerReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.AddStreamHandler()
 	return AddStreamHandlerReq(i), err
 }
-func (m AddStreamHandlerReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m AddStreamHandlerReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -51,7 +51,7 @@ func fromCloseStreamReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.CloseStream()
 	return CloseStreamReq(i), err
 }
-func (m CloseStreamReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m CloseStreamReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -77,7 +77,7 @@ func fromOpenStreamReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.OpenStream()
 	return OpenStreamReq(i), err
 }
-func (m OpenStreamReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m OpenStreamReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -122,14 +122,7 @@ func (m OpenStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 	}
 
 	streamIdx := app.AddStream(stream)
-	go func() {
-		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
-		time.Sleep(250 * time.Millisecond)
-		// Note: It is _very_ important that we call handleStreamReads here -- this is how the "caller" side of the stream starts listening to the responses from the RPCs. Do not remove.
-		handleStreamReads(app, stream, streamIdx)
-	}()
-
-	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+	mkResponse := func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 		resp, err := m.NewOpenStream()
 		panicOnErr(err)
 		sid, err := resp.NewStreamId()
@@ -138,7 +131,10 @@ func (m OpenStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 		pi, err := resp.NewPeer()
 		panicOnErr(err)
 		setPeerInfo(pi, peer)
-	})
+	}
+	return mkRpcRespSuccessNoFunc(seqno, mkResponse), func() {
+		handleStreamReads(app, stream, streamIdx)
+	}
 }
 
 type RemoveStreamHandlerReqT = ipc.Libp2pHelperInterface_RemoveStreamHandler_Request
@@ -148,7 +144,7 @@ func fromRemoveStreamHandlerReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.RemoveStreamHandler()
 	return RemoveStreamHandlerReq(i), err
 }
-func (m RemoveStreamHandlerReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m RemoveStreamHandlerReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -171,7 +167,7 @@ func fromResetStreamReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.ResetStream()
 	return ResetStreamReq(i), err
 }
-func (m ResetStreamReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m ResetStreamReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -197,7 +193,7 @@ func fromSendStreamReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.SendStream()
 	return SendStreamReq(i), err
 }
-func (m SendStreamReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m SendStreamReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}

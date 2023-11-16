@@ -195,7 +195,8 @@ func beginAdvertisingSendAndCheckDo(app *app, rpcSeqno uint64) (*capnp.Message, 
 	if err != nil {
 		return nil, err
 	}
-	return BeginAdvertisingReq(m).handle(app, rpcSeqno), nil
+	r, _ := BeginAdvertisingReq(m).handle(app, rpcSeqno)
+	return r, nil
 }
 
 func checkBeginAdvertisingResponse(t *testing.T, rpcSeqno uint64, resMsg *capnp.Message) {

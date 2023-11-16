@@ -31,7 +31,7 @@ func fromBeginAdvertisingReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.BeginAdvertising()
 	return BeginAdvertisingReq(i), err
 }
-func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) *capnp.Message {
+func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -293,7 +293,7 @@ func fromConfigureReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.Configure()
 	return ConfigureReq(i), err
 }
-func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
+func (msg ConfigureReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	m, err := ConfigureReqT(msg).Config()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
@@ -487,7 +487,7 @@ func fromGetListeningAddrsReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.GetListeningAddrs()
 	return GetListeningAddrsReq(i), err
 }
-func (msg GetListeningAddrsReq) handle(app *app, seqno uint64) *capnp.Message {
+func (msg GetListeningAddrsReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -508,7 +508,7 @@ func fromGenerateKeypairReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.GenerateKeypair()
 	return GenerateKeypairReq(i), err
 }
-func (msg GenerateKeypairReq) handle(app *app, seqno uint64) *capnp.Message {
+func (msg GenerateKeypairReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	privk, pubk, err := crypto.GenerateEd25519Key(cryptorand.Reader)
 	if err != nil {
 		return mkRpcRespError(seqno, badp2p(err))
@@ -548,7 +548,7 @@ func fromListenReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.Listen()
 	return ListenReq(i), err
 }
-func (m ListenReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m ListenReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -586,7 +586,7 @@ func fromSetGatingConfigReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.SetGatingConfig()
 	return SetGatingConfigReq(i), err
 }
-func (m SetGatingConfigReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m SetGatingConfigReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -616,7 +616,7 @@ func fromSetNodeStatusReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.SetNodeStatus()
 	return SetNodeStatusReq(i), err
 }
-func (m SetNodeStatusReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m SetNodeStatusReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	status, err := SetNodeStatusReqT(m).Status()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))

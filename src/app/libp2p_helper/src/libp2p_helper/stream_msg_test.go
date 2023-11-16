@@ -19,7 +19,7 @@ func testAddStreamHandlerDo(t *testing.T, protocol string, app *app, rpcSeqno ui
 	require.NoError(t, err)
 	require.NoError(t, m.SetProtocol(protocol))
 
-	resMsg := AddStreamHandlerReq(m).handle(app, rpcSeqno)
+	resMsg, _ := AddStreamHandlerReq(m).handle(app, rpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "addStreamHandler")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasAddStreamHandler())
@@ -58,7 +58,7 @@ func testOpenStreamDo(t *testing.T, appA *app, appBHost host.Host, appBPort uint
 	require.NoError(t, pid.SetId(appBHost.ID().String()))
 	require.NoError(t, err)
 
-	resMsg := OpenStreamReq(m).handle(appA, rpcSeqno)
+	resMsg, _ := OpenStreamReq(m).handle(appA, rpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "openStream")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasOpenStream())
@@ -103,7 +103,7 @@ func testCloseStreamDo(t *testing.T, app *app, streamId uint64, rpcSeqno uint64)
 	require.NoError(t, err)
 	sid.SetId(streamId)
 
-	resMsg := CloseStreamReq(m).handle(app, rpcSeqno)
+	resMsg, _ := CloseStreamReq(m).handle(app, rpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "closeStream")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasCloseStream())
@@ -134,7 +134,7 @@ func TestRemoveStreamHandler(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, rsh.SetProtocol(newProtocol))
 	var rshRpcSeqno uint64 = 1023
-	resMsg := RemoveStreamHandlerReq(rsh).handle(appB, rshRpcSeqno)
+	resMsg, _ := RemoveStreamHandlerReq(rsh).handle(appB, rshRpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "removeStreamHandler")
 	require.Equal(t, seqno, rshRpcSeqno)
 	require.True(t, respSuccess.HasRemoveStreamHandler())
@@ -151,7 +151,7 @@ func TestRemoveStreamHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	var osRpcSeqno uint64 = 1026
-	osResMsg := OpenStreamReq(os).handle(appA, osRpcSeqno)
+	osResMsg, _ := OpenStreamReq(os).handle(appA, osRpcSeqno)
 	osRpcSeqno_, errMsg := checkRpcResponseError(t, osResMsg)
 	require.Equal(t, osRpcSeqno, osRpcSeqno_)
 	require.Equal(t, "libp2p error: protocols not supported: [/mina/99]", errMsg)
@@ -166,7 +166,7 @@ func testResetStreamDo(t *testing.T, app *app, streamId uint64, rpcSeqno uint64)
 	require.NoError(t, err)
 	sid.SetId(streamId)
 
-	resMsg := ResetStreamReq(m).handle(app, rpcSeqno)
+	resMsg, _ := ResetStreamReq(m).handle(app, rpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "resetStream")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasResetStream())
@@ -194,7 +194,7 @@ func testSendStreamDo(t *testing.T, app *app, streamId uint64, msgBytes []byte, 
 	sid.SetId(streamId)
 	require.NoError(t, msg.SetData(msgBytes))
 
-	resMsg := SendStreamReq(m).handle(app, rpcSeqno)
+	resMsg, _ := SendStreamReq(m).handle(app, rpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "sendStream")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasSendStream())
@@ -260,7 +260,7 @@ func TestOpenStreamBeforeAndAfterSetGatingConfig(t *testing.T) {
 		gc.SetIsolate(false)
 
 		var mRpcSeqno uint64 = 2003
-		resMsg := SetGatingConfigReq(m).handle(appB, mRpcSeqno)
+		resMsg, _ := SetGatingConfigReq(m).handle(appB, mRpcSeqno)
 		seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "setGatingConfig")
 		require.Equal(t, seqno, mRpcSeqno)
 		require.True(t, respSuccess.HasSetGatingConfig())
@@ -291,7 +291,7 @@ func TestOpenStreamBeforeAndAfterSetGatingConfig(t *testing.T) {
 		require.NoError(t, pid.SetId(appB.P2p.Host.ID().String()))
 		require.NoError(t, err)
 
-		resMsg := OpenStreamReq(m).handle(appA, 9905)
+		resMsg, _ := OpenStreamReq(m).handle(appA, 9905)
 		seqno, _ := checkRpcResponseError(t, resMsg)
 		require.Equal(t, uint64(9905), seqno)
 	}

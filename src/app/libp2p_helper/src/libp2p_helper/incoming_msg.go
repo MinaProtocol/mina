@@ -43,32 +43,36 @@ var pushMesssageExtractors = map[ipc.Libp2pHelperInterface_PushMessage_Which]ext
 // Handles messages coming from the OCaml process
 func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {
 	if msg.HasRpcRequest() {
-		resp, err := func() (*capnp.Message, error) {
+		resp, afterWriteHandler, err := func() (*capnp.Message, func(), error) {
 			req, err := msg.RpcRequest()
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			h, err := req.Header()
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			seqnoO, err := h.SequenceNumber()
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			seqno := seqnoO.Seqno()
 			extractor, foundHandler := rpcRequestExtractors[req.Which()]
 			if !foundHandler {
-				return nil, errors.New("Received rpc message of an unknown type")
+				return nil, nil, errors.New("Received rpc message of an unknown type")
 			}
 			req2, err := extractor(req)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
-			return req2.handle(app, seqno), nil
+			resp, afterWriteHandler := req2.handle(app, seqno)
+			return resp, afterWriteHandler, nil
 		}()
 		if err == nil {
 			app.writeMsg(resp)
+			if afterWriteHandler != nil {
+				afterWriteHandler()
+			}
 		} else {
 			app.P2p.Logger.Errorf("Failed to process rpc message: %s", err)
 		}

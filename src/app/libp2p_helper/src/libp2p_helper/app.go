@@ -23,7 +23,7 @@ import (
 )
 
 func newApp() *app {
-	outChan := make(chan *capnp.Message, 1<<12) // 4kb
+	outChan := make(chan *capnp.Message, 1<<12) // 4096 messages stacked
 	ctx := context.Background()
 	return &app{
 		P2p:                      nil,
