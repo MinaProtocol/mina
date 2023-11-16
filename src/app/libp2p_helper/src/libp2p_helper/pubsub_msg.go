@@ -35,26 +35,24 @@ func (m ValidationPush) handle(app *app) {
 		app.P2p.Logger.Errorf("handleValidation: error %s", err)
 		return
 	}
+	res := ValidationUnknown
+	switch ValidationPushT(m).Result() {
+	case ipc.ValidationResult_accept:
+		res = pubsub.ValidationAccept
+	case ipc.ValidationResult_reject:
+		res = pubsub.ValidationReject
+	case ipc.ValidationResult_ignore:
+		res = pubsub.ValidationIgnore
+	default:
+		app.P2p.Logger.Warnf("handleValidation: unknown validation result %d", ValidationPushT(m).Result())
+	}
 	seqno := vid.Id()
-	found := app.FinishValidator(seqno, func(st *validationStatus) {
-		res := ValidationUnknown
-		switch ValidationPushT(m).Result() {
-		case ipc.ValidationResult_accept:
-			res = pubsub.ValidationAccept
-		case ipc.ValidationResult_reject:
-			res = pubsub.ValidationReject
-		case ipc.ValidationResult_ignore:
-			res = pubsub.ValidationIgnore
-		default:
-			app.P2p.Logger.Warnf("handleValidation: unknown validation result %d", ValidationPushT(m).Result())
-		}
+	if st, found := app.RemoveValidator(seqno); found {
 		st.Completion <- res
 		if st.TimedOutAt != nil {
 			app.P2p.Logger.Errorf("validation for item %d took %d seconds", seqno, time.Now().Add(validationTimeout).Sub(*st.TimedOutAt))
 		}
-	})
-
-	if !found {
+	} else {
 		app.P2p.Logger.Warnf("handleValidation: validation seqno %d unknown", seqno)
 	}
 }
@@ -253,7 +251,9 @@ func (m UnsubscribeReq) handle(app *app, seqno uint64) (*capnp.Message, func()) 
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 	subId := subId_.Id()
-	if app.CancelSubscription(subId) {
+	if sub, found := app.RemoveSubscription(subId); found {
+		sub.Sub.Cancel()
+		sub.Cancel()
 		return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 			_, err := m.NewUnsubscribe()
 			panicOnErr(err)

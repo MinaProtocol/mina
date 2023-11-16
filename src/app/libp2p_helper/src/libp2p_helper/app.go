@@ -68,12 +68,13 @@ func (app *app) AddPeers(infos ...peer.AddrInfo) {
 	app._addedPeers = append(app._addedPeers, infos...)
 }
 
+// GetAddedPeers returns list of peers
+//
+// Elements of returned slice should never be modified!
 func (app *app) GetAddedPeers() []peer.AddrInfo {
 	app.addedPeersMutex.RLock()
 	defer app.addedPeersMutex.RUnlock()
-	copyOfAddedPeers := make([]peer.AddrInfo, len(app._addedPeers))
-	copy(copyOfAddedPeers, app._addedPeers)
-	return copyOfAddedPeers
+	return app._addedPeers
 }
 
 func (app *app) ResetAddedPeers() {
@@ -90,32 +91,12 @@ func (app *app) AddStream(stream net.Stream) uint64 {
 	return streamIdx
 }
 
-func (app *app) CloseStream(streamId uint64) error {
+func (app *app) RemoveStream(streamId uint64) (net.Stream, bool) {
 	app.streamsMutex.Lock()
 	defer app.streamsMutex.Unlock()
-	if stream, ok := app._streams[streamId]; ok {
-		delete(app._streams, streamId)
-		err := stream.Close()
-		if err != nil {
-			return badp2p(err)
-		}
-		return nil
-	}
-	return badRPC(errors.New("unknown stream_idx"))
-}
-
-func (app *app) ResetStream(streamId uint64) error {
-	app.streamsMutex.Lock()
-	defer app.streamsMutex.Unlock()
-	if stream, ok := app._streams[streamId]; ok {
-		delete(app._streams, streamId)
-		err := stream.Reset()
-		if err != nil {
-			return badp2p(err)
-		}
-		return nil
-	}
-	return badRPC(errors.New("unknown stream_idx"))
+	stream, ok := app._streams[streamId]
+	delete(app._streams, streamId)
+	return stream, ok
 }
 
 func (app *app) StreamWrite(streamId uint64, data []byte) error {
@@ -149,12 +130,6 @@ func (app *app) AddValidator() (uint64, chan pubsub.ValidationResult) {
 	return seqno, ch
 }
 
-func (app *app) RemoveValidator(seqno uint64) {
-	app.validatorMutex.Lock()
-	defer app.validatorMutex.Unlock()
-	delete(app._validators, seqno)
-}
-
 func (app *app) TimeoutValidator(seqno uint64) {
 	now := time.Now()
 	app.validatorMutex.Lock()
@@ -162,16 +137,12 @@ func (app *app) TimeoutValidator(seqno uint64) {
 	app._validators[seqno].TimedOutAt = &now
 }
 
-func (app *app) FinishValidator(seqno uint64, finish func(st *validationStatus)) bool {
+func (app *app) RemoveValidator(seqno uint64) (*validationStatus, bool) {
 	app.validatorMutex.Lock()
 	defer app.validatorMutex.Unlock()
-	if st, ok := app._validators[seqno]; ok {
-		finish(st)
-		delete(app._validators, seqno)
-		return true
-	} else {
-		return false
-	}
+	st, ok := app._validators[seqno]
+	delete(app._validators, seqno)
+	return st, ok
 }
 
 func (app *app) AddTopic(topicName string, topic *pubsub.Topic) {
@@ -193,18 +164,12 @@ func (app *app) AddSubscription(subId uint64, sub subscription) {
 	app._subs[subId] = sub
 }
 
-func (app *app) CancelSubscription(subId uint64) bool {
+func (app *app) RemoveSubscription(subId uint64) (subscription, bool) {
 	app.subsMutex.Lock()
 	defer app.subsMutex.Unlock()
-
-	if sub, ok := app._subs[subId]; ok {
-		sub.Sub.Cancel()
-		sub.Cancel()
-		delete(app._subs, subId)
-		return true
-	}
-
-	return false
+	sub, ok := app._subs[subId]
+	delete(app._subs, subId)
+	return sub, ok
 }
 
 func parseMultiaddrWithID(ma multiaddr.Multiaddr, id peer.ID) (*codaPeerInfo, error) {

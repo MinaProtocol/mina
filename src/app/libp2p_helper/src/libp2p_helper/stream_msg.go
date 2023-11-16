@@ -7,6 +7,7 @@ import (
 	ipc "libp2p_ipc"
 
 	capnp "capnproto.org/go/capnp/v3"
+	"github.com/go-errors/errors"
 	net "github.com/libp2p/go-libp2p/core/network"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
@@ -34,8 +35,8 @@ func (m AddStreamHandlerReq) handle(app *app, seqno uint64) (*capnp.Message, fun
 			return
 		}
 		streamIdx := app.AddStream(stream)
-		handleStreamReads(app, stream, streamIdx)
 		app.writeMsg(mkIncomingStreamUpcall(peerinfo, streamIdx, protocolId))
+		handleStreamReads(app, stream, streamIdx)
 	})
 
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
@@ -60,7 +61,13 @@ func (m CloseStreamReq) handle(app *app, seqno uint64) (*capnp.Message, func()) 
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 	streamId := sid.Id()
-	err = app.CloseStream(streamId)
+	if stream, found := app.RemoveStream(streamId); found {
+		if err2 := stream.Close(); err2 != nil {
+			err = badp2p(err2)
+		}
+	} else {
+		err = badRPC(errors.New("unknown stream_idx"))
+	}
 	if err != nil {
 		return mkRpcRespError(seqno, err)
 	}
@@ -176,7 +183,13 @@ func (m ResetStreamReq) handle(app *app, seqno uint64) (*capnp.Message, func()) 
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 	streamId := sid.Id()
-	err = app.ResetStream(streamId)
+	if stream, found := app.RemoveStream(streamId); found {
+		if err2 := stream.Reset(); err2 != nil {
+			err = badp2p(err2)
+		}
+	} else {
+		err = badRPC(errors.New("unknown stream_idx"))
+	}
 	if err != nil {
 		return mkRpcRespError(seqno, err)
 	}
