@@ -12,6 +12,7 @@ let query ?executable ~parse q =
   printf "SQL: '%s'\n" q ;
   let%bind data = Process.run_lines ~prog ~stdin:q ~args:[] () in
   List.slice data 3 (-2) (* skip header and footer *)
+  |> List.filter ~f:(fun s -> not (String.is_empty s))
   |> List.fold_right ~init:(Ok []) ~f:(fun line acc ->
          let open Or_error.Let_syntax in
          let%bind l = acc in
