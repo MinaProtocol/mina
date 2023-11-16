@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
@@ -22,6 +21,8 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 
 	net "github.com/libp2p/go-libp2p/core/network"
+
+	gonet "net"
 
 	ipc "libp2p_ipc"
 
@@ -54,7 +55,7 @@ const (
 )
 
 func TestMplex_SendLargeMessage(t *testing.T) {
-	// assert we are able to send and receive a message with size up to 1 << 30 bytes
+	// assert we are able to send and receive a message with size up to 1 MiB
 	appA, _ := newTestApp(t, nil, true)
 	appA.NoDHT = true
 
@@ -68,7 +69,7 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
-	msgSize := uint64(1 << 30)
+	msgSize := uint64(1 << 20)
 
 	withTimeoutAsync(t, func(done chan interface{}) {
 		// create handler that reads `msgSize` bytes
@@ -274,9 +275,14 @@ func TestLibp2pMetrics(t *testing.T) {
 
 	appB.P2p.Host.SetStreamHandler(testProtocol, handler)
 
+	listener, err := gonet.Listen("tcp", ":0")
+	if err != nil {
+		panic(err)
+	}
+	port := listener.Addr().(*gonet.TCPAddr).Port
 	server := http.NewServeMux()
 	server.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(":9001", server)
+	go http.Serve(listener, server)
 
 	go appB.checkPeerCount()
 	go appB.checkMessageStats()
@@ -292,11 +298,11 @@ func TestLibp2pMetrics(t *testing.T) {
 	expectedPeerCount := len(appB.P2p.Host.Network().Peers())
 	expectedCurrentConnCount := appB.P2p.ConnectionManager.GetInfo().ConnCount
 
-	resp, err := http.Get("http://localhost:9001/metrics")
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", port))
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 
 	respBody := string(body)

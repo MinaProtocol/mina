@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -58,7 +59,10 @@ func testOpenStreamDo(t *testing.T, appA *app, appBHost host.Host, appBPort uint
 	require.NoError(t, pid.SetId(appBHost.ID().String()))
 	require.NoError(t, err)
 
-	resMsg, _ := OpenStreamReq(m).handle(appA, rpcSeqno)
+	resMsg, afterWriteHandler := OpenStreamReq(m).handle(appA, rpcSeqno)
+	if afterWriteHandler != nil {
+		afterWriteHandler()
+	}
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "openStream")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasOpenStream())
@@ -151,7 +155,10 @@ func TestRemoveStreamHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	var osRpcSeqno uint64 = 1026
-	osResMsg, _ := OpenStreamReq(os).handle(appA, osRpcSeqno)
+	osResMsg, afterWriteHandler := OpenStreamReq(os).handle(appA, osRpcSeqno)
+	if afterWriteHandler != nil {
+		afterWriteHandler()
+	}
 	osRpcSeqno_, errMsg := checkRpcResponseError(t, osResMsg)
 	require.Equal(t, osRpcSeqno, osRpcSeqno_)
 	require.Equal(t, "libp2p error: protocols not supported: [/mina/99]", errMsg)
@@ -180,6 +187,22 @@ func testResetStreamDo(t *testing.T, app *app, streamId uint64, rpcSeqno uint64)
 func TestResetStream(t *testing.T) {
 	appA, streamId := testOpenStreamImpl(t, 9902, string(testProtocol))
 	testResetStreamDo(t, appA, streamId, 114558)
+}
+
+func testSendStreamFailDo(t *testing.T, app *app, streamId uint64, msgBytes []byte, rpcSeqno uint64) {
+	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+	require.NoError(t, err)
+	m, err := ipc.NewRootLibp2pHelperInterface_SendStream_Request(seg)
+	require.NoError(t, err)
+	msg, err := m.NewMsg()
+	require.NoError(t, err)
+	sid, err := msg.NewStreamId()
+	require.NoError(t, err)
+	sid.SetId(streamId)
+	require.NoError(t, msg.SetData(msgBytes))
+
+	resMsg, _ := SendStreamReq(m).handle(app, rpcSeqno)
+	checkRpcResponseError(t, resMsg)
 }
 
 func testSendStreamDo(t *testing.T, app *app, streamId uint64, msgBytes []byte, rpcSeqno uint64) {
@@ -221,7 +244,7 @@ func TestOpenStreamBeforeAndAfterSetGatingConfig(t *testing.T) {
 	aUpcallErrChan := make(chan error)
 	launchFeedUpcallTrap(appA.P2p.Logger, appA.OutChan, aTrap, aUpcallErrChan, ctx)
 
-	appB, appBPort := newTestApp(t, appAInfos, false)
+	appB, appBPort := newTestApp(t, nil, false)
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 	bTrap := newUpcallTrap("appB", 64, upcallDropAllMask^(1<<StreamMessageReceivedChan))
@@ -291,8 +314,27 @@ func TestOpenStreamBeforeAndAfterSetGatingConfig(t *testing.T) {
 		require.NoError(t, pid.SetId(appB.P2p.Host.ID().String()))
 		require.NoError(t, err)
 
-		resMsg, _ := OpenStreamReq(m).handle(appA, 9905)
-		seqno, _ := checkRpcResponseError(t, resMsg)
-		require.Equal(t, uint64(9905), seqno)
+		resMsg, afterWriteHandler := OpenStreamReq(m).handle(appA, 9905)
+		if afterWriteHandler != nil {
+			afterWriteHandler()
+		}
+		msg, err := ipc.ReadRootDaemonInterface_Message(resMsg)
+		require.NoError(t, err)
+		require.True(t, msg.HasRpcResponse())
+		resp, err := msg.RpcResponse()
+		require.NoError(t, err)
+		if !resp.HasError() {
+			_, succ := checkRpcResponseSuccess(t, resMsg, "openStream")
+			require.True(t, succ.HasOpenStream())
+			resp, err := succ.OpenStream()
+			require.NoError(t, err)
+			sid, err := resp.StreamId()
+			require.NoError(t, err)
+			streamId := sid.Id()
+			msg := make([]byte, 1000000)
+			_, err = rand.Read(msg)
+			require.NoError(t, err)
+			testSendStreamFailDo(t, appA, streamId, msg, 1983)
+		}
 	}
 }

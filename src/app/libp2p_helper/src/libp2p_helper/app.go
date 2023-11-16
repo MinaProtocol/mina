@@ -46,11 +46,11 @@ func (app *app) SetConnectionHandlers() {
 	app.setConnectionHandlersOnce.Do(func() {
 		app.P2p.ConnectionManager.AddOnConnectHandler(func(net net.Network, c net.Conn) {
 			app.updateConnectionMetrics()
-			app.writeMsg(mkPeerConnectedUpcall(peer.Encode(c.RemotePeer())))
+			app.writeMsg(mkPeerConnectedUpcall(c.RemotePeer().String()))
 		})
 		app.P2p.ConnectionManager.AddOnDisconnectHandler(func(net net.Network, c net.Conn) {
 			app.updateConnectionMetrics()
-			app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(c.RemotePeer())))
+			app.writeMsg(mkPeerDisconnectedUpcall(c.RemotePeer().String()))
 		})
 	})
 }
@@ -119,7 +119,7 @@ func (app *app) WriteStream(streamId uint64, data []byte) error {
 				// another goroutine
 				close_err := stream.stream.Close()
 				if close_err != nil {
-					app.P2p.Logger.Errorf("failed to close stream %d after encountering write failure (%s): %s", streamId, err.Error(), close_err.Error())
+					app.P2p.Logger.Debugf("failed to close stream %d after encountering write failure (%s): %s", streamId, err.Error(), close_err.Error())
 				}
 			}
 			return wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data)))
@@ -308,13 +308,13 @@ func (app *app) checkPeerCount() {
 
 	err = prometheus.Register(peerCount)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register peer_count; perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register peer_count; perhaps we've already done so: %s", err)
 		return
 	}
 
 	err = prometheus.Register(connectedPeerCount)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register connected_peer_count; perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register connected_peer_count; perhaps we've already done so: %s", err)
 		return
 	}
 
