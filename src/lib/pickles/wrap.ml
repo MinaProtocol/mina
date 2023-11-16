@@ -666,7 +666,7 @@ let wrap
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
     ~actual_wrap_domains ~step_plonk_indices:_ ~feature_flags
-    ~actual_feature_flags ?(* ?(custom_gate_type = false) *) tweak_statement pk
+    ~actual_feature_flags ~custom_gate_type ?tweak_statement pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
       , _
@@ -830,10 +830,10 @@ let wrap
       lte
   in
   [%log internal] "Wrap_compute_deferred_values" ;
+  printf "wrap.ml wrap custom_gate_type = %b\n" custom_gate_type ;
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~sgs ~prev_challenges ~step_vk ~public_input ~proof
-      ~actual_proofs_verified ~actual_feature_flags ~custom_gate_type:false
-    (* JES: TODO: Need to get from where? *)
+      ~actual_proofs_verified ~actual_feature_flags ~custom_gate_type
   in
   [%log internal] "Wrap_compute_deferred_values_done" ;
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =

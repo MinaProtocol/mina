@@ -512,6 +512,7 @@ struct
         | rule :: rules ->
             let first =
               Timer.clock __LOC__ ;
+              printf "compile.ml compile Step_branch_data.create custom_gate_type = %b\n" rule.custom_gate_type ;
               let res =
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
@@ -602,7 +603,7 @@ struct
                        , index
                        , digest ) )
               in
-              printf "pickles: compile read_or_generate b.custom_gate_type = %b\n"
+              printf "compile.ml compile Cache.Step.read_or_generate b.custom_gate_type = %b\n"
                 b.custom_gate_type ;
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
@@ -683,8 +684,9 @@ struct
             Lazy.return (self_id, header, digest)
       in
       let r =
+        printf "compile.ml compile Cache.Wrap.read_or_generate custom_gate_type = %b\n" custom_gate_type ;
         Common.time "wrap read or generate " (fun () ->
-            Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
+            Cache.Wrap.read_or_generate (* Due to Wrap_hack *) ~custom_gate_type (* JES: TODO: This seems to impact verifying *)
               ~prev_challenges:2 cache disk_key_prover disk_key_verifier typ
               (Snarky_backendless.Typ.unit ())
               main )
@@ -786,8 +788,9 @@ struct
                   *)
                   Some tweak_statement
             in
+            printf "compile.ml Wrap.wrap custom_gate_type = %b\n" b.custom_gate_type ;
             Wrap.wrap ~proof_cache ~max_proofs_verified:Max_proofs_verified.n
-              ~feature_flags ~actual_feature_flags:b.feature_flags
+              ~feature_flags ~actual_feature_flags:b.feature_flags ~custom_gate_type:b.custom_gate_type
               full_signature.maxes wrap_requests ?tweak_statement
               ~dlog_plonk_index:
                 ((* TODO *) Plonk_verification_key_evals.map
@@ -836,6 +839,7 @@ struct
       go step_data step_keypairs
     in
     Timer.clock __LOC__ ;
+    printf "compile.ml compile Types_map custom_gate_type = %b\n" custom_gate_type ;
     let data : _ Types_map.Compiled.t =
       { branches = Branches.n
       ; proofs_verifieds

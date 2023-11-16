@@ -133,6 +133,7 @@ let create
         Impls.Step.Typ.(input_typ * output_typ)
   in
   Timer.clock __LOC__ ;
+  printf "step_branch_data.ml create custom_gate_type = %b\n" custom_gate_type ;
   let step ~step_domains =
     Step_main.step_main requests
       (Nat.Add.create max_proofs_verified)

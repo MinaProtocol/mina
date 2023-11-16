@@ -1162,10 +1162,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Step_branch_data.t
           end in
           let proofs_verifieds = Vector.singleton 2 in
+          printf "pickles.ml Make_str Step_branch_data.create custom_gate_type = %b\n" custom_gate_type ;
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags ~num_chunks:1
               ~actual_feature_flags
-              ~custom_gate_type:false (* JES: TODO: update *)
+              ~custom_gate_type:rule.custom_gate_type (* JES: TODO: update *)
               ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
               ~self ~public_input:(Input typ) ~auxiliary_typ:typ
               A.to_field_elements A_value.to_field_elements rule ~wrap_domains
@@ -1211,8 +1212,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  , index
                  , digest ) )
             in
+            printf "pickles.ml Make_str Cache.Step.read_or_generate custom_gate_type = %b\n" custom_gate_type ;
             Cache.Step.read_or_generate
-              ~custom_gate_type:false (* JES: TODO: Update *)
+              ~custom_gate_type:custom_gate_type (* JES: TODO: Update *)
               ~prev_challenges:
                 (Nat.to_int (fst inner_step_data.proofs_verified))
               [] k_p k_v
@@ -1286,7 +1288,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             in
             let r =
               Common.time "wrap read or generate " (fun () ->
-                  Cache.Wrap.read_or_generate ~prev_challenges:2 []
+                  Cache.Wrap.read_or_generate ~custom_gate_type:false (* JES: TODO: remove? *) ~prev_challenges:2 []
                     disk_key_prover disk_key_verifier typ Typ.unit main )
             in
             (r, disk_key_verifier)

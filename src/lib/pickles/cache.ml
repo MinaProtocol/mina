@@ -183,7 +183,7 @@ module Wrap = struct
                 (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
               header path ) )
 
-  let read_or_generate ~prev_challenges cache k_p k_v typ return_typ main =
+  let read_or_generate  ~(custom_gate_type : bool) ~prev_challenges cache k_p k_v typ return_typ main =
     let module Vk = Verification_key in
     let open Impls.Wrap in
     let s_p = storable in
@@ -197,10 +197,11 @@ module Wrap = struct
          | Ok (pk, d) ->
              (Keypair.create ~pk ~vk:(Backend.Tock.Keypair.vk pk), d)
          | Error _e ->
+          printf "cache.ml Wrap.read_or_generate custom_gate_type = %b\n" custom_gate_type ;
              let r =
                Common.time "wrapkeygen" (fun () ->
                    constraint_system ~input_typ:typ ~return_typ main
-                   |> Keypair.generate ~prev_challenges )
+                   |> Keypair.generate ~custom_gate_type ~prev_challenges )
              in
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)
