@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -104,22 +105,16 @@ func TestUnsubscribe(t *testing.T) {
 func TestValidationPush(t *testing.T) {
 	testApp, _ := newTestApp(t, nil, true)
 
-	ipcValResults := []ipc.ValidationResult{
-		ipc.ValidationResult_accept,
-		ipc.ValidationResult_reject,
-		ipc.ValidationResult_ignore,
+	ipc2Pubsub := map[ipc.ValidationResult]pubsub.ValidationResult{
+		ipc.ValidationResult_accept: pubsub.ValidationAccept,
+		ipc.ValidationResult_reject: pubsub.ValidationReject,
+		ipc.ValidationResult_ignore: pubsub.ValidationIgnore,
 	}
 
-	pubsubValResults := []pubsub.ValidationResult{
-		pubsub.ValidationAccept,
-		pubsub.ValidationReject,
-		pubsub.ValidationIgnore,
-	}
-
-	for i := 0; i < len(ipcValResults); i++ {
-		seqno := uint64(i)
+	for resIpc, resPS := range ipc2Pubsub {
+		seqno := rand.Uint64()
 		status := &validationStatus{
-			Completion: make(chan pubsub.ValidationResult),
+			Completion: make(chan pubsub.ValidationResult, 1),
 		}
 		testApp._validators[seqno] = status
 		_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
@@ -128,11 +123,11 @@ func TestValidationPush(t *testing.T) {
 		require.NoError(t, err)
 		validationId, err := m.NewValidationId()
 		validationId.SetId(seqno)
-		m.SetResult(ipcValResults[i])
+		m.SetResult(resIpc)
 		ValidationPush(m).handle(testApp)
 		require.NoError(t, err)
 		result := <-status.Completion
-		require.Equal(t, pubsubValResults[i], result)
+		require.Equal(t, resPS, result)
 		_, has := testApp._validators[seqno]
 		require.False(t, has)
 	}
