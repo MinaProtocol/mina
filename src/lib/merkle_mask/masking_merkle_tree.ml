@@ -211,9 +211,43 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let get_batch = self_find_or_batch_lookup self_find_account Base.get_batch
 
+    let self_merkle_path t address =
+      let location = Location.Account address in
+      match self_find_account t location with
+      | None ->
+          (* Short-circuit: We assume that the merkle path will be in this mask
+             only if the account is also.
+          *)
+          None
+      | Some _ ->
+          Option.try_with (fun () ->
+              let rec self_merkle_path address =
+                if Addr.height ~ledger_depth:t.depth address >= t.depth then []
+                else
+                  let sibling = Addr.sibling address in
+                  let sibling_dir = Location.last_direction sibling in
+                  let hash =
+                    match self_find_hash t sibling with
+                    | Some hash ->
+                        hash
+                    | None ->
+                        (* Caught by [try_with] above. *) assert false
+                  in
+                  let parent_address =
+                    match Addr.parent address with
+                    | Ok addr ->
+                        addr
+                    | Error _ ->
+                        (* Caught by [try_with] above. *) assert false
+                  in
+                  Direction.map sibling_dir ~left:(`Left hash)
+                    ~right:(`Right hash)
+                  :: self_merkle_path parent_address
+              in
+              self_merkle_path address )
+
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
-
     let fixup_merkle_path t path address =
       let rec build_fixed_path path address accum =
         if List.is_empty path then List.rev accum
@@ -241,34 +275,59 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let merkle_path_at_addr_exn t address =
       assert_is_attached t ;
-      let parent_merkle_path =
-        Base.merkle_path_at_addr_exn (get_parent t) address
-      in
-      fixup_merkle_path t parent_merkle_path address
+      match self_merkle_path t address with
+      | Some path ->
+          path
+      | None ->
+          let parent_merkle_path =
+            Base.merkle_path_at_addr_exn (get_parent t) address
+          in
+          fixup_merkle_path t parent_merkle_path address
 
     let merkle_path_at_index_exn t index =
-      assert_is_attached t ;
-      let address = Addr.of_int_exn ~ledger_depth:t.depth index in
-      let parent_merkle_path =
-        Base.merkle_path_at_addr_exn (get_parent t) address
-      in
-      fixup_merkle_path t parent_merkle_path address
+      merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:t.depth index)
 
     let merkle_path t location =
-      assert_is_attached t ;
-      let address = Location.to_path_exn location in
-      let parent_merkle_path = Base.merkle_path (get_parent t) location in
-      fixup_merkle_path t parent_merkle_path address
+      merkle_path_at_addr_exn t (Location.to_path_exn location)
 
     let merkle_path_batch t locations =
       assert_is_attached t ;
-      let addresses = List.map ~f:Location.to_path_exn locations in
-      let parent_merkle_paths =
-        Base.merkle_path_batch (get_parent t) locations
+      let self_merkle_paths_rev =
+        List.rev_map locations ~f:(fun location ->
+            let address = Location.to_path_exn location in
+            match self_merkle_path t address with
+            | Some path ->
+                Either.First path
+            | None ->
+                Either.Second (location, address) )
       in
-      List.map2_exn
-        ~f:(fun path address -> fixup_merkle_path t path address)
-        parent_merkle_paths addresses
+      let parent_merkle_paths_rev =
+        let parent_locations_rev =
+          List.filter_map self_merkle_paths_rev ~f:(function
+            | Either.First _ ->
+                None
+            | Either.Second (location, _) ->
+                Some location )
+        in
+        if List.is_empty parent_locations_rev then []
+        else Base.merkle_path_batch (get_parent t) parent_locations_rev
+      in
+      let rec recombine self_merkle_paths_rev parent_merkle_paths_rev acc =
+        match (self_merkle_paths_rev, parent_merkle_paths_rev) with
+        | [], [] ->
+            acc
+        | Either.First path :: self_merkle_paths_rev, parent_merkle_paths_rev ->
+            recombine self_merkle_paths_rev parent_merkle_paths_rev (path :: acc)
+        | ( Either.Second (_, address) :: self_merkle_paths_rev
+          , path :: parent_merkle_paths_rev ) ->
+            let path = fixup_merkle_path t path address in
+            recombine self_merkle_paths_rev parent_merkle_paths_rev (path :: acc)
+        | _ :: _, [] ->
+            assert false
+        | [], _ :: _ ->
+            assert false
+      in
+      recombine self_merkle_paths_rev parent_merkle_paths_rev []
 
     (* given a Merkle path corresponding to a starting address, calculate
        addresses and hashes for each node affected by the starting hash; that is,
