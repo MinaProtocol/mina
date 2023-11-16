@@ -64,6 +64,8 @@ module type Data_source = sig
   val verify_transaction_snarks :
        (Ledger_proof.t * Mina_base.Sok_message.t) list
     -> (unit, Error.t) Deferred.Result.t
+
+  val output : t -> submission -> Output.t Or_error.t -> unit Deferred.Or_error.t
 end
 
 module Filesystem = struct
@@ -95,6 +97,15 @@ module Filesystem = struct
         ( try Ok (In_channel.read_all block_path)
           with _ -> Error (Error.of_string "Fail to load block") )
         |> Ivar.fill ivar )
+
+  let output _ (_submission : submission) = function
+    | Ok payload ->
+       Output.display payload ;
+       Deferred.Or_error.return ()
+
+    | Error e ->
+        Output.display_error @@ Error.to_string_hum e ;
+        Deferred.Or_error.return ()
 end
 
 module Cassandra = struct
@@ -154,4 +165,6 @@ module Cassandra = struct
     | Some b ->
         String.chop_prefix_exn b.raw_block ~prefix:"0x"
         |> Hex.Safe.of_hex |> Option.value_exn |> return
+
+  let output = Filesystem.output
 end

@@ -13,32 +13,6 @@ let get_filenames =
 let verify_snark_work ~verify_transaction_snarks ~proof ~message =
   verify_transaction_snarks [ (proof, message) ]
 
-type valid_payload =
-  { created_at : string
-  ; submitter : string
-  ; state_hash : State_hash.t
-  ; parent : State_hash.t
-  ; height : Unsigned.uint32
-  ; slot : Mina_numbers.Global_slot_since_genesis.t
-  }
-
-let valid_payload_to_yojson (p : valid_payload) : Yojson.Safe.t =
-  `Assoc
-    [ ("created_at", `String p.created_at)
-    ; ("submitter", `String p.submitter)
-    ; ("state_hash", State_hash.to_yojson p.state_hash)
-    ; ("parent", State_hash.to_yojson p.parent)
-    ; ("height", `Int (Unsigned.UInt32.to_int p.height))
-    ; ("slot", `Int (Mina_numbers.Global_slot_since_genesis.to_int p.slot))
-    ]
-
-let display valid_payload =
-  printf "%s\n" @@ Yojson.Safe.to_string
-  @@ valid_payload_to_yojson valid_payload
-
-let display_error e =
-  eprintf "%s\n" @@ Yojson.Safe.to_string @@ `Assoc [ ("error", `String e) ]
-
 let config_flag =
   let open Command.Param in
   flag "--config-file" ~doc:"FILE config file" (optional string)
@@ -90,7 +64,7 @@ let instantiate_verify_functions ~logger = function
         | Ok (precomputed_values, _) ->
             Deferred.return precomputed_values
         | Error _ ->
-            display_error "fail to read config file" ;
+            Output.display_error "fail to read config file" ;
             exit 4
       in
       let constraint_constants =
@@ -141,30 +115,28 @@ module Make_verifier (Source : Submission.Data_source) = struct
     , Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state
     )
 
-  let validate_and_display_results ~validate submission =
+  let validate_and_display_results ~validate ~src submission =
     let open Deferred.Let_syntax in
-    match%map verify ~validate submission with
-    | Ok (state_hash, parent, height, slot) ->
-        display
-          { created_at = submission.created_at
-          ; submitter =
-              Signature_lib.Public_key.Compressed.to_base58_check
-                submission.submitter
-          ; state_hash
-          ; parent
-          ; height
-          ; slot
-          }
-    | Error e ->
-        display_error @@ Error.to_string_hum e
+    let%bind result = verify ~validate submission in
+    Result.map result ~f:(fun (state_hash, parent, height, slot) ->
+      Output.
+      { created_at = submission.created_at
+      ; submitter =
+          Signature_lib.Public_key.Compressed.to_base58_check
+            submission.submitter
+      ; state_hash
+      ; parent
+      ; height
+      ; slot
+      })
+    |> Source.output src submission
 
   let process ?(validate = true) (src : Source.t) =
     let open Deferred.Or_error.Let_syntax in
     let%bind submissions = Source.load_submissions src in
     List.iter submissions ~f:(intialize_submission ~validate src) ;
-    List.map submissions ~f:(validate_and_display_results ~validate)
-    |> Deferred.all_unit
-    |> Deferred.map ~f:Or_error.return
+    List.map submissions ~f:(validate_and_display_results ~src ~validate)
+    |> Deferred.Or_error.all_unit
 end
 
 let filesystem_command =
@@ -194,7 +166,7 @@ let filesystem_command =
         | Ok () ->
             Deferred.unit
         | Error e ->
-            display_error @@ Error.to_string_hum e ;
+            Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
 let cassandra_command =
@@ -230,7 +202,7 @@ let cassandra_command =
         | Ok () ->
             Deferred.unit
         | Error e ->
-            display_error @@ Error.to_string_hum e ;
+            Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
 let command =
