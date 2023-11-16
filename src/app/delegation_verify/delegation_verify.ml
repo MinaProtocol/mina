@@ -14,19 +14,22 @@ let verify_snark_work ~verify_transaction_snarks ~proof ~message =
   verify_transaction_snarks [ (proof, message) ]
 
 type valid_payload =
-  { state_hash : State_hash.t
+  { created_at : string
+  ; submitter : string
+  ; state_hash : State_hash.t
   ; parent : State_hash.t
   ; height : Unsigned.uint32
   ; slot : Mina_numbers.Global_slot_since_genesis.t
   }
 
-let valid_payload_to_yojson { state_hash; parent; height; slot } : Yojson.Safe.t
-    =
+let valid_payload_to_yojson (p : valid_payload) : Yojson.Safe.t =
   `Assoc
-    [ ("state_hash", State_hash.to_yojson state_hash)
-    ; ("parent", State_hash.to_yojson parent)
-    ; ("height", `Int (Unsigned.UInt32.to_int height))
-    ; ("slot", `Int (Mina_numbers.Global_slot_since_genesis.to_int slot))
+    [ ("created_at", `String p.created_at)
+    ; ("submitter", `String p.submitter)
+    ; ("state_hash", State_hash.to_yojson p.state_hash)
+    ; ("parent", State_hash.to_yojson p.parent)
+    ; ("height", `Int (Unsigned.UInt32.to_int p.height))
+    ; ("slot", `Int (Mina_numbers.Global_slot_since_genesis.to_int p.slot))
     ]
 
 let display valid_payload =
@@ -142,7 +145,16 @@ module Make_verifier (Source : Submission.Data_source) = struct
     let open Deferred.Let_syntax in
     match%map verify ~validate submission with
     | Ok (state_hash, parent, height, slot) ->
-        display { state_hash; parent; height; slot }
+        display
+          { created_at = submission.created_at
+          ; submitter =
+              Signature_lib.Public_key.Compressed.to_base58_check
+                submission.submitter
+          ; state_hash
+          ; parent
+          ; height
+          ; slot
+          }
     | Error e ->
         display_error @@ Error.to_string_hum e
 

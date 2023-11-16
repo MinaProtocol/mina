@@ -3,7 +3,8 @@ open Core
 open Signature_lib
 
 type t =
-  { snark_work : Uptime_service.Proof_data.t option
+  { created_at : string
+  ; snark_work : Uptime_service.Proof_data.t option
   ; submitter : Public_key.Compressed.t
   ; block_hash : string
   }
@@ -42,7 +43,11 @@ let of_raw meta =
         let%map snark_work = decode_snark_work s in
         Some snark_work
   in
-  { submitter; snark_work; block_hash = meta.block_hash }
+  { submitter
+  ; snark_work
+  ; block_hash = meta.block_hash
+  ; created_at = meta.created_at
+  }
 
 module type Data_source = sig
   type t
