@@ -9,7 +9,6 @@
    stdio
    base
    base.caml
-   hex
    ppx_deriving_yojson.runtime
    yojson
    base64
@@ -17,6 +16,7 @@
    async.async_command
    sexplib0
    sexplib
+   hex
    ; mina libs
    signature_lib
    mina_block

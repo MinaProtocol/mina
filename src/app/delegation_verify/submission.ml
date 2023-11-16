@@ -126,8 +126,12 @@ module Cassandra = struct
     List.fold_right raw ~init:(Ok []) ~f:(fun sub acc ->
         let open Result.Let_syntax in
         let%bind l = acc in
-        printf "sub: '%s'\n" (Yojson.Safe.to_string @@ raw_to_yojson sub) ;
-        let%map s = of_raw sub in
+        let snark_work =
+          Option.map sub.snark_work ~f:(fun s ->
+              String.chop_prefix_exn s ~prefix:"0x"
+              |> Hex.Safe.of_hex |> Option.value_exn |> Base64.encode_string )
+        in
+        let%map s = of_raw { sub with snark_work } in
         s :: l )
     |> Deferred.return
 
@@ -143,5 +147,6 @@ module Cassandra = struct
     | None ->
         Deferred.Or_error.error_string "Cassandra: Block not found"
     | Some b ->
-        Hex.Safe.of_hex b.raw_block |> Option.value_exn |> return
+        String.chop_prefix_exn b.raw_block ~prefix:"0x"
+        |> Hex.Safe.of_hex |> Option.value_exn |> return
 end
