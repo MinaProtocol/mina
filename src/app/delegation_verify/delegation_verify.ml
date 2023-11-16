@@ -119,16 +119,16 @@ module Make_verifier (Source : Submission.Data_source) = struct
     let open Deferred.Let_syntax in
     let%bind result = verify ~validate submission in
     Result.map result ~f:(fun (state_hash, parent, height, slot) ->
-      Output.
-      { created_at = submission.created_at
-      ; submitter =
-          Signature_lib.Public_key.Compressed.to_base58_check
-            submission.submitter
-      ; state_hash
-      ; parent
-      ; height
-      ; slot
-      })
+        Output.
+          { created_at = submission.created_at
+          ; submitter =
+              Signature_lib.Public_key.Compressed.to_base58_check
+                submission.submitter
+          ; state_hash
+          ; parent
+          ; height
+          ; slot
+          } )
     |> Source.output src submission
 
   let process ?(validate = true) (src : Source.t) =

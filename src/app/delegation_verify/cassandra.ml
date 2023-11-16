@@ -13,7 +13,7 @@ let query ?executable q =
 
 let select ?executable ~keyspace ~parse ~fields ?where from =
   let open Deferred.Or_error.Let_syntax in
-  let%bind data = 
+  let%bind data =
     query ?executable
     @@ Printf.sprintf "SELECT JSON %s FROM %s.%s%s;"
          (String.concat ~sep:"," fields)
@@ -38,9 +38,9 @@ let select ?executable ~keyspace ~parse ~fields ?where from =
 let update ?executable ~keyspace ~table ~where updates =
   let open Deferred.Or_error.Let_syntax in
   let assignments = List.map updates ~f:(fun (k, v) -> k ^ " = " ^ v) in
-  let%map _ = 
+  let%map _ =
     query ?executable
-    @@ Printf.sprintf "UPDATE %s.%s SET %s WHERE %s;"
+    @@ Printf.sprintf "CONSISTENCY LOCAL_QUORUM; UPDATE %s.%s SET %s WHERE %s;"
          keyspace table
          (String.concat ~sep:"," assignments)
          where
