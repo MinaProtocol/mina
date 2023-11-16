@@ -17,6 +17,7 @@ let ReleaseSpec = {
     service: Text,
     version: Text,
     branch: Text,
+    repo: Text,
     deb_codename: Text,
     deb_release: Text,
     deb_version: Text,
@@ -29,6 +30,7 @@ let ReleaseSpec = {
     version = "\\\${MINA_DOCKER_TAG}",
     service = "\\\${MINA_SERVICE}",
     branch = "\\\${BUILDKITE_BRANCH}",
+    repo = "\\\${BUILDKITE_REPO}",
     deb_codename = "bullseye",
     deb_release = "\\\${MINA_DEB_RELEASE}",
     deb_version = "\\\${MINA_DEB_VERSION}",
@@ -43,7 +45,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     [
         Cmd.run (
           "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/export-git-env-vars.sh && ./scripts/release-docker.sh " ++
-              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --extra-args \\\"${spec.extra_args}\\\""
+              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --repo ${spec.repo}--extra-args \\\"${spec.extra_args}\\\""
         )
     ]
 

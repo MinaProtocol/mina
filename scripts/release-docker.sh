@@ -21,6 +21,7 @@ function usage() {
   echo "  -v, --version             The version to be used in the docker image tag"
   echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=devnet"
   echo "  -b, --branch              The branch of the mina repository to use for staged docker builds. Default=compatible"
+  echo "  -r, --repo                The currently used mina repository"
   echo "      --deb-codename        The debian codename (stretch or buster) to build the docker image from. Default=stretch"
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
@@ -36,6 +37,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -v|--version) VERSION="$2"; shift;;
   -n|--network) NETWORK="--build-arg network=$2"; shift;;
   -b|--branch) BRANCH="--build-arg MINA_BRANCH=$2"; shift;;
+  -r|--repo) MINA_REPO="$2"; shift;;
   -c|--cache-from) CACHE="--cache-from $2"; shift;;
   --deb-codename) DEB_CODENAME="--build-arg deb_codename=$2"; shift;;
   --deb-release) DEB_RELEASE="--build-arg deb_release=$2"; shift;;
@@ -120,8 +122,8 @@ itn-orchestrator)
 esac
 
 
-REPO="--build-arg MINA_REPO=${BUILDKITE_REPO}"
-if [[ -z "${BUILDKITE_REPO}" ]]; then
+REPO="--build-arg MINA_REPO=${MINA_REPO}"
+if [[ -z "${MINA_REPO}" ]]; then
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
 fi
 
