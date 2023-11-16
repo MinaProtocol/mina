@@ -90,9 +90,9 @@ func isPrivateAddr(addr ma.Multiaddr) bool {
 
 type CodaConnectionManager struct {
 	p2pManager        *p2pconnmgr.BasicConnMgr
-	onConnectMutex    sync.Mutex
+	onConnectMutex    sync.RWMutex
 	onConnect         func(network.Network, network.Conn)
-	onDisconnectMutex sync.Mutex
+	onDisconnectMutex sync.RWMutex
 	onDisconnect      func(network.Network, network.Conn)
 	// protectedMirror is a map of protected peer ids/tags, mirroring the structure in
 	// BasicConnMgr which is not accessible from CodaConnectionManager
@@ -102,22 +102,22 @@ type CodaConnectionManager struct {
 
 func (cm *CodaConnectionManager) AddOnConnectHandler(f func(network.Network, network.Conn)) {
 	cm.onConnectMutex.Lock()
+	defer cm.onConnectMutex.Unlock()
 	prevOnConnect := cm.onConnect
 	cm.onConnect = func(net network.Network, c network.Conn) {
 		prevOnConnect(net, c)
 		f(net, c)
 	}
-	cm.onConnectMutex.Unlock()
 }
 
 func (cm *CodaConnectionManager) AddOnDisconnectHandler(f func(network.Network, network.Conn)) {
 	cm.onDisconnectMutex.Lock()
+	defer cm.onDisconnectMutex.Unlock()
 	prevOnDisconnect := cm.onDisconnect
 	cm.onDisconnect = func(net network.Network, c network.Conn) {
 		prevOnDisconnect(net, c)
 		f(net, c)
 	}
-	cm.onDisconnectMutex.Unlock()
 }
 
 func newCodaConnectionManager(minConnections, maxConnections int, grace time.Duration) (*CodaConnectionManager, error) {
@@ -197,18 +197,27 @@ func (cm *CodaConnectionManager) Listen(net network.Network, addr ma.Multiaddr) 
 func (cm *CodaConnectionManager) ListenClose(net network.Network, addr ma.Multiaddr) {
 	cm.p2pManager.Notifee().ListenClose(net, addr)
 }
+
+func (cm *CodaConnectionManager) onConnectHandler() func(net network.Network, c network.Conn) {
+	cm.onConnectMutex.RLock()
+	defer cm.onConnectMutex.RUnlock()
+	return cm.onConnect
+}
+
 func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) {
 	logger.Debugf("%s connected to %s", c.LocalPeer(), c.RemotePeer())
-	cm.onConnectMutex.Lock()
-	cm.onConnect(net, c)
-	cm.onConnectMutex.Unlock()
+	cm.onConnectHandler()(net, c)
 	cm.p2pManager.Notifee().Connected(net, c)
 }
 
+func (cm *CodaConnectionManager) onDisconnectHandler() func(net network.Network, c network.Conn) {
+	cm.onDisconnectMutex.RLock()
+	defer cm.onDisconnectMutex.RUnlock()
+	return cm.onDisconnect
+}
+
 func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Conn) {
-	cm.onDisconnectMutex.Lock()
-	cm.onDisconnect(net, c)
-	cm.onDisconnectMutex.Unlock()
+	cm.onDisconnectHandler()(net, c)
 	cm.p2pManager.Notifee().Disconnected(net, c)
 }
 
@@ -284,10 +293,28 @@ func (ms *MessageStats) GetStats() *safeStats {
 	}
 }
 
-func (h *Helper) ResetGatingConfigTrustedAddrFilters() {
+func (h *Helper) SetBannedPeers(newP map[peer.ID]struct{}) {
+	h.gatingState.bannedPeersMutex.Lock()
+	defer h.gatingState.bannedPeersMutex.Unlock()
+	h.gatingState.bannedPeers = newP
+}
+
+func (h *Helper) SetTrustedPeers(newP map[peer.ID]struct{}) {
+	h.gatingState.trustedPeersMutex.Lock()
+	defer h.gatingState.trustedPeersMutex.Unlock()
+	h.gatingState.trustedPeers = newP
+}
+
+func (h *Helper) SetTrustedAddrFilters(newF *ma.Filters) {
 	h.gatingState.trustedAddrFiltersMutex.Lock()
-	h.gatingState.trustedAddrFilters = ma.NewFilters()
-	h.gatingState.trustedAddrFiltersMutex.Unlock()
+	defer h.gatingState.trustedAddrFiltersMutex.Unlock()
+	h.gatingState.trustedAddrFilters = newF
+}
+
+func (h *Helper) SetBannedAddrFilters(newF *ma.Filters) {
+	h.gatingState.bannedAddrFiltersMutex.Lock()
+	defer h.gatingState.bannedAddrFiltersMutex.Unlock()
+	h.gatingState.bannedAddrFilters = newF
 }
 
 // this type implements the ConnectionGating interface
@@ -296,13 +323,13 @@ func (h *Helper) ResetGatingConfigTrustedAddrFilters() {
 type CodaGatingState struct {
 	logger                  logging.EventLogger
 	KnownPrivateAddrFilters *ma.Filters
-	bannedAddrFiltersMutex  sync.Mutex
+	bannedAddrFiltersMutex  sync.RWMutex
 	bannedAddrFilters       *ma.Filters
-	trustedAddrFiltersMutex sync.Mutex
+	trustedAddrFiltersMutex sync.RWMutex
 	trustedAddrFilters      *ma.Filters
-	bannedPeersMutex        sync.Mutex
+	bannedPeersMutex        sync.RWMutex
 	bannedPeers             map[peer.ID]struct{}
-	trustedPeersMutex       sync.Mutex
+	trustedPeersMutex       sync.RWMutex
 	trustedPeers            map[peer.ID]struct{}
 }
 
@@ -352,10 +379,10 @@ func (h *Helper) GatingState() *CodaGatingState {
 }
 
 func (h *Helper) SetGatingState(gs *CodaGatingConfig) {
-	h.gatingState.trustedPeers = gs.TrustedPeers
-	h.gatingState.bannedPeers = gs.BannedPeers
-	h.gatingState.trustedAddrFilters = gs.TrustedAddrFilters
-	h.gatingState.bannedAddrFilters = gs.BannedAddrFilters
+	h.SetTrustedPeers(gs.TrustedPeers)
+	h.SetBannedPeers(gs.BannedPeers)
+	h.SetTrustedAddrFilters(gs.TrustedAddrFilters)
+	h.SetBannedAddrFilters(gs.BannedAddrFilters)
 	for _, c := range h.Host.Network().Conns() {
 		pid := c.RemotePeer()
 		maddr := c.RemoteMultiaddr()
@@ -378,8 +405,8 @@ func (h *Helper) AddSeeds(infos ...peer.AddrInfo) {
 
 func (gs *CodaGatingState) TrustPeer(p peer.ID) {
 	gs.trustedPeersMutex.Lock()
+	defer gs.trustedPeersMutex.Unlock()
 	gs.trustedPeers[p] = struct{}{}
-	gs.trustedPeersMutex.Unlock()
 }
 
 func (gs *CodaGatingState) MarkPrivateAddrAsKnown(addr ma.Multiaddr) {
@@ -427,9 +454,9 @@ func (c connectionAllowance) isDeny() bool {
 }
 
 func (gs *CodaGatingState) checkPeerTrusted(p peer.ID) connectionAllowance {
-	gs.trustedPeersMutex.Lock()
+	gs.trustedPeersMutex.RLock()
+	defer gs.trustedPeersMutex.RUnlock()
 	_, isTrusted := gs.trustedPeers[p]
-	gs.trustedPeersMutex.Unlock()
 	if isTrusted {
 		return Accept
 	}
@@ -437,9 +464,9 @@ func (gs *CodaGatingState) checkPeerTrusted(p peer.ID) connectionAllowance {
 }
 
 func (gs *CodaGatingState) checkPeerBanned(p peer.ID) connectionAllowance {
-	gs.bannedPeersMutex.Lock()
+	gs.bannedPeersMutex.RLock()
+	defer gs.bannedPeersMutex.RUnlock()
 	_, isBanned := gs.bannedPeers[p]
-	gs.bannedPeersMutex.Unlock()
 	if isBanned {
 		return DenyBannedPeer
 	}
@@ -474,8 +501,8 @@ func (gs *CodaGatingState) checkAllowedPeer(p peer.ID) connectionAllowance {
 }
 
 func (gs *CodaGatingState) checkAddrTrusted(addr ma.Multiaddr) connectionAllowance {
-	gs.trustedAddrFiltersMutex.Lock()
-	defer gs.trustedAddrFiltersMutex.Unlock()
+	gs.trustedAddrFiltersMutex.RLock()
+	defer gs.trustedAddrFiltersMutex.RUnlock()
 	if !gs.trustedAddrFilters.AddrBlocked(addr) {
 		return Accept
 	}
@@ -483,8 +510,8 @@ func (gs *CodaGatingState) checkAddrTrusted(addr ma.Multiaddr) connectionAllowan
 }
 
 func (gs *CodaGatingState) checkAddrBanned(addr ma.Multiaddr) connectionAllowance {
-	gs.bannedAddrFiltersMutex.Lock()
-	defer gs.bannedAddrFiltersMutex.Unlock()
+	gs.bannedAddrFiltersMutex.RLock()
+	defer gs.bannedAddrFiltersMutex.RUnlock()
 	if gs.bannedAddrFilters.AddrBlocked(addr) {
 		return DenyBannedAddress
 	}

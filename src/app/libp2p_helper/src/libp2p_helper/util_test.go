@@ -74,7 +74,7 @@ func newTestAppWithMaxConnsAndCtxAndGrace(t *testing.T, privkey crypto.PrivKey, 
 	)
 	require.NoError(t, err)
 
-	helper.ResetGatingConfigTrustedAddrFilters()
+	helper.SetTrustedAddrFilters(ma.NewFilters())
 	helper.Host.SetStreamHandler(testProtocol, testStreamHandler)
 
 	t.Cleanup(func() {

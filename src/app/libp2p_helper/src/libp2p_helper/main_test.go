@@ -266,10 +266,10 @@ func TestLibp2pMetrics(t *testing.T) {
 	var streamIdx uint64 = 0
 	var streamMutex sync.Mutex
 	handler := func(stream net.Stream) {
-		streamMutex.Lock()
 		handleStreamReads(appB, stream, streamIdx)
+		streamMutex.Lock()
+		defer streamMutex.Unlock()
 		streamIdx++
-		streamMutex.Unlock()
 	}
 
 	appB.P2p.Host.SetStreamHandler(testProtocol, handler)
