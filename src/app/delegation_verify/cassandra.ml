@@ -30,6 +30,5 @@ let select ?executable ~keyspace ~parse ~fields ?where from =
   query ?executable ~parse
   @@ Printf.sprintf "SELECT JSON %s FROM %s.%s%s;"
        (String.concat ~sep:"," fields)
-       keyspace
-       from
+       keyspace from
        (match where with None -> "" | Some w -> " WHERE " ^ w)
