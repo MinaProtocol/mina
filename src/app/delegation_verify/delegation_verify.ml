@@ -77,20 +77,22 @@ module Make_verifier (Source : Submission.Data_source) = struct
 
   let verify_blockchain_snarks = Source.verify_blockchain_snarks
 
-  let intialize_submission ?validate (src : Source.t) (sub : Submission.t) =
-    if Known_blocks.is_known sub.block_hash then ()
+  let intialize_submission ?validate (src : Source.t) (sub : Source.submission)
+      =
+    let block_hash = Source.block_hash sub in
+    if Known_blocks.is_known block_hash then ()
     else
-      Known_blocks.add ?validate ~verify_blockchain_snarks
-        ~block_hash:sub.block_hash
-        (Source.load_block src ~block_hash:sub.block_hash)
+      Known_blocks.add ?validate ~verify_blockchain_snarks ~block_hash
+        (Source.load_block src ~block_hash)
 
-  let verify ~validate (submission : Submission.t) =
+  let verify ~validate (submission : Source.submission) =
     let open Deferred.Result.Let_syntax in
-    let%bind block = Known_blocks.get submission.block_hash in
-    let%bind () = Known_blocks.is_valid submission.block_hash in
+    let block_hash = Source.block_hash submission in
+    let%bind block = Known_blocks.get block_hash in
+    let%bind () = Known_blocks.is_valid block_hash in
     let%map () =
       if validate then
-        match submission.snark_work with
+        match Source.snark_work submission with
         | None ->
             Deferred.Result.return ()
         | Some
@@ -98,7 +100,7 @@ module Make_verifier (Source : Submission.Data_source) = struct
           ->
             let message =
               Mina_base.Sok_message.create ~fee:snark_work_fee
-                ~prover:submission.submitter
+                ~prover:(Source.submitter submission)
             in
             verify_snark_work ~verify_transaction_snarks ~proof ~message
       else return ()
@@ -120,10 +122,10 @@ module Make_verifier (Source : Submission.Data_source) = struct
     let%bind result = verify ~validate submission in
     Result.map result ~f:(fun (state_hash, parent, height, slot) ->
         Output.
-          { created_at = submission.created_at
+          { created_at = Source.created_at submission
           ; submitter =
               Signature_lib.Public_key.Compressed.to_base58_check
-                submission.submitter
+                (Source.submitter submission)
           ; state_hash
           ; parent
           ; height

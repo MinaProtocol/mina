@@ -2,26 +2,6 @@ open Async
 open Core
 open Signature_lib
 
-type t =
-  { created_at : string
-  ; snark_work : Uptime_service.Proof_data.t option
-  ; submitter : Public_key.Compressed.t
-  ; block_hash : string
-  }
-
-type submission = t
-
-type raw =
-  { created_at : string
-  ; peer_id : string
-  ; snark_work : string option [@default None]
-  ; remote_addr : string
-  ; submitter : string
-  ; block_hash : string
-  ; graphql_control_port : int option [@default None]
-  }
-[@@deriving yojson]
-
 let decode_snark_work str =
   match Base64.decode str with
   | Ok str -> (
@@ -30,27 +10,18 @@ let decode_snark_work str =
   | Error _ ->
       Error (Error.of_string "Fail to decode snark work")
 
-let of_raw meta =
-  let open Result.Let_syntax in
-  let%bind.Result submitter =
-    Public_key.Compressed.of_base58_check meta.submitter
-  in
-  let%map snark_work =
-    match meta.snark_work with
-    | None ->
-        Ok None
-    | Some s ->
-        let%map snark_work = decode_snark_work s in
-        Some snark_work
-  in
-  { submitter
-  ; snark_work
-  ; block_hash = meta.block_hash
-  ; created_at = meta.created_at
-  }
-
 module type Data_source = sig
   type t
+
+  type submission
+
+  val created_at : submission -> string
+
+  val block_hash : submission -> string
+
+  val snark_work : submission -> Uptime_service.Proof_data.t option
+
+  val submitter : submission -> Public_key.Compressed.t
 
   val load_submissions : t -> submission list Deferred.Or_error.t
 
@@ -71,6 +42,51 @@ end
 
 module Filesystem = struct
   type t = { block_dir : string; submission_paths : string list }
+
+  type submission =
+    { created_at : string
+    ; snark_work : Uptime_service.Proof_data.t option
+    ; submitter : Public_key.Compressed.t
+    ; block_hash : string
+    }
+
+  type raw =
+    { created_at : string
+    ; peer_id : string
+    ; snark_work : string option [@default None]
+    ; remote_addr : string
+    ; submitter : string
+    ; block_hash : string
+    ; graphql_control_port : int option [@default None]
+    }
+  [@@deriving yojson]
+
+  let of_raw meta =
+    let open Result.Let_syntax in
+    let%bind.Result submitter =
+      Public_key.Compressed.of_base58_check meta.submitter
+    in
+    let%map snark_work =
+      match meta.snark_work with
+      | None ->
+          Ok None
+      | Some s ->
+          let%map snark_work = decode_snark_work s in
+          Some snark_work
+    in
+    { submitter
+    ; snark_work
+    ; block_hash = meta.block_hash
+    ; created_at = meta.created_at
+    }
+
+  let created_at ({ created_at; _ } : submission) = created_at
+
+  let block_hash ({ block_hash; _ } : submission) = block_hash
+
+  let snark_work ({ snark_work; _ } : submission) = snark_work
+
+  let submitter ({ submitter; _ } : submission) = submitter
 
   let load_submissions { submission_paths; _ } =
     Deferred.create (fun ivar ->
@@ -118,12 +134,66 @@ module Cassandra = struct
 
   type block_data = { raw_block : string } [@@deriving yojson]
 
+  type submission =
+    { created_at : string
+    ; snark_work : Uptime_service.Proof_data.t option
+    ; submitter : Public_key.Compressed.t
+    ; block_hash : string
+    ; submitted_at : string
+    ; submitted_at_date : string
+    }
+
+  type raw =
+    { created_at : string
+    ; peer_id : string
+    ; snark_work : string option [@default None]
+    ; remote_addr : string
+    ; submitter : string
+    ; block_hash : string
+    ; graphql_control_port : int option [@default None]
+    ; submitted_at : string
+    ; submitted_at_date : string
+    }
+  [@@deriving yojson]
+
+  let of_raw meta =
+    let open Result.Let_syntax in
+    let%bind.Result submitter =
+      Public_key.Compressed.of_base58_check meta.submitter
+    in
+    let%map snark_work =
+      match meta.snark_work with
+      | None ->
+          Ok None
+      | Some s ->
+          let%map snark_work = decode_snark_work s in
+          Some snark_work
+    in
+    ( { submitter
+      ; snark_work
+      ; block_hash = meta.block_hash
+      ; created_at = meta.created_at
+      ; submitted_at_date = meta.submitted_at_date
+      ; submitted_at = meta.submitted_at
+      }
+      : submission )
+
+  let created_at ({ created_at; _ } : submission) = created_at
+
+  let block_hash ({ block_hash; _ } : submission) = block_hash
+
+  let snark_work ({ snark_work; _ } : submission) = snark_work
+
+  let submitter ({ submitter; _ } : submission) = submitter
+
   let load_submissions { executable; keyspace; period_start; period_end } =
     let open Deferred.Or_error.Let_syntax in
     let%bind raw =
       Cassandra.select ?executable ~parse:raw_of_yojson ~keyspace
         ~fields:
           [ "created_at"
+          ; "submitted_at_date"
+          ; "submitted_at"
           ; "peer_id"
           ; "snark_work"
           ; "remote_addr"
