@@ -73,7 +73,7 @@ let test () =
                 ; auxiliary_output = ()
                 } )
           ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
-          ; custom_gate_type = false (* JES: TODO: This is fine? *)
+          ; custom_gate_type = false
           }
         ] )
       ()
@@ -118,7 +118,7 @@ let test () =
                 ; auxiliary_output = ()
                 } )
           ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
-          ; custom_gate_type = false (* JES: TODO: This is fine? *)
+          ; custom_gate_type = false
           }
         ] )
       ()

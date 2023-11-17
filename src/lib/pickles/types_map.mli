@@ -4,7 +4,7 @@ type inner_curve_var =
   Backend.Tick.Field.t Snarky_backendless.Cvar.t
   * Backend.Tick.Field.t Snarky_backendless.Cvar.t
 
-(* JES: TODO: Basic wrap function metadata *)
+(* Basic wrap function metadata *)
 module Basic : sig
   type ('var, 'value, 'n1, 'n2) t =
     { max_proofs_verified : (module Pickles_types.Nat.Add.Intf with type n = 'n1)

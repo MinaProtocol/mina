@@ -44,7 +44,8 @@ module Step = struct
     let generate ~custom_gate_type ~prev_challenges cs =
       let open Tick.Keypair in
       let keypair =
-        printf "impls.ml Step.Keypair.generate custom_gate_type = %b\n" custom_gate_type ;
+        printf "impls.ml Step.Keypair.generate custom_gate_type = %b\n"
+          custom_gate_type ;
         if custom_gate_type then
           create_plus custom_gate_type ~prev_challenges cs
         else create ~prev_challenges cs
@@ -168,10 +169,13 @@ module Wrap = struct
 
     let generate ~custom_gate_type ~prev_challenges cs =
       let open Tock.Keypair in
-      printf "impls.ml Wrap.Keypair.generate custom_gate_type = %b\n" custom_gate_type ;
-      let keypair = if custom_gate_type then
-        create_plus custom_gate_type ~prev_challenges cs
-      else create ~prev_challenges cs in
+      printf "impls.ml Wrap.Keypair.generate custom_gate_type = %b\n"
+        custom_gate_type ;
+      let keypair =
+        if custom_gate_type then
+          create_plus custom_gate_type ~prev_challenges cs
+        else create ~prev_challenges cs
+      in
       { pk = pk keypair; vk = vk keypair }
   end
 

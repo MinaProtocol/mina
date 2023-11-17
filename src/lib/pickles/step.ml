@@ -240,7 +240,6 @@ struct
             statement.messages_for_next_step_proof.old_bulletproof_challenges
           ~zk_rows:data.zk_rows ~proof_state:statement.proof_state
           ~custom_gate_type:data.custom_gate_type
-        (* JES: PLACE1 *)
       in
       let prev_statement_with_hashes :
           ( _

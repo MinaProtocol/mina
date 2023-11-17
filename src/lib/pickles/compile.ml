@@ -382,8 +382,7 @@ struct
          * _
          * _
          * _ =
-   fun ~self ~cache ~proof_cache
-       ?disk_keys
+   fun ~self ~cache ~proof_cache ?disk_keys
        ?(return_early_digest_exception = false) ?override_wrap_domain
        ?override_wrap_main ?(num_chunks = 1) ~branches:(module Branches)
        ~max_proofs_verified ~name ~constraint_constants ~public_input
@@ -421,7 +420,7 @@ struct
     in
     let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
     Timer.clock __LOC__ ;
-    (* JES: TODO: Is this correct below? *)
+    (* Note: we have the limitation that the custom_gate_type for all choices must be the same *)
     let feature_flags, custom_gate_type =
       let rec go :
           type a b c d.
@@ -441,6 +440,7 @@ struct
             , r.custom_gate_type )
         | r :: rules ->
             let feature_flags, custom_gate_type = go rules in
+            assert (Bool.(custom_gate_type = r.custom_gate_type)) ;
             ( Plonk_types.Features.Full.map2
                 (Plonk_types.Features.to_full ~or_:( || ) r.feature_flags)
                 feature_flags ~f:(fun enabled flag ->
@@ -451,7 +451,7 @@ struct
                       No
                   | _, Maybe | true, No | false, Yes ->
                       Maybe )
-            , custom_gate_type || r.custom_gate_type )
+            , custom_gate_type )
       in
       go choices
     in
@@ -512,12 +512,14 @@ struct
         | rule :: rules ->
             let first =
               Timer.clock __LOC__ ;
-              printf "compile.ml compile Step_branch_data.create custom_gate_type = %b\n" rule.custom_gate_type ;
+              printf
+                "compile.ml compile Step_branch_data.create custom_gate_type = \
+                 %b\n"
+                rule.custom_gate_type ;
               let res =
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
                       ~actual_feature_flags:rule.feature_flags
-                      ~custom_gate_type:rule.custom_gate_type
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
                       Arg_var.to_field_elements Arg_value.to_field_elements rule
@@ -603,7 +605,9 @@ struct
                        , index
                        , digest ) )
               in
-              printf "compile.ml compile Cache.Step.read_or_generate b.custom_gate_type = %b\n"
+              printf
+                "compile.ml compile Cache.Step.read_or_generate \
+                 b.custom_gate_type = %b\n"
                 b.custom_gate_type ;
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
@@ -684,9 +688,13 @@ struct
             Lazy.return (self_id, header, digest)
       in
       let r =
-        printf "compile.ml compile Cache.Wrap.read_or_generate custom_gate_type = %b\n" custom_gate_type ;
+        printf
+          "compile.ml compile Cache.Wrap.read_or_generate custom_gate_type = %b\n"
+          custom_gate_type ;
         Common.time "wrap read or generate " (fun () ->
-            Cache.Wrap.read_or_generate (* Due to Wrap_hack *) ~custom_gate_type (* JES: TODO: This seems to impact verifying *)
+            Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
+              ~custom_gate_type
+                (* Note: custom_gate_type needed for case when gate is overriden (true) and witness is valid *)
               ~prev_challenges:2 cache disk_key_prover disk_key_verifier typ
               (Snarky_backendless.Typ.unit ())
               main )
@@ -788,10 +796,13 @@ struct
                   *)
                   Some tweak_statement
             in
-            printf "compile.ml Wrap.wrap custom_gate_type = %b\n" b.custom_gate_type ;
+            printf "compile.ml Wrap.wrap custom_gate_type = %b\n"
+              b.custom_gate_type ;
+            (* Note: custom_gate_type is passed below because Wrap needs to verify the Step proof *)
             Wrap.wrap ~proof_cache ~max_proofs_verified:Max_proofs_verified.n
-              ~feature_flags ~actual_feature_flags:b.feature_flags ~custom_gate_type:b.custom_gate_type
-              full_signature.maxes wrap_requests ?tweak_statement
+              ~feature_flags ~actual_feature_flags:b.feature_flags
+              ~custom_gate_type:b.custom_gate_type full_signature.maxes
+              wrap_requests ?tweak_statement
               ~dlog_plonk_index:
                 ((* TODO *) Plonk_verification_key_evals.map
                    ~f:(fun x -> [| x |])
@@ -839,7 +850,8 @@ struct
       go step_data step_keypairs
     in
     Timer.clock __LOC__ ;
-    printf "compile.ml compile Types_map custom_gate_type = %b\n" custom_gate_type ;
+    printf "compile.ml compile Types_map custom_gate_type = %b\n"
+      custom_gate_type ;
     let data : _ Types_map.Compiled.t =
       { branches = Branches.n
       ; proofs_verifieds
@@ -1321,7 +1333,7 @@ struct
           ; auxiliary_output = ()
           } )
     ; feature_flags = Plonk_types.Features.none_bool
-    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+    ; custom_gate_type = false
     }
 
   let override_wrap_main =
@@ -1390,7 +1402,7 @@ struct
             ~choices:(fun ~self:_ ->
               [ { identifier = "main"
                 ; feature_flags = Plonk_types.Features.none_bool
-                ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                ; custom_gate_type = false
                 ; prevs = [ tag; tag ]
                 ; main =
                     (fun { public_input = () } ->

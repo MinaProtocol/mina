@@ -3,13 +3,13 @@ open Pickles_types
 open Pickles.Impls.Step
 
 let perform_step_tests = true
-let perform_recursive_tests = false
+
+let perform_recursive_tests = true
 
 let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 
 let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
-(* JES: TODO: delete *)
 let constraint_constants =
   { Snark_keys_header.Constraint_constants.sub_windows_per_window = 0
   ; ledger_depth = 0

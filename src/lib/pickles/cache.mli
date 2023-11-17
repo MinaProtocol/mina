@@ -61,8 +61,8 @@ module Wrap : sig
   end
 
   val read_or_generate :
-  custom_gate_type:bool
-  -> prev_challenges:Core_kernel.Int.t
+       custom_gate_type:bool
+    -> prev_challenges:Core_kernel.Int.t
     -> Key_cache.Spec.t list
     -> Key.Proving.t Core_kernel.Lazy.t
     -> Key.Verification.t Core_kernel.Lazy.t

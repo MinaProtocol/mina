@@ -40,7 +40,8 @@ let verify_one ~custom_gate_type ~srs
           Sponge.absorb sponge (`Field sponge_digest) ;
           sponge
         in
-        printf "step_main.ml verify_one custom_gate_type = %b\n" custom_gate_type ;
+        printf "step_main.ml verify_one custom_gate_type = %b\n"
+          custom_gate_type ;
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof ~custom_gate_type d.max_proofs_verified
           ~step_domains:d.step_domains ~zk_rows:d.zk_rows ~sponge
@@ -347,7 +348,6 @@ let step_main :
               go previous_proof_statements rule.prevs
             in
             Req.Compute_prev_proof_parts previous_proof_statements ) ;
-        (*  JES TODO: This pops up in step.ml where Plonk_checks is called *)
         let dlog_plonk_index =
           let num_chunks = (* TODO *) 1 in
           exists
@@ -420,7 +420,7 @@ let step_main :
                 | [], [], [], [], [], Z, [] ->
                     ([], [])
                 | ( p :: proofs
-                  , d :: datas (* JES: TODO: Perhaps rename to data_tag or just tag (separate) *)
+                  , d :: datas
                   , messages_for_next_wrap_proof
                     :: messages_for_next_wrap_proofs
                   , unfinalized :: unfinalizeds
@@ -459,10 +459,12 @@ let step_main :
                       | `Side_loaded _ ->
                           ()
                     in
-                    printf "step_main.ml step_main basic.custom_gate_type = %b\n" basic.custom_gate_type ;
+                    printf
+                      "step_main.ml step_main basic.custom_gate_type = %b\n"
+                      basic.custom_gate_type ;
                     let chals, v =
-                      verify_one ~custom_gate_type:d.custom_gate_type ~srs p
-                        d messages_for_next_wrap_proof unfinalized should_verify
+                      verify_one ~custom_gate_type:d.custom_gate_type ~srs p d
+                        messages_for_next_wrap_proof unfinalized should_verify
                     in
                     let chalss, vs =
                       go proofs datas messages_for_next_wrap_proofs unfinalizeds

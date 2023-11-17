@@ -410,7 +410,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -462,7 +462,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; main =
                         (fun _ ->
                           dummy_constraints () ;
@@ -530,7 +530,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = [ self ]
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; main =
                         (fun { public_input = self } ->
                           let prev =
@@ -638,7 +638,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; prevs = [ No_recursion.tag; self ]
                     ; main =
                         (fun { public_input = self } ->
@@ -771,7 +771,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; prevs = [ No_recursion_return.tag; self ]
                     ; main =
                         (fun { public_input = () } ->
@@ -884,7 +884,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; prevs = []
                     ; main =
                         (fun { public_input = x } ->
@@ -938,7 +938,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; prevs = []
                     ; main =
                         (fun { public_input = input } ->
@@ -1046,7 +1046,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ; auxiliary_output = ()
               } )
         ; feature_flags = Plonk_types.Features.none_bool
-        ; custom_gate_type = false (* JES: TODO *)
+        ; custom_gate_type = false
         }
 
       module M = struct
@@ -1136,7 +1136,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let feature_flags = Plonk_types.Features.Full.none in
           let actual_feature_flags = Plonk_types.Features.none_bool in
           let custom_gate_type = false in
-          (* JES: TODO: FIX *)
           let wrap_domains =
             let module M =
               Wrap_domains.Make (A) (A_value) (A) (A_value) (A) (A_value)
@@ -1162,15 +1161,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Step_branch_data.t
           end in
           let proofs_verifieds = Vector.singleton 2 in
-          printf "pickles.ml Make_str Step_branch_data.create custom_gate_type = %b\n" custom_gate_type ;
+          printf
+            "pickles.ml Make_str Step_branch_data.create custom_gate_type = %b\n"
+            custom_gate_type ;
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags ~num_chunks:1
-              ~actual_feature_flags
-              ~custom_gate_type:rule.custom_gate_type (* JES: TODO: update *)
-              ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
-              ~self ~public_input:(Input typ) ~auxiliary_typ:typ
-              A.to_field_elements A_value.to_field_elements rule ~wrap_domains
-              ~proofs_verifieds
+              ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
+              ~branches:Branches.n ~self ~public_input:(Input typ)
+              ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
+              rule ~wrap_domains ~proofs_verifieds
           in
           let step_domains = Vector.singleton inner_step_data.domains in
           let step_keypair =
@@ -1212,9 +1211,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  , index
                  , digest ) )
             in
-            printf "pickles.ml Make_str Cache.Step.read_or_generate custom_gate_type = %b\n" custom_gate_type ;
+            printf
+              "pickles.ml Make_str Cache.Step.read_or_generate \
+               custom_gate_type = %b\n"
+              custom_gate_type ;
             Cache.Step.read_or_generate
-              ~custom_gate_type:custom_gate_type (* JES: TODO: Update *)
+              ~custom_gate_type
               ~prev_challenges:
                 (Nat.to_int (fst inner_step_data.proofs_verified))
               [] k_p k_v
@@ -1286,10 +1288,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
                      (Md5.to_hex digest)
                  , digest ) )
             in
+            printf
+              "pickles.ml Make_str Cache.Wrap.read_or_generate \
+               custom_gate_type = %b\n"
+              custom_gate_type ;
             let r =
               Common.time "wrap read or generate " (fun () ->
-                  Cache.Wrap.read_or_generate ~custom_gate_type:false (* JES: TODO: remove? *) ~prev_challenges:2 []
-                    disk_key_prover disk_key_verifier typ Typ.unit main )
+                  Cache.Wrap.read_or_generate
+                    ~custom_gate_type
+                      (* Note: custom_gate_type not needed here, but needed when called from compile.ml *)
+                    ~prev_challenges:2 [] disk_key_prover disk_key_verifier typ
+                    Typ.unit main )
             in
             (r, disk_key_verifier)
           in
@@ -1914,7 +1923,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; prevs = [ tag; tag ]
                     ; main =
                         (fun { public_input = () } ->
@@ -2056,7 +2065,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -2108,7 +2117,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -2161,7 +2170,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -2215,7 +2224,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
             ~feature_flags:Plonk_types.Features.none ~custom_gate_type:false
             ~typ:Field.typ
-        (* JES: TODO: FIX *)
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
@@ -2241,7 +2249,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = [ side_loaded_tag ]
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; main =
                         (fun { public_input = self } ->
                           let prev =
@@ -2410,7 +2418,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -2462,7 +2470,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -2515,7 +2523,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -2571,7 +2579,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Side_loaded.create ~name:"foo"
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
             ~feature_flags:maybe_features ~custom_gate_type:false ~typ:Field.typ
-        (* JES: TODO: FIX *)
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
@@ -2597,7 +2604,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   [ { identifier = "main"
                     ; prevs = [ side_loaded_tag ]
                     ; feature_flags = Plonk_types.Features.none_bool
-                    ; custom_gate_type = false (* JES: TODO: This is fine? *)
+                    ; custom_gate_type = false
                     ; main =
                         (fun { public_input = self } ->
                           let prev =

@@ -50,7 +50,8 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       (module Tick.Field)
       ~rounds:tick_rounds e.evals
   in
-  printf "wrap.ml combined_inner_product custom_gate_type = %b\n" custom_gate_type ;
+  printf "wrap.ml combined_inner_product custom_gate_type = %b\n"
+    custom_gate_type ;
   let ft_eval0 : Tick.Field.t =
     if custom_gate_type then
       Type1Plus.ft_eval0
@@ -402,7 +403,6 @@ let%test_module "gate finalization" =
           ~custom_gate_type
       in
 
-      (* JES: What's this doing *)
       let full_features =
         Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
       in
@@ -412,7 +412,6 @@ let%test_module "gate finalization" =
 
          This complex function is called with two sets of inputs: once for the step circuit and
          once for the wrap circuit.  It was decided not to use a functor for this. *)
-      (* JES: Question: Why not use a functor? *)
       let deferred_values_typ =
         let open Impls.Step in
         let open Step_main_inputs in
@@ -535,15 +534,12 @@ let%test_module "gate finalization" =
 
       let%test "true -> yes" =
         runtest test_feature_flags_configs.true_is_yes false
-      (* JES: Custom gate type *)
 
       let%test "true -> maybe" =
         runtest test_feature_flags_configs.true_is_maybe false
-      (* JES: Custom gate type *)
 
       let%test "all maybes" =
         runtest test_feature_flags_configs.all_maybes false
-      (* JES: Custom gate type *)
     end
 
     (* Small combinators to lift gate example signatures to the expected

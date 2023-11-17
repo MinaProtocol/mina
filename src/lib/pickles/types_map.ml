@@ -20,7 +20,6 @@ module Basic = struct
     ; wrap_vk : Impls.Wrap.Verification_key.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; custom_gate_type : bool
-          (* JES: TODO: (I) propagate custom_gate_type here (probably required) *)
     ; num_chunks : int
     ; zk_rows : int
     }

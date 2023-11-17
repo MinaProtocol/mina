@@ -74,8 +74,7 @@ let create
     (type branches max_proofs_verified var value a_var a_value ret_var ret_value)
     ~index ~(self : (var, value, max_proofs_verified, branches) Tag.t)
     ~wrap_domains ~(feature_flags : Opt.Flag.t Plonk_types.Features.Full.t)
-    ~(custom_gate_type : bool) ~num_chunks
-    ~(actual_feature_flags : bool Plonk_types.Features.t)
+    ~num_chunks ~(actual_feature_flags : bool Plonk_types.Features.t)
     ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
     ~(public_input :
@@ -133,7 +132,8 @@ let create
         Impls.Step.Typ.(input_typ * output_typ)
   in
   Timer.clock __LOC__ ;
-  printf "step_branch_data.ml create custom_gate_type = %b\n" custom_gate_type ;
+  printf "step_branch_data.ml create custom_gate_type = %b\n"
+    rule.custom_gate_type ;
   let step ~step_domains =
     Step_main.step_main requests
       (Nat.Add.create max_proofs_verified)
@@ -144,7 +144,7 @@ let create
         ; wrap_domains
         ; step_domains
         ; feature_flags
-        ; custom_gate_type
+        ; custom_gate_type = rule.custom_gate_type
         ; num_chunks
         ; zk_rows =
             ( match num_chunks with
@@ -186,5 +186,5 @@ let create
     ; main = step
     ; requests
     ; feature_flags = actual_feature_flags
-    ; custom_gate_type
+    ; custom_gate_type = rule.custom_gate_type
     }
