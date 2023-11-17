@@ -418,9 +418,9 @@ module Make (Inputs : Inputs_intf.S) = struct
     let set_merkle_path_unsafe t addr path =
       assert_is_attached t ;
       ignore
-        ( List.fold_left ~init:addr (List.rev path) ~f:(fun addr path ->
-              let addr = Location.Addr.parent_exn addr in
+        ( List.fold_left ~init:addr path ~f:(fun addr path ->
               let sibling_addr = Location.Addr.sibling addr in
+              let addr = Location.Addr.parent_exn addr in
               let hash = match path with `Left hash | `Right hash -> hash in
               self_set_hash t sibling_addr hash ;
               addr )
