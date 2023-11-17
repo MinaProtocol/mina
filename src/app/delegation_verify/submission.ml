@@ -188,6 +188,20 @@ module Cassandra = struct
 
   let load_submissions { executable; keyspace; period_start; period_end } =
     let open Deferred.Or_error.Let_syntax in
+    let start_day = Time.of_string period_start |> Time.to_date ~zone:Time.Zone.utc in
+    let end_day = Time.of_string period_end |> Time.to_date ~zone:Time.Zone.utc in
+    let partition_keys =
+      Date.dates_between ~min:start_day ~max:end_day
+      |> List.map ~f:(fun d -> Date.format d "%Y-%m-%d")
+    in
+    let partition =
+      if List.length partition_keys = 1 then
+        sprintf "submitted_at_date = '%s'" (List.hd_exn partition_keys)
+      else
+        sprintf
+          "submitted_at_date IN (%s)"
+          (String.concat ~sep:"," @@ List.map ~f:(sprintf "'%s'") partition_keys)
+    in
     let%bind raw =
       Cassandra.select ?executable ~parse:raw_of_yojson ~keyspace
         ~fields:
@@ -203,9 +217,8 @@ module Cassandra = struct
           ]
         ~where:
           (sprintf
-             "submitted_at_date = '%s' AND submitted_at >= '%s' AND \
-              submitted_at <= '%s'"
-             (List.hd_exn @@ String.split ~on:' ' period_start)
+             "%s AND submitted_at >= '%s' AND submitted_at <= '%s'"
+             partition
              period_start period_end )
         "submissions"
     in
