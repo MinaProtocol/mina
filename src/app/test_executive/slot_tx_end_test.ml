@@ -156,50 +156,49 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         section "wait for payments to be processed"
           Async.(at end_t >>= const Malleable_error.ok_unit)
       in
-      (* let event_router = event_router t in
-         let event_subscription =
-           Event_router.on event_router Block_produced
-             ~f:(fun
-                  node
-                  { Event_type.Block_produced.block_height
-                  ; epoch
-                  ; global_slot
-                  ; snarked_ledger_generated
-                  ; state_hash
-                  }
-                ->
-               [%log info] "block produced" ;
-               Async.Deferred.return `Continue )
-         in
-         Async.Deferred.Let_syntax.let%bind () =
-           Event_router.await event_router event_subscription
-         in *)
       let ok_if_true s =
         Malleable_error.ok_if_true ~error:(Error.of_string s) ~error_type:`Soft
       in
-      section "checked produced blocks"
-        (let%bind blocks =
-           Integration_test_lib.Graphql_requests
-           .must_get_best_chain_for_slot_end_test ~max_length:(2 * num_slots)
-             ~logger
-             (Network.Node.get_ingress_uri receiver)
-         in
-         let%bind () =
-           Malleable_error.List.iter blocks ~f:(fun block ->
-               let%bind () =
-                 Option.value_map slot_tx_end ~default:Malleable_error.ok_unit
-                   ~f:(fun slot_tx_end ->
-                     ok_if_true "block with transactions after slot_tx_end"
-                       ( Mina_numbers.Global_slot.(
-                           of_uint32 block.slot_since_genesis < slot_tx_end)
-                       || block.command_transaction_count = 0
-                          && block.snark_work_count = 0 && block.coinbase = 0 ) )
-               in
-               Option.value_map slot_chain_end ~default:Malleable_error.ok_unit
-                 ~f:(fun slot_chain_end ->
-                   ok_if_true "block produced for slot after slot_chain_end"
-                     Mina_numbers.Global_slot.(
-                       of_uint32 block.slot_since_genesis < slot_chain_end) ) )
-         in
-         ok_if_true "" true )
+      let%bind blocks =
+        Integration_test_lib.Graphql_requests
+        .must_get_best_chain_for_slot_end_test ~max_length:(2 * num_slots)
+          ~logger
+          (Network.Node.get_ingress_uri receiver)
+      in
+      let%bind () =
+        section "check blocks after slot_tx_end"
+          (Malleable_error.List.iter blocks ~f:(fun block ->
+               Option.value_map slot_tx_end ~default:Malleable_error.ok_unit
+                 ~f:(fun slot_tx_end ->
+                   let msg =
+                     Printf.sprintf
+                       "block with transactions after slot_tx_end. block slot \
+                        since genesis: %s, txn count: %d, snark work count: \
+                        %d, coinbase: %d"
+                       (Mina_numbers.Global_slot.to_string
+                          block.slot_since_genesis )
+                       block.command_transaction_count block.snark_work_count
+                       block.coinbase
+                   in
+                   ok_if_true msg
+                     ( Mina_numbers.Global_slot.(
+                         of_uint32 block.slot_since_genesis < slot_tx_end)
+                     || block.command_transaction_count = 0
+                        && block.snark_work_count = 0 && block.coinbase = 0 ) ) )
+          )
+      in
+      section "check for blocks after slot_chain_end"
+        (Malleable_error.List.iter blocks ~f:(fun block ->
+             Option.value_map slot_chain_end ~default:Malleable_error.ok_unit
+               ~f:(fun slot_chain_end ->
+                 let msg =
+                   Printf.sprintf
+                     "block produced for slot %s after slot_chain_end (%s)"
+                     (Mina_numbers.Global_slot.to_string
+                        block.slot_since_genesis )
+                     (Mina_numbers.Global_slot.to_string slot_chain_end)
+                 in
+                 ok_if_true msg
+                   Mina_numbers.Global_slot.(
+                     of_uint32 block.slot_since_genesis < slot_chain_end) ) ) )
 end

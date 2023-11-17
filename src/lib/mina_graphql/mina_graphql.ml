@@ -3066,21 +3066,21 @@ module Mutations = struct
 
   let send_user_command coda user_command_input =
     match (Mina_lib.config coda).slot_tx_end with
-    _ ->
-    match
-      Mina_commands.setup_and_submit_user_command coda user_command_input
-    with
-    | `Active f -> (
-        match%map f with
-        | Ok user_command ->
-            Ok
-              { Types.UserCommand.With_status.data = user_command
-              ; status = Unknown
-              }
-        | Error e ->
-            Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
-    | `Bootstrapping ->
-        return (Error "Daemon is bootstrapping")
+    | _ -> (
+        match
+          Mina_commands.setup_and_submit_user_command coda user_command_input
+        with
+        | `Active f -> (
+            match%map f with
+            | Ok user_command ->
+                Ok
+                  { Types.UserCommand.With_status.data = user_command
+                  ; status = Unknown
+                  }
+            | Error e ->
+                Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
+        | `Bootstrapping ->
+            return (Error "Daemon is bootstrapping") )
 
   let find_identity ~public_key coda =
     Result.of_option
