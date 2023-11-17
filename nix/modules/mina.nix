@@ -68,6 +68,7 @@ inputs:
         };
         libp2p-keypair = lib.mkOption {
           type = path;
+          default = "/root/libp2p-keys/key";
         };
 
         waitForRpc = lib.mkOption {

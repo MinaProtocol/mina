@@ -15,6 +15,7 @@ module type S = sig
   module Types_map = Types_map
   module Step_verifier = Step_verifier
   module Common = Common
+  module Proof_cache = Proof_cache
 
   exception Return_digest of Md5.t
 
@@ -188,20 +189,20 @@ module type S = sig
         The types parameters are:
         - ['prev_vars] the tuple-list of public input circuit types to the previous
           proofs.
-        - For example, [Boolean.var * (Boolean.var * unit)] represents 2 previous
+          For example, [Boolean.var * (Boolean.var * unit)] represents 2 previous
           proofs whose public inputs are booleans
         - ['prev_values] the tuple-list of public input non-circuit types to the
           previous proofs.
-        - For example, [bool * (bool * unit)] represents 2 previous proofs whose
+          For example, [bool * (bool * unit)] represents 2 previous proofs whose
           public inputs are booleans.
         - ['widths] is a tuple list of the maximum number of previous proofs each
           previous proof itself had.
-        - For example, [Nat.z Nat.s * (Nat.z * unit)] represents 2 previous
+          For example, [Nat.z Nat.s * (Nat.z * unit)] represents 2 previous
           proofs where the first has at most 1 previous proof and the second had
           zero previous proofs.
         - ['heights] is a tuple list of the number of inductive rules in each of
           the previous proofs
-        - For example, [Nat.z Nat.s Nat.s * (Nat.z Nat.s * unit)] represents 2
+          For example, [Nat.z Nat.s Nat.s * (Nat.z Nat.s * unit)] represents 2
           previous proofs where the first had 2 inductive rules and the second
           had 1.
         - ['a_var] is the in-circuit type of the [main] function's public input.
@@ -237,8 +238,12 @@ module type S = sig
       }
   end
 
+  type chunking_data = Verify.Instance.chunking_data =
+    { num_chunks : int; domain_size : int; zk_rows : int }
+
   val verify_promise :
-       (module Nat.Intf with type n = 'n)
+       ?chunking_data:chunking_data
+    -> (module Nat.Intf with type n = 'n)
     -> (module Statement_value_intf with type t = 'a)
     -> Verification_key.t
     -> ('a * ('n, 'n) Proof.t) list
@@ -365,11 +370,13 @@ module type S = sig
   val compile_promise :
        ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
+    -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
     -> ?return_early_digest_exception:bool
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?num_chunks:int
     -> public_input:
          ( 'var
          , 'value
@@ -419,10 +426,12 @@ module type S = sig
   val compile :
        ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
+    -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?num_chunks:int
     -> public_input:
          ( 'var
          , 'value

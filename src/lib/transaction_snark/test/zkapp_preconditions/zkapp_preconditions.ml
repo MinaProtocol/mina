@@ -5,8 +5,17 @@ module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Update_states_spec
 open Mina_base
 
+let proof_cache =
+  lazy
+    ( Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+    @@ Yojson.Safe.from_file "proof_cache.json" )
+
 let%test_module "Valid_while precondition tests" =
   ( module struct
+    let proof_cache = Lazy.force proof_cache
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let constraint_constants = U.constraint_constants
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
@@ -40,7 +49,7 @@ let%test_module "Valid_while precondition tests" =
           Some
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
-            ; account = Account_update.Account_precondition.Accept
+            ; account = Zkapp_precondition.Account.accept
             ; valid_while = Check { lower = global_slot; upper = global_slot }
             }
       }
@@ -99,6 +108,10 @@ let%test_module "Valid_while precondition tests" =
 
 let%test_module "Protocol state precondition tests" =
   ( module struct
+    let proof_cache = Lazy.force proof_cache
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
@@ -170,7 +183,7 @@ let%test_module "Protocol state precondition tests" =
                   { Account_update.Preconditions.network =
                       precondition_exact
                         (Mina_state.Protocol_state.Body.view state_body)
-                  ; account = Account_update.Account_precondition.Accept
+                  ; account = Zkapp_precondition.Account.accept
                   ; valid_while = Ignore
                   }
             }
@@ -212,7 +225,7 @@ let%test_module "Protocol state precondition tests" =
             ; preconditions =
                 Some
                   { Account_update.Preconditions.network = network_precondition
-                  ; account = Account_update.Account_precondition.Accept
+                  ; account = Zkapp_precondition.Account.accept
                   ; valid_while = Ignore
                   }
             }
@@ -287,7 +300,9 @@ let%test_module "Protocol state precondition tests" =
                         ; preconditions =
                             { Account_update.Preconditions.network =
                                 invalid_network_precondition
-                            ; account = Nonce (Account.Nonce.succ sender_nonce)
+                            ; account =
+                                Zkapp_precondition.Account.nonce
+                                  (Account.Nonce.succ sender_nonce)
                             ; valid_while = Ignore
                             }
                         ; use_full_commitment = false
@@ -320,8 +335,7 @@ let%test_module "Protocol state precondition tests" =
                         ; preconditions =
                             { Account_update.Preconditions.network =
                                 invalid_network_precondition
-                            ; account =
-                                Account_update.Account_precondition.Accept
+                            ; account = Zkapp_precondition.Account.accept
                             ; valid_while = Ignore
                             }
                         ; use_full_commitment = true
@@ -401,6 +415,10 @@ let%test_module "Protocol state precondition tests" =
 
 let%test_module "Account precondition tests" =
   ( module struct
+    let proof_cache = Lazy.force proof_cache
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let zkapp_prover_and_vk = (zkapp_prover, vk)
@@ -482,7 +500,7 @@ let%test_module "Account precondition tests" =
         ; is_new
         }
       in
-      Account_update.Account_precondition.Full predicate_account
+      predicate_account
 
     let%test_unit "exact account predicate" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -604,16 +622,15 @@ let%test_module "Account precondition tests" =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
             Ignore )
       in
-      Full
-        { balance = Ignore
-        ; nonce = Ignore
-        ; receipt_chain_hash = Ignore
-        ; delegate = Check pk
-        ; state
-        ; action_state = Ignore
-        ; proved_state = Ignore
-        ; is_new = Check true
-        }
+      { balance = Ignore
+      ; nonce = Ignore
+      ; receipt_chain_hash = Ignore
+      ; delegate = Check pk
+      ; state
+      ; action_state = Ignore
+      ; proved_state = Ignore
+      ; is_new = Check true
+      }
 
     let add_account_precondition ~at precondition account_updates =
       Zkapp_command.Call_forest.mapi account_updates
@@ -696,7 +713,9 @@ let%test_module "Account precondition tests" =
       let account_creation_fee =
         Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
       in
-      Quickcheck.test ~trials:5 Signature_lib.Keypair.gen ~f:(fun new_kp ->
+      Quickcheck.test ~trials:5
+        (Quickcheck.Generator.tuple2 Signature_lib.Keypair.gen
+           Signature_lib.Keypair.gen ) ~f:(fun (new_kp, token_account) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let module Init_ledger =
@@ -715,7 +734,6 @@ let%test_module "Account precondition tests" =
                     Account_id.derive_token_id
                       ~owner:(Account_id.create token_owner_pk Token_id.default)
                   in
-                  let token_account = Keypair.create () in
                   let token_account_pk =
                     Public_key.compress token_account.public_key
                   in
@@ -876,7 +894,9 @@ let%test_module "Account precondition tests" =
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
-                        ; account = Nonce (Account.Nonce.succ sender_nonce)
+                        ; account =
+                            Zkapp_precondition.Account.nonce
+                              (Account.Nonce.succ sender_nonce)
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
@@ -907,7 +927,7 @@ let%test_module "Account precondition tests" =
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
-                        ; account = Account_update.Account_precondition.Accept
+                        ; account = Zkapp_precondition.Account.accept
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = true
@@ -991,4 +1011,11 @@ let%test_module "Account precondition tests" =
                   failwith
                     "Expected transaction to fail due to invalid account \
                      precondition in the fee payer" ) )
+
+    let () =
+      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )

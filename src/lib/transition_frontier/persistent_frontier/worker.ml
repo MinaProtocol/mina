@@ -61,88 +61,108 @@ module Worker = struct
     | `Not_found (`Arcs hash) ->
         Printf.sprintf "arcs not found for %s" (State_hash.to_base58_check hash)
 
-  let apply_diff (type mutant) (t : t) (diff : mutant Diff.Lite.t) :
-      (mutant, apply_diff_error) Result.t =
-    let map_error result ~diff_type ~diff_type_name =
-      Result.map_error result ~f:(fun err ->
-          [%log' error t.logger] "error applying %s diff: %s" diff_type_name
-            (apply_diff_error_internal_to_string err) ;
-          `Apply_diff diff_type )
-    in
+  let apply_diff (type mutant) ~old_root ~arcs_cache (t : t)
+      (diff : mutant Diff.Lite.t) : Database.batch_t -> unit =
     match diff with
-    | New_node (Lite transition) -> (
-        let r =
-          ( Database.add t.db ~transition
-            :> (mutant, apply_diff_error_internal) Result.t )
-        in
-        match r with
-        | Ok x ->
-            Ok x
-        | Error (`Not_found (`Parent_transition h | `Arcs h)) ->
-            [%log' trace t.logger]
-              "Did not add node $hash to DB. Its $parent has already been \
-               thrown away"
-              ~metadata:
-                [ ( "hash"
-                  , `String
-                      (State_hash.to_base58_check
-                         (Mina_block.Validated.state_hash transition) ) )
-                ; ("parent", `String (State_hash.to_base58_check h))
-                ] ;
-            Ok ()
-        | _ ->
-            map_error ~diff_type:`New_node ~diff_type_name:"New_node" r )
-    | Root_transitioned
-        { new_root; garbage = Lite garbage; just_emitted_a_proof } ->
-        if just_emitted_a_proof then (
-          [%log' info t.logger] "Dequeued a snarked ledger" ;
-          Persistent_root.Instance.dequeue_snarked_ledger
-            t.persistent_root_instance ) ;
-        map_error ~diff_type:`Root_transitioned
-          ~diff_type_name:"Root_transitioned"
-          ( Database.move_root t.db ~new_root ~garbage
-            :> (mutant, apply_diff_error_internal) Result.t )
+    | New_node (Lite transition) ->
+        Database.add ~arcs_cache ~transition
+    | Root_transitioned { new_root; garbage = Lite garbage; _ } ->
+        Database.move_root ~old_root ~new_root ~garbage
     | Best_tip_changed best_tip_hash ->
-        map_error ~diff_type:`Best_tip_changed
-          ~diff_type_name:"Best_tip_changed"
-          ( Database.set_best_tip t.db best_tip_hash
-            :> (mutant, apply_diff_error_internal) Result.t )
-
-  let handle_diff t (Diff.Lite.E.E diff) =
-    let open Result.Let_syntax in
-    let%map _mutant = apply_diff t diff in
-    ()
-
-  (* result equivalent of Deferred.Or_error.List.fold *)
-  let rec deferred_result_list_fold ls ~init ~f =
-    let open Deferred.Result.Let_syntax in
-    match ls with
-    | [] ->
-        return init
-    | h :: t ->
-        let%bind init = f init h in
-        deferred_result_list_fold t ~init ~f
+        Database.set_best_tip best_tip_hash
 
   let perform t input =
+    let arcs_cache = State_hash.Table.create () in
     O1trace.thread "persistent_frontier_write_to_disk" (fun () ->
-        match%map
-          [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
-            (List.length input) ;
-          (* Iterating over the diff application in this way
-             * effectively allows the scheduler to scheduler
-             * other tasks in between diff applications.
-             * If implemented otherwise, all diffs would be
-             * applied during the same scheduler cycle.
-          *)
-          deferred_result_list_fold input ~init:() ~f:(fun () diff ->
-              Deferred.return (handle_diff t diff) )
-        with
-        | Ok () ->
-            ()
-        (* TODO: log the diff that failed *)
+        [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
+          (List.length input) ;
+        (* OPTIMIZATION: Compress the best tip diffs and root transition diffs in order avoid unnecessary intermediate writes. *)
+        let best_tip_diffs, root_transition_diffs, other_diffs =
+          List.partition3_map input ~f:(function
+            | Diff.Lite.E.E (Best_tip_changed diff) ->
+                `Fst diff
+            | E (Root_transitioned diff) ->
+                `Snd diff
+            | diff ->
+                `Trd diff )
+        in
+        (* We only care about the final best tip diff in the sequence, as all other best tip diffs get overwritten *)
+        let final_best_tip_diff = List.last best_tip_diffs in
+        (* We only care about the final root transition diff in the sequence, but we do want to retain garbage that is removed from prior root transitions. We do this by compressing all garbage into the final root transition. *)
+        let final_root_transition_diff = List.last root_transition_diffs in
+        let extra_garbage =
+          List.drop_last root_transition_diffs
+          |> Option.value ~default:[]
+          |> List.bind ~f:(fun { new_root; garbage = Lite garbage; _ } ->
+                 (Root_data.Limited.hashes new_root).state_hash :: garbage )
+        in
+        let total_root_transition_diff =
+          Option.map final_root_transition_diff
+            ~f:(fun ({ garbage = Lite garbage; _ } as r) ->
+              { r with garbage = Lite (extra_garbage @ garbage) } )
+        in
+        let diffs_to_apply =
+          List.concat
+            [ other_diffs
+            ; Option.value_map total_root_transition_diff ~default:[]
+                ~f:(fun diff -> [ Diff.Lite.E.E (Root_transitioned diff) ])
+            ; Option.value_map final_best_tip_diff ~default:[] ~f:(fun diff ->
+                  [ Diff.Lite.E.E (Best_tip_changed diff) ] )
+            ]
+        in
+        let apply_funcs =
+          let state_hashes =
+            List.filter_map input ~f:(function
+              | E (New_node (Lite transition)) ->
+                  Mina_block.Validated.state_hash transition |> Option.some
+              | _ ->
+                  None )
+            |> State_hash.Set.of_list
+          in
+          let parent_hashes =
+            List.filter_map input ~f:(function
+              | E (New_node (Lite transition)) ->
+                  let parent_hash =
+                    Mina_block.Validated.header transition
+                    |> Header.protocol_state
+                    |> Mina_state.Protocol_state.previous_state_hash
+                  in
+                  Option.some_if
+                    (not @@ State_hash.Set.mem state_hashes parent_hash)
+                    parent_hash
+              | _ ->
+                  None )
+          in
+          let%map.Result old_root =
+            Database.find_arcs_and_root t.db ~arcs_cache ~parent_hashes
+          in
+          List.map diffs_to_apply ~f:(fun (Diff.Lite.E.E diff) ->
+              apply_diff ~old_root ~arcs_cache t diff )
+        in
+        let handle_emitted_proof = function
+          | { Diff.Root_transition.just_emitted_a_proof = true; _ } ->
+              [%log' info t.logger] "Dequeued a snarked ledger" ;
+              Persistent_root.Instance.dequeue_snarked_ledger
+                t.persistent_root_instance
+          | _ ->
+              ()
+        in
+        match apply_funcs with
+        | Ok fs ->
+            let%map () = Scheduler.yield () in
+            List.iter root_transition_diffs ~f:handle_emitted_proof ;
+            Database.with_batch t.db ~f:(fun batch ->
+                List.iter fs ~f:(fun f -> f batch) )
+        | Error (`Not_found `Old_root_transition) ->
+            failwith "Old root transition not found"
         | Error (`Apply_diff _) ->
             failwith
-              "Failed to apply a diff to the persistent transition frontier" )
+              "Failed to apply a diff to the persistent transition frontier"
+        | Error (`Not_found (`Arcs h)) ->
+            [%log' warn t.logger]
+              "Did not add node to DB. Its $parent has already been thrown away"
+              ~metadata:[ ("parent", `String (State_hash.to_base58_check h)) ] ;
+            Deferred.unit )
 end
 
 include Worker_supervisor.Make (Worker)

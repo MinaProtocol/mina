@@ -111,7 +111,7 @@ let mk_scan_state_base_node
       (* for zkApps, some or all of the accounts will be zkApp accounts, so this
          understates mem usage
       *)
-      let ledger = Mina_ledger.Ledger.create ~depth () in
+      let ledger = Mina_ledger.Sparse_ledger.L.empty ~depth () in
       let accounts =
         Quickcheck.random_value
         @@ Quickcheck.Generator.list_with_length num_accounts_accessed
@@ -119,12 +119,10 @@ let mk_scan_state_base_node
       in
       List.iter accounts ~f:(fun acct ->
           ignore
-            ( Mina_ledger.Ledger.get_or_create_account ledger
-                (Mina_base.Account.identifier acct)
-                acct
-              : _ ) ) ;
-      Mina_ledger.Sparse_ledger.of_any_ledger
-        (Mina_ledger.Ledger.Any_ledger.cast (module Mina_ledger.Ledger) ledger)
+            (Mina_ledger.Sparse_ledger.L.get_or_create_account ledger
+               (Mina_base.Account.identifier acct)
+               acct ) ) ;
+      !ledger
     in
     let transaction_with_info : Mina_transaction_logic.Transaction_applied.t =
       let previous_hash = get Mina_base.Ledger_hash.gen in

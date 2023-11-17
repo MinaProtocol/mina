@@ -134,7 +134,7 @@ module Constant = struct
   end
 end
 
-let typ (type n avar aval) ~feature_flags
+let typ (type n avar aval) ~feature_flags ~num_chunks
     (statement : (avar, aval) Impls.Step.Typ.t) (max_proofs_verified : n Nat.t)
     =
   let module Sc = Scalar_challenge in
@@ -156,7 +156,7 @@ let typ (type n avar aval) ~feature_flags
         (Branch_data.typ
            (module Impl)
            ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
-    ; Plonk_types.All_evals.typ
+    ; Plonk_types.All_evals.typ ~num_chunks
         (module Impl)
         (* Assume we have lookup iff we have runtime tables *)
         feature_flags

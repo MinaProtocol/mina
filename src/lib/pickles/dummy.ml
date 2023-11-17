@@ -10,13 +10,13 @@ let evals =
   lazy
     (let open Plonk_types in
     let e =
-      Evals.map (Evaluation_lengths.create ~of_int:Fn.id) ~f:(fun n ->
+      Evals.map Evaluation_lengths.default ~f:(fun n ->
           let a () = Array.create ~len:n (Ro.tock ()) in
           (a (), a ()) )
     in
     let ex =
       { All_evals.With_public_input.evals = e
-      ; public_input = (Ro.tock (), Ro.tock ())
+      ; public_input = ([| Ro.tock () |], [| Ro.tock () |])
       }
     in
     { All_evals.ft_eval1 = Ro.tock (); evals = ex })

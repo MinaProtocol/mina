@@ -49,10 +49,7 @@ end
 
 module Account_precondition = struct
   module V1 = struct
-    type t =
-      | Full of Mina_base_zkapp_precondition.Account.V2.t
-      | Nonce of Mina_numbers.Account_nonce.V1.t
-      | Accept
+    type t = Mina_base_zkapp_precondition.Account.V2.t
   end
 end
 

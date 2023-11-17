@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"strconv"
 	"sync"
-	"time"
 )
 
 type FundParams struct {
@@ -71,32 +70,15 @@ func fundImpl(config Config, ctx context.Context, daemonPort string, params Fund
 	})
 }
 
-func runImpl(config Config, ctx context.Context, daemonPortIx int, params FundParams, output OutputF) error {
+func fundRunImpl(config Config, ctx context.Context, daemonPortIx int, params FundParams, output OutputF) error {
 	amountPerKey := params.Amount / uint64(params.Num)
-	var err error
 	password := ""
 	if params.PasswordEnv != "" {
 		password, _ = os.LookupEnv(params.PasswordEnv)
 	}
-	daemonPort := ""
-	if len(config.FundDaemonPorts) > 0 {
-		daemonPort = config.FundDaemonPorts[daemonPortIx]
-	}
-	for retryPause := 1; retryPause <= 16; retryPause = retryPause * 2 {
-		err = fundImpl(config, ctx, daemonPort, params, amountPerKey, password)
-		if err == nil {
-			break
-		}
-		if retryPause <= 8 {
-			config.Log.Warnf("Failed to run fund command, retrying in %d minutes: %s", retryPause, err.Error())
-			time.Sleep(time.Duration(retryPause) * time.Minute)
-		}
-		if len(config.FundDaemonPorts) > 0 {
-			daemonPortIx = (daemonPortIx + 1) % len(config.FundDaemonPorts)
-			daemonPort = config.FundDaemonPorts[daemonPortIx]
-		}
-	}
-	return err
+	return retryOnMultipleServers(config.FundDaemonPorts, daemonPortIx, "fund", config.Log, func(daemonPort string) error {
+		return fundImpl(config, ctx, daemonPort, params, amountPerKey, password)
+	})
 }
 
 func (FundAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
@@ -104,7 +86,7 @@ func (FundAction) Run(config Config, rawParams json.RawMessage, output OutputF) 
 	if err := json.Unmarshal(rawParams, &params); err != nil {
 		return err
 	}
-	return runImpl(config, config.Ctx, 0, params, output)
+	return fundRunImpl(config, config.Ctx, 0, params, output)
 }
 
 func (FundAction) Name() string { return "fund-keys" }
@@ -144,7 +126,7 @@ func (FundAction) RunMany(config Config, actionIOs []ActionIO) error {
 				out := actionIOs[i].Output
 				if memorize(usedKeys, fp.Privkeys) {
 					spawnAction(func() error {
-						return runImpl(config, ctx, daemonPortIx, fp, out)
+						return fundRunImpl(config, ctx, daemonPortIx, fp, out)
 					})
 				} else {
 					break

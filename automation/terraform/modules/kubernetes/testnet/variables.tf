@@ -26,6 +26,16 @@ variable "expose_graphql" {
   default = false
 }
 
+variable "expose_itn_graphql" {
+  type    = bool
+  default = false
+}
+
+variable "itn_keys" {
+  type    = string
+  default = ""
+}
+
 variable "use_local_charts" {
   type    = bool
   default = false
@@ -106,6 +116,12 @@ variable "watchdog_image" {
   type    = string
   default = "gcr.io/o1labs-192920/watchdog:latest"
 }
+
+variable "itn_orchestrator_image" {
+  type    = string
+  default = "gcr.io/o1labs-192920/itn_orchestrator_image:latest"
+}
+
 
 # this must be a string to avoid scientific notation truncation
 variable "mina_faucet_amount" {
