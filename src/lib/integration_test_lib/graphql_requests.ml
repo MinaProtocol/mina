@@ -1107,7 +1107,7 @@ let get_filtered_log_entries ~last_log_index_seen node_uri =
       make @@ makeVariables ~offset:last_log_index_seen ())
   in
   let%bind query_result_obj =
-    exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec:10.0
+    exec_graphql_request ~logger:(Logger.null ()) ~num_tries:5 ~retry_delay_sec:5.0
       ~node_uri ~query_name:"GetFilteredLogEntries" query_obj
   in
   let res = query_result_obj.getFilteredLogEntries in
