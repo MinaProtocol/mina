@@ -6,5 +6,5 @@
    snark keys, a valid genesis proof, etc. *)
 [%%import "/src/config/proof_level/none.mlh"]
 
-[%%define slot_tx_end 8]
-[%%define slot_chain_end 15]
+[%%undef slot_tx_end]
+[%%undef slot_chain_end]

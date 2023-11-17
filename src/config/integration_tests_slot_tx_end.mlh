@@ -1,5 +1,5 @@
 (* same as integration_tests *)
 [%%import "/src/config/integration_tests.mlh"]
 
-[%%define slot_tx_end 8]
+[%%define slot_tx_end 10]
 [%%define slot_chain_end 15]
