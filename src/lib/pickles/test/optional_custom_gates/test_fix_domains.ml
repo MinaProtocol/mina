@@ -207,8 +207,6 @@ let test_fix_domains_with_range_check_table () =
     [ Pickles_types.Plonk_types.Features.{ none_bool with range_check0 = true }
     ; Pickles_types.Plonk_types.Features.{ none_bool with range_check1 = true }
     ; Pickles_types.Plonk_types.Features.
-        { none_bool with range_check1 = true; foreign_field_add = true }
-    ; Pickles_types.Plonk_types.Features.
         { none_bool with range_check0 = true; foreign_field_add = true }
     ; Pickles_types.Plonk_types.Features.
         { none_bool with range_check0 = true; range_check1 = true }
