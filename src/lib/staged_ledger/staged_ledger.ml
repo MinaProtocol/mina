@@ -1018,6 +1018,7 @@ module T = struct
     in
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
+    Ledger.unsafe_preload_accounts_from_parent new_ledger [] ;
     let transactions, works, commands_count, coinbases = pre_diff_info in
     [%log internal] "Update_coinbase_stack"
       ~metadata:

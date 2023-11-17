@@ -245,7 +245,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                 | Error _ ->
                     (* Caught by [try_with] above. *) assert false
               in
-              Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+              Direction.map sibling_dir ~left:(`Right hash) ~right:(`Left hash)
               :: self_merkle_path parent_address
           in
           self_merkle_path address )
