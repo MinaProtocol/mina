@@ -76,8 +76,6 @@ module type S = sig
     (* makes new mask instance with copied tables, re-use parent *)
     val copy : t -> t
 
-    val unsafe_preload_accounts_from_parent : t -> account_id list -> unit
-
     (** already have module For_testing from include above *)
     module For_testing : sig
       val location_in_mask : t -> location -> bool
