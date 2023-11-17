@@ -402,6 +402,17 @@ module Make (Inputs : Inputs_intf.S) = struct
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           self_set_hash t addr hash )
 
+    let set_merkle_path_unsafe t addr path =
+      assert_is_attached t ;
+      ignore
+        ( List.fold_left ~init:addr (List.rev path) ~f:(fun addr path ->
+              let addr = Location.Addr.parent_exn addr in
+              let sibling_addr = Location.Addr.sibling addr in
+              let hash = match path with `Left hash | `Right hash -> hash in
+              self_set_hash t sibling_addr hash ;
+              addr )
+          : Location.Addr.t )
+
     (* if the mask's parent sets an account, we can prune an entry in the mask
        if the account in the parent is the same in the mask *)
     let parent_set_notify t account =
@@ -612,6 +623,33 @@ module Make (Inputs : Inputs_intf.S) = struct
     let location_of_account_batch =
       self_find_or_batch_lookup self_find_location
         Base.location_of_account_batch
+
+    let unsafe_preload_accounts_from_parent t account_ids =
+      assert_is_attached t ;
+      let locations =
+        Base.location_of_account_batch (get_parent t) account_ids
+      in
+      let non_empty_locations =
+        List.filter_map locations ~f:(fun (_account_id, location) -> location)
+      in
+      let accounts = Base.get_batch (get_parent t) non_empty_locations in
+      let merkle_paths =
+        Base.merkle_path_batch (get_parent t) non_empty_locations
+      in
+      (* TODO: If we also insert the empty merkle paths corresponding that may
+         be used by the unmatched account IDs, we can avoid any further disk IO
+         when accessng this mask.
+      *)
+      List.iter2_exn non_empty_locations merkle_paths
+        ~f:(fun location merkle_path ->
+          let addr = Location.to_path_exn location in
+          set_merkle_path_unsafe t addr merkle_path ) ;
+      List.iter accounts ~f:(fun (location, account) ->
+          match account with
+          | None ->
+              ()
+          | Some account ->
+              set t location account )
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for t =
