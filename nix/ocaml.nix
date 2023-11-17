@@ -98,7 +98,8 @@ let
             --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/libp2p_helper \
             --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1} \
             --set MINA_COMMIT_DATE ${escapeShellArg commit_date} \
-            --set MINA_BRANCH "''${MINA_BRANCH-<unknown due to nix build>}"
+            --set MINA_BRANCH "''${MINA_BRANCH-<unknown due to nix build>}" \
+            --set TZDIR "${pkgs.tzdata}/share/zoneinfo"
         done
       '') package.outputs);
 
@@ -320,6 +321,27 @@ let
           mv _build/default/src/lib/snarky_js_bindings/snarky_js_*.js $out/share/snarkyjs_bindings
         '';
       });
+
+      # Stateless verification tool
+      mina-delegation-verify-dev = self.mina-dev.overrideAttrs (oa: {
+        pname = "mina-delegation-verify";
+        version = "dev";
+        outputs = [ "out" ];
+
+        buildInputs = oa.buildInputs ++ [ pkgs.cassandra_4 ];
+
+        buildPhase = ''
+          dune build --display=short \
+            src/app/delegation_verify/delegation_verify.exe
+        '';
+
+        installPhase = ''
+          mkdir -p $out/bin
+          mv _build/default/src/app/delegation_verify/delegation_verify.exe $out/bin/delegation-verify
+        '';
+      });
+
+      mina-delegation-verify = wrapMina self.mina-delegation-verify-dev { };
 
       # Integration test executive
       test_executive-dev = self.mina-dev.overrideAttrs (oa: {
