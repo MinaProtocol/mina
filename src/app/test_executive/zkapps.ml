@@ -772,16 +772,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            zkapp_command_update_all )
     in
     let%bind () =
-      section_hard "Send a zkapp with an invalid proof"
-        (send_invalid_zkapp ~logger
-           (Network.Node.get_ingress_uri node)
-           zkapp_command_invalid_proof "Invalid_proof" )
-    in
-    let%bind () =
       section_hard "Send a zkapp with an insufficient replace fee"
         (send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri node)
            zkapp_command_insufficient_replace_fee "Insufficient_replace_fee" )
+    in
+    let%bind () =
+      section_hard "Send a zkapp with an invalid proof"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_invalid_proof "Invalid_proof" )
     in
     let%bind () =
       section_hard "Send a zkApp transaction with an invalid nonce"
