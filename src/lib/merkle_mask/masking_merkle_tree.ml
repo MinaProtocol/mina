@@ -212,39 +212,30 @@ module Make (Inputs : Inputs_intf.S) = struct
     let get_batch = self_find_or_batch_lookup self_find_account Base.get_batch
 
     let self_merkle_path t address =
-      let location = Location.Account address in
-      match self_find_account t location with
-      | None ->
-          (* Short-circuit: We assume that the merkle path will be in this mask
-             only if the account is also.
-          *)
-          None
-      | Some _ ->
-          Option.try_with (fun () ->
-              let rec self_merkle_path address =
-                if Addr.height ~ledger_depth:t.depth address >= t.depth then []
-                else
-                  let sibling = Addr.sibling address in
-                  let sibling_dir = Location.last_direction sibling in
-                  let hash =
-                    match self_find_hash t sibling with
-                    | Some hash ->
-                        hash
-                    | None ->
-                        (* Caught by [try_with] above. *) assert false
-                  in
-                  let parent_address =
-                    match Addr.parent address with
-                    | Ok addr ->
-                        addr
-                    | Error _ ->
-                        (* Caught by [try_with] above. *) assert false
-                  in
-                  Direction.map sibling_dir ~left:(`Left hash)
-                    ~right:(`Right hash)
-                  :: self_merkle_path parent_address
+      Option.try_with (fun () ->
+          let rec self_merkle_path address =
+            if Addr.height ~ledger_depth:t.depth address >= t.depth then []
+            else
+              let sibling = Addr.sibling address in
+              let sibling_dir = Location.last_direction sibling in
+              let hash =
+                match self_find_hash t sibling with
+                | Some hash ->
+                    hash
+                | None ->
+                    (* Caught by [try_with] above. *) assert false
               in
-              self_merkle_path address )
+              let parent_address =
+                match Addr.parent address with
+                | Ok addr ->
+                    addr
+                | Error _ ->
+                    (* Caught by [try_with] above. *) assert false
+              in
+              Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+              :: self_merkle_path parent_address
+          in
+          self_merkle_path address )
 
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
