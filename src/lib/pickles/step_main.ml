@@ -420,7 +420,7 @@ let step_main :
                 | [], [], [], [], [], Z, [] ->
                     ([], [])
                 | ( p :: proofs
-                  , d :: datas
+                  , d :: datas (* JES: TODO: Perhaps rename to data_tag or just tag (separate) *)
                   , messages_for_next_wrap_proof
                     :: messages_for_next_wrap_proofs
                   , unfinalized :: unfinalizeds
@@ -461,7 +461,7 @@ let step_main :
                     in
                     printf "step_main.ml step_main basic.custom_gate_type = %b\n" basic.custom_gate_type ;
                     let chals, v =
-                      verify_one ~custom_gate_type:basic.custom_gate_type ~srs p
+                      verify_one ~custom_gate_type:d.custom_gate_type ~srs p
                         d messages_for_next_wrap_proof unfinalized should_verify
                     in
                     let chalss, vs =
