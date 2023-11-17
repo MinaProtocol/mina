@@ -79,6 +79,15 @@ in {
     contents = [ ocamlPackages_mina.mina.out ];
   };
 
+  mina-delegation-verify-image = dockerTools.streamLayeredImage {
+    name = "mina-delegation-verify";
+    inherit created;
+    contents = [ ocamlPackages_mina.mina-delegation-verify.out ];
+    config = {
+      cmd = [ "/bin/delegation-verify" ];
+    };
+  };
+
   mina-image-full = mkFullImage "mina" (with ocamlPackages_mina; [
     mina-build-config
     mina-daemon-scripts
