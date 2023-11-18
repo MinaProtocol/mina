@@ -4,6 +4,7 @@ BRANCH=$1
 CURRENT=$(git branch --show-current)
 echo 'Testing for conflicts between the current branch `'"${CURRENT}"'` and `'"${BRANCH}"'`...'
 
+
 # Adapted from this stackoverflow answer: https://stackoverflow.com/a/10856937
 # The git merge-tree command shows the content of a 3-way merge without
 # touching the index, which we can then search for conflict markers.
@@ -11,14 +12,23 @@ echo 'Testing for conflicts between the current branch `'"${CURRENT}"'` and `'"$
 # Tell git where to find ssl certs
 git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt
 # Fetch a fresh copy of the repo
-git fetch origin
+if [ "${BUILDKITE_REPO}" == "https://github.com/MinaProtocol/mina.git" ]; then
+    REMOTE="origin"
+else
+    REMOTE="mina"
+    git remote add ${REMOTE} https://github.com/MinaProtocol/mina.git --fetch --tags
+fi
+
+git fetch ${REMOTE}
+
+
 git config --global user.email "hello@ci.com"
 git config --global user.name "It's me, CI"
 # Check mergeability. We use flags so that
 # * `--no-commit` stops us from updating the index with a merge commit,
 # * `--no-ff` stops us from updating the index to the HEAD, if the merge is a
 #   straightforward fast-forward
-git merge --no-commit --no-ff origin/$BRANCH
+git merge --no-commit --no-ff ${REMOTE}/$BRANCH
 
 RET=$?
 

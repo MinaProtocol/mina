@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -euo pipefail
-
 set -eou pipefail
 set +x
 
@@ -16,7 +14,8 @@ echo 'experimental-features = nix-command flakes' > "${XDG_CONFIG_HOME-${HOME}/.
 
 git config --global --add safe.directory /workdir
 
-# Nix has issue when performing operations on detached head
+git fetch
+# Nix has issue when performing operations on detached head.
 # On Ci machine it spit out issues like:
 # fatal: reference is not a tree: ....
 # error:
@@ -24,7 +23,7 @@ git config --global --add safe.directory /workdir
 #
 #       error: program 'git' failed with exit code 128
 # That is why we checkout branch explicitly
-git checkout $1
+git checkout origin/$1
 
 ./nix/pin.sh
 

@@ -15,13 +15,15 @@ apt-get install -y git apt-transport-https ca-certificates tzdata curl python3 p
 
 git config --global --add safe.directory /workdir
 
+
+source buildkite/scripts/handle-fork.sh
 source buildkite/scripts/export-git-env-vars.sh
 
 pip3 install sexpdata
 
-base_branch=origin/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
+base_branch=${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
 pr_branch=origin/${BUILDKITE_BRANCH}
-release_branch=origin/$1
+release_branch=${REMOTE}/$1
 
 echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} ${release_branch}"
 ./scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch}
