@@ -73,6 +73,11 @@ end = struct
   let merkle_path_at_index_exn t index =
     merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:t.depth index)
 
+  let get_hash_batch_exn t locations =
+    List.map locations ~f:(fun location ->
+        empty_hash_at_height
+          (Addr.height ~ledger_depth:t.depth (Location.to_path_exn location)) )
+
   let index_of_account_exn _t =
     failwith "index_of_account_exn: null ledgers are empty"
 
