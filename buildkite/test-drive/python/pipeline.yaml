@@ -1,0 +1,9 @@
+steps:
+- agents:
+    size: "generic"
+  label: ":test-drive: fast and furious"
+  command: "python ./buildkite/test-drive/python/test.py"
+  plugins:
+  - docker#v5.9.0:
+      image: python:slim-bullseye
+      propagate-environment: true
