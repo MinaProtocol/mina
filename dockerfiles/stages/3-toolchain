@@ -60,7 +60,7 @@ RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_V
     && rm -f deb-s3-${DEBS3_VERSION}.gem
 
 # --- Docker Daemon
-RUN curl -sL https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
+RUN curl -sL https://download.docker.com/linux/static/stable/aarch64/docker-${DOCKER_VERSION}.tgz \
     | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
 
 # --- Terraform tools
@@ -99,11 +99,11 @@ RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # Dhall
-RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-x86_64-linux.tar.bz2 \
-    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall
-RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-bash-$DHALL_BASH_VERSION-x86_64-linux.tar.bz2 \
-    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-bash
-RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-x86_64-linux.tar.bz2 \
-    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
+# RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-aarch64-linux.tar.bz2 \
+#     | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall
+# RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-bash-$DHALL_BASH_VERSION-aarch64-linux.tar.bz2 \
+#     | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-bash
+# RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-aarch64-linux.tar.bz2 \
+#     | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
 
 USER opam
