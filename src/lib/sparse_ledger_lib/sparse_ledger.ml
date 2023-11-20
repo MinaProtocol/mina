@@ -1,5 +1,19 @@
 open Core_kernel
 
+module Metrics = struct
+  type t = Time.Span.t String.Table.t
+
+  let t : t = String.Table.create ()
+
+  let time id f =
+    let start = Time.now () in
+    let x = f () in
+    let elapsed = Time.abs_diff (Time.now ()) start in
+    Hashtbl.update t id ~f:(fun total_elapsed ->
+        Time.Span.(elapsed + Option.value total_elapsed ~default:zero) ) ;
+    x
+end
+
 module Tree = struct
   [%%versioned
   module Stable = struct
@@ -164,14 +178,15 @@ end = struct
     union (depth0 - 1) tree0 (List.rev path0)
 
   let add_path (t : t) path account_id account =
-    let index =
-      List.foldi path ~init:0 ~f:(fun i acc x ->
-          match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
-    in
-    { t with
-      tree = add_path t.depth t.tree path account
-    ; indexes = (account_id, index) :: t.indexes
-    }
+    Metrics.time "add_path" (fun () ->
+        let index =
+          List.foldi path ~init:0 ~f:(fun i acc x ->
+              match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
+        in
+        { t with
+          tree = add_path t.depth t.tree path account
+        ; indexes = (account_id, index) :: t.indexes
+        } )
 
   let iteri (t : t) ~f =
     let rec go acc i tree ~f =

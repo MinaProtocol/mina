@@ -1,6 +1,8 @@
 module type S = sig
   include Base_ledger_intf.S
 
+  (* val metrics : t -> Rocksdb.Database.Metrics.t option *)
+
   val create : ?directory_name:string -> depth:int -> unit -> t
 
   (** create_checkpoint would create the checkpoint and open a db connection to that checkpoint *)

@@ -7,11 +7,24 @@ let of_ledger_root ledger =
   of_root ~depth:(Ledger.depth ledger) (Ledger.merkle_root ledger)
 
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
-  let ledger = Ledger.copy oledger in
-  let locations = Ledger.location_of_account_batch ledger keys in
+  let ledger =
+    Sparse_ledger_lib.Sparse_ledger.Metrics.time "Ledger.copy" (fun () ->
+        Ledger.copy oledger )
+  in
+  let locations =
+    Sparse_ledger_lib.Sparse_ledger.Metrics.time
+      "Ledger.location_of_account_batch" (fun () ->
+        Ledger.location_of_account_batch ledger keys )
+  in
   let non_empty_locations = List.filter_map ~f:snd locations in
-  let accounts = Ledger.get_batch ledger non_empty_locations in
-  let merkle_paths = Ledger.merkle_path_batch ledger non_empty_locations in
+  let accounts =
+    Sparse_ledger_lib.Sparse_ledger.Metrics.time "Ledger.get_batch" (fun () ->
+        Ledger.get_batch ledger non_empty_locations )
+  in
+  let merkle_paths =
+    Sparse_ledger_lib.Sparse_ledger.Metrics.time "Ledger.merkle_path_batch"
+      (fun () -> Ledger.merkle_path_batch ledger non_empty_locations)
+  in
   let _, sparse =
     let rec go (new_keys, sl) locations accounts merkle_paths =
       match locations with
@@ -30,7 +43,11 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
           | _ ->
               assert false )
       | (key, None) :: locations ->
-          let path, acct = Ledger.create_empty_exn ledger key in
+          let path, acct =
+            Sparse_ledger_lib.Sparse_ledger.Metrics.time
+              "Ledger.create_empty_exn" (fun () ->
+                Ledger.create_empty_exn ledger key )
+          in
           go
             (key :: new_keys, add_path sl path key acct)
             locations accounts merkle_paths

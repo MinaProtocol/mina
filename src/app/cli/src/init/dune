@@ -122,6 +122,8 @@
    zkapp_command_builder
    internal_tracing
    transaction_snark_scan_state
+   rocksdb
+   sparse_ledger_lib
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh

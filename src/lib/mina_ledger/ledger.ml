@@ -182,6 +182,8 @@ module Ledger_inner = struct
     let mask = Mask.create ~depth:(Db.depth db) () in
     Maskable.register_mask casted mask
 
+  (* let db_metrics db = Option.value_exn (Db.metrics db) *)
+
   (* Mask.Attached.create () fails, can't create an attached mask directly
      shadow create in order to create an attached mask
   *)

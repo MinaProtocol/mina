@@ -2,8 +2,34 @@
 
 open Core
 
+module Metrics = struct
+  type t =
+    { get : int ref
+    ; get_batch : int ref
+    ; set : int ref
+    ; set_batch : int ref
+    ; to_alist : int ref
+    }
+  [@@deriving fields, sexp]
+
+  let create () =
+    { get = ref 0
+    ; get_batch = ref 0
+    ; set = ref 0
+    ; set_batch = ref 0
+    ; to_alist = ref 0
+    }
+
+  let incr t f = incr (f t)
+end
+
+let metrics = Metrics.create ()
+
 type t = { uuid : Uuid.Stable.V1.t; db : (Rocks.t[@sexp.opaque]) }
+(* type t = { uuid : Uuid.Stable.V1.t; metrics : Metrics.t; db : (Rocks.t[@sexp.opaque]) } *)
 [@@deriving sexp]
+
+(* let metrics t = Some t.metrics *)
 
 let create directory =
   let opts = Rocks.Options.create () in
@@ -24,17 +50,21 @@ let get_uuid t = t.uuid
 let close t = Rocks.close t.db
 
 let get t ~(key : Bigstring.t) : Bigstring.t option =
+  Metrics.(incr metrics get) ;
   Rocks.get ?pos:None ?len:None ?opts:None t.db key
 
 let get_batch t ~(keys : Bigstring.t list) : Bigstring.t option list =
+  Metrics.(incr metrics get_batch) ;
   Rocks.multi_get t.db keys
 
 let set t ~(key : Bigstring.t) ~(data : Bigstring.t) : unit =
+  Metrics.(incr metrics set) ;
   Rocks.put ?key_pos:None ?key_len:None ?value_pos:None ?value_len:None
     ?opts:None t.db key data
 
 let set_batch t ?(remove_keys = [])
     ~(key_data_pairs : (Bigstring.t * Bigstring.t) list) : unit =
+  Metrics.(incr metrics set_batch) ;
   let batch = Rocks.WriteBatch.create () in
   (* write to batch *)
   List.iter key_data_pairs ~f:(fun (key, data) ->
@@ -63,6 +93,7 @@ let remove t ~(key : Bigstring.t) : unit =
   Rocks.delete ?pos:None ?len:None ?opts:None t.db key
 
 let to_alist t : (Bigstring.t * Bigstring.t) list =
+  Metrics.(incr metrics to_alist) ;
   let iterator = Rocks.Iterator.create t.db in
   Rocks.Iterator.seek_to_last iterator ;
   (* iterate backwards and cons, to build list sorted by key *)

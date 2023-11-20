@@ -120,6 +120,13 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
         } )
   in
   let start = Time.now () in
+  let accounts_accessed =
+    List.fold_left zkapps ~init:Account_id.Set.empty ~f:(fun set cmd ->
+        Account_id.Set.(
+          union set (of_list (Zkapp_command.accounts_referenced cmd))) )
+  in
+  Ledger.unsafe_preload_accounts_from_parent ledger
+    (Set.to_list accounts_accessed) ;
   match%map
     Staged_ledger.For_tests.update_coinbase_stack_and_get_data_impl
       ~first_partition_slots ~is_new_stack:(not no_new_stack)
@@ -129,7 +136,19 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
   with
   | Ok (b, _, _, _, _) ->
       printf "Result of application: %B (took %s)\n" b
-        Time.(Span.to_string @@ diff (now ()) start)
+        Time.(Span.to_string @@ diff (now ()) start) ;
+      printf
+        !"Database metrics = %{sexp: Rocksdb.Database.Metrics.t}\n"
+        Rocksdb.Database.metrics ;
+      [ Mina_transaction_logic.Zkapp_command_logic.Metrics.t
+      ; Sparse_ledger_lib.Sparse_ledger.Metrics.t
+      ]
+      |> List.map ~f:Hashtbl.to_alist
+      |> List.concat
+      |> List.sort ~compare:(fun a b -> Time.Span.compare (snd a) (snd b))
+      |> List.iter ~f:(fun (id, span) ->
+             printf "%s: %s\n" id (Time.Span.to_string_hum span) )
+      (* printf !"Transaction logic metrics = %{sexp: (string * Time.Span.t) list}\n" (Hashtbl.to_alist Mina_transaction_logic.Zkapp_command_logic.Metrics.t) *)
   | Error e ->
       eprintf "Error applying staged ledger: %s\n"
         (Staged_ledger.Staged_ledger_error.to_string e)

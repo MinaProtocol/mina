@@ -3,6 +3,29 @@
 open Core_kernel
 open Mina_base
 
+module Metrics = struct
+  type t = Time.Span.t String.Table.t
+
+  let t : t = String.Table.create ()
+
+  let time id f =
+    let start = Time.now () in
+    let x = f () in
+    let elapsed = Time.abs_diff (Time.now ()) start in
+    Hashtbl.update t id ~f:(fun total_elapsed ->
+        Time.Span.(elapsed + Option.value total_elapsed ~default:zero) ) ;
+    x
+
+  let time' id f =
+    let open Async_kernel.Deferred.Let_syntax in
+    let start = Time.now () in
+    let%map x = f () in
+    let elapsed = Time.abs_diff (Time.now ()) start in
+    Hashtbl.update t id ~f:(fun total_elapsed ->
+        Time.Span.(elapsed + Option.value total_elapsed ~default:zero) ) ;
+    x
+end
+
 module type Iffable = sig
   type bool
 
@@ -1081,863 +1104,915 @@ module Make (Inputs : Inputs_intf) = struct
         handler )
       ((global_state : Global_state.t), (local_state : Local_state.t)) =
     let open Inputs in
-    let is_start' =
-      let is_empty_call_forest =
-        Call_forest.is_empty (Stack_frame.calls local_state.stack_frame)
-      in
-      ( match is_start with
-      | `Compute _ ->
-          ()
-      | `Yes _ ->
-          assert_ ~pos:__POS__ is_empty_call_forest
-      | `No ->
-          assert_ ~pos:__POS__ (Bool.not is_empty_call_forest) ) ;
-      match is_start with
-      | `Yes _ ->
-          Bool.true_
-      | `No ->
-          Bool.false_
-      | `Compute _ ->
-          is_empty_call_forest
-    in
-    let will_succeed =
-      match is_start with
-      | `Compute start_data ->
-          Bool.if_ is_start' ~then_:start_data.will_succeed
-            ~else_:local_state.will_succeed
-      | `Yes start_data ->
-          start_data.will_succeed
-      | `No ->
-          local_state.will_succeed
-    in
-    let local_state =
-      { local_state with
-        ledger =
-          Inputs.Ledger.if_ is_start'
-            ~then_:(Inputs.Global_state.first_pass_ledger global_state)
-            ~else_:local_state.ledger
-      ; will_succeed
-      }
-    in
-    let ( (account_update, remaining, call_stack)
-        , account_update_forest
+    let ( global_state
         , local_state
-        , (a, inclusion_proof) ) =
-      let to_pop, call_stack =
-        match is_start with
-        | `Compute start_data ->
-            ( Stack_frame.if_ is_start'
-                ~then_:
-                  (Stack_frame.make ~calls:start_data.account_updates
-                     ~caller:default_caller ~caller_caller:default_caller )
-                ~else_:local_state.stack_frame
-            , Call_stack.if_ is_start' ~then_:(Call_stack.empty ())
-                ~else_:local_state.call_stack )
-        | `Yes start_data ->
-            ( Stack_frame.make ~calls:start_data.account_updates
-                ~caller:default_caller ~caller_caller:default_caller
-            , Call_stack.empty () )
-        | `No ->
-            (local_state.stack_frame, local_state.call_stack)
-      in
-      let { account_update
-          ; caller_id
-          ; account_update_forest
-          ; new_frame = remaining
-          ; new_call_stack = call_stack
-          } =
-        with_label ~label:"get next account update" (fun () ->
-            (* TODO: Make the stack frame hashed inside of the local state *)
-            get_next_account_update to_pop call_stack )
-      in
-      let local_state =
-        with_label ~label:"token owner not caller" (fun () ->
-            let default_token_or_token_owner_was_caller =
-              (* Check that the token owner was consulted if using a non-default
-                 token *)
+        , account_update
+        , a
+        , proof_verifies
+        , signature_verifies
+        , txn_global_slot
+        , account_update_token_is_default
+        , is_start'
+        , inclusion_proof
+        , remaining ) =
+      Metrics.time "a" (fun () ->
+          let is_start' =
+            let is_empty_call_forest =
+              Call_forest.is_empty (Stack_frame.calls local_state.stack_frame)
+            in
+            ( match is_start with
+            | `Compute _ ->
+                ()
+            | `Yes _ ->
+                assert_ ~pos:__POS__ is_empty_call_forest
+            | `No ->
+                assert_ ~pos:__POS__ (Bool.not is_empty_call_forest) ) ;
+            match is_start with
+            | `Yes _ ->
+                Bool.true_
+            | `No ->
+                Bool.false_
+            | `Compute _ ->
+                is_empty_call_forest
+          in
+          let will_succeed =
+            match is_start with
+            | `Compute start_data ->
+                Bool.if_ is_start' ~then_:start_data.will_succeed
+                  ~else_:local_state.will_succeed
+            | `Yes start_data ->
+                start_data.will_succeed
+            | `No ->
+                local_state.will_succeed
+          in
+          let local_state =
+            { local_state with
+              ledger =
+                Inputs.Ledger.if_ is_start'
+                  ~then_:(Inputs.Global_state.first_pass_ledger global_state)
+                  ~else_:local_state.ledger
+            ; will_succeed
+            }
+          in
+          let ( (account_update, remaining, call_stack)
+              , account_update_forest
+              , local_state
+              , (a, inclusion_proof) ) =
+            let to_pop, call_stack =
+              match is_start with
+              | `Compute start_data ->
+                  ( Stack_frame.if_ is_start'
+                      ~then_:
+                        (Stack_frame.make ~calls:start_data.account_updates
+                           ~caller:default_caller ~caller_caller:default_caller )
+                      ~else_:local_state.stack_frame
+                  , Call_stack.if_ is_start' ~then_:(Call_stack.empty ())
+                      ~else_:local_state.call_stack )
+              | `Yes start_data ->
+                  ( Stack_frame.make ~calls:start_data.account_updates
+                      ~caller:default_caller ~caller_caller:default_caller
+                  , Call_stack.empty () )
+              | `No ->
+                  (local_state.stack_frame, local_state.call_stack)
+            in
+            let { account_update
+                ; caller_id
+                ; account_update_forest
+                ; new_frame = remaining
+                ; new_call_stack = call_stack
+                } =
+              with_label ~label:"get next account update" (fun () ->
+                  (* TODO: Make the stack frame hashed inside of the local state *)
+                  get_next_account_update to_pop call_stack )
+            in
+            let local_state =
+              with_label ~label:"token owner not caller" (fun () ->
+                  let default_token_or_token_owner_was_caller =
+                    (* Check that the token owner was consulted if using a non-default
+                       token *)
+                    let account_update_token_id =
+                      Account_update.token_id account_update
+                    in
+                    Bool.( ||| )
+                      (Token_id.equal account_update_token_id Token_id.default)
+                      (Token_id.equal account_update_token_id caller_id)
+                  in
+                  Local_state.add_check local_state Token_owner_not_caller
+                    default_token_or_token_owner_was_caller )
+            in
+            let ((a, inclusion_proof) as acct) =
+              with_label ~label:"get account" (fun () ->
+                  Inputs.Ledger.get_account account_update local_state.ledger )
+            in
+            Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
+            let transaction_commitment, full_transaction_commitment =
+              match is_start with
+              | `No ->
+                  ( local_state.transaction_commitment
+                  , local_state.full_transaction_commitment )
+              | `Yes start_data | `Compute start_data ->
+                  let tx_commitment_on_start =
+                    Transaction_commitment.commitment
+                      ~account_updates:(Stack_frame.calls remaining)
+                  in
+                  let full_tx_commitment_on_start =
+                    Transaction_commitment.full_commitment ~account_update
+                      ~memo_hash:start_data.memo_hash
+                      ~commitment:tx_commitment_on_start
+                  in
+                  let tx_commitment =
+                    Transaction_commitment.if_ is_start'
+                      ~then_:tx_commitment_on_start
+                      ~else_:local_state.transaction_commitment
+                  in
+                  let full_tx_commitment =
+                    Transaction_commitment.if_ is_start'
+                      ~then_:full_tx_commitment_on_start
+                      ~else_:local_state.full_transaction_commitment
+                  in
+                  (tx_commitment, full_tx_commitment)
+            in
+            let local_state =
+              { local_state with
+                transaction_commitment
+              ; full_transaction_commitment
+              }
+            in
+            ( (account_update, remaining, call_stack)
+            , account_update_forest
+            , local_state
+            , acct )
+          in
+          let local_state =
+            { local_state with stack_frame = remaining; call_stack }
+          in
+          let local_state =
+            Local_state.add_new_failure_status_bucket local_state
+          in
+          (* Register verification key, in case it needs to be 'side-loaded' to
+             verify a zkapp proof.
+          *)
+          Account.register_verification_key a ;
+          let (`Is_new account_is_new) =
+            Inputs.Ledger.check_account
+              (Account_update.public_key account_update)
+              (Account_update.token_id account_update)
+              (a, inclusion_proof)
+          in
+          (* delegate to public key if new account using default token *)
+          let a =
+            let self_delegate =
               let account_update_token_id =
                 Account_update.token_id account_update
               in
-              Bool.( ||| )
-                (Token_id.equal account_update_token_id Token_id.default)
-                (Token_id.equal account_update_token_id caller_id)
+              Bool.(
+                account_is_new
+                &&& Token_id.equal account_update_token_id Token_id.default)
             in
-            Local_state.add_check local_state Token_owner_not_caller
-              default_token_or_token_owner_was_caller )
-      in
-      let ((a, inclusion_proof) as acct) =
-        with_label ~label:"get account" (fun () ->
-            Inputs.Ledger.get_account account_update local_state.ledger )
-      in
-      Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
-      let transaction_commitment, full_transaction_commitment =
-        match is_start with
-        | `No ->
-            ( local_state.transaction_commitment
-            , local_state.full_transaction_commitment )
-        | `Yes start_data | `Compute start_data ->
-            let tx_commitment_on_start =
-              Transaction_commitment.commitment
-                ~account_updates:(Stack_frame.calls remaining)
+            (* in-SNARK, a new account has the empty public key here
+               in that case, use the public key from the account update, not the account
+            *)
+            Account.set_delegate
+              (Public_key.if_ self_delegate
+                 ~then_:(Account_update.public_key account_update)
+                 ~else_:(Account.delegate a) )
+              a
+          in
+          let matching_verification_key_hashes =
+            Inputs.Bool.(
+              (not (Account_update.is_proved account_update))
+              ||| Verification_key_hash.equal
+                    (Account.verification_key_hash a)
+                    (Account_update.verification_key_hash account_update))
+          in
+          let local_state =
+            Local_state.add_check local_state Unexpected_verification_key_hash
+              matching_verification_key_hashes
+          in
+          let local_state =
+            h.perform
+              (Check_account_precondition
+                 (account_update, a, account_is_new, local_state) )
+          in
+          let protocol_state_predicate_satisfied =
+            h.perform
+              (Check_protocol_state_precondition
+                 ( Account_update.protocol_state_precondition account_update
+                 , global_state ) )
+          in
+          let local_state =
+            Local_state.add_check local_state
+              Protocol_state_precondition_unsatisfied
+              protocol_state_predicate_satisfied
+          in
+          let local_state =
+            let valid_while_satisfied =
+              h.perform
+                (Check_valid_while_precondition
+                   ( Account_update.valid_while_precondition account_update
+                   , global_state ) )
             in
-            let full_tx_commitment_on_start =
-              Transaction_commitment.full_commitment ~account_update
-                ~memo_hash:start_data.memo_hash
-                ~commitment:tx_commitment_on_start
-            in
-            let tx_commitment =
-              Transaction_commitment.if_ is_start' ~then_:tx_commitment_on_start
+            Local_state.add_check local_state
+              Valid_while_precondition_unsatisfied valid_while_satisfied
+          in
+          let ( `Proof_verifies proof_verifies
+              , `Signature_verifies signature_verifies ) =
+            let commitment =
+              Inputs.Transaction_commitment.if_
+                (Inputs.Account_update.use_full_commitment account_update)
+                ~then_:local_state.full_transaction_commitment
                 ~else_:local_state.transaction_commitment
             in
-            let full_tx_commitment =
-              Transaction_commitment.if_ is_start'
-                ~then_:full_tx_commitment_on_start
-                ~else_:local_state.full_transaction_commitment
+            Inputs.Account_update.check_authorization
+              ~will_succeed:local_state.will_succeed ~commitment
+              ~calls:account_update_forest account_update
+          in
+          assert_ ~pos:__POS__
+            (Bool.equal proof_verifies
+               (Account_update.is_proved account_update) ) ;
+          assert_ ~pos:__POS__
+            (Bool.equal signature_verifies
+               (Account_update.is_signed account_update) ) ;
+          (* The fee-payer must increment their nonce. *)
+          let local_state =
+            Local_state.add_check local_state Fee_payer_nonce_must_increase
+              Inputs.Bool.(
+                Inputs.Account_update.increment_nonce account_update
+                ||| not is_start')
+          in
+          let local_state =
+            Local_state.add_check local_state Fee_payer_must_be_signed
+              Inputs.Bool.(signature_verifies ||| not is_start')
+          in
+          let local_state =
+            let precondition_has_constant_nonce =
+              Inputs.Account_update.Account_precondition.nonce account_update
+              |> Inputs.Nonce_precondition.is_constant
             in
-            (tx_commitment, full_tx_commitment)
-      in
-      let local_state =
-        { local_state with transaction_commitment; full_transaction_commitment }
-      in
-      ( (account_update, remaining, call_stack)
-      , account_update_forest
-      , local_state
-      , acct )
+            let increments_nonce_and_constrains_its_old_value =
+              Inputs.Bool.(
+                Inputs.Account_update.increment_nonce account_update
+                &&& precondition_has_constant_nonce)
+            in
+            let depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer =
+              Inputs.Bool.(
+                Inputs.Account_update.use_full_commitment account_update
+                &&& not is_start')
+            in
+            let does_not_use_a_signature = Inputs.Bool.not signature_verifies in
+            Local_state.add_check local_state Zkapp_command_replay_check_failed
+              Inputs.Bool.(
+                increments_nonce_and_constrains_its_old_value
+                ||| depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer
+                ||| does_not_use_a_signature)
+          in
+          let a =
+            Account.set_token_id a (Account_update.token_id account_update)
+          in
+          let account_update_token = Account_update.token_id account_update in
+          let account_update_token_is_default =
+            Token_id.(equal default) account_update_token
+          in
+          let account_is_untimed = Bool.not (Account.is_timed a) in
+          (* Set account timing. *)
+          let a, local_state =
+            let timing = Account_update.Update.timing account_update in
+            let has_permission =
+              Controller.check ~proof_verifies ~signature_verifies
+                (Account.Permissions.set_timing a)
+            in
+            let local_state =
+              Local_state.add_check local_state Update_not_permitted_timing
+                Bool.(
+                  Set_or_keep.is_keep timing
+                  ||| (account_is_untimed &&& has_permission))
+            in
+            let timing =
+              Set_or_keep.set_or_keep ~if_:Timing.if_ timing (Account.timing a)
+            in
+            let vesting_period = Timing.vesting_period timing in
+            (* Assert that timing is valid, otherwise we may have a division by 0. *)
+            assert_ ~pos:__POS__ Global_slot_span.(vesting_period > zero) ;
+            let a = Account.set_timing a timing in
+            (a, local_state)
+          in
+          let account_creation_fee =
+            Amount.of_constant_fee constraint_constants.account_creation_fee
+          in
+          let implicit_account_creation_fee =
+            Account_update.implicit_account_creation_fee account_update
+          in
+          (* Check the token for implicit account creation fee payment. *)
+          let local_state =
+            Local_state.add_check local_state Cannot_pay_creation_fee_in_token
+              Bool.(
+                (not implicit_account_creation_fee)
+                ||| account_update_token_is_default)
+          in
+          (* Compute the change to the account balance. *)
+          let local_state, actual_balance_change =
+            let balance_change = Account_update.balance_change account_update in
+            let neg_creation_fee =
+              let open Amount.Signed in
+              negate (of_unsigned account_creation_fee)
+            in
+            let balance_change_for_creation, `Overflow creation_overflow =
+              let open Amount.Signed in
+              add_flagged balance_change neg_creation_fee
+            in
+            let pay_creation_fee =
+              Bool.(account_is_new &&& implicit_account_creation_fee)
+            in
+            let creation_overflow =
+              Bool.(pay_creation_fee &&& creation_overflow)
+            in
+            let balance_change =
+              Amount.Signed.if_ pay_creation_fee
+                ~then_:balance_change_for_creation ~else_:balance_change
+            in
+            let local_state =
+              Local_state.add_check local_state
+                Amount_insufficient_to_create_account
+                Bool.(
+                  not
+                    ( pay_creation_fee
+                    &&& ( creation_overflow
+                        ||| Amount.Signed.is_neg balance_change ) ))
+            in
+            (local_state, balance_change)
+          in
+          (* Apply balance change. *)
+          let a, local_state =
+            let pay_creation_fee_from_excess =
+              Bool.(account_is_new &&& not implicit_account_creation_fee)
+            in
+            let balance, `Overflow failed1 =
+              Balance.add_signed_amount_flagged (Account.balance a)
+                actual_balance_change
+            in
+            (* TODO: Should this report 'insufficient balance'? *)
+            let local_state =
+              Local_state.add_check local_state Overflow (Bool.not failed1)
+            in
+            let account_creation_fee =
+              Amount.of_constant_fee constraint_constants.account_creation_fee
+            in
+            let local_state =
+              (* Conditionally subtract account creation fee from fee excess *)
+              let excess_minus_creation_fee, `Overflow excess_update_failed =
+                Amount.Signed.add_flagged local_state.excess
+                  Amount.Signed.(negate (of_unsigned account_creation_fee))
+              in
+              let local_state =
+                Local_state.add_check local_state Local_excess_overflow
+                  Bool.(
+                    not (pay_creation_fee_from_excess &&& excess_update_failed))
+              in
+              { local_state with
+                excess =
+                  Amount.Signed.if_ pay_creation_fee_from_excess
+                    ~then_:excess_minus_creation_fee ~else_:local_state.excess
+              }
+            in
+            let local_state =
+              (* Conditionally subtract account creation fee from supply increase *)
+              let ( supply_increase_minus_creation_fee
+                  , `Overflow supply_increase_update_failed ) =
+                Amount.Signed.add_flagged local_state.supply_increase
+                  Amount.Signed.(negate (of_unsigned account_creation_fee))
+              in
+              let local_state =
+                Local_state.add_check local_state Local_supply_increase_overflow
+                  Bool.(not (account_is_new &&& supply_increase_update_failed))
+              in
+              { local_state with
+                supply_increase =
+                  Amount.Signed.if_ account_is_new
+                    ~then_:supply_increase_minus_creation_fee
+                    ~else_:local_state.supply_increase
+              }
+            in
+            let is_receiver = Amount.Signed.is_non_neg actual_balance_change in
+            let local_state =
+              let controller =
+                Controller.if_ is_receiver
+                  ~then_:(Account.Permissions.receive a)
+                  ~else_:(Account.Permissions.send a)
+              in
+              let has_permission =
+                Controller.check ~proof_verifies ~signature_verifies controller
+              in
+              Local_state.add_check local_state Update_not_permitted_balance
+                Bool.(
+                  has_permission
+                  ||| Amount.Signed.(
+                        equal (of_unsigned Amount.zero) actual_balance_change))
+            in
+            let a = Account.set_balance balance a in
+            (a, local_state)
+          in
+          let txn_global_slot = Global_state.block_global_slot global_state in
+          (* Check timing with current balance *)
+          let a, local_state =
+            let `Invalid_timing invalid_timing, timing =
+              match Account.check_timing ~txn_global_slot a with
+              | `Insufficient_balance _, _ ->
+                  failwith
+                    "Did not propose a balance change at this timing check!"
+              | `Invalid_timing invalid_timing, timing ->
+                  (* NB: Have to destructure to remove the possibility of
+                     [`Insufficient_balance _] in the type.
+                  *)
+                  (`Invalid_timing invalid_timing, timing)
+            in
+            let local_state =
+              Local_state.add_check local_state Source_minimum_balance_violation
+                (Bool.not invalid_timing)
+            in
+            let a = Account.set_timing a timing in
+            (a, local_state)
+          in
+          (* Transform into a zkApp account.
+             This must be done before updating zkApp fields!
+          *)
+          let a = Account.make_zkapp a in
+          (* Check that the account can be accessed with the given authorization. *)
+          let local_state =
+            let has_permission =
+              Controller.check ~proof_verifies ~signature_verifies
+                (Account.Permissions.access a)
+            in
+            Local_state.add_check local_state Update_not_permitted_access
+              has_permission
+          in
+          ( global_state
+          , local_state
+          , account_update
+          , a
+          , proof_verifies
+          , signature_verifies
+          , txn_global_slot
+          , account_update_token_is_default
+          , is_start'
+          , inclusion_proof
+          , remaining ) )
     in
-    let local_state =
-      { local_state with stack_frame = remaining; call_stack }
-    in
-    let local_state = Local_state.add_new_failure_status_bucket local_state in
-    (* Register verification key, in case it needs to be 'side-loaded' to
-       verify a zkapp proof.
-    *)
-    Account.register_verification_key a ;
-    let (`Is_new account_is_new) =
-      Inputs.Ledger.check_account
-        (Account_update.public_key account_update)
-        (Account_update.token_id account_update)
-        (a, inclusion_proof)
-    in
-    (* delegate to public key if new account using default token *)
-    let a =
-      let self_delegate =
-        let account_update_token_id = Account_update.token_id account_update in
-        Bool.(
-          account_is_new
-          &&& Token_id.equal account_update_token_id Token_id.default)
-      in
-      (* in-SNARK, a new account has the empty public key here
-         in that case, use the public key from the account update, not the account
-      *)
-      Account.set_delegate
-        (Public_key.if_ self_delegate
-           ~then_:(Account_update.public_key account_update)
-           ~else_:(Account.delegate a) )
-        a
-    in
-    let matching_verification_key_hashes =
-      Inputs.Bool.(
-        (not (Account_update.is_proved account_update))
-        ||| Verification_key_hash.equal
-              (Account.verification_key_hash a)
-              (Account_update.verification_key_hash account_update))
-    in
-    let local_state =
-      Local_state.add_check local_state Unexpected_verification_key_hash
-        matching_verification_key_hashes
-    in
-    let local_state =
-      h.perform
-        (Check_account_precondition
-           (account_update, a, account_is_new, local_state) )
-    in
-    let protocol_state_predicate_satisfied =
-      h.perform
-        (Check_protocol_state_precondition
-           ( Account_update.protocol_state_precondition account_update
-           , global_state ) )
-    in
-    let local_state =
-      Local_state.add_check local_state Protocol_state_precondition_unsatisfied
-        protocol_state_predicate_satisfied
-    in
-    let local_state =
-      let valid_while_satisfied =
-        h.perform
-          (Check_valid_while_precondition
-             ( Account_update.valid_while_precondition account_update
-             , global_state ) )
-      in
-      Local_state.add_check local_state Valid_while_precondition_unsatisfied
-        valid_while_satisfied
-    in
-    let `Proof_verifies proof_verifies, `Signature_verifies signature_verifies =
-      let commitment =
-        Inputs.Transaction_commitment.if_
-          (Inputs.Account_update.use_full_commitment account_update)
-          ~then_:local_state.full_transaction_commitment
-          ~else_:local_state.transaction_commitment
-      in
-      Inputs.Account_update.check_authorization
-        ~will_succeed:local_state.will_succeed ~commitment
-        ~calls:account_update_forest account_update
-    in
-    assert_ ~pos:__POS__
-      (Bool.equal proof_verifies (Account_update.is_proved account_update)) ;
-    assert_ ~pos:__POS__
-      (Bool.equal signature_verifies (Account_update.is_signed account_update)) ;
-    (* The fee-payer must increment their nonce. *)
-    let local_state =
-      Local_state.add_check local_state Fee_payer_nonce_must_increase
-        Inputs.Bool.(
-          Inputs.Account_update.increment_nonce account_update ||| not is_start')
-    in
-    let local_state =
-      Local_state.add_check local_state Fee_payer_must_be_signed
-        Inputs.Bool.(signature_verifies ||| not is_start')
-    in
-    let local_state =
-      let precondition_has_constant_nonce =
-        Inputs.Account_update.Account_precondition.nonce account_update
-        |> Inputs.Nonce_precondition.is_constant
-      in
-      let increments_nonce_and_constrains_its_old_value =
-        Inputs.Bool.(
-          Inputs.Account_update.increment_nonce account_update
-          &&& precondition_has_constant_nonce)
-      in
-      let depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer =
-        Inputs.Bool.(
-          Inputs.Account_update.use_full_commitment account_update
-          &&& not is_start')
-      in
-      let does_not_use_a_signature = Inputs.Bool.not signature_verifies in
-      Local_state.add_check local_state Zkapp_command_replay_check_failed
-        Inputs.Bool.(
-          increments_nonce_and_constrains_its_old_value
-          ||| depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer
-          ||| does_not_use_a_signature)
-    in
-    let a = Account.set_token_id a (Account_update.token_id account_update) in
-    let account_update_token = Account_update.token_id account_update in
-    let account_update_token_is_default =
-      Token_id.(equal default) account_update_token
-    in
-    let account_is_untimed = Bool.not (Account.is_timed a) in
-    (* Set account timing. *)
-    let a, local_state =
-      let timing = Account_update.Update.timing account_update in
-      let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.set_timing a)
-      in
-      let local_state =
-        Local_state.add_check local_state Update_not_permitted_timing
-          Bool.(
-            Set_or_keep.is_keep timing
-            ||| (account_is_untimed &&& has_permission))
-      in
-      let timing =
-        Set_or_keep.set_or_keep ~if_:Timing.if_ timing (Account.timing a)
-      in
-      let vesting_period = Timing.vesting_period timing in
-      (* Assert that timing is valid, otherwise we may have a division by 0. *)
-      assert_ ~pos:__POS__ Global_slot_span.(vesting_period > zero) ;
-      let a = Account.set_timing a timing in
-      (a, local_state)
-    in
-    let account_creation_fee =
-      Amount.of_constant_fee constraint_constants.account_creation_fee
-    in
-    let implicit_account_creation_fee =
-      Account_update.implicit_account_creation_fee account_update
-    in
-    (* Check the token for implicit account creation fee payment. *)
-    let local_state =
-      Local_state.add_check local_state Cannot_pay_creation_fee_in_token
-        Bool.(
-          (not implicit_account_creation_fee)
-          ||| account_update_token_is_default)
-    in
-    (* Compute the change to the account balance. *)
-    let local_state, actual_balance_change =
-      let balance_change = Account_update.balance_change account_update in
-      let neg_creation_fee =
-        let open Amount.Signed in
-        negate (of_unsigned account_creation_fee)
-      in
-      let balance_change_for_creation, `Overflow creation_overflow =
-        let open Amount.Signed in
-        add_flagged balance_change neg_creation_fee
-      in
-      let pay_creation_fee =
-        Bool.(account_is_new &&& implicit_account_creation_fee)
-      in
-      let creation_overflow = Bool.(pay_creation_fee &&& creation_overflow) in
-      let balance_change =
-        Amount.Signed.if_ pay_creation_fee ~then_:balance_change_for_creation
-          ~else_:balance_change
-      in
-      let local_state =
-        Local_state.add_check local_state Amount_insufficient_to_create_account
-          Bool.(
-            not
-              ( pay_creation_fee
-              &&& (creation_overflow ||| Amount.Signed.is_neg balance_change) ))
-      in
-      (local_state, balance_change)
-    in
-    (* Apply balance change. *)
-    let a, local_state =
-      let pay_creation_fee_from_excess =
-        Bool.(account_is_new &&& not implicit_account_creation_fee)
-      in
-      let balance, `Overflow failed1 =
-        Balance.add_signed_amount_flagged (Account.balance a)
-          actual_balance_change
-      in
-      (* TODO: Should this report 'insufficient balance'? *)
-      let local_state =
-        Local_state.add_check local_state Overflow (Bool.not failed1)
-      in
-      let account_creation_fee =
-        Amount.of_constant_fee constraint_constants.account_creation_fee
-      in
-      let local_state =
-        (* Conditionally subtract account creation fee from fee excess *)
-        let excess_minus_creation_fee, `Overflow excess_update_failed =
-          Amount.Signed.add_flagged local_state.excess
-            Amount.Signed.(negate (of_unsigned account_creation_fee))
+    Metrics.time "b" (fun () ->
+        (* Update app state. *)
+        let a, local_state =
+          let app_state = Account_update.Update.app_state account_update in
+          let keeping_app_state =
+            Bool.all
+              (List.map ~f:Set_or_keep.is_keep
+                 (Pickles_types.Vector.to_list app_state) )
+          in
+          let changing_entire_app_state =
+            Bool.all
+              (List.map ~f:Set_or_keep.is_set
+                 (Pickles_types.Vector.to_list app_state) )
+          in
+          let proved_state =
+            (* The [proved_state] tracks whether the app state has been entirely
+               determined by proofs ([true] if so), to allow zkApp authors to be
+               confident that their initialization logic has been run, rather than
+               some malicious deployer instantiating the zkApp in an account with
+               some fake non-initial state.
+               The logic here is:
+               * if the state is unchanged, keep the previous value;
+               * if the state has been entirely replaced, and the authentication
+                 was a proof, the state has been 'proved' and [proved_state] is set
+                 to [true];
+               * if the state has been partially updated by a proof, the
+                 [proved_state] is unchanged;
+               * if the state has been changed by some authentication other than a
+                 proof, the state is considered to have been tampered with, and
+                 [proved_state] is reset to [false].
+            *)
+            Bool.if_ keeping_app_state ~then_:(Account.proved_state a)
+              ~else_:
+                (Bool.if_ proof_verifies
+                   ~then_:
+                     (Bool.if_ changing_entire_app_state ~then_:Bool.true_
+                        ~else_:(Account.proved_state a) )
+                   ~else_:Bool.false_ )
+          in
+          let a = Account.set_proved_state proved_state a in
+          let has_permission =
+            Controller.check ~proof_verifies ~signature_verifies
+              (Account.Permissions.edit_state a)
+          in
+          let local_state =
+            Local_state.add_check local_state Update_not_permitted_app_state
+              Bool.(keeping_app_state ||| has_permission)
+          in
+          let app_state =
+            Pickles_types.Vector.map2 app_state (Account.app_state a)
+              ~f:(Set_or_keep.set_or_keep ~if_:Field.if_)
+          in
+          let a = Account.set_app_state app_state a in
+          (a, local_state)
         in
+        (* Set verification key. *)
+        let a, local_state =
+          let verification_key =
+            Account_update.Update.verification_key account_update
+          in
+          let has_permission =
+            Controller.check ~proof_verifies ~signature_verifies
+              (Account.Permissions.set_verification_key a)
+          in
+          let local_state =
+            Local_state.add_check local_state
+              Update_not_permitted_verification_key
+              Bool.(Set_or_keep.is_keep verification_key ||| has_permission)
+          in
+          let verification_key =
+            Set_or_keep.set_or_keep ~if_:Verification_key.if_ verification_key
+              (Account.verification_key a)
+          in
+          let a = Account.set_verification_key verification_key a in
+          (a, local_state)
+        in
+        (* Update action state. *)
+        let a, local_state =
+          let actions = Account_update.Update.actions account_update in
+          let last_action_slot = Account.last_action_slot a in
+          let action_state, last_action_slot =
+            update_action_state (Account.action_state a) actions
+              ~txn_global_slot ~last_action_slot
+          in
+          let is_empty =
+            (* also computed in update_action_state, but messy to return it *)
+            Actions.is_empty actions
+          in
+          let has_permission =
+            Controller.check ~proof_verifies ~signature_verifies
+              (Account.Permissions.edit_action_state a)
+          in
+          let local_state =
+            Local_state.add_check local_state Update_not_permitted_action_state
+              Bool.(is_empty ||| has_permission)
+          in
+          let a =
+            a
+            |> Account.set_action_state action_state
+            |> Account.set_last_action_slot last_action_slot
+          in
+          (a, local_state)
+        in
+        (* Update zkApp URI. *)
+        let a, local_state =
+          let zkapp_uri = Account_update.Update.zkapp_uri account_update in
+          let has_permission =
+            Controller.check ~proof_verifies ~signature_verifies
+              (Account.Permissions.set_zkapp_uri a)
+          in
+          let local_state =
+            Local_state.add_check local_state Update_not_permitted_zkapp_uri
+              Bool.(Set_or_keep.is_keep zkapp_uri ||| has_permission)
+          in
+          let zkapp_uri =
+            Set_or_keep.set_or_keep ~if_:Zkapp_uri.if_ zkapp_uri
+              (Account.zkapp_uri a)
+          in
+          let a = Account.set_zkapp_uri zkapp_uri a in
+          (a, local_state)
+        in
+        (* At this point, all possible changes have been made to the zkapp
+           part of an account. Reset zkApp state to [None] if that part
+           is unmodified.
+        *)
+        let a = Account.unmake_zkapp a in
+        (* Update token symbol. *)
+        let a, local_state =
+          let token_symbol =
+            Account_update.Update.token_symbol account_update
+          in
+          let has_permission =
+            Controller.check ~proof_verifies ~signature_verifies
+              (Account.Permissions.set_token_symbol a)
+          in
+          let local_state =
+            Local_state.add_check local_state Update_not_permitted_token_symbol
+              Bool.(Set_or_keep.is_keep token_symbol ||| has_permission)
+          in
+          let token_symbol =
+            Set_or_keep.set_or_keep ~if_:Token_symbol.if_ token_symbol
+              (Account.token_symbol a)
+          in
+          let a = Account.set_token_symbol token_symbol a in
+          (a, local_state)
+        in
+        (* Update delegate. *)
+        let a, local_state =
+          let delegate = Account_update.Update.delegate account_update in
+          (* for new accounts using the default token, we've already
+             set the delegate to the public key
+          *)
+          let base_delegate = Account.delegate a in
+          let has_permission =
+            Controller.check ~proof_verifies ~signature_verifies
+              (Account.Permissions.set_delegate a)
+          in
+          let local_state =
+            (* Note: only accounts for the default token can delegate. *)
+            Local_state.add_check local_state Update_not_permitted_delegate
+              Bool.(
+                Set_or_keep.is_keep delegate
+                ||| (has_permission &&& account_update_token_is_default))
+          in
+          let delegate =
+            Set_or_keep.set_or_keep ~if_:Public_key.if_ delegate base_delegate
+          in
+          let a = Account.set_delegate delegate a in
+          (a, local_state)
+        in
+        (* Update nonce. *)
+        let a, local_state =
+          let nonce = Account.nonce a in
+          let increment_nonce = Account_update.increment_nonce account_update in
+          let nonce =
+            Nonce.if_ increment_nonce ~then_:(Nonce.succ nonce) ~else_:nonce
+          in
+          let has_permission =
+            Controller.check ~proof_verifies ~signature_verifies
+              (Account.Permissions.increment_nonce a)
+          in
+          let local_state =
+            Local_state.add_check local_state Update_not_permitted_nonce
+              Bool.((not increment_nonce) ||| has_permission)
+          in
+          let a = Account.set_nonce nonce a in
+          (a, local_state)
+        in
+        (* Update voting-for. *)
+        let a, local_state =
+          let voting_for = Account_update.Update.voting_for account_update in
+          let has_permission =
+            Controller.check ~proof_verifies ~signature_verifies
+              (Account.Permissions.set_voting_for a)
+          in
+          let local_state =
+            Local_state.add_check local_state Update_not_permitted_voting_for
+              Bool.(Set_or_keep.is_keep voting_for ||| has_permission)
+          in
+          let voting_for =
+            Set_or_keep.set_or_keep ~if_:State_hash.if_ voting_for
+              (Account.voting_for a)
+          in
+          let a = Account.set_voting_for voting_for a in
+          (a, local_state)
+        in
+        (* Update receipt chain hash *)
+        let a =
+          let new_hash =
+            let old_hash = Account.receipt_chain_hash a in
+            Receipt_chain_hash.if_
+              (let open Inputs.Bool in
+              signature_verifies ||| proof_verifies)
+              ~then_:
+                (let elt =
+                   local_state.full_transaction_commitment
+                   |> Receipt_chain_hash.Elt.of_transaction_commitment
+                 in
+                 Receipt_chain_hash.cons_zkapp_command_commitment
+                   local_state.account_update_index elt old_hash )
+              ~else_:old_hash
+          in
+          Account.set_receipt_chain_hash a new_hash
+        in
+        (* Finally, update permissions.
+           This should be the last update applied, to ensure that any earlier
+           updates use the account's existing permissions, and not permissions that
+           are specified by the account_update!
+        *)
+        let a, local_state =
+          let permissions = Account_update.Update.permissions account_update in
+          let has_permission =
+            Controller.check ~proof_verifies ~signature_verifies
+              (Account.Permissions.set_permissions a)
+          in
+          let local_state =
+            Local_state.add_check local_state Update_not_permitted_permissions
+              Bool.(Set_or_keep.is_keep permissions ||| has_permission)
+          in
+          let permissions =
+            Set_or_keep.set_or_keep ~if_:Account.Permissions.if_ permissions
+              (Account.permissions a)
+          in
+          let a = Account.set_permissions permissions a in
+          (a, local_state)
+        in
+        (* Initialize account's pk, in case it is new. *)
+        let a = h.perform (Init_account { account_update; account = a }) in
+        (* DO NOT ADD ANY UPDATES HERE. They must be earlier in the code.
+           See comment above.
+        *)
+        let local_delta =
+          (* NOTE: It is *not* correct to use the actual change in balance here.
+             Indeed, if the account creation fee is paid, using that amount would
+             be equivalent to paying it out to the block producer.
+             In the case of a failure that prevents any updates from being applied,
+             every other account_update in this transaction will also fail, and the
+             excess will never be promoted to the global excess, so this amount is
+             irrelevant.
+          *)
+          Amount.Signed.negate (Account_update.balance_change account_update)
+        in
+        let new_local_fee_excess, `Overflow overflowed =
+          (* We only allow the default token for fees. *)
+          Bool.(
+            assert_ ~pos:__POS__
+              ( (not is_start')
+              ||| ( account_update_token_is_default
+                  &&& Amount.Signed.is_non_neg local_delta ) )) ;
+          let new_local_fee_excess, `Overflow overflow =
+            Amount.Signed.add_flagged local_state.excess local_delta
+          in
+          ( Amount.Signed.if_ account_update_token_is_default
+              ~then_:new_local_fee_excess ~else_:local_state.excess
+          , (* No overflow if we aren't using the result of the addition (which we don't in the case that account_update token is not default). *)
+            `Overflow (Bool.( &&& ) account_update_token_is_default overflow) )
+        in
+        let local_state = { local_state with excess = new_local_fee_excess } in
         let local_state =
           Local_state.add_check local_state Local_excess_overflow
-            Bool.(not (pay_creation_fee_from_excess &&& excess_update_failed))
+            (Bool.not overflowed)
         in
-        { local_state with
-          excess =
-            Amount.Signed.if_ pay_creation_fee_from_excess
-              ~then_:excess_minus_creation_fee ~else_:local_state.excess
-        }
-      in
-      let local_state =
-        (* Conditionally subtract account creation fee from supply increase *)
-        let ( supply_increase_minus_creation_fee
-            , `Overflow supply_increase_update_failed ) =
-          Amount.Signed.add_flagged local_state.supply_increase
-            Amount.Signed.(negate (of_unsigned account_creation_fee))
+        (* If a's token ID differs from that in the local state, then
+           the local state excess gets moved into the execution state's fee excess.
+
+           If there are more zkapp_command to execute after this one, then the local delta gets
+           accumulated in the local state.
+
+           If there are no more zkapp_command to execute, then we do the same as if we switch tokens.
+           The local state excess (plus the local delta) gets moved to the fee excess if it is default token.
+        *)
+        let new_ledger =
+          Inputs.Ledger.set_account local_state.ledger (a, inclusion_proof)
+        in
+        let is_last_account_update =
+          Call_forest.is_empty (Stack_frame.calls remaining)
         in
         let local_state =
-          Local_state.add_check local_state Local_supply_increase_overflow
-            Bool.(not (account_is_new &&& supply_increase_update_failed))
+          { local_state with
+            ledger = new_ledger
+          ; transaction_commitment =
+              Transaction_commitment.if_ is_last_account_update
+                ~then_:Transaction_commitment.empty
+                ~else_:local_state.transaction_commitment
+          ; full_transaction_commitment =
+              Transaction_commitment.if_ is_last_account_update
+                ~then_:Transaction_commitment.empty
+                ~else_:local_state.full_transaction_commitment
+          }
         in
-        { local_state with
-          supply_increase =
-            Amount.Signed.if_ account_is_new
-              ~then_:supply_increase_minus_creation_fee
-              ~else_:local_state.supply_increase
-        }
-      in
-      let is_receiver = Amount.Signed.is_non_neg actual_balance_change in
-      let local_state =
-        let controller =
-          Controller.if_ is_receiver
-            ~then_:(Account.Permissions.receive a)
-            ~else_:(Account.Permissions.send a)
+        let valid_fee_excess =
+          let delta_settled =
+            Amount.Signed.equal local_state.excess
+              Amount.(Signed.of_unsigned zero)
+          in
+          (* 1) ignore local excess if it is_start because it will be promoted to global
+                 excess and then set to zero later in the code
+             2) ignore everything but last account update since the excess wouldn't have
+                been settled
+             3) Excess should be settled after the last account update has been applied.
+          *)
+          Bool.(is_start' ||| not is_last_account_update ||| delta_settled)
         in
-        let has_permission =
-          Controller.check ~proof_verifies ~signature_verifies controller
+        let local_state =
+          Local_state.add_check local_state Invalid_fee_excess valid_fee_excess
         in
-        Local_state.add_check local_state Update_not_permitted_balance
-          Bool.(
-            has_permission
-            ||| Amount.Signed.(
-                  equal (of_unsigned Amount.zero) actual_balance_change))
-      in
-      let a = Account.set_balance balance a in
-      (a, local_state)
-    in
-    let txn_global_slot = Global_state.block_global_slot global_state in
-    (* Check timing with current balance *)
-    let a, local_state =
-      let `Invalid_timing invalid_timing, timing =
-        match Account.check_timing ~txn_global_slot a with
-        | `Insufficient_balance _, _ ->
-            failwith "Did not propose a balance change at this timing check!"
-        | `Invalid_timing invalid_timing, timing ->
-            (* NB: Have to destructure to remove the possibility of
-               [`Insufficient_balance _] in the type.
-            *)
-            (`Invalid_timing invalid_timing, timing)
-      in
-      let local_state =
-        Local_state.add_check local_state Source_minimum_balance_violation
-          (Bool.not invalid_timing)
-      in
-      let a = Account.set_timing a timing in
-      (a, local_state)
-    in
-    (* Transform into a zkApp account.
-       This must be done before updating zkApp fields!
-    *)
-    let a = Account.make_zkapp a in
-    (* Check that the account can be accessed with the given authorization. *)
-    let local_state =
-      let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.access a)
-      in
-      Local_state.add_check local_state Update_not_permitted_access
-        has_permission
-    in
-    (* Update app state. *)
-    let a, local_state =
-      let app_state = Account_update.Update.app_state account_update in
-      let keeping_app_state =
-        Bool.all
-          (List.map ~f:Set_or_keep.is_keep
-             (Pickles_types.Vector.to_list app_state) )
-      in
-      let changing_entire_app_state =
-        Bool.all
-          (List.map ~f:Set_or_keep.is_set
-             (Pickles_types.Vector.to_list app_state) )
-      in
-      let proved_state =
-        (* The [proved_state] tracks whether the app state has been entirely
-           determined by proofs ([true] if so), to allow zkApp authors to be
-           confident that their initialization logic has been run, rather than
-           some malicious deployer instantiating the zkApp in an account with
-           some fake non-initial state.
-           The logic here is:
-           * if the state is unchanged, keep the previous value;
-           * if the state has been entirely replaced, and the authentication
-             was a proof, the state has been 'proved' and [proved_state] is set
-             to [true];
-           * if the state has been partially updated by a proof, the
-             [proved_state] is unchanged;
-           * if the state has been changed by some authentication other than a
-             proof, the state is considered to have been tampered with, and
-             [proved_state] is reset to [false].
+        let is_start_or_last = Bool.(is_start' ||| is_last_account_update) in
+        let update_global_state_fee_excess =
+          Bool.(is_start_or_last &&& local_state.success)
+        in
+        let global_state, global_excess_update_failed =
+          let amt = Global_state.fee_excess global_state in
+          let res, `Overflow overflow =
+            Amount.Signed.add_flagged amt local_state.excess
+          in
+          let global_excess_update_failed =
+            Bool.(update_global_state_fee_excess &&& overflow)
+          in
+          let new_amt =
+            Amount.Signed.if_ update_global_state_fee_excess ~then_:res
+              ~else_:amt
+          in
+          ( Global_state.set_fee_excess global_state new_amt
+          , global_excess_update_failed )
+        in
+        let local_state =
+          { local_state with
+            excess =
+              Amount.Signed.if_ is_start_or_last
+                ~then_:Amount.(Signed.of_unsigned zero)
+                ~else_:local_state.excess
+          }
+        in
+        let local_state =
+          Local_state.add_check local_state Global_excess_overflow
+            Bool.(not global_excess_update_failed)
+        in
+        (* add local supply increase in global state *)
+        let new_global_supply_increase, global_supply_increase_update_failed =
+          let res, `Overflow overflow =
+            Amount.Signed.add_flagged
+              (Global_state.supply_increase global_state)
+              local_state.supply_increase
+          in
+          (res, overflow)
+        in
+        let local_state =
+          Local_state.add_check local_state Global_supply_increase_overflow
+            Bool.(not global_supply_increase_update_failed)
+        in
+        (* The first account_update must succeed. *)
+        Bool.(
+          assert_with_failure_status_tbl ~pos:__POS__
+            ((not is_start') ||| local_state.success)
+            local_state.failure_status_tbl) ;
+        (* If we are the fee payer (is_start' = true), push the first pass ledger
+           and set the local ledger to be the second pass ledger in preparation for
+           the children.
         *)
-        Bool.if_ keeping_app_state ~then_:(Account.proved_state a)
-          ~else_:
-            (Bool.if_ proof_verifies
-               ~then_:
-                 (Bool.if_ changing_entire_app_state ~then_:Bool.true_
-                    ~else_:(Account.proved_state a) )
-               ~else_:Bool.false_ )
-      in
-      let a = Account.set_proved_state proved_state a in
-      let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.edit_state a)
-      in
-      let local_state =
-        Local_state.add_check local_state Update_not_permitted_app_state
-          Bool.(keeping_app_state ||| has_permission)
-      in
-      let app_state =
-        Pickles_types.Vector.map2 app_state (Account.app_state a)
-          ~f:(Set_or_keep.set_or_keep ~if_:Field.if_)
-      in
-      let a = Account.set_app_state app_state a in
-      (a, local_state)
-    in
-    (* Set verification key. *)
-    let a, local_state =
-      let verification_key =
-        Account_update.Update.verification_key account_update
-      in
-      let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.set_verification_key a)
-      in
-      let local_state =
-        Local_state.add_check local_state Update_not_permitted_verification_key
-          Bool.(Set_or_keep.is_keep verification_key ||| has_permission)
-      in
-      let verification_key =
-        Set_or_keep.set_or_keep ~if_:Verification_key.if_ verification_key
-          (Account.verification_key a)
-      in
-      let a = Account.set_verification_key verification_key a in
-      (a, local_state)
-    in
-    (* Update action state. *)
-    let a, local_state =
-      let actions = Account_update.Update.actions account_update in
-      let last_action_slot = Account.last_action_slot a in
-      let action_state, last_action_slot =
-        update_action_state (Account.action_state a) actions ~txn_global_slot
-          ~last_action_slot
-      in
-      let is_empty =
-        (* also computed in update_action_state, but messy to return it *)
-        Actions.is_empty actions
-      in
-      let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.edit_action_state a)
-      in
-      let local_state =
-        Local_state.add_check local_state Update_not_permitted_action_state
-          Bool.(is_empty ||| has_permission)
-      in
-      let a =
-        a
-        |> Account.set_action_state action_state
-        |> Account.set_last_action_slot last_action_slot
-      in
-      (a, local_state)
-    in
-    (* Update zkApp URI. *)
-    let a, local_state =
-      let zkapp_uri = Account_update.Update.zkapp_uri account_update in
-      let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.set_zkapp_uri a)
-      in
-      let local_state =
-        Local_state.add_check local_state Update_not_permitted_zkapp_uri
-          Bool.(Set_or_keep.is_keep zkapp_uri ||| has_permission)
-      in
-      let zkapp_uri =
-        Set_or_keep.set_or_keep ~if_:Zkapp_uri.if_ zkapp_uri
-          (Account.zkapp_uri a)
-      in
-      let a = Account.set_zkapp_uri zkapp_uri a in
-      (a, local_state)
-    in
-    (* At this point, all possible changes have been made to the zkapp
-       part of an account. Reset zkApp state to [None] if that part
-       is unmodified.
-    *)
-    let a = Account.unmake_zkapp a in
-    (* Update token symbol. *)
-    let a, local_state =
-      let token_symbol = Account_update.Update.token_symbol account_update in
-      let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.set_token_symbol a)
-      in
-      let local_state =
-        Local_state.add_check local_state Update_not_permitted_token_symbol
-          Bool.(Set_or_keep.is_keep token_symbol ||| has_permission)
-      in
-      let token_symbol =
-        Set_or_keep.set_or_keep ~if_:Token_symbol.if_ token_symbol
-          (Account.token_symbol a)
-      in
-      let a = Account.set_token_symbol token_symbol a in
-      (a, local_state)
-    in
-    (* Update delegate. *)
-    let a, local_state =
-      let delegate = Account_update.Update.delegate account_update in
-      (* for new accounts using the default token, we've already
-         set the delegate to the public key
-      *)
-      let base_delegate = Account.delegate a in
-      let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.set_delegate a)
-      in
-      let local_state =
-        (* Note: only accounts for the default token can delegate. *)
-        Local_state.add_check local_state Update_not_permitted_delegate
-          Bool.(
-            Set_or_keep.is_keep delegate
-            ||| (has_permission &&& account_update_token_is_default))
-      in
-      let delegate =
-        Set_or_keep.set_or_keep ~if_:Public_key.if_ delegate base_delegate
-      in
-      let a = Account.set_delegate delegate a in
-      (a, local_state)
-    in
-    (* Update nonce. *)
-    let a, local_state =
-      let nonce = Account.nonce a in
-      let increment_nonce = Account_update.increment_nonce account_update in
-      let nonce =
-        Nonce.if_ increment_nonce ~then_:(Nonce.succ nonce) ~else_:nonce
-      in
-      let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.increment_nonce a)
-      in
-      let local_state =
-        Local_state.add_check local_state Update_not_permitted_nonce
-          Bool.((not increment_nonce) ||| has_permission)
-      in
-      let a = Account.set_nonce nonce a in
-      (a, local_state)
-    in
-    (* Update voting-for. *)
-    let a, local_state =
-      let voting_for = Account_update.Update.voting_for account_update in
-      let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.set_voting_for a)
-      in
-      let local_state =
-        Local_state.add_check local_state Update_not_permitted_voting_for
-          Bool.(Set_or_keep.is_keep voting_for ||| has_permission)
-      in
-      let voting_for =
-        Set_or_keep.set_or_keep ~if_:State_hash.if_ voting_for
-          (Account.voting_for a)
-      in
-      let a = Account.set_voting_for voting_for a in
-      (a, local_state)
-    in
-    (* Update receipt chain hash *)
-    let a =
-      let new_hash =
-        let old_hash = Account.receipt_chain_hash a in
-        Receipt_chain_hash.if_
-          (let open Inputs.Bool in
-          signature_verifies ||| proof_verifies)
-          ~then_:
-            (let elt =
-               local_state.full_transaction_commitment
-               |> Receipt_chain_hash.Elt.of_transaction_commitment
-             in
-             Receipt_chain_hash.cons_zkapp_command_commitment
-               local_state.account_update_index elt old_hash )
-          ~else_:old_hash
-      in
-      Account.set_receipt_chain_hash a new_hash
-    in
-    (* Finally, update permissions.
-       This should be the last update applied, to ensure that any earlier
-       updates use the account's existing permissions, and not permissions that
-       are specified by the account_update!
-    *)
-    let a, local_state =
-      let permissions = Account_update.Update.permissions account_update in
-      let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.set_permissions a)
-      in
-      let local_state =
-        Local_state.add_check local_state Update_not_permitted_permissions
-          Bool.(Set_or_keep.is_keep permissions ||| has_permission)
-      in
-      let permissions =
-        Set_or_keep.set_or_keep ~if_:Account.Permissions.if_ permissions
-          (Account.permissions a)
-      in
-      let a = Account.set_permissions permissions a in
-      (a, local_state)
-    in
-    (* Initialize account's pk, in case it is new. *)
-    let a = h.perform (Init_account { account_update; account = a }) in
-    (* DO NOT ADD ANY UPDATES HERE. They must be earlier in the code.
-       See comment above.
-    *)
-    let local_delta =
-      (* NOTE: It is *not* correct to use the actual change in balance here.
-         Indeed, if the account creation fee is paid, using that amount would
-         be equivalent to paying it out to the block producer.
-         In the case of a failure that prevents any updates from being applied,
-         every other account_update in this transaction will also fail, and the
-         excess will never be promoted to the global excess, so this amount is
-         irrelevant.
-      *)
-      Amount.Signed.negate (Account_update.balance_change account_update)
-    in
-    let new_local_fee_excess, `Overflow overflowed =
-      (* We only allow the default token for fees. *)
-      Bool.(
-        assert_ ~pos:__POS__
-          ( (not is_start')
-          ||| ( account_update_token_is_default
-              &&& Amount.Signed.is_non_neg local_delta ) )) ;
-      let new_local_fee_excess, `Overflow overflow =
-        Amount.Signed.add_flagged local_state.excess local_delta
-      in
-      ( Amount.Signed.if_ account_update_token_is_default
-          ~then_:new_local_fee_excess ~else_:local_state.excess
-      , (* No overflow if we aren't using the result of the addition (which we don't in the case that account_update token is not default). *)
-        `Overflow (Bool.( &&& ) account_update_token_is_default overflow) )
-    in
-    let local_state = { local_state with excess = new_local_fee_excess } in
-    let local_state =
-      Local_state.add_check local_state Local_excess_overflow
-        (Bool.not overflowed)
-    in
-    (* If a's token ID differs from that in the local state, then
-       the local state excess gets moved into the execution state's fee excess.
-
-       If there are more zkapp_command to execute after this one, then the local delta gets
-       accumulated in the local state.
-
-       If there are no more zkapp_command to execute, then we do the same as if we switch tokens.
-       The local state excess (plus the local delta) gets moved to the fee excess if it is default token.
-    *)
-    let new_ledger =
-      Inputs.Ledger.set_account local_state.ledger (a, inclusion_proof)
-    in
-    let is_last_account_update =
-      Call_forest.is_empty (Stack_frame.calls remaining)
-    in
-    let local_state =
-      { local_state with
-        ledger = new_ledger
-      ; transaction_commitment =
-          Transaction_commitment.if_ is_last_account_update
-            ~then_:Transaction_commitment.empty
-            ~else_:local_state.transaction_commitment
-      ; full_transaction_commitment =
-          Transaction_commitment.if_ is_last_account_update
-            ~then_:Transaction_commitment.empty
-            ~else_:local_state.full_transaction_commitment
-      }
-    in
-    let valid_fee_excess =
-      let delta_settled =
-        Amount.Signed.equal local_state.excess Amount.(Signed.of_unsigned zero)
-      in
-      (* 1) ignore local excess if it is_start because it will be promoted to global
-             excess and then set to zero later in the code
-         2) ignore everything but last account update since the excess wouldn't have
-            been settled
-         3) Excess should be settled after the last account update has been applied.
-      *)
-      Bool.(is_start' ||| not is_last_account_update ||| delta_settled)
-    in
-    let local_state =
-      Local_state.add_check local_state Invalid_fee_excess valid_fee_excess
-    in
-    let is_start_or_last = Bool.(is_start' ||| is_last_account_update) in
-    let update_global_state_fee_excess =
-      Bool.(is_start_or_last &&& local_state.success)
-    in
-    let global_state, global_excess_update_failed =
-      let amt = Global_state.fee_excess global_state in
-      let res, `Overflow overflow =
-        Amount.Signed.add_flagged amt local_state.excess
-      in
-      let global_excess_update_failed =
-        Bool.(update_global_state_fee_excess &&& overflow)
-      in
-      let new_amt =
-        Amount.Signed.if_ update_global_state_fee_excess ~then_:res ~else_:amt
-      in
-      ( Global_state.set_fee_excess global_state new_amt
-      , global_excess_update_failed )
-    in
-    let local_state =
-      { local_state with
-        excess =
-          Amount.Signed.if_ is_start_or_last
-            ~then_:Amount.(Signed.of_unsigned zero)
-            ~else_:local_state.excess
-      }
-    in
-    let local_state =
-      Local_state.add_check local_state Global_excess_overflow
-        Bool.(not global_excess_update_failed)
-    in
-    (* add local supply increase in global state *)
-    let new_global_supply_increase, global_supply_increase_update_failed =
-      let res, `Overflow overflow =
-        Amount.Signed.add_flagged
-          (Global_state.supply_increase global_state)
-          local_state.supply_increase
-      in
-      (res, overflow)
-    in
-    let local_state =
-      Local_state.add_check local_state Global_supply_increase_overflow
-        Bool.(not global_supply_increase_update_failed)
-    in
-    (* The first account_update must succeed. *)
-    Bool.(
-      assert_with_failure_status_tbl ~pos:__POS__
-        ((not is_start') ||| local_state.success)
-        local_state.failure_status_tbl) ;
-    (* If we are the fee payer (is_start' = true), push the first pass ledger
-       and set the local ledger to be the second pass ledger in preparation for
-       the children.
-    *)
-    let local_state, global_state =
-      let is_fee_payer = is_start' in
-      let global_state =
-        Global_state.set_first_pass_ledger ~should_update:is_fee_payer
-          global_state local_state.ledger
-      in
-      let local_state =
-        { local_state with
-          ledger =
-            Inputs.Ledger.if_ is_fee_payer
-              ~then_:(Global_state.second_pass_ledger global_state)
-              ~else_:local_state.ledger
-        }
-      in
-      (local_state, global_state)
-    in
-    (* If this is the last account update, and [will_succeed] is false, then
-       [success] must also be false.
-    *)
-    Bool.(
-      Assert.any ~pos:__POS__
-        [ not is_last_account_update
-        ; local_state.will_succeed
-        ; not local_state.success
-        ]) ;
-    (* If this is the last party and there were no failures, update the second
-       pass ledger and the supply increase.
-    *)
-    let global_state =
-      let is_successful_last_party =
-        Bool.(is_last_account_update &&& local_state.success)
-      in
-      let global_state =
-        Global_state.set_supply_increase global_state
-          (Amount.Signed.if_ is_successful_last_party
-             ~then_:new_global_supply_increase
-             ~else_:(Global_state.supply_increase global_state) )
-      in
-      Global_state.set_second_pass_ledger
-        ~should_update:is_successful_last_party global_state local_state.ledger
-    in
-    let local_state =
-      (* Make sure to reset the local_state at the end of a transaction.
-         The following fields are already reset
-         - zkapp_command
-         - transaction_commitment
-         - full_transaction_commitment
-         - excess
-         so we need to reset
-         - token_id = Token_id.default
-         - ledger = Frozen_ledger_hash.empty_hash
-         - success = true
-         - account_update_index = Index.zero
-         - supply_increase = Amount.Signed.zero
-      *)
-      { local_state with
-        ledger =
-          Inputs.Ledger.if_ is_last_account_update
-            ~then_:(Inputs.Ledger.empty ~depth:0 ())
-            ~else_:local_state.ledger
-      ; success =
-          Bool.if_ is_last_account_update ~then_:Bool.true_
-            ~else_:local_state.success
-      ; account_update_index =
-          Inputs.Index.if_ is_last_account_update ~then_:Inputs.Index.zero
-            ~else_:(Inputs.Index.succ local_state.account_update_index)
-      ; supply_increase =
-          Amount.Signed.if_ is_last_account_update
-            ~then_:Amount.(Signed.of_unsigned zero)
-            ~else_:local_state.supply_increase
-      ; will_succeed =
-          Bool.if_ is_last_account_update ~then_:Bool.true_
-            ~else_:local_state.will_succeed
-      }
-    in
-    (global_state, local_state)
+        let local_state, global_state =
+          let is_fee_payer = is_start' in
+          let global_state =
+            Global_state.set_first_pass_ledger ~should_update:is_fee_payer
+              global_state local_state.ledger
+          in
+          let local_state =
+            { local_state with
+              ledger =
+                Inputs.Ledger.if_ is_fee_payer
+                  ~then_:(Global_state.second_pass_ledger global_state)
+                  ~else_:local_state.ledger
+            }
+          in
+          (local_state, global_state)
+        in
+        (* If this is the last account update, and [will_succeed] is false, then
+           [success] must also be false.
+        *)
+        Bool.(
+          Assert.any ~pos:__POS__
+            [ not is_last_account_update
+            ; local_state.will_succeed
+            ; not local_state.success
+            ]) ;
+        (* If this is the last party and there were no failures, update the second
+           pass ledger and the supply increase.
+        *)
+        let global_state =
+          let is_successful_last_party =
+            Bool.(is_last_account_update &&& local_state.success)
+          in
+          let global_state =
+            Global_state.set_supply_increase global_state
+              (Amount.Signed.if_ is_successful_last_party
+                 ~then_:new_global_supply_increase
+                 ~else_:(Global_state.supply_increase global_state) )
+          in
+          Global_state.set_second_pass_ledger
+            ~should_update:is_successful_last_party global_state
+            local_state.ledger
+        in
+        let local_state =
+          (* Make sure to reset the local_state at the end of a transaction.
+             The following fields are already reset
+             - zkapp_command
+             - transaction_commitment
+             - full_transaction_commitment
+             - excess
+             so we need to reset
+             - token_id = Token_id.default
+             - ledger = Frozen_ledger_hash.empty_hash
+             - success = true
+             - account_update_index = Index.zero
+             - supply_increase = Amount.Signed.zero
+          *)
+          { local_state with
+            ledger =
+              Inputs.Ledger.if_ is_last_account_update
+                ~then_:(Inputs.Ledger.empty ~depth:0 ())
+                ~else_:local_state.ledger
+          ; success =
+              Bool.if_ is_last_account_update ~then_:Bool.true_
+                ~else_:local_state.success
+          ; account_update_index =
+              Inputs.Index.if_ is_last_account_update ~then_:Inputs.Index.zero
+                ~else_:(Inputs.Index.succ local_state.account_update_index)
+          ; supply_increase =
+              Amount.Signed.if_ is_last_account_update
+                ~then_:Amount.(Signed.of_unsigned zero)
+                ~else_:local_state.supply_increase
+          ; will_succeed =
+              Bool.if_ is_last_account_update ~then_:Bool.true_
+                ~else_:local_state.will_succeed
+          }
+        in
+        (global_state, local_state) )
 
   let step h state = apply ~is_start:`No h state
 

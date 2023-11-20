@@ -114,6 +114,8 @@ module type Key_value_database = sig
 
   type config
 
+  (* val metrics : t -> Rocksdb.Database.Metrics.t option *)
+
   include
     Key_value_database.Intf.Ident
       with type t := t
