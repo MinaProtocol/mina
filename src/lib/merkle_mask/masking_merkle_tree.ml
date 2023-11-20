@@ -181,7 +181,16 @@ module Make (Inputs : Inputs_intf.S) = struct
       | Some account ->
           Some account
       | None ->
-          Base.get (get_parent t) location
+          let is_empty =
+            match t.current_location with
+            | None ->
+                true
+            | Some current_location ->
+                let address = Location.to_path_exn location in
+                let current_address = Location.to_path_exn current_location in
+                Addr.is_further_right ~than:current_address address
+          in
+          if is_empty then None else Base.get (get_parent t) location
 
     let self_find_or_batch_lookup self_find lookup_parent t ids =
       assert_is_attached t ;
