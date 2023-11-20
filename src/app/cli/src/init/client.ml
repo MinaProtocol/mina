@@ -2244,11 +2244,23 @@ let test_ledger_application =
      and num_txs =
        flag "--num-txs" ~doc:"NN Number of transactions to create"
          (required int)
+     and first_partition_slots =
+       flag "--first-partition-slots"
+         ~doc:"NN Number of slots in first partition of scan state"
+         (optional int)
+     and no_new_stack =
+       flag "--old-stack" ~doc:"Use is_new_stack: false (scan state)" no_arg
+     and has_second_partition =
+       flag "--has-second-partition"
+         ~doc:"Assume there is a second partition (scan state)" no_arg
      in
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
-     Test_ledger_application.test privkey_path ledger_path prev_block_path
-       num_txs )
+     let first_partition_slots =
+       Option.value ~default:128 first_partition_slots
+     in
+     Test_ledger_application.test ~privkey_path ~ledger_path ~prev_block_path
+       ~first_partition_slots ~no_new_stack ~has_second_partition num_txs )
 
 let itn_create_accounts =
   Command.async ~summary:"Fund new accounts for incentivized testnet"
