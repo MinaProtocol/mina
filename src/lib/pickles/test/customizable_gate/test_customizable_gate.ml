@@ -2,9 +2,11 @@ open Core_kernel
 open Pickles_types
 open Pickles.Impls.Step
 
-let perform_step_tests = true
+let perform_step_tests = false
 
-let perform_recursive_tests = true
+let perform_recursive_tests = false
+
+let perform_step_choices_test = true
 
 let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 
@@ -23,7 +25,7 @@ let constraint_constants =
   ; fork = None
   }
 
-let test ~step_only ~custom_gate_type ~valid_witness () =
+let test ~step_only ~custom_gate_type ~valid_witness =
   printf "\n* Compiling STEP proof\n" ;
   let tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
@@ -188,16 +190,16 @@ let () =
   if perform_step_tests then (
     printf "Performing step tests\n" ;
     (* Customised as ForeignFieldAdd gate; valid witness *)
-    test ~step_only:true ~custom_gate_type:false ~valid_witness:true () ;
+    test ~step_only:true ~custom_gate_type:false ~valid_witness:true ;
     (* Customised as Conditional gate; valid witness *)
     (* Note: Requires Cache.Wrap.read_or_generate to have custom_gate_type passed to it *)
-    test ~step_only:true ~custom_gate_type:true ~valid_witness:true () ;
+    test ~step_only:true ~custom_gate_type:true ~valid_witness:true ;
 
     (* Customised as ForeignFieldAdd gate; invalid witness *)
     let test_failed =
       try
         let _cs =
-          test ~step_only:true ~custom_gate_type:false ~valid_witness:false ()
+          test ~step_only:true ~custom_gate_type:false ~valid_witness:false
         in
         false
       with _ -> true
@@ -208,7 +210,7 @@ let () =
     let test_failed =
       try
         let _cs =
-          test ~step_only:true ~custom_gate_type:true ~valid_witness:false ()
+          test ~step_only:true ~custom_gate_type:true ~valid_witness:false
         in
         false
       with _ -> true
@@ -220,16 +222,16 @@ let () =
   if perform_recursive_tests then (
     printf "Performing recursive tests\n" ;
     (* Customised as ForeignFieldAdd gate; valid witness *)
-    test ~step_only:false ~custom_gate_type:false ~valid_witness:true () ;
+    test ~step_only:false ~custom_gate_type:false ~valid_witness:true ;
 
     (* Customised as Conditional gate; valid witness *)
-    test ~step_only:false ~custom_gate_type:true ~valid_witness:true () ;
+    test ~step_only:false ~custom_gate_type:true ~valid_witness:true ;
 
     (* Customised as ForeignFieldAdd gate; invalid witness *)
     let test_failed =
       try
         let _cs =
-          test ~step_only:false ~custom_gate_type:false ~valid_witness:false ()
+          test ~step_only:false ~custom_gate_type:false ~valid_witness:false
         in
         false
       with _ -> true
@@ -240,10 +242,160 @@ let () =
     let test_failed =
       try
         let _cs =
-          test ~step_only:false ~custom_gate_type:true ~valid_witness:false ()
+          test ~step_only:false ~custom_gate_type:true ~valid_witness:false
         in
         false
       with _ -> true
     in
     assert test_failed ) ;
   ()
+
+let () =
+  if perform_step_choices_test then
+    (* Test multiple step choices assertion *)
+    let compile_failed =
+      try
+        let _test_multiple_step_choices =
+          let _tag, _cache_handle, _proof, Pickles.Provers.[ _prove_a; _prove_b ]
+              =
+            Pickles.compile
+              ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
+              ~auxiliary_typ:Typ.unit
+              ~branches:(module Nat.N2)
+              ~max_proofs_verified:(module Nat.N0)
+              ~name:"customizable gate"
+              ~constraint_constants
+                (* TODO(mrmr1993): This was misguided.. Delete. *)
+              ~choices:(fun ~self:_ ->
+                [ { identifier = "customizable gate"
+                  ; prevs = []
+                  ; main =
+                      (fun _ ->
+                        let cell1, cell2, cell3, cell4, result =
+                          ( Field.one (* Conditional output *)
+                          , Field.one (* Conditional x *)
+                          , Field.zero (* Conditional y *)
+                          , Field.one (* Conditional b *)
+                          , Field.zero )
+                        in
+                        with_label "customizable gate (ffadd)" (fun () ->
+                            assert_
+                              { annotation = Some __LOC__
+                              ; basic =
+                                  Kimchi_backend_common.Plonk_constraint_system
+                                  .Plonk_constraint
+                                  .T
+                                    (ForeignFieldAdd
+                                       { left_input_lo = cell1
+                                       ; left_input_mi = cell2
+                                       ; left_input_hi = cell3
+                                       ; right_input_lo = cell4
+                                       ; right_input_mi = Field.zero
+                                       ; right_input_hi = Field.zero
+                                       ; field_overflow = Field.zero
+                                       ; carry = Field.zero
+                                       ; foreign_field_modulus0 =
+                                           Field.Constant.of_int 7919
+                                       ; foreign_field_modulus1 =
+                                           Field.Constant.zero
+                                       ; foreign_field_modulus2 =
+                                           Field.Constant.zero
+                                       ; sign = Field.Constant.one
+                                       } )
+                              } ) ;
+
+                        with_label "customizable gate (result)" (fun () ->
+                            assert_
+                              { annotation = Some __LOC__
+                              ; basic =
+                                  Kimchi_backend_common.Plonk_constraint_system
+                                  .Plonk_constraint
+                                  .T
+                                    (Raw
+                                       { kind = Zero
+                                       ; values =
+                                           [| result; Field.zero; Field.zero |]
+                                       ; coeffs = [||]
+                                       } )
+                              } ) ;
+
+                        { previous_proof_statements = []
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
+                  ; feature_flags =
+                      Pickles_types.Plonk_types.Features.
+                        { none_bool with foreign_field_add = true }
+                  ; custom_gate_type = true
+                  }
+                ; { identifier = "customizable gate (choice 2)"
+                  ; prevs = []
+                  ; main =
+                      (fun _ ->
+                        let cell1, cell2, cell3, cell4, result =
+                          ( Field.of_int 7
+                          , Field.zero
+                          , Field.zero
+                          , Field.of_int 63
+                          , Field.of_int 70 )
+                        in
+                        with_label "customizable gate (ffadd)" (fun () ->
+                            assert_
+                              { annotation = Some __LOC__
+                              ; basic =
+                                  Kimchi_backend_common.Plonk_constraint_system
+                                  .Plonk_constraint
+                                  .T
+                                    (ForeignFieldAdd
+                                       { left_input_lo = cell1
+                                       ; left_input_mi = cell2
+                                       ; left_input_hi = cell3
+                                       ; right_input_lo = cell4
+                                       ; right_input_mi = Field.zero
+                                       ; right_input_hi = Field.zero
+                                       ; field_overflow = Field.zero
+                                       ; carry = Field.zero
+                                       ; foreign_field_modulus0 =
+                                           Field.Constant.of_int 7919
+                                       ; foreign_field_modulus1 =
+                                           Field.Constant.zero
+                                       ; foreign_field_modulus2 =
+                                           Field.Constant.zero
+                                       ; sign = Field.Constant.one
+                                       } )
+                              } ) ;
+
+                        with_label "customizable gate (result)" (fun () ->
+                            assert_
+                              { annotation = Some __LOC__
+                              ; basic =
+                                  Kimchi_backend_common.Plonk_constraint_system
+                                  .Plonk_constraint
+                                  .T
+                                    (Raw
+                                       { kind = Zero
+                                       ; values =
+                                           [| result; Field.zero; Field.zero |]
+                                       ; coeffs = [||]
+                                       } )
+                              } ) ;
+
+                        { previous_proof_statements = []
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
+                  ; feature_flags =
+                      Pickles_types.Plonk_types.Features.
+                        { none_bool with foreign_field_add = true }
+                  ; custom_gate_type = false
+                  }
+                ] )
+              ()
+          in
+          ()
+        in
+
+        false
+      with _ -> true
+    in
+    assert compile_failed
