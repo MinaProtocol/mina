@@ -2,9 +2,9 @@ open Core_kernel
 open Pickles_types
 open Pickles.Impls.Step
 
-let perform_step_tests = false
+let perform_step_tests = true
 
-let perform_recursive_tests = false
+let perform_recursive_tests = true
 
 let perform_step_choices_test = true
 
@@ -25,6 +25,58 @@ let constraint_constants =
   ; fork = None
   }
 
+let create_customisable_circuit ~custom_gate_type ~valid_witness =
+  (* Create the witness corresponding to the config of customizable
+     gate as either ForeignFieldAdd or Conditional gate
+     and make it either valid or invalid *)
+  let cell1, cell2, cell3, cell4, result =
+    if custom_gate_type then
+      ( ( if valid_witness then Field.one
+        else Field.zero (* Conditional output *) )
+      , Field.one (* Conditional x *)
+      , Field.zero (* Conditional y *)
+      , Field.one (* Conditional b *)
+      , Field.zero )
+    else
+      ( Field.of_int 7
+      , Field.zero
+      , Field.zero
+      , Field.of_int 63
+      , if valid_witness then Field.of_int 70 else Field.of_int 71 )
+  in
+  with_label "customizable gate (ffadd)" (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (ForeignFieldAdd
+                 { left_input_lo = cell1
+                 ; left_input_mi = cell2
+                 ; left_input_hi = cell3
+                 ; right_input_lo = cell4
+                 ; right_input_mi = Field.zero
+                 ; right_input_hi = Field.zero
+                 ; field_overflow = Field.zero
+                 ; carry = Field.zero
+                 ; foreign_field_modulus0 = Field.Constant.of_int 7919
+                 ; foreign_field_modulus1 = Field.Constant.zero
+                 ; foreign_field_modulus2 = Field.Constant.zero
+                 ; sign = Field.Constant.one
+                 } )
+        } ) ;
+
+  with_label "customizable gate (result)" (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Raw
+                 { kind = Zero
+                 ; values = [| result; Field.zero; Field.zero |]
+                 ; coeffs = [||]
+                 } )
+        } )
+
 let test ~step_only ~custom_gate_type ~valid_witness =
   printf "\n* Compiling STEP proof\n" ;
   let tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
@@ -39,62 +91,7 @@ let test ~step_only ~custom_gate_type ~valid_witness =
           ; prevs = []
           ; main =
               (fun _ ->
-                (* Create the witness corresponding to the config of customizable
-                   gate as either ForeignFieldAdd or Conditional gate
-                   and make it either valid or invalid *)
-                let cell1, cell2, cell3, cell4, result =
-                  if custom_gate_type then
-                    ( ( if valid_witness then Field.one
-                      else Field.zero (* Conditional output *) )
-                    , Field.one (* Conditional x *)
-                    , Field.zero (* Conditional y *)
-                    , Field.one (* Conditional b *)
-                    , Field.zero )
-                  else
-                    ( Field.of_int 7
-                    , Field.zero
-                    , Field.zero
-                    , Field.of_int 63
-                    , if valid_witness then Field.of_int 70 else Field.of_int 71
-                    )
-                in
-                with_label "customizable gate (ffadd)" (fun () ->
-                    assert_
-                      { annotation = Some __LOC__
-                      ; basic =
-                          Kimchi_backend_common.Plonk_constraint_system
-                          .Plonk_constraint
-                          .T
-                            (ForeignFieldAdd
-                               { left_input_lo = cell1
-                               ; left_input_mi = cell2
-                               ; left_input_hi = cell3
-                               ; right_input_lo = cell4
-                               ; right_input_mi = Field.zero
-                               ; right_input_hi = Field.zero
-                               ; field_overflow = Field.zero
-                               ; carry = Field.zero
-                               ; foreign_field_modulus0 =
-                                   Field.Constant.of_int 7919
-                               ; foreign_field_modulus1 = Field.Constant.zero
-                               ; foreign_field_modulus2 = Field.Constant.zero
-                               ; sign = Field.Constant.one
-                               } )
-                      } ) ;
-
-                with_label "customizable gate (result)" (fun () ->
-                    assert_
-                      { annotation = Some __LOC__
-                      ; basic =
-                          Kimchi_backend_common.Plonk_constraint_system
-                          .Plonk_constraint
-                          .T
-                            (Raw
-                               { kind = Zero
-                               ; values = [| result; Field.zero; Field.zero |]
-                               ; coeffs = [||]
-                               } )
-                      } ) ;
+                create_customisable_circuit ~custom_gate_type ~valid_witness ;
 
                 { previous_proof_statements = []
                 ; public_output = ()
@@ -256,8 +253,10 @@ let () =
     let compile_failed =
       try
         let _test_multiple_step_choices =
-          let _tag, _cache_handle, _proof, Pickles.Provers.[ _prove_a; _prove_b ]
-              =
+          let ( _tag
+              , _cache_handle
+              , _proof
+              , Pickles.Provers.[ _prove_a; _prove_b ] ) =
             Pickles.compile
               ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
               ~auxiliary_typ:Typ.unit
@@ -271,53 +270,8 @@ let () =
                   ; prevs = []
                   ; main =
                       (fun _ ->
-                        let cell1, cell2, cell3, cell4, result =
-                          ( Field.one (* Conditional output *)
-                          , Field.one (* Conditional x *)
-                          , Field.zero (* Conditional y *)
-                          , Field.one (* Conditional b *)
-                          , Field.zero )
-                        in
-                        with_label "customizable gate (ffadd)" (fun () ->
-                            assert_
-                              { annotation = Some __LOC__
-                              ; basic =
-                                  Kimchi_backend_common.Plonk_constraint_system
-                                  .Plonk_constraint
-                                  .T
-                                    (ForeignFieldAdd
-                                       { left_input_lo = cell1
-                                       ; left_input_mi = cell2
-                                       ; left_input_hi = cell3
-                                       ; right_input_lo = cell4
-                                       ; right_input_mi = Field.zero
-                                       ; right_input_hi = Field.zero
-                                       ; field_overflow = Field.zero
-                                       ; carry = Field.zero
-                                       ; foreign_field_modulus0 =
-                                           Field.Constant.of_int 7919
-                                       ; foreign_field_modulus1 =
-                                           Field.Constant.zero
-                                       ; foreign_field_modulus2 =
-                                           Field.Constant.zero
-                                       ; sign = Field.Constant.one
-                                       } )
-                              } ) ;
-
-                        with_label "customizable gate (result)" (fun () ->
-                            assert_
-                              { annotation = Some __LOC__
-                              ; basic =
-                                  Kimchi_backend_common.Plonk_constraint_system
-                                  .Plonk_constraint
-                                  .T
-                                    (Raw
-                                       { kind = Zero
-                                       ; values =
-                                           [| result; Field.zero; Field.zero |]
-                                       ; coeffs = [||]
-                                       } )
-                              } ) ;
+                        create_customisable_circuit ~custom_gate_type:true
+                          ~valid_witness:true ;
 
                         { previous_proof_statements = []
                         ; public_output = ()
@@ -332,53 +286,8 @@ let () =
                   ; prevs = []
                   ; main =
                       (fun _ ->
-                        let cell1, cell2, cell3, cell4, result =
-                          ( Field.of_int 7
-                          , Field.zero
-                          , Field.zero
-                          , Field.of_int 63
-                          , Field.of_int 70 )
-                        in
-                        with_label "customizable gate (ffadd)" (fun () ->
-                            assert_
-                              { annotation = Some __LOC__
-                              ; basic =
-                                  Kimchi_backend_common.Plonk_constraint_system
-                                  .Plonk_constraint
-                                  .T
-                                    (ForeignFieldAdd
-                                       { left_input_lo = cell1
-                                       ; left_input_mi = cell2
-                                       ; left_input_hi = cell3
-                                       ; right_input_lo = cell4
-                                       ; right_input_mi = Field.zero
-                                       ; right_input_hi = Field.zero
-                                       ; field_overflow = Field.zero
-                                       ; carry = Field.zero
-                                       ; foreign_field_modulus0 =
-                                           Field.Constant.of_int 7919
-                                       ; foreign_field_modulus1 =
-                                           Field.Constant.zero
-                                       ; foreign_field_modulus2 =
-                                           Field.Constant.zero
-                                       ; sign = Field.Constant.one
-                                       } )
-                              } ) ;
-
-                        with_label "customizable gate (result)" (fun () ->
-                            assert_
-                              { annotation = Some __LOC__
-                              ; basic =
-                                  Kimchi_backend_common.Plonk_constraint_system
-                                  .Plonk_constraint
-                                  .T
-                                    (Raw
-                                       { kind = Zero
-                                       ; values =
-                                           [| result; Field.zero; Field.zero |]
-                                       ; coeffs = [||]
-                                       } )
-                              } ) ;
+                        create_customisable_circuit ~custom_gate_type:false
+                          ~valid_witness:true ;
 
                         { previous_proof_statements = []
                         ; public_output = ()
