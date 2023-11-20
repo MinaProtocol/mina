@@ -54,7 +54,7 @@ Package: ${PROJECT}
 Version: ${MINA_DEB_VERSION}
 Section: base
 Priority: optional
-Architecture: amd64
+Architecture: arm64
 Depends: ${SHARED_DEPS}${ARCHIVE_DEPS}
 License: Apache-2.0
 Homepage: https://minaprotocol.com/

@@ -78,7 +78,7 @@ Package: ${1}
 Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
 Vendor: none
-Architecture: amd64
+Architecture: arm64
 Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
 Depends: ${2}
