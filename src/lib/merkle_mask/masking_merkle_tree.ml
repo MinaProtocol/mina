@@ -181,23 +181,118 @@ module Make (Inputs : Inputs_intf.S) = struct
       | Some account ->
           Some account
       | None ->
-          Base.get (get_parent t) location
+          let is_empty =
+            match t.current_location with
+            | None ->
+                true
+            | Some current_location ->
+                let address = Location.to_path_exn location in
+                let current_address = Location.to_path_exn current_location in
+                Addr.is_further_right ~than:current_address address
+          in
+          if is_empty then None else Base.get (get_parent t) location
 
     let get_batch t locations =
       assert_is_attached t ;
-      let found_accounts, leftover_locations =
-        List.partition_map locations ~f:(fun location ->
-            match self_find_account t location with
-            | Some account ->
-                Either.first (location, Some account)
-            | None ->
-                Either.second location )
+      let locations_with_locations_rev, leftover_locations_rev =
+        let rec go locations locations_with_locations_rev leftover_locations_rev
+            =
+          match locations with
+          | [] ->
+              (locations_with_locations_rev, leftover_locations_rev)
+          | location :: locations -> (
+              match self_find_account t location with
+              | None ->
+                  let is_empty =
+                    match t.current_location with
+                    | None ->
+                        true
+                    | Some current_location ->
+                        let address = Location.to_path_exn location in
+                        let current_address =
+                          Location.to_path_exn current_location
+                        in
+                        Addr.is_further_right ~than:current_address address
+                  in
+                  if is_empty then
+                    go locations
+                      ((location, Some None) :: locations_with_locations_rev)
+                      leftover_locations_rev
+                  else
+                    go locations
+                      ((location, None) :: locations_with_locations_rev)
+                      (location :: leftover_locations_rev)
+              | Some account ->
+                  go locations
+                    ( (location, Some (Some account))
+                    :: locations_with_locations_rev )
+                    leftover_locations_rev )
+        in
+        go locations [] []
       in
-      found_accounts @ Base.get_batch (get_parent t) leftover_locations
+      let leftover_location_accounts_rev =
+        Base.get_batch (get_parent t) leftover_locations_rev
+      in
+      let rec go locations_with_locations_rev leftover_locations_rev accounts =
+        match (locations_with_locations_rev, leftover_locations_rev) with
+        | [], _ ->
+            accounts
+        | ( (location, None) :: locations_with_locations_rev
+          , (_location, account) :: leftover_locations_rev ) ->
+            go locations_with_locations_rev leftover_locations_rev
+              ((location, account) :: accounts)
+        | ( (location, Some account) :: locations_with_locations_rev
+          , leftover_locations_rev ) ->
+            go locations_with_locations_rev leftover_locations_rev
+              ((location, account) :: accounts)
+        | _ :: _, [] ->
+            assert false
+      in
+      go locations_with_locations_rev leftover_location_accounts_rev []
+
+    let empty_hash =
+      Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+
+    let self_merkle_path t address =
+      Option.try_with (fun () ->
+          let rec self_merkle_path address =
+            let height = Addr.height ~ledger_depth:t.depth address in
+            if height >= t.depth then []
+            else
+              let sibling = Addr.sibling address in
+              let sibling_dir = Location.last_direction sibling in
+              let hash =
+                match self_find_hash t sibling with
+                | Some hash ->
+                    hash
+                | None ->
+                    let is_empty =
+                      match t.current_location with
+                      | None ->
+                          true
+                      | Some current_location ->
+                          let current_address =
+                            Location.to_path_exn current_location
+                          in
+                          Addr.is_further_right ~than:current_address sibling
+                    in
+                    if is_empty then empty_hash height
+                    else (* Caught by [try_with] above. *) assert false
+              in
+              let parent_address =
+                match Addr.parent address with
+                | Ok addr ->
+                    addr
+                | Error _ ->
+                    (* Caught by [try_with] above. *) assert false
+              in
+              Direction.map sibling_dir ~left:(`Right hash) ~right:(`Left hash)
+              :: self_merkle_path parent_address
+          in
+          self_merkle_path address )
 
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
-
     let fixup_merkle_path t path address =
       let rec build_fixed_path path address accum =
         if List.is_empty path then List.rev accum
@@ -225,24 +320,59 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let merkle_path_at_addr_exn t address =
       assert_is_attached t ;
-      let parent_merkle_path =
-        Base.merkle_path_at_addr_exn (get_parent t) address
-      in
-      fixup_merkle_path t parent_merkle_path address
+      match self_merkle_path t address with
+      | Some path ->
+          path
+      | None ->
+          let parent_merkle_path =
+            Base.merkle_path_at_addr_exn (get_parent t) address
+          in
+          fixup_merkle_path t parent_merkle_path address
 
     let merkle_path_at_index_exn t index =
-      assert_is_attached t ;
-      let address = Addr.of_int_exn ~ledger_depth:t.depth index in
-      let parent_merkle_path =
-        Base.merkle_path_at_addr_exn (get_parent t) address
-      in
-      fixup_merkle_path t parent_merkle_path address
+      merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:t.depth index)
 
     let merkle_path t location =
+      merkle_path_at_addr_exn t (Location.to_path_exn location)
+
+    let merkle_path_batch t locations =
       assert_is_attached t ;
-      let address = Location.to_path_exn location in
-      let parent_merkle_path = Base.merkle_path (get_parent t) location in
-      fixup_merkle_path t parent_merkle_path address
+      let self_merkle_paths_rev =
+        List.rev_map locations ~f:(fun location ->
+            let address = Location.to_path_exn location in
+            match self_merkle_path t address with
+            | Some path ->
+                Either.First path
+            | None ->
+                Either.Second (location, address) )
+      in
+      let parent_merkle_paths_rev =
+        let parent_locations_rev =
+          List.filter_map self_merkle_paths_rev ~f:(function
+            | Either.First _ ->
+                None
+            | Either.Second (location, _) ->
+                Some location )
+        in
+        if List.is_empty parent_locations_rev then []
+        else Base.merkle_path_batch (get_parent t) parent_locations_rev
+      in
+      let rec recombine self_merkle_paths_rev parent_merkle_paths_rev acc =
+        match (self_merkle_paths_rev, parent_merkle_paths_rev) with
+        | [], [] ->
+            acc
+        | Either.First path :: self_merkle_paths_rev, parent_merkle_paths_rev ->
+            recombine self_merkle_paths_rev parent_merkle_paths_rev (path :: acc)
+        | ( Either.Second (_, address) :: self_merkle_paths_rev
+          , path :: parent_merkle_paths_rev ) ->
+            let path = fixup_merkle_path t path address in
+            recombine self_merkle_paths_rev parent_merkle_paths_rev (path :: acc)
+        | _ :: _, [] ->
+            assert false
+        | [], _ :: _ ->
+            assert false
+      in
+      recombine self_merkle_paths_rev parent_merkle_paths_rev []
 
     (* given a Merkle path corresponding to a starting address, calculate
        addresses and hashes for each node affected by the starting hash; that is,
@@ -325,6 +455,17 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           self_set_hash t addr hash )
+
+    let set_merkle_path_unsafe t addr path =
+      assert_is_attached t ;
+      ignore
+        ( List.fold_left ~init:addr path ~f:(fun addr path ->
+              let sibling_addr = Location.Addr.sibling addr in
+              let addr = Location.Addr.parent_exn addr in
+              let hash = match path with `Left hash | `Right hash -> hash in
+              self_set_hash t sibling_addr hash ;
+              addr )
+          : Location.Addr.t )
 
     (* if the mask's parent sets an account, we can prune an entry in the mask
        if the account in the parent is the same in the mask *)
@@ -535,16 +676,82 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let location_of_account_batch t account_ids =
       assert_is_attached t ;
-      let found_locations, leftover_account_ids =
-        List.partition_map account_ids ~f:(fun account_id ->
-            match self_find_location t account_id with
-            | Some location ->
-                Either.first (account_id, Some location)
-            | None ->
-                Either.second account_id )
+      let account_ids_with_locations_rev, leftover_account_ids_rev =
+        let rec go account_ids account_ids_with_locations_rev
+            leftover_account_ids_rev =
+          match account_ids with
+          | [] ->
+              (account_ids_with_locations_rev, leftover_account_ids_rev)
+          | account_id :: account_ids -> (
+              match self_find_location t account_id with
+              | None ->
+                  go account_ids
+                    ((account_id, None) :: account_ids_with_locations_rev)
+                    (account_id :: leftover_account_ids_rev)
+              | Some loc ->
+                  go account_ids
+                    ((account_id, Some loc) :: account_ids_with_locations_rev)
+                    leftover_account_ids_rev )
+        in
+        go account_ids [] []
       in
-      found_locations
-      @ Base.location_of_account_batch (get_parent t) leftover_account_ids
+      let leftover_account_id_locs_rev =
+        Base.location_of_account_batch (get_parent t) leftover_account_ids_rev
+      in
+      let rec go account_ids_with_locations_rev leftover_account_ids_rev locs =
+        match (account_ids_with_locations_rev, leftover_account_ids_rev) with
+        | [], _ ->
+            locs
+        | ( (account_id, None) :: account_ids_with_locations_rev
+          , (_account_id, loc) :: leftover_account_ids_rev ) ->
+            go account_ids_with_locations_rev leftover_account_ids_rev
+              ((account_id, loc) :: locs)
+        | ( (account_id, Some loc) :: account_ids_with_locations_rev
+          , leftover_account_ids_rev ) ->
+            go account_ids_with_locations_rev leftover_account_ids_rev
+              ((account_id, Some loc) :: locs)
+        | _ :: _, [] ->
+            assert false
+      in
+      go account_ids_with_locations_rev leftover_account_id_locs_rev []
+
+    let unsafe_preload_accounts_from_parent t account_ids =
+      assert_is_attached t ;
+      let locations =
+        Base.location_of_account_batch (get_parent t) account_ids
+      in
+      let non_empty_locations =
+        List.filter_map locations ~f:(fun (_account_id, location) -> location)
+      in
+      let () =
+        (* Batch import the accounts. *)
+        let accounts = Base.get_batch (get_parent t) non_empty_locations in
+        List.iter accounts ~f:(fun (location, account) ->
+            match account with
+            | None ->
+                ()
+            | Some account ->
+                set t location account )
+      in
+      (* Batch import the merkle paths. *)
+      let non_empty_locations =
+        match t.current_location with
+        | None ->
+            non_empty_locations
+        | Some location ->
+            location :: non_empty_locations
+      in
+      let merkle_paths =
+        Base.merkle_path_batch (get_parent t) non_empty_locations
+      in
+      (* TODO: If we also insert the empty merkle paths corresponding that may
+         be used by the unmatched account IDs, we can avoid any further disk IO
+         when accessng this mask.
+      *)
+      List.iter2_exn non_empty_locations merkle_paths
+        ~f:(fun location merkle_path ->
+          let addr = Location.to_path_exn location in
+          set_merkle_path_unsafe t addr merkle_path )
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for t =
