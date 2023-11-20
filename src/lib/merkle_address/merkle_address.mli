@@ -74,3 +74,7 @@ val height : ledger_depth:int -> t -> int
 val to_int : t -> int
 
 val of_int_exn : ledger_depth:int -> int -> t
+
+val same_height_ancestors : t -> t -> t * t
+
+val is_further_right : than:t -> t -> bool
