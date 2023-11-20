@@ -8,7 +8,6 @@ let query ?executable q =
     Option.merge executable (Sys.getenv "CQLSH") ~f:Fn.const
     |> Option.value ~default:"cqlsh"
   in
-  printf "SQL: '%s'\n" q ;
   Process.run_lines ~prog ~stdin:q ~args:[] ()
 
 let select ?executable ~keyspace ~parse ~fields ?where from =
