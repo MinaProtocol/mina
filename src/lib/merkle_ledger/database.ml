@@ -154,7 +154,7 @@ module Make (Inputs : Inputs_intf) :
     | None ->
         empty_hash (Location.height ~ledger_depth:mdb.depth location)
 
-  let get_hash_batch mdb locations =
+  let get_hash_batch_exn mdb locations =
     List.iter locations ~f:(fun location -> assert (Location.is_hash location)) ;
     let hashes = get_bin_batch mdb locations Hash.bin_read_t in
     List.map2_exn locations hashes ~f:(fun location hash ->
@@ -705,7 +705,7 @@ module Make (Inputs : Inputs_intf) :
       in
       loop location [] []
     in
-    let rev_hashes = get_hash_batch mdb rev_locations in
+    let rev_hashes = get_hash_batch_exn mdb rev_locations in
     let rec loop directions hashes acc =
       match (directions, hashes) with
       | [], [] ->
@@ -751,7 +751,7 @@ module Make (Inputs : Inputs_intf) :
       in
       loop locations [] [] [ 0 ]
     in
-    let rev_hashes = get_hash_batch mdb rev_locations in
+    let rev_hashes = get_hash_batch_exn mdb rev_locations in
     let rec loop directions hashes lengths acc =
       match (directions, hashes, lengths, acc) with
       | [], [], [], _ (* actually [] *) :: acc_tl ->
