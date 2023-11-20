@@ -224,10 +224,14 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       go locations_with_locations_rev leftover_location_accounts_rev []
 
+    let empty_hash =
+      Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+
     let self_merkle_path t address =
       Option.try_with (fun () ->
           let rec self_merkle_path address =
-            if Addr.height ~ledger_depth:t.depth address >= t.depth then []
+            let height = Addr.height ~ledger_depth:t.depth address in
+            if height >= t.depth then []
             else
               let sibling = Addr.sibling address in
               let sibling_dir = Location.last_direction sibling in
@@ -236,7 +240,18 @@ module Make (Inputs : Inputs_intf.S) = struct
                 | Some hash ->
                     hash
                 | None ->
-                    (* Caught by [try_with] above. *) assert false
+                    let is_empty =
+                      match t.current_location with
+                      | None ->
+                          true
+                      | Some current_location ->
+                          let current_address =
+                            Location.to_path_exn current_location
+                          in
+                          Addr.is_further_right ~than:current_address sibling
+                    in
+                    if is_empty then empty_hash height
+                    else (* Caught by [try_with] above. *) assert false
               in
               let parent_address =
                 match Addr.parent address with
