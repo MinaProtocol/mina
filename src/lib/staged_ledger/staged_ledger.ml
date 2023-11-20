@@ -2343,6 +2343,11 @@ module Test_helpers = struct
 
   let dummy_state_view ?global_slot () =
     dummy_state_and_view ?global_slot () |> snd
+
+  let update_coinbase_stack_and_get_data t =
+    update_coinbase_stack_and_get_data
+      ~constraint_constants:t.constraint_constants t.scan_state t.ledger
+      t.pending_coinbase_collection
 end
 
 let%test_module "staged ledger tests" =

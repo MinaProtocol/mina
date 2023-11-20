@@ -122,6 +122,7 @@
    string_sign
    zkapp_command_builder
    internal_tracing
+   transaction_snark_scan_state
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../../graphql_schema.json
