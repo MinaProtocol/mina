@@ -17,6 +17,10 @@ let config_flag =
   let open Command.Param in
   flag "--config-file" ~doc:"FILE config file" (optional string)
 
+let keyspace_flag =
+  let open Command.Param in
+  flag "--keyspace" ~doc:"Name of the Cassandra keyspace" (required string)
+
 let no_checks_flag =
   let open Command.Param in
   flag "--no-checks" ~aliases:[ "-no-checks" ]
@@ -177,6 +181,7 @@ let cassandra_command =
       let%map_open cqlsh = cassandra_executable_flag
       and no_checks = no_checks_flag
       and config_file = config_flag
+      and keyspace = keyspace_flag
       and period_start = timestamp
       and period_end = timestamp in
       fun () ->
@@ -195,7 +200,7 @@ let cassandra_command =
         let src =
           Submission.Cassandra.
             { executable = cqlsh
-            ; keyspace = "bpu_integration_dev"
+            ; keyspace
             ; period_start
             ; period_end
             }
