@@ -53,7 +53,8 @@ let mk_tx acc_creation_fee keypair nonce =
   in
   Transaction_snark.For_tests.multiple_transfers multispec
 
-let test privkey_path ledger_path prev_block_path num_txs =
+let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
+    ~no_new_stack ~has_second_partition num_txs =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let logger = Logger.create () in
   let%bind keypair = read_privkey privkey_path in
@@ -106,7 +107,11 @@ let test privkey_path ledger_path prev_block_path num_txs =
     |> Mina_numbers.Global_slot_since_genesis.add fork_slot
   in
   let zkapps = List.init num_txs ~f:(Fn.compose mk_txs' to_nonce) in
-  let staged_ledger = Staged_ledger.create_exn ~constraint_constants ~ledger in
+  let pending_coinbase =
+    Pending_coinbase.create ~depth:constraint_constants.pending_coinbase_depth
+      ()
+    |> Or_error.ok_exn
+  in
   let zkapps' =
     List.map zkapps ~f:(fun tx ->
         { With_status.data =
@@ -116,13 +121,14 @@ let test privkey_path ledger_path prev_block_path num_txs =
   in
   let start = Time.now () in
   match%map
-    Staged_ledger.For_tests.update_coinbase_stack_and_get_data ~logger
-      ~global_slot staged_ledger zkapps' prev_state_view
+    Staged_ledger.For_tests.update_coinbase_stack_and_get_data_impl
+      ~first_partition_slots ~is_new_stack:(not no_new_stack)
+      ~no_second_partition:(not has_second_partition) ~constraint_constants
+      ~logger ~global_slot ledger pending_coinbase zkapps' prev_state_view
       (prev_protocol_state_hash, prev_protocol_state_body_hash)
   with
   | Ok (b, _, _, _, _) ->
-      printf "Result of application: %s (took %s)\n"
-        (if b then "true" else "false")
+      printf "Result of application: %B (took %s)\n" b
         Time.(Span.to_string @@ diff (now ()) start)
   | Error e ->
       eprintf "Error applying staged ledger: %s\n"
