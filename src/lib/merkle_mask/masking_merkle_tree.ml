@@ -194,9 +194,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let self_find_or_batch_lookup self_find lookup_parent t ids =
       assert_is_attached t ;
-      let self_found_or_none =
-        List.map ids ~f:(fun id -> (id, self_find t id))
-      in
+      let self_found_or_none = List.map ids ~f:self_find in
       let not_found =
         List.filter_map self_found_or_none ~f:(function
           | id, None ->
@@ -205,20 +203,37 @@ module Make (Inputs : Inputs_intf.S) = struct
               None )
       in
       let from_parent = lookup_parent (get_parent t) not_found in
-      let _, res =
-        List.fold_map self_found_or_none ~init:from_parent
-          ~f:(fun from_parent (id, self_found) ->
-            match (self_found, from_parent) with
-            | None, r :: rest ->
-                (rest, r)
-            | Some _, _ ->
-                (from_parent, (id, self_found))
-            | _ ->
-                failwith "unexpected number of results from DB" )
-      in
-      res
+      List.fold_map self_found_or_none ~init:from_parent
+        ~f:(fun from_parent (id, self_found) ->
+          match (self_found, from_parent) with
+          | None, r :: rest ->
+              (rest, r)
+          | Some acc_found_locally, _ ->
+              (from_parent, (id, acc_found_locally))
+          | _ ->
+              failwith "unexpected number of results from DB" )
+      |> snd
 
-    let get_batch = self_find_or_batch_lookup self_find_account Base.get_batch
+    let get_batch t =
+      let self_find id =
+        let res = self_find_account t id in
+        let res =
+          if Option.is_none res then
+            let is_empty =
+              match t.current_location with
+              | None ->
+                  true
+              | Some current_location ->
+                  let address = Location.to_path_exn id in
+                  let current_address = Location.to_path_exn current_location in
+                  Addr.is_further_right ~than:current_address address
+            in
+            Option.some_if is_empty None
+          else Some res
+        in
+        (id, res)
+      in
+      self_find_or_batch_lookup self_find Base.get_batch t
 
     let empty_hash =
       Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
@@ -652,9 +667,11 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.location_of_account (get_parent t) account_id
 
-    let location_of_account_batch =
-      self_find_or_batch_lookup self_find_location
-        Base.location_of_account_batch
+    let location_of_account_batch t =
+      (* TODO consider handling special case of empty addresses *)
+      self_find_or_batch_lookup
+        (fun id -> (id, Option.map ~f:Option.some @@ self_find_location t id))
+        Base.location_of_account_batch t
 
     (* Adds specified accounts to the mask by laoding them from parent ledger.
 
