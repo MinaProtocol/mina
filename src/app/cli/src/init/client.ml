@@ -2232,6 +2232,24 @@ let thread_graph =
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
              exit 1 ) )
 
+let test_ledger_application =
+  Command.async ~summary:"Test ledger application"
+    (let%map_open.Command privkey_path = Cli_lib.Flag.privkey_read_path
+     and prev_block_path =
+       flag "--prev-block-path" ~doc:"FILE file with serialized block"
+         (required string)
+     and ledger_path =
+       flag "--ledger-path" ~doc:"FILE directory with ledger DB"
+         (required string)
+     and num_txs =
+       flag "--num-txs" ~doc:"NN Number of transactions to create"
+         (required int)
+     in
+     Cli_lib.Exceptions.handle_nicely
+     @@ fun () ->
+     Test_ledger_application.test privkey_path ledger_path prev_block_path
+       num_txs )
+
 let itn_create_accounts =
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
@@ -2393,6 +2411,7 @@ let ledger =
     [ ("export", export_ledger)
     ; ("hash", hash_ledger)
     ; ("currency", currency_in_ledger)
+    ; ("test-apply", test_ledger_application)
     ]
 
 let libp2p =
