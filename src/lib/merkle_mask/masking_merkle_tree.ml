@@ -381,16 +381,20 @@ module Make (Inputs : Inputs_intf.S) = struct
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           self_set_hash t addr hash )
 
-    (* a write writes only to the mask, parent is not involved need to update
-       both account and hash pieces of the mask *)
-    let set t location account =
+    let set_account_unsafe t location account =
       assert_is_attached t ;
       self_set_account t location account ;
       (* Update token info. *)
       let account_id = Account.identifier account in
       Token_id.Table.set t.token_owners
         ~key:(Account_id.derive_token_id ~owner:account_id)
-        ~data:account_id ;
+        ~data:account_id
+
+    (* a write writes only to the mask, parent is not involved need to update
+       both account and hash pieces of the mask *)
+    let set t location account =
+      assert_is_attached t ;
+      set_account_unsafe t location account ;
       (* Update merkle path. *)
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.hash_account account in
@@ -401,17 +405,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           self_set_hash t addr hash )
-
-    let set_merkle_path_unsafe t addr path =
-      assert_is_attached t ;
-      ignore
-        ( List.fold_left ~init:addr path ~f:(fun addr path ->
-              let sibling_addr = Location.Addr.sibling addr in
-              let addr = Location.Addr.parent_exn addr in
-              let hash = match path with `Left hash | `Right hash -> hash in
-              self_set_hash t sibling_addr hash ;
-              addr )
-          : Location.Addr.t )
 
     (* if the mask's parent sets an account, we can prune an entry in the mask
        if the account in the parent is the same in the mask *)
@@ -655,23 +648,42 @@ module Make (Inputs : Inputs_intf.S) = struct
         List.filter_map locations ~f:(fun (_account_id, location) -> location)
       in
       let accounts = Base.get_batch (get_parent t) non_empty_locations in
-      let merkle_paths =
-        Base.merkle_path_batch (get_parent t) non_empty_locations
+      let all_hash_locations =
+        let rec generate_locations account_locations acc =
+          match account_locations with
+          | [] ->
+              acc
+          | location :: account_locations -> (
+              let address = Location.to_path_exn location in
+              match Addr.parent address with
+              | Ok parent ->
+                  let sibling = Addr.sibling address in
+                  generate_locations
+                    (Location.Hash parent :: account_locations)
+                    (Location.Hash address :: Location.Hash sibling :: acc)
+              | Error _ ->
+                  (* This is the root. It's somewhat wasteful to add it for
+                     every account, but makes this logic simpler.
+                  *)
+                  generate_locations account_locations
+                    (Location.Hash address :: acc) )
+        in
+        generate_locations non_empty_locations []
       in
-      (* TODO: If we also insert the empty merkle paths corresponding that may
-         be used by the unmatched account IDs, we can avoid any further disk IO
-         when accessng this mask.
-      *)
-      List.iter2_exn non_empty_locations merkle_paths
-        ~f:(fun location merkle_path ->
-          let addr = Location.to_path_exn location in
-          set_merkle_path_unsafe t addr merkle_path ) ;
+      let all_hashes =
+        Base.get_hash_batch_exn (get_parent t) all_hash_locations
+      in
+      (* Batch import merkle paths and self hashes. *)
+      List.iter2_exn all_hash_locations all_hashes ~f:(fun location hash ->
+          let address = Location.to_path_exn location in
+          self_set_hash t address hash ) ;
+      (* Batch import accounts. *)
       List.iter accounts ~f:(fun (location, account) ->
           match account with
           | None ->
               ()
           | Some account ->
-              set t location account )
+              set_account_unsafe t location account )
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for t =
