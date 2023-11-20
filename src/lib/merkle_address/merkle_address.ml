@@ -215,6 +215,15 @@ let serialize ~ledger_depth path =
 
 let is_parent_of parent ~maybe_child = Bitstring.is_prefix maybe_child parent
 
+let same_height_ancestors x y =
+  let depth_x = depth x in
+  let depth_y = depth y in
+  if depth_x < depth_y then (x, slice y 0 depth_x) else (slice x 0 depth_y, y)
+
+let is_further_right ~than path =
+  let than, path = same_height_ancestors than path in
+  compare than path < 0
+
 module Range = struct
   type nonrec t = t * t
 
