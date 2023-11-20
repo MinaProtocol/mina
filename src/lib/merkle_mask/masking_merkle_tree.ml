@@ -203,12 +203,29 @@ module Make (Inputs : Inputs_intf.S) = struct
           | location :: locations -> (
               match self_find_account t location with
               | None ->
-                  go locations
-                    ((location, None) :: locations_with_locations_rev)
-                    (location :: leftover_locations_rev)
+                  let is_empty =
+                    match t.current_location with
+                    | None ->
+                        true
+                    | Some current_location ->
+                        let address = Location.to_path_exn location in
+                        let current_address =
+                          Location.to_path_exn current_location
+                        in
+                        Addr.is_further_right ~than:current_address address
+                  in
+                  if is_empty then
+                    go locations
+                      ((location, Some None) :: locations_with_locations_rev)
+                      leftover_locations_rev
+                  else
+                    go locations
+                      ((location, None) :: locations_with_locations_rev)
+                      (location :: leftover_locations_rev)
               | Some account ->
                   go locations
-                    ((location, Some account) :: locations_with_locations_rev)
+                    ( (location, Some (Some account))
+                    :: locations_with_locations_rev )
                     leftover_locations_rev )
         in
         go locations [] []
@@ -227,7 +244,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         | ( (location, Some account) :: locations_with_locations_rev
           , leftover_locations_rev ) ->
             go locations_with_locations_rev leftover_locations_rev
-              ((location, Some account) :: accounts)
+              ((location, account) :: accounts)
         | _ :: _, [] ->
             assert false
       in
