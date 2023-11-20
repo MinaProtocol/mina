@@ -487,16 +487,31 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       List.map locations ~f:(fun location -> get t location)
 
-    (* NB: rocksdb does not support batch reads; is this needed? *)
-    let get_hash_batch_exn t addrs =
+    let get_hash_batch_exn t locations =
       assert_is_attached t ;
-      List.map addrs ~f:(fun addr ->
-          match self_find_hash t addr with
-          | Some account ->
-              Some account
-          | None -> (
-              try Some (Base.get_inner_hash_at_addr_exn (get_parent t) addr)
-              with _ -> None ) )
+      let self_hashes_rev =
+        List.rev_map locations ~f:(fun location ->
+            (location, self_find_hash t (Location.to_path_exn location)) )
+      in
+      let parent_locations_rev =
+        List.filter_map self_hashes_rev ~f:(fun (location, hash) ->
+            match hash with None -> Some location | Some _ -> None )
+      in
+      let parent_hashes_rev =
+        if List.is_empty parent_locations_rev then []
+        else Base.get_hash_batch_exn (get_parent t) parent_locations_rev
+      in
+      let rec recombine self_hashes_rev parent_hashes_rev acc =
+        match (self_hashes_rev, parent_hashes_rev) with
+        | [], [] ->
+            acc
+        | (_location, None) :: self_hashes_rev, hash :: parent_hashes_rev
+        | (_location, Some hash) :: self_hashes_rev, parent_hashes_rev ->
+            recombine self_hashes_rev parent_hashes_rev (hash :: acc)
+        | _, [] | [], _ ->
+            assert false
+      in
+      recombine self_hashes_rev parent_hashes_rev []
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
