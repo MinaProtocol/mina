@@ -4832,3 +4832,10 @@ let%test_module "staged ledger tests" =
                               "block should be rejected because batch \
                                verification failed" ) ) ) )
   end )
+
+module For_tests = struct
+  let update_coinbase_stack_and_get_data t =
+    update_coinbase_stack_and_get_data
+      ~constraint_constants:t.constraint_constants t.scan_state t.ledger
+      t.pending_coinbase_collection
+end
