@@ -673,17 +673,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let non_empty_locations =
         List.filter_map locations ~f:(fun (_account_id, location) -> location)
       in
-      let () =
-        (* Batch import the accounts. *)
-        let accounts = Base.get_batch (get_parent t) non_empty_locations in
-        List.iter accounts ~f:(fun (location, account) ->
-            match account with
-            | None ->
-                ()
-            | Some account ->
-                set t location account )
-      in
-      (* Batch import the merkle paths. *)
+      let accounts = Base.get_batch (get_parent t) non_empty_locations in
       let non_empty_locations =
         match t.current_location with
         | None ->
@@ -694,14 +684,18 @@ module Make (Inputs : Inputs_intf.S) = struct
       let merkle_paths =
         Base.merkle_path_batch (get_parent t) non_empty_locations
       in
-      (* TODO: If we also insert the empty merkle paths corresponding that may
-         be used by the unmatched account IDs, we can avoid any further disk IO
-         when accessng this mask.
-      *)
+      (* Batch import merkle paths. *)
       List.iter2_exn non_empty_locations merkle_paths
         ~f:(fun location merkle_path ->
           let addr = Location.to_path_exn location in
-          set_merkle_path_unsafe t addr merkle_path )
+          set_merkle_path_unsafe t addr merkle_path ) ;
+      (* Batch import accounts. *)
+      List.iter accounts ~f:(fun (location, account) ->
+          match account with
+          | None ->
+              ()
+          | Some account ->
+              set t location account )
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for t =
