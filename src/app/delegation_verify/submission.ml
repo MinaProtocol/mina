@@ -186,19 +186,12 @@ module Cassandra = struct
 
   let submitter ({ submitter; _ } : submission) = submitter
 
-  let dates_between start finish =
-    let rec go acc current =
-      if Date.(current > finish) then acc
-      else go (current :: acc) Date.(add_days current 1)
-    in
-    go [] start
-
   let load_submissions { executable; keyspace; period_start; period_end } =
     let open Deferred.Or_error.Let_syntax in
     let start_day = Time.of_string period_start |> Time.to_date ~zone:Time.Zone.utc in
     let end_day = Time.of_string period_end |> Time.to_date ~zone:Time.Zone.utc in
     let partition_keys =
-      dates_between start_day end_day
+      Date.dates_between ~min:start_day ~max:end_day
       |> List.map ~f:(fun d -> Date.format d "%Y-%m-%d")
     in
     let partition =
