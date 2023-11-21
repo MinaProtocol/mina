@@ -693,32 +693,12 @@ module Make (Inputs : Inputs_intf) :
         Location.Hash (Location.to_path_exn location)
       else location
     in
-    assert (Location.is_hash location) ;
-    let rev_locations, rev_directions =
-      let rec loop k loc_acc dir_acc =
-        if Location.height ~ledger_depth:mdb.depth k >= mdb.depth then
-          (loc_acc, dir_acc)
-        else
-          let sibling = Location.sibling k in
-          let sibling_dir = Location.last_direction (Location.to_path_exn k) in
-          loop (Location.parent k) (sibling :: loc_acc) (sibling_dir :: dir_acc)
-      in
-      loop location [] []
+    let dependency_locs, dependency_dirs =
+      List.unzip (Location.merkle_path_dependencies_exn location)
     in
-    let rev_hashes = get_hash_batch mdb rev_locations in
-    let rec loop directions hashes acc =
-      match (directions, hashes) with
-      | [], [] ->
-          acc
-      | direction :: directions, hash :: hashes ->
-          let dir =
-            Direction.map direction ~left:(`Left hash) ~right:(`Right hash)
-          in
-          loop directions hashes (dir :: acc)
-      | _ ->
-          failwith "Mismatched lengths"
-    in
-    loop rev_directions rev_hashes []
+    let dependency_hashes = get_hash_batch mdb dependency_locs in
+    List.map2_exn dependency_dirs dependency_hashes ~f:(fun dir hash ->
+        Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
 
