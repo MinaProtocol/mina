@@ -6,6 +6,10 @@ open Mina_ledger
 open Mina_base
 open Mina_state
 
+let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
+let logger = Logger.create ()
+
 let read_privkey privkey_path =
   let password =
     lazy (Secrets.Keypair.Terminal_stdin.prompt_password "Enter password: ")
@@ -53,15 +57,8 @@ let mk_tx acc_creation_fee keypair nonce =
   in
   Transaction_snark.For_tests.multiple_transfers multispec
 
-let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
-    ~no_new_stack ~has_second_partition num_txs =
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
-  let logger = Logger.create () in
-  let%bind keypair = read_privkey privkey_path in
-  let ledger =
-    Ledger.create ~directory_name:ledger_path
-      ~depth:constraint_constants.ledger_depth ()
-  in
+let apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
+    ~num_txs ~prev_protocol_state ~(keypair : Signature_lib.Keypair.t) ~ledger =
   let init_nonce =
     let account_id = Account_id.of_public_key keypair.public_key in
     let loc =
@@ -73,12 +70,11 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
   let to_nonce =
     Fn.compose (Unsigned.UInt32.add init_nonce) Unsigned.UInt32.of_int
   in
-  let prev_block_data = In_channel.read_all prev_block_path in
-  let prev_block =
-    Binable.of_string (module Mina_block.Stable.Latest) prev_block_data
-  in
-  let prev_protocol_state =
-    Mina_block.header prev_block |> Mina_block.Header.protocol_state
+  let mk_txs' = mk_tx constraint_constants.account_creation_fee keypair in
+  let fork_slot =
+    Option.value_map ~default:Mina_numbers.Global_slot_since_genesis.zero
+      ~f:(fun f -> f.genesis_slot)
+      constraint_constants.fork
   in
   let prev_protocol_state_body_hash =
     Protocol_state.body prev_protocol_state |> Protocol_state.Body.hash
@@ -91,12 +87,6 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
   let prev_state_view =
     Protocol_state.body prev_protocol_state
     |> Mina_state.Protocol_state.Body.view
-  in
-  let mk_txs' = mk_tx constraint_constants.account_creation_fee keypair in
-  let fork_slot =
-    Option.value_map ~default:Mina_numbers.Global_slot_since_genesis.zero
-      ~f:(fun f -> f.genesis_slot)
-      constraint_constants.fork
   in
   let global_slot =
     Protocol_state.consensus_state prev_protocol_state
@@ -128,8 +118,38 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
       (prev_protocol_state_hash, prev_protocol_state_body_hash)
   with
   | Ok (b, _, _, _, _) ->
-      printf "Result of application: %B (took %s)\n" b
+      printf
+        !"Result of application: %B (took %s)\n%!"
+        b
         Time.(Span.to_string @@ diff (now ()) start)
   | Error e ->
-      eprintf "Error applying staged ledger: %s\n"
-        (Staged_ledger.Staged_ledger_error.to_string e)
+      eprintf
+        !"Error applying staged ledger: %s\n%!"
+        (Staged_ledger.Staged_ledger_error.to_string e) ;
+      exit 1
+
+let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
+    ~no_new_stack ~has_second_partition num_txs =
+  let%bind keypair = read_privkey privkey_path in
+  let ledger =
+    Ledger.create ~directory_name:ledger_path
+      ~depth:constraint_constants.ledger_depth ()
+  in
+  let prev_block_data = In_channel.read_all prev_block_path in
+  let prev_block =
+    Binable.of_string (module Mina_block.Stable.Latest) prev_block_data
+  in
+  let prev_protocol_state =
+    Mina_block.header prev_block |> Mina_block.Header.protocol_state
+  in
+  Deferred.ignore_m
+    (Deferred.List.fold
+       (List.init 290 ~f:(Fn.const ()))
+       ~init:ledger
+       ~f:(fun ledger () ->
+         let%map () =
+           apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
+             ~num_txs ~prev_protocol_state ~keypair ~ledger
+         in
+         Ledger.register_mask ledger
+           (Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()) ) )
