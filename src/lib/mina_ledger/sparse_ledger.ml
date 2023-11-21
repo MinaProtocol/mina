@@ -13,7 +13,7 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
     List.length locations - List.length non_empty_locations
   in
   let accounts = Ledger.get_batch oledger non_empty_locations in
-  let empty_merkle_paths, merkle_paths =
+  let wide_merkle_paths, empty_merkle_paths =
     let next_location_exn loc = Option.value_exn (Ledger.Location.next loc) in
     let empty_address =
       Ledger.Addr.of_directions
@@ -33,29 +33,32 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
                loc := next_location_exn !loc ;
                !loc )
     in
-    let merkle_paths =
-      Ledger.merkle_path_batch oledger (empty_locations @ non_empty_locations)
+    let paths =
+      Ledger.wide_merkle_path_batch oledger
+        (empty_locations @ non_empty_locations)
     in
-    List.split_n merkle_paths num_new_accounts
+    List.split_n paths num_new_accounts
   in
   let sl, _, _, _ =
     List.fold locations
-      ~init:(of_ledger_root oledger, accounts, merkle_paths, empty_merkle_paths)
-      ~f:(fun (sl, accounts, merkle_paths, empty_merkle_paths) (key, location) ->
+      ~init:
+        (of_ledger_root oledger, accounts, wide_merkle_paths, empty_merkle_paths)
+      ~f:(fun (sl, accounts, paths, empty_paths) (key, location) ->
         match location with
         | Some _loc -> (
-            match (accounts, merkle_paths) with
-            | (_, account) :: rest, merkle_path :: rest_merkle_paths ->
+            match (accounts, paths) with
+            | (_, account) :: rest, merkle_path :: rest_paths ->
                 let sl =
-                  add_path sl merkle_path key (Option.value_exn account)
+                  add_wide_path_unsafe sl merkle_path key
+                    (Option.value_exn account)
                 in
-                (sl, rest, rest_merkle_paths, empty_merkle_paths)
+                (sl, rest, rest_paths, empty_paths)
             | _ ->
                 failwith "unexpected number of non empty accounts" )
         | None ->
-            let path = List.hd_exn empty_merkle_paths in
-            let sl = add_path sl path key Account.empty in
-            (sl, accounts, merkle_paths, List.tl_exn empty_merkle_paths) )
+            let path = List.hd_exn empty_paths in
+            let sl = add_wide_path_unsafe sl path key Account.empty in
+            (sl, accounts, paths, List.tl_exn empty_paths) )
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
