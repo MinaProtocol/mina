@@ -98,8 +98,7 @@ let
             --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/libp2p_helper \
             --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1} \
             --set MINA_COMMIT_DATE ${escapeShellArg commit_date} \
-            --set MINA_BRANCH "''${MINA_BRANCH-<unknown due to nix build>}" \
-            --set TZDIR "${pkgs.tzdata}/share/zoneinfo"
+            --set MINA_BRANCH "''${MINA_BRANCH-<unknown due to nix build>}"
         done
       '') package.outputs);
 
@@ -357,7 +356,7 @@ let
         '';
       });
 
-      mina-delegation-verify = wrapMina self.mina-delegation-verify-dev { };
+      mina-delegation-verify = wrapMina self.mina-delegation-verify-dev { deps = [ pkgs.cassandra_4 ]; };
 
       # Integration test executive
       test_executive-dev = self.mina-dev.overrideAttrs (oa: {
