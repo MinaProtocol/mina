@@ -1431,7 +1431,10 @@ struct
 
   module Plonk_checks = struct
     include Plonk_checks
-    include Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
+    module Type1 =
+      Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
+    module Type1Plus =
+      Plonk_checks.Make (Shifted_value.Type2) (Scalars.TockPlus)
   end
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
@@ -1444,7 +1447,8 @@ struct
      3. Check that the "b" value was computed correctly.
      4. Perform the arithmetic checks from marlin. *)
   let finalize_other_proof (type b)
-      (module Proofs_verified : Nat.Add.Intf with type n = b) ~domain ~sponge
+      (module Proofs_verified : Nat.Add.Intf with type n = b)
+      ?(custom_gate_type = false) ~domain ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({ xi; combined_inner_product; bulletproof_challenges; b; plonk } :
         ( _
@@ -1578,12 +1582,22 @@ struct
       let evals1, evals2 =
         All_evals.With_public_input.In_circuit.factor evals
       in
+      printf
+        "wrap_verifier.ml finalize_other_proof ft_eval0 custom_gate_type = %b\n"
+        custom_gate_type ;
       with_label __LOC__ (fun () ->
           let ft_eval0 : Field.t =
             with_label __LOC__ (fun () ->
-                Plonk_checks.ft_eval0
-                  (module Field)
-                  ~env ~domain plonk_minimal combined_evals evals1.public_input )
+                if custom_gate_type then
+                  Plonk_checks.Type1Plus.ft_eval0
+                    (module Field)
+                    ~env ~domain plonk_minimal combined_evals
+                    evals1.public_input
+                else
+                  Plonk_checks.Type1.ft_eval0
+                    (module Field)
+                    ~env ~domain plonk_minimal combined_evals
+                    evals1.public_input )
           in
           (* sum_i r^i sum_j xi^j f_j(beta_i) *)
           let actual_combined_inner_product =
@@ -1656,14 +1670,25 @@ struct
     in
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
-          (* This proof is a wrap proof; no need to consider features. *)
-          Plonk_checks.checked
-            (module Impl)
-            ~env ~shift:shift2
-            (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-             .to_wrap ~opt_none:Pickles_types.Opt.nothing ~false_:Boolean.false_
-               plonk )
-            combined_evals )
+          if custom_gate_type then
+            (* This proof is a wrap proof; no need to consider features. *)
+            Plonk_checks.Type1Plus.checked
+              (module Impl)
+              ~env ~shift:shift2
+              (Composition_types.Step.Proof_state.Deferred_values.Plonk
+               .In_circuit
+               .to_wrap ~opt_none:Pickles_types.Opt.nothing
+                 ~false_:Boolean.false_ plonk )
+              combined_evals
+          else
+            Plonk_checks.Type1.checked
+              (module Impl)
+              ~env ~shift:shift2
+              (Composition_types.Step.Proof_state.Deferred_values.Plonk
+               .In_circuit
+               .to_wrap ~opt_none:Pickles_types.Opt.nothing
+                 ~false_:Boolean.false_ plonk )
+              combined_evals )
     in
     print_bool "xi_correct" xi_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;

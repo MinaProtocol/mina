@@ -83,7 +83,7 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_proofs_verified branches prev_varss max_local_max_proofs_verifieds)
-    ~num_chunks ~feature_flags
+    ~num_chunks ~feature_flags ~custom_gate_type
     (full_signature :
       ( max_proofs_verified
       , branches
@@ -332,6 +332,7 @@ let wrap_main
                       with_label __LOC__ (fun () ->
                           Wrap_verifier.finalize_other_proof
                             (module Wrap_hack.Padded_length)
+                            ~custom_gate_type
                             ~domain:(wrap_domain :> _ Plonk_checks.plonk_domain)
                             ~sponge ~old_bulletproof_challenges deferred_values
                             evals )

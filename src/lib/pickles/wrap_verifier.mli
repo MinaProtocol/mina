@@ -109,6 +109,7 @@ val incrementally_verify_proof :
 
 val finalize_other_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)
+  -> ?custom_gate_type:bool
   -> domain:
        < generator : Wrap_main_inputs.Impl.Field.t
        ; shifts : Wrap_main_inputs.Impl.Field.t array
