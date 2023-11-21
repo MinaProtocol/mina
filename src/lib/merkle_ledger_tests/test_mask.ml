@@ -188,17 +188,6 @@ module Make (Test : Test_intf) = struct
         (* verify all hashes to root are same in mask and parent *)
         compare_maskable_mask_hashes maskable attached_mask dummy_address )
 
-  let%test "mask delegates to parent" =
-    Test.with_instances (fun maskable mask ->
-        let attached_mask = Maskable.register_mask maskable mask in
-        (* set to parent, get from mask *)
-        Maskable.set maskable dummy_location dummy_account ;
-        let mask_result = Mask.Attached.get attached_mask dummy_location in
-        Option.is_some mask_result
-        &&
-        let mask_account = Option.value_exn mask_result in
-        Account.equal dummy_account mask_account )
-
   let%test "mask prune after parent notification" =
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in

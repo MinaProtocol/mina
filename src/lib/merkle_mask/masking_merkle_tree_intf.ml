@@ -73,9 +73,10 @@ module type S = sig
     (** called when parent sets an account; update local state *)
     val parent_set_notify : t -> account -> unit
 
+    (* makes new mask instance with copied tables, re-use parent *)
     val copy : t -> t
 
-    (* makes new mask instance with copied tables, re-use parent *)
+    val unsafe_preload_accounts_from_parent : t -> account_id list -> unit
 
     (** already have module For_testing from include above *)
     module For_testing : sig

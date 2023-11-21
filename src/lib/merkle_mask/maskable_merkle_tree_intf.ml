@@ -15,6 +15,9 @@ module type S = sig
 
   val register_mask : t -> unattached_mask -> attached_mask
 
+  val unsafe_preload_accounts_from_parent :
+    attached_mask -> account_id list -> unit
+
   (** raises an exception if mask is not registered *)
   val unregister_mask_exn :
        ?grandchildren:

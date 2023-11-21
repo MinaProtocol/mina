@@ -134,6 +134,15 @@ module type S = sig
 
   val merkle_path_at_index_exn : t -> int -> Path.t
 
+  val merkle_path_batch : t -> Location.t list -> Path.t list
+
+  val wide_merkle_path_batch :
+       t
+    -> Location.t list
+    -> [ `Left of hash * hash | `Right of hash * hash ] list list
+
+  val get_hash_batch_exn : t -> Location.t list -> hash list
+
   val remove_accounts_exn : t -> account_id list -> unit
 
   (** Triggers when the ledger has been detached and should no longer be

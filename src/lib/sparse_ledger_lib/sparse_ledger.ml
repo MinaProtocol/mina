@@ -74,6 +74,17 @@ module type S = sig
   val add_path :
     t -> [ `Left of hash | `Right of hash ] list -> account_id -> account -> t
 
+  (** Same as [add_path], but using the hashes provided in the wide merkle path
+      instead of recomputing them.
+      This is unsafe: the hashes are not checked or recomputed.
+  *)
+  val add_wide_path_unsafe :
+       t
+    -> [ `Left of hash * hash | `Right of hash * hash ] list
+    -> account_id
+    -> account
+    -> t
+
   val iteri : t -> f:(int -> account -> unit) -> unit
 
   val merkle_root : t -> hash
@@ -170,6 +181,54 @@ end = struct
     in
     { t with
       tree = add_path t.depth t.tree path account
+    ; indexes = (account_id, index) :: t.indexes
+    }
+
+  let add_wide_path_unsafe depth0 tree0 path0 account =
+    let rec build_tree hash height p =
+      match p with
+      | `Left (h_l, h_r) :: path ->
+          let l = build_tree h_l (height - 1) path in
+          Tree.Node (hash, l, Hash h_r)
+      | `Right (h_l, h_r) :: path ->
+          let r = build_tree h_r (height - 1) path in
+          Node (hash, Hash h_l, r)
+      | [] ->
+          assert (height = -1) ;
+          Account account
+    in
+    let rec union height tree path =
+      match (tree, path) with
+      | Tree.Hash h, path ->
+          let t = build_tree h height path in
+          [%test_result: Hash.t]
+            ~message:
+              "Hashes in union are not equal, something is wrong with your \
+               ledger"
+            ~expect:h (hash t) ;
+          t
+      | Node (h, l, r), `Left (_h_l, _h_r) :: path ->
+          let l = union (height - 1) l path in
+          Node (h, l, r)
+      | Node (h, l, r), `Right (_h_l, _h_r) :: path ->
+          let r = union (height - 1) r path in
+          Node (h, l, r)
+      | Node _, [] ->
+          failwith "Path too short"
+      | Account _, _ :: _ ->
+          failwith "Path too long"
+      | Account _, [] ->
+          tree
+    in
+    union (depth0 - 1) tree0 (List.rev path0)
+
+  let add_wide_path_unsafe (t : t) path account_id account =
+    let index =
+      List.foldi path ~init:0 ~f:(fun i acc x ->
+          match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
+    in
+    { t with
+      tree = add_wide_path_unsafe t.depth t.tree path account
     ; indexes = (account_id, index) :: t.indexes
     }
 
