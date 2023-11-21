@@ -2,7 +2,8 @@
 
 open Core
 
-type t = { uuid : Uuid.Stable.V1.t; db : (Rocks.t[@sexp.opaque]) }
+type t =
+  { uuid : Uuid.Stable.V1.t; db : (Rocks.t[@sexp.opaque]); metrics : Metrics.t }
 [@@deriving sexp]
 
 let create directory =
@@ -10,39 +11,48 @@ let create directory =
   Rocks.Options.set_create_if_missing opts true ;
   Rocks.Options.set_prefix_extractor opts
     (Rocks.Options.SliceTransform.Noop.create_no_gc ()) ;
-  { uuid = Uuid_unix.create (); db = Rocks.open_db ~opts directory }
+  { uuid = Uuid_unix.create ()
+  ; db = Rocks.open_db ~opts directory
+  ; metrics = Metrics.create ()
+  }
 
 let create_checkpoint t dir =
-  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None () ;
+  Metrics.wrap t.metrics Metrics.checkpoint_create ~f:(fun () ->
+      Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None () ) ;
   create dir
 
 let make_checkpoint t dir =
-  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None ()
+  Metrics.wrap t.metrics Metrics.checkpoint_create ~f:(fun () ->
+      Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None () )
 
 let get_uuid t = t.uuid
 
 let close t = Rocks.close t.db
 
 let get t ~(key : Bigstring.t) : Bigstring.t option =
-  Rocks.get ?pos:None ?len:None ?opts:None t.db key
+  Metrics.wrap t.metrics Metrics.get ~f:(fun () ->
+      Rocks.get ?pos:None ?len:None ?opts:None t.db key )
 
 let get_batch t ~(keys : Bigstring.t list) : Bigstring.t option list =
-  Rocks.multi_get t.db keys
+  Metrics.wrap t.metrics Metrics.get_batch ~f:(fun () ->
+      Rocks.multi_get t.db keys )
 
 let set t ~(key : Bigstring.t) ~(data : Bigstring.t) : unit =
-  Rocks.put ?key_pos:None ?key_len:None ?value_pos:None ?value_len:None
-    ?opts:None t.db key data
+  Metrics.wrap t.metrics Metrics.set ~f:(fun () ->
+      Rocks.put ?key_pos:None ?key_len:None ?value_pos:None ?value_len:None
+        ?opts:None t.db key data )
 
 let set_batch t ?(remove_keys = [])
     ~(key_data_pairs : (Bigstring.t * Bigstring.t) list) : unit =
-  let batch = Rocks.WriteBatch.create () in
-  (* write to batch *)
-  List.iter key_data_pairs ~f:(fun (key, data) ->
-      Rocks.WriteBatch.put batch key data ) ;
-  (* Delete any key pairs *)
-  List.iter remove_keys ~f:(fun key -> Rocks.WriteBatch.delete batch key) ;
-  (* commit batch *)
-  Rocks.write t.db batch
+  Metrics.wrap t.metrics Metrics.set_batch ~f:(fun () ->
+      let batch = Rocks.WriteBatch.create () in
+      (* write to batch *)
+      List.iter key_data_pairs ~f:(fun (key, data) ->
+          Rocks.WriteBatch.put batch key data ) ;
+      (* Delete any key pairs *)
+      List.iter remove_keys ~f:(fun key -> Rocks.WriteBatch.delete batch key) ;
+      (* commit batch *)
+      Rocks.write t.db batch )
 
 module Batch = struct
   type t = Rocks.WriteBatch.t
@@ -52,37 +62,44 @@ module Batch = struct
   let set t ~key ~data = Rocks.WriteBatch.put t key data
 
   let with_batch t ~f =
-    let batch = Rocks.WriteBatch.create () in
-    let result = f batch in
-    Rocks.write t.db batch ; result
+    Metrics.wrap t.metrics Metrics.with_batch ~f:(fun () ->
+        let batch = Rocks.WriteBatch.create () in
+        let result = f batch in
+        Rocks.write t.db batch ; result )
 end
 
 let copy _t = failwith "copy: not implemented"
 
 let remove t ~(key : Bigstring.t) : unit =
-  Rocks.delete ?pos:None ?len:None ?opts:None t.db key
+  Metrics.wrap t.metrics Metrics.remove ~f:(fun () ->
+      Rocks.delete ?pos:None ?len:None ?opts:None t.db key )
 
 let to_alist t : (Bigstring.t * Bigstring.t) list =
-  let iterator = Rocks.Iterator.create t.db in
-  Rocks.Iterator.seek_to_last iterator ;
-  (* iterate backwards and cons, to build list sorted by key *)
-  let copy t =
-    let tlen = Bigstring.length t in
-    let new_t = Bigstring.create tlen in
-    Bigstring.blit ~src:t ~dst:new_t ~src_pos:0 ~dst_pos:0 ~len:tlen ;
-    new_t
-  in
-  let rec loop accum =
-    if Rocks.Iterator.is_valid iterator then (
-      let key = copy (Rocks.Iterator.get_key iterator) in
-      let value = copy (Rocks.Iterator.get_value iterator) in
-      Rocks.Iterator.prev iterator ;
-      loop ((key, value) :: accum) )
-    else accum
-  in
-  loop []
+  Metrics.wrap t.metrics Metrics.to_alist ~f:(fun () ->
+      let iterator = Rocks.Iterator.create t.db in
+      Rocks.Iterator.seek_to_last iterator ;
+      (* iterate backwards and cons, to build list sorted by key *)
+      let copy t =
+        let tlen = Bigstring.length t in
+        let new_t = Bigstring.create tlen in
+        Bigstring.blit ~src:t ~dst:new_t ~src_pos:0 ~dst_pos:0 ~len:tlen ;
+        new_t
+      in
+      let rec loop accum =
+        if Rocks.Iterator.is_valid iterator then (
+          let key = copy (Rocks.Iterator.get_key iterator) in
+          let value = copy (Rocks.Iterator.get_value iterator) in
+          Rocks.Iterator.prev iterator ;
+          loop ((key, value) :: accum) )
+        else accum
+      in
+      loop [] )
 
 let to_bigstring = Bigstring.of_string
+
+let reset_db_metrics t = Metrics.reset t.metrics
+
+let db_metrics_to_string t = Metrics.to_string t.metrics
 
 let%test_unit "get_batch" =
   Async.Thread_safe.block_on_async_exn (fun () ->

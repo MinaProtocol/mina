@@ -203,5 +203,10 @@ module Make_base (Inputs : Inputs_intf) :
     let depth (T ((module Base), t)) = Base.depth t
 
     let detached_signal (T ((module Base), t)) = Base.detached_signal t
+
+    let reset_db_metrics (T ((module Base), t)) = Base.reset_db_metrics t
+
+    let db_metrics_to_string (T ((module Base), t)) =
+      Base.db_metrics_to_string t
   end
 end

@@ -428,6 +428,15 @@ module Make (Inputs : Inputs_intf.S) = struct
                     "last_filled: expected account locations for the parent \
                      and mask" ) )
 
+    let reset_db_metrics t = Result.iter t.parent ~f:Base.reset_db_metrics
+
+    let db_metrics_to_string t =
+      match t.parent with
+      | Error _ ->
+          "()"
+      | Ok b ->
+          Base.db_metrics_to_string b
+
     include Merkle_ledger.Util.Make (struct
       module Location = Location
       module Location_binable = Location_binable

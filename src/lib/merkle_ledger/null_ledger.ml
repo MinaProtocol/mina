@@ -157,4 +157,8 @@ end = struct
   let depth t = t.depth
 
   let detached_signal _ = Async_kernel.Deferred.never ()
+
+  let reset_db_metrics _ = ()
+
+  let db_metrics_to_string _ = "()"
 end

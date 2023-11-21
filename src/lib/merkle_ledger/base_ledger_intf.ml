@@ -140,4 +140,8 @@ module type S = sig
       accessed.
   *)
   val detached_signal : t -> unit Async_kernel.Deferred.t
+
+  val reset_db_metrics : t -> unit
+
+  val db_metrics_to_string : t -> string
 end

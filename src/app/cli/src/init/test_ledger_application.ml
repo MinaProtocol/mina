@@ -60,6 +60,7 @@ let mk_tx acc_creation_fee keypair nonce =
 let apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
     ~num_txs ~prev_protocol_state ~(keypair : Signature_lib.Keypair.t) ~i ledger
     =
+  Ledger.reset_db_metrics ledger ;
   let init_nonce =
     let account_id = Account_id.of_public_key keypair.public_key in
     let loc =
@@ -120,9 +121,10 @@ let apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
   with
   | Ok (b, _, _, _, _) ->
       printf
-        !"Result of application %d: %B (took %s)\n%!"
+        !"Result of application %d: %B (took %s)\n\t%s\n%!"
         i b
         Time.(Span.to_string @@ diff (now ()) start)
+        (Ledger.db_metrics_to_string ledger)
   | Error e ->
       eprintf
         !"Error applying staged ledger: %s\n%!"

@@ -700,4 +700,8 @@ module Make (Inputs : Inputs_intf) :
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
     merkle_path_at_addr_exn t addr
+
+  let reset_db_metrics t = Kvdb.reset_db_metrics t.kvdb
+
+  let db_metrics_to_string t = Kvdb.db_metrics_to_string t.kvdb
 end

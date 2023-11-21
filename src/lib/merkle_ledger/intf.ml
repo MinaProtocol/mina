@@ -136,6 +136,10 @@ module type Key_value_database = sig
   val to_alist : t -> (Bigstring.t * Bigstring.t) list
 
   (* an association list, sorted by key *)
+
+  val reset_db_metrics : t -> unit
+
+  val db_metrics_to_string : t -> string
 end
 
 module type Storage_locations = sig
