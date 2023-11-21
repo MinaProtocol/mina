@@ -122,6 +122,9 @@ module Make_base (Inputs : Inputs_intf) :
 
     let merkle_path_batch (T ((module Base), t)) = Base.merkle_path_batch t
 
+    let wide_merkle_path_batch (T ((module Base), t)) =
+      Base.wide_merkle_path_batch t
+
     let merkle_root (T ((module Base), t)) = Base.merkle_root t
 
     let get_hash_batch_exn (T ((module Base), t)) = Base.get_hash_batch_exn t

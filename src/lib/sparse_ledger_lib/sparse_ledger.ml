@@ -74,6 +74,10 @@ module type S = sig
   val add_path :
     t -> [ `Left of hash | `Right of hash ] list -> account_id -> account -> t
 
+  (** Same as [add_path], but using the hashes provided in the wide merkle path
+      instead of recomputing them.
+      This is unsafe: the hashes are not checked or recomputed.
+  *)
   val add_wide_path_unsafe :
        t
     -> [ `Left of hash * hash | `Right of hash * hash ] list
