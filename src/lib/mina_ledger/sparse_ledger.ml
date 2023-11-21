@@ -7,26 +7,89 @@ let of_ledger_root ledger =
   of_root ~depth:(Ledger.depth ledger) (Ledger.merkle_root ledger)
 
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
-  let ledger = Ledger.copy oledger in
+  let locations = Ledger.location_of_account_batch oledger keys in
+  let num_new_accounts, non_empty_locations =
+    let num_new_accounts = ref 0 in
+    let non_empty_locations =
+      List.filter_map locations ~f:(fun (_key, location) ->
+          if Option.is_none location then incr num_new_accounts ;
+          location )
+    in
+    (!num_new_accounts, non_empty_locations)
+  in
+  let accounts = Ledger.get_batch oledger non_empty_locations in
+  let merkle_paths, empty_merkle_paths =
+    let next_location_exn loc = Option.value_exn (Ledger.Location.next loc) in
+    let empty_address depth =
+      Ledger.Addr.of_directions @@ List.init depth ~f:(fun _ -> Direction.Left)
+    in
+    let merkle_path_locations =
+      (let rec add_locations remaining last_filled merkle_path_locations =
+         if remaining > 0 then
+           let new_location =
+             match last_filled with
+             | None ->
+                 Ledger.Location.Account (empty_address (Ledger.depth oledger))
+             | Some last_filled ->
+                 next_location_exn last_filled
+           in
+           add_locations (remaining - 1) (Some new_location)
+             (new_location :: merkle_path_locations)
+         else merkle_path_locations
+       in
+       add_locations )
+        num_new_accounts
+        (Ledger.last_filled oledger)
+        non_empty_locations
+    in
+    let merkle_paths = Ledger.merkle_path_batch oledger merkle_path_locations in
+    (let rec pop_empties num_empties merkle_paths locations acc =
+       if num_empties <= 0 then (merkle_paths, acc)
+       else
+         match (merkle_paths, locations) with
+         | path :: merkle_paths, location :: locations ->
+             pop_empties (num_empties - 1) merkle_paths locations
+               ((location, path) :: acc)
+         | [], _ | _, [] ->
+             assert false
+     in
+     pop_empties )
+      num_new_accounts merkle_paths merkle_path_locations []
+  in
   let _, sparse =
-    List.fold keys
-      ~f:(fun (new_keys, sl) key ->
-        match Ledger.location_of_account ledger key with
-        | Some loc ->
-            ( new_keys
-            , add_path sl
-                (Ledger.merkle_path ledger loc)
-                key
-                ( Ledger.get ledger loc
-                |> Option.value_exn ?here:None ?error:None ?message:None ) )
-        | None ->
-            let path, acct = Ledger.create_empty_exn ledger key in
-            (key :: new_keys, add_path sl path key acct) )
-      ~init:([], of_ledger_root ledger)
+    let rec go (new_keys, sl) locations accounts merkle_paths empty_merkle_paths
+        =
+      match locations with
+      | [] ->
+          (new_keys, sl)
+      | (key, Some _loc) :: locations -> (
+          match (accounts, merkle_paths) with
+          | (_, account) :: accounts, merkle_path :: merkle_paths ->
+              go
+                ( new_keys
+                , add_path sl merkle_path key
+                    ( account
+                    |> Option.value_exn ?here:None ?error:None ?message:None )
+                )
+                locations accounts merkle_paths empty_merkle_paths
+          | _ ->
+              assert false )
+      | (key, None) :: locations -> (
+          match empty_merkle_paths with
+          | (_location, path) :: empty_merkle_paths ->
+              go
+                (key :: new_keys, add_path sl path key Account.empty)
+                locations accounts merkle_paths empty_merkle_paths
+          | [] ->
+              assert false )
+    in
+    go
+      ([], of_ledger_root oledger)
+      locations accounts merkle_paths empty_merkle_paths
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
-        (Ledger.merkle_root ledger)
+        (Ledger.merkle_root oledger)
         ((merkle_root sparse :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) ) ;
   sparse
 
