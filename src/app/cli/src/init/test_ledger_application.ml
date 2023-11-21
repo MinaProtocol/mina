@@ -58,7 +58,8 @@ let mk_tx acc_creation_fee keypair nonce =
   Transaction_snark.For_tests.multiple_transfers multispec
 
 let apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
-    ~num_txs ~prev_protocol_state ~(keypair : Signature_lib.Keypair.t) ~ledger =
+    ~num_txs ~prev_protocol_state ~(keypair : Signature_lib.Keypair.t) ~i ledger
+    =
   let init_nonce =
     let account_id = Account_id.of_public_key keypair.public_key in
     let loc =
@@ -119,8 +120,8 @@ let apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
   with
   | Ok (b, _, _, _, _) ->
       printf
-        !"Result of application: %B (took %s)\n%!"
-        b
+        !"Result of application %d: %B (took %s)\n%!"
+        i b
         Time.(Span.to_string @@ diff (now ()) start)
   | Error e ->
       eprintf
@@ -129,9 +130,10 @@ let apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
       exit 1
 
 let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
-    ~no_new_stack ~has_second_partition num_txs =
+    ~no_new_stack ~has_second_partition ~num_txs_per_round ~rounds ~no_masks
+    num_txs_final =
   let%bind keypair = read_privkey privkey_path in
-  let ledger =
+  let init_ledger =
     Ledger.create ~directory_name:ledger_path
       ~depth:constraint_constants.ledger_depth ()
   in
@@ -142,14 +144,17 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
   let prev_protocol_state =
     Mina_block.header prev_block |> Mina_block.Header.protocol_state
   in
-  Deferred.ignore_m
-    (Deferred.List.fold
-       (List.init 290 ~f:(Fn.const ()))
-       ~init:ledger
-       ~f:(fun ledger () ->
-         let%map () =
-           apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
-             ~num_txs ~prev_protocol_state ~keypair ~ledger
-         in
-         Ledger.register_mask ledger
-           (Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()) ) )
+  let apply =
+    apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
+      ~prev_protocol_state ~keypair
+  in
+  let mask_handler ledger =
+    if no_masks then Fn.const ledger
+    else
+      Fn.compose (Ledger.register_mask ledger)
+      @@ Ledger.Mask.create ~depth:constraint_constants.ledger_depth
+  in
+  Deferred.List.fold (List.init rounds ~f:ident) ~init:init_ledger
+    ~f:(fun ledger i ->
+      apply ~num_txs:num_txs_per_round ~i ledger >>| mask_handler ledger )
+  >>= apply ~num_txs:num_txs_final ~i:rounds

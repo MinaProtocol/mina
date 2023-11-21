@@ -2242,25 +2242,39 @@ let test_ledger_application =
        flag "--ledger-path" ~doc:"FILE directory with ledger DB"
          (required string)
      and num_txs =
-       flag "--num-txs" ~doc:"NN Number of transactions to create"
+       flag "--num-txs"
+         ~doc:"NN Number of transactions to create after preparatory rounds"
          (required int)
+     and num_txs_per_round =
+       flag "--num-txs-per-round"
+         ~doc:
+           "NN Number of transactions to create per preparatory round \
+            (default: 3)"
+         (optional int)
+     and rounds =
+       flag "--rounds" ~doc:"NN Number of preparatory rounds (default: 290)"
+         (optional int)
      and first_partition_slots =
        flag "--first-partition-slots"
-         ~doc:"NN Number of slots in first partition of scan state"
+         ~doc:
+           "NN Number of slots in first partition of scan state (default: 128)"
          (optional int)
      and no_new_stack =
        flag "--old-stack" ~doc:"Use is_new_stack: false (scan state)" no_arg
      and has_second_partition =
        flag "--has-second-partition"
          ~doc:"Assume there is a second partition (scan state)" no_arg
-     in
+     and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg in
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
      let first_partition_slots =
        Option.value ~default:128 first_partition_slots
      in
+     let num_txs_per_round = Option.value ~default:3 num_txs_per_round in
+     let rounds = Option.value ~default:290 rounds in
      Test_ledger_application.test ~privkey_path ~ledger_path ~prev_block_path
-       ~first_partition_slots ~no_new_stack ~has_second_partition num_txs )
+       ~first_partition_slots ~no_new_stack ~has_second_partition
+       ~num_txs_per_round ~rounds ~no_masks num_txs )
 
 let itn_create_accounts =
   Command.async ~summary:"Fund new accounts for incentivized testnet"
