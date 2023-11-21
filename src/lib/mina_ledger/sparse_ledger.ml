@@ -18,7 +18,7 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
     (!num_new_accounts, non_empty_locations)
   in
   let accounts = Ledger.get_batch oledger non_empty_locations in
-  let merkle_paths, empty_merkle_paths =
+  let wide_merkle_paths, empty_merkle_paths =
     let next_location_exn loc = Option.value_exn (Ledger.Location.next loc) in
     let empty_address depth =
       Ledger.Addr.of_directions @@ List.init depth ~f:(fun _ -> Direction.Left)
@@ -42,50 +42,53 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
         (Ledger.last_filled oledger)
         non_empty_locations
     in
-    let merkle_paths = Ledger.merkle_path_batch oledger merkle_path_locations in
-    (let rec pop_empties num_empties merkle_paths locations acc =
-       if num_empties <= 0 then (merkle_paths, acc)
+    let wide_merkle_paths =
+      Ledger.wide_merkle_path_batch oledger merkle_path_locations
+    in
+    (let rec pop_empties num_empties wide_merkle_paths locations acc =
+       if num_empties <= 0 then (wide_merkle_paths, acc)
        else
-         match (merkle_paths, locations) with
-         | path :: merkle_paths, location :: locations ->
-             pop_empties (num_empties - 1) merkle_paths locations
-               ((location, path) :: acc)
+         match (wide_merkle_paths, locations) with
+         | wide_path :: wide_merkle_paths, location :: locations ->
+             pop_empties (num_empties - 1) wide_merkle_paths locations
+               ((location, wide_path) :: acc)
          | [], _ | _, [] ->
              assert false
      in
      pop_empties )
-      num_new_accounts merkle_paths merkle_path_locations []
+      num_new_accounts wide_merkle_paths merkle_path_locations []
   in
   let _, sparse =
-    let rec go (new_keys, sl) locations accounts merkle_paths empty_merkle_paths
-        =
+    let rec go (new_keys, sl) locations accounts wide_merkle_paths
+        empty_merkle_paths =
       match locations with
       | [] ->
           (new_keys, sl)
       | (key, Some _loc) :: locations -> (
-          match (accounts, merkle_paths) with
-          | (_, account) :: accounts, merkle_path :: merkle_paths ->
+          match (accounts, wide_merkle_paths) with
+          | (_, account) :: accounts, wide_merkle_path :: wide_merkle_paths ->
               go
                 ( new_keys
-                , add_path sl merkle_path key
+                , add_wide_path_unsafe sl wide_merkle_path key
                     ( account
                     |> Option.value_exn ?here:None ?error:None ?message:None )
                 )
-                locations accounts merkle_paths empty_merkle_paths
+                locations accounts wide_merkle_paths empty_merkle_paths
           | _ ->
               assert false )
       | (key, None) :: locations -> (
           match empty_merkle_paths with
-          | (_location, path) :: empty_merkle_paths ->
+          | (_location, wide_path) :: empty_merkle_paths ->
               go
-                (key :: new_keys, add_path sl path key Account.empty)
-                locations accounts merkle_paths empty_merkle_paths
+                ( key :: new_keys
+                , add_wide_path_unsafe sl wide_path key Account.empty )
+                locations accounts wide_merkle_paths empty_merkle_paths
           | [] ->
               assert false )
     in
     go
       ([], of_ledger_root oledger)
-      locations accounts merkle_paths empty_merkle_paths
+      locations accounts wide_merkle_paths empty_merkle_paths
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
