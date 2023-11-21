@@ -111,6 +111,15 @@ let apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
         } )
   in
   let start = Time.now () in
+  let accounts_accessed = List.fold_left zkapps ~init:Account_id.Set.empty ~f:(fun set cmd ->
+    Account_id.Set.(union set (of_list (Zkapp_command.accounts_referenced cmd))))
+  in
+  Ledger.unsafe_preload_accounts_from_parent ledger (Set.to_list accounts_accessed) ;
+  (*
+  let ledger' = Ledger.register_mask ledger (Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()) in
+  Ledger.unsafe_preload_accounts_from_parent ledger' (Set.to_list accounts_accessed) ;
+  Ledger.commit ledger' ;
+  *)
   match%map
     Staged_ledger.For_tests.update_coinbase_stack_and_get_data_impl
       ~first_partition_slots ~is_new_stack:(not no_new_stack)
@@ -149,12 +158,27 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
       ~prev_protocol_state ~keypair
   in
   let mask_handler ledger =
-    if no_masks then Fn.const ledger
+    if no_masks then
+      (fun () ->
+        (* Ledger.commit ledger ; *)
+        ledger)
     else
-      Fn.compose (Ledger.register_mask ledger)
-      @@ Ledger.Mask.create ~depth:constraint_constants.ledger_depth
+      (fun () ->
+        Ledger.register_mask ledger (Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()))
+      (*
+      (fun () ->
+        let ledger' = Ledger.register_mask ledger (Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()) in
+        Ledger.commit ledger ;
+        ledger')
+      *)
   in
+  (*
+  let chained_ledger =
+    List.fold (List.init rounds ~f:(Fn.const ())) ~init:init_ledger ~f:mask_handler
+  in
+  *)
   Deferred.List.fold (List.init rounds ~f:ident) ~init:init_ledger
     ~f:(fun ledger i ->
+      (* apply ~num_txs:num_txs_per_round ~i ledger >>| Fn.const ledger ) *)
       apply ~num_txs:num_txs_per_round ~i ledger >>| mask_handler ledger )
   >>= apply ~num_txs:num_txs_final ~i:rounds
