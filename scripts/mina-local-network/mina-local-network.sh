@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# set -x
+#set -x
 
 # Exit script when commands fail
 set -e
@@ -28,6 +28,7 @@ FILE_LOG_LEVEL=${LOG_LEVEL}
 VALUE_TRANSFERS=false
 RESET=false
 UPDATE_GENESIS_TIMESTAMP=false
+LOG_PRECOMPUTED_BLOCKS=false
 
 SNARK_WORKER_FEE=0.01
 TRANSACTION_FREQUENCY=10 # in seconds
@@ -101,6 +102,8 @@ help() {
   echo "                                  |   Default: ${TRANSACTION_FREQUENCY}"
   echo "-sf |--snark-worker-fee <#>       | SNARK Worker fee"
   echo "                                  |   Default: ${SNARK_WORKER_FEE}"
+  echo "-lp |--log-precomputed-blocks     | Log precomputed blocks"
+  echo "                                  |   Default: ${LOG_PRECOMPUTED_BLOCKS}"
   echo "-r  |--reset                      | Whether to reset the Mina Local Network storage file-system (presence of argument)"
   echo "                                  |   Default: ${RESET}"
   echo "-u  |--update-genesis-timestamp   | Whether to update the Genesis Ledger timestamp (presence of argument)"
@@ -145,6 +148,8 @@ exec-daemon() {
     -log-json \
     -log-level ${LOG_LEVEL} \
     -file-log-level ${FILE_LOG_LEVEL} \
+    -precomputed-blocks-file ${FOLDER}/precomputed_blocks.log \
+    -log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
     $@
 }
 
@@ -253,6 +258,7 @@ while [[ "$#" -gt 0 ]]; do
     SNARK_WORKER_FEE="${2}"
     shift
     ;;
+  -lp | --log-precomputed-blocks) LOG_PRECOMPUTED_BLOCKS=true ;;
   -r | --reset) RESET=true ;;
   -u | --update-genesis-timestamp) UPDATE_GENESIS_TIMESTAMP=true ;;
   *)
