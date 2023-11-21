@@ -1,7 +1,8 @@
 { lib, dockerTools, buildEnv, ocamlPackages_mina, runCommand, dumb-init
 , coreutils, bashInteractive, python3, libp2p_helper, procps, postgresql, curl
-, jq, stdenv, rsync, bash, gnutar, gzip, currentTime, flockenzeit }:
+, jq, stdenv, rsync, bash, gnutar, gzip, currentTime, flockenzeit, tzdata }:
 let
+
   created = flockenzeit.lib.ISO-8601 currentTime;
 
   mkdir = name:
@@ -81,10 +82,12 @@ in {
   mina-delegation-verify-image = dockerTools.streamLayeredImage {
     name = "mina-delegation-verify";
     inherit created;
-    contents = [ ocamlPackages_mina.mina-delegation-verify.out coreutils bashInteractive ];
+    contents = [ ocamlPackages_mina.mina-delegation-verify.out ];
     config = {
       cmd = [ "/bin/delegation-verify" ];
+      Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" ];
     };
+    
   };
 
   mina-image-full = mkFullImage "mina" (with ocamlPackages_mina; [
