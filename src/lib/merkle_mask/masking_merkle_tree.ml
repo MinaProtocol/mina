@@ -141,9 +141,6 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let depth t = assert_is_attached t ; t.depth
 
-    (* don't rely on a particular implementation *)
-    let self_find_hash t address = Map.find t.maps.hashes address
-
     let self_set_hash t address hash =
       t.maps.hashes <- Map.set t.maps.hashes ~key:address ~data:hash
 
@@ -151,9 +148,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       assert (Addr.depth address <= t.depth) ;
       self_set_hash t address hash
-
-    (* don't rely on a particular implementation *)
-    let self_find_location t account_id = Map.find t.maps.locations account_id
 
     let self_set_location t account_id location =
       t.maps.locations <-
@@ -168,9 +162,6 @@ module Make (Inputs : Inputs_intf.S) = struct
           if Location.( > ) location loc then
             t.current_location <- Some location
 
-    (* don't rely on a particular implementation *)
-    let self_find_account t location = Map.find t.maps.accounts location
-
     let self_set_account t location account =
       t.maps.accounts <- Map.set t.maps.accounts ~key:location ~data:account ;
       self_set_location t (Account.identifier account) location
@@ -179,7 +170,7 @@ module Make (Inputs : Inputs_intf.S) = struct
        parent *)
     let get t location =
       assert_is_attached t ;
-      match self_find_account t location with
+      match Map.find t.maps.accounts location with
       | Some account ->
           Some account
       | None ->
@@ -218,7 +209,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let get_batch t =
       let self_find id =
-        let res = self_find_account t id in
+        let res = Map.find t.maps.accounts id in
         let res =
           if Option.is_none res then
             let is_empty =
@@ -417,7 +408,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
       assert_is_attached t ;
-      match self_find_hash t (Addr.root ()) with
+      match Map.find t.maps.hashes (Addr.root ()) with
       | Some hash ->
           hash
       | None ->
@@ -426,7 +417,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let remove_account_and_update_hashes t location =
       assert_is_attached t ;
       (* remove account and key from tables *)
-      let account = Option.value_exn (self_find_account t location) in
+      let account = Option.value_exn (Map.find t.maps.accounts location) in
       t.maps.accounts <- Map.remove t.maps.accounts location ;
       (* Update token info. *)
       let account_id = Account.identifier account in
@@ -485,11 +476,11 @@ module Make (Inputs : Inputs_intf.S) = struct
        if the account in the parent is the same in the mask *)
     let parent_set_notify t account =
       assert_is_attached t ;
-      match self_find_location t (Account.identifier account) with
+      match Map.find t.maps.locations (Account.identifier account) with
       | None ->
           ()
       | Some location -> (
-          match self_find_account t location with
+          match Map.find t.maps.accounts location with
           | Some existing_account ->
               if Account.equal account existing_account then
                 remove_account_and_update_hashes t location
@@ -500,7 +491,7 @@ module Make (Inputs : Inputs_intf.S) = struct
        parent *)
     let get_hash t addr =
       assert_is_attached t ;
-      match self_find_hash t addr with
+      match Map.find t.maps.hashes addr with
       | Some hash ->
           Some hash
       | None -> (
@@ -520,7 +511,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       let self_hashes_rev =
         List.rev_map locations ~f:(fun location ->
-            (location, self_find_hash t (Location.to_path_exn location)) )
+            (location, Map.find t.maps.hashes (Location.to_path_exn location)) )
       in
       let parent_locations_rev =
         List.filter_map self_hashes_rev ~f:(fun (location, hash) ->
@@ -696,7 +687,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let location_of_account t account_id =
       assert_is_attached t ;
-      let mask_result = self_find_location t account_id in
+      let mask_result = Map.find t.maps.locations account_id in
       match mask_result with
       | Some _ ->
           mask_result
@@ -705,7 +696,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let location_of_account_batch t =
       self_find_or_batch_lookup
-        (fun id -> (id, Option.map ~f:Option.some @@ self_find_location t id))
+        (fun id ->
+          (id, Option.map ~f:Option.some @@ Map.find t.maps.locations id) )
         Base.location_of_account_batch t
 
     (* Adds specified accounts to the mask by laoding them from parent ledger.
@@ -858,11 +850,11 @@ module Make (Inputs : Inputs_intf.S) = struct
     module For_testing = struct
       let location_in_mask t location =
         assert_is_attached t ;
-        Option.is_some (self_find_account t location)
+        Option.is_some (Map.find t.maps.accounts location)
 
       let address_in_mask t addr =
         assert_is_attached t ;
-        Option.is_some (self_find_hash t addr)
+        Option.is_some (Map.find t.maps.hashes addr)
 
       let current_location t = t.current_location
     end
@@ -881,7 +873,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =
       assert_is_attached t ;
-      match self_find_location t account_id with
+      match Map.find t.maps.locations account_id with
       | None -> (
           (* not in mask, maybe in parent *)
           match Base.location_of_account (get_parent t) account_id with
