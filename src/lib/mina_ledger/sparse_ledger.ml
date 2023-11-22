@@ -11,36 +11,32 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let locations = Ledger.location_of_account_batch ledger keys in
   let non_empty_locations = List.filter_map ~f:snd locations in
   let accounts = Ledger.get_batch ledger non_empty_locations in
-  let _, sparse =
-    let rec go (new_keys, sl) locations accounts =
-      match locations with
-      | [] ->
-          (new_keys, sl)
-      | (key, Some loc) :: locations -> (
-          match accounts with
-          | (_, account) :: accounts ->
-              go
-                ( new_keys
-                , add_path sl
+  let sl, _ =
+    List.fold locations
+      ~init:(of_ledger_root ledger, accounts)
+      ~f:(fun (sl, accounts) (key, location) ->
+        match location with
+        | Some loc -> (
+            match accounts with
+            | (_, account) :: rest ->
+                let sl =
+                  add_path sl
                     (Ledger.merkle_path ledger loc)
-                    key
-                    ( account
-                    |> Option.value_exn ?here:None ?error:None ?message:None )
-                )
-                locations accounts
-          | _ ->
-              assert false )
-      | (key, None) :: locations ->
-          let path, acct = Ledger.create_empty_exn ledger key in
-          go (key :: new_keys, add_path sl path key acct) locations accounts
-    in
-    go ([], of_ledger_root ledger) locations accounts
+                    key (Option.value_exn account)
+                in
+                (sl, rest)
+            | [] ->
+                failwith "unexpected number of non empty accounts" )
+        | None ->
+            let path, account = Ledger.create_empty_exn ledger key in
+            let sl = add_path sl path key account in
+            (sl, accounts) )
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
-        ((merkle_root sparse :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) ) ;
-  sparse
+        ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) ) ;
+  sl
 
 let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
   List.fold indexes
