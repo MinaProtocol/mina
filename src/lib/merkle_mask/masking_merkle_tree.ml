@@ -758,10 +758,6 @@ module Make (Inputs : Inputs_intf.S) = struct
               set_account_unsafe t location account )
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
-    let make_space_for t =
-      assert_is_attached t ;
-      Base.make_space_for (get_parent t)
-
     let get_inner_hash_at_addr_exn t address =
       assert_is_attached t ;
       assert (Addr.depth address <= t.depth) ;

@@ -147,8 +147,6 @@ end = struct
 
   let to_list_sequential _t = []
 
-  let make_space_for _t _tot = ()
-
   let get_all_accounts_rooted_at_exn t addr =
     let first_node, last_node =
       Addr.Range.subtree_range ~ledger_depth:t.depth addr
