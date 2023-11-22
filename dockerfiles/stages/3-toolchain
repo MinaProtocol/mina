@@ -60,7 +60,17 @@ RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_V
     && rm -f deb-s3-${DEBS3_VERSION}.gem
 
 # --- Docker Daemon
-RUN curl -sL https://download.docker.com/linux/static/stable/aarch64/docker-${DOCKER_VERSION}.tgz \
+RUN set -ex; \
+    case "$TARGETPLATFORM" in \
+    'linux/amd64') \
+    docker_arch='x86_64'; \
+    ;; \
+    'linux/arm64') \
+    docker_arch='aarch64'; \
+    ;; \
+    *) echo >&2 "error: unsupported architecture '$TARGETPLATFORM'"; exit 1 ;; \
+    esac; \
+    curl -sL https://download.docker.com/linux/static/stable/${docker_arch}/docker-${DOCKER_VERSION}.tgz \
     | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
 
 # --- Terraform tools
