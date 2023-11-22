@@ -196,8 +196,6 @@ module Make (Inputs : Inputs_intf) :
     assert (Addr.depth address <= mdb.depth) ;
     set_bin mdb (Location.Hash address) Hash.bin_size_t Hash.bin_write_t hash
 
-  let make_space_for _t _tot = ()
-
   let get_generic mdb location =
     assert (Location.is_generic location) ;
     get_raw mdb location
