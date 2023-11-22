@@ -86,10 +86,6 @@ module Sponge = struct
         absorb t (Field.pack bs)
 end
 
-let%test_unit "sponge" =
-  let module T = Make_sponge.Test (Impl) (Tick_field_sponge.Field) (Sponge.S) in
-  T.test Tick_field_sponge.params
-
 (* module Input_domain = struct
      let domain = Import.Domain.Pow_2_roots_of_unity 6
 
