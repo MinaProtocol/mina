@@ -141,7 +141,7 @@ else
 fi
 
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
-  TARGET_PLATFORMS="linux/amd64,linux/arm64"
+  TARGET_PLATFORMS="linux/amd64"
 
   echo "Release Env Var: ${DEB_RELEASE}"
   echo "Release: ${DEB_RELEASE##*=}"
