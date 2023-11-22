@@ -15,6 +15,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val mask_ledger_chunk : int
 end
 
 (* There must be at least 2 peers to create a network *)
@@ -400,6 +402,8 @@ module Generator = struct
 
       let consensus_constants =
         precomputed_values.Precomputed_values.consensus_constants
+
+      let mask_ledger_chunk = 17
     end in
     let open Quickcheck.Generator.Let_syntax in
     let%map states =

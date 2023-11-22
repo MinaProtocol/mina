@@ -34,6 +34,7 @@ val build :
   -> verifier:Verifier.t
   -> trust_system:Trust_system.t
   -> parent:t
+  -> mask_ledger_chunk:int
   -> transition:Mina_block.almost_valid_block
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t

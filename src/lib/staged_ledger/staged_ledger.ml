@@ -407,16 +407,6 @@ module T = struct
       ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
       ~expected_merkle_root ~get_state of_scan_state_and_ledger_unchecked
 
-  let copy
-      { scan_state; ledger; constraint_constants; pending_coinbase_collection }
-      =
-    let new_mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
-    { scan_state
-    ; ledger = Ledger.register_mask ledger new_mask
-    ; constraint_constants
-    ; pending_coinbase_collection
-    }
-
   let hash
       { scan_state
       ; ledger
@@ -1008,9 +998,9 @@ module T = struct
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts")
           )
 
-  let apply_diff ?(skip_verification = false) ~logger ~constraint_constants
-      ~global_slot t pre_diff_info ~current_state_view ~state_and_body_hash
-      ~log_prefix =
+  let apply_diff ?(skip_verification = false) ~skip_mask_accumulation ~logger
+      ~constraint_constants ~global_slot t pre_diff_info ~current_state_view
+      ~state_and_body_hash ~log_prefix =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2 t.constraint_constants.transaction_capacity_log_2
@@ -1021,7 +1011,11 @@ module T = struct
       , List.length jobs )
     in
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
-    let new_ledger = Ledger.register_mask t.ledger new_mask in
+    let accumulated =
+      if skip_mask_accumulation then None
+      else Some (Ledger.Mask.Attached.to_accumulated t.ledger)
+    in
+    let new_ledger = Ledger.register_mask ?accumulated t.ledger new_mask in
     let transactions, works, commands_count, coinbases = pre_diff_info in
     let accounts_accessed =
       List.fold_left ~init:Account_id.Set.empty transactions ~f:(fun set txn ->
@@ -1228,10 +1222,10 @@ module T = struct
               (Verifier.Failure.Verification_failed
                  (Error.of_string "batch verification failed") ) ) )
 
-  let apply ?skip_verification ~constraint_constants ~global_slot t
-      ~get_completed_work (witness : Staged_ledger_diff.t) ~logger ~verifier
-      ~current_state_view ~state_and_body_hash ~coinbase_receiver
-      ~supercharge_coinbase =
+  let apply ?skip_verification ~skip_mask_accumulation ~constraint_constants
+      ~global_slot t ~get_completed_work (witness : Staged_ledger_diff.t)
+      ~logger ~verifier ~current_state_view ~state_and_body_hash
+      ~coinbase_receiver ~supercharge_coinbase =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
@@ -1258,7 +1252,7 @@ module T = struct
     let apply_diff_start_time = Core.Time.now () in
     [%log internal] "Apply_diff" ;
     let%map ((_, _, `Staged_ledger new_staged_ledger, _) as res) =
-      apply_diff
+      apply_diff ~skip_mask_accumulation
         ~skip_verification:
           ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
         ~constraint_constants ~global_slot t
@@ -1283,7 +1277,8 @@ module T = struct
     in
     res
 
-  let apply_diff_unchecked ~constraint_constants ~global_slot t
+  let apply_diff_unchecked ~skip_mask_accumulation ~constraint_constants
+      ~global_slot t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) ~logger
       ~current_state_view ~state_and_body_hash ~coinbase_receiver
       ~supercharge_coinbase =
@@ -1294,7 +1289,7 @@ module T = struct
            ~supercharge_coinbase sl_diff
       |> Deferred.return
     in
-    apply_diff t
+    apply_diff ~skip_mask_accumulation t
       (forget_prediff_info prediff)
       ~constraint_constants ~global_slot ~logger ~current_state_view
       ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
@@ -2278,8 +2273,9 @@ let%test_module "staged ledger tests" =
               , `Staged_ledger sl'
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
-          Sl.apply ~constraint_constants ~global_slot !sl diff' ~logger
-            ~verifier ~get_completed_work:(Fn.const None) ~current_state_view
+          Sl.apply ~skip_mask_accumulation:true ~constraint_constants
+            ~global_slot !sl diff' ~logger ~verifier
+            ~get_completed_work:(Fn.const None) ~current_state_view
             ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
         with
         | Ok x ->
@@ -3263,8 +3259,9 @@ let%test_module "staged ledger tests" =
                       Mina_state.Protocol_state.hashes current_state
                     in
                     let%bind apply_res =
-                      Sl.apply ~constraint_constants ~global_slot !sl diff
-                        ~logger ~verifier ~get_completed_work:(Fn.const None)
+                      Sl.apply ~skip_mask_accumulation:true
+                        ~constraint_constants ~global_slot !sl diff ~logger
+                        ~verifier ~get_completed_work:(Fn.const None)
                         ~current_state_view:current_view
                         ~state_and_body_hash:
                           ( state_hashes.state_hash
@@ -4290,7 +4287,8 @@ let%test_module "staged ledger tests" =
                     }
                   in
                   match%map
-                    Sl.apply ~constraint_constants ~global_slot !sl
+                    Sl.apply ~skip_mask_accumulation:true ~constraint_constants
+                      ~global_slot !sl
                       (Staged_ledger_diff.forget diff)
                       ~logger ~verifier ~get_completed_work:(Fn.const None)
                       ~current_state_view ~state_and_body_hash
@@ -4502,7 +4500,8 @@ let%test_module "staged ledger tests" =
                   |> List.map ~f:(fun cmd -> User_command.forget_check cmd) ) ) ;
               assert (List.length invalid_txns = 3) ;
               match%bind
-                Sl.apply ~constraint_constants ~global_slot sl
+                Sl.apply ~skip_mask_accumulation:true ~constraint_constants
+                  ~global_slot sl
                   (Staged_ledger_diff.forget diff)
                   ~logger ~verifier ~get_completed_work:(Fn.const None)
                   ~current_state_view ~state_and_body_hash ~coinbase_receiver
@@ -4548,7 +4547,8 @@ let%test_module "staged ledger tests" =
                     }
                   in
                   match%map
-                    Sl.apply ~constraint_constants ~global_slot sl
+                    Sl.apply ~skip_mask_accumulation:true ~constraint_constants
+                      ~global_slot sl
                       (Staged_ledger_diff.forget diff)
                       ~logger ~verifier ~get_completed_work:(Fn.const None)
                       ~current_state_view ~state_and_body_hash
@@ -4824,7 +4824,8 @@ let%test_module "staged ledger tests" =
                           ()
                       in
                       match%map
-                        Sl.apply ~constraint_constants ~global_slot !sl
+                        Sl.apply ~skip_mask_accumulation:true
+                          ~constraint_constants ~global_slot !sl
                           (Staged_ledger_diff.forget diff)
                           ~get_completed_work:(Fn.const None) ~logger
                           ~verifier:verifier_full ~current_state_view

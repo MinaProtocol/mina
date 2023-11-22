@@ -12,6 +12,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val mask_ledger_chunk : int
 end
 
 module Node = struct
@@ -958,6 +960,10 @@ module For_tests = struct
     let precomputed_values = precomputed_values
 
     let consensus_constants = precomputed_values.consensus_constants
+
+    let mask_ledger_chunk =
+      Unsigned.UInt32.to_int consensus_constants.k
+      |> Float.of_int |> Float.sqrt |> Float.round |> Float.to_int
   end
 
   let verifier () =

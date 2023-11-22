@@ -74,7 +74,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
        , unit )
-       Writer.t ) ~clean_up_signal =
+       Writer.t ) ~clean_up_signal ~mask_ledger_chunk =
   let collected_transitions = State_hash.Table.create () in
   let parent_root_timeouts = State_hash.Table.create () in
   let validation_callbacks = State_hash.Table.create () in
@@ -97,7 +97,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
     Capped_supervisor.create ~job_capacity:30
       (fun (initial_hash, transition_branches) ->
         match%map
-          Breadcrumb_builder.build_subtrees_of_breadcrumbs
+          Breadcrumb_builder.build_subtrees_of_breadcrumbs ~mask_ledger_chunk
             ~logger:
               (Logger.extend logger
                  [ ("catchup_scheduler", `String "Called from catchup scheduler")
@@ -364,6 +364,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+              ~mask_ledger_chunk:17
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -422,6 +423,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+              ~mask_ledger_chunk:17
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -498,6 +500,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+              ~mask_ledger_chunk:17
           in
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =
             List.rev branch

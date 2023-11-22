@@ -11,6 +11,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val mask_ledger_chunk : int
 end
 
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network

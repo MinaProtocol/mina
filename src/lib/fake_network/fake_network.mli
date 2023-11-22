@@ -13,6 +13,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val mask_ledger_chunk : int
 end
 
 (* There must be at least 2 peers to create a network *)

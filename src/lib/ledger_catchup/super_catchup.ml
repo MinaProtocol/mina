@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val mask_ledger_chunk : int
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -1372,6 +1374,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
         ~build_func:
           (Transition_frontier.Breadcrumb.build
+             ~mask_ledger_chunk:Context.mask_ledger_chunk
              ~get_completed_work:(Fn.const None) ) )
 
 (* Unit tests *)
@@ -1421,6 +1424,10 @@ let%test_module "Ledger_catchup tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let mask_ledger_chunk =
+        Unsigned.UInt32.to_int consensus_constants.k
+        |> Float.of_int |> Float.sqrt |> Float.round |> Float.to_int
     end
 
     (* let mock_verifier =

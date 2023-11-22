@@ -14,6 +14,7 @@
    sexplib0
    extlib
    async_unix
+   integers
    ;;local libraries
    o1trace
    mina_metrics

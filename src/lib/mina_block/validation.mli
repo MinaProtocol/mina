@@ -248,7 +248,8 @@ val reset_frontier_dependencies_validation :
      with_block
 
 val validate_staged_ledger_diff :
-     ?skip_staged_ledger_verification:[ `All | `Proofs ]
+     skip_mask_accumulation:bool
+  -> ?skip_staged_ledger_verification:[ `All | `Proofs ]
   -> logger:Logger.t
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t

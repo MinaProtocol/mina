@@ -13,6 +13,7 @@
    async
    async_unix
    ppx_inline_test.config
+   integers
    ;; local libraries
    mina_numbers
    gadt_lib

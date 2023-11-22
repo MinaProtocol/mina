@@ -25,6 +25,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val mask_ledger_chunk : int
 end
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
@@ -217,10 +219,10 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
     let%bind breadcrumb =
       cached_transform_deferred_result cached_initially_validated_transition
         ~transform_cached:(fun _ ->
-          Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
-            ~verifier ~get_completed_work ~trust_system ~transition_receipt_time
-            ~sender:(Some sender) ~parent:parent_breadcrumb
-            ~transition:mostly_validated_transition
+          Transition_frontier.Breadcrumb.build ~mask_ledger_chunk ~logger
+            ~precomputed_values ~verifier ~get_completed_work ~trust_system
+            ~transition_receipt_time ~sender:(Some sender)
+            ~parent:parent_breadcrumb ~transition:mostly_validated_transition
             (* TODO: Can we skip here? *) () )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
@@ -291,7 +293,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
   let catchup_scheduler =
     Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
       ~frontier ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
-      ~clean_up_signal:clean_up_catchup_scheduler
+      ~clean_up_signal:clean_up_catchup_scheduler ~mask_ledger_chunk
   in
   let add_and_finalize =
     add_and_finalize ~frontier ~catchup_scheduler ~processed_transition_writer
@@ -468,6 +470,10 @@ let%test_module "Transition_handler.Processor tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let mask_ledger_chunk =
+        Unsigned.UInt32.to_int consensus_constants.k
+        |> Float.of_int |> Float.sqrt |> Float.round |> Float.to_int
     end
 
     let downcast_breadcrumb breadcrumb =

@@ -415,8 +415,9 @@ let propose_block_onto_chain ~logger ~keys
           , `Staged_ledger staged_ledger
           , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) ) =
     let%map res =
-      Staged_ledger.apply_diff_unchecked previous_staged_ledger ~logger
-        staged_ledger_diff ~state_body_hash:previous_protocol_state_body_hash
+      Staged_ledger.apply_diff_unchecked ~skip_mask_accumulation:true
+        previous_staged_ledger ~logger staged_ledger_diff
+        ~state_body_hash:previous_protocol_state_body_hash
     in
     res
     |> Result.map_error ~f:Staged_ledger.Staged_ledger_error.to_error

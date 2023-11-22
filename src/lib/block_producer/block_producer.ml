@@ -14,6 +14,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val mask_ledger_chunk : int
 end
 
 type Structured_log_events.t += Block_produced
@@ -237,8 +239,9 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       [%log internal] "Apply_staged_ledger_diff" ;
       match%map
         let%bind.Deferred.Result diff = return diff in
-        Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
-          ~global_slot diff ~logger ~current_state_view:previous_state_view
+        Staged_ledger.apply_diff_unchecked staged_ledger
+          ~skip_mask_accumulation:true ~constraint_constants ~global_slot diff
+          ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
           ~coinbase_receiver ~supercharge_coinbase
@@ -887,7 +890,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     let%bind breadcrumb =
                       time ~logger ~time_controller
                         "Build breadcrumb on produced block" (fun () ->
-                          Breadcrumb.build ~logger ~precomputed_values ~verifier
+                          Breadcrumb.build ~mask_ledger_chunk ~logger
+                            ~precomputed_values ~verifier
                             ~get_completed_work:(Fn.const None) ~trust_system
                             ~parent:crumb ~transition
                             ~sender:None (* Consider skipping `All here *)
@@ -1388,8 +1392,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           let%bind breadcrumb =
             time ~logger ~time_controller
               "Build breadcrumb on produced block (precomputed)" (fun () ->
-                Breadcrumb.build ~logger ~precomputed_values ~verifier
-                  ~get_completed_work:(Fn.const None) ~trust_system
+                Breadcrumb.build ~mask_ledger_chunk ~logger ~precomputed_values
+                  ~verifier ~get_completed_work:(Fn.const None) ~trust_system
                   ~parent:crumb ~transition ~sender:None
                   ~skip_staged_ledger_verification:`Proofs
                   ~transition_receipt_time ()

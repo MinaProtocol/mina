@@ -88,8 +88,13 @@ let compute_block_trace_metadata transition_with_validation =
     ; ("coinbase_receiver", Account.key_to_yojson @@ coinbase_receiver cs)
     ]
 
+let block_with_hash =
+  Fn.compose Mina_block.Validated.forget validated_transition
+
+let block = Fn.compose With_hash.data block_with_hash
+
 let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
-    ~trust_system ~parent
+    ~trust_system ~parent ~mask_ledger_chunk
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
     ~get_completed_work ~sender ~transition_receipt_time () =
   let state_hash =
@@ -102,11 +107,18 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
   [%log internal] "Build_breadcrumb" ;
   let metadata = compute_block_trace_metadata transition_with_validation in
   [%log internal] "@block_metadata" ~metadata ;
+  let skip_mask_accumulation =
+    let height =
+      block parent |> Mina_block.blockchain_length |> Unsigned.UInt32.to_int
+    in
+    height % mask_ledger_chunk = 0
+  in
   O1trace.thread "build_breadcrumb" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
-        Validation.validate_staged_ledger_diff ?skip_staged_ledger_verification
-          ~get_completed_work ~logger ~precomputed_values ~verifier
+        Validation.validate_staged_ledger_diff ~skip_mask_accumulation
+          ?skip_staged_ledger_verification ~get_completed_work ~logger
+          ~precomputed_values ~verifier
           ~parent_staged_ledger:(staged_ledger parent)
           ~parent_protocol_state:
             ( parent.validated_transition |> Mina_block.Validated.header
@@ -198,11 +210,6 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
             (`Invalid_staged_ledger_diff
               (Staged_ledger.Staged_ledger_error.to_error staged_ledger_error)
               ) )
-
-let block_with_hash =
-  Fn.compose Mina_block.Validated.forget validated_transition
-
-let block = Fn.compose With_hash.data block_with_hash
 
 let state_hash = Fn.compose Mina_block.Validated.state_hash validated_transition
 
@@ -396,7 +403,8 @@ module For_tests = struct
                , `Staged_ledger _
                , `Pending_coinbase_update _ ) =
         match%bind
-          Staged_ledger.apply_diff_unchecked parent_staged_ledger
+          Staged_ledger.apply_diff_unchecked ~skip_mask_accumulation:true
+            parent_staged_ledger
             ~global_slot:current_state_view.global_slot_since_genesis
             ~coinbase_receiver ~logger staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
@@ -478,6 +486,7 @@ module For_tests = struct
       match%map
         build ~logger ~precomputed_values ~trust_system ~verifier
           ~get_completed_work:(Fn.const None) ~parent:parent_breadcrumb
+          ~mask_ledger_chunk:17
           ~transition:
             ( next_block |> Mina_block.Validated.remember
             |> Validation.reset_staged_ledger_diff_validation )

@@ -173,12 +173,11 @@ val proof_txns_with_state_hashes :
      Mina_stdlib.Nonempty_list.t
      option
 
-val copy : t -> t
-
 val hash : t -> Staged_ledger_hash.t
 
 val apply :
      ?skip_verification:[ `Proofs | `All ]
+  -> skip_mask_accumulation:bool
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
@@ -207,7 +206,8 @@ val apply :
      Deferred.Result.t
 
 val apply_diff_unchecked :
-     constraint_constants:Genesis_constants.Constraint_constants.t
+     skip_mask_accumulation:bool
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
