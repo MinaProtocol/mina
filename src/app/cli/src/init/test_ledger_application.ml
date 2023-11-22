@@ -157,16 +157,19 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
     apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
       ~prev_protocol_state ~keypair
   in
-  let mask_handler ledger =
+  let mask_handler ~i ledger =
     if no_masks then Fn.const ledger
     else fun () ->
       let mask =
         Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()
       in
-      let accumulated = Ledger.Mask.Attached.to_accumulated ledger in
-      Ledger.register_mask ~accumulated ledger mask
+      let accumulated =
+        if i < 17 || i % 17 = 0 then None
+        else Some (Ledger.Mask.Attached.to_accumulated ledger)
+      in
+      Ledger.register_mask ?accumulated ledger mask
   in
   Deferred.List.fold (List.init rounds ~f:ident) ~init:init_ledger
     ~f:(fun ledger i ->
-      apply ~num_txs:num_txs_per_round ~i ledger >>| mask_handler ledger )
+      apply ~num_txs:num_txs_per_round ~i ledger >>| mask_handler ~i ledger )
   >>= apply ~num_txs:num_txs_final ~i:rounds
