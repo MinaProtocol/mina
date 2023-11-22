@@ -141,9 +141,6 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let depth t = assert_is_attached t ; t.depth
 
-    (* don't rely on a particular implementation *)
-    let self_find_hash t address = Map.find t.maps.hashes address
-
     let self_set_hash t address hash =
       t.maps.hashes <- Map.set t.maps.hashes ~key:address ~data:hash
 
@@ -151,9 +148,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       assert (Addr.depth address <= t.depth) ;
       self_set_hash t address hash
-
-    (* don't rely on a particular implementation *)
-    let self_find_location t account_id = Map.find t.maps.locations account_id
 
     let self_set_location t account_id location =
       t.maps.locations <-
@@ -168,9 +162,6 @@ module Make (Inputs : Inputs_intf.S) = struct
           if Location.( > ) location loc then
             t.current_location <- Some location
 
-    (* don't rely on a particular implementation *)
-    let self_find_account t location = Map.find t.maps.accounts location
-
     let self_set_account t location account =
       t.maps.accounts <- Map.set t.maps.accounts ~key:location ~data:account ;
       self_set_location t (Account.identifier account) location
@@ -179,7 +170,7 @@ module Make (Inputs : Inputs_intf.S) = struct
        parent *)
     let get t location =
       assert_is_attached t ;
-      match self_find_account t location with
+      match Map.find t.maps.accounts location with
       | Some account ->
           Some account
       | None ->
@@ -203,7 +194,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           | [] ->
               (locations_with_locations_rev, leftover_locations_rev)
           | location :: locations -> (
-              match self_find_account t location with
+              match Map.find t.maps.accounts location with
               | None ->
                   let is_empty =
                     match t.current_location with
@@ -255,22 +246,21 @@ module Make (Inputs : Inputs_intf.S) = struct
     let empty_hash =
       Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
-    let self_merkle_path t address =
-      assert_is_attached t ;
+    let self_merkle_path ~depth ~hashes ~current_location address =
       Option.try_with (fun () ->
           let rec self_merkle_path address =
-            let height = Addr.height ~ledger_depth:t.depth address in
-            if height >= t.depth then []
+            let height = Addr.height ~ledger_depth:depth address in
+            if height >= depth then []
             else
               let sibling = Addr.sibling address in
               let sibling_dir = Location.last_direction sibling in
               let hash =
-                match self_find_hash t sibling with
+                match Map.find hashes sibling with
                 | Some hash ->
                     hash
                 | None ->
                     let is_empty =
-                      match t.current_location with
+                      match current_location with
                       | None ->
                           true
                       | Some current_location ->
@@ -294,22 +284,21 @@ module Make (Inputs : Inputs_intf.S) = struct
           in
           self_merkle_path address )
 
-    let self_wide_merkle_path t address =
-      assert_is_attached t ;
+    let self_wide_merkle_path ~depth ~current_location ~hashes address =
       Option.try_with (fun () ->
           let rec self_wide_merkle_path address =
-            let height = Addr.height ~ledger_depth:t.depth address in
-            if height >= t.depth then []
+            let height = Addr.height ~ledger_depth:depth address in
+            if height >= depth then []
             else
               let sibling = Addr.sibling address in
               let sibling_dir = Location.last_direction sibling in
               let get_hash addr =
-                match self_find_hash t addr with
+                match Map.find hashes addr with
                 | Some hash ->
                     hash
                 | None ->
                     let is_empty =
-                      match t.current_location with
+                      match current_location with
                       | None ->
                           true
                       | Some current_location ->
@@ -339,15 +328,14 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
-    let fixup_merkle_path t path address =
-      assert_is_attached t ;
+    let fixup_merkle_path ~hashes path address =
       let rec build_fixed_path path address accum =
         if List.is_empty path then List.rev accum
         else
           (* first element in the path contains hash at sibling of address *)
           let curr_element = List.hd_exn path in
           let merkle_node_address = Addr.sibling address in
-          let mask_hash = self_find_hash t merkle_node_address in
+          let mask_hash = Map.find hashes merkle_node_address in
           let parent_hash = match curr_element with `Left h | `Right h -> h in
           let new_hash = Option.value mask_hash ~default:parent_hash in
           let new_element =
@@ -364,16 +352,15 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
-    let fixup_wide_merkle_path t path address =
-      assert_is_attached t ;
+    let fixup_wide_merkle_path ~hashes path address =
       let rec build_fixed_path path address accum =
         if List.is_empty path then List.rev accum
         else
           (* first element in the path contains hash at sibling of address *)
           let curr_element = List.hd_exn path in
           let merkle_node_address = Addr.sibling address in
-          let self_mask_hash = self_find_hash t address in
-          let sibling_mask_hash = self_find_hash t merkle_node_address in
+          let self_mask_hash = Map.find hashes address in
+          let sibling_mask_hash = Map.find hashes merkle_node_address in
           let new_element =
             match curr_element with
             | `Left (h_l, h_r) ->
@@ -395,14 +382,17 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let merkle_path_at_addr_exn t address =
       assert_is_attached t ;
-      match self_merkle_path t address with
+      match
+        self_merkle_path ~depth:t.depth ~current_location:t.current_location
+          ~hashes:t.maps.hashes address
+      with
       | Some path ->
           path
       | None ->
           let parent_merkle_path =
             Base.merkle_path_at_addr_exn (get_parent t) address
           in
-          fixup_merkle_path t parent_merkle_path address
+          fixup_merkle_path ~hashes:t.maps.hashes parent_merkle_path address
 
     let merkle_path_at_index_exn t index =
       merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:t.depth index)
@@ -415,7 +405,11 @@ module Make (Inputs : Inputs_intf.S) = struct
       let self_merkle_paths_rev =
         List.rev_map locations ~f:(fun location ->
             let address = Location.to_path_exn location in
-            match self_merkle_path t address with
+            match
+              self_merkle_path ~depth:t.depth
+                ~current_location:t.current_location ~hashes:t.maps.hashes
+                address
+            with
             | Some path ->
                 Either.First path
             | None ->
@@ -440,7 +434,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             recombine self_merkle_paths_rev parent_merkle_paths_rev (path :: acc)
         | ( Either.Second (_, address) :: self_merkle_paths_rev
           , path :: parent_merkle_paths_rev ) ->
-            let path = fixup_merkle_path t path address in
+            let path = fixup_merkle_path ~hashes:t.maps.hashes path address in
             recombine self_merkle_paths_rev parent_merkle_paths_rev (path :: acc)
         | _ :: _, [] ->
             assert false
@@ -454,7 +448,11 @@ module Make (Inputs : Inputs_intf.S) = struct
       let self_merkle_paths_rev =
         List.rev_map locations ~f:(fun location ->
             let address = Location.to_path_exn location in
-            match self_wide_merkle_path t address with
+            match
+              self_wide_merkle_path ~depth:t.depth
+                ~current_location:t.current_location ~hashes:t.maps.hashes
+                address
+            with
             | Some path ->
                 Either.First path
             | None ->
@@ -479,7 +477,9 @@ module Make (Inputs : Inputs_intf.S) = struct
             recombine self_merkle_paths_rev parent_merkle_paths_rev (path :: acc)
         | ( Either.Second (_, address) :: self_merkle_paths_rev
           , path :: parent_merkle_paths_rev ) ->
-            let path = fixup_wide_merkle_path t path address in
+            let path =
+              fixup_wide_merkle_path ~hashes:t.maps.hashes path address
+            in
             recombine self_merkle_paths_rev parent_merkle_paths_rev (path :: acc)
         | _ :: _, [] ->
             assert false
@@ -512,7 +512,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
       assert_is_attached t ;
-      match self_find_hash t (Addr.root ()) with
+      match Map.find t.maps.hashes (Addr.root ()) with
       | Some hash ->
           hash
       | None ->
@@ -521,7 +521,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let remove_account_and_update_hashes t location =
       assert_is_attached t ;
       (* remove account and key from tables *)
-      let account = Option.value_exn (self_find_account t location) in
+      let account = Option.value_exn (Map.find t.maps.accounts location) in
       t.maps.accounts <- Map.remove t.maps.accounts location ;
       (* Update token info. *)
       let account_id = Account.identifier account in
@@ -591,11 +591,11 @@ module Make (Inputs : Inputs_intf.S) = struct
        if the account in the parent is the same in the mask *)
     let parent_set_notify t account =
       assert_is_attached t ;
-      match self_find_location t (Account.identifier account) with
+      match Map.find t.maps.locations (Account.identifier account) with
       | None ->
           ()
       | Some location -> (
-          match self_find_account t location with
+          match Map.find t.maps.accounts location with
           | Some existing_account ->
               if Account.equal account existing_account then
                 remove_account_and_update_hashes t location
@@ -606,7 +606,7 @@ module Make (Inputs : Inputs_intf.S) = struct
        parent *)
     let get_hash t addr =
       assert_is_attached t ;
-      match self_find_hash t addr with
+      match Map.find t.maps.hashes addr with
       | Some hash ->
           Some hash
       | None -> (
@@ -626,7 +626,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       let self_hashes_rev =
         List.rev_map locations ~f:(fun location ->
-            (location, self_find_hash t (Location.to_path_exn location)) )
+            (location, Map.find t.maps.hashes (Location.to_path_exn location)) )
       in
       let parent_locations_rev =
         List.filter_map self_hashes_rev ~f:(fun (location, hash) ->
@@ -811,7 +811,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let location_of_account t account_id =
       assert_is_attached t ;
-      let mask_result = self_find_location t account_id in
+      let mask_result = Map.find t.maps.locations account_id in
       match mask_result with
       | Some _ ->
           mask_result
@@ -827,7 +827,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           | [] ->
               (account_ids_with_locations_rev, leftover_account_ids_rev)
           | account_id :: account_ids -> (
-              match self_find_location t account_id with
+              match Map.find t.maps.locations account_id with
               | None ->
                   go account_ids
                     ((account_id, None) :: account_ids_with_locations_rev)
@@ -1006,11 +1006,11 @@ module Make (Inputs : Inputs_intf.S) = struct
     module For_testing = struct
       let location_in_mask t location =
         assert_is_attached t ;
-        Option.is_some (self_find_account t location)
+        Option.is_some (Map.find t.maps.accounts location)
 
       let address_in_mask t addr =
         assert_is_attached t ;
-        Option.is_some (self_find_hash t addr)
+        Option.is_some (Map.find t.maps.hashes addr)
 
       let current_location t = t.current_location
     end
@@ -1029,7 +1029,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =
       assert_is_attached t ;
-      match self_find_location t account_id with
+      match Map.find t.maps.locations account_id with
       | None -> (
           (* not in mask, maybe in parent *)
           match Base.location_of_account (get_parent t) account_id with
