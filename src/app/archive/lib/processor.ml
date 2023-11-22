@@ -1,5 +1,23 @@
 (* processor.ml -- database processing for archive node *)
 
+(* For each table in the archive database schema, a
+   corresponding module contains code to read from and write to
+   that table. The module defines a type `t`, a record with fields
+   corresponding to columns in the table; typically, the `id` column
+   that does not have an associated field.
+
+   The more recently written modules use the Mina_caqti library to
+   construct the SQL for those queries. For consistency and
+   simplicity, the older modules should probably be refactored to use
+   Mina_caqti.
+
+   Module `Account_identifiers` is a good example of how Mina_caqti
+   can be used.
+
+   After these table-related modules, there are functions related to
+   running the archive process and archive-related apps.
+*)
+
 module Archive_rpc = Rpc
 open Async
 open Core
@@ -51,6 +69,7 @@ module Public_key = struct
           public_key
 end
 
+(* Unlike other modules here, `Token_owners` does not correspond with a database table *)
 module Token_owners = struct
   (* hash table of token owners, updated for each block *)
   let owner_tbl : Account_id.t Token_id.Table.t = Token_id.Table.create ()
@@ -1845,7 +1864,7 @@ module User_command = struct
             (Caqti_request.find typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
-                    | "typ" -> Some "user_command_type" | _ -> None )
+                    | "command_type" -> Some "user_command_type" | _ -> None )
                   ~cols:Fields.names () ) )
             { command_type = user_cmd.command_type
             ; fee_payer_id
@@ -1994,7 +2013,8 @@ module Internal_command = struct
           (Caqti_request.find typ Caqti_type.int
              (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                 ~tannot:(function
-                  | "typ" -> Some "internal_command_type" | _ -> None )
+                  | "command_type" -> Some "internal_command_type" | _ -> None
+                  )
                 ~cols:Fields.names () ) )
           { command_type = internal_cmd.command_type
           ; receiver_id
@@ -2767,9 +2787,9 @@ module Block = struct
             (Consensus.Data.Consensus_state.block_stake_winner consensus_state)
         in
         let last_vrf_output =
-          (* encode as hex, Postgresql won't accept arbitrary bitstrings *)
+          (* encode as base64, same as in precomputed blocks JSON *)
           Consensus.Data.Consensus_state.last_vrf_output consensus_state
-          |> Hex.Safe.to_hex
+          |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
         in
         let%bind snarked_ledger_hash_id =
           Snarked_ledger_hash.add_if_doesn't_exist
@@ -3173,8 +3193,9 @@ module Block = struct
             Public_key.add_if_doesn't_exist (module Conn) block.block_winner
           in
           let last_vrf_output =
-            (* already encoded as hex *)
+            (* encode as base64, same as in precomputed blocks JSON *)
             block.last_vrf_output
+            |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
           in
           let%bind snarked_ledger_hash_id =
             Snarked_ledger_hash.add_if_doesn't_exist
@@ -3214,19 +3235,15 @@ module Block = struct
           in
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               {sql| INSERT INTO blocks
-                     (state_hash, parent_id, parent_hash,
-                      creator_id, block_winner_id,last_vrf_output,
-                      snarked_ledger_hash_id, staking_epoch_data_id,
-                      next_epoch_data_id,
-                      min_window_density, sub_window_densities, total_currency,
-                      ledger_hash, height,
-                      global_slot_since_hard_fork, global_slot_since_genesis,
-                      protocol_version, proposed_protocol_version,
-                      timestamp, chain_status)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::bigint[], ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
-                     RETURNING id
-               |sql} )
+               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                  ~tannot:(function
+                    | "sub_window_densities" ->
+                        Some "bigint[]"
+                    | "chain_status" ->
+                        Some "chain_status_type"
+                    | _ ->
+                        None )
+                  ~cols:Fields.names () ) )
             { state_hash = block.state_hash |> State_hash.to_base58_check
             ; parent_id
             ; parent_hash = block.parent_hash |> State_hash.to_base58_check
@@ -3755,6 +3772,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
   in
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
 
+(* used by `archive_blocks` app *)
 let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
     ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
@@ -3765,6 +3783,7 @@ let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
     ~accounts_created:block.Precomputed.accounts_created
     ~tokens_used:block.Precomputed.tokens_used block
 
+(* used by `archive_blocks` app *)
 let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
     ~add_block:Block.add_from_extensional
@@ -3773,6 +3792,7 @@ let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
     ~accounts_created:block.Extensional.Block.accounts_created
     ~tokens_used:block.Extensional.Block.tokens_used block
 
+(* receive blocks from a daemon, write them to the database *)
 let run pool reader ~constraint_constants ~logger ~delete_older_than :
     unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
@@ -3799,6 +3819,7 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
     | Transition_frontier _ ->
         Deferred.unit )
 
+(* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     pool =
   match runtime_config_opt with
@@ -3976,6 +3997,7 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
       in
       go ()
 
+(* for running the archive process *)
 let setup_server ~metrics_server_port ~constraint_constants ~logger
     ~postgres_address ~server_port ~delete_older_than ~runtime_config_opt
     ~missing_blocks_width =
