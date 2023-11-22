@@ -752,8 +752,9 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
       | Generic of Merkle_ledger.Location.Bigstring.t
       | Account of Location.Addr.t
       | Hash of Location.Addr.t
-    [@@deriving hash, sexp, compare]
+    [@@deriving hash, sexp]
 
+    include Comparable.Make_binable (Arg)
     include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
   end
 
