@@ -40,7 +40,7 @@ let update_body ?preconditions ?(update = Account_update.Update.noop) ~account
     let%map nonce = get_nonce_exn account.pk in
     Account_update.Preconditions.
       { network = Zkapp_precondition.Protocol_state.accept
-      ; account = Account_precondition.Nonce nonce
+      ; account = Zkapp_precondition.Account.nonce nonce
       ; valid_while = Ignore
       }
   in

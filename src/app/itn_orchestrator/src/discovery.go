@@ -32,7 +32,7 @@ type DiscoveryParams struct {
 	Exactly            bool `json:"exactly,omitempty"`
 }
 
-func DiscoverParticipants(config Config, params DiscoveryParams, output func(NodeAddress)) error {
+func discoverParticipantsDo(config Config, params DiscoveryParams, output func(NodeAddress)) error {
 	before := time.Now().Add(-time.Duration(params.OffsetMin) * time.Minute)
 	query := &storage.Query{StartOffset: prefixByTime(before)}
 	log := config.Log
@@ -87,7 +87,24 @@ func DiscoverParticipants(config Config, params DiscoveryParams, output func(Nod
 	if len(cache) != params.Limit && params.Exactly {
 		return errors.New("failed to discover the exact number of nodes")
 	}
+	if len(cache) == 0 {
+		return errors.New("didn't find any participants")
+	}
 	return nil
+}
+
+func DiscoverParticipants(config Config, params DiscoveryParams, output func(NodeAddress)) (err error) {
+	for retryPause := 10; retryPause <= 40; retryPause = retryPause * 2 {
+		err = discoverParticipantsDo(config, params, output)
+		if err == nil {
+			return
+		}
+		if retryPause <= 20 {
+			config.Log.Warnf("Failed to discover participants, retrying in %d minutes: %s", retryPause, err)
+			time.Sleep(time.Duration(retryPause) * time.Minute)
+		}
+	}
+	return
 }
 
 type DiscoveryAction struct{}

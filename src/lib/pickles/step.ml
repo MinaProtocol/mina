@@ -39,7 +39,7 @@ struct
             *)
       max_local_max_proof_verifieds self_branches prev_vars prev_values
       local_widths local_heights prevs_length var value ret_var ret_value
-      auxiliary_var auxiliary_value ) ?handler
+      auxiliary_var auxiliary_value ) ?handler ~proof_cache
       (T branch_data :
         ( A.t
         , A_value.t
@@ -121,7 +121,7 @@ struct
     let expand_proof :
         type var value local_max_proofs_verified m.
            Impls.Wrap.Verification_key.t
-        -> 'a
+        -> _ array Plonk_verification_key_evals.t
         -> value
         -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t
         -> (var, value, local_max_proofs_verified, m) Tag.t
@@ -204,7 +204,7 @@ struct
           Plonk_checks.scalars_env
             (module Env_bool)
             (module Env_field)
-            ~srs_length_log2:Common.Max_degree.step_log2
+            ~srs_length_log2:Common.Max_degree.step_log2 ~zk_rows:data.zk_rows
             ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
             ~field_of_hex:(fun s ->
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
@@ -237,7 +237,7 @@ struct
         Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
           ~old_bulletproof_challenges:
             statement.messages_for_next_step_proof.old_bulletproof_challenges
-          ~proof_state:statement.proof_state
+          ~zk_rows:data.zk_rows ~proof_state:statement.proof_state
       in
       let prev_statement_with_hashes :
           ( _
@@ -456,6 +456,7 @@ struct
           (module Env_bool)
           (module Env_field)
           ~domain:tock_domain ~srs_length_log2:Common.Max_degree.wrap_log2
+          ~zk_rows:3
           ~field_of_hex:(fun s ->
             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
             |> Kimchi_pasta.Pasta.Fq.of_bigint )
@@ -489,7 +490,7 @@ struct
           Plonk_checks.Type2.ft_eval0
             (module Tock.Field)
             ~domain:tock_domain ~env:tock_env tock_plonk_minimal
-            tock_combined_evals x_hat_1
+            tock_combined_evals [| x_hat_1 |]
         in
         let open Tock.Field in
         combine ~which_eval:`Fst ~ft_eval:ft_eval0 As_field.zeta
@@ -752,7 +753,7 @@ struct
                     ~f:(fun j acc (Pow_2_roots_of_unity domain) ->
                       if Int.equal domain domain_size then j else acc )
                 in
-                Pickles_base.Proofs_verified.of_int domain_index )
+                Pickles_base.Proofs_verified.of_int_exn domain_index )
           in
           k wrap_domain_indices
       | _ -> (
@@ -784,7 +785,8 @@ struct
                } )
            |> to_list) )
     in
-    let%map.Promise (next_proof : Tick.Proof.t), _next_statement_hashed =
+    let%map.Promise ( (next_proof : Tick.Proof.with_public_evals)
+                    , _next_statement_hashed ) =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n
@@ -808,12 +810,35 @@ struct
                           ; public_inputs
                           } next_statement_hashed ->
                     [%log internal] "Backend_tick_proof_create_async" ;
-                    let%map.Promise proof =
+                    let create_proof () =
                       Backend.Tick.Proof.create_async ~primary:public_inputs
                         ~auxiliary:auxiliary_inputs
                         ~message:
                           (Lazy.force prev_challenge_polynomial_commitments)
                         pk
+                    in
+                    let%map.Promise proof =
+                      match proof_cache with
+                      | None ->
+                          create_proof ()
+                      | Some proof_cache -> (
+                          match
+                            Proof_cache.get_step_proof proof_cache ~keypair:pk
+                              ~public_input:public_inputs
+                          with
+                          | None ->
+                              if
+                                Proof_cache
+                                .is_env_var_set_requesting_error_for_proofs ()
+                              then failwith "Regenerated proof" ;
+                              let%map.Promise proof = create_proof () in
+                              Proof_cache.set_step_proof proof_cache ~keypair:pk
+                                ~public_input:public_inputs proof.proof ;
+                              proof
+                          | Some proof ->
+                              Promise.return
+                                ( { proof; public_evals = None }
+                                  : Tick.Proof.with_public_evals ) )
                     in
                     [%log internal] "Backend_tick_proof_create_async_done" ;
                     (proof, next_statement_hashed) )
@@ -870,7 +895,11 @@ struct
                  Plonk_types.All_evals.
                    { ft_eval1
                    ; evals =
-                       { With_public_input.evals = es; public_input = x_hat }
+                       { With_public_input.evals = es
+                       ; public_input =
+                           (let x1, x2 = x_hat in
+                            ([| x1 |], [| x2 |]) )
+                       }
                    } ) )
             lte Max_proofs_verified.n (Lazy.force Dummy.evals)
       }

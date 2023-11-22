@@ -91,7 +91,7 @@ let compute_block_trace_metadata transition_with_validation =
 let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
     ~trust_system ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
-    ~sender ~transition_receipt_time () =
+    ~get_completed_work ~sender ~transition_receipt_time () =
   let state_hash =
     ( With_hash.hash
     @@ Mina_block.Validation.block_with_hash transition_with_validation )
@@ -106,7 +106,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
       let open Deferred.Let_syntax in
       match%bind
         Validation.validate_staged_ledger_diff ?skip_staged_ledger_verification
-          ~logger ~precomputed_values ~verifier
+          ~get_completed_work ~logger ~precomputed_values ~verifier
           ~parent_staged_ledger:(staged_ledger parent)
           ~parent_protocol_state:
             ( parent.validated_transition |> Mina_block.Validated.header
@@ -455,7 +455,6 @@ module For_tests = struct
           ~blockchain_state:next_blockchain_state ~consensus_state
           ~constants:(Protocol_state.constants previous_protocol_state)
       in
-      Protocol_version.(set_current zero) ;
       let next_block =
         let header =
           Mina_block.Header.create ~protocol_state
@@ -478,7 +477,7 @@ module For_tests = struct
       let transition_receipt_time = Some (Time.now ()) in
       match%map
         build ~logger ~precomputed_values ~trust_system ~verifier
-          ~parent:parent_breadcrumb
+          ~get_completed_work:(Fn.const None) ~parent:parent_breadcrumb
           ~transition:
             ( next_block |> Mina_block.Validated.remember
             |> Validation.reset_staged_ledger_diff_validation )

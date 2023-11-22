@@ -35,6 +35,9 @@ val build :
   -> trust_system:Trust_system.t
   -> parent:t
   -> transition:Mina_block.almost_valid_block
+  -> get_completed_work:
+       (   Transaction_snark_work.Statement.t
+        -> Transaction_snark_work.Checked.t option )
   -> sender:Envelope.Sender.t option
   -> transition_receipt_time:Time.t option
   -> unit

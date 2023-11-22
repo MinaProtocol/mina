@@ -20,7 +20,7 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 
-	net "github.com/libp2p/go-libp2p-core/network"
+	net "github.com/libp2p/go-libp2p/core/network"
 
 	ipc "libp2p_ipc"
 

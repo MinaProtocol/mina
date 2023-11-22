@@ -95,9 +95,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     type t = Unsigned.t [@@deriving sexp, compare, hash]
 
-    (* can't be automatically derived *)
-    let dhall_type = Ppx_dhall_type.Dhall_type.Text
-
     [%%define_locally
     Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
 
@@ -945,7 +942,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         type t = Unsigned_extended.UInt64.Stable.V1.t
         [@@deriving sexp, compare, hash, equal]
 
-        [%%define_from_scope to_yojson, of_yojson, dhall_type]
+        [%%define_from_scope to_yojson, of_yojson]
 
         let to_latest = Fn.id
       end
@@ -976,9 +973,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             [@@@with_all_version_tags]
 
             type t = A.t [@@deriving sexp, compare, hash, equal, yojson]
-
-            (* not automatically derived *)
-            val dhall_type : Ppx_dhall_type.Dhall_type.t
           end
         end]
 
@@ -1092,7 +1086,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           type t = Unsigned_extended.UInt64.Stable.V1.t
           [@@deriving sexp, compare, hash, equal, yojson]
 
-          [%%define_from_scope to_yojson, of_yojson, dhall_type]
+          [%%define_from_scope to_yojson, of_yojson]
 
           let to_latest = Fn.id
         end
@@ -1137,9 +1131,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving sexp, compare, equal, hash, yojson]
 
         let to_latest = Fn.id
-
-        (* can't be automatically derived *)
-        let dhall_type = Ppx_dhall_type.Dhall_type.Text
       end
     end]
 

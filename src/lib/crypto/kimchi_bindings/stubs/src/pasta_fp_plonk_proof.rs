@@ -21,7 +21,7 @@ use kimchi::{
     },
     verifier::Context,
 };
-use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
+use kimchi::{prover::caml::CamlProofWithPublic, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fp, Fq, Pallas, Vesta, VestaParameters};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
@@ -43,7 +43,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     runtime_tables: Vec<CamlRuntimeTable<CamlFp>>,
     prev_challenges: Vec<CamlFp>,
     prev_sgs: Vec<CamlGVesta>,
-) -> Result<CamlProverProof<CamlGVesta, CamlFp>, ocaml::Error> {
+) -> Result<CamlProofWithPublic<CamlGVesta, CamlFp>, ocaml::Error> {
     {
         let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -75,7 +75,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .map_err(|_| ocaml::Error::Message("the witness should be a column of 15 vectors"))?;
-    let index: &ProverIndex<Vesta> = &index.as_ref().0;
+    let index: &ProverIndex<Vesta, OpeningProof<Vesta>> = &index.as_ref().0;
     let runtime_tables: Vec<RuntimeTable<Fp>> =
         runtime_tables.into_iter().map(Into::into).collect();
 
@@ -111,7 +111,7 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
     runtime_tables: Vec<CamlRuntimeTable<CamlFp>>,
     prev_challenges: Vec<CamlFp>,
     prev_sgs: Vec<CamlGVesta>,
-) -> Result<CamlProverProof<CamlGVesta, CamlFp>, ocaml::Error> {
+) -> Result<CamlProofWithPublic<CamlGVesta, CamlFp>, ocaml::Error> {
     {
         let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -143,7 +143,7 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .map_err(|_| ocaml::Error::Message("the witness should be a column of 15 vectors"))?;
-    let index: &ProverIndex<Vesta> = &index.as_ref().0;
+    let index: &ProverIndex<Vesta, OpeningProof<Vesta>> = &index.as_ref().0;
     let runtime_tables: Vec<RuntimeTable<Fp>> =
         runtime_tables.into_iter().map(Into::into).collect();
 
@@ -171,7 +171,12 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
         let verifier_index = index.verifier_index();
 
         // Verify proof
-        verify::<Vesta, EFqSponge, EFrSponge>(&group_map, &verifier_index, &proof, &public_input)?;
+        verify::<Vesta, EFqSponge, EFrSponge, OpeningProof<Vesta>>(
+            &group_map,
+            &verifier_index,
+            &proof,
+            &public_input,
+        )?;
 
         Ok((proof, public_input).into())
     })
@@ -184,7 +189,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlFp,
-    CamlProverProof<CamlGVesta, CamlFp>,
+    CamlProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
@@ -261,7 +266,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     ptr.add_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = witness[0][0];
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
@@ -287,7 +292,10 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     srs: CamlFpSrs,
-) -> (CamlPastaFpPlonkIndex, CamlProverProof<CamlGVesta, CamlFp>) {
+) -> (
+    CamlPastaFpPlonkIndex,
+    CamlProofWithPublic<CamlGVesta, CamlFp>,
+) {
     use ark_ff::Zero;
     use kimchi::circuits::{
         constraints::ConstraintSystem,
@@ -425,7 +433,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     ptr.add_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
         &group_map,
@@ -446,7 +454,10 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     srs: CamlFpSrs,
-) -> (CamlPastaFpPlonkIndex, CamlProverProof<CamlGVesta, CamlFp>) {
+) -> (
+    CamlPastaFpPlonkIndex,
+    CamlProofWithPublic<CamlGVesta, CamlFp>,
+) {
     use ark_ff::Zero;
     use kimchi::circuits::{
         constraints::ConstraintSystem, gate::CircuitGate, polynomials::range_check, wires::Wire,
@@ -491,7 +502,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     ptr.add_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
         &group_map,
@@ -512,7 +523,10 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
     srs: CamlFpSrs,
-) -> (CamlPastaFpPlonkIndex, CamlProverProof<CamlGVesta, CamlFp>) {
+) -> (
+    CamlPastaFpPlonkIndex,
+    CamlProofWithPublic<CamlGVesta, CamlFp>,
+) {
     use ark_ff::Zero;
     use kimchi::circuits::{
         constraints::ConstraintSystem,
@@ -563,7 +577,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
     ptr.add_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
         &group_map,
@@ -587,7 +601,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlFp,
-    CamlProverProof<CamlGVesta, CamlFp>,
+    CamlProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
@@ -688,7 +702,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     ptr.add_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = witness[0][0];
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
@@ -714,7 +728,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
 ) -> (
     CamlPastaFpPlonkIndex,
     (CamlFp, CamlFp),
-    CamlProverProof<CamlGVesta, CamlFp>,
+    CamlProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
@@ -777,7 +791,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
     ptr.add_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = (witness[0][0], witness[0][1]);
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
@@ -803,7 +817,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
 ) -> (
     CamlPastaFpPlonkIndex,
     (CamlFp, CamlFp),
-    CamlProverProof<CamlGVesta, CamlFp>,
+    CamlProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
@@ -871,7 +885,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
     ptr.add_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = (witness[0][0], witness[0][1]);
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
@@ -894,7 +908,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_verify(
     index: CamlPastaFpPlonkVerifierIndex,
-    proof: CamlProverProof<CamlGVesta, CamlFp>,
+    proof: CamlProofWithPublic<CamlGVesta, CamlFp>,
 ) -> bool {
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
 
@@ -910,6 +924,7 @@ pub fn caml_pasta_fp_plonk_proof_verify(
         Vesta,
         DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>,
+        OpeningProof<Vesta>,
     >(&group_map, &[context])
     .is_ok()
 }
@@ -918,18 +933,19 @@ pub fn caml_pasta_fp_plonk_proof_verify(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_batch_verify(
     indexes: Vec<CamlPastaFpPlonkVerifierIndex>,
-    proofs: Vec<CamlProverProof<CamlGVesta, CamlFp>>,
+    proofs: Vec<CamlProofWithPublic<CamlGVesta, CamlFp>>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
         .zip(proofs.into_iter())
         .map(|(caml_index, caml_proof)| {
-            let verifier_index: VerifierIndex<Vesta> = caml_index.into();
-            let (proof, public_input): (ProverProof<_>, Vec<_>) = caml_proof.into();
+            let verifier_index: VerifierIndex<Vesta, OpeningProof<Vesta>> = caml_index.into();
+            let (proof, public_input): (ProverProof<Vesta, OpeningProof<Vesta>>, Vec<_>) =
+                caml_proof.into();
             (verifier_index, proof, public_input)
         })
         .collect();
-    let ts_ref: Vec<_> = ts
+    let ts_ref: Vec<Context<Vesta, OpeningProof<Vesta>>> = ts
         .iter()
         .map(|(verifier_index, proof, public_input)| Context {
             verifier_index,
@@ -943,13 +959,14 @@ pub fn caml_pasta_fp_plonk_proof_batch_verify(
         Vesta,
         DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>,
+        OpeningProof<Vesta>,
     >(&group_map, &ts_ref)
     .is_ok()
 }
 
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> {
+pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProofWithPublic<CamlGVesta, CamlFp> {
     fn comm() -> PolyComm<Vesta> {
         let g = Vesta::prime_subgroup_generator();
         PolyComm {
@@ -977,6 +994,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
         zeta_omega: vec![Fp::one()],
     };
     let evals = ProofEvaluations {
+        public: Some(eval()),
         w: array_init(|_| eval()),
         coefficients: array_init(|_| eval()),
         z: eval(),
@@ -1024,7 +1042,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_deep_copy(
-    x: CamlProverProof<CamlGVesta, CamlFp>,
-) -> CamlProverProof<CamlGVesta, CamlFp> {
+    x: CamlProofWithPublic<CamlGVesta, CamlFp>,
+) -> CamlProofWithPublic<CamlGVesta, CamlFp> {
     x
 }

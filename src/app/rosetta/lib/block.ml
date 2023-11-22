@@ -827,30 +827,26 @@ module Sql = struct
          FROM user_commands u
          INNER JOIN blocks_user_commands buc
            ON buc.user_command_id = u.id
-         INNER JOIN account_identifiers ai_payer
-           ON ai_payer.id = u.fee_payer_id
-        INNER JOIN public_keys pk_payer
-          ON pk_payer.id = ai_payer.public_key_id
-        INNER JOIN account_identifiers ai_source
-          ON ai_source.id = u.source_id
-        INNER JOIN public_keys pk_source
-          ON pk_source.id = ai_source.public_key_id
-        INNER JOIN account_identifiers ai_receiver
-          ON ai_receiver.id = u.receiver_id
-        INNER JOIN public_keys pk_receiver
-          ON pk_receiver.id = ai_receiver.public_key_id
+         INNER JOIN public_keys pk_payer
+           ON pk_payer.id = u.fee_payer_id
+         INNER JOIN public_keys pk_source
+           ON pk_source.id = u.source_id
+         INNER JOIN public_keys pk_receiver
+           ON pk_receiver.id = u.receiver_id
+         INNER JOIN account_identifiers ai_receiver
+           ON ai_receiver.public_key_id = pk_receiver.id
         /* Account creation fees are attributed to the first successful command in the
            block that mentions the account with the following LEFT JOIN */
          LEFT JOIN accounts_created ac
            ON buc.block_id = ac.block_id
-           AND u.receiver_id = ac.account_identifier_id
+           AND ai_receiver.id = ac.account_identifier_id
            AND buc.status = 'applied'
            AND buc.sequence_no =
              (SELECT MIN(buc2.sequence_no)
               FROM blocks_user_commands buc2
               INNER JOIN user_commands uc2
                 ON buc2.user_command_id = uc2.id
-                AND uc2.receiver_id = ac.account_identifier_id
+                AND uc2.receiver_id = u.receiver_iD
                 AND buc2.block_id = buc.block_id)
          WHERE buc.block_id = ?
         |}
@@ -892,12 +888,12 @@ module Sql = struct
          FROM internal_commands i
          INNER JOIN blocks_internal_commands bic
            ON bic.internal_command_id = i.id
+         INNER JOIN public_keys pk
+           ON pk.id = i.receiver_id
          INNER JOIN account_identifiers ai
-           ON ai.id = i.receiver_id
+           ON ai.public_key_id = receiver_id
          LEFT JOIN accounts_created ac
            ON ac.account_identifier_id = ai.id
-         INNER JOIN public_keys pk
-           ON pk.id = ai.public_key_id
          WHERE bic.block_id = ?
       |}
 

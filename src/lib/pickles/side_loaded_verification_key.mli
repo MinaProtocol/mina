@@ -1,3 +1,7 @@
+(** A homogenized verification key type, used to 'side load' and verify any
+    pickles proof regardless of its original structure.
+*)
+
 module V = Pickles_base.Side_loaded_verification_key
 
 include
