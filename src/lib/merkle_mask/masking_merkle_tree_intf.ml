@@ -32,6 +32,8 @@ module type S = sig
 
   val get_uuid : t -> Uuid.t
 
+  type accumulated_t
+
   module Attached : sig
     include
       Base_merkle_tree_intf.S
@@ -85,6 +87,8 @@ module type S = sig
     *)
     val unsafe_preload_accounts_from_parent : t -> account_id list -> unit
 
+    val to_accumulated : t -> accumulated_t
+
     (** already have module For_testing from include above *)
     module For_testing : sig
       val location_in_mask : t -> location -> bool
@@ -96,5 +100,6 @@ module type S = sig
   end
 
   (** tell mask about parent *)
-  val set_parent : unattached -> parent -> Attached.t
+  val set_parent :
+    ?accumulated:accumulated_t -> unattached -> parent -> Attached.t
 end
