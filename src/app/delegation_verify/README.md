@@ -147,3 +147,8 @@ Some command-line options work with both modes of operation:
   of blocks and snark work, and will immediately proceed to outputting
   state hashes and other metadata for each submission, whether it is
   valid or not.
+
+Build
+-----
+
+The executable and docker image can be built with Nix. For further instructions, consult the Mina [Nix documentation](https://github.com/MinaProtocol/mina/tree/berkeley/nix) 

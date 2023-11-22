@@ -87,7 +87,6 @@ in {
       cmd = [ "/bin/delegation-verify" ];
       Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" ];
     };
-    
   };
 
   mina-image-full = mkFullImage "mina" (with ocamlPackages_mina; [
