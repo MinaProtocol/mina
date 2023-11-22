@@ -54,13 +54,12 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
-COPY debian_packages/*.deb .
-
 # Mina daemon package
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
+  && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
-  && apt-get install --quiet --yes --allow-downgrades ./mina-batch-txn_2.0.0rampup6-4061884.deb ./mina-berkeley_2.0.0rampup6-4061884.deb ./mina-logproc_2.0.0rampup6-4061884.deb ./mina-zkapp-test-transaction_2.0.0rampup6-4061884.deb \
+  && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" \
   && rm -rf /var/lib/apt/lists/*
 
 
