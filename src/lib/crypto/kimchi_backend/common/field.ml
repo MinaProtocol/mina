@@ -37,6 +37,8 @@ module type Input_intf = sig
 
   val is_square : t -> bool
 
+  val compare : t -> t -> int
+
   val equal : t -> t -> bool
 
   val print : t -> unit
@@ -194,7 +196,7 @@ module Make (F : Input_intf) :
 
       let hash = Hash.of_fold hash_fold_t
 
-      let compare t1 t2 = Bigint.compare (to_bigint t1) (to_bigint t2)
+      let compare = compare
 
       let equal = equal
 
