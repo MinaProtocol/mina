@@ -144,8 +144,8 @@ module Make (Inputs : Inputs_intf) = struct
   let unsafe_preload_accounts_from_parent =
     Mask.Attached.unsafe_preload_accounts_from_parent
 
-  let register_mask t mask =
-    let attached_mask = Mask.set_parent mask t in
+  let register_mask ?accumulated t mask =
+    let attached_mask = Mask.set_parent ?accumulated mask t in
     List.iter (Uuid.Table.data registered_masks) ~f:(fun ms ->
         List.iter ms ~f:(fun m ->
             [%test_result: bool]

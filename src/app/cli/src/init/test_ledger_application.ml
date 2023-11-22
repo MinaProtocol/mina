@@ -159,9 +159,12 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
   in
   let mask_handler ledger =
     if no_masks then Fn.const ledger
-    else
-      Fn.compose (Ledger.register_mask ledger)
-      @@ Ledger.Mask.create ~depth:constraint_constants.ledger_depth
+    else fun () ->
+      let mask =
+        Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()
+      in
+      let accumulated = Ledger.Mask.Attached.to_accumulated ledger in
+      Ledger.register_mask ~accumulated ledger mask
   in
   Deferred.List.fold (List.init rounds ~f:ident) ~init:init_ledger
     ~f:(fun ledger i ->

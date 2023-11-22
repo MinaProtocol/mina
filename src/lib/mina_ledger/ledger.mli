@@ -56,6 +56,7 @@ module Maskable :
      and type root_hash := Ledger_hash.t
      and type unattached_mask := Mask.t
      and type attached_mask := Mask.Attached.t
+     and type accumulated_t := Mask.accumulated_t
      and type t := Any_ledger.M.t
 
 include
@@ -73,6 +74,7 @@ include
      and type t = Mask.Attached.t
      and type attached_mask = Mask.Attached.t
      and type unattached_mask = Mask.t
+     and type accumulated_t = Mask.accumulated_t
 
 (* We override the type of unregister_mask_exn that comes from
    Merkle_mask.Maskable_merkle_tree_intf.S because at this level callers aren't
@@ -100,7 +102,8 @@ val of_database : Db.t -> t
 (** This is not _really_ copy, merely a stop-gap until we remove usages of copy in our codebase. What this actually does is creates a new empty mask on top of the current ledger *)
 val copy : t -> t
 
-val register_mask : t -> Mask.t -> Mask.Attached.t
+val register_mask :
+  ?accumulated:Mask.accumulated_t -> t -> Mask.t -> Mask.Attached.t
 
 val commit : Mask.Attached.t -> unit
 
