@@ -915,38 +915,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert (Addr.depth address <= t.depth) ;
       get_hash t address |> Option.value_exn
 
-    let remove_accounts_exn t keys =
-      assert_is_attached t ;
-      let rec loop keys parent_keys mask_locations =
-        match keys with
-        | [] ->
-            (parent_keys, mask_locations)
-        | key :: rest -> (
-            match self_find_location t key with
-            | None ->
-                loop rest (key :: parent_keys) mask_locations
-            | Some loc ->
-                loop rest parent_keys (loc :: mask_locations) )
-      in
-      (* parent_keys not in mask, may be in parent mask_locations definitely in
-         mask *)
-      let parent_keys, mask_locations = loop keys [] [] in
-      (* allow call to parent to raise an exception if raised, the parent
-         hasn't removed any accounts, and we don't try to remove any accounts
-         from mask *)
-      Base.remove_accounts_exn (get_parent t) parent_keys ;
-      (* removing accounts in parent succeeded, so proceed with removing
-         accounts from mask we sort mask locations in reverse order,
-         potentially allowing reuse of locations *)
-      let rev_sorted_mask_locations =
-        List.sort mask_locations ~compare:(fun loc1 loc2 ->
-            let loc1 = Location.to_path_exn loc1 in
-            let loc2 = Location.to_path_exn loc2 in
-            Location.Addr.compare loc2 loc1 )
-      in
-      List.iter rev_sorted_mask_locations
-        ~f:(remove_account_and_update_hashes t)
-
     (* Destroy intentionally does not commit before destroying
        as sometimes this is desired behavior *)
     let close t =
