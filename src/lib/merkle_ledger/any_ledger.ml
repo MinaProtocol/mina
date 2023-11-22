@@ -113,8 +113,6 @@ module Make_base (Inputs : Inputs_intf) :
 
     module Addr = Location.Addr
 
-    let remove_accounts_exn (T ((module Base), t)) = Base.remove_accounts_exn t
-
     let merkle_path_at_index_exn (T ((module Base), t)) =
       Base.merkle_path_at_index_exn t
 

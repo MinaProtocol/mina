@@ -420,82 +420,6 @@ module Make (Test : Test_intf) = struct
             Stdlib.List.compare_lengths base_accounts retrieved_accounts = 0 ) ;
           assert (List.equal Account.equal expected_accounts retrieved_accounts) )
 
-  let%test_unit "removing accounts from mask restores Merkle root" =
-    Test.with_instances (fun maskable mask ->
-        let attached_mask = Maskable.register_mask maskable mask in
-        let num_accounts = 5 in
-        let account_ids = Account_id.gen_accounts num_accounts in
-        let balances =
-          Quickcheck.random_value
-            (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-        in
-        let accounts = List.map2_exn account_ids balances ~f:Account.create in
-        let merkle_root0 = Mask.Attached.merkle_root attached_mask in
-        List.iter accounts ~f:(fun account ->
-            ignore @@ create_new_account_exn attached_mask account ) ;
-        let merkle_root1 = Mask.Attached.merkle_root attached_mask in
-        (* adding accounts should change the Merkle root *)
-        assert (not (Hash.equal merkle_root0 merkle_root1)) ;
-        Mask.Attached.remove_accounts_exn attached_mask account_ids ;
-        (* should see original Merkle root after removing the accounts *)
-        let merkle_root2 = Mask.Attached.merkle_root attached_mask in
-        assert (Hash.equal merkle_root2 merkle_root0) )
-
-  let%test_unit "removing accounts from parent restores Merkle root" =
-    Test.with_instances (fun maskable mask ->
-        let attached_mask = Maskable.register_mask maskable mask in
-        let num_accounts = 5 in
-        let account_ids = Account_id.gen_accounts num_accounts in
-        let balances =
-          Quickcheck.random_value
-            (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-        in
-        let accounts = List.map2_exn account_ids balances ~f:Account.create in
-        let merkle_root0 = Mask.Attached.merkle_root attached_mask in
-        (* add accounts to parent *)
-        List.iter accounts ~f:(fun account ->
-            ignore @@ parent_create_new_account_exn maskable account ) ;
-        (* observe Merkle root in mask *)
-        let merkle_root1 = Mask.Attached.merkle_root attached_mask in
-        (* adding accounts should change the Merkle root *)
-        assert (not (Hash.equal merkle_root0 merkle_root1)) ;
-        Mask.Attached.remove_accounts_exn attached_mask account_ids ;
-        (* should see original Merkle root after removing the accounts *)
-        let merkle_root2 = Mask.Attached.merkle_root attached_mask in
-        assert (Hash.equal merkle_root2 merkle_root0) )
-
-  let%test_unit "removing accounts from parent and mask restores Merkle root" =
-    Test.with_instances (fun maskable mask ->
-        let attached_mask = Maskable.register_mask maskable mask in
-        let num_accounts_parent = 5 in
-        let num_accounts_mask = 5 in
-        let num_accounts = num_accounts_parent + num_accounts_mask in
-        let account_ids = Account_id.gen_accounts num_accounts in
-        let balances =
-          Quickcheck.random_value
-            (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-        in
-        let accounts = List.map2_exn account_ids balances ~f:Account.create in
-        let parent_accounts, mask_accounts =
-          List.split_n accounts num_accounts_parent
-        in
-        let merkle_root0 = Mask.Attached.merkle_root attached_mask in
-        (* add accounts to parent *)
-        List.iter parent_accounts ~f:(fun account ->
-            ignore @@ parent_create_new_account_exn maskable account ) ;
-        (* add accounts to mask *)
-        List.iter mask_accounts ~f:(fun account ->
-            ignore @@ create_new_account_exn attached_mask account ) ;
-        (* observe Merkle root in mask *)
-        let merkle_root1 = Mask.Attached.merkle_root attached_mask in
-        (* adding accounts should change the Merkle root *)
-        assert (not (Hash.equal merkle_root0 merkle_root1)) ;
-        (* remove accounts from mask and parent *)
-        Mask.Attached.remove_accounts_exn attached_mask account_ids ;
-        (* should see original Merkle root after removing the accounts *)
-        let merkle_root2 = Mask.Attached.merkle_root attached_mask in
-        assert (Hash.equal merkle_root2 merkle_root0) )
-
   let%test_unit "fold of addition over account balances in parent and mask" =
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in
@@ -619,31 +543,6 @@ module Make (Test : Test_intf) = struct
               "create_empty with empty ledger somehow already has that key?"
         | `Added, _new_loc ->
             [%test_eq: Hash.t] start_hash (merkle_root ledger) )
-
-  let%test_unit "reuse of locations for removed accounts" =
-    Test.with_instances (fun maskable mask ->
-        let attached_mask = Maskable.register_mask maskable mask in
-        let num_accounts = 5 in
-        let account_ids = Account_id.gen_accounts num_accounts in
-        let balances =
-          Quickcheck.random_value
-            (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-        in
-        let accounts = List.map2_exn account_ids balances ~f:Account.create in
-        assert (
-          Option.is_none
-            (Mask.Attached.For_testing.current_location attached_mask) ) ;
-        (* add accounts to mask *)
-        List.iter accounts ~f:(fun account ->
-            ignore @@ create_new_account_exn attached_mask account ) ;
-        assert (
-          Option.is_some
-            (Mask.Attached.For_testing.current_location attached_mask) ) ;
-        (* remove accounts *)
-        Mask.Attached.remove_accounts_exn attached_mask account_ids ;
-        assert (
-          Option.is_none
-            (Mask.Attached.For_testing.current_location attached_mask) ) )
 
   let%test_unit "num_accounts for unique keys in mask and parent" =
     Test.with_instances (fun maskable mask ->
