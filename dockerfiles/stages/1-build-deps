@@ -29,6 +29,11 @@ ARG WASM_PACK_VERSION=v0.10.3
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
 
+# Target platform for multi-architecture builds
+ARG TARGETPLATFORM
+
+ENV TARGET_PLATFORM=${TARGETPLATFORM}
+
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
@@ -83,13 +88,33 @@ RUN adduser --uid 65533 --disabled-password --gecos '' opam \
 RUN git config --global advice.detachedHead false
 
 # --- Opam install of a given OPAM_VERSION from github release
-RUN curl -sL \
-  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-arm64-linux" \
+RUN set -ex; \
+  case "$TARGETPLATFORM" in \
+  'linux/amd64') \
+  opam_arch='x86_64'; \
+  ;; \
+  'linux/arm64') \
+  opam_arch='arm64'; \
+  ;; \
+  *) echo >&2 "error: unsupported architecture '$TARGETPLATFORM'"; exit 1 ;; \
+  esac; \
+  curl -sL \
+  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-${opam_arch}-linux" \
   -o /usr/bin/opam \
   && chmod +x /usr/bin/opam
 
 # --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
-RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-arm64.tar.gz" | tar -xz -C /usr/lib/
+RUN set -ex; \
+  case "$TARGETPLATFORM" in \
+  'linux/amd64') \
+  go_arch='amd64'; \
+  ;; \
+  'linux/arm64') \
+  go_arch='arm64'; \
+  ;; \
+  *) echo >&2 "error: unsupported architecture '$TARGETPLATFORM'"; exit 1 ;; \
+  esac; \
+  curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-${go_arch}.tar.gz" | tar -xz -C /usr/lib/
 
 # --- Rust install via rustup-init to a given RUST_VERSION
 # --- Additionally, install RUST_NIGHTLY via rustup
@@ -97,8 +122,18 @@ RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-arm64.tar.gz" | tar 
 # As opposed to introducing another shell script here (that mostly just determines the platform)
 # we just download the binary for the only platform we care about in this docker environment
 USER opam
-RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
-  https://static.rust-lang.org/rustup/dist/aarch64-unknown-linux-gnu/rustup-init \
+RUN set -ex; \
+  case "$TARGETPLATFORM" in \
+  'linux/amd64') \
+  rust_arch='x86_64'; \
+  ;; \
+  'linux/arm64') \
+  rust_arch='aarch64'; \
+  ;; \
+  *) echo >&2 "error: unsupported architecture '$TARGETPLATFORM'"; exit 1 ;; \
+  esac; \
+  curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
+  https://static.rust-lang.org/rustup/dist/${rust_arch}-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
   && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal --component rust-src --target wasm32-unknown-unknown \
   && $HOME/.cargo/bin/rustup toolchain install "nightly-${RUST_NIGHTLY}" --profile minimal --component rust-src --target wasm32-unknown-unknown --no-self-update \
@@ -106,7 +141,17 @@ RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
 USER root
 
 # --- Install rust wasm-pack version WASM_PACK_VERSION manually via curl/tar
-RUN curl -sL https://github.com/rustwasm/wasm-pack/releases/download/${WASM_PACK_VERSION}/wasm-pack-${WASM_PACK_VERSION}-aarch64-unknown-linux-musl.tar.gz \
+RUN set -ex; \
+  case "$TARGETPLATFORM" in \
+  'linux/amd64') \
+  wasm_pack_arch='x86_64'; \
+  ;; \
+  'linux/arm64') \
+  wasm_pack_arch='aarch64'; \
+  ;; \
+  *) echo >&2 "error: unsupported architecture '$TARGETPLATFORM'"; exit 1 ;; \
+  esac; \
+  curl -sL https://github.com/rustwasm/wasm-pack/releases/download/${WASM_PACK_VERSION}/wasm-pack-${WASM_PACK_VERSION}-${wasm_pack_arch}-unknown-linux-musl.tar.gz \
   | tar --extract --gzip --strip-components=1 --directory=/usr/bin --file=-
 
 # --- RocksDB Installation of a given ROCKSDB_VERSION

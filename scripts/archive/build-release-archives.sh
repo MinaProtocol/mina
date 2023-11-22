@@ -32,6 +32,19 @@ echo "--- Building Mina archive package"
 PROJECT="mina-archive"
 BUILD_DIR="deb_build"
 
+case "${TARGET_PLATFORM}" in
+linux/amd64)
+  ARCH="amd64"
+  ;;
+linux/arm64)
+  ARCH="arm64"
+  ;;
+*)
+  echo "Unsupported platform provided: ${TARGET_PLATFORM}"
+    exit 1
+    ;;
+esac
+
 ###### archiver deb
 
 mkdir -p "${BUILD_DIR}/DEBIAN"
@@ -40,7 +53,7 @@ Package: ${PROJECT}
 Version: ${MINA_DEB_VERSION}
 Section: base
 Priority: optional
-Architecture: arm64
+Architecture: ${ARCH}
 Depends: ${SHARED_DEPS}${ARCHIVE_DEPS}
 License: Apache-2.0
 Homepage: https://minaprotocol.com/

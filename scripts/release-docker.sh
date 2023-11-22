@@ -131,32 +131,45 @@ TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}"
 GITHASH=$(git rev-parse --short=7 HEAD)
 HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}"
 
-# If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
-extra_build_args=$(echo ${EXTRA} | tr -d '"')
-if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args -t "$TAG" -
+BUILDX_NAME="minabuild"
+# Initialize builder instance
+if [[ $(docker ps -a | grep -o "${BUILDX_NAME}" - | wc -w) -eq 0 ]]; then
+  docker buildx create --use --bootstrap --name ${BUILDX_NAME}
 else
-  docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
+  docker buildx inspect --bootstrap ${BUILDX_NAME} >/dev/null 2>&1
+  docker buildx use ${BUILDX_NAME}
 fi
 
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
-  
-  # push to GCR
-  docker push "${TAG}"
-
-  # retag and push again to GCR
-  docker tag "${TAG}" "${HASHTAG}"
-  docker push "${HASHTAG}"
+  TARGET_PLATFORMS="linux/amd64,linux/arm64"
 
   echo "Release Env Var: ${DEB_RELEASE}"
   echo "Release: ${DEB_RELEASE##*=}"
 
   if [[ "${DEB_RELEASE##*=}" = "unstable" ]]; then
     echo "Release is unstable: not pushing to docker hub"
+    TAG_ARGS="-t ${TAG} -t ${HASHTAG} --push"
   else
     echo "Release is public (alpha, beta, berkeley, or stable): pushing image to docker hub"
-    # tag and push to dockerhub
-    docker tag "${TAG}" "minaprotocol/${SERVICE}:${VERSION}"
-    docker push "minaprotocol/${SERVICE}:${VERSION}"
+    TAG_ARGS="-t ${TAG} -t ${HASHTAG} -t minaprotocol/${SERVICE}:${VERSION} --push"
   fi
+else
+  case "$(uname -m)" in
+  x86_64)
+    TARGET_PLATFORMS="linux/amd64"
+    ;;
+  arm64)
+    TARGET_PLATFORMS="linux/arm64"
+    ;;
+  esac
+
+  TAG_ARGS="-t ${TAG} --load"
+fi
+
+# If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
+extra_build_args=$(echo ${EXTRA} | tr -d '"')
+if [[ -z "${DOCKER_CONTEXT}" ]]; then
+  cat $DOCKERFILE_PATH | docker buildx build --platform $TARGET_PLATFORMS $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $TAG_ARGS -
+else
+  docker buildx build --platform $TARGET_PLATFORMS $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT $TAG_ARGS -f $DOCKERFILE_PATH
 fi

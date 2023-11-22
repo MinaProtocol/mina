@@ -48,6 +48,18 @@ esac
 
 BUILDDIR="deb_build"
 
+case "${TARGET_PLATFORM}" in
+linux/amd64)
+  ARCH="amd64"
+  ;;
+linux/arm64)
+  ARCH="arm64"
+  ;;
+*)
+  echo "Unsupported platform provided: ${TARGET_PLATFORM}"
+    exit 1
+    ;;
+esac
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -71,7 +83,7 @@ Package: ${1}
 Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
 Vendor: none
-Architecture: arm64
+Architecture: ${ARCH}
 Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
 Depends: ${2}
