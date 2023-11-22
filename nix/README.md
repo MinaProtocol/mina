@@ -186,6 +186,23 @@ Alternatively, you can build the entirety of Mina inside the Nix sandbox fully
 automatically: run `nix build mina` if you're using flakes (or `nix-build`
 otherwise). You can find the resulting executable at `result/bin/mina`.
 
+To build the available packages use `nix build mina#<package-name>` where `<package-name>` is from the following list.
+
+Available packages:
+- **mina** - mina daemon executable
+- **mina-deb** - mina debian package
+- **mina_tests** - mina unit tests
+- **mina-ocaml-format** - checks if the code is formatted properly
+- **mina-delegation-verify** - [stateless verification tool](https://github.com/MinaProtocol/mina/tree/berkeley/src/app/delegation_verify) for Delegation Program
+- **test_executive** - [test executive](https://github.com/MinaProtocol/mina/tree/berkeley/src/app/test_executive) executable
+- **libp2p_helper** - helper go module for unit tests
+- **kimchi_bindings_stubs**
+- **snarky_js** - builds snarkyjs npm package
+- **leaderboard** - builds the [leaderboard](https://github.com/MinaProtocol/mina/tree/berkeley/frontend/leaderboard) yarn package
+- **validation** - builds the [validation](https://github.com/MinaProtocol/mina/tree/berkeley/src/app/validation) app
+- **trace-tool** - builds the [trace-tool](https://github.com/MinaProtocol/mina/tree/berkeley/src/app/trace-tool)
+- **zkapp-cli** - builds the [zkapp-cli](https://github.com/o1-labs/zkapp-cli/)
+
 ### "Impure" development shell
 
 TL;DR:
@@ -214,7 +231,6 @@ branches, or otherwise changing the dependency tree of Mina.
 TL;DR:
 ```
 $(nix build mina#mina-image-full) | docker load
-# Also available: mina-image-slim, mina-image-instr, mina-archive-image-full,
 ```
 
 Since a "pure" build can happen entirely inside the Nix sandbox, we can use its
@@ -229,8 +245,11 @@ registry at
 `docker run --rm -it
 us-west2-docker.pkg.dev/o1labs-192920/nix-containers/mina-image-full:develop` .
 
-The `slim` image only has the Mina daemon itself, whereas `full` images also
-contain many useful tools, such as coreutils, fake init, jq, etc.
+Available images:
+- **mina-image-full** - full Mina daemon image with useful tools, such as coreutils, fake init, jq, etc.
+- **mina-image-slim** - has Mina daemon only
+- **mina-archive-image-full** - full Mina archive image with useful tools
+- **mina-delegation-verify-image** - stateless verification tool for Delegation Program
 
 The `instr` image is a replica of `full` image with additional instrumenation data.
 
