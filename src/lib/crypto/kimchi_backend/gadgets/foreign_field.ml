@@ -931,6 +931,7 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      Inserts ForeignFieldAdd gate into the circuit
  *      Returns the result
  *)
+open Js_of_ocaml
 let add (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f External_checks.t) (left_input : f Element.Standard.t)
     (right_input : f Element.Standard.t)
@@ -938,9 +939,11 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   let result, _sign, _ovf =
     sum_setup (module Circuit) left_input right_input Add foreign_field_modulus
   in
+  let _ : unit = Firebug.console##log (Js.string "sum setup ok") in
   (* Add external check for multi-range-check of result *)
   External_checks.append_multi_range_check external_checks
   @@ Element.Standard.to_limbs result ;
+  Firebug.console##log (Js.string "result multi range check ok");
 
   result
 

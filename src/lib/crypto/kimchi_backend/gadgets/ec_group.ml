@@ -1,5 +1,4 @@
 open Core_kernel
-open Js_of_ocaml
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
@@ -59,6 +58,7 @@ let is_on_curve_bignum_point (curve : Curve_params.t)
  *         and we don't need it for our application.  By doing this we also
  *         lose Invertibility, which we also don't need for our goals.
  *)
+open Js_of_ocaml
 let add (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t)
     (curve : f Curve_params.InCircuit.t) (left_input : f Affine.t)
