@@ -240,6 +240,20 @@ cp ./default/src/app/batch_txn_tool/batch_txn_tool.exe "${BUILDDIR}/usr/local/bi
 
 build_deb mina-batch-txn
 
+##################################### END BATCH TXN TOOL PACKAGE #######################################
+
+##################################### GENERATE TEST SUITE PACKAGE #######################################
+
+
+create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
+
+# Binaries
+cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
+
+build_deb mina-test-suite
+
+##################################### END TEST SUITE PACKAGE #######################################
+
 ##################################### MAINNET PACKAGE #######################################
 if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
 then
