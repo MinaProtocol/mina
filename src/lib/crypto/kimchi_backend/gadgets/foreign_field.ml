@@ -659,6 +659,7 @@ let as_prover_compact_limb (type f)
     =
   Circuit.Field.Constant.(lo + (hi * two_to_limb_field (module Circuit)))
 
+open Js_of_ocaml
 (* Internal foreign field addition helper *)
 let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
     (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
@@ -669,14 +670,17 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
   let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
     foreign_field_modulus
   in
+  let _ : unit = Firebug.console##log (Js.string "foreign field modulus decomposition ok") in
   (* Decompose left input into limbs *)
   let left_input0, left_input1, left_input2 =
     Element.Standard.to_limbs left_input
   in
+  let _ : unit = Firebug.console##log (Js.string "left input decomposition ok") in
   (* Decompose right input into limbs. If final check, right_input2 will contain 2^limb *)
   let right_input0, right_input1, right_input2 =
     Element.Standard.to_limbs right_input
   in
+  let _ : unit = Firebug.console##log (Js.string "right input decomposition ok") in
 
   (* Addition or subtraction *)
   let sign =
@@ -686,6 +690,7 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
     | Add ->
         Field.Constant.one
   in
+  let _ : unit = Firebug.console##log (Js.string "sign ok") in
 
   (* Given a left and right inputs to an addition or subtraction, and a modulus, it computes
    * all necessary values needed for the witness layout. Meaning, it returns an [FFAddValues] instance
@@ -793,6 +798,7 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
         [| result0; result1; result2; field_overflow; carry_bot |] )
     |> tuple5_of_array
   in
+  let _ : unit = Firebug.console##log (Js.string "result ok") in
 
   (* Create the gate *)
   with_label "ffadd_gate" (fun () ->
@@ -816,9 +822,12 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
                  ; sign
                  } )
         } ) ;
+  Firebug.console##log (Js.string "ffadd_gate ok");
 
   (* Return the result *)
-  (Element.Standard.of_limbs (result0, result1, result2), sign, field_overflow)
+  let ret = (Element.Standard.of_limbs (result0, result1, result2), sign, field_overflow) in
+  let _ : unit = Firebug.console##log (Js.string "sum_setup ret ok") in
+  ret
 
 (* Gadget for creating an addition or subtraction result row (Zero gate with result) *)
 let result_row (type f) (module Circuit : Snark_intf.Run with type field = f)
