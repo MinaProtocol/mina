@@ -82,6 +82,8 @@ module type S = sig
 
     val to_accumulated : t -> accumulated_t
 
+    val unattach_accumulated : t -> bool
+
     (** already have module For_testing from include above *)
     module For_testing : sig
       val location_in_mask : t -> location -> bool

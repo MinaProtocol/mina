@@ -111,6 +111,11 @@ module Make (Inputs : Inputs_intf.S) = struct
       Dangling_parent_reference of
         Uuid.t * (* Location where null was set*) string
 
+    let unattach_accumulated t =
+      let res = Option.is_some t.accumulated in
+      t.accumulated <- None ;
+      res
+
     let to_accumulated t =
       match (t.accumulated, t.parent) with
       | Some { accumulated_maps; ancestor }, _ ->
