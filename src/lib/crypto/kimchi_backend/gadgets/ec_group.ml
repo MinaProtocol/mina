@@ -1,4 +1,5 @@
 open Core_kernel
+open Js_of_ocaml
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
@@ -81,10 +82,12 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
              (module Circuit)
              right_input
              (Affine.const_zero (module Circuit)) ) ) ) ;
+  Firebug.console##log (Js.string "two points are not equal and not infinity") ;
 
   (* Unpack coordinates *)
   let left_x, left_y = Affine.to_coordinates left_input in
   let right_x, right_y = Affine.to_coordinates right_input in
+  let _ : unit = Firebug.console##log (Js.string "unpack coordinates ok") in
 
   (* TODO: Remove sanity checks if this API is not public facing *)
   (* Sanity check that x-coordinates are not equal (i.e. we don't support Invertibility) *)
@@ -94,6 +97,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
           (Foreign_field.Element.Standard.equal_as_prover
              (module Circuit)
              left_x right_x ) ) ) ;
+  Firebug.console##log (Js.string "x-coordinates are not equal") ;
 
   (* Compute witness values *)
   let ( slope0
@@ -184,23 +188,28 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
         |] )
     |> tuple9_of_array
   in
+  let _ : unit = Firebug.console##log (Js.string "witness computation ok") in
 
   (* Convert slope and result into foreign field elements *)
   let slope =
     Foreign_field.Element.Standard.of_limbs (slope0, slope1, slope2)
   in
+  let _ : unit = Firebug.console##log (Js.string "slope conversion ok") in
   let result_x =
     Foreign_field.Element.Standard.of_limbs (result_x0, result_x1, result_x2)
   in
+  let _ : unit = Firebug.console##log (Js.string "result x conversion ok") in
   let result_y =
     Foreign_field.Element.Standard.of_limbs (result_y0, result_y1, result_y2)
   in
+  let _ : unit = Firebug.console##log (Js.string "result y conversion ok") in
 
   (* C1: Constrain computation of slope squared *)
   let slope_squared =
     (* s * s = s^2 *)
     Foreign_field.mul (module Circuit) external_checks slope slope curve.modulus
   in
+  let _ : unit = Firebug.console##log (Js.string "constraint compuation of slope squared ok") in
   (* Bounds 1: Left input (slope) bound check below.
    *           Right input (slope) equal to left input (already checked)
    *           Result (s^2) bound check already tracked by Foreign_field.mul.
@@ -208,6 +217,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   Foreign_field.(
     External_checks.append_bound_check external_checks
     @@ Element.Standard.of_limbs (slope0, slope1, slope2)) ;
+  Firebug.console##log (Js.string "slopes bound check ok");
 
   (*
    * Constrain result x-coordinate computation: x = s^2 - Lx - Rx with length 2 chain
@@ -219,6 +229,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       external_checks slope_squared result_x curve.modulus
   in
+  let _ : unit = Firebug.console##log (Js.string "slope squared minus x constraint ok") in
 
   (* Bounds 2: Left input (s^2) bound check covered by (Bounds 1).
    *           Right input (x) bound check value is gadget output (checked by caller).
@@ -231,6 +242,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       external_checks slope_squared_minus_x left_x curve.modulus
   in
+  let _ : unit = Firebug.console##log (Js.string "expected right x constraint ok") in
 
   (* Bounds 3: Left input (sΔx) is chained (no bound check required).
    *           Right input (Lx) is gadget input (checked by caller).
@@ -241,6 +253,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   Foreign_field.Element.Standard.assert_equal
     (module Circuit)
     expected_right_x right_x ;
+  Firebug.console##log (Js.string "expected right x assert ok");
 
   (* Continue the chain to length 4 by computing (Rx - x) * s (used later) *)
 
@@ -250,11 +263,13 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       external_checks expected_right_x result_x curve.modulus
   in
+  let _ : unit = Firebug.console##log (Js.string "right delta constraint ok") in
   (* Bounds 4: Left input (Rx) is chained (no bound check required).
    *           Right input (x) is gadget output (checked by caller).
    *           Addition chain result (right_delta) bound check added below.
    *)
   Foreign_field.External_checks.append_bound_check external_checks right_delta ;
+  Firebug.console##log (Js.string "right delta bound check ok");
 
   (* C5: RxΔ * s = RxΔs *)
   let right_delta_s =
@@ -262,6 +277,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       external_checks right_delta slope curve.modulus
   in
+  let _ : unit = Firebug.console##log (Js.string "right delta s ok") in
 
   (* Bounds 5: Left input (right_delta) already covered by (Bounds 4)
    *           Right input (slope) already covered by (Bounds 1).
@@ -279,10 +295,12 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       external_checks right_x left_x curve.modulus
   in
+  let _ : unit = Firebug.console##log (Js.string "delta x ok") in
   (* Bounds 6: Inputs (Rx and Lx) are gadget inputs (checked by caller).
    *           Addition chain result (delta_x) bound check below.
    *)
   Foreign_field.External_checks.append_bound_check external_checks delta_x ;
+  Firebug.console##log (Js.string "delta x bound check ok");
 
   (* C7: Δx * s = Δxs *)
   let delta_x_s =
@@ -290,6 +308,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       external_checks delta_x slope curve.modulus
   in
+  let _ : unit = Firebug.console##log (Js.string "delta x s ok") in
 
   (* Bounds 7: Left input (delta_x) already covered by (Bounds 6)
    *           Right input (slope) already covered by (Bounds 1).
@@ -306,6 +325,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       external_checks delta_x_s left_y curve.modulus
   in
+  let _ : unit = Firebug.console##log (Js.string "expected right y ok") in
 
   (* Bounds 8: Left input (delta_x_s) check is tracked by (Bounds 7).
    *           Right input bound check value is gadget input (checked by caller).
@@ -316,6 +336,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   Foreign_field.Element.Standard.assert_equal
     (module Circuit)
     expected_right_y right_y ;
+  Firebug.console##log (Js.string "expected right y assert ok");
 
   (*
    * Constrain result y-coordinate computation: y = (Rx - x) * s - Ry
@@ -328,10 +349,12 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       external_checks expected_right_y result_y curve.modulus
   in
+  let _ : unit = Firebug.console##log (Js.string "expected right delta s ok") in
   (* Result row *)
   Foreign_field.result_row
     (module Circuit)
     ~label:"Ec_group.add_expected_right_delta_s" expected_right_delta_s None ;
+  Firebug.console##log (Js.string "expected right delta s ok");
   (* Bounds 9: Left input (Ry) check is chained (no check required).
    *           Right input (y) check value is gadget output (checked by caller).
    *           Addition chain result (expected_right_delta_s) check already covered by (Bounds 5).
@@ -340,6 +363,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   Foreign_field.Element.Standard.assert_equal
     (module Circuit)
     expected_right_delta_s right_delta_s ;
+  Firebug.console##log (Js.string "expected right delta s assert ok");
 
   (* Return result point *)
   Affine.of_coordinates (result_x, result_y)
