@@ -49,7 +49,15 @@ module Make (Inputs : Inputs_intf.S) = struct
   let maps_copy { accounts; token_owners; hashes; locations } =
     { accounts; token_owners; hashes; locations }
 
-  type accumulated_t = { accumulated_maps : maps_t; ancestor : Base.t }
+  type accumulated_t =
+    { current : maps_t
+    ; next : maps_t
+    ; base : Base.t
+    ; detached_next_signal : Detached_parent_signal.t
+          (* Ivar for mask from which next was started being built
+             When it's fulfilled, "next" becomes "current".
+          *)
+    }
 
   type t =
     { uuid : Uuid.Stable.V1.t
@@ -67,6 +75,13 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   type unattached = t [@@deriving sexp]
 
+  let empty_maps () =
+    { accounts = Location_binable.Map.empty
+    ; token_owners = Token_id.Map.empty
+    ; hashes = Addr.Map.empty
+    ; locations = Account_id.Map.empty
+    }
+
   let create ~depth () =
     { uuid = Uuid_unix.create ()
     ; parent = Error __LOC__
@@ -74,12 +89,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; current_location = None
     ; depth
     ; accumulated = None
-    ; maps =
-        { accounts = Location_binable.Map.empty
-        ; token_owners = Token_id.Map.empty
-        ; hashes = Addr.Map.empty
-        ; locations = Account_id.Map.empty
-        }
+    ; maps = empty_maps ()
     }
 
   let get_uuid { uuid; _ } = uuid
@@ -113,10 +123,18 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let to_accumulated t =
       match (t.accumulated, t.parent) with
-      | Some { accumulated_maps; ancestor }, _ ->
-          { ancestor; accumulated_maps = maps_copy accumulated_maps }
-      | None, Ok ancestor ->
-          { ancestor; accumulated_maps = maps_copy t.maps }
+      | Some { base; detached_next_signal; next; current }, _ ->
+          { base
+          ; detached_next_signal
+          ; next = maps_copy next
+          ; current = maps_copy current
+          }
+      | None, Ok base ->
+          { base
+          ; next = maps_copy t.maps
+          ; current = maps_copy t.maps
+          ; detached_next_signal = t.detached_parent_signal
+          }
       | None, Error loc ->
           raise (Dangling_parent_reference (t.uuid, loc))
 
@@ -133,9 +151,9 @@ module Make (Inputs : Inputs_intf.S) = struct
     let unset_parent ?(trigger_signal = true) ~loc t =
       assert (Result.is_ok t.parent) ;
       t.parent <- Error loc ;
-      t.accumulated <- None ;
-      if trigger_signal then
-        Async.Ivar.fill_if_empty t.detached_parent_signal () ;
+      if trigger_signal then (
+        t.accumulated <- None ;
+        Async.Ivar.fill_if_empty t.detached_parent_signal () ) ;
       t
 
     let assert_is_attached t =
@@ -151,9 +169,19 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ; Result.ok_or_failwith opt
 
     let maps_and_ancestor t =
+      Option.iter t.accumulated
+        ~f:(fun { detached_next_signal; next; base; current = _ } ->
+          if Async.Ivar.is_full detached_next_signal then
+            t.accumulated <-
+              Some
+                { next = empty_maps ()
+                ; current = next
+                ; detached_next_signal = t.detached_parent_signal
+                ; base
+                } ) ;
       match t.accumulated with
-      | Some { accumulated_maps; ancestor } ->
-          (accumulated_maps, ancestor)
+      | Some { current; base; _ } ->
+          (current, base)
       | None ->
           (t.maps, get_parent t)
 
@@ -167,7 +195,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let update_maps ~f t =
       f t.maps ;
-      Option.iter t.accumulated ~f:(fun { accumulated_maps = ms; _ } -> f ms)
+      Option.iter t.accumulated ~f:(fun { current; next; _ } ->
+          f current ; f next )
 
     let self_set_hash t address hash =
       update_maps t ~f:(fun maps ->
@@ -603,7 +632,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       ; maps = maps_copy t.maps
       ; accumulated =
           Option.map t.accumulated ~f:(fun acc ->
-              { acc with accumulated_maps = maps_copy acc.accumulated_maps } )
+              { acc with
+                next = maps_copy acc.next
+              ; current = maps_copy acc.current
+              } )
       }
 
     let last_filled t =
