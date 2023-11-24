@@ -226,7 +226,7 @@ branches, or otherwise changing the dependency tree of Mina.
 
 TL;DR:
 ```
-$(nix build mina#mina-image-full) | docker load
+$(nix build mina#mina-image-full --print-out-paths) | docker load
 ```
 
 Since a "pure" build can happen entirely inside the Nix sandbox, we can use its

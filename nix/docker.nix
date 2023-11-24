@@ -82,7 +82,7 @@ in {
   mina-delegation-verify-image = dockerTools.streamLayeredImage {
     name = "mina-delegation-verify";
     inherit created;
-    contents = [ ocamlPackages_mina.mina-delegation-verify.out ];
+    contents = [ ocamlPackages_mina.mina-delegation-verify.out coreutils bashInteractive ];
     config = {
       cmd = [ "/bin/delegation-verify" ];
       Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" ];
