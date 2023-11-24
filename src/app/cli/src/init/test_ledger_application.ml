@@ -133,7 +133,7 @@ let apply_txs ~constraint_constants ~first_partition_slots ~no_new_stack
 
 let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
     ~no_new_stack ~has_second_partition ~num_txs_per_round ~rounds ~no_masks
-    num_txs_final =
+    ~max_depth num_txs_final =
   let constraint_constants =
     Genesis_constants_compiled.Constraint_constants.t
   in
@@ -159,7 +159,17 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
       Fn.compose (Ledger.register_mask ledger)
       @@ Ledger.Mask.create ~depth:constraint_constants.ledger_depth
   in
-  Deferred.List.fold (List.init rounds ~f:ident) ~init:init_ledger
-    ~f:(fun ledger i ->
-      apply ~num_txs:num_txs_per_round ~i ledger >>| mask_handler ledger )
+  let drop_old_ledger ledger =
+    if not no_masks then (
+      Ledger.commit ledger ;
+      Ledger.remove_and_reparent_exn ledger ledger )
+  in
+  Deferred.List.fold (List.init rounds ~f:ident) ~init:(init_ledger, [])
+    ~f:(fun (ledger, ledgers) i ->
+      List.hd (List.drop ledgers (max_depth - 1))
+      |> Option.iter ~f:drop_old_ledger ;
+      apply ~num_txs:num_txs_per_round ~i ledger
+      >>| mask_handler ledger
+      >>| Fn.flip Tuple2.create (ledger :: ledgers) )
+  >>| fst
   >>= apply ~num_txs:num_txs_final ~i:rounds
