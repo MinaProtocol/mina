@@ -716,13 +716,18 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
        and type hash := Hash.t
        and type unattached_mask := Mask.t
        and type attached_mask := Mask.Attached.t
-       and type t := Base.t = Merkle_mask.Maskable_merkle_tree.Make (struct
-    include Inputs
-    module Base = Base
-    module Mask = Mask
+       and type accumulated_t = Mask.accumulated_t
+       and type t := Base.t = struct
+    type accumulated_t = Mask.accumulated_t
 
-    let mask_to_base m = Any_base.cast (module Mask.Attached) m
-  end)
+    include Merkle_mask.Maskable_merkle_tree.Make (struct
+      include Inputs
+      module Base = Base
+      module Mask = Mask
+
+      let mask_to_base m = Any_base.cast (module Mask.Attached) m
+    end)
+  end
 
   (* test runner *)
   let with_instances f =
