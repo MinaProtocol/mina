@@ -23,7 +23,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; test_account "fish2" "3000"
         ; test_account "snark-node-key" "0"
         ]
-    ; block_producers = [ bp "node-a" (); bp "node-b" () ]
+    ; block_producers = [ bp "node-a"; bp "node-b" ]
+    ; archive_nodes = [ archive "archive" ]
     ; snark_coordinator = snark "snark-node" 2
     ; snark_worker_fee = "0.0001"
     ; proof_config =

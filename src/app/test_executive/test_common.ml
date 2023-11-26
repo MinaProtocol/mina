@@ -456,9 +456,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   module Node_config = struct
     open Inputs.Engine.Network
 
-    let archive node_name ?(account_name = node_name ^ "-key")
-        ?(docker_image = !mina_image) ?(archive_image = !archive_image)
-        ?git_build () =
+    let archive ?account_name ?(docker_image = !mina_image)
+        ?(archive_image = !archive_image) ?git_build node_name =
+      let account_name =
+        Option.value account_name ~default:(node_name ^ "-key")
+      in
       let docker_image =
         if Option.is_some git_build then None else Some docker_image
       in
@@ -469,8 +471,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; git_build
       }
 
-    let bp node_name ?(account_name = node_name ^ "-key")
-        ?(docker_image = !mina_image) ?git_build () =
+    let bp ?account_name ?(docker_image = !mina_image) ?git_build node_name =
+      let account_name =
+        Option.value account_name ~default:(node_name ^ "-key")
+      in
       let docker_image =
         if Option.is_some git_build then None else Some docker_image
       in
@@ -480,8 +484,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; git_build
       }
 
-    let seed node_name ?(account_name = node_name ^ "-key")
-        ?(docker_image = !mina_image) ?git_build () =
+    let seed ?account_name ?(docker_image = !mina_image) ?git_build node_name =
+      let account_name =
+        Option.value account_name ~default:(node_name ^ "-key")
+      in
       let docker_image =
         if Option.is_some git_build then None else Some docker_image
       in

@@ -72,7 +72,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; test_account "whale2-key" "1000000000"
         ; test_account "snark-node-key" "100"
         ]
-    ; block_producers = [ bp "whale1" (); bp "whale2" () ]
+    ; block_producers = [ bp "whale1"; bp "whale2" ]
     ; snark_coordinator = snark "snark-node" 2
     ; snark_worker_fee = "0.0001"
     }

@@ -153,10 +153,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~cliff_amount:2_000_000_000_000 ~vesting_period:1
                    ~vesting_increment:1_000_000_000_000 )
           ]
-    ; block_producers = [ bp "node-a" (); bp "node-b" () ]
+    ; block_producers = [ bp "node-a"; bp "node-b" ]
     ; snark_coordinator = snark "snark-node" ~account_name:"snark-node-key1" 4
     ; snark_worker_fee = "0.0002"
-    ; archive_nodes = [ archive "archive-node" () ]
+    ; archive_nodes = [ archive "archive-node" ]
     ; proof_config =
         { proof_config_default with
           work_delay = Some 1

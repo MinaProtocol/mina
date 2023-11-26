@@ -23,14 +23,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
         @ List.init num_extra_keys ~f:(fun i ->
               let i_str = Int.to_string i in
-              test_account ("sender-account-" ^ i_str) "10000" )
+              test_account ~timing:Untimed ("sender-account" ^ i_str) "10000" )
     ; block_producers =
-        [ bp "receiver" ()
-        ; bp "empty_node-1" ~account_name:"empty-bp-key" ()
-        ; bp "empty_node-2" ~account_name:"empty-bp-key" ()
-        ; bp "empty_node-3" ~account_name:"empty-bp-key" ()
-        ; bp "empty_node-4" ~account_name:"empty-bp-key" ()
-        ; bp "observer" ~account_name:"empty-bp-key" ()
+        [ bp "receiver"
+        ; bp "empty_node-1" ~account_name:"empty-bp-key"
+        ; bp "empty_node-2" ~account_name:"empty-bp-key"
+        ; bp "empty_node-3" ~account_name:"empty-bp-key"
+        ; bp "empty_node-4" ~account_name:"empty-bp-key"
+        ; bp "observer" ~account_name:"empty-bp-key"
         ]
     ; snark_coordinator = snark "snark-node" 4
     ; txpool_max_size = 10_000_000

@@ -21,10 +21,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               let i_str = Int.to_string i in
               test_account ("sender-account-" ^ i_str) "10000" )
     ; block_producers =
-        [ bp "receiver" ()
-        ; bp "empty_node-1" ~account_name:"empty-bp-key" ()
-        ; bp "empty_node-2" ~account_name:"empty-bp-key" ()
-        ; bp "observer" ~account_name:"empty-bp-key" ()
+        [ bp "receiver"
+        ; bp "empty_node-1" ~account_name:"empty-bp-key"
+        ; bp "empty_node-2" ~account_name:"empty-bp-key"
+        ; bp "observer" ~account_name:"empty-bp-key"
         ]
     ; snark_coordinator = snark "snark-node" 4
     ; txpool_max_size = 10_000_000
@@ -35,8 +35,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.small
         }
-    ; seed_nodes = [ seed "seed-0" (); seed "seed-1" () ]
-    ; archive_nodes = [ archive "archive-node" () ]
+    ; seed_nodes = [ seed "seed-0"; seed "seed-1" ]
+    ; archive_nodes = [ archive "archive-node" ]
     }
 
   let run _network _t = Malleable_error.return ()

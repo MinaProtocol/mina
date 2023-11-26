@@ -16,7 +16,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Node_config in
     { default with
       genesis_ledger = [ test_account "node-key" "1000" ]
-    ; block_producers = [ bp "node" () ]
+    ; block_producers = [ bp "node" ]
     }
 
   let run network t =
