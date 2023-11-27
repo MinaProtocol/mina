@@ -38,8 +38,8 @@ blocks after a certain slot will be as follows:
 
 * There will be a configuration parameter set at compile-time that will define
   the slot at which the node will stop processing transactions.
-* The previous configuration should be overridable at runtime by optional CLI
-  flags.
+* The previous configuration cannot be overridable at runtime, by design, as
+  this compromises the safety of the daemon software.
 * The node (daemon) will stop accepting new transactions from clients after
   the configured slot.
 * After the configured slot, the block producer will stop including transactions
@@ -54,8 +54,6 @@ next:
 
 * There will be a configuration parameter set at compile-time that will define
   the slot at which the node will stop the network.
-* The previous configuration should be overridable at runtime by optional CLI
-  flags.
 * After the configured slot, the block producer will stop producing any blocks.
 * The block validator will reject any blocks received after the stop network
 * slot.
@@ -64,7 +62,7 @@ next:
 
 Each of these procedures will be described in detail in the following sections.
 
-### Compile-time configuration and CLI flag
+### Compile-time configuration
 
 The configuration parameters `slot_tx_end` and `slot_chain_end` will be set at
 compile-time and will define the slot at which the node will stop processing
@@ -73,17 +71,6 @@ configuration parameters will be optional and will default to `None`. If
 `slot_tx_end` is set to `None`, the node will not stop processing transactions.
 If `slot_chain_end` is set to `None`, the node will not stop producing or
 validating blocks.
-
-There will be two optional CLI flags that will override this configuration.
-
-* `--slot-tx-end`: if set to `none`, disables the feature by setting the
-  slot at which the node will stop processing transactions to `None`. If set to
-  a slot, enables the stop transaction processing feature and sets the value
-  passed as the slot at which the node will stop processing transactions.
-* `--slot-network-end`: if set to `none`, disables the feature by setting the
-  slot at which the node will stop to `None`. If set to a slot, enables the stop
-  network feature and sets the value passed as the slot at which the node will
-  stop producing/validating blocks.
 
 ### Client submits transaction
 
