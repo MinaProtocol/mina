@@ -741,23 +741,21 @@ module Make (Inputs : Inputs_intf) :
     (* Batch-request hashes to answer the query `rev_locations` *)
     let rev_hashes = get_hash_batch_exn mdb rev_location_query in
     (* Reconstruct merkle paths from response, query, lengths structure and directions *)
-    let rec loop directions hashes lengths acc =
-      match (lengths, directions, hashes, acc) with
-      | [], [], [], [] :: acc_tl ->
-          acc_tl
-      | 0 :: lengths, _, _, _ ->
-          loop directions hashes lengths ([] :: acc)
-      | length :: lengths, direction :: directions, hashes, acc_hd :: acc_tl ->
-          let entry, rest_hashes = extract_hashes_exn ~direction hashes in
-          let dir =
-            Direction.map direction ~left:(`Left entry) ~right:(`Right entry)
-          in
-          loop directions rest_hashes ((length - 1) :: lengths)
-            ((dir :: acc_hd) :: acc_tl)
-      | _ ->
-          failwith "Mismatched lengths"
+    let f (directions, all_hashes, acc) length =
+      let dirs, rest_dirs = List.split_n directions length in
+      let rest_hashes, res =
+        List.fold_map dirs ~init:all_hashes ~f:(fun hashes direction ->
+            let entry, rest_hashes = extract_hashes_exn ~direction hashes in
+            let dir =
+              Direction.map direction ~left:(`Left entry) ~right:(`Right entry)
+            in
+            (rest_hashes, dir) )
+      in
+      (rest_dirs, rest_hashes, res :: acc)
     in
-    loop rev_directions rev_hashes rev_lengths [ [] ]
+    (* essentially it's `List.rev_fold_map`, but there is no such operator sadly *)
+    Tuple3.get3
+    @@ List.fold ~init:(rev_directions, rev_hashes, []) ~f rev_lengths
 
   let merkle_path_batch =
     let update_locs = Fn.compose List.cons Location.sibling in
