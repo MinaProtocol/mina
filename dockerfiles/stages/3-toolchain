@@ -109,11 +109,23 @@ RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # Dhall
-# RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-aarch64-linux.tar.bz2 \
-#     | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall
-# RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-bash-$DHALL_BASH_VERSION-aarch64-linux.tar.bz2 \
-#     | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-bash
-# RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-aarch64-linux.tar.bz2 \
-#     | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
+RUN set -ex; \
+    case "$TARGETPLATFORM" in \
+    'linux/amd64') \
+    gh_org='dhall-lang' \
+    dhall_arch='x86_64'; \
+    ;; \
+    'linux/arm64') \
+    gh_org='MinaFoundation' \
+    dhall_arch='aarch64'; \
+    ;; \
+    *) echo >&2 "error: unsupported architecture '$TARGETPLATFORM'"; exit 1 ;; \
+    esac; \
+    curl -sL https://github.com/${gh_org}/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-${dhall_arch}-linux.tar.bz2 \
+    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall \
+    && curl -sL https://github.com/${gh_org}/dhall-haskell/releases/download/$DHALL_VERSION/dhall-bash-$DHALL_BASH_VERSION-${dhall_arch}-linux.tar.bz2 \
+    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-bash \
+    && curl -sL https://github.com/${gh_org}/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-${dhall_arch}-linux.tar.bz2 \
+    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
 
 USER opam
