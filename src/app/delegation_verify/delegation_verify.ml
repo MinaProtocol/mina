@@ -199,8 +199,7 @@ let cassandra_command =
         end) in
         let src =
           Submission.Cassandra.
-            { executable = cqlsh
-            ; keyspace
+            { conf = Cassandra.make_conf ?executable:cqlsh ~keyspace
             ; period_start
             ; period_end
             }

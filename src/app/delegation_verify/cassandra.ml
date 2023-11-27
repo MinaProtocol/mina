@@ -3,20 +3,56 @@ open Core
 
 type 'a parser = Yojson.Safe.t -> 'a Ppx_deriving_yojson_runtime.error_or
 
-let query ?executable q =
-  let prog =
+type connection_conf =
+  { hostname : string
+  ; port : int
+  ; username : string
+  ; password : string
+  ; ssl : bool
+  }
+
+type conf =
+  { executable : string
+  ; connection : connection_conf option
+  ; keyspace : string
+  }
+
+let make_conn_conf () : connection_conf option =
+  let open Option.Let_syntax in
+  let%bind hostname = Sys.getenv "CASSANDRA_HOST" in
+  let%bind port = Option.map ~f:Int.of_string @@ Sys.getenv "CASSANDRA_PORT" in
+  let%bind ssl = 
+    Sys.getenv "CASSANDRA_USE_SSL"
+    |> Option.map ~f:(List.mem ~equal:String.equal ["1"; "TRUE"; "true"; "YES"; "yes"])
+  in
+  let%bind username = Sys.getenv "CASSANDRA_USERNAME" in
+  let%map password = Sys.getenv "CASSANDRA_PASSWORD" in
+  { hostname; port; ssl; username; password }
+
+let make_conf ?executable ~keyspace : conf =
+  let conn = make_conn_conf () in
+  let executable =
     Option.merge executable (Sys.getenv "CQLSH") ~f:Fn.const
     |> Option.value ~default:"cqlsh"
   in
-  Process.run_lines ~prog ~stdin:q ~args:[] ()
+  { executable; connection = conn; keyspace }
 
-let select ?executable ~keyspace ~parse ~fields ?where from =
+let query ~conf q =
+  let args =
+    Option.value_map conf.connection ~default:[]
+      ~f:(fun { hostname; port; ssl; username; password } ->
+      [ "--username"; username; "--password"; password
+      ; hostname; Int.to_string port ] @ ( if ssl then [ "--ssl" ] else [] ))
+  in
+  Process.run_lines ~prog:conf.executable ~stdin:q ~args ()
+
+let select ~conf ~parse ~fields ?where from =
   let open Deferred.Or_error.Let_syntax in
   let%bind data =
-    query ?executable
+    query ~conf
     @@ Printf.sprintf "SELECT JSON %s FROM %s.%s%s;"
          (String.concat ~sep:"," fields)
-         keyspace from
+         conf.keyspace from
          (match where with None -> "" | Some w -> " WHERE " ^ w)
   in
   List.slice data 3 (-2) (* skip header and footer *)
@@ -34,13 +70,13 @@ let select ?executable ~keyspace ~parse ~fields ?where from =
          with Yojson.Json_error e -> Or_error.error_string e )
   |> Deferred.return
 
-let update ?executable ~keyspace ~table ~where updates =
+let update ~conf ~table ~where updates =
   let open Deferred.Or_error.Let_syntax in
   let assignments = List.map updates ~f:(fun (k, v) -> k ^ " = " ^ v) in
   let%map _ =
-    query ?executable
+    query ~conf
     @@ Printf.sprintf "CONSISTENCY LOCAL_QUORUM; UPDATE %s.%s SET %s WHERE %s;"
-         keyspace table
+         conf.keyspace table
          (String.concat ~sep:"," assignments)
          where
   in

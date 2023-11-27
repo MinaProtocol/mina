@@ -2,9 +2,12 @@ open Async
 
 type 'a parser = Yojson.Safe.t -> 'a Ppx_deriving_yojson_runtime.error_or
 
+type conf
+
+val make_conf : ?executable:string -> keyspace:string -> conf
+
 val select :
-     ?executable:string
-  -> keyspace:string
+     conf:conf
   -> parse:'a parser
   -> fields:string list
   -> ?where:string
@@ -12,8 +15,7 @@ val select :
   -> 'a list Deferred.Or_error.t
 
 val update :
-     ?executable:string
-  -> keyspace:string
+     conf:conf
   -> table:string
   -> where:string
   -> (string * string) list

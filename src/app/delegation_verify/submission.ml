@@ -126,8 +126,7 @@ end
 
 module Cassandra = struct
   type t =
-    { executable : string option
-    ; keyspace : string
+    { conf : Cassandra.conf
     ; period_start : string
     ; period_end : string
     }
@@ -186,7 +185,7 @@ module Cassandra = struct
 
   let submitter ({ submitter; _ } : submission) = submitter
 
-  let load_submissions { executable; keyspace; period_start; period_end } =
+  let load_submissions { conf ; period_start; period_end } =
     let open Deferred.Or_error.Let_syntax in
     let start_day = Time.of_string period_start |> Time.to_date ~zone:Time.Zone.utc in
     let end_day = Time.of_string period_end |> Time.to_date ~zone:Time.Zone.utc in
@@ -203,7 +202,7 @@ module Cassandra = struct
           (String.concat ~sep:"," @@ List.map ~f:(sprintf "'%s'") partition_keys)
     in
     let%bind raw =
-      Cassandra.select ?executable ~parse:raw_of_yojson ~keyspace
+      Cassandra.select ~conf ~parse:raw_of_yojson
         ~fields:
           [ "created_at"
           ; "submitted_at_date"
@@ -234,10 +233,10 @@ module Cassandra = struct
         s :: l )
     |> Deferred.return
 
-  let load_block ~block_hash { executable; keyspace; _ } =
+  let load_block ~block_hash { conf; _ } =
     let open Deferred.Or_error.Let_syntax in
     let%bind block_data =
-      Cassandra.select ?executable ~parse:block_data_of_yojson ~keyspace
+      Cassandra.select ~conf ~parse:block_data_of_yojson
         ~fields:[ "raw_block" ]
         ~where:(sprintf "block_hash = '%s'" block_hash)
         "blocks"
@@ -249,10 +248,10 @@ module Cassandra = struct
         String.chop_prefix_exn b.raw_block ~prefix:"0x"
         |> Hex.Safe.of_hex |> Option.value_exn |> return
 
-  let output src (submission : submission) = function
+  let output { conf; _ } (submission : submission) = function
     | Ok payload ->
         Output.display payload ;
-        Cassandra.update ?executable:src.executable ~keyspace:src.keyspace
+        Cassandra.update ~conf
           ~table:"submissions"
           ~where:
             (sprintf
@@ -264,7 +263,7 @@ module Cassandra = struct
           Output.(valid_payload_to_cassandra_updates payload)
     | Error e ->
         Output.display_error @@ Error.to_string_hum e ;
-        Cassandra.update ?executable:src.executable ~keyspace:src.keyspace
+        Cassandra.update ~conf
           ~table:"submissions"
           ~where:
             (sprintf
