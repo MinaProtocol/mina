@@ -46,8 +46,8 @@ blocks after a certain slot will be as follows:
   in blocks, and all fees are set to 0.
 * The block validator will reject blocks produced after the stop slot that
   contain any transaction or any non-zero fee.
-* The node should start notifying the user every 60 slots when transaction
-  processing halts in less than 480 slots.
+* The node should start notifying the user every 60 slots (3 hours) when transaction
+  processing halts in less than 480 slots (24 hours).
 
 To stop the network after a certain slot, the procedure will be as described
 next:
@@ -57,8 +57,8 @@ next:
 * After the configured slot, the block producer will stop producing any blocks.
 * The block validator will reject any blocks received after the stop network
 * slot.
-* The node should start notifying the user every 60 slots when block
-  production/validation halts in less than 480 slots.
+* The node should start notifying the user every 60 slots (3 hours) when block
+  production/validation halts in less than 480 slots (24 hours).
 
 Each of these procedures will be described in detail in the following sections.
 
