@@ -179,28 +179,16 @@ module Make (F : Input_intf) :
             let of_sexpable = of_bigint
           end)
 
-      let zero = of_int 0
-
-      let to_bignum_bigint n =
-        (* For non-zero values, conversion is done by creating the bin_prot representation
-           of the [Bignum_bigit.t] value, and then parsing it with bin_prot. *)
-        match compare n zero with
-        | 0 ->
-            Bignum_bigint.zero
-        | c ->
-            (* Tag for positive values is 1, negative is 2:
-               https://github.com/janestreet/bignum/blob/6c63419787a4e209e85befd3d823fff2790677e0/bigint/src/bigint.ml#L27-L30 *)
-            let tag_byte = if c > 0 then '\x01' else '\x02' in
-            let bytes = to_bytes n in
-            let len = Bytes.length bytes in
-            let size_byte = Char.of_int_exn len in
-            let buf = Bytes.create (2 + len) in
-            (* First byte is the tag, second the amount of bytes *)
-            Bytes.unsafe_set buf 0 tag_byte ;
-            Bytes.unsafe_set buf 1 size_byte ;
-            (* Copy the bytes representation of the value, skip the tag and size bytes *)
-            Bytes.unsafe_blit ~src:bytes ~src_pos:0 ~dst_pos:2 ~len ~dst:buf ;
-            Bin_prot.Reader.of_bytes Bignum_bigint.Stable.V1.bin_reader_t buf
+      let to_bignum_bigint =
+        let zero = of_int 0 in
+        let one = of_int 1 in
+        fun n ->
+          if equal n zero then Bignum_bigint.zero
+          else if equal n one then Bignum_bigint.one
+          else
+            Bytes.unsafe_to_string
+              ~no_mutation_while_string_reachable:(to_bytes n)
+            |> Z.of_bits |> Bignum_bigint.of_zarith_bigint
 
       let hash_fold_t s x = Bignum_bigint.hash_fold_t s (to_bignum_bigint x)
 
