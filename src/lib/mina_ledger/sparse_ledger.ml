@@ -58,26 +58,23 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
      pop_empties )
       num_new_accounts wide_merkle_paths merkle_path_locations []
   in
+  let process_location sl key = function
+    | Some _, (_, Some account) :: accs, wide_path :: wpaths, epaths ->
+        (add_wide_path_unsafe sl wide_path key account, accs, wpaths, epaths)
+    | None, accs, wpaths, (_location, wide_path) :: epaths ->
+        ( add_wide_path_unsafe sl wide_path key Account.empty
+        , accs
+        , wpaths
+        , epaths )
+    | _ ->
+        failwith "of_ledger_subset_exn: unexpected case"
+  in
   let sl, _, _, _ =
     List.fold locations
       ~init:
         (of_ledger_root oledger, accounts, wide_merkle_paths, empty_merkle_paths)
-      ~f:(fun (sl, accounts, paths, empty_paths) (key, location) ->
-        match location with
-        | Some _loc -> (
-            match (accounts, paths) with
-            | (_, account) :: rest, merkle_path :: rest_paths ->
-                let sl =
-                  add_wide_path_unsafe sl merkle_path key
-                    (Option.value_exn account)
-                in
-                (sl, rest, rest_paths, empty_paths)
-            | _ ->
-                failwith "unexpected number of non empty accounts" )
-        | None ->
-            let _, path = List.hd_exn empty_paths in
-            let sl = add_wide_path_unsafe sl path key Account.empty in
-            (sl, accounts, paths, List.tl_exn empty_paths) )
+      ~f:(fun (sl, accs, wpaths, epaths) (key, mloc) ->
+        process_location sl key (mloc, accs, wpaths, epaths) )
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]

@@ -185,38 +185,39 @@ end = struct
     }
 
   let add_wide_path_unsafe depth0 tree0 path0 account =
-    let rec build_tree hash height p =
-      match p with
-      | `Left (h_l, h_r) :: path ->
-          let l = build_tree h_l (height - 1) path in
-          Tree.Node (hash, l, Hash h_r)
-      | `Right (h_l, h_r) :: path ->
-          let r = build_tree h_r (height - 1) path in
-          Node (hash, Hash h_l, r)
-      | [] ->
-          assert (height = -1) ;
-          Account account
+    let f (prev_l, prev_r) = function
+      | `Left (h_l, h_r) ->
+          (Tree.Node (h_l, prev_l, prev_r), Tree.Hash h_r)
+      | `Right (h_l, h_r) ->
+          (Hash h_l, Node (h_r, prev_l, prev_r))
     in
     let rec union height tree path =
       match (tree, path) with
-      | Tree.Hash h, path ->
-          let t = build_tree h height path in
-          [%test_result: Hash.t]
-            ~message:
-              "Hashes in union are not equal, something is wrong with your \
-               ledger"
-            ~expect:h (hash t) ;
-          t
-      | Node (h, l, r), `Left (_h_l, _h_r) :: path ->
-          let l = union (height - 1) l path in
-          Node (h, l, r)
-      | Node (h, l, r), `Right (_h_l, _h_r) :: path ->
-          let r = union (height - 1) r path in
-          Node (h, l, r)
-      | Node _, [] ->
-          failwith "Path too short"
-      | Account _, _ :: _ ->
-          failwith "Path too long"
+      | Tree.Hash _, [] ->
+          assert (height = -1) ;
+          Tree.Account account
+      | Tree.Hash h, fst_el :: rest when List.length rest = height ->
+          (* Split `path` into last element and list of rest of elements in reversed order *)
+          let last_el, init_path_rev =
+            Mina_stdlib.Nonempty_list.(init fst_el rest |> rev |> uncons)
+          in
+          let init =
+            match last_el with
+            | `Left (_, h_r) ->
+                (Tree.Account account, Tree.Hash h_r)
+            | `Right (h_l, _) ->
+                (Hash h_l, Account account)
+          in
+          let l, r = List.fold ~init init_path_rev ~f in
+          Tree.Node (h, l, r)
+      | Node (h, l, r), `Left _ :: path ->
+          let l' = union (height - 1) l path in
+          Node (h, l', r)
+      | Node (h, l, r), `Right _ :: path ->
+          let r' = union (height - 1) r path in
+          Node (h, l, r')
+      | Tree.Hash _, _ | Account _, _ :: _ | Node _, [] ->
+          failwith "Path length doesn't match depth/tree"
       | Account _, [] ->
           tree
     in
