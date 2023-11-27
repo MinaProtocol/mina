@@ -1,7 +1,7 @@
 {
     "submodules": [
         {
-            "name":"webhook_submodule_test", 
+            "name":"dkijania/webhook_submodule_test",
             "branches":{
                 "develop":"develop",
                 "berkeley":"berkeley"

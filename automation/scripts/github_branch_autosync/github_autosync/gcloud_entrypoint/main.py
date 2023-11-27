@@ -1,9 +1,10 @@
-''' Main module for handling incoming github webhook event'''
+""" Main module for handling incoming GitHub webhook event"""
 
 from .lib import *
-from typing import Optional 
+from typing import Optional
 
-config = config.load('tests/config.json')
+config = config.load('../tests/config.json')
+
 
 def handle_request(request):
     """Responds to any HTTP request.
@@ -15,37 +16,51 @@ def handle_request(request):
         `make_response <http://flask.pocoo.org/docs/1.0/api/#flask.Flask.make_response>`.
     """
     event = WebHookEvent(request)
-    
+
+    event.verify_signature(config)
+
     if not event.is_push_event():
         print("not a push event. skipping...")
         return
-    
-    repository_name = event.repo()
 
-    if config.repo_fullname() == repository_name:
-        event.verify_signature(request.data, config.github.secret)
-        handle_incoming_commit_push(event,config=config)
-    
-    else:
-        submodule = config.submodules_for_name(repository_name)
+    handle_incoming_commit_push_json(event.info(), config)
 
-        if submodule.is_none():
-            print("unknown source repository. skipping...")
-            return
+
+def handle_incoming_commit_push_json(payload_info, config):
+    """
+      Main logic for handling incoming GitHub webhook event
+    """
+    repository = payload_info.repository
+    source_branch = payload_info.incoming_branch
+
+    if config.is_main_repository(repository):
+        if source_branch in config.github.branches:
+            handle_incoming_commit_push_in_stable_branches(source_branch)
         else:
-            event.verify_signature(request.data, submodule.secret)
-            handle_incoming_commit_push_in_submodule(event,config=config)
-    
-    print("done")
-    
-def handle_incoming_commit_from_submodule(event,config):
-    new_commit_hash = event.info().new_commit_hash()
-    parent_commit = event.info().old_commit_hash()
-    github = GithubApi(config.github)
-    github.submodules(event.info().incoming_branch())
+            handle_incoming_commit_push_in_personal_branches(source_branch)
+    elif config.is_submodule_repository(repository):
+        handle_incoming_commit_from_submodule(payload_info, config)
+    else:
+        print(f"unknown source repository {payload_info.repository}. skipping...")
+        return
 
+    print("done")
+
+
+def handle_incoming_commit_from_submodule(info, config):
+    new_commit_hash = info.new_commit_hash
+    parent_commit = info.old_commit_hash
+    github_api = GithubApi(config.github)
+    submodule = config.get_submodule_repository(info.repository).first()
+    mainline_branch = submodule,info.incoming_branch)
+    #update_branch = f"update_{info.repository}_for_{mainline_branch}"
+    #github_api.create_new_branch(update_branch)
+
+    print(github_api.update_module_hash(parent_commit,new_commit_hash,))
+    #github_api.submodules(info.incoming_branch())
 
     return
+
 
 def handle_incoming_commit_push_in_stable_branches(source_branch):
     """Hand incoming commit on major branch.
@@ -56,7 +71,7 @@ def handle_incoming_commit_push_in_stable_branches(source_branch):
     target_branch = config.github.branches[source_branch]
     github = GithubApi(config.github)
     print(f"generating diff between {source_branch} and '{target_branch}'...")
-    cmp = github.get_diff_commits(target_branch,source_branch)
+    cmp = github.get_diff_commits(target_branch, source_branch)
 
     if cmp.status == "identical":
         print(f"'{source_branch}' and '{target_branch}' branches are identical. skipping merge...")
@@ -67,40 +82,43 @@ def handle_incoming_commit_push_in_stable_branches(source_branch):
 
     if cmp.status == "ahead":
         print(f"'{source_branch}' is ahead of '{target_branch}'. It is enough just to fast-forward...")
-        new_sha = github.fast_forward(target_branch,source_branch)
+        new_sha = github.fast_forward(target_branch, source_branch)
         print(f'branch {target_branch} successfully fast-forward. It is now on commit: {new_sha}')
         return
 
-    print(f"'{source_branch}' and '{target_branch}' branches are not identical, both branches contains different commits (there are 'diverged'). approaching merge...")
-    new_branch = config.tmp_branch_name(source_branch,target_branch)
+    print(
+        f"'{source_branch}' and '{target_branch}' branches are not identical, both branches contains different commits (there are 'diverged'). approaching merge...")
+    new_branch = config.tmp_branch_name(source_branch, target_branch)
 
     if github.branch_exists(new_branch):
-        print(f'temporary sync branch {new_branch} already exists. fast-forwarding or creating yet another pr for new changes')
+        print(
+            f'temporary sync branch {new_branch} already exists. fast-forwarding or creating yet another pr for new changes')
 
         try:
-            new_sha = github.fast_forward(new_branch,source_branch)
+            new_sha = github.fast_forward(new_branch, source_branch)
             print(f'branch {new_branch} successfully fast-forward. It is now on commit: {new_sha}')
         except GithubException:
-            title = github.create_pull_request_for_tmp_branch(config,source_branch,new_branch)
+            title = github.create_pull_request_for_tmp_branch(config, source_branch, new_branch)
             print(f"new PR: '{title}' created. Please resolve it before merge...")
 
     else:
         print(f'creating new sync branch {new_branch} to incorporate changes from {source_branch} to {target_branch}')
-        github.create_new_branch(new_branch,source_branch)
+        github.create_new_branch(new_branch, source_branch)
 
         print("checking mergeability...")
 
-        if github.has_merge_conflict(new_branch,target_branch):
+        if github.has_merge_conflict(new_branch, target_branch):
             print("branches have a merge conflict! creating PR to address those changes...")
-            title = github.create_pull_request(config,source_branch,target_branch,new_branch)
+            title = github.create_pull_request(config, source_branch, target_branch, new_branch)
             print(f"new PR: '{title}' created. Please resolve it before merge...")
 
         else:
             print(f"there is no merge conflict. merging {new_branch} into {target_branch}...")
-            github.merge(target_branch,new_branch, f"Github Autosync: {source_branch} -> {target_branch}")
+            github.merge(target_branch, new_branch, f"Github Autosync: {source_branch} -> {target_branch}")
             github.delete_branch(new_branch)
 
-def get_branches_earlier_in_chain(branches,branch):
+
+def get_branches_earlier_in_chain(branches, branch):
     """ Retrieves names of branches earlier in the chain that incoming one
     Args:
         branches (Dictionary): Configuration element which defines branches relation.
@@ -109,9 +127,10 @@ def get_branches_earlier_in_chain(branches,branch):
         List of branches earlier in the chain
     """
     inv_branches = {v: k for k, v in branches.items()}
-    return get_branches_later_in_chain(inv_branches,branch)
+    return get_branches_later_in_chain(inv_branches, branch)
 
-def get_branches_later_in_chain(branches,branch):
+
+def get_branches_later_in_chain(branches, branch):
     """ Retrieves names of branches earlier in the chain that incoming one
     Args:
         branches (Dictionary): Configuration element which defines branches relation.
@@ -127,57 +146,60 @@ def get_branches_later_in_chain(branches,branch):
     return output
 
 
-def handle_pr(pr,github,source_branch):
+def handle_pr(pr, github, source_branch):
     """ Handle push in personal pr
     Args:
         pr (PullRequest): Configuration element which defines branches relation.
         github (Github): Github wrapper
         branch (String): Incoming branch
     """
-    branches = get_branches_earlier_in_chain(config.branches,pr.base.ref)
-    later_branches = get_branches_later_in_chain(config.branches,pr.base.ref)
+    branches = get_branches_earlier_in_chain(config.branches, pr.base.ref)
+    later_branches = get_branches_later_in_chain(config.branches, pr.base.ref)
     branches.extend(later_branches)
 
     data = []
-   
-    for branch in branches: 
-        if github.has_merge_conflict(branch,source_branch):
-            print(f"{branch} and {source_branch} branches have a merge conflict! creating PR to address those changes...")
-            
-            new_branch = config.tmp_branch_name(source_branch,branch)
+
+    for branch in branches:
+        if github.has_merge_conflict(branch, source_branch):
+            print(
+                f"{branch} and {source_branch} branches have a merge conflict! creating PR to address those changes...")
+
+            new_branch = config.tmp_branch_name(source_branch, branch)
 
             if github.branch_exists(new_branch):
                 print(f"{new_branch} already exists therefore we will recreate it")
                 github.delete_branch(new_branch)
 
-            github.create_new_branch(new_branch,branch)
+            github.create_new_branch(new_branch, branch)
 
             commits = pr.get_commits()
-            github.cherry_pick_commits(new_branch,commits,skip_merges=True)
+            github.cherry_pick_commits(new_branch, commits, skip_merges=True)
 
-            title = github.create_pull_request(config,source_branch,branch,new_branch)
+            title = github.create_pull_request(config, source_branch, branch, new_branch)
             print(f"new PR: '{title}' created. Please resolve it before merge...")
 
             for pr in github.repository().inner.get_pulls(head=new_branch):
                 if pr.title == title:
-                    data.append((pr.html_url,new_branch,branch))
+                    data.append((pr.html_url, new_branch, branch))
     if any(data):
         pr.create_issue_comment(comment_conflict(data))
+
 
 def handle_incoming_commit_push_in_personal_branches(source_branch):
     """
       Main handler for change in personal branch
     """
     github = GithubApi(config.github)
-    
+
     pull_requests = github.get_opened_not_draft_prs_from(source_branch)
 
     if not any(pull_requests):
         print(f"skipping... merge check as branch {source_branch} does not have any non-draft pr opened")
 
     for pr in pull_requests:
-        handle_pr(pr,github,source_branch)
-    
+        handle_pr(pr, github, source_branch)
+
+
 def comment_conflict(data):
     """
       Template for issue comment after conflict in PR is detected
@@ -190,7 +212,7 @@ def comment_conflict(data):
     <th> Conflicting branch </th>
   </tr>
 """
-    for (url,base,branch) in data: 
+    for (url, base, branch) in data:
         content = content + f"""
 <tr>
     <td> <a href="{url}"> {url} </a> </td>
@@ -202,17 +224,3 @@ def comment_conflict(data):
 </table>
 """
     return content
-
-def handle_incoming_commit_push_json(json,config):
-    """
-      Main logic for handling incoming github webhook event
-    """
-    payload_info=  GithubPayloadInfo(json)
-
-    source_branch = payload_info.incoming_branch
-
-    if not source_branch in config.github.branches:
-        handle_incoming_commit_push_in_personal_branches(source_branch)
-    else:
-        handle_incoming_commit_push_in_stable_branches(source_branch)
-    

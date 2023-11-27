@@ -103,6 +103,34 @@ class Config:
     pr: PullRequest
     buildkite: Buildkite
 
+    def full_main_repo_name(self):
+        return f'{self.github.username}/{self.github.repo}'
+
+    def get_secret_token_for_repo(self, repo):
+        if self.is_main_repository(repo):
+            return self.github.secret
+        else:
+            return [repo == x.name for x in self.submodules]
+
+    def is_main_repository(self, repo):
+        return repo == self.full_main_repo_name()
+
+    def is_submodule_repository(self, repo):
+        return any(self.get_submodule_repository(repo))
+
+    def get_submodule_repository(self, repo):
+        return filter(lambda x: repo == x.name, self.submodules)
+
+    def mainline_branch_for_submodule(self, repo, branch):
+        submodules = self.get_submodule_repository(repo)
+
+        for submodule in submodules:
+            for (key, value) in submodule.branches.items():
+                if key == branch:
+                    return value
+
+        return None
+
 
 def load(config_file_path):
     if os.path.isfile(config_file_path):

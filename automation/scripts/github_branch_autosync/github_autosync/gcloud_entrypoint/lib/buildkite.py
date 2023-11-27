@@ -1,7 +1,8 @@
-'''
+"""
     Module for Buildkite operations
-'''
+"""
 from pybuildkite.buildkite import Buildkite
+
 
 class BuildkiteApi:
     """ Api for running buildkite pipeline. Currently not used"""
@@ -12,9 +13,8 @@ class BuildkiteApi:
         self.org = config["org"]
         self.pipeline = config["pipeline"]
 
-
-    def run_pipeline(self, sha, branch, message):   
-        '''
+    def run_pipeline(self, sha, branch, message):
+        """
         Runs pipeline for given branch.
 
         Parameters:
@@ -22,7 +22,7 @@ class BuildkiteApi:
             branch (str): Branch name.
             message (str): Message seen on buildkite job.
         Returns:
-            Buildkite pipeline handle.   
-        '''
-        return self.buildkite.builds().create_build(self.org, self.pipeline, sha, branch, 
-        clean_checkout=True, message=message)
+            Buildkite pipeline handle.
+        """
+        return self.buildkite.builds().create_build(self.org, self.pipeline, sha, branch,
+                                                    clean_checkout=True, message=message)

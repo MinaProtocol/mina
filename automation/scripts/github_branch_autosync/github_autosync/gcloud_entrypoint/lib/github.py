@@ -151,9 +151,9 @@ class GithubApi:
         """
         self.repository().delete_branch(branch_name)
 
-    def update_module_hash(self, old_hash, new_hash):
+    def update_module_hash(self, old_hash, new_hash, module_name):
         inputs = [InputGitTreeElement(
-            path=element.path, mode=element.mode, type=element.type, sha=element.sha
+            path=module_name, mode="", type="", sha=new_hash
         )]
         self.repository().inner.create_git_tree(inputs, old_hash)
 

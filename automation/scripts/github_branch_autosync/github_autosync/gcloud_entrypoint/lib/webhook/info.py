@@ -1,11 +1,13 @@
 """
-    Module responsible for extracting information from github webhook event payload json
+    Module responsible for extracting information from GitHub webhook event payload json
 """
+
 
 class GithubPayloadInfo(object):
     """
         Class responsible for parsing webhook event payload json
     """
+
     def __init__(self, json):
         self.data = json
 
@@ -15,8 +17,17 @@ class GithubPayloadInfo(object):
             Gets full branch id (/refs/head/{})
         """
         branch_id = self.data["ref"]
-        return str.split(branch_id,"/")[2]
-    
+        return str.split(branch_id, "/")[2]
+
+    @property
+    def repository(self):
+        """
+
+        Returns: repository name
+
+        """
+        return self.data["repository"]["full_name"]
+
     @property
     def new_commit_hash(self):
         """
@@ -24,7 +35,15 @@ class GithubPayloadInfo(object):
         """
         after = self.data["after"]
         return after
-    
+
+    @property
+    def old_commit_hash(self):
+        """
+            Gets old commit hash
+        """
+        before = self.data["before"]
+        return before
+
     @property
     def commits(self):
         """
@@ -32,10 +51,12 @@ class GithubPayloadInfo(object):
         """
         return list(map(CommitInfo, self.data["commits"]))
 
+
 class CommitInfo(object):
     """
         Responsible for providing information about commit
     """
+
     def __init__(self, json):
         self.data = json
 
