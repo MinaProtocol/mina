@@ -38,9 +38,9 @@ struct
     Timer.clock __LOC__ ;
     let srs = Backend.Tick.Keypair.load_urs () in
     let _, main =
-      Wrap_main.wrap_main ~feature_flags ~custom_gate_type:false ~num_chunks ~srs full_signature
-        choices_length dummy_step_keys dummy_step_widths dummy_step_domains
-        max_proofs_verified
+      Wrap_main.wrap_main ~feature_flags ~custom_gate_type:false ~num_chunks
+        ~srs full_signature choices_length dummy_step_keys dummy_step_widths
+        dummy_step_domains max_proofs_verified
     in
     Timer.clock __LOC__ ;
     let t =
@@ -58,7 +58,8 @@ struct
       Common.wrap_domains
         ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
     in
-    ( if debug then
+    ( if false then
+      (* JES: TODO revert back *)
       let res' =
         f_debug full_signature num_choices choices_length ~feature_flags
           ~num_chunks ~max_proofs_verified

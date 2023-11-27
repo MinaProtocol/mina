@@ -637,9 +637,9 @@ struct
       match override_wrap_main with
       | None ->
           let srs = Tick.Keypair.load_urs () in
-          Wrap_main.wrap_main ~num_chunks ~feature_flags ~custom_gate_type ~srs full_signature
-            prev_varss_length step_vks proofs_verifieds step_domains
-            max_proofs_verified
+          Wrap_main.wrap_main ~num_chunks ~feature_flags ~custom_gate_type ~srs
+            full_signature prev_varss_length step_vks proofs_verifieds
+            step_domains max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
           (* Instead of creating a proof using the pickles wrap circuit, we
              have been asked to create proof in an 'adversarial' way, where

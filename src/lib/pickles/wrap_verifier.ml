@@ -790,6 +790,30 @@ struct
          array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
       ~(messages : _ Messages.In_circuit.t) ~which_branch ~openings_proof
       ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
+    (* JES: Debugging parameters *)
+    (* as_prover (fun () ->
+        printf "xi = %s"
+          (Pasta_bindings.Fp.to_string
+             (Scalar_challenge.Constant.to_field
+                (As_prover.read Scalar_challenge.typ xi) ) ) ) ; *)
+    printf "xi = \n" ;
+    as_prover (fun () ->
+        Pasta_bindings.Fp.print_rust
+          (Scalar_challenge.Constant.to_field
+             (As_prover.read Scalar_challenge.typ xi) ) ) ;
+
+    Array.iter
+      ~f:(fun (c1, c2) -> print_g "messages.z_comm" (c1, c2))
+      messages.z_comm ;
+    Array.iter
+      ~f:(fun (c1, c2) -> print_g "messages.t_comm" (c1, c2))
+      messages.t_comm ;
+
+    (* Pasta_bindings.Fp.print_rust (As_prover.read Scalar_challenge.typ xi) ; *)
+    (* as_prover (fun () ->
+        Format.eprintf "%s@." __LOC__ ;
+        Pasta_bindings.Fp.print_rust
+          (As_prover.read Pasta_bindings.Fp.typ actual_proofs_verified_mask) ) ; *)
     let T = Max_proofs_verified.eq in
     let sg_old =
       with_label __LOC__ (fun () ->
@@ -1245,6 +1269,7 @@ struct
         let scale_fast =
           scale_fast ~num_bits:Other_field.Packed.Constant.size_in_bits
         in
+        (* JES: Check field Snarky_backendless.Cvar.t Double.t *)
         let ft_comm =
           with_label __LOC__ (fun () ->
               Common.ft_comm
@@ -1356,6 +1381,11 @@ struct
           ; joint_combiner
           ; feature_flags = plonk.feature_flags
           } ;
+        Format.eprintf "OK HERE %s@." __LOC__ ;
+        (* as_prover (fun () ->
+           Format.eprintf "%s@." __LOC__ ;
+           Pasta_bindings.Fp.print_rust
+             (As_prover.read Digest.typ sponge_digest_before_evaluations) ) ; *)
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   let _mask_evals (type n)
@@ -1434,7 +1464,7 @@ struct
     module Type1 =
       Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
     module Type1Plus =
-      Plonk_checks.Make (Shifted_value.Type2) (Scalars.TockPlus)
+      Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.TockPlus)
   end
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
@@ -1668,6 +1698,9 @@ struct
             (Shifted_value.Type2.to_field (module Field) ~shift:shift2 b)
             b_actual )
     in
+    printf
+      "wrap_verifier.ml finalize_other_proof checked custom_gate_type = %b\n"
+      custom_gate_type ;
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
           if custom_gate_type then

@@ -110,7 +110,6 @@ let test ?(step_only = false) ~custom_gate_type ~valid_witness
   in
 
   let module Proof = (val proof) in
-
   printf "\nPROVING\n" ;
   let test_prove () =
     let public_input, (), proof =
@@ -161,18 +160,20 @@ let test ?(step_only = false) ~custom_gate_type ~valid_witness
                         printf "Adding customisable gate to wrap circuit" ;
                         create_customisable_circuit ~custom_gate_type
                           ~valid_witness:true ) ; *)
-                    let () =
-                      match wrap_circuit_with_configurable_gate with
-                      | Some custom_gate_type ->
-                          printf
-                            "Adding customisable gate to wrap circuit \
-                             custom_gate_type = %b\n"
-                            custom_gate_type ;
-                          create_customisable_circuit ~custom_gate_type
-                            ~valid_witness:true
-                      | _ ->
-                          ()
-                    in
+                    create_customisable_circuit ~custom_gate_type
+                      ~valid_witness:true ;
+                    (* let () =
+                         match wrap_circuit_with_configurable_gate with
+                         | Some custom_gate_type ->
+                             printf
+                               "Adding customisable gate to wrap circuit \
+                                custom_gate_type = %b\n"
+                               custom_gate_type ;
+                             create_customisable_circuit ~custom_gate_type
+                               ~valid_witness:true
+                         | _ ->
+                             ()
+                       in *)
                     { previous_proof_statements =
                         [ { public_input = ()
                           ; proof
@@ -183,7 +184,13 @@ let test ?(step_only = false) ~custom_gate_type ~valid_witness
                     ; public_output = ()
                     ; auxiliary_output = ()
                     } )
-              ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+              ; feature_flags =
+                  ( match wrap_circuit_with_configurable_gate with
+                  | Some _custom_gate_type ->
+                      Pickles_types.Plonk_types.Features.
+                        { none_bool with foreign_field_add = true }
+                  | None ->
+                      Pickles_types.Plonk_types.Features.none_bool )
               ; custom_gate_type =
                   ( match wrap_circuit_with_configurable_gate with
                   | Some custom_gate_type ->
@@ -335,7 +342,7 @@ let () =
   if perform_wrap_custom_tests then
     (* Customised as ForeignFieldAdd gate; valid witness; wrap with custom_gate_type:true *)
     test ~custom_gate_type:false ~valid_witness:true
-      ~wrap_circuit_with_configurable_gate:(Some true) ()
+      ~wrap_circuit_with_configurable_gate:(Some false) ()
 
 (* Customised as ForeignFieldAdd gate; valid witness; wrap with custom_gate_type:true *)
 (* test ~custom_gate_type:true ~valid_witness:true

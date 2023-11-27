@@ -328,6 +328,10 @@ let wrap_main
                       Wrap_hack.Checked.pad_challenges
                         old_bulletproof_challenges
                     in
+                    printf
+                      "wrap_main.ml wrap_main finalize_other_proof \
+                       custom_gate_type = %b\n"
+                      custom_gate_type ;
                     let finalized, chals =
                       with_label __LOC__ (fun () ->
                           Wrap_verifier.finalize_other_proof
@@ -398,6 +402,7 @@ let wrap_main
                   ~request:(fun () -> Req.Messages) )
           in
           let sponge = Wrap_verifier.Opt.create sponge_params in
+          Format.eprintf "HERE %s@." __LOC__ ;
           with_label __LOC__ (fun () ->
               [%log internal] "Wrap_verifier_incrementally_verify_proof" ;
               let res =
