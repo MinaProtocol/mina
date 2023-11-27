@@ -133,7 +133,9 @@ let apply_txs ~constraint_constants ~first_partition_slots ~no_new_stack
 
 let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
     ~no_new_stack ~has_second_partition ~num_txs_per_round ~rounds ~no_masks
-    ~max_depth num_txs_final =
+    ~max_depth ~tracing num_txs_final =
+  O1trace.thread "mina"
+  @@ fun () ->
   let constraint_constants =
     Genesis_constants_compiled.Constraint_constants.t
   in
@@ -164,8 +166,14 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
       Ledger.commit ledger ;
       Ledger.remove_and_reparent_exn ledger ledger )
   in
+  let stop_tracing =
+    if tracing then (fun x -> Mina_tracing.stop () ; x) else ident
+  in
   Deferred.List.fold (List.init rounds ~f:ident) ~init:(init_ledger, [])
     ~f:(fun (ledger, ledgers) i ->
+      let%bind () =
+        if tracing && i = 1 then Mina_tracing.start "." else Deferred.unit
+      in
       List.hd (List.drop ledgers (max_depth - 1))
       |> Option.iter ~f:drop_old_ledger ;
       apply ~num_txs:num_txs_per_round ~i ledger
@@ -173,3 +181,4 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
       >>| Fn.flip Tuple2.create (ledger :: ledgers) )
   >>| fst
   >>= apply ~num_txs:num_txs_final ~i:rounds
+  >>| stop_tracing
