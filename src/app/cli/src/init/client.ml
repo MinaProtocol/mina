@@ -2267,6 +2267,7 @@ let test_ledger_application =
      and has_second_partition =
        flag "--has-second-partition"
          ~doc:"Assume there is a second partition (scan state)" no_arg
+     and tracing = flag "--tracing" ~doc:"Wrap test into tracing" no_arg
      and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg in
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
@@ -2278,7 +2279,7 @@ let test_ledger_application =
      let max_depth = Option.value ~default:290 max_depth in
      Test_ledger_application.test ~privkey_path ~ledger_path ~prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
-       ~num_txs_per_round ~rounds ~no_masks ~max_depth num_txs )
+       ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing num_txs )
 
 let itn_create_accounts =
   Command.async ~summary:"Fund new accounts for incentivized testnet"
