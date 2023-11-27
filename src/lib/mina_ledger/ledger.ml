@@ -271,6 +271,9 @@ module Ledger_inner = struct
 
   let register_mask t mask = Maskable.register_mask (packed t) mask
 
+  let unsafe_preload_accounts_from_parent =
+    Maskable.unsafe_preload_accounts_from_parent
+
   let unregister_mask_exn ~loc mask = Maskable.unregister_mask_exn ~loc mask
 
   let remove_and_reparent_exn t t_as_mask =
