@@ -97,7 +97,7 @@ to `cqlsh`, the delegation verifier can only work in the file system
 mode described above.
 
 Additionally, the aforementioned Cassandra client requires some
-configuration. In particular, and address and credentials to access
+configuration. In particular, an address and credentials to access
 the right Cassandra server must be provided. They should be put in a
 configuration file: `$HOME/.cassandra/cqlshrc`. The file can look
 like this:
@@ -115,6 +115,15 @@ ssl = true
 [ssl]
 certfile = /home/user/uptime-service-backend/database/cert/sf-class2-root.crt
 ```
+
+Alternatively this configuration can be provided in environment variables:
+* `CASSANDRA_HOST`
+* `CASSANDRA_PORT`
+* `CASSANDRA_USERNAME`
+* `CASSANDRA_PASSWORD`
+* `SSL_CERTFILE`
+* `CASSANDRA_USE_SSL` – "1", "YES", "yes", "TRUE", "true" all mean yes,
+  any other value means no.
 
 Usage:
 ```
