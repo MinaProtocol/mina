@@ -72,6 +72,8 @@ let minimalDirtyWhen = [
   S.exactly "buildkite/src/Jobs/Test/RunSnarkProfiler" "dhall",
   S.exactly "buildkite/scripts/run-snark-transaction-profiler" "sh",
   S.exactly "scripts/snark_transaction_profiler" "py"
+  S.exactly "buildkite/scripts/version-linter" "sh"
+  S.exactly "scripts/version-linter" "py"
 ]
 
 -- The default debian version (Bullseye) is used in all downstream CI jobs
