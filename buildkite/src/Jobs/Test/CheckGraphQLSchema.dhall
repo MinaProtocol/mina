@@ -5,10 +5,11 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let CheckGraphQLSchema = ../../Command/CheckGraphQLSchema.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
+let Profiles = ../../Constants/Profiles.dhall
 
-let dependsOn = [
-    { name = "MinaArtifactBullseye", key = "build-deb-pkg" }
-]
+let dependsOn = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Standard
+
 
 in Pipeline.build Pipeline.Config::{
   spec =

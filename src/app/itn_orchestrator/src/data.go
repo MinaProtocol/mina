@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/Khan/genqlient/graphql"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	logging "github.com/ipfs/go-log/v2"
 )
 
@@ -38,9 +38,15 @@ type NodeEntry struct {
 	LastStatusCode  *int
 }
 
+type AwsContext struct {
+	Client     *s3.Client
+	BucketName *string
+	Prefix     string
+}
+
 type Config struct {
 	Ctx                context.Context
-	UptimeBucket       *storage.BucketHandle
+	AwsContext         AwsContext
 	Sk                 ed25519.PrivateKey
 	Log                logging.StandardLogger
 	MinaExec           string
