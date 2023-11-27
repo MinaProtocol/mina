@@ -149,7 +149,7 @@ module Make
                           in
                           [%log debug] "GOSSIP RECEIVED by $node"
                             ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
-                          [%log debug] "GOSSIP RECEIVED recevied event: $event"
+                          [%log debug] "GOSSIP RECEIVED received event: $event"
                             ~metadata:
                               [ ( "event"
                                 , Event_type.event_to_yojson
