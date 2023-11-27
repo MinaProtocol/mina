@@ -6,14 +6,14 @@ module GS = Global_state
 let of_ledger_root ledger =
   of_root ~depth:(Ledger.depth ledger) (Ledger.merkle_root ledger)
 
-let of_ledger_subset_exn (oledger : Ledger.t) keys =
+let of_ledger_subset_exn_impl ~path_query ~path_add (oledger : Ledger.t) keys =
   let locations = Ledger.location_of_account_batch oledger keys in
   let non_empty_locations = List.filter_map locations ~f:snd in
   let num_new_accounts =
     List.length locations - List.length non_empty_locations
   in
   let accounts = Ledger.get_batch oledger non_empty_locations in
-  let wide_merkle_paths, empty_merkle_paths =
+  let non_empty_paths, empty_paths =
     let next_location_exn loc = Option.value_exn (Ledger.Location.next loc) in
     let empty_address =
       Ledger.Addr.of_directions
@@ -33,38 +33,32 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
                loc := next_location_exn !loc ;
                !loc )
     in
-    let paths =
-      Ledger.wide_merkle_path_batch oledger
-        (empty_locations @ non_empty_locations)
-    in
+    let paths = path_query oledger (empty_locations @ non_empty_locations) in
     List.split_n paths num_new_accounts
+  in
+  let process_location sl key = function
+    | Some _, (_, Some account) :: accs, path :: ne_paths, epaths ->
+        (path_add sl path key account, accs, ne_paths, epaths)
+    | None, accs, ne_paths, path :: epaths ->
+        (path_add sl path key Account.empty, accs, ne_paths, epaths)
+    | _ ->
+        failwith "of_ledger_subset_exn: unexpected case"
   in
   let sl, _, _, _ =
     List.fold locations
-      ~init:
-        (of_ledger_root oledger, accounts, wide_merkle_paths, empty_merkle_paths)
-      ~f:(fun (sl, accounts, paths, empty_paths) (key, location) ->
-        match location with
-        | Some _loc -> (
-            match (accounts, paths) with
-            | (_, account) :: rest, merkle_path :: rest_paths ->
-                let sl =
-                  add_wide_path_unsafe sl merkle_path key
-                    (Option.value_exn account)
-                in
-                (sl, rest, rest_paths, empty_paths)
-            | _ ->
-                failwith "unexpected number of non empty accounts" )
-        | None ->
-            let path = List.hd_exn empty_paths in
-            let sl = add_wide_path_unsafe sl path key Account.empty in
-            (sl, accounts, paths, List.tl_exn empty_paths) )
+      ~init:(of_ledger_root oledger, accounts, non_empty_paths, empty_paths)
+      ~f:(fun (sl, accs, ne_paths, epaths) (key, mloc) ->
+        process_location sl key (mloc, accs, ne_paths, epaths) )
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root oledger)
         ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) ) ;
   sl
+
+let of_ledger_subset_exn =
+  of_ledger_subset_exn_impl ~path_query:Ledger.wide_merkle_path_batch
+    ~path_add:add_wide_path_unsafe
 
 let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
   List.fold indexes
