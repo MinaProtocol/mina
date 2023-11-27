@@ -237,7 +237,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
     let self_path_get_hash ~hashes ~current_location height address =
-      match Hashtbl.find hashes address with
+      match Map.find hashes address with
       | Some hash ->
           Some hash
       | None ->
@@ -292,7 +292,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let fixup_merkle_path ~hashes ~address:init =
       let f address =
         (* first element in the path contains hash at sibling of address *)
-        let sibling_mask_hash = Hashtbl.find hashes (Addr.sibling address) in
+        let sibling_mask_hash = Map.find hashes (Addr.sibling address) in
         let parent_addr = Addr.parent_exn address in
         let open Option in
         function
@@ -308,8 +308,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     let fixup_wide_merkle_path ~hashes ~address:init =
       let f address =
         (* element in the path contains hash at sibling of address *)
-        let sibling_mask_hash = Hashtbl.find hashes (Addr.sibling address) in
-        let self_mask_hash = Hashtbl.find hashes address in
+        let sibling_mask_hash = Map.find hashes (Addr.sibling address) in
+        let self_mask_hash = Map.find hashes address in
         let parent_addr = Addr.parent_exn address in
         let open Option in
         function
@@ -332,7 +332,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let merkle_path_at_addr_exn t address =
       assert_is_attached t ;
       match
-        self_merkle_path ~depth:t.depth ~hashes:t.hash_tbl
+        self_merkle_path ~depth:t.depth ~hashes:!(t.hashes)
           ~current_location:t.current_location address
       with
       | Some path ->
@@ -341,7 +341,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           let parent_merkle_path =
             Base.merkle_path_at_addr_exn (get_parent t) address
           in
-          fixup_merkle_path ~hashes:t.hash_tbl parent_merkle_path ~address
+          fixup_merkle_path ~hashes:!(t.hashes) parent_merkle_path ~address
 
     let merkle_path_at_index_exn t index =
       merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:t.depth index)
@@ -355,7 +355,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let self_paths =
         List.map locations ~f:(fun location ->
             let address = Location.to_path_exn location in
-            self_lookup ~hashes:t.hash_tbl ~current_location:t.current_location
+            self_lookup ~hashes:!(t.hashes) ~current_location:t.current_location
               ~depth:t.depth address
             |> Option.value_map
                  ~default:(Either.Second (location, address))
@@ -376,7 +376,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             (parent_paths, path)
         | Either.Second (_, address) ->
             let path =
-              fixup_path ~hashes:t.hash_tbl ~address (List.hd_exn parent_paths)
+              fixup_path ~hashes:!(t.hashes) ~address (List.hd_exn parent_paths)
             in
             (List.tl_exn parent_paths, path)
       in
