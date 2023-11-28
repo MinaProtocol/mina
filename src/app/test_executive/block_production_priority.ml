@@ -10,6 +10,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let num_extra_keys = 1000
 
+  (* let num_sender_nodes = 4 *)
+
   let test_name = "block-prod-prio"
 
   let config =

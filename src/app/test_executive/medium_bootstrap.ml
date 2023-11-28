@@ -16,6 +16,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Node_config in
     { default with
       k = 2
+    ; requires_graphql = true
     ; genesis_ledger =
         [ test_account "node-a-key" "1000"
         ; test_account "node-b-key" "1000"

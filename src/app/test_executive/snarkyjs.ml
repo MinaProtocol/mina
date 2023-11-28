@@ -15,7 +15,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     let open Node_config in
     { default with
-      genesis_ledger =
+      requires_graphql = true
+    ; genesis_ledger =
         [ test_account "node-key" "8000000"; test_account "extra-key" "10" ]
     ; block_producers = [ bp "node" ]
     }

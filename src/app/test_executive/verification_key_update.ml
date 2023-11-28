@@ -67,7 +67,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     let open Node_config in
     { default with
-      genesis_ledger =
+      requires_graphql = true
+    ; genesis_ledger =
         [ test_account "whale1-key" "9000000000"
         ; test_account "whale2-key" "1000000000"
         ; test_account "snark-node-key" "100"

@@ -20,6 +20,8 @@ type best_chain_block =
   ; global_slot_since_hard_fork : Mina_numbers.Global_slot_since_hard_fork.t
   }
 
+(* TODO: malleable error -> or error *)
+
 module Engine = struct
   module type Network_config_intf = sig
     module Cli_inputs : sig
@@ -362,6 +364,8 @@ module Test = struct
     val run : network -> dsl -> unit Malleable_error.t
   end
 
+  (* NB: until the DSL is actually implemented, a test just takes in the engine
+   * implementation directly. *)
   module type Functor_intf = functor (Inputs : Inputs_intf) ->
     S
       with type network := Inputs.Engine.Network.t

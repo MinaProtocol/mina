@@ -262,6 +262,8 @@ let report_test_errors ~log_error_set ~internal_error_set =
       let%bind () = Writer.(flushed (Lazy.force stderr)) in
       return exit_code
 
+(* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
+
 let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
     ~log_engine_cleanup_func ~lift_accumulated_errors_func ~net_manager_ref
     ~log_engine_ref ~network_state_writer_ref ~cleanup_deferred_ref ~exit_reason
