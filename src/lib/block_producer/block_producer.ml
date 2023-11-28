@@ -113,17 +113,34 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
     ~log_block_creation ~block_reward_threshold ~consensus_constants =
   let open Interruptible.Let_syntax in
-  let current_global_slot =
-    Consensus.Data.Consensus_time.(
-      to_global_slot
-        (of_time_exn ~constants:consensus_constants
-           (Block_time.now time_controller) ))
+  let global_slot =
+    Consensus.Data.Block_data.global_slot_since_genesis block_data
   in
   match Mina_compile_config.slot_chain_end with
   | Some slot_chain_end
-    when Mina_numbers.Global_slot.(current_global_slot >= slot_chain_end) ->
+    when Mina_numbers.Global_slot.(global_slot >= slot_chain_end) ->
+      [%log info] "Reached slot_chain_end $slot_chain_end, not producing blocks"
+        ~metadata:
+          [ ("slot_chain_end", Mina_numbers.Global_slot.to_yojson slot_chain_end)
+          ] ;
       Interruptible.return None
   | None | Some _ -> (
+      let current_global_slot =
+        Consensus.Data.Consensus_time.(
+          to_global_slot
+            (of_time_exn ~constants:consensus_constants
+               (Block_time.now time_controller) ))
+      in
+      let slot_diff slot =
+        let open Mina_numbers.Global_slot in
+        Option.map ~f:to_int @@ sub slot current_global_slot
+      in
+      Option.iter (Option.bind Mina_compile_config.slot_chain_end ~f:slot_diff)
+        ~f:(fun slot_diff' ->
+          if slot_diff' <= 480 && slot_diff' mod 60 = 0 then
+            [%log info]
+              "Block producer will stop producing blocks after $slot_diff slots"
+              ~metadata:[ ("slot_diff", `Int slot_diff') ] ) ;
       let previous_protocol_state_body_hash =
         Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
       in
@@ -138,9 +155,6 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       in
       let supercharge_coinbase =
         let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
-        let global_slot =
-          Consensus.Data.Block_data.global_slot_since_genesis block_data
-        in
         Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
           ~epoch_ledger ~global_slot
       in
@@ -150,23 +164,28 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           let coinbase_receiver =
             Consensus.Data.Block_data.coinbase_receiver block_data
           in
-
           let diff =
-            O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
-                let current_global_slot =
-                  Consensus.Data.Consensus_time.(
-                    to_global_slot
-                      (of_time_exn ~constants:consensus_constants
-                         (Block_time.now time_controller) ))
-                in
-                match Mina_compile_config.slot_tx_end with
-                | Some slot_tx_end
-                  when Mina_numbers.Global_slot.(
-                         current_global_slot >= slot_tx_end) ->
-                    Ok
-                      Staged_ledger_diff.With_valid_signatures_and_proofs
-                      .empty_diff
-                | None | Some _ -> (
+            match Mina_compile_config.slot_tx_end with
+            | Some slot_tx_end
+              when Mina_numbers.Global_slot.(global_slot >= slot_tx_end) ->
+                [%log info]
+                  "Reached slot_tx_end $slot_tx_end, producing empty block"
+                  ~metadata:
+                    [ ( "slot_tx_end"
+                      , Mina_numbers.Global_slot.to_yojson slot_tx_end )
+                    ] ;
+                Result.return
+                  Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
+            | Some _ | None ->
+                Option.iter
+                  (Option.bind Mina_compile_config.slot_tx_end ~f:slot_diff)
+                  ~f:(fun slot_diff' ->
+                    if slot_diff' <= 480 && slot_diff' mod 60 = 0 then
+                      [%log info]
+                        "Block producer will begin producing only empty blocks \
+                         after $slot_diff slots"
+                        ~metadata:[ ("slot_diff", `Int slot_diff') ] ) ;
+                O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
                     let diff =
                       Staged_ledger.create_diff ~constraint_constants
                         staged_ledger ~coinbase_receiver ~logger
@@ -198,7 +217,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                             Staged_ledger_diff.With_valid_signatures_and_proofs
                             .empty_diff )
                     | _ ->
-                        diff ) )
+                        diff )
           in
           match%map
             let%bind.Deferred.Result diff = return diff in

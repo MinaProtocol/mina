@@ -23,8 +23,19 @@ let validate_transition ~consensus_constants ~logger ~frontier
     @@ Mina_block.header transition_data
   in
   let%bind () =
+    match Mina_compile_config.slot_chain_end with
+    | Some slot_chain_end
+      when Mina_numbers.Global_slot.(block_slot >= slot_chain_end) ->
+        [%log info] "Block after slot_chain_end, rejecting" ;
+        Result.fail `Block_after_after_stop_slot
+    | None | Some _ ->
+        Result.return ()
+  in
+  let%bind () =
     match Mina_compile_config.slot_tx_end with
-    | Some slot when Mina_numbers.Global_slot.(block_slot >= slot) ->
+    | Some slot_tx_end when Mina_numbers.Global_slot.(block_slot >= slot_tx_end)
+      ->
+        [%log info] "Block after slot_tx_end, validating it is empty" ;
         let staged_ledger_diff =
           Body.staged_ledger_diff @@ body transition_data
         in
@@ -149,7 +160,22 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                 ~metadata:
                   [ ("state_hash", State_hash.to_yojson transition_hash)
                   ; ( "reason"
-                    , `String "not empty staged ledger diff after stop slot" )
+                    , `String "not empty staged ledger diff after slot_tx_end"
+                    )
+                  ; ( "block_slot"
+                    , Mina_numbers.Global_slot.to_yojson
+                      @@ Consensus.Data.Consensus_state.curr_global_slot
+                      @@ Protocol_state.consensus_state @@ Header.protocol_state
+                      @@ Mina_block.header @@ transition )
+                  ]
+                "Validation error: external transition with state hash \
+                 $state_hash was rejected for reason $reason" ;
+              Deferred.unit
+          | Error `Block_after_after_stop_slot ->
+              [%log error]
+                ~metadata:
+                  [ ("state_hash", State_hash.to_yojson transition_hash)
+                  ; ("reason", `String "block after slot_chain_end")
                   ; ( "block_slot"
                     , Mina_numbers.Global_slot.to_yojson
                       @@ Consensus.Data.Consensus_state.curr_global_slot

@@ -269,8 +269,13 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       [%log warn]
         ~metadata:[ ("state_hash", state_hash) ]
         "initial_validate: transition with non empty staged ledger diff after \
-         stop slot" ;
+         slot_tx_end" ;
       Deferred.Or_error.fail @@ Error.of_string "non empty staged ledger diff"
+  | Error `Block_after_after_stop_slot ->
+      [%log warn]
+        ~metadata:[ ("state_hash", state_hash) ]
+        "initial_validate: block after slot_chain_end" ;
+      Deferred.Or_error.fail @@ Error.of_string "block after stop slot"
 
 let find_map_ok ?how xs ~f =
   let res = Ivar.create () in

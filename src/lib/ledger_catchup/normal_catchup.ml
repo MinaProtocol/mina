@@ -157,6 +157,8 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
   | Error `Non_empty_staged_ledger_diff_after_stop_slot ->
       Deferred.Or_error.fail @@ Error.of_string "non empty staged ledger diff"
+  | Error `Block_after_after_stop_slot ->
+      Deferred.Or_error.fail @@ Error.of_string "block after stop slot"
 
 let rec fold_until ~(init : 'accum)
     ~(f :
