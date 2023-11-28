@@ -79,8 +79,8 @@ let create_customisable_circuit ~custom_gate_type ~valid_witness =
                  } )
         } )
 
-let test ?(step_only = false) ~custom_gate_type ~valid_witness
-    ?(wrap_circuit_with_configurable_gate = None) () =
+let test ~step_only ~custom_gate_type ~valid_witness
+    ?(wrap_circuit_with_configurable_gate = false) () =
   printf "\n* Compiling STEP proof\n" ;
   let tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
@@ -110,7 +110,6 @@ let test ?(step_only = false) ~custom_gate_type ~valid_witness
   in
 
   let module Proof = (val proof) in
-
   printf "\nPROVING\n" ;
   let test_prove () =
     let public_input, (), proof =
@@ -149,7 +148,7 @@ let test ?(step_only = false) ~custom_gate_type ~valid_witness
           ~constraint_constants
             (* TODO(mrmr1993): This was misguided.. Delete. *)
           ~choices:(fun ~self:_ ->
-            [ { identifier = "recurse over customizable gate circuit"
+            [ { identifier = "recurse over customizable gate"
               ; prevs = [ tag ]
               ; main =
                   (fun _ ->
@@ -157,22 +156,10 @@ let test ?(step_only = false) ~custom_gate_type ~valid_witness
                       exists (Typ.Internal.ref ()) ~request:(fun () ->
                           Requests.Proof )
                     in
-                    (* if wrap_circuit_with_configurable_gate then (
-                        printf "Adding customisable gate to wrap circuit" ;
-                        create_customisable_circuit ~custom_gate_type
-                          ~valid_witness:true ) ; *)
-                    let () =
-                      match wrap_circuit_with_configurable_gate with
-                      | Some custom_gate_type ->
-                          printf
-                            "Adding customisable gate to wrap circuit \
-                             custom_gate_type = %b\n"
-                            custom_gate_type ;
-                          create_customisable_circuit ~custom_gate_type
-                            ~valid_witness:true
-                      | _ ->
-                          ()
-                    in
+                    if wrap_circuit_with_configurable_gate then (
+                      printf "Adding customisable gate to wrap circuit" ;
+                      create_customisable_circuit ~custom_gate_type
+                        ~valid_witness:true ) ;
                     { previous_proof_statements =
                         [ { public_input = ()
                           ; proof
@@ -185,11 +172,8 @@ let test ?(step_only = false) ~custom_gate_type ~valid_witness
                     } )
               ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
               ; custom_gate_type =
-                  ( match wrap_circuit_with_configurable_gate with
-                  | Some custom_gate_type ->
-                      custom_gate_type
-                  | None ->
-                      false )
+                  ( if wrap_circuit_with_configurable_gate then custom_gate_type
+                  else false )
               }
             ] )
           ()
@@ -244,15 +228,15 @@ let () =
   if perform_recursive_tests then (
     printf "Performing recursive tests\n" ;
     (* Customised as ForeignFieldAdd gate; valid witness *)
-    test ~custom_gate_type:false ~valid_witness:true () ;
+    test ~step_only:false ~custom_gate_type:false ~valid_witness:true () ;
 
     (* Customised as Conditional gate; valid witness *)
-    test ~custom_gate_type:true ~valid_witness:true () ;
+    test ~step_only:false ~custom_gate_type:true ~valid_witness:true () ;
 
     (* Customised as ForeignFieldAdd gate; invalid witness *)
     let test_failed =
       try
-        test ~custom_gate_type:false ~valid_witness:false () ;
+        test ~step_only:false ~custom_gate_type:false ~valid_witness:false () ;
         false
       with _ -> true
     in
@@ -261,16 +245,16 @@ let () =
     (* Customised as Conditional gate; invalid witness *)
     let test_failed =
       try
-        test ~custom_gate_type:true ~valid_witness:false () ;
+        test ~step_only:false ~custom_gate_type:true ~valid_witness:false () ;
         false
       with _ -> true
     in
     assert test_failed ) ;
   ()
 
-(* Test multiple step choices assertion *)
 let () =
   if perform_step_choices_test then
+    (* Test multiple step choices assertion *)
     let compile_failed =
       try
         let _test_multiple_step_choices =
@@ -334,9 +318,9 @@ let () =
 let () =
   if perform_wrap_custom_tests then
     (* Customised as ForeignFieldAdd gate; valid witness; wrap with custom_gate_type:true *)
-    test ~custom_gate_type:false ~valid_witness:true
-      ~wrap_circuit_with_configurable_gate:(Some true) ()
+    test ~step_only:false ~custom_gate_type:false ~valid_witness:true
+      ~wrap_circuit_with_configurable_gate:true () ;
 
-(* Customised as ForeignFieldAdd gate; valid witness; wrap with custom_gate_type:true *)
-(* test ~custom_gate_type:true ~valid_witness:true
-   ~wrap_circuit_with_configurable_gate:true () ) *)
+  (* Customised as ForeignFieldAdd gate; valid witness; wrap with custom_gate_type:true *)
+  test ~step_only:false ~custom_gate_type:true ~valid_witness:true
+    ~wrap_circuit_with_configurable_gate:true ()
