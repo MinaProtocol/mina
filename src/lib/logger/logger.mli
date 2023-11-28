@@ -12,6 +12,7 @@ module Level : sig
     | Internal
     | Spam
     | Trace
+    | Span
     | Debug
     | Info
     | Warn
@@ -161,6 +162,8 @@ val spam :
   -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
   -> ('a, unit, string, unit) format4
   -> 'a
+
+val span : _ log_function
 
 val faulty_peer : _ log_function [@@deprecated "use Trust_system.record"]
 

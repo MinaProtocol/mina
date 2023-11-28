@@ -7,6 +7,7 @@ module Level = struct
     | Internal
     | Spam
     | Trace
+    | Span
     | Debug
     | Info
     | Warn
@@ -422,6 +423,8 @@ let warn = log ~level:Warn
 let error = log ~level:Error
 
 let fatal = log ~level:Fatal
+
+let span = log ~level:Span
 
 let faulty_peer_without_punishment = log ~level:Faulty_peer
 

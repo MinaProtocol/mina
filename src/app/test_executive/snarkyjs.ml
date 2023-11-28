@@ -50,7 +50,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       [%log info] "Waiting for nodes to be initialized" ;
       let%bind () = wait_for t (Wait_condition.node_to_initialize node) in
-      [%log info] "Running test script" ;
+      [%log info] "Running script" ;
       let%bind.Deferred result =
         let%bind.Deferred process =
           Async_unix.Process.create_exn
