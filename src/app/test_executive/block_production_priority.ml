@@ -25,7 +25,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
         @ List.init num_extra_keys ~f:(fun i ->
               let i_str = Int.to_string i in
-              test_account ~timing:Untimed ("sender-account" ^ i_str) "10000" )
+              test_account ("sender-account" ^ i_str) "10000" )
     ; block_producers =
         [ bp "receiver"
         ; bp "empty_node-1" ~account_name:"empty-bp-key"
