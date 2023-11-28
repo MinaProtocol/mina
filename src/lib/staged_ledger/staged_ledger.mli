@@ -302,3 +302,29 @@ val check_commands :
 *)
 val latest_block_accounts_created :
   t -> previous_block_state_hash:State_hash.t -> Account_id.t list
+
+module For_tests : sig
+  val update_coinbase_stack_and_get_data_impl :
+       logger:Logger.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
+    -> first_partition_slots:int
+    -> no_second_partition:bool
+    -> is_new_stack:bool
+    -> Ledger.t
+    -> Pending_coinbase.t
+    -> Transaction.t With_status.t list
+    -> Zkapp_precondition.Protocol_state.View.t
+    -> Frozen_ledger_hash.t * Frozen_ledger_hash.t
+    -> ( bool
+         * Transaction_snark_scan_state.Transaction_with_witness.t list
+         * Pending_coinbase.Update.Action.t
+         * [> `Update_none
+           | `Update_one of Pending_coinbase.Stack_versioned.t
+           | `Update_two of
+             Pending_coinbase.Stack_versioned.t
+             * Pending_coinbase.Stack_versioned.t ]
+         * [> `First_pass_ledger_end of Frozen_ledger_hash.t ]
+       , Staged_ledger_error.t )
+       Deferred.Result.t
+end
