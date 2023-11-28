@@ -668,7 +668,6 @@ module Make (Inputs : Inputs_intf.S) = struct
           Base.location_of_account (get_parent t) account_id
 
     let location_of_account_batch t =
-      (* TODO consider handling special case of empty addresses *)
       self_find_or_batch_lookup
         (fun id -> (id, Option.map ~f:Option.some @@ self_find_location t id))
         Base.location_of_account_batch t
