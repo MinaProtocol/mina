@@ -17,11 +17,11 @@ let Cmd = ../Lib/Cmds.dhall in
             Cmd.Docker::{
               image = (../Constants/ContainerImages.dhall).ubuntu2004
             }
-            "./buildkite/scripts/connect-to-berkeley.sh"
+            "./buildkite/scripts/connect-to-testworld-2-0.sh"
         ],
-        label = "Connect to Berkeley",
+        label = "Connect to Testworld 2.0",
         soft_fail = Some (B/SoftFail.Boolean True),
-        key = "connect-to-berkeley",
+        key = "connect-to-testworld-2-0",
         target = Size.Large,
         depends_on = dependsOn
       }
