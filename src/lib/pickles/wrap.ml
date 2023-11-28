@@ -23,7 +23,7 @@ module Type1 =
 
 module Type1Plus =
   Plonk_checks.Make
-    (Shifted_value.Type2)
+    (Shifted_value.Type1)
     (struct
       let constant_term = Plonk_checks.Scalars.TickPlus.constant_term
 
@@ -247,11 +247,6 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     let prechals = Array.map prechals ~f:Bulletproof_challenge.unpack in
     (prechals, b)
   in
-  (* JES: TODO: Need to update this? *)
-  (* let shift_value =
-     if custom_gate_type then
-     Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2
-     else Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1 *)
   let shift_value =
     Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1
   and chal = Challenge.Constant.of_tick_field in
