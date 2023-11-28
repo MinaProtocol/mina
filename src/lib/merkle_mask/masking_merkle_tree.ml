@@ -217,7 +217,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             if Addr.height ~ledger_depth:t.depth address >= t.depth then []
             else
               let sibling = Addr.sibling address in
-              let sibling_dir = Location.last_direction sibling in
+              let sibling_dir = Location.last_direction address in
               let hash =
                 match self_find_hash t sibling with
                 | Some hash ->
