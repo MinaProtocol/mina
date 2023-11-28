@@ -1215,8 +1215,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               "pickles.ml Make_str Cache.Step.read_or_generate \
                custom_gate_type = %b\n"
               custom_gate_type ;
-            Cache.Step.read_or_generate
-              ~custom_gate_type
+            Cache.Step.read_or_generate ~custom_gate_type
               ~prev_challenges:
                 (Nat.to_int (fst inner_step_data.proofs_verified))
               [] k_p k_v

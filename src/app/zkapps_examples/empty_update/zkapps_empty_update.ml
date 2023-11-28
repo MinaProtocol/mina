@@ -10,4 +10,5 @@ let rule public_key : _ Pickles.Inductive_rule.t =
   ; prevs = []
   ; main = main public_key
   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+  ; custom_gate_type = false
   }

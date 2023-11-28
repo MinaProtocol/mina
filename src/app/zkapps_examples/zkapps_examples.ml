@@ -593,10 +593,12 @@ let compile :
            H4_6.T(Pickles.Inductive_rule).t = function
       | [] ->
           []
-      | { identifier; prevs; main; feature_flags } :: choices ->
+      | { identifier; prevs; main; feature_flags; custom_gate_type } :: choices
+        ->
           { identifier
           ; prevs
           ; feature_flags
+          ; custom_gate_type
           ; main =
               (fun { Pickles.Inductive_rule.public_input = () } ->
                 let vk_hash =

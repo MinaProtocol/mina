@@ -60,6 +60,7 @@ module Rules = struct
       ; prevs = []
       ; main
       ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      ; custom_gate_type = false
       }
   end
 
@@ -151,6 +152,7 @@ module Rules = struct
       ; prevs = []
       ; main
       ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      ; custom_gate_type = false
       }
   end
 
@@ -508,6 +510,7 @@ module Rules = struct
         ; prevs = [ self; self ]
         ; main
         ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+        ; custom_gate_type = false
         }
 
       let handler
@@ -595,6 +598,7 @@ module Rules = struct
       ; prevs = [ prev; prev ]
       ; main
       ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      ; custom_gate_type = false
       }
 
     let handler (public_key : Public_key.Compressed.t) (token_id : Token_id.t)

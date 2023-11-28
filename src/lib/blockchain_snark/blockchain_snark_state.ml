@@ -423,6 +423,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
         ; auxiliary_output = ()
         } )
   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+  ; custom_gate_type = false
   }
 
 module type S = sig

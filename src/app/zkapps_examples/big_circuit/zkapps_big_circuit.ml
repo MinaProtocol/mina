@@ -2,8 +2,8 @@ open Signature_lib
 open Snark_params.Tick.Run
 open Mina_base
 
-(** Constructs a circuit with around [num_constraints] constraints. 
-    Note that since the frontend of snarky doesn't know the number of constraints it creates, 
+(** Constructs a circuit with around [num_constraints] constraints.
+    Note that since the frontend of snarky doesn't know the number of constraints it creates,
     we can't create a circuit the exact number of constraints we want. We can only approximate.
   *)
 let big_circuit num_constraints =
@@ -41,4 +41,5 @@ let rule ~num_constraints public_key : _ Pickles.Inductive_rule.t =
   ; prevs = []
   ; main = main ~num_constraints public_key
   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+  ; custom_gate_type = false
   }

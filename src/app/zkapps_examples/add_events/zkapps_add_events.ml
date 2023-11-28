@@ -41,6 +41,7 @@ let initialize_rule public_key : _ Pickles.Inductive_rule.t =
   ; prevs = []
   ; main = initialize public_key
   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+  ; custom_gate_type = false
   }
 
 let update_events_rule public_key : _ Pickles.Inductive_rule.t =
@@ -48,4 +49,5 @@ let update_events_rule public_key : _ Pickles.Inductive_rule.t =
   ; prevs = []
   ; main = update_events public_key
   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+  ; custom_gate_type = false
   }

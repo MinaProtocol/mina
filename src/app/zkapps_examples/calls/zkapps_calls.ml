@@ -201,6 +201,7 @@ module Rules = struct
       ; prevs = []
       ; main
       ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      ; custom_gate_type = false
       }
   end
 
@@ -261,6 +262,7 @@ module Rules = struct
       ; prevs = []
       ; main
       ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      ; custom_gate_type = false
       }
   end
 
@@ -328,6 +330,7 @@ module Rules = struct
       ; prevs = []
       ; main
       ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      ; custom_gate_type = false
       }
   end
 
@@ -421,6 +424,7 @@ module Rules = struct
       ; prevs = []
       ; main
       ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      ; custom_gate_type = false
       }
   end
 end

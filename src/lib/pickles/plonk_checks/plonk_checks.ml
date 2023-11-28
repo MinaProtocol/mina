@@ -344,7 +344,14 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   *)
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
       ~(env : t Scalars.Env.t)
-      ({ alpha = _; beta; gamma; zeta; joint_combiner = _; feature_flags = _; _ } :
+      ({ alpha = _
+       ; beta
+       ; gamma
+       ; zeta
+       ; joint_combiner = _
+       ; feature_flags = _
+       ; _
+       } :
         _ Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0 =
     let open Plonk_types.Evals.In_circuit in
     let e0 field = fst (field e) in

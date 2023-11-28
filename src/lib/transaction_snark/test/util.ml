@@ -359,6 +359,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
         ; auxiliary_output = ()
         } )
   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+  ; custom_gate_type = false
   }
 
 let gen_snapp_ledger =

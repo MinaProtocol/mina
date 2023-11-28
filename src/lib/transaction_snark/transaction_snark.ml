@@ -1433,7 +1433,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                   in
                   let actual_hash = Zkapp_account.Checked.digest_vk vk in
                   Field.Assert.equal expected_hash actual_hash ;
-                  Pickles.Side_loaded.in_circuit (side_loaded 0) vk
+                  Pickles.Side_loaded.in_circuit
+                    (side_loaded 0 ~custom_gate_type:false)
+                    vk
               | Signature | None_given ->
                   ()
           end
@@ -2104,6 +2106,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; auxiliary_output = ()
                   } )
             ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+            ; custom_gate_type = false
             }
         | Opt_signed_opt_signed ->
             { identifier = "opt_signed-opt_signed"
@@ -2119,6 +2122,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; auxiliary_output = ()
                   } )
             ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+            ; custom_gate_type = false
             }
         | Opt_signed ->
             { identifier = "opt_signed"
@@ -2134,6 +2138,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; auxiliary_output = ()
                   } )
             ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+            ; custom_gate_type = false
             }
     end
 
@@ -3111,6 +3116,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; auxiliary_output = ()
             } )
       ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      ; custom_gate_type = false
       }
 
     let transaction_union_handler handler (transaction : Transaction_union.t)
@@ -3271,6 +3277,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; auxiliary_output = ()
             } )
       ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      ; custom_gate_type = false
       }
   end
 
@@ -4144,6 +4151,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; auxiliary_output = ()
                 } )
           ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+          ; custom_gate_type = false
           }
         in
         Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
