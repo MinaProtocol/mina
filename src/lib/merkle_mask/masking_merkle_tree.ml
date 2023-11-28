@@ -263,25 +263,25 @@ module Make (Inputs : Inputs_intf.S) = struct
     let self_merkle_path ~hashes ~current_location =
       let element height address =
         let sibling = Addr.sibling address in
-        let sibling_dir = Location.last_direction address in
-        let%map.Option hash =
+        let dir = Location.last_direction address in
+        let%map.Option sibling_hash =
           self_path_get_hash ~hashes ~current_location height sibling
         in
-        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+        Direction.map dir ~left:(`Left sibling_hash) ~right:(`Right sibling_hash)
       in
       self_path_impl ~element
 
     let self_wide_merkle_path ~hashes ~current_location =
       let element height address =
         let sibling = Addr.sibling address in
-        let sibling_dir = Location.last_direction address in
+        let dir = Location.last_direction address in
         let%bind.Option sibling_hash =
           self_path_get_hash ~hashes ~current_location height sibling
         in
         let%map.Option self_hash =
           self_path_get_hash ~hashes ~current_location height address
         in
-        Direction.map sibling_dir
+        Direction.map dir
           ~left:(`Left (self_hash, sibling_hash))
           ~right:(`Right (sibling_hash, self_hash))
       in
