@@ -42,7 +42,7 @@ let actual_wrap_domain_size ~log_2_domain_size =
     | _ ->
         assert false
   in
-  Pickles_base.Proofs_verified.of_int d
+  Pickles_base.Proofs_verified.of_int_exn d
 
 let hash_messages_for_next_step_proof ~app_state
     (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
