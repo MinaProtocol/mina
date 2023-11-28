@@ -57,9 +57,9 @@ end = struct
       let h = Location.height ~ledger_depth:t.depth k in
       if h >= t.depth then []
       else
-        let sibling_dir = Location.last_direction (Location.to_path_exn k) in
+        let dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
-        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+        Direction.map dir ~left:(`Left hash) ~right:(`Right hash)
         :: loop (Location.parent k)
     in
     loop location
@@ -77,11 +77,9 @@ end = struct
       let h = Location.height ~ledger_depth:t.depth k in
       if h >= t.depth then []
       else
-        let sibling_dir = Location.last_direction (Location.to_path_exn k) in
+        let dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
-        Direction.map sibling_dir
-          ~left:(`Left (hash, hash))
-          ~right:(`Right (hash, hash))
+        Direction.map dir ~left:(`Left (hash, hash)) ~right:(`Right (hash, hash))
         :: loop (Location.parent k)
     in
     loop location
