@@ -79,7 +79,7 @@ occupied by commands within a block. Better still, we could compute
 the difference in memory occupied by the scan state before and after
 each block and make sure it does not go above certain limit.  This
 would, however, complicate the solution and require more time to
-develop it, while it sill wouldn't properly solve the problem.
+develop it, while it still wouldn't properly solve the problem.
 Therefore we should strive for a quick solution which already improves
 the situation and wait for the proper fix to come.
 
