@@ -111,8 +111,7 @@ end
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
-    ~log_block_creation ~block_reward_threshold ~consensus_constants
-    ~slot_tx_end ~slot_chain_end =
+    ~log_block_creation ~block_reward_threshold ~consensus_constants =
   let open Interruptible.Let_syntax in
   let current_global_slot =
     Consensus.Data.Consensus_time.(
@@ -120,9 +119,9 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
         (of_time_exn ~constants:consensus_constants
            (Block_time.now time_controller) ))
   in
-  match slot_chain_end with
-  | Some slot_chain_end'
-    when Mina_numbers.Global_slot.(current_global_slot >= slot_chain_end') ->
+  match Mina_compile_config.slot_chain_end with
+  | Some slot_chain_end
+    when Mina_numbers.Global_slot.(current_global_slot >= slot_chain_end) ->
       Interruptible.return None
   | None | Some _ -> (
       let previous_protocol_state_body_hash =
@@ -160,10 +159,10 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                       (of_time_exn ~constants:consensus_constants
                          (Block_time.now time_controller) ))
                 in
-                match slot_tx_end with
-                | Some slot_tx_end'
+                match Mina_compile_config.slot_tx_end with
+                | Some slot_tx_end
                   when Mina_numbers.Global_slot.(
-                         current_global_slot >= slot_tx_end') ->
+                         current_global_slot >= slot_tx_end) ->
                     Ok
                       Staged_ledger_diff.With_valid_signatures_and_proofs
                       .empty_diff
@@ -574,7 +573,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
     ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
     ~(precomputed_values : Precomputed_values.t) ~block_reward_threshold
-    ~block_produced_bvar ~slot_tx_end ~slot_chain_end =
+    ~block_produced_bvar =
   O1trace.sync_thread "produce_blocks" (fun () ->
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants = precomputed_values.consensus_constants in
@@ -700,7 +699,6 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk ~block_reward_threshold ~consensus_constants
-                ~slot_tx_end ~slot_chain_end
             in
             match next_state_opt with
             | None ->

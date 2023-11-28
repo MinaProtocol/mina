@@ -120,7 +120,7 @@ let write_graph (_ : t) =
   ()
 
 let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
-    ~unprocessed_transition_cache ~slot_tx_end enveloped_transition =
+    ~unprocessed_transition_cache enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
@@ -139,7 +139,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
         ~f:(Fn.const initially_validated_transition)
     in
     Transition_handler.Validator.validate_transition ~logger ~frontier
-      ~consensus_constants ~unprocessed_transition_cache ~slot_tx_end
+      ~consensus_constants ~unprocessed_transition_cache
       enveloped_initially_validated_transition
   in
   let state_hash =
@@ -564,7 +564,7 @@ end
 
 let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
     ~trust_system ~(batcher : _ Initial_validate_batcher.t) ~frontier
-    ~unprocessed_transition_cache ~slot_tx_end transition =
+    ~unprocessed_transition_cache transition =
   let verification_start_time = Core.Time.now () in
   let open Deferred.Result.Let_syntax in
   let state_hash =
@@ -614,7 +614,7 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
     "initial_validate: verification of proofs complete" ;
   verify_transition ~logger
     ~consensus_constants:precomputed_values.consensus_constants ~trust_system
-    ~frontier ~unprocessed_transition_cache ~slot_tx_end tv
+    ~frontier ~unprocessed_transition_cache tv
   |> Deferred.map ~f:(Result.map_error ~f:(fun e -> `Error e))
 
 open Frontier_base
@@ -716,7 +716,7 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
             | `Invalid_staged_ledger_hash of Error.t
             | `Fatal_error of exn ] )
           Result.t
-          Deferred.t ) ~slot_tx_end =
+          Deferred.t ) =
   (* setup_state_machine_runner returns a fully configured lambda function, which is the state machine runner *)
   let initial_validation_batcher =
     Initial_validate_batcher.create ~verifier ~precomputed_values
@@ -813,7 +813,7 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
               step
                 ( initial_validate ~precomputed_values ~logger ~trust_system
                     ~batcher:initial_validation_batcher ~frontier
-                    ~unprocessed_transition_cache ~slot_tx_end
+                    ~unprocessed_transition_cache
                     { external_block with
                       data =
                         { With_hash.data = external_block.data
@@ -1004,7 +1004,6 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
 
 (* TODO: In the future, this could take over scheduling bootstraps too. *)
 let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
-    ~slot_tx_end
     ~(catchup_job_reader :
        ( State_hash.t
        * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -1125,7 +1124,7 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
   let run_state_machine =
     setup_state_machine_runner ~t ~verifier ~downloader ~logger
       ~precomputed_values ~trust_system ~frontier ~unprocessed_transition_cache
-      ~catchup_breadcrumbs_writer ~build_func ~slot_tx_end
+      ~catchup_breadcrumbs_writer ~build_func
   in
   (* TODO: Maybe add everything from transition frontier at the beginning? *)
   (* TODO: Print out the hashes you're adding *)
@@ -1335,11 +1334,11 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
 
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_job_reader ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache ~slot_tx_end : unit =
+    ~unprocessed_transition_cache : unit =
   O1trace.background_thread "perform_super_catchup" (fun () ->
       run_catchup ~logger ~trust_system ~verifier ~network ~frontier
         ~catchup_job_reader ~precomputed_values ~unprocessed_transition_cache
-        ~catchup_breadcrumbs_writer ~slot_tx_end
+        ~catchup_breadcrumbs_writer
         ~build_func:Transition_frontier.Breadcrumb.build )
 
 (* Unit tests *)
@@ -1420,7 +1419,7 @@ let%test_module "Ledger_catchup tests" =
           Strict_pipe.Reader.t
       }
 
-    let setup_catchup_pipes ~network ~frontier ~slot_tx_end =
+    let setup_catchup_pipes ~network ~frontier =
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
           (Buffered (`Capacity 10, `Overflow Crash))
@@ -1434,7 +1433,7 @@ let%test_module "Ledger_catchup tests" =
       in
       run ~logger ~precomputed_values ~verifier ~trust_system ~network ~frontier
         ~catchup_breadcrumbs_writer ~catchup_job_reader
-        ~unprocessed_transition_cache ~slot_tx_end ;
+        ~unprocessed_transition_cache ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader
@@ -1460,9 +1459,8 @@ let%test_module "Ledger_catchup tests" =
        ; breadcrumbs_reader = catchup_breadcrumbs_reader
        } *)
 
-    let setup_catchup_with_target ~network ~frontier ~target_breadcrumb
-        ~slot_tx_end =
-      let test = setup_catchup_pipes ~network ~frontier ~slot_tx_end in
+    let setup_catchup_with_target ~network ~frontier ~target_breadcrumb =
+      let test = setup_catchup_pipes ~network ~frontier in
       let parent_hash =
         Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
       in
@@ -1511,12 +1509,12 @@ let%test_module "Ledger_catchup tests" =
           (n + 1)
       else Deferred.return b_list
 
-    let test_successful_catchup ~my_net ~target_best_tip_path ~slot_tx_end =
+    let test_successful_catchup ~my_net ~target_best_tip_path =
       let open Fake_network in
       let target_breadcrumb = List.last_exn target_best_tip_path in
       let `Test { breadcrumbs_reader; _ }, _ =
         setup_catchup_with_target ~network:my_net.network
-          ~frontier:my_net.state.frontier ~target_breadcrumb ~slot_tx_end
+          ~frontier:my_net.state.frontier ~target_breadcrumb
       in
       let%map breadcrumb_list =
         call_read ~breadcrumbs_reader ~target_best_tip_path ~my_peer:my_net [] 0
@@ -1567,8 +1565,7 @@ let%test_module "Ledger_catchup tests" =
                 (best_tip peer_net.state.frontier))
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path
-                ~slot_tx_end:None ) )
+              test_successful_catchup ~my_net ~target_best_tip_path ) )
 
     let%test_unit "catchup succeeds even if the parent transition is already \
                    in the frontier" =
@@ -1584,8 +1581,7 @@ let%test_module "Ledger_catchup tests" =
             [ Transition_frontier.best_tip peer_net.state.frontier ]
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path
-                ~slot_tx_end:None ) )
+              test_successful_catchup ~my_net ~target_best_tip_path ) )
 
     let%test_unit "catchup succeeds even if the parent transition is already \
                    in the frontier" =
@@ -1601,8 +1597,7 @@ let%test_module "Ledger_catchup tests" =
             [ Transition_frontier.best_tip peer_net.state.frontier ]
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path
-                ~slot_tx_end:None ) )
+              test_successful_catchup ~my_net ~target_best_tip_path ) )
 
     let%test_unit "when catchup fails to download state hashes, catchup will \
                    properly clear the unprocessed_transition_cache of the \
@@ -1625,7 +1620,7 @@ let%test_module "Ledger_catchup tests" =
           let target_breadcrumb = List.last_exn target_best_tip_path in
           let test =
             setup_catchup_pipes ~network:my_net.network
-              ~frontier:my_net.state.frontier ~slot_tx_end:None
+              ~frontier:my_net.state.frontier
           in
           let parent_hash =
             Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
@@ -1723,7 +1718,7 @@ let%test_module "Ledger_catchup tests" =
           let target_breadcrumb = List.last_exn target_best_tip_path in
           let test =
             setup_catchup_pipes ~network:my_net.network
-              ~frontier:my_net.state.frontier ~slot_tx_end:None
+              ~frontier:my_net.state.frontier
           in
           let parent_hash =
             Transition_frontier.Breadcrumb.parent_hash target_breadcrumb

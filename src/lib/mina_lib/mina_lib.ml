@@ -1212,8 +1212,7 @@ let start t =
       ~log_block_creation:t.config.log_block_creation
       ~precomputed_values:t.config.precomputed_values
       ~block_reward_threshold:t.config.block_reward_threshold
-      ~block_produced_bvar:t.components.block_produced_bvar
-      ~slot_tx_end:t.config.slot_tx_end ~slot_chain_end:t.config.slot_chain_end ;
+      ~block_produced_bvar:t.components.block_produced_bvar ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -1777,7 +1776,6 @@ let create ?wallets (config : Config.t) =
               ~catchup_mode ~network_transition_reader:block_reader
               ~producer_transition_reader ~most_recent_valid_block
               ~precomputed_values:config.precomputed_values ~notify_online
-              ~slot_tx_end:config.slot_tx_end
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

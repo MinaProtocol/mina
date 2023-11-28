@@ -430,24 +430,6 @@ let setup_daemon logger =
          for the associated private key that is being tracked by this daemon. \
          You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
-  and slot_tx_end =
-    flag "--slot-tx-end" ~aliases:[ "slot-tx-end" ]
-      ~doc:
-        (sprintf
-           "SLOT Slot after which the node will stop accepting transactions, or\n\
-           \           `none` to disable the feature. (default: %s)"
-           (Option.value_map Mina_compile_config.slot_tx_end ~default:"none"
-              ~f:Mina_numbers.Global_slot.to_string ) )
-      (optional string)
-  and slot_chain_end =
-    flag "--slot-network-end" ~aliases:[ "slot-network-end" ]
-      ~doc:
-        (sprintf
-           "SLOT Slot after which the node will stop producing/validating \
-            blocks, or `none` to disable the feature. (default: %s)"
-           (Option.value_map Mina_compile_config.slot_chain_end ~default:"none"
-              ~f:Mina_numbers.Global_slot.to_string ) )
-      (optional string)
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -1288,24 +1270,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   "Cannot provide both uptime submitter public key and uptime \
                    submitter keyfile"
           in
-          let slot_tx_end =
-            match slot_tx_end with
-            | Some "none" ->
-                None
-            | Some slot ->
-                Some (Mina_numbers.Global_slot.of_string slot)
-            | None ->
-                Mina_compile_config.slot_tx_end
-          in
-          let slot_chain_end =
-            match slot_chain_end with
-            | Some "none" ->
-                None
-            | Some slot ->
-                Some (Mina_numbers.Global_slot.of_string slot)
-            | None ->
-                Mina_compile_config.slot_chain_end
-          in
           let start_time = Time.now () in
           let%map coda =
             Mina_lib.create ~wallets
@@ -1336,8 +1300,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~log_block_creation ~precomputed_values ~start_time
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~stop_time ~node_status_url
-                 ~slot_tx_end ~slot_chain_end () )
+                 ~uptime_submitter_keypair ~stop_time ~node_status_url () )
           in
           { Coda_initialization.coda
           ; client_trustlist
