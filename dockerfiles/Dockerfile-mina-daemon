@@ -5,6 +5,15 @@ ARG deb_version
 ARG deb_release=unstable
 ARG deb_codename=bullseye
 ARG network=mainnet
+ARG deb_profile
+
+# if --build-arg deb_profile is defined, add hypen at beginning.
+ENV SUFFIX=${deb_profile:+-${deb_profile}}
+# construct mina debian package name based on network and suffix.
+# possible values:
+# - mina-berkeley
+# - mina-berkeley-lightnet etc.
+ENV MINA_DEB=mina-${network}${SUFFIX}
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -59,7 +68,7 @@ ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
   && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
-  && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" \
+  && apt-get install --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" \
   && rm -rf /var/lib/apt/lists/*
 
 
