@@ -31,7 +31,7 @@ Pipeline.build
         ],
         path = "Release",
         name = "MinaToolchainArtifactBuster",
-        tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ],
+        tags = [ PipelineTag.Type.Toolchain ],
         mode = PipelineMode.Type.Stable        
       },
     steps = [
