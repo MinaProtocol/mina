@@ -2,13 +2,11 @@ open Core_kernel
 open Pickles_types
 open Pickles.Impls.Step
 
-let perform_step_tests = false
+let perform_step_tests = true
 
-let perform_recursive_tests = false
+let perform_recursive_tests = true
 
-let perform_step_choices_test = false
-
-let perform_wrap_custom_tests = true
+let perform_step_choices_test = true
 
 let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 
@@ -79,8 +77,7 @@ let create_customisable_circuit ~custom_gate_type ~valid_witness =
                  } )
         } )
 
-let test ~step_only ~custom_gate_type ~valid_witness
-    ?(wrap_circuit_with_configurable_gate = false) () =
+let test ~step_only ~custom_gate_type ~valid_witness =
   printf "\n* Compiling STEP proof\n" ;
   let tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
@@ -156,10 +153,6 @@ let test ~step_only ~custom_gate_type ~valid_witness
                       exists (Typ.Internal.ref ()) ~request:(fun () ->
                           Requests.Proof )
                     in
-                    if wrap_circuit_with_configurable_gate then (
-                      printf "Adding customisable gate to wrap circuit" ;
-                      create_customisable_circuit ~custom_gate_type
-                        ~valid_witness:true ) ;
                     { previous_proof_statements =
                         [ { public_input = ()
                           ; proof
@@ -171,9 +164,7 @@ let test ~step_only ~custom_gate_type ~valid_witness
                     ; auxiliary_output = ()
                     } )
               ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
-              ; custom_gate_type =
-                  ( if wrap_circuit_with_configurable_gate then custom_gate_type
-                  else false )
+              ; custom_gate_type = false
               }
             ] )
           ()
@@ -196,16 +187,16 @@ let () =
   if perform_step_tests then (
     printf "Performing step tests\n" ;
     (* Customised as ForeignFieldAdd gate; valid witness *)
-    test ~step_only:true ~custom_gate_type:false ~valid_witness:true () ;
+    test ~step_only:true ~custom_gate_type:false ~valid_witness:true ;
     (* Customised as Conditional gate; valid witness *)
     (* Note: Requires Cache.Wrap.read_or_generate to have custom_gate_type passed to it *)
-    test ~step_only:true ~custom_gate_type:true ~valid_witness:true () ;
+    test ~step_only:true ~custom_gate_type:true ~valid_witness:true ;
 
     (* Customised as ForeignFieldAdd gate; invalid witness *)
     let test_failed =
       try
         let _cs =
-          test ~step_only:true ~custom_gate_type:false ~valid_witness:false ()
+          test ~step_only:true ~custom_gate_type:false ~valid_witness:false
         in
         false
       with _ -> true
@@ -216,7 +207,7 @@ let () =
     let test_failed =
       try
         let _cs =
-          test ~step_only:true ~custom_gate_type:true ~valid_witness:false ()
+          test ~step_only:true ~custom_gate_type:true ~valid_witness:false
         in
         false
       with _ -> true
@@ -228,15 +219,17 @@ let () =
   if perform_recursive_tests then (
     printf "Performing recursive tests\n" ;
     (* Customised as ForeignFieldAdd gate; valid witness *)
-    test ~step_only:false ~custom_gate_type:false ~valid_witness:true () ;
+    test ~step_only:false ~custom_gate_type:false ~valid_witness:true ;
 
     (* Customised as Conditional gate; valid witness *)
-    test ~step_only:false ~custom_gate_type:true ~valid_witness:true () ;
+    test ~step_only:false ~custom_gate_type:true ~valid_witness:true ;
 
     (* Customised as ForeignFieldAdd gate; invalid witness *)
     let test_failed =
       try
-        test ~step_only:false ~custom_gate_type:false ~valid_witness:false () ;
+        let _cs =
+          test ~step_only:false ~custom_gate_type:false ~valid_witness:false
+        in
         false
       with _ -> true
     in
@@ -245,7 +238,9 @@ let () =
     (* Customised as Conditional gate; invalid witness *)
     let test_failed =
       try
-        test ~step_only:false ~custom_gate_type:true ~valid_witness:false () ;
+        let _cs =
+          test ~step_only:false ~custom_gate_type:true ~valid_witness:false
+        in
         false
       with _ -> true
     in
@@ -313,14 +308,3 @@ let () =
       with _ -> true
     in
     assert compile_failed
-
-(* Wrap with custom gate tests *)
-let () =
-  if perform_wrap_custom_tests then
-    (* Customised as ForeignFieldAdd gate; valid witness; wrap with custom_gate_type:true *)
-    test ~step_only:false ~custom_gate_type:false ~valid_witness:true
-      ~wrap_circuit_with_configurable_gate:true () ;
-
-  (* Customised as ForeignFieldAdd gate; valid witness; wrap with custom_gate_type:true *)
-  test ~step_only:false ~custom_gate_type:true ~valid_witness:true
-    ~wrap_circuit_with_configurable_gate:true ()
