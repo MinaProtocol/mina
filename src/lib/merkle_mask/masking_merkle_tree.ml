@@ -264,10 +264,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       let element height address =
         let sibling = Addr.sibling address in
         let sibling_dir = Location.last_direction address in
-        let%map.Option hash =
+        let%map.Option sibling_hash =
           self_path_get_hash ~hashes ~current_location height sibling
         in
-        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+        Direction.map sibling_dir ~left:(`Left sibling_hash) ~right:(`Right sibling_hash)
       in
       self_path_impl ~element
 
