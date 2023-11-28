@@ -624,6 +624,13 @@ module Make (Inputs : Inputs_intf.S) = struct
       self_find_or_batch_lookup self_find_location
         Base.location_of_account_batch
 
+    (* Adds specified accounts to the mask by laoding them from parent ledger.
+
+       Could be useful for transaction processing when to pre-populate mask with the
+       accounts used in processing a transaction (or a block) to ensure there are not loaded
+       from parent on each lookup. I.e. these accounts will be cached in mask and accessing
+       them during processing of a transaction won't use disk I/O.
+    *)
     let unsafe_preload_accounts_from_parent t account_ids =
       assert_is_attached t ;
       let locations =
