@@ -1,14 +1,12 @@
 open Core_kernel
 
 module Fork_config = struct
-  (* previous_global_slot here is a global slot since genesis. previous
-     length is a number of blocks produced since genesis, which might be
-     smaller than previous_global_slot or equal if a block was produced
-     in every slot possible, which may or may not be the case. *)
+  (* Note that previous_length might be smaller than the gernesis_slot
+     or equal if a block was produced in every slot possible. *)
   type t =
     { previous_state_hash : string
-    ; previous_length : int
-    ; previous_global_slot : int
+    ; previous_length : int (* number of blocks produced since genesis *)
+    ; previous_global_slot : int (* global slot since genesis *)
     }
   [@@deriving yojson, dhall_type, bin_io_unversioned]
 
