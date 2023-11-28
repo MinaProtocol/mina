@@ -12,7 +12,6 @@ let Dockers = ../../Constants/DockerVersions.dhall
 let dependsOn = 
     Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "daemon-berkeley"
     # Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
-in
 
 in Pipeline.build Pipeline.Config::{
   spec =
