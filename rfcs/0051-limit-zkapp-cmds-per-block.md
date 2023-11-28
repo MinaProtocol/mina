@@ -43,6 +43,17 @@ from the command line arguments to the function which initializes
 the mempool, but other than that the solution is quite
 straightforward to implement.
 
+The default would be no limit, as that's the easiest to express.
+Alternatively, we can provide another default, but that would require
+providing an option to disable the limit altogether, complicating the
+interface.
+
+An example call could look like this:
+
+```shell
+$ mina daemon --limit-zkapp-cmds-per-block 64 ...
+```
+
 ## Drawbacks
 
 Any non-protocol-level solution to this issue has a drawback that a
@@ -129,17 +140,6 @@ also remove the problem of zkApp commands stacking in the mempool,
 although it might make it less severe by setting a more fine-grained
 limit. However, considering that it would still be a temporary
 solution, it's probably not worth the effort.
-
-The default would be no limit, as that's the easiest to express.
-Alternatively, we can provide another default, but that would require
-providing an option to disable the limit altogether, complicating the
-interface.
-
-An example call could look like this:
-
-```shell
-$ mina daemon --limit-zkapp-cmds-per-block 64 ...
-```
 
 ## Unresolved questions
 
