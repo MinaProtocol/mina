@@ -1083,8 +1083,8 @@ let start_filtered_log ~logger ~log_filter node_uri =
     Graphql.StartFilteredLog.(make @@ makeVariables ~filter:log_filter ())
   in
   let%bind res =
-    exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec:10.0
-      ~node_uri ~query_name:"StartFilteredLog" query_obj
+    exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec:0.25
+      ~num_tries:100 ~node_uri ~query_name:"StartFilteredLog" query_obj
   in
   match res with
   | Ok query_result_obj ->

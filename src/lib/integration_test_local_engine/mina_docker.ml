@@ -5,192 +5,147 @@ open Signature_lib
 open Mina_base
 open Integration_test_lib
 
-let docker_swarm_version = "3.9"
-
-let postgres_image = "docker.io/bitnami/postgresql"
-
-let mina_archive_schema =
-  "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
-
-let mina_create_schema = "create_schema.sql"
+let docker_swarm_version = "3.8"
 
 module Network_config = struct
   module Cli_inputs = Cli_inputs
-
-  module Port = struct
-    type t = string list
-
-    let get_new_port t =
-      match t with [] -> [ 7000 ] | x :: xs -> [ x + 1 ] @ [ x ] @ xs
-
-    let get_latest_port t = match t with [] -> 7000 | x :: _ -> x
-
-    let create_rest_port t =
-      match t with [] -> "7000:3085" | x :: _ -> Int.to_string x ^ ":3085"
-  end
-
-  type docker_volume_configs = { name : string; data : string }
-  [@@deriving to_yojson]
-
-  type seed_config = { name : string; ports : (string * string) list }
-  [@@deriving to_yojson]
-
-  type block_producer_config =
-    { name : string
-    ; id : string
-    ; keypair : Network_keypair.t
-    ; public_key : string
-    ; private_key : string
-    ; keypair_secret : string
-    ; libp2p_secret : string
-    ; ports : (string * string) list
-    }
-  [@@deriving to_yojson]
-
-  type snark_coordinator_configs =
-    { name : string
-    ; id : string
-    ; public_key : string
-    ; snark_worker_fee : string
-    ; ports : (string * string) list
-    }
-  [@@deriving to_yojson]
-
-  type archive_node_configs =
-    { name : string
-    ; id : string
-    ; schema : string
-    ; ports : (string * string) list
-    }
-  [@@deriving to_yojson]
 
   type docker_config =
     { docker_swarm_version : string
     ; stack_name : string
     ; mina_image : string
+    ; mina_agent_image : string
+    ; mina_bots_image : string
+    ; mina_points_image : string
     ; mina_archive_image : string
-    ; docker_volume_configs : docker_volume_configs list
-    ; seed_configs : seed_config list
-    ; block_producer_configs : block_producer_config list
-    ; snark_coordinator_configs : snark_coordinator_configs list
-    ; archive_node_configs : archive_node_configs list
-    ; log_precomputed_blocks : bool
-    ; archive_node_count : int
-    ; mina_archive_schema : string
     ; runtime_config : Yojson.Safe.t
-          [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
+    ; seed_configs : Docker_node_config.Seed_config.t list
+    ; block_producer_configs : Docker_node_config.Block_producer_config.t list
+    ; snark_coordinator_config :
+        Docker_node_config.Snark_coordinator_config.t option
+    ; archive_node_configs : Docker_node_config.Archive_node_config.t list
+    ; mina_archive_schema_aux_files : string list
+    ; log_precomputed_blocks : bool
     }
   [@@deriving to_yojson]
 
   type t =
-    { keypairs : Network_keypair.t list
-    ; debug_arg : bool
+    { debug_arg : bool
+    ; genesis_keypairs :
+        (Network_keypair.t Core.String.Map.t
+        [@to_yojson
+          fun map ->
+            `Assoc
+              (Core.Map.fold_right ~init:[]
+                 ~f:(fun ~key:k ~data:v accum ->
+                   (k, Network_keypair.to_yojson v) :: accum )
+                 map )] )
     ; constants : Test_config.constants
     ; docker : docker_config
     }
   [@@deriving to_yojson]
 
-  let expand ~logger ~test_name ~cli_inputs:_ ~(debug : bool)
+  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
-    let { Test_config.k
+    let _ = cli_inputs in
+    let { genesis_ledger
+        ; epoch_data
+        ; block_producers
+        ; snark_coordinator
+        ; snark_worker_fee
+        ; num_archive_nodes
+        ; log_precomputed_blocks
+        ; proof_config
+        ; Test_config.k
         ; delta
         ; slots_per_epoch
         ; slots_per_sub_window
-        ; proof_level
         ; txpool_max_size
-        ; requires_graphql = _
-        ; block_producers
-        ; num_snark_workers
-        ; num_archive_nodes
-        ; log_precomputed_blocks
-        ; snark_worker_fee
-        ; snark_worker_public_key
+        ; _
         } =
       test_config
     in
-    let user_from_env = Option.value (Unix.getenv "USER") ~default:"auto" in
-    let user_sanitized =
-      Str.global_replace (Str.regexp "\\W|_-") "" user_from_env
-    in
-    let user_len = Int.min 5 (String.length user_sanitized) in
-    let user = String.sub user_sanitized ~pos:0 ~len:user_len in
     let git_commit = Mina_version.commit_id_short in
-    (* see ./src/app/test_executive/README.md for information regarding the namespace name format and length restrictions *)
-    let stack_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
-    (* GENERATE ACCOUNTS AND KEYPAIRS *)
-    let num_block_producers = List.length block_producers in
-    let block_producer_keypairs, runtime_accounts =
-      (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
-      let keypairs =
-        List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1
-      in
-      if num_block_producers > List.length keypairs then
-        failwith
-          "not enough sample keypairs for specified number of block producers" ;
-      let f index ({ Test_config.Block_producer.balance; timing }, (pk, sk)) =
-        let runtime_account =
-          let timing =
-            match timing with
-            | Account.Timing.Untimed ->
-                None
-            | Timed t ->
-                Some
-                  { Runtime_config.Accounts.Single.Timed.initial_minimum_balance =
-                      t.initial_minimum_balance
-                  ; cliff_time = t.cliff_time
-                  ; cliff_amount = t.cliff_amount
-                  ; vesting_period = t.vesting_period
-                  ; vesting_increment = t.vesting_increment
-                  }
-          in
+    let stack_name = "it-" ^ git_commit ^ "-" ^ test_name in
+    let key_names_list =
+      List.map genesis_ledger ~f:(fun acct -> acct.account_name)
+    in
+    if List.contains_dup ~compare:String.compare key_names_list then
+      failwith
+        "All accounts in genesis ledger must have unique names.  Check to make \
+         sure you are not using the same account_name more than once" ;
+    let all_nodes_names_list =
+      List.map block_producers ~f:(fun acct -> acct.node_name)
+      @ match snark_coordinator with None -> [] | Some n -> [ n.node_name ]
+    in
+    if List.contains_dup ~compare:String.compare all_nodes_names_list then
+      failwith
+        "All nodes in testnet must have unique names.  Check to make sure you \
+         are not using the same node_name more than once" ;
+    let keypairs =
+      List.take
+        (List.tl_exn
+           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs)) )
+        (List.length genesis_ledger)
+    in
+    let runtime_timing_of_timing = function
+      | Account.Timing.Untimed ->
+          None
+      | Timed t ->
+          Some
+            { Runtime_config.Accounts.Single.Timed.initial_minimum_balance =
+                t.initial_minimum_balance
+            ; cliff_time = t.cliff_time
+            ; cliff_amount = t.cliff_amount
+            ; vesting_period = t.vesting_period
+            ; vesting_increment = t.vesting_increment
+            }
+    in
+    let add_accounts accounts_and_keypairs =
+      List.map accounts_and_keypairs
+        ~f:(fun
+             ( { Test_config.Test_Account.balance; account_name; timing }
+             , (pk, sk) )
+           ->
+          let timing = runtime_timing_of_timing timing in
           let default = Runtime_config.Accounts.Single.default in
-          { default with
-            pk = Some (Public_key.Compressed.to_string pk)
-          ; sk = None
-          ; balance =
-              Balance.of_formatted_string balance
-              (* delegation currently unsupported *)
-          ; delegate = None
-          ; timing
-          }
-        in
-        let secret_name = "test-keypair-" ^ Int.to_string index in
-        let keypair =
-          { Keypair.public_key = Public_key.decompress_exn pk
-          ; private_key = sk
-          }
-        in
-        ( Network_keypair.create_network_keypair ~keypair ~secret_name
-        , runtime_account )
-      in
-      List.mapi ~f
-        (List.zip_exn block_producers
-           (List.take keypairs (List.length block_producers)))
-      |> List.unzip
+          let account =
+            { default with
+              pk = Public_key.Compressed.to_string pk
+            ; sk = Some (Private_key.to_base58_check sk)
+            ; balance = Balance.of_mina_string_exn balance
+            ; delegate = None
+            ; timing
+            }
+          in
+          (account_name, account) )
     in
-    (* DAEMON CONFIG *)
-    let proof_config =
-      (* TODO: lift configuration of these up Test_config.t *)
-      { Runtime_config.Proof_keys.level = Some proof_level
-      ; sub_windows_per_window = None
-      ; ledger_depth = None
-      ; work_delay = None
-      ; block_window_duration_ms = None
-      ; transaction_capacity = None
-      ; coinbase_amount = None
-      ; supercharged_coinbase_factor = None
-      ; account_creation_fee = None
-      ; fork = None
-      }
-    in
+    let genesis_accounts_and_keys = List.zip_exn genesis_ledger keypairs in
+    let genesis_ledger_accounts = add_accounts genesis_accounts_and_keys in
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
         ~default:Genesis_constants.Constraint_constants.compiled proof_config
     in
+    let ledger_is_prefix ledger1 ledger2 =
+      List.is_prefix ledger2 ~prefix:ledger1
+        ~equal:(fun
+                 ({ account_name = name1; _ } : Test_config.Test_Account.t)
+                 ({ account_name = name2; _ } : Test_config.Test_Account.t)
+               -> String.equal name1 name2 )
+    in
     let runtime_config =
       { Runtime_config.daemon =
-          Some { txpool_max_size = Some txpool_max_size; peer_list_url = None }
+          Some
+            { txpool_max_size = Some txpool_max_size
+            ; peer_list_url = None
+            ; zkapp_proof_update_cost = None
+            ; zkapp_signed_single_update_cost = None
+            ; zkapp_signed_pair_update_cost = None
+            ; zkapp_transaction_cost_limit = None
+            ; max_event_elements = None
+            ; max_action_elements = None
+            }
       ; genesis =
           Some
             { k = Some k
@@ -200,130 +155,361 @@ module Network_config = struct
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
             }
-      ; proof =
-          None
-          (* was: Some proof_config; TODO: prebake ledger and only set hash *)
+      ; proof = Some proof_config
       ; ledger =
           Some
-            { base = Accounts runtime_accounts
+            { base =
+                Accounts
+                  (List.map genesis_ledger_accounts ~f:(fun (_name, acct) ->
+                       acct ) )
             ; add_genesis_winner = None
             ; num_accounts = None
             ; balances = []
             ; hash = None
             ; name = None
             }
-      ; epoch_data = None
+      ; epoch_data =
+          Option.map epoch_data ~f:(fun { staking = staking_ledger; next } ->
+              let genesis_winner_account : Runtime_config.Accounts.single =
+                Runtime_config.Accounts.Single.of_account
+                  Mina_state.Consensus_state_hooks.genesis_winner_account
+                |> Result.ok_or_failwith
+              in
+              let ledger_of_epoch_accounts
+                  (epoch_accounts : Test_config.Test_Account.t list) =
+                let epoch_ledger_accounts =
+                  List.map epoch_accounts
+                    ~f:(fun { account_name; balance; timing } ->
+                      let balance = Balance.of_mina_string_exn balance in
+                      let timing = runtime_timing_of_timing timing in
+                      let genesis_account =
+                        match
+                          List.Assoc.find genesis_ledger_accounts account_name
+                            ~equal:String.equal
+                        with
+                        | Some acct ->
+                            acct
+                        | None ->
+                            failwithf
+                              "Epoch ledger account %s not in genesis ledger"
+                              account_name ()
+                      in
+                      { genesis_account with balance; timing } )
+                in
+                ( { base =
+                      Accounts (genesis_winner_account :: epoch_ledger_accounts)
+                  ; add_genesis_winner = None (* no effect *)
+                  ; num_accounts = None
+                  ; balances = []
+                  ; hash = None
+                  ; name = None
+                  }
+                  : Runtime_config.Ledger.t )
+              in
+              let staking =
+                let ({ epoch_ledger; epoch_seed }
+                      : Test_config.Epoch_data.Data.t ) =
+                  staking_ledger
+                in
+                if not (ledger_is_prefix epoch_ledger genesis_ledger) then
+                  failwith "Staking epoch ledger not a prefix of genesis ledger" ;
+                let ledger = ledger_of_epoch_accounts epoch_ledger in
+                let seed = epoch_seed in
+                ({ ledger; seed } : Runtime_config.Epoch_data.Data.t)
+              in
+              let next =
+                Option.map next ~f:(fun { epoch_ledger; epoch_seed } ->
+                    if
+                      not
+                        (ledger_is_prefix staking_ledger.epoch_ledger
+                           epoch_ledger )
+                    then
+                      failwith
+                        "Staking epoch ledger not a prefix of next epoch ledger" ;
+                    if not (ledger_is_prefix epoch_ledger genesis_ledger) then
+                      failwith
+                        "Next epoch ledger not a prefix of genesis ledger" ;
+                    let ledger = ledger_of_epoch_accounts epoch_ledger in
+                    let seed = epoch_seed in
+                    ({ ledger; seed } : Runtime_config.Epoch_data.Data.t) )
+              in
+              ({ staking; next } : Runtime_config.Epoch_data.t) )
       }
     in
     let genesis_constants =
       Or_error.ok_exn
         (Genesis_ledger_helper.make_genesis_constants ~logger
-           ~default:Genesis_constants.compiled runtime_config)
+           ~default:Genesis_constants.compiled runtime_config )
     in
     let constants : Test_config.constants =
       { constraints = constraint_constants; genesis = genesis_constants }
     in
-    let open Docker_node_config.Services in
-    let available_host_ports_ref = ref [] in
-    (* BLOCK PRODUCER CONFIG *)
-    let block_producer_config index keypair =
-      available_host_ports_ref := Port.get_new_port !available_host_ports_ref ;
-      let rest_port = Port.create_rest_port !available_host_ports_ref in
-      { name = Block_producer.name ^ "-" ^ Int.to_string (index + 1)
-      ; id = Int.to_string index
-      ; keypair
-      ; keypair_secret = keypair.secret_name
-      ; public_key = keypair.public_key_file
-      ; private_key = keypair.private_key_file
-      ; libp2p_secret = ""
-      ; ports = [ ("rest-port", rest_port) ]
-      }
+    let mk_net_keypair keypair_name (pk, sk) =
+      let keypair =
+        { Keypair.public_key = Public_key.decompress_exn pk; private_key = sk }
+      in
+      Network_keypair.create_network_keypair ~keypair_name ~keypair
+    in
+    let long_commit_id =
+      if String.is_substring Mina_version.commit_id ~substring:"[DIRTY]" then
+        String.sub Mina_version.commit_id ~pos:7
+          ~len:(String.length Mina_version.commit_id - 7)
+      else Mina_version.commit_id
+    in
+    let mina_archive_base_url =
+      "https://raw.githubusercontent.com/MinaProtocol/mina/" ^ long_commit_id
+      ^ "/src/app/archive/"
+    in
+    let mina_archive_schema_aux_files =
+      [ sprintf "%screate_schema.sql" mina_archive_base_url
+      ; sprintf "%szkapp_tables.sql" mina_archive_base_url
+      ]
+    in
+    let genesis_keypairs =
+      List.fold genesis_accounts_and_keys ~init:String.Map.empty
+        ~f:(fun map ({ account_name; _ }, (pk, sk)) ->
+          let keypair = mk_net_keypair account_name (pk, sk) in
+          String.Map.add_exn map ~key:account_name ~data:keypair )
+    in
+    let open Docker_node_config in
+    let open Docker_compose.Dockerfile in
+    let port_manager = PortManager.create ~min_port:10000 ~max_port:11000 in
+    let docker_volumes =
+      [ Base_node_config.runtime_config_volume
+      ; Base_node_config.entrypoint_volume
+      ]
+    in
+    let generate_random_id () =
+      let rand_char () =
+        let ascii_a = int_of_char 'a' in
+        let ascii_z = int_of_char 'z' in
+        char_of_int (ascii_a + Random.int (ascii_z - ascii_a + 1))
+      in
+      String.init 4 ~f:(fun _ -> rand_char ())
+    in
+    let seed_config =
+      let config : Seed_config.config =
+        { archive_address = None
+        ; peer = None
+        ; runtime_config_path = Base_node_config.container_runtime_config_path
+        }
+      in
+      Seed_config.create
+        ~service_name:(sprintf "seed-%s" (generate_random_id ()))
+        ~image:images.mina
+        ~ports:(PortManager.allocate_ports_for_node port_manager)
+        ~volumes:(docker_volumes @ [ Seed_config.seed_libp2p_keypair ])
+        ~config
+    in
+    let seed_config_peer =
+      Some
+        (Seed_config.create_libp2p_peer ~peer_name:seed_config.service_name
+           ~external_port:PortManager.mina_internal_external_port )
+    in
+    let archive_node_configs =
+      List.init num_archive_nodes ~f:(fun index ->
+          let config =
+            { Postgres_config.host =
+                sprintf "postgres-%d-%s" (index + 1) (generate_random_id ())
+            ; username = "postgres"
+            ; password = "password"
+            ; database = "archive"
+            ; port = PortManager.postgres_internal_port
+            }
+          in
+          let postgres_port =
+            Service.Port.create
+              ~published:(PortManager.allocate_port port_manager)
+              ~target:PortManager.postgres_internal_port
+          in
+          let postgres_config =
+            Postgres_config.create ~service_name:config.host
+              ~image:Postgres_config.postgres_image ~ports:[ postgres_port ]
+              ~volumes:
+                [ Postgres_config.postgres_create_schema_volume
+                ; Postgres_config.postgres_zkapp_schema_volume
+                ; Postgres_config.postgres_entrypoint_volume
+                ]
+              ~config
+          in
+          let archive_server_port =
+            Service.Port.create
+              ~published:(PortManager.allocate_port port_manager)
+              ~target:PortManager.mina_internal_server_port
+          in
+          let config : Archive_node_config.config =
+            { postgres_config
+            ; server_port = archive_server_port.target
+            ; runtime_config_path =
+                Base_node_config.container_runtime_config_path
+            }
+          in
+          let archive_rest_port =
+            Service.Port.create
+              ~published:(PortManager.allocate_port port_manager)
+              ~target:PortManager.mina_internal_rest_port
+          in
+          Archive_node_config.create
+            ~service_name:
+              (sprintf "archive-%d-%s" (index + 1) (generate_random_id ()))
+            ~image:images.archive_node
+            ~ports:[ archive_server_port; archive_rest_port ]
+            ~volumes:docker_volumes ~config )
+    in
+    (* Each archive node has it's own seed node *)
+    let seed_configs =
+      List.mapi archive_node_configs ~f:(fun index archive_config ->
+          let config : Seed_config.config =
+            { archive_address =
+                Some
+                  (sprintf "%s:%d" archive_config.service_name
+                     PortManager.mina_internal_server_port )
+            ; peer = seed_config_peer
+            ; runtime_config_path =
+                Base_node_config.container_runtime_config_path
+            }
+          in
+          Seed_config.create
+            ~service_name:
+              (sprintf "seed-%d-%s" (index + 1) (generate_random_id ()))
+            ~image:images.mina
+            ~ports:(PortManager.allocate_ports_for_node port_manager)
+            ~volumes:docker_volumes ~config )
+      @ [ seed_config ]
     in
     let block_producer_configs =
-      List.mapi block_producer_keypairs ~f:block_producer_config
+      List.map block_producers ~f:(fun node ->
+          let keypair =
+            match
+              List.find genesis_accounts_and_keys
+                ~f:(fun ({ account_name; _ }, _keypair) ->
+                  String.equal account_name node.account_name )
+            with
+            | Some (_acct, keypair) ->
+                keypair |> mk_net_keypair node.account_name
+            | None ->
+                let failstring =
+                  Format.sprintf
+                    "Failing because the account key of all initial block \
+                     producers must be in the genesis ledger.  name of Node: \
+                     %s.  name of Account which does not exist: %s"
+                    node.node_name node.account_name
+                in
+                failwith failstring
+          in
+          let priv_key_path =
+            Base_node_config.container_keys_path ^/ node.account_name
+          in
+          let volumes =
+            [ Service.Volume.create ("keys" ^/ node.account_name) priv_key_path
+            ]
+            @ docker_volumes
+          in
+          let block_producer_config : Block_producer_config.config =
+            { keypair
+            ; runtime_config_path =
+                Base_node_config.container_runtime_config_path
+            ; peer = seed_config_peer
+            ; priv_key_path
+            ; enable_peer_exchange = true
+            ; enable_flooding = true
+            ; libp2p_secret = ""
+            }
+          in
+          Block_producer_config.create ~service_name:node.node_name
+            ~image:images.mina
+            ~ports:(PortManager.allocate_ports_for_node port_manager)
+            ~volumes ~config:block_producer_config )
     in
-    (* SEED NODE CONFIG *)
-    available_host_ports_ref := Port.get_new_port !available_host_ports_ref ;
-    let seed_rest_port = Port.create_rest_port !available_host_ports_ref in
-    let seed_configs =
-      [ { name = Seed.name; ports = [ ("rest-port", seed_rest_port) ] } ]
-    in
-    (* SNARK COORDINATOR CONFIG *)
-    available_host_ports_ref := Port.get_new_port !available_host_ports_ref ;
-    let snark_coord_rest_port =
-      Port.create_rest_port !available_host_ports_ref
-    in
-    let snark_coordinator_configs =
-      if num_snark_workers > 0 then
-        List.mapi
-          (List.init num_snark_workers ~f:(const 0))
-          ~f:(fun index _ ->
-            available_host_ports_ref :=
-              Port.get_new_port !available_host_ports_ref ;
-            let rest_port = Port.create_rest_port !available_host_ports_ref in
-            { name = Snark_worker.name ^ "-" ^ Int.to_string (index + 1)
-            ; id = Int.to_string index
+    let snark_coordinator_config =
+      match snark_coordinator with
+      | None ->
+          None
+      | Some snark_coordinator_node ->
+          let network_kp =
+            match
+              String.Map.find genesis_keypairs
+                snark_coordinator_node.account_name
+            with
+            | Some acct ->
+                acct
+            | None ->
+                let failstring =
+                  Format.sprintf
+                    "Failing because the account key of all initial snark \
+                     coordinators must be in the genesis ledger.  name of \
+                     Node: %s.  name of Account which does not exist: %s"
+                    snark_coordinator_node.node_name
+                    snark_coordinator_node.account_name
+                in
+                failwith failstring
+          in
+          let public_key =
+            Public_key.Compressed.to_base58_check
+              (Public_key.compress network_kp.keypair.public_key)
+          in
+          let coordinator_ports =
+            PortManager.allocate_ports_for_node port_manager
+          in
+          let daemon_port =
+            coordinator_ports
+            |> List.find_exn ~f:(fun p ->
+                   p.target
+                   = Docker_node_config.PortManager.mina_internal_client_port )
+          in
+          let snark_node_service_name = snark_coordinator_node.node_name in
+          let worker_node_config : Snark_worker_config.config =
+            { daemon_address = snark_node_service_name
+            ; daemon_port = Int.to_string daemon_port.target
+            ; proof_level = "full"
+            }
+          in
+          let worker_nodes =
+            List.init snark_coordinator_node.worker_nodes ~f:(fun index ->
+                Docker_node_config.Snark_worker_config.create
+                  ~service_name:
+                    (sprintf "snark-worker-%d-%s" (index + 1)
+                       (generate_random_id ()) )
+                  ~image:images.mina
+                  ~ports:
+                    (Docker_node_config.PortManager.allocate_ports_for_node
+                       port_manager )
+                  ~volumes:docker_volumes ~config:worker_node_config )
+          in
+          let snark_coordinator_config : Snark_coordinator_config.config =
+            { worker_nodes
             ; snark_worker_fee
-            ; public_key = snark_worker_public_key
-            ; ports = [ ("rest_port", rest_port) ]
-            })
-        (* Add one snark coordinator for all workers *)
-        |> List.append
-             [ { name = Snark_coordinator.name
-               ; id = "1"
-               ; snark_worker_fee
-               ; public_key = snark_worker_public_key
-               ; ports = [ ("rest-port", snark_coord_rest_port) ]
-               }
-             ]
-      else []
-    in
-    (* ARCHIVE CONFIG *)
-    let archive_node_configs =
-      if num_archive_nodes > 0 then
-        List.mapi
-          (List.init num_archive_nodes ~f:(const 0))
-          ~f:(fun index _ ->
-            available_host_ports_ref :=
-              Port.get_new_port !available_host_ports_ref ;
-            let rest_port = Port.create_rest_port !available_host_ports_ref in
-            { name = Archive_node.name ^ "-" ^ Int.to_string (index + 1)
-            ; id = Int.to_string index
-            ; schema = mina_archive_schema
-            ; ports = [ ("rest-port", rest_port) ]
-            })
-      else []
-    in
-    (* DOCKER VOLUME CONFIG:
-       Create a docker volume structure for the runtime_config and all block producer keys
-       to mount in the specified docker services
-    *)
-    let docker_volume_configs =
-      List.map block_producer_configs ~f:(fun config ->
-          { name = "sk-" ^ config.name; data = config.private_key })
-      @ [ { name = Docker_node_config.Volumes.Runtime_config.name
-          ; data =
-              Yojson.Safe.to_string (Runtime_config.to_yojson runtime_config)
-          }
-        ]
+            ; runtime_config_path =
+                Base_node_config.container_runtime_config_path
+            ; snark_coordinator_key = public_key
+            ; peer = seed_config_peer
+            ; work_selection = "seq"
+            }
+          in
+          Some
+            (Snark_coordinator_config.create
+               ~service_name:snark_node_service_name ~image:images.mina
+               ~ports:coordinator_ports ~volumes:docker_volumes
+               ~config:snark_coordinator_config )
     in
     { debug_arg = debug
-    ; keypairs = block_producer_keypairs
+    ; genesis_keypairs
     ; constants
     ; docker =
         { docker_swarm_version
         ; stack_name
         ; mina_image = images.mina
+        ; mina_agent_image = images.user_agent
+        ; mina_bots_image = images.bots
+        ; mina_points_image = images.points
         ; mina_archive_image = images.archive_node
-        ; docker_volume_configs
         ; runtime_config = Runtime_config.to_yojson runtime_config
-        ; seed_configs
+        ; log_precomputed_blocks (* Node configs *)
         ; block_producer_configs
-        ; snark_coordinator_configs
-        ; archive_node_configs
-        ; log_precomputed_blocks
-        ; archive_node_count = num_archive_nodes
-        ; mina_archive_schema
+        ; seed_configs
+        ; mina_archive_schema_aux_files
+        ; snark_coordinator_config
+        ; archive_node_configs (* Resource configs *)
         }
     }
 
@@ -336,373 +522,509 @@ module Network_config = struct
      be used (which are mostly defaults).
   *)
   let to_docker network_config =
-    let open Docker_compose.Compose in
-    let open Docker_node_config in
-    let open Docker_node_config.Services in
-    (* RUNTIME CONFIG DOCKER BIND VOLUME *)
-    let runtime_config =
-      Service.Volume.create Volumes.Runtime_config.name
-        Volumes.Runtime_config.container_mount_target
-    in
-    (* BLOCK PRODUCER DOCKER SERVICE *)
+    let open Docker_compose.Dockerfile in
     let block_producer_map =
       List.map network_config.docker.block_producer_configs ~f:(fun config ->
-          (* BP KEYPAIR CONFIG DOCKER BIND VOLUME *)
-          let private_key_config_name = "sk-" ^ config.name in
-          let private_key_config =
-            Service.Volume.create private_key_config_name
-              ("/root/" ^ private_key_config_name)
-          in
-          let cmd =
-            Cmd.(
-              Block_producer
-                (Block_producer.default
-                   ~private_key_config:private_key_config.target))
-          in
-          let rest_port =
-            List.find
-              ~f:(fun ports -> String.equal (fst ports) "rest-port")
-              config.ports
-            |> Option.value_exn |> snd
-          in
-          ( config.name
-          , { Service.image = network_config.docker.mina_image
-            ; volumes = [ private_key_config; runtime_config ]
-            ; command = Cmd.create_cmd cmd ~config_file:runtime_config.target
-            ; ports = [ rest_port ]
-            ; environment = Service.Environment.create Envs.base_node_envs
-            } ))
+          (config.service_name, config.docker_config) )
       |> StringMap.of_alist_exn
     in
-    (* SNARK COORD/WORKER DOCKER SERVICE *)
-    let snark_worker_map =
-      List.map network_config.docker.snark_coordinator_configs ~f:(fun config ->
-          (* Assign different command and environment configs depending on coordinator or worker *)
-          let command, environment =
-            match
-              String.substr_index config.name ~pattern:Snark_coordinator.name
-            with
-            | Some _ ->
-                let cmd =
-                  Cmd.(
-                    Snark_coordinator
-                      (Snark_coordinator.default
-                         ~snark_coordinator_key:config.public_key
-                         ~snark_worker_fee:config.snark_worker_fee))
-                in
-                let coordinator_command =
-                  Cmd.create_cmd cmd ~config_file:runtime_config.target
-                in
-                let coordinator_environment =
-                  Service.Environment.create
-                    (Envs.snark_coord_envs
-                       ~snark_coordinator_key:config.public_key
-                       ~snark_worker_fee:config.snark_worker_fee)
-                in
-                (coordinator_command, coordinator_environment)
-            | None ->
-                let daemon_address = Snark_coordinator.name in
-                let daemon_port = Snark_coordinator.default_port in
-                let cmd =
-                  Cmd.(
-                    Snark_worker
-                      (Snark_worker.default ~daemon_address ~daemon_port))
-                in
-                let worker_command =
-                  Cmd.create_cmd cmd ~config_file:runtime_config.target
-                in
-                let worker_environment = Service.Environment.create [] in
-                (worker_command, worker_environment)
-          in
-          let rest_port =
-            List.find
-              ~f:(fun ports -> String.equal (fst ports) "rest-port")
-              config.ports
-            |> Option.value_exn |> snd
-          in
-          ( config.name
-          , { Service.image = network_config.docker.mina_image
-            ; volumes = [ runtime_config ]
-            ; command
-            ; ports = [ rest_port ]
-            ; environment
-            } ))
-      |> StringMap.of_alist_exn
-    in
-    (* ARCHIVE NODE SERVICE *)
-    let archive_node_configs =
-      List.mapi network_config.docker.archive_node_configs
-        ~f:(fun index config ->
-          let postgres_uri =
-            Cmd.Cli_args.Postgres_uri.create
-              ~host:
-                ( network_config.docker.stack_name ^ "_"
-                ^ Archive_node.postgres_name ^ "-"
-                ^ Int.to_string (index + 1) )
-            |> Cmd.Cli_args.Postgres_uri.to_string
-          in
-          let cmd =
-            let server_port = Archive_node.server_port in
-            Cmd.(Archive_node { Archive_node.postgres_uri; server_port })
-          in
-          let rest_port =
-            List.find
-              ~f:(fun ports -> String.equal (fst ports) "rest-port")
-              config.ports
-            |> Option.value_exn |> snd
-          in
-          ( config.name
-          , { Service.image = network_config.docker.mina_archive_image
-            ; volumes = [ runtime_config ]
-            ; command = Cmd.create_cmd cmd ~config_file:runtime_config.target
-            ; ports = [ rest_port ]
-            ; environment = Service.Environment.create Envs.base_node_envs
-            } ))
-      (* Add an equal number of postgres containers as archive nodes *)
-      @ List.mapi network_config.docker.archive_node_configs ~f:(fun index _ ->
-            let pg_config = Cmd.Cli_args.Postgres_uri.default in
-            (* Mount the archive schema on the /docker-entrypoint-initdb.d postgres entrypoint *)
-            let archive_config =
-              Service.Volume.create mina_create_schema
-                (Archive_node.entrypoint_target ^/ mina_create_schema)
-            in
-            ( Archive_node.postgres_name ^ "-" ^ Int.to_string (index + 1)
-            , { Service.image = postgres_image
-              ; volumes = [ archive_config ]
-              ; command = []
-              ; ports = []
-              ; environment =
-                  Service.Environment.create
-                    (Envs.postgres_envs ~username:pg_config.username
-                       ~password:pg_config.password ~database:pg_config.db
-                       ~port:pg_config.port)
-              } ))
-      |> StringMap.of_alist_exn
-    in
-    (* SEED NODE DOCKER SERVICE *)
     let seed_map =
-      List.mapi network_config.docker.seed_configs ~f:(fun index config ->
-          let command =
-            if List.length network_config.docker.archive_node_configs > 0 then
-              (* If an archive node is specified in the test plan, use the seed node to connect to the first mina-archive process *)
-              Cmd.create_cmd Seed ~config_file:runtime_config.target
-              @ Cmd.Seed.connect_to_archive
-                  ~archive_node:
-                    ( "archive-"
-                    ^ Int.to_string (index + 1)
-                    ^ ":" ^ Services.Archive_node.server_port )
-            else Cmd.create_cmd Seed ~config_file:runtime_config.target
-          in
-          let rest_port =
-            List.find
-              ~f:(fun ports -> String.equal (fst ports) "rest-port")
-              config.ports
-            |> Option.value_exn |> snd
-          in
-          ( Seed.name
-          , { Service.image = network_config.docker.mina_image
-            ; volumes = [ runtime_config ]
-            ; command
-            ; ports = [ rest_port ]
-            ; environment = Service.Environment.create Envs.base_node_envs
-            } ))
+      List.map network_config.docker.seed_configs ~f:(fun config ->
+          (config.service_name, config.docker_config) )
+      |> StringMap.of_alist_exn
+    in
+    let snark_coordinator_map =
+      match network_config.docker.snark_coordinator_config with
+      | Some config ->
+          StringMap.of_alist_exn [ (config.service_name, config.docker_config) ]
+      | None ->
+          StringMap.empty
+    in
+    let snark_worker_map =
+      match network_config.docker.snark_coordinator_config with
+      | Some snark_coordinator_config ->
+          List.map snark_coordinator_config.config.worker_nodes
+            ~f:(fun config -> (config.service_name, config.docker_config))
+          |> StringMap.of_alist_exn
+      | None ->
+          StringMap.empty
+    in
+    let archive_node_map =
+      List.map network_config.docker.archive_node_configs ~f:(fun config ->
+          (config.service_name, config.docker_config) )
+      |> StringMap.of_alist_exn
+    in
+    let postgres_map =
+      List.map network_config.docker.archive_node_configs
+        ~f:(fun archive_config ->
+          let config = archive_config.config.postgres_config in
+          (config.service_name, config.docker_config) )
       |> StringMap.of_alist_exn
     in
     let services =
-      seed_map |> merge block_producer_map |> merge snark_worker_map
-      |> merge archive_node_configs
+      postgres_map |> merge archive_node_map |> merge snark_worker_map
+      |> merge snark_coordinator_map
+      |> merge block_producer_map |> merge seed_map
     in
     { version = docker_swarm_version; services }
 end
 
 module Network_manager = struct
   type t =
-    { stack_name : string
-    ; logger : Logger.t
-    ; testnet_dir : string
-    ; testnet_log_filter : string
+    { logger : Logger.t
+    ; stack_name : string
+    ; graphql_enabled : bool
+    ; docker_dir : string
+    ; docker_compose_file_path : string
     ; constants : Test_config.constants
-    ; seed_nodes : Swarm_network.Node.t list
-    ; nodes_by_app_id : Swarm_network.Node.t String.Map.t
-    ; block_producer_nodes : Swarm_network.Node.t list
-    ; snark_coordinator_nodes : Swarm_network.Node.t list
-    ; archive_node_nodes : Swarm_network.Node.t list
+    ; seed_workloads : Docker_network.Service_to_deploy.t Core.String.Map.t
+    ; block_producer_workloads :
+        Docker_network.Service_to_deploy.t Core.String.Map.t
+    ; snark_coordinator_workloads :
+        Docker_network.Service_to_deploy.t Core.String.Map.t
+    ; snark_worker_workloads :
+        Docker_network.Service_to_deploy.t Core.String.Map.t
+    ; archive_workloads : Docker_network.Service_to_deploy.t Core.String.Map.t
+    ; services_by_id : Docker_network.Service_to_deploy.t Core.String.Map.t
     ; mutable deployed : bool
-    ; keypairs : Keypair.t list
+    ; genesis_keypairs : Network_keypair.t Core.String.Map.t
     }
 
-  let run_cmd t prog args = Util.run_cmd t.testnet_dir prog args
-
-  let run_cmd_exn t prog args = Util.run_cmd_exn t.testnet_dir prog args
-
-  (*
-      Creates a docker swarm network by creating a local working directory and writing a
-      docker_compose.json file to disk with all related resources (e.g. runtime_config and secret keys).
-
-      First, check if there is a running swarm network and let the user remove it. Continue by creating a
-      working directory and writing out all resources to be used as docker volumes. Additionally for each resource, specify
-      file permissions of 600 so that the daemon can run properly.
-  *)
-  let create ~logger (network_config : Network_config.t) =
+  let get_current_running_stacks =
+    let open Malleable_error.Let_syntax in
     let%bind all_stacks_str =
-      Util.run_cmd_exn "/" "docker" [ "stack"; "ls"; "--format"; "{{.Name}}" ]
+      Util.run_cmd_or_hard_error "/" "docker"
+        [ "stack"; "ls"; "--format"; "{{.Name}}" ]
     in
-    let all_stacks = String.split ~on:'\n' all_stacks_str in
-    let testnet_dir = network_config.docker.stack_name in
-    let%bind () =
-      if
-        List.mem all_stacks network_config.docker.stack_name ~equal:String.equal
-      then
-        let%bind () =
-          if network_config.debug_arg then
-            Util.prompt_continue
-              "Existing stack name of same name detected, pausing startup. \
-               Enter [y/Y] to continue on and remove existing stack name, \
-               start clean, and run the test; press Ctrl-C to quit out: "
-          else
-            Deferred.return
-              ([%log info]
-                 "Existing stack of same name detected; removing to start clean")
-        in
-        Util.run_cmd_exn "/" "docker"
-          [ "stack"; "rm"; network_config.docker.stack_name ]
-        >>| Fn.const ()
-      else return ()
-    in
-    let%bind () =
-      if%bind File_system.dir_exists testnet_dir then (
-        [%log info] "Old docker stack directory found; removing to start clean" ;
-        File_system.remove_dir testnet_dir )
-      else return ()
-    in
-    let%bind () = Unix.mkdir testnet_dir in
-    [%log info] "Writing network configuration" ;
-    Out_channel.with_file ~fail_if_exists:true (testnet_dir ^/ "compose.json")
-      ~f:(fun ch ->
-        Network_config.to_docker network_config
-        |> Docker_compose.to_string
-        |> Out_channel.output_string ch) ;
-    List.iter network_config.docker.docker_volume_configs ~f:(fun config ->
-        [%log info] "Writing volume config: %s" (testnet_dir ^/ config.name) ;
-        Out_channel.with_file ~fail_if_exists:false (testnet_dir ^/ config.name)
-          ~f:(fun ch -> config.data |> Out_channel.output_string ch) ;
-        ignore (Util.run_cmd_exn testnet_dir "chmod" [ "600"; config.name ])) ;
-    let cons_node swarm_name service_id ports network_keypair_opt =
-      { Swarm_network.Node.swarm_name
-      ; service_id
-      ; ports
-      ; graphql_enabled = true
-      ; network_keypair = network_keypair_opt
-      }
-    in
-    let seed_nodes =
-      List.map network_config.docker.seed_configs ~f:(fun seed_config ->
-          cons_node network_config.docker.stack_name
-            (network_config.docker.stack_name ^ "_" ^ seed_config.name)
-            seed_config.ports None)
-    in
-    let block_producer_nodes =
-      List.map network_config.docker.block_producer_configs ~f:(fun bp_config ->
-          cons_node network_config.docker.stack_name
-            (network_config.docker.stack_name ^ "_" ^ bp_config.name)
-            bp_config.ports (Some bp_config.keypair))
-    in
-    let snark_coordinator_nodes =
-      List.map network_config.docker.snark_coordinator_configs
-        ~f:(fun snark_config ->
-          cons_node network_config.docker.stack_name
-            (network_config.docker.stack_name ^ "_" ^ snark_config.name)
-            snark_config.ports None)
-    in
-    let%bind _ =
-      (* If any archive nodes are specified, write the archive schema to the working directory to use as an entrypoint for postgres *)
-      if List.length network_config.docker.archive_node_configs > 0 then
-        let cmd =
-          Printf.sprintf "curl -Ls %s > %s"
-            network_config.docker.mina_archive_schema mina_create_schema
-        in
-        Util.run_cmd_exn testnet_dir "bash" [ "-c"; cmd ]
-      else return ""
-    in
-    let archive_node_nodes =
-      List.map network_config.docker.archive_node_configs
-        ~f:(fun archive_node ->
-          cons_node network_config.docker.stack_name
-            (network_config.docker.stack_name ^ "_" ^ archive_node.name)
-            archive_node.ports None)
-    in
-    let nodes_by_app_id =
-      let all_nodes =
-        seed_nodes @ block_producer_nodes @ snark_coordinator_nodes
-        @ archive_node_nodes
+    return (String.split ~on:'\n' all_stacks_str)
+
+  let remove_stack_if_exists ~logger (network_config : Network_config.t) =
+    let open Malleable_error.Let_syntax in
+    let%bind all_stacks = get_current_running_stacks in
+    if List.mem all_stacks network_config.docker.stack_name ~equal:String.equal
+    then
+      let%bind () =
+        if network_config.debug_arg then
+          Deferred.bind ~f:Malleable_error.return
+            (Util.prompt_continue
+               "Existing stack name of same name detected, pausing startup. \
+                Enter [y/Y] to continue on and remove existing stack name, \
+                start clean, and run the test; press Ctrl-C to quit out: " )
+        else
+          Malleable_error.return
+            ([%log info]
+               "Existing stack of same name detected; removing to start clean" )
       in
-      all_nodes
-      |> List.map ~f:(fun node -> (node.service_id, node))
+      Util.run_cmd_or_hard_error "/" "docker"
+        [ "stack"; "rm"; network_config.docker.stack_name ]
+      >>| Fn.const ()
+    else return ()
+
+  let generate_docker_stack_file ~logger ~docker_dir ~docker_compose_file_path
+      ~network_config =
+    let open Deferred.Let_syntax in
+    let%bind () =
+      if%bind File_system.dir_exists docker_dir then (
+        [%log info] "Old docker stack directory found; removing to start clean" ;
+        File_system.remove_dir docker_dir )
+      else return ()
+    in
+    [%log info] "Writing docker configuration %s" docker_dir ;
+    let%bind () = Unix.mkdir docker_dir in
+    let%bind _ =
+      Docker_compose.Dockerfile.write_config ~dir:docker_dir
+        ~filename:docker_compose_file_path
+        (Network_config.to_docker network_config)
+    in
+    return ()
+
+  let write_docker_bind_volumes ~logger ~docker_dir
+      ~(network_config : Network_config.t) =
+    let open Deferred.Let_syntax in
+    [%log info] "Writing runtime_config %s" docker_dir ;
+    let%bind () =
+      Yojson.Safe.to_file
+        (String.concat [ docker_dir; "/runtime_config.json" ])
+        network_config.docker.runtime_config
+      |> Deferred.return
+    in
+    [%log info] "Writing out the genesis keys to dir %s" docker_dir ;
+    let kps_base_path = String.concat [ docker_dir; "/keys" ] in
+    let%bind () = Unix.mkdir kps_base_path in
+    [%log info] "Writing genesis keys to %s" kps_base_path ;
+    let%bind () =
+      Core.String.Map.iter network_config.genesis_keypairs ~f:(fun kp ->
+          let keypath = String.concat [ kps_base_path; "/"; kp.keypair_name ] in
+          Out_channel.with_file ~fail_if_exists:true keypath ~f:(fun ch ->
+              kp.private_key |> Out_channel.output_string ch ) ;
+          Out_channel.with_file ~fail_if_exists:true (keypath ^ ".pub")
+            ~f:(fun ch -> kp.public_key |> Out_channel.output_string ch) ;
+          ignore
+            (Util.run_cmd_exn kps_base_path "chmod" [ "600"; kp.keypair_name ]) )
+      |> Deferred.return
+    in
+    [%log info] "Writing seed libp2p keypair to %s" kps_base_path ;
+    let%bind () =
+      let keypath = String.concat [ kps_base_path; "/"; "libp2p_key" ] in
+      Out_channel.with_file ~fail_if_exists:true keypath ~f:(fun ch ->
+          Docker_node_config.Seed_config.libp2p_keypair
+          |> Out_channel.output_string ch ) ;
+      ignore (Util.run_cmd_exn kps_base_path "chmod" [ "600"; "libp2p_key" ]) ;
+      return ()
+    in
+    let%bind () =
+      ignore (Util.run_cmd_exn docker_dir "chmod" [ "700"; "keys" ])
+      |> Deferred.return
+    in
+    [%log info]
+      "Writing custom entrypoint script (libp2p key generation and puppeteer \
+       context)" ;
+    let entrypoint_filename, entrypoint_script =
+      Docker_node_config.Base_node_config.entrypoint_script
+    in
+    Out_channel.with_file ~fail_if_exists:true
+      (docker_dir ^/ entrypoint_filename) ~f:(fun ch ->
+        entrypoint_script |> Out_channel.output_string ch ) ;
+    let%bind _ =
+      Deferred.List.iter network_config.docker.mina_archive_schema_aux_files
+        ~f:(fun schema_url ->
+          let filename = Filename.basename schema_url in
+          [%log info] "Downloading %s" schema_url ;
+          let%bind _ =
+            Util.run_cmd_or_hard_error docker_dir "curl"
+              [ "-o"; filename; schema_url ]
+          in
+          [%log info]
+            "Writing custom postgres entrypoint script (import archive node \
+             schema)" ;
+
+          Deferred.return () )
+      |> Deferred.return
+    in
+    ignore (Util.run_cmd_exn docker_dir "chmod" [ "+x"; entrypoint_filename ]) ;
+    let postgres_entrypoint_filename, postgres_entrypoint_script =
+      Docker_node_config.Postgres_config.postgres_script
+    in
+    Out_channel.with_file ~fail_if_exists:true
+      (docker_dir ^/ postgres_entrypoint_filename) ~f:(fun ch ->
+        postgres_entrypoint_script |> Out_channel.output_string ch ) ;
+    ignore
+      (Util.run_cmd_exn docker_dir "chmod"
+         [ "+x"; postgres_entrypoint_filename ] ) ;
+    return ()
+
+  let initialize_workloads ~logger (network_config : Network_config.t) =
+    let find_rest_port ports =
+      List.find_map_exn ports ~f:(fun port ->
+          match port with
+          | Docker_compose.Dockerfile.Service.Port.{ published; target } ->
+              if target = Docker_node_config.PortManager.mina_internal_rest_port
+              then Some published
+              else None )
+    in
+    [%log info] "Initializing seed workloads" ;
+    let seed_workloads =
+      List.map network_config.docker.seed_configs ~f:(fun seed_config ->
+          let graphql_port = find_rest_port seed_config.docker_config.ports in
+          let node =
+            Docker_network.Service_to_deploy.construct_service
+              network_config.docker.stack_name seed_config.service_name
+              (Docker_network.Service_to_deploy.init_service_to_deploy_config
+                 ~network_keypair:None ~postgres_connection_uri:None
+                 ~graphql_port )
+          in
+          (seed_config.service_name, node) )
+      |> Core.String.Map.of_alist_exn
+    in
+    [%log info] "Initializing block producer workloads" ;
+    let block_producer_workloads =
+      List.map network_config.docker.block_producer_configs ~f:(fun bp_config ->
+          let graphql_port = find_rest_port bp_config.docker_config.ports in
+          let node =
+            Docker_network.Service_to_deploy.construct_service
+              network_config.docker.stack_name bp_config.service_name
+              (Docker_network.Service_to_deploy.init_service_to_deploy_config
+                 ~network_keypair:(Some bp_config.config.keypair)
+                 ~postgres_connection_uri:None ~graphql_port )
+          in
+          (bp_config.service_name, node) )
+      |> Core.String.Map.of_alist_exn
+    in
+    [%log info] "Initializing snark coordinator and worker workloads" ;
+    let snark_coordinator_workloads, snark_worker_workloads =
+      match network_config.docker.snark_coordinator_config with
+      | Some snark_coordinator_config ->
+          let snark_coordinator_workloads =
+            if List.length snark_coordinator_config.config.worker_nodes > 0 then
+              let graphql_port =
+                find_rest_port snark_coordinator_config.docker_config.ports
+              in
+              let coordinator =
+                Docker_network.Service_to_deploy.construct_service
+                  network_config.docker.stack_name
+                  snark_coordinator_config.service_name
+                  (Docker_network.Service_to_deploy
+                   .init_service_to_deploy_config ~network_keypair:None
+                     ~postgres_connection_uri:None ~graphql_port )
+              in
+              [ (snark_coordinator_config.service_name, coordinator) ]
+              |> Core.String.Map.of_alist_exn
+            else Core.String.Map.empty
+          in
+          let snark_worker_workloads =
+            List.map snark_coordinator_config.config.worker_nodes
+              ~f:(fun snark_worker_config ->
+                let graphql_port =
+                  find_rest_port snark_worker_config.docker_config.ports
+                in
+                let worker =
+                  Docker_network.Service_to_deploy.construct_service
+                    network_config.docker.stack_name
+                    snark_worker_config.service_name
+                    (Docker_network.Service_to_deploy
+                     .init_service_to_deploy_config ~network_keypair:None
+                       ~postgres_connection_uri:None ~graphql_port )
+                in
+
+                (snark_worker_config.service_name, worker) )
+            |> Core.String.Map.of_alist_exn
+          in
+          (snark_coordinator_workloads, snark_worker_workloads)
+      | None ->
+          (Core.String.Map.of_alist_exn [], Core.String.Map.of_alist_exn [])
+    in
+    [%log info] "Initializing archive node workloads" ;
+    let archive_workloads =
+      List.map network_config.docker.archive_node_configs
+        ~f:(fun archive_config ->
+          let graphql_port =
+            find_rest_port archive_config.docker_config.ports
+          in
+          let postgres_connection_uri =
+            Some
+              (Docker_node_config.Postgres_config.to_connection_uri
+                 archive_config.config.postgres_config.config )
+          in
+          let node =
+            Docker_network.Service_to_deploy.construct_service
+              network_config.docker.stack_name archive_config.service_name
+              (Docker_network.Service_to_deploy.init_service_to_deploy_config
+                 ~network_keypair:None ~postgres_connection_uri ~graphql_port )
+          in
+          (archive_config.service_name, node) )
+      |> Core.String.Map.of_alist_exn
+    in
+    ( seed_workloads
+    , block_producer_workloads
+    , snark_coordinator_workloads
+    , snark_worker_workloads
+    , archive_workloads )
+
+  let poll_until_stack_deployed ~logger =
+    let poll_interval = Time.Span.of_sec 15.0 in
+    let max_polls = 20 (* 5 mins *) in
+    let get_service_statuses () =
+      let%bind output =
+        Util.run_cmd_exn "/" "docker"
+          [ "service"; "ls"; "--format"; "{{.Name}}: {{.Replicas}}" ]
+      in
+      return
+        ( output |> String.split_lines
+        |> List.map ~f:(fun line ->
+               match String.split ~on:':' line with
+               | [ name; replicas ] ->
+                   (String.strip name, String.strip replicas)
+               | _ ->
+                   failwith "Unexpected format for docker service output" ) )
+    in
+    let rec poll n =
+      [%log debug] "Checking Docker service statuses, n=%d" n ;
+      let%bind service_statuses = get_service_statuses () in
+      let bad_service_statuses =
+        List.filter service_statuses ~f:(fun (_, status) ->
+            let parts = String.split ~on:'/' status in
+            assert (List.length parts = 2) ;
+            let num, denom =
+              ( String.strip (List.nth_exn parts 0)
+              , String.strip (List.nth_exn parts 1) )
+            in
+            not (String.equal num denom) )
+      in
+      let open Malleable_error.Let_syntax in
+      if List.is_empty bad_service_statuses then return ()
+      else if n > 0 then (
+        [%log debug] "Got bad service statuses, polling again ($failed_statuses"
+          ~metadata:
+            [ ( "failed_statuses"
+              , `Assoc
+                  (List.Assoc.map bad_service_statuses ~f:(fun v -> `String v))
+              )
+            ] ;
+        let%bind () =
+          after poll_interval |> Deferred.bind ~f:Malleable_error.return
+        in
+        poll (n - 1) )
+      else
+        let bad_service_statuses_json =
+          `List
+            (List.map bad_service_statuses ~f:(fun (service_name, status) ->
+                 `Assoc
+                   [ ("service_name", `String service_name)
+                   ; ("status", `String status)
+                   ] ) )
+        in
+        [%log fatal]
+          "Not all services could be deployed in time: $bad_service_statuses"
+          ~metadata:[ ("bad_service_statuses", bad_service_statuses_json) ] ;
+        Malleable_error.hard_error_string ~exit_code:4
+          (Yojson.Safe.to_string bad_service_statuses_json)
+    in
+    [%log info] "Waiting for Docker services to be deployed" ;
+    let res = poll max_polls in
+    match%bind.Deferred res with
+    | Error _ ->
+        [%log error] "Not all Docker services were deployed, cannot proceed!" ;
+        res
+    | Ok _ ->
+        [%log info] "Docker services deployed" ;
+        res
+
+  let create ~logger (network_config : Network_config.t) =
+    let open Malleable_error.Let_syntax in
+    let%bind () = remove_stack_if_exists ~logger network_config in
+    let ( seed_workloads
+        , block_producer_workloads
+        , snark_coordinator_workloads
+        , snark_worker_workloads
+        , archive_workloads ) =
+      initialize_workloads ~logger network_config
+    in
+    let services_by_id =
+      let all_workloads =
+        Core.String.Map.data seed_workloads
+        @ Core.String.Map.data snark_coordinator_workloads
+        @ Core.String.Map.data snark_worker_workloads
+        @ Core.String.Map.data block_producer_workloads
+        @ Core.String.Map.data archive_workloads
+      in
+      all_workloads
+      |> List.map ~f:(fun w -> (w.service_name, w))
       |> String.Map.of_alist_exn
+    in
+    let open Deferred.Let_syntax in
+    let docker_dir = network_config.docker.stack_name in
+    let docker_compose_file_path =
+      network_config.docker.stack_name ^ ".compose.json"
+    in
+    let%bind () =
+      generate_docker_stack_file ~logger ~docker_dir ~docker_compose_file_path
+        ~network_config
+    in
+    let%bind () =
+      write_docker_bind_volumes ~logger ~docker_dir ~network_config
     in
     let t =
       { stack_name = network_config.docker.stack_name
       ; logger
-      ; testnet_dir
+      ; docker_dir
+      ; docker_compose_file_path
       ; constants = network_config.constants
-      ; seed_nodes
-      ; block_producer_nodes
-      ; snark_coordinator_nodes
-      ; archive_node_nodes
-      ; nodes_by_app_id
+      ; graphql_enabled = true
+      ; seed_workloads
+      ; block_producer_workloads
+      ; snark_coordinator_workloads
+      ; snark_worker_workloads
+      ; archive_workloads
+      ; services_by_id
       ; deployed = false
-      ; testnet_log_filter = ""
-      ; keypairs =
-          List.map network_config.keypairs ~f:(fun { keypair; _ } -> keypair)
+      ; genesis_keypairs = network_config.genesis_keypairs
       }
     in
-    Deferred.return t
+    [%log info] "Initializing docker swarm" ;
+    Malleable_error.return t
 
   let deploy t =
+    let logger = t.logger in
     if t.deployed then failwith "network already deployed" ;
-    [%log' info t.logger] "Deploying network" ;
-    [%log' info t.logger] "Stack_name in deploy: %s" t.stack_name ;
-    let%map _ =
-      run_cmd_exn t "docker"
-        [ "stack"; "deploy"; "-c"; "compose.json"; t.stack_name ]
+    [%log info] "Deploying stack '%s' from %s" t.stack_name t.docker_dir ;
+    let open Malleable_error.Let_syntax in
+    let%bind (_ : string) =
+      Util.run_cmd_or_hard_error t.docker_dir "docker"
+        [ "stack"; "deploy"; "-c"; t.docker_compose_file_path; t.stack_name ]
     in
     t.deployed <- true ;
-    let result =
-      { Swarm_network.namespace = t.stack_name
+    let%bind () = poll_until_stack_deployed ~logger in
+    let open Malleable_error.Let_syntax in
+    let func_for_fold ~(key : string) ~data accum_M =
+      let%bind mp = accum_M in
+      let%map node =
+        Docker_network.Service_to_deploy.get_node_from_service data
+      in
+      Core.String.Map.add_exn mp ~key ~data:node
+    in
+    let%map seeds =
+      Core.String.Map.fold t.seed_workloads
+        ~init:(Malleable_error.return Core.String.Map.empty)
+        ~f:func_for_fold
+    and block_producers =
+      Core.String.Map.fold t.block_producer_workloads
+        ~init:(Malleable_error.return Core.String.Map.empty)
+        ~f:func_for_fold
+    and snark_coordinators =
+      Core.String.Map.fold t.snark_coordinator_workloads
+        ~init:(Malleable_error.return Core.String.Map.empty)
+        ~f:func_for_fold
+    and snark_workers =
+      Core.String.Map.fold t.snark_worker_workloads
+        ~init:(Malleable_error.return Core.String.Map.empty)
+        ~f:func_for_fold
+    and archive_nodes =
+      Core.String.Map.fold t.archive_workloads
+        ~init:(Malleable_error.return Core.String.Map.empty)
+        ~f:func_for_fold
+    in
+    let network =
+      { Docker_network.namespace = t.stack_name
       ; constants = t.constants
-      ; seeds = t.seed_nodes
-      ; block_producers = t.block_producer_nodes
-      ; snark_coordinators = t.snark_coordinator_nodes
-      ; archive_nodes = t.archive_node_nodes
-      ; nodes_by_app_id = t.nodes_by_app_id
-      ; testnet_log_filter = t.testnet_log_filter
-      ; keypairs = t.keypairs
+      ; seeds
+      ; block_producers
+      ; snark_coordinators
+      ; snark_workers
+      ; archive_nodes
+      ; genesis_keypairs = t.genesis_keypairs
       }
     in
     let nodes_to_string =
-      Fn.compose (String.concat ~sep:", ") (List.map ~f:Swarm_network.Node.id)
+      Fn.compose (String.concat ~sep:", ") (List.map ~f:Docker_network.Node.id)
     in
-    [%log' info t.logger] "Network deployed" ;
-    [%log' info t.logger] "testnet swarm: %s" t.stack_name ;
-    [%log' info t.logger] "seed nodes: %s" (nodes_to_string result.seeds) ;
-    [%log' info t.logger] "snark coordinators: %s"
-      (nodes_to_string result.snark_coordinators) ;
-    [%log' info t.logger] "block producers: %s"
-      (nodes_to_string result.block_producers) ;
-    [%log' info t.logger] "archive nodes: %s"
-      (nodes_to_string result.archive_nodes) ;
-    result
+    [%log info] "Network deployed" ;
+    [%log info] "testnet namespace: %s" t.stack_name ;
+    [%log info] "snark coordinators: %s"
+      (nodes_to_string (Core.String.Map.data network.snark_coordinators)) ;
+    [%log info] "snark workers: %s"
+      (nodes_to_string (Core.String.Map.data network.snark_workers)) ;
+    [%log info] "block producers: %s"
+      (nodes_to_string (Core.String.Map.data network.block_producers)) ;
+    [%log info] "archive nodes: %s"
+      (nodes_to_string (Core.String.Map.data network.archive_nodes)) ;
+    network
 
   let destroy t =
     [%log' info t.logger] "Destroying network" ;
     if not t.deployed then failwith "network not deployed" ;
-    let%bind _ = run_cmd_exn t "docker" [ "stack"; "rm"; t.stack_name ] in
+    let%bind _ =
+      Util.run_cmd_exn "/" "docker" [ "stack"; "rm"; t.stack_name ]
+    in
     t.deployed <- false ;
     Deferred.unit
 
   let cleanup t =
     let%bind () = if t.deployed then destroy t else return () in
     [%log' info t.logger] "Cleaning up network configuration" ;
-    let%bind () = File_system.remove_dir t.testnet_dir in
+    let%bind () = File_system.remove_dir t.docker_dir in
     Deferred.unit
+
+  let destroy t =
+    Deferred.Or_error.try_with ~here:[%here] (fun () -> destroy t)
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 end
