@@ -700,7 +700,7 @@ module Make (Inputs : Inputs_intf) :
     List.map2_exn dependency_dirs dependency_hashes ~f:(fun dir hash ->
         Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
 
-  let path_batch_impl ~is_wide ~compute_path mdb locations =
+  let path_batch_impl ~expand_query ~compute_path mdb locations =
     let locations =
       List.map locations ~f:(fun location ->
           if Location.is_account location then
@@ -713,67 +713,40 @@ module Make (Inputs : Inputs_intf) :
       List.map locations ~f:Location.merkle_path_dependencies_exn
     in
     let all_locs =
-      let sibling_locs = List.concat list_of_dependencies |> List.map ~f:fst in
-      if is_wide then
-        let self_locs = List.map sibling_locs ~f:Location.sibling in
-        sibling_locs @ self_locs
-      else sibling_locs
+      List.concat list_of_dependencies |> List.map ~f:fst |> expand_query
     in
     let hashes = get_hash_batch_exn mdb all_locs in
-    compute_path ~hashes ~list_of_dependencies
+    snd @@ List.fold_map ~init:hashes ~f:compute_path list_of_dependencies
 
   let merkle_path_batch =
-    let compute_path ~hashes ~list_of_dependencies =
-      let rec go list_of_deps sibling_hashes acc =
-        match list_of_deps with
-        | [] ->
-            acc
-        | deps :: rest_of_deps ->
-            let _, dirs = List.unzip deps in
-            let sibling_hashes, rest_of_sibling_hashes =
-              List.(split_n sibling_hashes (length dirs))
-            in
-            let path =
-              List.map2_exn dirs sibling_hashes ~f:(fun dir sibling_hash ->
-                  Direction.map dir ~left:(`Left sibling_hash)
-                    ~right:(`Right sibling_hash) )
-            in
-            go rest_of_deps rest_of_sibling_hashes (path :: acc)
-      in
-      go list_of_dependencies hashes [] |> List.rev
-    in
-    path_batch_impl ~is_wide:false ~compute_path
+    path_batch_impl ~expand_query:ident
+      ~compute_path:(fun all_hashes loc_and_dir_list ->
+        let len = List.length loc_and_dir_list in
+        let sibling_hashes, rest_hashes = List.split_n all_hashes len in
+        let res =
+          List.map2_exn loc_and_dir_list sibling_hashes
+            ~f:(fun (_, direction) sibling_hash ->
+              Direction.map direction ~left:(`Left sibling_hash)
+                ~right:(`Right sibling_hash) )
+        in
+        (rest_hashes, res) )
 
   let wide_merkle_path_batch =
-    let compute_path ~hashes ~list_of_dependencies =
-      let rec go list_of_deps sibling_hashes self_hashes acc =
-        match list_of_deps with
-        | [] ->
-            acc
-        | deps :: rest_of_deps ->
-            let _, dirs = List.unzip deps in
-            let sibling_hashes, rest_of_sibling_hashes =
-              List.(split_n sibling_hashes (length dirs))
-            in
-            let self_hashes, rest_of_self_hashes =
-              List.(split_n self_hashes (length dirs))
-            in
-            let path =
-              List.map3_exn dirs sibling_hashes self_hashes
-                ~f:(fun dir sibling_hash self_hash ->
-                  Direction.map dir
-                    ~left:(`Left (sibling_hash, self_hash))
-                    ~right:(`Right (sibling_hash, self_hash)) )
-            in
-            go rest_of_deps rest_of_sibling_hashes rest_of_self_hashes
-              (path :: acc)
-      in
-      let sibling_hashes, self_hashes =
-        List.(split_n hashes (length hashes / 2))
-      in
-      go list_of_dependencies sibling_hashes self_hashes [] |> List.rev
-    in
-    path_batch_impl ~is_wide:true ~compute_path
+    path_batch_impl
+      ~expand_query:(fun sib_locs ->
+        sib_locs @ List.map sib_locs ~f:Location.sibling )
+      ~compute_path:(fun all_hashes loc_and_dir_list ->
+        let len = List.length loc_and_dir_list in
+        let sibling_hashes, rest_hashes = List.split_n all_hashes len in
+        let self_hashes, rest_hashes' = List.split_n rest_hashes len in
+        let res =
+          List.map3_exn loc_and_dir_list sibling_hashes self_hashes
+            ~f:(fun (_, direction) sibling_hash self_hash ->
+              Direction.map direction
+                ~left:(`Left (self_hash, sibling_hash))
+                ~right:(`Right (sibling_hash, self_hash)) )
+        in
+        (rest_hashes', res) )
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
 
