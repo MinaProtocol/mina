@@ -2093,31 +2093,30 @@ module T = struct
               Sequence.fold_until transactions_by_fee
                 ~init:(Sequence.empty, [], 0)
                 ~f:(fun (valid_seq, invalid_txns, count) txn ->
-                  match
-                    O1trace.sync_thread
-                      "validate_transaction_against_staged_ledger" (fun () ->
-                        Transaction_validator.apply_transaction_first_pass
-                          ~constraint_constants ~global_slot validating_ledger
-                          ~txn_state_view:current_state_view
-                          (Command (User_command.forget_check txn)) )
-                  with
-                  | Error e ->
-                      [%log error]
-                        ~metadata:
-                          [ ("user_command", User_command.Valid.to_yojson txn)
-                          ; ("error", Error_json.error_to_yojson e)
-                          ]
-                        "Staged_ledger_diff creation: Skipping user command: \
-                         $user_command due to error: $error" ;
-                      Continue (valid_seq, (txn, e) :: invalid_txns, count)
-                  | Ok _txn_partially_applied ->
-                      let valid_seq' =
-                        Sequence.append (Sequence.singleton txn) valid_seq
-                      in
-                      let count' = count + 1 in
-                      if count' >= Scan_state.free_space t.scan_state then
-                        Stop (valid_seq', invalid_txns)
-                      else Continue (valid_seq', invalid_txns, count') )
+                  if count < Scan_state.free_space t.scan_state then
+                    match
+                      O1trace.sync_thread
+                        "validate_transaction_against_staged_ledger" (fun () ->
+                          Transaction_validator.apply_transaction_first_pass
+                            ~constraint_constants ~global_slot validating_ledger
+                            ~txn_state_view:current_state_view
+                            (Command (User_command.forget_check txn)) )
+                    with
+                    | Error e ->
+                        [%log error]
+                          ~metadata:
+                            [ ("user_command", User_command.Valid.to_yojson txn)
+                            ; ("error", Error_json.error_to_yojson e)
+                            ]
+                          "Staged_ledger_diff creation: Skipping user command: \
+                           $user_command due to error: $error" ;
+                        Continue (valid_seq, (txn, e) :: invalid_txns, count)
+                    | Ok _txn_partially_applied ->
+                        let valid_seq' =
+                          Sequence.append (Sequence.singleton txn) valid_seq
+                        in
+                        Continue (valid_seq', invalid_txns, count + 1)
+                  else Stop (valid_seq, invalid_txns) )
                 ~finish:(fun (valid, invalid, _) -> (valid, invalid))
             in
             [%log internal] "Generate_staged_ledger_diff" ;
