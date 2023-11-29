@@ -713,7 +713,7 @@ module Make (Inputs : Inputs_intf) :
       List.map locations ~f:Location.merkle_path_dependencies_exn
     in
     let all_locs =
-      List.concat list_of_dependencies |> List.map ~f:fst |> expand_query
+      List.map list_of_dependencies ~f:(fun deps -> List.map ~f:fst deps |> expand_query) |> List.concat
     in
     let hashes = get_hash_batch_exn mdb all_locs in
     snd @@ List.fold_map ~init:hashes ~f:compute_path list_of_dependencies
