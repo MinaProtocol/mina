@@ -700,86 +700,72 @@ module Make (Inputs : Inputs_intf) :
     List.map2_exn dependency_dirs dependency_hashes ~f:(fun dir hash ->
         Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
 
-  let path_batch_impl ~update_locs ~extract_hashes_exn mdb locations =
+  let path_batch_impl ~is_wide mdb locations =
     let locations =
-      List.map locations ~f:(fun loc ->
-          let loc' =
-            if Location.is_account loc then
-              Location.Hash (Location.to_path_exn loc)
-            else (
-              assert (Location.is_hash loc) ;
-              loc )
+      List.map locations ~f:(fun location ->
+          if Location.is_account location then
+            Location.Hash (Location.to_path_exn location)
+          else (
+            assert (Location.is_hash location) ;
+            location ) )
+    in
+    let list_of_dependencies =
+      List.map locations ~f:Location.merkle_path_dependencies_exn
+    in
+    let all_locs =
+      let sibling_locs = List.concat list_of_dependencies |> List.map ~f:fst in
+      if is_wide then
+        let self_locs = List.map sibling_locs ~f:Location.sibling in
+        sibling_locs @ self_locs
+      else sibling_locs
+    in
+    let hashes = get_hash_batch_exn mdb all_locs in
+    let rec go list_of_dependencies sibling_hashes self_hashes acc =
+      match list_of_dependencies with
+      | [] ->
+          acc
+      | deps :: rest_of_deps ->
+          let locs, dirs = List.unzip deps in
+          let length_of_locs = List.length locs in
+          let sibling_hashes, rest_of_sibling_hashes =
+            List.(split_n sibling_hashes length_of_locs)
           in
-          (loc', mdb.depth - Location.height ~ledger_depth:mdb.depth loc', 0) )
-    in
-    let rev_location_query, rev_directions, rev_lengths =
-      (* This loop is equivalent to:
-         1. collecting location path for every location from `locations`
-         2. updating the query with `update_locs` for every entry in every path from step 1.
-         3. remembering length structure to be able to recover correspondence of hash lookups
-         to `locations`
-         4. remembering directions corresponding to entries of location paths from step 1.
-      *)
-      let rec loop locations loc_acc dir_acc length_acc =
-        match (locations, length_acc) with
-        | [], length_acc ->
-            (loc_acc, dir_acc, length_acc)
-        | (_, 0, length) :: locations, length_acc ->
-            (* We found a root, all locations for it were added,
-               just the length needs to be added to length accumulator *)
-            loop locations loc_acc dir_acc (length :: length_acc)
-        | (k, depth, length) :: locations, length_acc ->
-            let sibling_dir =
-              Location.last_direction (Location.to_path_exn k)
-            in
-            loop
-              ((Location.parent k, depth - 1, length + 1) :: locations)
-              (update_locs k loc_acc) (sibling_dir :: dir_acc) length_acc
-      in
-      loop locations [] [] []
-    in
-    (* Batch-request hashes to answer the query `rev_locations` *)
-    let rev_hashes = get_hash_batch_exn mdb rev_location_query in
-    (* Reconstruct merkle paths from response, query, lengths structure and directions *)
-    let f (directions, all_hashes, acc) length =
-      let dirs, rest_dirs = List.split_n directions length in
-      let rest_hashes, res =
-        List.fold_map dirs ~init:all_hashes ~f:(fun hashes direction ->
-            let entry, rest_hashes = extract_hashes_exn ~direction hashes in
-            let dir =
-              Direction.map direction ~left:(`Left entry) ~right:(`Right entry)
-            in
-            (rest_hashes, dir) )
-      in
-      (rest_dirs, rest_hashes, res :: acc)
-    in
-    (* essentially it's `List.rev_fold_map`, but there is no such operator sadly *)
-    Tuple3.get3
-    @@ List.fold ~init:(rev_directions, rev_hashes, []) ~f rev_lengths
-
-  let merkle_path_batch =
-    let update_locs = Fn.compose List.cons Location.sibling in
-    let extract_hashes_exn ~direction:_ hs = (List.hd_exn hs, List.tl_exn hs) in
-    path_batch_impl ~update_locs ~extract_hashes_exn
-
-  let wide_merkle_path_batch =
-    let update_locs k =
-      Fn.compose (List.cons (Location.sibling k)) (List.cons k)
-    in
-    let extract_hashes_exn ~direction = function
-      | sibling :: self :: rest ->
-          let el =
-            match direction with
-            | Direction.Left ->
-                (self, sibling)
-            | Right ->
-                (sibling, self)
+          let self_hashes, rest_of_self_hashes =
+            List.(split_n self_hashes length_of_locs)
           in
-          (el, rest)
-      | _ ->
-          failwith "wide_merkle_path_batch: mismatched lengths"
+          let path =
+            List.map3_exn dirs sibling_hashes self_hashes
+              ~f:(fun dir sibling_hash self_hash ->
+                Direction.map dir
+                  ~left:
+                    (`Left
+                      ( if is_wide then (sibling_hash, self_hash)
+                      else (sibling_hash, sibling_hash) ) )
+                  ~right:
+                    (`Right
+                      ( if is_wide then (sibling_hash, self_hash)
+                      else (sibling_hash, sibling_hash) ) ) )
+          in
+          go rest_of_deps rest_of_sibling_hashes rest_of_self_hashes
+            (path :: acc)
     in
-    path_batch_impl ~update_locs ~extract_hashes_exn
+    if is_wide then
+      let sibling_hashes, self_hashes =
+        List.(split_n hashes (length hashes / 2))
+      in
+      go list_of_dependencies sibling_hashes self_hashes []
+    else go list_of_dependencies hashes hashes []
+
+  let merkle_path_batch md locs =
+    path_batch_impl ~is_wide:false md locs
+    |> List.map ~f:(fun p ->
+           List.map p ~f:(function
+             | `Left (h, _) ->
+                 `Left h
+             | `Right (h, _) ->
+                 `Right h ) )
+
+  let wide_merkle_path_batch = path_batch_impl ~is_wide:true
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
 
