@@ -156,6 +156,11 @@ Some command-line options work with both modes of operation:
   of blocks and snark work, and will immediately proceed to outputting
   state hashes and other metadata for each submission, whether it is
   valid or not.
+  
+* `--config-file` - a configuration file of the Mina network. It is
+  necessary to provide it if the network which produced the blocks
+  used configuration affecting block validation. In most cases it can
+  be omitted.
 
 Build
 -----
