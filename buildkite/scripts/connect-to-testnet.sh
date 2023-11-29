@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-if [[ $# -ne 4 ]]; then
+if [[ $# -ne 3 ]]; then
     echo "Usage: $0 '<testnet-name>' '<wait-between-polling-graphql>''<wait-after-final-check>'"
     exit 1
 fi
