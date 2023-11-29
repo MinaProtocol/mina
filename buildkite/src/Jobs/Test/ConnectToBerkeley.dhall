@@ -1,5 +1,5 @@
 let S = ../../Lib/SelectFiles.dhall
-
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
 
@@ -22,6 +22,6 @@ in Pipeline.build Pipeline.Config::{
     name = "ConnectToBerkeley"
   },
   steps = [
-    ConnectToTestnet.step dependsOn "berkeley" "40s" "2m"
+    ConnectToTestnet.step dependsOn "berkeley" "40s" "2m" (B/SoftFail.Boolean True)
   ]
 }
