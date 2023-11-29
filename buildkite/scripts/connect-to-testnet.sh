@@ -2,6 +2,16 @@
 
 set -eo pipefail
 
+if [[ $# -ne 4 ]]; then
+    echo "Usage: $0 '<testnet-name>' '<wait-between-polling-graphql>''<wait-after-final-check>'"
+    exit 1
+fi
+
+TESTNET_VERSION_NAME="berkeley"
+TESTNET_NAME=$1
+WAIT_BETWEEN_POLLING_GRAPHQL=$2
+WAIT_AFTER_FINAL_CHECK=$3
+
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
   rampup|berkeley|release/2.0.0|develop)
   ;;
@@ -15,9 +25,6 @@ export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
 apt-get install -y git apt-transport-https ca-certificates tzdata curl
-
-TESTNET_VERSION_NAME="berkeley"
-TESTNET_NAME="testworld-2-0"
 
 git config --global --add safe.directory /workdir
 
@@ -47,7 +54,7 @@ mina daemon \
 # Attempt to connect to the GraphQL client every 10s for up to 8 minutes
 num_status_retries=24
 for ((i=1;i<=$num_status_retries;i++)); do
-  sleep 20s
+  sleep $WAIT_BETWEEN_POLLING_GRAPHQL
   set +e
   mina client status
   status_exit_code=$?
@@ -60,7 +67,7 @@ for ((i=1;i<=$num_status_retries;i++)); do
 done
 
 # Check that the daemon has connected to peers and is still up after 2 mins
-sleep 2m
+sleep $WAIT_AFTER_FINAL_CHECK
 mina client status
 if [ $(mina advanced get-peers | wc -l) -gt 0 ]; then
     echo "Found some peers"

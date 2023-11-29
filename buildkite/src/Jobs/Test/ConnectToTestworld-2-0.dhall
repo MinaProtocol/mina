@@ -15,13 +15,13 @@ in Pipeline.build Pipeline.Config::{
     dirtyWhen = [
       S.strictlyStart (S.contains "src"),
       S.exactly "buildkite/scripts/connect-to-testnet" "sh",
-      S.exactly "buildkite/src/Jobs/Test/ConnectToBerkeley" "dhall",
+      S.exactly "buildkite/src/Jobs/Test/ConnectToTestworld-2-0" "dhall",
       S.exactly "buildkite/src/Command/ConnectToTestnet" "dhall"
     ],
     path = "Test",
-    name = "ConnectToBerkeley"
+    name = "ConnectToTestworld-2-0"
   },
   steps = [
-    ConnectToTestnet.step dependsOn "berkeley" "40s" "2m"
+    ConnectToTestnet.step dependsOn "testworld-2-0" "40s" "2m"
   ]
 }
