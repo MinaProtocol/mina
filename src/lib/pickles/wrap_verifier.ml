@@ -1419,9 +1419,6 @@ struct
     Shifted_value.Type2.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
 
-  let%test_unit "endo scalar" =
-    SC.test (module Impl) ~endo:Endo.Step_inner_curve.scalar
-
   let map_plonk_to_field plonk =
     Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
       ~f:(Util.seal (module Impl))

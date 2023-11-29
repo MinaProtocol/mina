@@ -29,7 +29,21 @@ esac
 
 echo "--- Building Mina archive package"
 
-PROJECT="mina-archive"
+
+# Determina suffix for mina name. To preserve backward compatibility devnet profile won't have any suffix. 
+# For others profiles we are adding suffix. For example '-lightnet'
+case "${DUNE_PROFILE}" in
+  devnet)
+    PROJECT_SUFFIX=""
+    ;;
+  *)
+    PROJECT_SUFFIX="-${DUNE_PROFILE}"
+    ;;
+esac
+
+
+
+PROJECT="mina-archive${PROJECT_SUFFIX}"
 BUILD_DIR="deb_build"
 
 ###### archiver deb
@@ -62,6 +76,9 @@ ls
 cp ./default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
 cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
 cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"
+cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILD_DIR}/usr/local/bin/mina-berkeley-migration"
+cp ./default/src/app/berkeley_account_tables/berkeley_account_tables.exe "${BUILD_DIR}/usr/local/bin/mina-berkeley-account-tables"
+
 cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-auditor"
 cp ./default/src/app/replayer/replayer.exe "${BUILD_DIR}/usr/local/bin/mina-replayer"
 cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILD_DIR}/usr/local/bin/mina-swap-bad-balances"
