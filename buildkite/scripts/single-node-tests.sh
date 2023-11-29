@@ -2,27 +2,23 @@
 
 set -eo pipefail
 
-if [[ $# -ne 1 ]]; then
-    echo "Usage: $0  <path-to-source-tests>"
-    exit 1
-fi
+# Don't prompt for answers during apt-get install
+export DEBIAN_FRONTEND=noninteractive
 
-path=$1
+sudo apt-get update
+sudo apt-get install -y git apt-transport-https ca-certificates tzdata curl python3 python3-pip wget
 
-eval "$(opam config env)"
-export PATH="/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH"
-export GO=/usr/lib/go/bin/go
+git config --global --add safe.directory /workdir
 
-# TODO: Stop building lib_p2p multiple times by pulling from buildkite-agent artifacts or docker or somewhere
-echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact"
-make -C src/app/libp2p_helper
+source buildkite/scripts/export-git-env-vars.sh
+
+sudo echo "deb [trusted=yes] http://packages.o1test.net bullseye ${MINA_DEB_RELEASE}" | sudo tee /etc/apt/sources.list.d/mina.list
+sudo apt-get update
+
+echo "Installing mina test suite package: mina-test-suite=${MINA_DEB_VERSION}"
+sudo apt-get install --allow-downgrades -y mina-test-suite=${MINA_DEB_VERSION} mina-berkeley-lightnet=${MINA_DEB_VERSION}
 
 export MINA_LIBP2P_PASS="naughty blue worm"
 export MINA_PRIVKEY_PASS="naughty blue worm"
 
-echo "--- Make build"
-export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go
-time make build
-
-echo "--- Run tests"
-dune exec "${path}" -- -v 
+mina-command-line-tests test --mina-path mina -v
