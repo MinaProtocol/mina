@@ -147,6 +147,20 @@ module T = struct
     | Right ->
         (sibling, base)
 
+  let merkle_path_dependencies_exn (location : t) : (t * Direction.t) list =
+    let rec loop k acc =
+      if Addr.depth k = 0 then acc
+      else
+        let sibling = Hash (Addr.sibling k) in
+        let sibling_dir = last_direction k in
+        loop (Addr.parent_exn k) ((sibling, sibling_dir) :: acc)
+    in
+    match location with
+    | Hash addr ->
+        List.rev (loop addr [])
+    | _ ->
+        failwith "can only get merkle path dependencies of a hash location"
+
   type location = t [@@deriving sexp, compare]
 
   include Comparable.Make (struct
