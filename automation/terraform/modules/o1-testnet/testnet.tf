@@ -66,22 +66,20 @@ module "kubernetes_testnet" {
   # block_producer_key_pass = var.block_producer_key_pass
   block_producer_configs = [for i, bp in local.block_producer_configs :
     {
-      name  = bp.name
-      class = bp.class
-      # id                     = bp.total_node_index
+      name                   = bp.name
+      class                  = bp.class
       keypair_name           = "${bp.class}-${bp.unique_node_index}-key"
       privkey_password       = "naughty blue worm"
       external_port          = bp.port
       libp2p_secret          = ""
       enable_gossip_flooding = false
-      # run_with_user_agent    = bp.class =="whale" ? false : ( var.nodes_with_user_agent == [] ? true : contains(var.nodes_with_user_agent, bp.name) )
-      run_with_user_agent  = bp.class == "whale" ? false : true
-      run_with_bots        = false
-      enable_peer_exchange = true
-      isolated             = false
-      enableArchive        = false
-      archiveAddress       = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i % (length(local.archive_node_configs)))["name"]}:${element(local.archive_node_configs, i % (length(local.archive_node_configs)))["serverPort"]}" : ""
-      persist_working_dir  = true
+      run_with_user_agent    = bp.class == "whale" ? false : true
+      run_with_bots          = false
+      enable_peer_exchange   = true
+      isolated               = false
+      enableArchive          = false
+      archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i % (length(local.archive_node_configs)))["name"]}:${element(local.archive_node_configs, i % (length(local.archive_node_configs)))["serverPort"]}" : ""
+      persist_working_dir    = true
     }
   ]
 
@@ -89,14 +87,11 @@ module "kubernetes_testnet" {
 
   seed_configs = [
     for i in range(var.seed_count) : {
-      name  = local.seed_static_peers[i].name
-      class = "seed"
-      # id                 = i + 1
-      # external_port      = local.seed_static_peers[i].port
-      libp2p_secret    = "seed-${i + 1}-key"
-      libp2p_secret_pw = "naughty blue worm"
-      external_ip      = google_compute_address.seed_static_ip[i].address
-      # private_key_secret = "online-seeds-account-${i + 1}-key"
+      name                = local.seed_static_peers[i].name
+      class               = "seed"
+      libp2p_secret       = "seed-${i + 1}-key"
+      libp2p_secret_pw    = "naughty blue worm"
+      external_ip         = google_compute_address.seed_static_ip[i].address
       enableArchive       = length(local.archive_node_configs) > 0
       archiveAddress      = length(local.archive_node_configs) > 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
       persist_working_dir = true

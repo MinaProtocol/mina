@@ -203,13 +203,11 @@ variable "seed_external_port" {
 variable "seed_configs" {
   type = list(
     object({
-      name             = string,
-      class            = string,
-      libp2p_secret    = string,
-      libp2p_secret_pw = string
-      # external_port      = number,
-      external_ip = string,
-      # private_key_secret = string,
+      name                = string,
+      class               = string,
+      libp2p_secret       = string,
+      libp2p_secret_pw    = string
+      external_ip         = string,
       enableArchive       = bool,
       archiveAddress      = string
       persist_working_dir = bool,
@@ -233,11 +231,9 @@ variable "block_producer_key_pass" {
 variable "block_producer_configs" {
   type = list(
     object({
-      name         = string,
-      class        = string,
-      keypair_name = string,
-      # private_key            = string,
-      # public_key             = string,
+      name                   = string,
+      class                  = string,
+      keypair_name           = string,
       privkey_password       = string,
       external_port          = number,
       libp2p_secret          = string,
