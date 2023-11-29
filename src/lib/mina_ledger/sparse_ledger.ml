@@ -23,26 +23,24 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
     let empty_address depth =
       Ledger.Addr.of_directions @@ List.init depth ~f:(fun _ -> Direction.Left)
     in
-    let merkle_path_locations =
-      (let rec add_locations remaining last_filled merkle_path_locations =
-         if remaining > 0 then
-           let new_location =
-             match last_filled with
-             | None ->
-                 Ledger.Location.Account (empty_address (Ledger.depth oledger))
-             | Some last_filled ->
-                 next_location_exn last_filled
-           in
-           add_locations (remaining - 1) (Some new_location)
-             (new_location :: merkle_path_locations)
-         else merkle_path_locations
-       in
-       add_locations )
-        num_new_accounts
-        (Ledger.last_filled oledger)
-        non_empty_locations
+    let empty_locations =
+      let rec add_locations remaining last_filled acc =
+        if remaining > 0 then
+          let new_location =
+            match last_filled with
+            | None ->
+                Ledger.Location.Account (empty_address (Ledger.depth oledger))
+            | Some last_filled ->
+                next_location_exn last_filled
+          in
+          add_locations (remaining - 1) (Some new_location) (new_location :: acc)
+        else List.rev acc
+      in
+      add_locations num_new_accounts (Ledger.last_filled oledger) []
     in
-    let merkle_paths = Ledger.merkle_path_batch oledger merkle_path_locations in
+    let merkle_paths =
+      Ledger.merkle_path_batch oledger (empty_locations @ non_empty_locations)
+    in
     List.split_n merkle_paths num_new_accounts
   in
   let sl, _, _, _ =
