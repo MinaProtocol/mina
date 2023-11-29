@@ -213,9 +213,9 @@ module For_tests_only : sig
     }
 
   val deferred_values :
-       sgs:(Kimchi_pasta_basic.Vesta.Affine.t, 'n) Vector.vec
+       sgs:(Kimchi_pasta_basic.Vesta.Affine.t, 'n) Vector.t
     -> actual_feature_flags:bool Plonk_types.Features.t
-    -> prev_challenges:((Pasta_bindings.Fp.t, 'a) Vector.vec, 'n) Vector.vec
+    -> prev_challenges:((Pasta_bindings.Fp.t, 'a) Vector.t, 'n) Vector.t
     -> step_vk:Kimchi_bindings.Protocol.VerifierIndex.Fp.t
     -> public_input:Pasta_bindings.Fp.t list
     -> proof:Backend.Tick.Proof.with_public_evals
