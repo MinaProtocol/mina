@@ -72,209 +72,218 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
   combine ~which_eval:`Fst ~ft:ft_eval0 zeta
   + (r * combine ~which_eval:`Snd ~ft:ft_eval1 zetaw)
 
-module Deferred_values = Types.Wrap.Proof_state.Deferred_values
+module For_tests_only = struct
+  type shifted_tick_field =
+    Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
 
-type scalar_challenge_constant = Challenge.Constant.t Scalar_challenge.t
+  type scalar_challenge_constant =
+    Import.Challenge.Constant.t Import.Scalar_challenge.t
 
-type deferred_values_and_hints =
-  { x_hat_evals : Backend.Tick.Field.t array * Backend.Tick.Field.t array
-  ; sponge_digest_before_evaluations : Tick.Field.t
-  ; deferred_values :
-      ( ( Challenge.Constant.t
+  type deferred_values_and_hints =
+    { x_hat_evals : Backend.Tick.Field.t array * Backend.Tick.Field.t array
+    ; sponge_digest_before_evaluations : Backend.Tick.Field.t
+    ; deferred_values :
+        ( ( Import.Challenge.Constant.t
+          , scalar_challenge_constant
+          , shifted_tick_field
+          , (shifted_tick_field, bool) Opt.t
+          , (scalar_challenge_constant, bool) Opt.t
+          , bool )
+          Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
         , scalar_challenge_constant
-        , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-        , (Tick.Field.t Shifted_value.Type1.t, bool) Opt.t
-        , (scalar_challenge_constant, bool) Opt.t
-        , bool )
-        Deferred_values.Plonk.In_circuit.t
-      , scalar_challenge_constant
-      , Tick.Field.t Shifted_value.Type1.t
-      , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
-        Step_bp_vec.t
-      , Branch_data.t )
-      Deferred_values.t
-  }
-
-let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
-    ~actual_feature_flags
-    ~(prev_challenges : ((Backend.Tick.Field.t, _) Vector.t, n) Vector.t)
-    ~(step_vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
-    ~(public_input : Backend.Tick.Field.t list)
-    ~(proof : Backend.Tick.Proof.with_public_evals)
-    ~(actual_proofs_verified : n Nat.t) : deferred_values_and_hints =
-  let module O = Tick.Oracles in
-  let o =
-    O.create_with_public_evals step_vk
-      Vector.(
-        map2 sgs prev_challenges ~f:(fun commitment cs ->
-            { Tick.Proof.Challenge_polynomial.commitment
-            ; challenges = Vector.to_array cs
-            } )
-        |> to_list)
-      public_input proof
-  in
-  let x_hat =
-    match proof.public_evals with
-    | Some x ->
-        x
-    | None ->
-        O.([| p_eval_1 o |], [| p_eval_2 o |])
-  in
-  let scalar_chal f =
-    Scalar_challenge.map ~f:Challenge.Constant.of_tick_field (f o)
-  in
-  let plonk0 =
-    { Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.alpha =
-        scalar_chal O.alpha
-    ; beta = O.beta o
-    ; gamma = O.gamma o
-    ; zeta = scalar_chal O.zeta
-    ; joint_combiner =
-        (* TODO: Needs to be changed when lookups are fully implemented *)
-        Option.map (O.joint_combiner_chal o)
-          ~f:(Scalar_challenge.map ~f:Challenge.Constant.of_tick_field)
-    ; feature_flags = actual_feature_flags
+        , shifted_tick_field
+        , scalar_challenge_constant Import.Bulletproof_challenge.t
+          Import.Types.Step_bp_vec.t
+        , Import.Branch_data.t )
+        Import.Types.Wrap.Proof_state.Deferred_values.t
     }
-  in
-  let r = scalar_chal O.u in
-  let xi = scalar_chal O.v in
-  let module As_field = struct
-    let to_field =
-      SC.to_field_constant
-        (module Tick.Field)
-        ~endo:Endo.Wrap_inner_curve.scalar
 
-    let r = to_field r
-
-    let xi = to_field xi
-
-    let zeta = to_field plonk0.zeta
-
-    let alpha = to_field plonk0.alpha
-
-    let joint_combiner = Option.map ~f:to_field plonk0.joint_combiner
-  end in
-  let domain = Domain.Pow_2_roots_of_unity step_vk.domain.log_size_of_group in
-  let zetaw = Tick.Field.mul As_field.zeta step_vk.domain.group_gen in
-  let tick_plonk_minimal =
-    { plonk0 with
-      zeta = As_field.zeta
-    ; alpha = As_field.alpha
-    ; joint_combiner = As_field.joint_combiner
-    }
-  in
-  let tick_combined_evals =
-    Plonk_checks.evals_of_split_evals
-      (module Tick.Field)
-      proof.proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
-      ~zeta:As_field.zeta ~zetaw
-    |> Plonk_types.Evals.to_in_circuit
-  in
-  let tick_domain =
-    Plonk_checks.domain
-      (module Tick.Field)
-      domain ~shifts:Common.tick_shifts
-      ~domain_generator:Backend.Tick.Field.domain_generator
-  in
-  let tick_env =
-    let module Env_bool = struct
-      type t = bool
-
-      let true_ = true
-
-      let false_ = false
-
-      let ( &&& ) = ( && )
-
-      let ( ||| ) = ( || )
-
-      let any = List.exists ~f:Fn.id
-    end in
-    let module Env_field = struct
-      include Tick.Field
-
-      type bool = Env_bool.t
-
-      let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
-    end in
-    Plonk_checks.scalars_env
-      (module Env_bool)
-      (module Env_field)
-      ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
-      ~zk_rows:step_vk.zk_rows ~srs_length_log2:Common.Max_degree.step_log2
-      ~field_of_hex:(fun s ->
-        Kimchi_pasta.Pasta.Bigint256.of_hex_string s
-        |> Kimchi_pasta.Pasta.Fp.of_bigint )
-      ~domain:tick_domain tick_plonk_minimal tick_combined_evals
-  in
-  let plonk =
-    let module Field = struct
-      include Tick.Field
-    end in
-    Type1.derive_plonk
-      (module Field)
-      ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
-  and new_bulletproof_challenges, b =
-    let prechals =
-      Array.map (O.opening_prechallenges o) ~f:(fun x ->
-          Scalar_challenge.map ~f:Challenge.Constant.of_tick_field x )
+  let deferred_values (type n)
+      ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t) ~actual_feature_flags
+      ~(prev_challenges : ((Backend.Tick.Field.t, _) Vector.t, n) Vector.t)
+      ~(step_vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
+      ~(public_input : Backend.Tick.Field.t list)
+      ~(proof : Backend.Tick.Proof.with_public_evals)
+      ~(actual_proofs_verified : n Nat.t) : deferred_values_and_hints =
+    let module O = Tick.Oracles in
+    let o =
+      O.create_with_public_evals step_vk
+        Vector.(
+          map2 sgs prev_challenges ~f:(fun commitment cs ->
+              { Tick.Proof.Challenge_polynomial.commitment
+              ; challenges = Vector.to_array cs
+              } )
+          |> to_list)
+        public_input proof
     in
-    let chals = Array.map prechals ~f:(fun x -> Ipa.Step.compute_challenge x) in
-    let challenge_poly = unstage (challenge_polynomial chals) in
-    let open As_field in
-    let b =
-      let open Tick.Field in
-      challenge_poly zeta + (r * challenge_poly zetaw)
+    let x_hat =
+      match proof.public_evals with
+      | Some x ->
+          x
+      | None ->
+          O.([| p_eval_1 o |], [| p_eval_2 o |])
     in
-    let prechals = Array.map prechals ~f:Bulletproof_challenge.unpack in
-    (prechals, b)
-  in
-  let shift_value =
-    Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1
-  and chal = Challenge.Constant.of_tick_field in
-  { deferred_values =
-      { Types.Wrap.Proof_state.Deferred_values.xi
-      ; b = shift_value b
-      ; bulletproof_challenges =
-          Vector.of_array_and_length_exn new_bulletproof_challenges
-            Tick.Rounds.n
-      ; combined_inner_product =
-          shift_value
-            As_field.(
-              combined_inner_product (* Note: We do not pad here. *)
-                ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
-                { evals = proof.proof.openings.evals; public_input = x_hat }
-                ~r ~xi ~zeta ~zetaw ~old_bulletproof_challenges:prev_challenges
-                ~env:tick_env ~domain:tick_domain
-                ~ft_eval1:proof.proof.openings.ft_eval1
-                ~plonk:tick_plonk_minimal)
-      ; branch_data =
-          { proofs_verified =
-              ( match actual_proofs_verified with
-              | Z ->
-                  Branch_data.Proofs_verified.N0
-              | S Z ->
-                  N1
-              | S (S Z) ->
-                  N2
-              | S _ ->
-                  assert false )
-          ; domain_log2 =
-              Branch_data.Domain_log2.of_int_exn
-                step_vk.domain.log_size_of_group
-          }
-      ; plonk =
-          { plonk with
-            zeta = plonk0.zeta
-          ; alpha = plonk0.alpha
-          ; beta = chal plonk0.beta
-          ; gamma = chal plonk0.gamma
-          ; joint_combiner = Opt.of_option plonk0.joint_combiner
-          }
+    let scalar_chal f =
+      Scalar_challenge.map ~f:Challenge.Constant.of_tick_field (f o)
+    in
+    let plonk0 =
+      { Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.alpha =
+          scalar_chal O.alpha
+      ; beta = O.beta o
+      ; gamma = O.gamma o
+      ; zeta = scalar_chal O.zeta
+      ; joint_combiner =
+          (* TODO: Needs to be changed when lookups are fully implemented *)
+          Option.map (O.joint_combiner_chal o)
+            ~f:(Scalar_challenge.map ~f:Challenge.Constant.of_tick_field)
+      ; feature_flags = actual_feature_flags
       }
-  ; x_hat_evals = x_hat
-  ; sponge_digest_before_evaluations = O.digest_before_evaluations o
-  }
+    in
+    let r = scalar_chal O.u in
+    let xi = scalar_chal O.v in
+    let module As_field = struct
+      let to_field =
+        SC.to_field_constant
+          (module Tick.Field)
+          ~endo:Endo.Wrap_inner_curve.scalar
+
+      let r = to_field r
+
+      let xi = to_field xi
+
+      let zeta = to_field plonk0.zeta
+
+      let alpha = to_field plonk0.alpha
+
+      let joint_combiner = Option.map ~f:to_field plonk0.joint_combiner
+    end in
+    let domain = Domain.Pow_2_roots_of_unity step_vk.domain.log_size_of_group in
+    let zetaw = Tick.Field.mul As_field.zeta step_vk.domain.group_gen in
+    let tick_plonk_minimal =
+      { plonk0 with
+        zeta = As_field.zeta
+      ; alpha = As_field.alpha
+      ; joint_combiner = As_field.joint_combiner
+      }
+    in
+    let tick_combined_evals =
+      Plonk_checks.evals_of_split_evals
+        (module Tick.Field)
+        proof.proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
+        ~zeta:As_field.zeta ~zetaw
+      |> Plonk_types.Evals.to_in_circuit
+    in
+    let tick_domain =
+      Plonk_checks.domain
+        (module Tick.Field)
+        domain ~shifts:Common.tick_shifts
+        ~domain_generator:Backend.Tick.Field.domain_generator
+    in
+    let tick_env =
+      let module Env_bool = struct
+        type t = bool
+
+        let true_ = true
+
+        let false_ = false
+
+        let ( &&& ) = ( && )
+
+        let ( ||| ) = ( || )
+
+        let any = List.exists ~f:Fn.id
+      end in
+      let module Env_field = struct
+        include Tick.Field
+
+        type bool = Env_bool.t
+
+        let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
+      end in
+      Plonk_checks.scalars_env
+        (module Env_bool)
+        (module Env_field)
+        ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
+        ~zk_rows:step_vk.zk_rows ~srs_length_log2:Common.Max_degree.step_log2
+        ~field_of_hex:(fun s ->
+          Kimchi_pasta.Pasta.Bigint256.of_hex_string s
+          |> Kimchi_pasta.Pasta.Fp.of_bigint )
+        ~domain:tick_domain tick_plonk_minimal tick_combined_evals
+    in
+    let plonk =
+      let module Field = struct
+        include Tick.Field
+      end in
+      Type1.derive_plonk
+        (module Field)
+        ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
+    and new_bulletproof_challenges, b =
+      let prechals =
+        Array.map (O.opening_prechallenges o) ~f:(fun x ->
+            Scalar_challenge.map ~f:Challenge.Constant.of_tick_field x )
+      in
+      let chals =
+        Array.map prechals ~f:(fun x -> Ipa.Step.compute_challenge x)
+      in
+      let challenge_poly = unstage (challenge_polynomial chals) in
+      let open As_field in
+      let b =
+        let open Tick.Field in
+        challenge_poly zeta + (r * challenge_poly zetaw)
+      in
+      let prechals = Array.map prechals ~f:Bulletproof_challenge.unpack in
+      (prechals, b)
+    in
+    let shift_value =
+      Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1
+    and chal = Challenge.Constant.of_tick_field in
+    { deferred_values =
+        { Types.Wrap.Proof_state.Deferred_values.xi
+        ; b = shift_value b
+        ; bulletproof_challenges =
+            Vector.of_array_and_length_exn new_bulletproof_challenges
+              Tick.Rounds.n
+        ; combined_inner_product =
+            shift_value
+              As_field.(
+                combined_inner_product (* Note: We do not pad here. *)
+                  ~actual_proofs_verified:
+                    (Nat.Add.create actual_proofs_verified)
+                  { evals = proof.proof.openings.evals; public_input = x_hat }
+                  ~r ~xi ~zeta ~zetaw
+                  ~old_bulletproof_challenges:prev_challenges ~env:tick_env
+                  ~domain:tick_domain ~ft_eval1:proof.proof.openings.ft_eval1
+                  ~plonk:tick_plonk_minimal)
+        ; branch_data =
+            { proofs_verified =
+                ( match actual_proofs_verified with
+                | Z ->
+                    Branch_data.Proofs_verified.N0
+                | S Z ->
+                    N1
+                | S (S Z) ->
+                    N2
+                | S _ ->
+                    assert false )
+            ; domain_log2 =
+                Branch_data.Domain_log2.of_int_exn
+                  step_vk.domain.log_size_of_group
+            }
+        ; plonk =
+            { plonk with
+              zeta = plonk0.zeta
+            ; alpha = plonk0.alpha
+            ; beta = chal plonk0.beta
+            ; gamma = chal plonk0.gamma
+            ; joint_combiner = Opt.of_option plonk0.joint_combiner
+            }
+        }
+    ; x_hat_evals = x_hat
+    ; sponge_digest_before_evaluations = O.digest_before_evaluations o
+    }
+end
+
+include For_tests_only
 
 (* Testing
    -------
