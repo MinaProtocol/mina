@@ -8,35 +8,30 @@ let of_ledger_root ledger =
 
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let locations = Ledger.location_of_account_batch oledger keys in
-  let num_new_accounts, non_empty_locations =
-    let num_new_accounts = ref 0 in
-    let non_empty_locations =
-      List.filter_map locations ~f:(fun (_key, location) ->
-          if Option.is_none location then incr num_new_accounts ;
-          location )
-    in
-    (!num_new_accounts, non_empty_locations)
+  let non_empty_locations = List.filter_map locations ~f:snd in
+  let num_new_accounts =
+    List.length locations - List.length non_empty_locations
   in
   let accounts = Ledger.get_batch oledger non_empty_locations in
   let empty_merkle_paths, merkle_paths =
     let next_location_exn loc = Option.value_exn (Ledger.Location.next loc) in
-    let empty_address depth =
-      Ledger.Addr.of_directions @@ List.init depth ~f:(fun _ -> Direction.Left)
+    let empty_address =
+      Ledger.Addr.of_directions
+      @@ List.init (Ledger.depth oledger) ~f:(Fn.const Direction.Left)
     in
     let empty_locations =
-      let rec add_locations remaining last_filled acc =
-        if remaining > 0 then
-          let new_location =
-            match last_filled with
-            | None ->
-                Ledger.Location.Account (empty_address (Ledger.depth oledger))
-            | Some last_filled ->
-                next_location_exn last_filled
-          in
-          add_locations (remaining - 1) (Some new_location) (new_location :: acc)
-        else List.rev acc
-      in
-      add_locations num_new_accounts (Ledger.last_filled oledger) []
+      if num_new_accounts = 0 then []
+      else
+        let first_loc =
+          Option.value_map ~f:next_location_exn
+            ~default:(Ledger.Location.Account empty_address)
+            (Ledger.last_filled oledger)
+        in
+        let loc = ref first_loc in
+        first_loc
+        :: List.init (num_new_accounts - 1) ~f:(fun _ ->
+               loc := next_location_exn !loc ;
+               !loc )
     in
     let merkle_paths =
       Ledger.merkle_path_batch oledger (empty_locations @ non_empty_locations)
