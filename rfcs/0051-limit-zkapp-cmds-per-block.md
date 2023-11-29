@@ -43,16 +43,16 @@ from the command line arguments to the function which initializes
 the mempool, but other than that the solution is quite
 straightforward to implement.
 
-The default would be no limit, as that's the easiest to express.
-Alternatively, we can provide another default, but that would require
-providing an option to disable the limit altogether, complicating the
-interface.
-
 An example call could look like this:
 
 ```shell
 $ mina daemon --limit-zkapp-cmds-per-block 64 ...
 ```
+
+The flag will accept either an integer parameter setting the exact
+limit or the string `none` or `null`, which will disable the limit
+entirely. The default will be set by the compilation profile for
+easier adjustments.
 
 ## Drawbacks
 
