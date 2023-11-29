@@ -30,6 +30,7 @@ type inputs =
   ; mina_image : string
   ; archive_image : string option
   ; debug : bool
+  ; generate_code_coverage : bool
   }
 
 let validate_inputs ~logger inputs (test_config : Test_config.t) :
@@ -276,7 +277,8 @@ let main inputs =
   [%log trace] "expanding network config" ;
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
-      ~debug:inputs.debug ~test_config:T.config ~images
+      ~debug:inputs.debug ~generate_code_coverage:inputs.generate_code_coverage
+      ~test_config:T.config ~images
   in
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
@@ -324,7 +326,7 @@ let main inputs =
     in
     Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->
         let open Malleable_error.Let_syntax in
-        let%bind network, dsl =
+        let%bind network, net_manager, dsl =
           let lift ?exit_code =
             Deferred.bind ~f:(Malleable_error.or_hard_error ?exit_code)
           in
@@ -355,7 +357,7 @@ let main inputs =
           let (`Don't_call_in_tests dsl) =
             Dsl.create ~logger ~network ~event_router ~network_state_reader
           in
-          (network, dsl)
+          (network, net_manager, dsl)
         in
         [%log trace] "initializing network abstraction" ;
         let%bind () = Engine.Network.initialize_infra ~logger network in
@@ -397,8 +399,12 @@ let main inputs =
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
         [%log trace] "executing test" ;
-        T.run network dsl )
+        let%bind result = T.run network dsl in
+        let open Malleable_error.Let_syntax in
+        let%bind () = Engine.Network_manager.tear_down net_manager network in
+        Malleable_error.return result )
   in
+
   let exit_reason, test_result =
     match monitor_test_result with
     | Ok malleable_error ->
@@ -449,6 +455,17 @@ let debug_arg =
   in
   Arg.(value & flag & info [ "debug"; "d" ] ~doc)
 
+let generate_code_coverage =
+  let doc =
+    "Flag which enable gathering code coverage metrics from deamon and \
+     archive. It requires mina built with instrumentaion enabled.\n\
+    \    "
+  in
+  let env = Arg.env_var "GENERATE_CODE_COVERAGE" ~doc in
+  Arg.(
+    value & opt bool false
+    & info [ "generate-code-coverage" ] ~env ~docv:"GENERATE_CODE_COVERAGE" ~doc)
+
 let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
 let engine_cmd ((engine_name, (module Engine)) : engine) =
@@ -464,12 +481,19 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs test_inputs test mina_image archive_image debug =
-      { test_inputs; test; mina_image; archive_image; debug }
+    let cons_inputs test_inputs test mina_image archive_image debug
+        generate_code_coverage =
+      { test_inputs
+      ; test
+      ; mina_image
+      ; archive_image
+      ; debug
+      ; generate_code_coverage
+      }
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
-      $ mina_image_arg $ archive_image_arg $ debug_arg)
+      $ mina_image_arg $ archive_image_arg $ debug_arg $ generate_code_coverage)
   in
   let term = Term.(const start $ inputs_term) in
   (term, info)
