@@ -20,11 +20,11 @@ let Cmd = ../Lib/Cmds.dhall in
               Cmd.Docker::{
                 image = (../Constants/ContainerImages.dhall).ubuntu2004
               }
-              "./buildkite/scripts/connect-testnet.sh $testnet $wait_between_graphql_poll wait_before_final_check"
+              "./buildkite/scripts/connect-testnet.sh ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check}"
           ],
-          label = "Connect to $testnet",
+          label = "Connect to ${testnet}",
           soft_fail = Some (B/SoftFail.Boolean True),
-          key = "connect-to-$testnet",
+          key = "connect-to-${testnet}",
           target = Size.Large,
           depends_on = dependsOn
         }
