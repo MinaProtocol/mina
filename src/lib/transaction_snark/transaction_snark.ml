@@ -885,6 +885,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           module Permissions = struct
             type controller = Permissions.Auth_required.Checked.t
 
+            type txn_version = Mina_numbers.Txn_version.Checked.t
+
             let edit_state : t -> controller =
              fun a -> a.data.permissions.edit_state
 
@@ -900,8 +902,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             let set_permissions : t -> controller =
              fun a -> a.data.permissions.set_permissions
 
-            let set_verification_key : t -> controller =
-             fun a -> a.data.permissions.set_verification_key
+            let set_verification_key_auth : t -> controller =
+             fun a -> fst a.data.permissions.set_verification_key
+
+            let set_verification_key_txn_version : t -> txn_version =
+             fun a -> snd a.data.permissions.set_verification_key
 
             let set_zkapp_uri : t -> controller =
              fun a -> a.data.permissions.set_zkapp_uri
@@ -923,7 +928,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             type t = Permissions.Checked.t
 
-            let if_ b ~then_ ~else_ = Permissions.Checked.if_ b ~then_ ~else_
+            let if_ b ~then_ ~else_ =
+              run_checked @@ Permissions.Checked.if_ b ~then_ ~else_
           end
 
           let account_with_hash (account : Account.Checked.Unhashed.t) : t =
@@ -1452,6 +1458,23 @@ module Make_str (A : Wire_types.Concrete) = struct
                   fun ~proof_verifies:_ ~signature_verifies perm ->
                     Permissions.Auth_required.Checked.eval_no_proof
                       ~signature_verifies perm
+
+            let fallback = Permissions.Auth_required.Checked.fallback
+          end
+
+          module Txn_version = struct
+            type t = Mina_numbers.Txn_version.Checked.t
+
+            let if_ cond ~then_ ~else_ =
+              run_checked
+              @@ Mina_numbers.Txn_version.Checked.if_ cond ~then_ ~else_
+
+            let equal_to_current t =
+              run_checked @@ Mina_numbers.Txn_version.equal_to_current_checked t
+
+            let older_than_current t =
+              run_checked
+              @@ Mina_numbers.Txn_version.older_than_current_checked t
           end
 
           module Ledger = struct

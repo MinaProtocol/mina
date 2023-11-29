@@ -192,7 +192,8 @@ let update_of_id pool update_id =
                   ; access
                   ; set_delegate
                   ; set_permissions
-                  ; set_verification_key
+                  ; set_verification_key_auth
+                  ; set_verification_key_txn_version
                   ; set_zkapp_uri
                   ; edit_action_state
                   ; set_token_symbol
@@ -210,7 +211,10 @@ let update_of_id pool update_id =
               ; access
               ; set_delegate
               ; set_permissions
-              ; set_verification_key
+              ; set_verification_key =
+                  ( set_verification_key_auth
+                  , Mina_numbers.Txn_version.of_int
+                      set_verification_key_txn_version )
               ; set_zkapp_uri
               ; edit_action_state
               ; set_token_symbol
@@ -734,7 +738,8 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ; access
             ; set_delegate
             ; set_permissions
-            ; set_verification_key
+            ; set_verification_key_auth
+            ; set_verification_key_txn_version
             ; set_zkapp_uri
             ; edit_action_state
             ; set_token_symbol
@@ -750,7 +755,9 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       ; access
       ; set_delegate
       ; set_permissions
-      ; set_verification_key
+      ; set_verification_key =
+          ( set_verification_key_auth
+          , Mina_numbers.Txn_version.of_int set_verification_key_txn_version )
       ; set_zkapp_uri
       ; edit_action_state
       ; set_token_symbol

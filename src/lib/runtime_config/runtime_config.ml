@@ -112,6 +112,20 @@ module Json_layout = struct
                 Impossible
         end
 
+        module Txn_version = struct
+          type t = Mina_numbers.Txn_version.Stable.Latest.t
+          [@@deriving bin_io_unversioned]
+
+          include (
+            Mina_numbers.Txn_version :
+              module type of Mina_numbers.Txn_version with type t := t )
+        end
+
+        module Verification_key_perm = struct
+          type t = { auth : Auth_required.t; txn_version : Txn_version.t }
+          [@@deriving dhall_type, sexp, yojson, bin_io_unversioned]
+        end
+
         type t =
           { edit_state : Auth_required.t [@default None]
           ; send : Auth_required.t [@default None]
@@ -119,7 +133,11 @@ module Json_layout = struct
           ; access : Auth_required.t [@default None]
           ; set_delegate : Auth_required.t [@default None]
           ; set_permissions : Auth_required.t [@default None]
-          ; set_verification_key : Auth_required.t [@default None]
+          ; set_verification_key : Verification_key_perm.t
+                [@default
+                  { auth = None
+                  ; txn_version = Mina_numbers.Txn_version.current
+                  }]
           ; set_zkapp_uri : Auth_required.t [@default None]
           ; edit_action_state : Auth_required.t [@default None]
           ; set_token_symbol : Auth_required.t [@default None]
@@ -132,6 +150,26 @@ module Json_layout = struct
         let fields = Fields.names |> Array.of_list
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
+
+        let of_permissions (perm : Mina_base.Permissions.t) =
+          { edit_state = Auth_required.of_account_perm perm.edit_action_state
+          ; send = Auth_required.of_account_perm perm.send
+          ; receive = Auth_required.of_account_perm perm.receive
+          ; set_delegate = Auth_required.of_account_perm perm.set_delegate
+          ; set_permissions = Auth_required.of_account_perm perm.set_permissions
+          ; set_verification_key =
+              (let auth, txn_version = perm.set_verification_key in
+               { auth = Auth_required.of_account_perm auth; txn_version } )
+          ; set_token_symbol =
+              Auth_required.of_account_perm perm.set_token_symbol
+          ; access = Auth_required.of_account_perm perm.access
+          ; edit_action_state =
+              Auth_required.of_account_perm perm.edit_action_state
+          ; set_zkapp_uri = Auth_required.of_account_perm perm.set_zkapp_uri
+          ; increment_nonce = Auth_required.of_account_perm perm.increment_nonce
+          ; set_timing = Auth_required.of_account_perm perm.set_timing
+          ; set_voting_for = Auth_required.of_account_perm perm.set_voting_for
+          }
       end
 
       module Zkapp_account = struct
@@ -198,6 +236,22 @@ module Json_layout = struct
         let fields = Fields.names |> Array.of_list
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
+
+        let of_zkapp (zkapp : Mina_base.Zkapp_account.t) : t =
+          let open Mina_base.Zkapp_account in
+          { app_state = Mina_base.Zkapp_state.V.to_list zkapp.app_state
+          ; verification_key =
+              Option.map zkapp.verification_key ~f:With_hash.data
+          ; zkapp_version = zkapp.zkapp_version
+          ; action_state =
+              Pickles_types.Vector.Vector_5.to_list zkapp.action_state
+          ; last_action_slot =
+              Unsigned.UInt32.to_int
+              @@ Mina_numbers.Global_slot_since_genesis.to_uint32
+                   zkapp.last_action_slot
+          ; proved_state = zkapp.proved_state
+          ; zkapp_uri = zkapp.zkapp_uri
+          }
       end
 
       type t =
@@ -261,22 +315,7 @@ module Json_layout = struct
                     } )
           ; token = Some (Mina_base.Token_id.to_string a.token_id)
           ; token_symbol = Some a.token_symbol
-          ; zkapp =
-              Option.map a.zkapp ~f:(fun zkapp ->
-                  let open Zkapp_account in
-                  { app_state = Mina_base.Zkapp_state.V.to_list zkapp.app_state
-                  ; verification_key =
-                      Option.map zkapp.verification_key ~f:With_hash.data
-                  ; zkapp_version = zkapp.zkapp_version
-                  ; action_state =
-                      Pickles_types.Vector.Vector_5.to_list zkapp.action_state
-                  ; last_action_slot =
-                      Unsigned.UInt32.to_int
-                      @@ Mina_numbers.Global_slot_since_genesis.to_uint32
-                           zkapp.last_action_slot
-                  ; proved_state = zkapp.proved_state
-                  ; zkapp_uri = zkapp.zkapp_uri
-                  } )
+          ; zkapp = Option.map a.zkapp ~f:Zkapp_account.of_zkapp
           ; nonce = a.nonce
           ; receipt_chain_hash =
               Some
@@ -284,39 +323,7 @@ module Json_layout = struct
                    a.receipt_chain_hash )
           ; voting_for =
               Some (Mina_base.State_hash.to_base58_check a.voting_for)
-          ; permissions =
-              Some
-                Permissions.
-                  { edit_state =
-                      Auth_required.of_account_perm a.permissions.edit_state
-                  ; send = Auth_required.of_account_perm a.permissions.send
-                  ; receive =
-                      Auth_required.of_account_perm a.permissions.receive
-                  ; set_delegate =
-                      Auth_required.of_account_perm a.permissions.set_delegate
-                  ; set_permissions =
-                      Auth_required.of_account_perm
-                        a.permissions.set_permissions
-                  ; set_verification_key =
-                      Auth_required.of_account_perm
-                        a.permissions.set_verification_key
-                  ; set_token_symbol =
-                      Auth_required.of_account_perm
-                        a.permissions.set_token_symbol
-                  ; access = Auth_required.of_account_perm a.permissions.access
-                  ; edit_action_state =
-                      Auth_required.of_account_perm
-                        a.permissions.edit_action_state
-                  ; set_zkapp_uri =
-                      Auth_required.of_account_perm a.permissions.set_zkapp_uri
-                  ; increment_nonce =
-                      Auth_required.of_account_perm
-                        a.permissions.increment_nonce
-                  ; set_timing =
-                      Auth_required.of_account_perm a.permissions.set_timing
-                  ; set_voting_for =
-                      Auth_required.of_account_perm a.permissions.set_voting_for
-                  }
+          ; permissions = Some (Permissions.of_permissions a.permissions)
           }
     end
 

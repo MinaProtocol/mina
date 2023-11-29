@@ -16,6 +16,7 @@
    stdio
    sexplib0
    ;; local libraries
+   protocol_version
    mina_wire_types
    with_hash
    data_hash_lib

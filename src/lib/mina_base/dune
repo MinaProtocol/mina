@@ -23,6 +23,7 @@
    base_quickcheck.ppx_quickcheck
    core_kernel.uuid
    ;; local libraries
+   protocol_version
    mina_wire_types
    run_in_thread
    kimchi_backend_common
