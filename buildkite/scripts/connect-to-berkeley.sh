@@ -16,7 +16,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y git apt-transport-https ca-certificates tzdata curl
 
-TESTNET_NAME="berkeley"
+TESTNET_NAME="testworld-2-0"
 
 git config --global --add safe.directory /workdir
 
