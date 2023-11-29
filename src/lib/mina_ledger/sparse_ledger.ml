@@ -18,7 +18,7 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
     (!num_new_accounts, non_empty_locations)
   in
   let accounts = Ledger.get_batch oledger non_empty_locations in
-  let merkle_paths, empty_merkle_paths =
+  let empty_merkle_paths, merkle_paths =
     let next_location_exn loc = Option.value_exn (Ledger.Location.next loc) in
     let empty_address depth =
       Ledger.Addr.of_directions @@ List.init depth ~f:(fun _ -> Direction.Left)
@@ -43,18 +43,7 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
         non_empty_locations
     in
     let merkle_paths = Ledger.merkle_path_batch oledger merkle_path_locations in
-    (let rec pop_empties num_empties merkle_paths locations acc =
-       if num_empties <= 0 then (merkle_paths, acc)
-       else
-         match (merkle_paths, locations) with
-         | path :: merkle_paths, location :: locations ->
-             pop_empties (num_empties - 1) merkle_paths locations
-               ((location, path) :: acc)
-         | [], _ | _, [] ->
-             assert false
-     in
-     pop_empties )
-      num_new_accounts merkle_paths merkle_path_locations []
+    List.split_n merkle_paths num_new_accounts
   in
   let sl, _, _, _ =
     List.fold locations
@@ -71,7 +60,7 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
             | _ ->
                 failwith "unexpected number of non empty accounts" )
         | None ->
-            let _, path = List.hd_exn empty_merkle_paths in
+            let path = List.hd_exn empty_merkle_paths in
             let sl = add_path sl path key Account.empty in
             (sl, accounts, merkle_paths, List.tl_exn empty_merkle_paths) )
   in
