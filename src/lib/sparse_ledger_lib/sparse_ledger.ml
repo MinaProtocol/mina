@@ -184,44 +184,69 @@ end = struct
     ; indexes = (account_id, index) :: t.indexes
     }
 
-  let add_wide_path_unsafe depth0 tree0 path0 account =
-    let f (prev_l, prev_r) = function
-      | `Left (h_l, h_r) ->
-          (Tree.Node (h_l, prev_l, prev_r), Tree.Hash h_r)
-      | `Right (h_l, h_r) ->
-          (Hash h_l, Node (h_r, prev_l, prev_r))
+  let add_wide_path_unsafe tree0 path0 account =
+    (* Traverses the tree along path, collecting node and untraversed sibling hashes
+        Stops when encounters `Hash` or `Account` node.
+
+       Returns the last visited node (`Hash` or `Account`), remainder of path and
+       collected node/sibling hashes in bottom-to-top order.
+    *)
+    let rec traverse_through_nodes acc = function
+      | Tree.Hash h, rest ->
+          (acc, `Hash h, rest)
+      | Account a, rest ->
+          (acc, `Account a, rest)
+      | Node (h, l, r), `Left _ :: rest ->
+          traverse_through_nodes ((h, `Right_preserved r) :: acc) (l, rest)
+      | Node (h, l, r), `Right _ :: rest ->
+          traverse_through_nodes ((h, `Left_preserved l) :: acc) (r, rest)
+      | Node _, [] ->
+          failwith "path is shorter than a tree's branch"
     in
-    let rec union height tree path =
-      match (tree, path) with
-      | Tree.Hash _, [] ->
-          assert (height = -1) ;
-          Tree.Account account
-      | Tree.Hash h, fst_el :: rest when List.length rest = height ->
-          (* Split `path` into last element and list of rest of elements in reversed order *)
-          let last_el, init_path_rev =
-            Mina_stdlib.Nonempty_list.(init fst_el rest |> rev |> uncons)
-          in
-          let init =
-            match last_el with
-            | `Left (_, h_r) ->
-                (Tree.Account account, Tree.Hash h_r)
-            | `Right (h_l, _) ->
-                (Hash h_l, Account account)
-          in
-          let l, r = List.fold ~init init_path_rev ~f in
-          Tree.Node (h, l, r)
-      | Node (h, l, r), `Left _ :: path ->
-          let l' = union (height - 1) l path in
-          Node (h, l', r)
-      | Node (h, l, r), `Right _ :: path ->
-          let r' = union (height - 1) r path in
-          Node (h, l, r')
-      | Tree.Hash _, _ | Account _, _ :: _ | Node _, [] ->
-          failwith "Path length doesn't match depth/tree"
-      | Account _, [] ->
-          tree
+    (* Takes a list of collected node/sibling hashes in bottom-to-top order
+       (returned by the function above) and returns a tree that is reconstructed from
+       bottom to top, substituting siblings as necessary. *)
+    let build_to_top bottom_node =
+      List.fold ~init:bottom_node ~f:(fun node -> function
+        | h, `Left_preserved l ->
+            Tree.Node (h, l, node)
+        | h, `Right_preserved r ->
+            Tree.Node (h, node, r) )
     in
-    union (depth0 - 1) tree0 (List.rev path0)
+    (* Uses wide path to build the tail of path *)
+    let build_tail hash_node_to_bottom_path =
+      let bottom_el, bottom_to_hash_node_path =
+        Mina_stdlib.Nonempty_list.(rev hash_node_to_bottom_path |> uncons)
+      in
+      (* Left and right branches of a node that is parent of the bottom node *)
+      let init =
+        match bottom_el with
+        | `Left (_, h_r) ->
+            (Tree.Account account, Tree.Hash h_r)
+        | `Right (h_l, _) ->
+            (Hash h_l, Account account)
+      in
+      let f (prev_l, prev_r) = function
+        | `Left (h_l, h_r) ->
+            (Tree.Node (h_l, prev_l, prev_r), Tree.Hash h_r)
+        | `Right (h_l, h_r) ->
+            (Hash h_l, Node (h_r, prev_l, prev_r))
+      in
+      List.fold ~init bottom_to_hash_node_path ~f
+    in
+    let hash_to_top_path, hash_node, rest =
+      traverse_through_nodes [] (tree0, List.rev path0)
+    in
+    match (hash_node, Mina_stdlib.Nonempty_list.of_list_opt rest) with
+    | `Account _, None ->
+        tree0
+    | `Hash _, None ->
+        build_to_top (Tree.Account account) hash_to_top_path
+    | `Hash h, Some hash_to_bottom_path ->
+        let tail_l, tail_r = build_tail hash_to_bottom_path in
+        build_to_top (Tree.Node (h, tail_l, tail_r)) hash_to_top_path
+    | `Account _, Some _ ->
+        failwith "path is longer than a tree's branch"
 
   let add_wide_path_unsafe (t : t) path account_id account =
     let index =
@@ -229,7 +254,7 @@ end = struct
           match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
     in
     { t with
-      tree = add_wide_path_unsafe t.depth t.tree path account
+      tree = add_wide_path_unsafe t.tree path account
     ; indexes = (account_id, index) :: t.indexes
     }
 
