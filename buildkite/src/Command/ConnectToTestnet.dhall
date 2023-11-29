@@ -13,7 +13,7 @@ let Cmd = ../Lib/Cmds.dhall in
     -> \(testnet : Text) 
     -> \(wait_between_graphql_poll : Text) 
     -> \(wait_before_final_check: Text )
-    -> \(soft_fail: B/SoftFail.Boolean)
+    -> \(soft_fail: B/SoftFail)
     -> Command.build
         Command.Config::{
           commands = [
