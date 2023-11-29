@@ -75,6 +75,11 @@ to get their transactions into increasingly crowded mempools. Also a
 lot of transactions will be lost in the process due to mempool
 overflow.
 
+Some payments and delegations may wait a long time for inclusion or
+even get dropped if they are created by the same fee payer as a
+zkApp command waiting for inclusion due to the limit. This cannot
+be helped, unfortunately.
+
 ## Rationale and alternatives
 
 This is a temporary solution until the scan state storage can be
