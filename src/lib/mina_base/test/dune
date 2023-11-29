@@ -18,7 +18,6 @@
   fields_derivers.zkapps
   fields_derivers.json
   fields_derivers.graphql
-  genesis_constants
   kimchi_backend.pasta
   kimchi_backend.pasta.basic
   mina_base
