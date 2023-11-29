@@ -25,6 +25,8 @@ module Kimchi_gate_type = struct
     | ForeignFieldMul
     | Xor16
     | Rot64
+    | KeccakRound
+    | KeccakSponge
   [@@deriving sexp]
 end
 
