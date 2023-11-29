@@ -104,6 +104,23 @@ module Engine = struct
     val genesis_keypairs : t -> Network_keypair.t Core.String.Map.t
 
     val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
+
+    val id : t -> string
+
+    (*** [network_runner] is instantiated when command line args are parsed *)
+    val network_runner : string option ref
+
+    (*** [archive_image] is instantiated when command line args are parsed *)
+    val archive_image : string option ref
+
+    (*** [config_path] is instantiated when command line args are parsed *)
+    val config_path : string ref
+
+    (*** [keypairs_path] is instantiated when command line args are parsed *)
+    val keypairs_path : string ref
+
+    (*** [mina_image] is instantiated when command line args are parsed *)
+    val mina_image : string ref
   end
 
   module type Network_manager_intf = sig
@@ -340,6 +357,8 @@ module Test = struct
 
     type dsl
 
+    val test_name : string
+
     val config : Test_config.t
 
     val run : network -> dsl -> unit Malleable_error.t
@@ -349,7 +368,7 @@ module Test = struct
    * implementation directly. *)
   module type Functor_intf = functor (Inputs : Inputs_intf) ->
     S
-      with type network = Inputs.Engine.Network.t
-       and type node = Inputs.Engine.Network.Node.t
-       and type dsl = Inputs.Dsl.t
+      with type network := Inputs.Engine.Network.t
+       and type node := Inputs.Engine.Network.Node.t
+       and type dsl := Inputs.Dsl.t
 end

@@ -12,11 +12,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  type network = Network.t
-
-  type node = Network.Node.t
-
-  type dsl = Dsl.t
+  let test_name = "hard-fork"
 
   module Balances = struct
     module Balance = Currency.Balance
@@ -96,11 +92,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
+    let open Node_config in
     let staking_accounts : Test_Account.t list =
-      [ { account_name = "node-a-key"; balance = "400000"; timing = Untimed }
-      ; { account_name = "node-b-key"; balance = "300000"; timing = Untimed }
-      ; { account_name = "snark-node-key1"; balance = "0"; timing = Untimed }
-      ; { account_name = "snark-node-key2"; balance = "0"; timing = Untimed }
+      [ test_account "node-a-key" "400000"
+      ; test_account "node-b-key" "300000"
+      ; test_account "snark-node-key1" "0"
+      ; test_account "snark-node-key2" "0"
       ]
     in
     let staking : Test_config.Epoch_data.Data.t =
@@ -112,11 +109,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (* next accounts contains staking accounts, with balances changed, one new account *)
     let next_accounts : Test_Account.t list =
-      [ { account_name = "node-a-key"; balance = "200000"; timing = Untimed }
-      ; { account_name = "node-b-key"; balance = "350000"; timing = Untimed }
-      ; { account_name = "snark-node-key1"; balance = "0"; timing = Untimed }
-      ; { account_name = "snark-node-key2"; balance = "0"; timing = Untimed }
-      ; { account_name = "fish1"; balance = "100"; timing = Untimed }
+      [ test_account "node-a-key" "200000"
+      ; test_account "node-b-key" "350000"
+      ; test_account "snark-node-key1" "0"
+      ; test_account "snark-node-key2" "0"
+      ; test_account "fish1" "100"
       ]
     in
     let next : Test_config.Epoch_data.Data.t =
@@ -132,48 +129,34 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; genesis_ledger =
         (* the genesis ledger contains the staking ledger plus some other accounts *)
         staking_accounts
-        @ [ { account_name = "fish1"; balance = "100"; timing = Untimed }
-          ; { account_name = "fish2"; balance = "100"; timing = Untimed }
-          ; { account_name = "fish3"; balance = "1000"; timing = Untimed }
+        @ [ test_account "fish1" "100"
+          ; test_account "fish2" "100"
+          ; test_account "fish3" "1000"
             (* account fully vested before hard fork *)
-          ; { account_name = "timed1"
-            ; balance = "10000" (* balance in Mina *)
-            ; timing =
-                make_timing ~min_balance:10_000_000_000_000 ~cliff_time:100_000
-                  ~cliff_amount:1_000_000_000_000 ~vesting_period:1000
-                  ~vesting_increment:1_000_000_000_000
-            }
+          ; test_account "timed1" "10000" (* balance in Mina *)
+              ~timing:
+                (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:100_000
+                   ~cliff_amount:1_000_000_000_000 ~vesting_period:1000
+                   ~vesting_increment:1_000_000_000_000 )
             (* account starts vesting before hard fork, not fully vested after
                cliff is before hard fork
             *)
-          ; { account_name = "timed2"
-            ; balance = "10000" (* balance in Mina *)
-            ; timing =
-                make_timing ~min_balance:10_000_000_000_000 ~cliff_time:499_995
-                  ~cliff_amount:2_000_000_000_000 ~vesting_period:5
-                  ~vesting_increment:3_000_000_000_000
-            }
+          ; test_account "timed2" "10000" (* balance in Mina *)
+              ~timing:
+                (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:499_995
+                   ~cliff_amount:2_000_000_000_000 ~vesting_period:5
+                   ~vesting_increment:3_000_000_000_000 )
             (* cliff at hard fork, vesting with each slot *)
-          ; { account_name = "timed3"
-            ; balance = "20000" (* balance in Mina *)
-            ; timing =
-                make_timing ~min_balance:20_000_000_000_000 ~cliff_time:500_000
-                  ~cliff_amount:2_000_000_000_000 ~vesting_period:1
-                  ~vesting_increment:1_000_000_000_000
-            }
+          ; test_account "timed3" "20000" (* balance in Mina *)
+              ~timing:
+                (make_timing ~min_balance:20_000_000_000_000 ~cliff_time:500_000
+                   ~cliff_amount:2_000_000_000_000 ~vesting_period:1
+                   ~vesting_increment:1_000_000_000_000 )
           ]
-    ; block_producers =
-        [ { node_name = "node-a"; account_name = "node-a-key" }
-        ; { node_name = "node-b"; account_name = "node-b-key" }
-        ]
-    ; snark_coordinator =
-        Some
-          { node_name = "snark-node"
-          ; account_name = "snark-node-key1"
-          ; worker_nodes = 4
-          }
+    ; block_producers = [ bp "node-a"; bp "node-b" ]
+    ; snark_coordinator = snark "snark-node" ~account_name:"snark-node-key1" 4
     ; snark_worker_fee = "0.0002"
-    ; num_archive_nodes = 1
+    ; archive_nodes = [ archive "archive-node" ]
     ; proof_config =
         { proof_config_default with
           work_delay = Some 1

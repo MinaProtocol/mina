@@ -9,36 +9,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  type network = Network.t
-
-  type node = Network.Node.t
-
-  type dsl = Dsl.t
+  let test_name = "zkapps-timing"
 
   let config =
     let open Test_config in
+    let open Node_config in
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-a-key"
-          ; balance = "8000000000"
-          ; timing = Untimed
-          }
-        ; { account_name = "node-b-key"
-          ; balance = "1000000000"
-          ; timing = Untimed
-          }
-        ; { account_name = "node-c-key"
-          ; balance = "1000000000"
-          ; timing = Untimed
-          }
+        [ test_account "node-a-key" "8000000000"
+        ; test_account "node-b-key" "1000000000"
+        ; test_account "node-c-key" "1000000000"
         ]
-    ; block_producers =
-        [ { node_name = "node-a"; account_name = "node-a-key" }
-        ; { node_name = "node-b"; account_name = "node-b-key" }
-        ; { node_name = "node-c"; account_name = "node-c-key" }
-        ]
-    ; num_archive_nodes = 1
+    ; block_producers = [ bp "node-a"; bp "node-b"; bp "node-c" ]
+    ; archive_nodes = [ archive "archive" ]
     }
 
   let run network t =

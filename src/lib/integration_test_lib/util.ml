@@ -9,6 +9,74 @@ let run_cmd dir prog args =
   Process.create_exn ~working_dir:dir ~prog ~args ()
   >>= Process.collect_output_and_wait
 
+let drop_outer_quotes s =
+  let open String in
+  let s = strip s in
+  let s_list = to_list s in
+  let f c = Char.equal c '"' in
+  let n =
+    Int.min
+      (List.take_while s_list ~f |> List.length)
+      (List.rev s_list |> List.take_while ~f |> List.length)
+  in
+  let s = drop_prefix s n in
+  let s = drop_suffix s n in
+  s
+
+(** Pulls [num_keypairs] unique keypairs from [path] *)
+let pull_keypairs path num_keypairs =
+  let random =
+    Random.State.make_self_init () |> Splittable_random.State.create
+  in
+  (* elem must be in list *)
+  let drop_elem list elem =
+    let open List in
+    let idx = findi list ~f:(fun _ x -> x = elem) |> Option.value_exn |> fst in
+    let left, right = split_n list idx in
+    match right with [] -> left | _ :: tl -> left @ tl
+  in
+  let random_nums =
+    let rec aux rem acc n =
+      let open Quickcheck.Generator in
+      if n = 0 then acc
+      else
+        let next = of_list rem |> generate ~size:num_keypairs ~random in
+        let rem = drop_elem rem next in
+        aux rem (next :: acc) (n - 1)
+    in
+    aux (List.range ~stop:`inclusive 1 10_000) [] num_keypairs
+  in
+  (* network keypairs + private keys *)
+  let keypair_name = sprintf "network-keypairs/network-keypair-%d" in
+  let base_filename n = path ^/ keypair_name n ^ ".json" in
+  let read_sk n = In_channel.read_all (base_filename n ^ ".sk") in
+  let read_keypair n =
+    let open Signature_lib in
+    let sk = read_sk n |> Private_key.of_base58_check_exn in
+    { Network_keypair.keypair = Keypair.of_private_key_exn sk
+    ; keypair_name = keypair_name n
+    ; privkey_password = "naughty blue worm"
+    ; public_key =
+        Public_key.(
+          of_private_key_exn sk |> compress |> Compressed.to_base58_check)
+    ; private_key = In_channel.read_all (base_filename n)
+    }
+  in
+  (* libp2p keypairs *)
+  let libp2p_base_filename n =
+    path ^/ sprintf "libp2p-keypairs/libp2p-keypair-%d.json" n
+  in
+  let read_peerid n =
+    let raw = In_channel.read_all (libp2p_base_filename n ^ ".peerid") in
+    let open String in
+    if suffix raw 1 = "\n" then drop_suffix raw 1 else raw
+  in
+  let read_libp2p n = Yojson.Safe.from_file (libp2p_base_filename n) in
+  ( List.map random_nums ~f:read_keypair
+  , List.map random_nums ~f:read_sk
+  , List.map random_nums ~f:read_libp2p
+  , List.map random_nums ~f:read_peerid )
+
 let check_cmd_output ~prog ~args output =
   let open Process.Output in
   let print_output () =
@@ -31,7 +99,7 @@ let check_cmd_output ~prog ~args output =
   in
   match output.exit_status with
   | Ok () ->
-      return (Ok output.stdout)
+      return @@ Ok (drop_outer_quotes output.stdout)
   | Error (`Exit_non_zero status) ->
       let%map () = print_output () in
       Or_error.errorf "command exited with status code %d" status
@@ -40,10 +108,12 @@ let check_cmd_output ~prog ~args output =
       Or_error.errorf "command exited prematurely due to signal %d"
         (Signal.to_system_int signal)
 
-let run_cmd_or_error_timeout ~timeout_seconds dir prog args =
-  [%log' spam (Logger.create ())]
-    "Running command (from %s): $command" dir
-    ~metadata:[ ("command", `String (String.concat (prog :: args) ~sep:" ")) ] ;
+let run_cmd_or_error_timeout ?(suppress_logs = false) ~timeout_seconds dir prog
+    args =
+  if not suppress_logs then
+    [%log' spam (Logger.create ())]
+      "Running command (from %s): $command" dir
+      ~metadata:[ ("command", `String (String.concat (prog :: args) ~sep:" ")) ] ;
   let open Deferred.Let_syntax in
   let%bind process = Process.create_exn ~working_dir:dir ~prog ~args () in
   let%bind res =

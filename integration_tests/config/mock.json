@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "actions": [
+    {
+      "name": "create_network",
+      "args": {
+        "network_id": "string",
+        "genesis_ledger": "string",
+        "topology": "string"
+      },
+      "command": "MOCK_NETWORK network create --network-id {{network_id}} --genesis-ledger {{genesis_ledger}} --topology {{topology}}"
+    },
+    {
+      "name": "start_network",
+      "args": {
+        "network_id": "string"
+      },
+      "command": "MOCK_NETWORK network start --network-id {{network_id}}"
+    },
+    {
+      "name": "delete_network",
+      "args": {
+        "network_id": "string"
+      },
+      "command": "MOCK_NETWORK network delete --network-id {{network_id}}"
+    },
+    {
+      "name": "start_node",
+      "args": {
+        "network_id": "string",
+        "node_id": "string",
+        "fresh_state": "bool"
+      },
+      "command": "MOCK_NETWORK node start {{fresh_state}} --network-id {{network_id}} --node-id {{node_id}}"
+    },
+    {
+      "name": "stop_node",
+      "args": {
+        "network_id": "string",
+        "node_id": "string"
+      },
+      "command": "MOCK_NETWORK node stop --network-id {{network_id}} --node-id {{node_id}}"
+    },
+    {
+      "name": "dump_archive_data",
+      "args": {
+        "network_id": "string",
+        "node_id": "string"
+      },
+      "command": "MOCK_NETWORK node dump-archive-data --network-id {{network_id}} --node-id {{node_id}}"
+    },
+    {
+      "name": "dump_mina_logs",
+      "args": {
+        "network_id": "string",
+        "node_id": "string"
+      },
+      "command": "MOCK_NETWORK node dump-mina-logs --network-id {{network_id}} --node-id {{node_id}}"
+    },
+    {
+      "name": "dump_precomputed_blocks",
+      "args": {
+        "network_id": "string",
+        "node_id": "string"
+      },
+      "command": "MOCK_NETWORK node dump-precomputed-blocks --network-id {{network_id}} --node-id {{node_id}}"
+    },
+    {
+      "name": "run_replayer",
+      "args": {
+        "network_id": "string",
+        "node_id": "string",
+        "start_slot_since_genesis": "int"
+      },
+      "command": "MOCK_NETWORK node run-replayer --network-id {{network_id}} --node-id {{node_id}} --start-slot-since-genesis {{start_slot_since_genesis}}"
+    }
+  ]
+}

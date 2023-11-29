@@ -5,6 +5,18 @@ open Integration_test_lib
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
 
+let network_runner : string option ref = ref None
+
+let archive_image : string option ref = ref None
+
+let config_path = ref "N/A"
+
+let keypairs_path = ref ""
+
+let mina_image = ref ""
+
+let id _ = "cloud"
+
 let mina_archive_container_id = "archive"
 
 let mina_archive_username = "mina"

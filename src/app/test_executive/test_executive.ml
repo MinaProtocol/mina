@@ -4,7 +4,7 @@ open Cmdliner
 open Pipe_lib
 open Integration_test_lib
 
-type test = string * (module Intf.Test.Functor_intf)
+type test = (module Intf.Test.Functor_intf)
 
 type engine = string * (module Intf.Engine.S)
 
@@ -30,7 +30,15 @@ type inputs =
   ; mina_image : string
   ; archive_image : string option
   ; debug : bool
+  ; config_path : string option
+  ; keypairs_path : string option
+  ; network_runner : string option
   }
+
+let test_name (test : test)
+    (module Inputs : Integration_test_lib.Intf.Test.Inputs_intf) =
+  let module Test = (val test) (Inputs) in
+  Test.test_name
 
 let validate_inputs ~logger inputs (test_config : Test_config.t) :
     unit Deferred.t =
@@ -38,35 +46,92 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
     [%log fatal] "mina-image argument cannot be an empty string" ;
     exit 1 )
   else if
-    test_config.num_archive_nodes > 0 && Option.is_none inputs.archive_image
+    List.length test_config.archive_nodes > 0
+    && Option.is_none inputs.archive_image
   then (
     [%log fatal]
       "This test uses archive nodes.  archive-image argument cannot be absent \
        for this test" ;
     exit 1 )
-  else Deferred.return ()
+  else
+    let (Test_inputs_with_cli_inputs ((module Inputs), _)) =
+      inputs.test_inputs
+    in
+    if
+      String.(Inputs.Engine.name = "abstract")
+      && Option.is_none inputs.network_runner
+      && (Option.is_none @@ Sys.getenv "MINA_NETWORK_RUNNER")
+    then (
+      [%log fatal]
+        "Must provide either --alias command line arg or set the \
+         MINA_NETWORK_RUNNER env var to the path of your network runner binary" ;
+      ignore @@ exit 1 ) ;
+    match Inputs.Engine.name with
+    | "abstract" -> (
+        if Option.is_none inputs.config_path then (
+          [%log fatal]
+            "Must provide a config file when using the abstract engine" ;
+          exit 1 )
+        else
+          match inputs.keypairs_path with
+          | None ->
+              [%log fatal]
+                "Must provide a keypair file when using the abstract engine" ;
+              exit 1
+          | Some path ->
+              [%log info] "Using network runner: %s"
+                (Option.value_exn inputs.network_runner) ;
+              let keypairs_ls = Stdlib.Sys.readdir path in
+              (* check network-keypairs *)
+              if
+                not
+                  ( Array.exists keypairs_ls ~f:(String.equal "network-keypairs")
+                  && (Stdlib.Sys.is_directory @@ path ^/ "network-keypairs") )
+              then (
+                [%log fatal]
+                  "No network-keypairs directory present in %s \n\
+                  \ Consider cloning the pre-generated keypairs repo: \n\
+                  \   git clone git@github.com:MinaFoundation/lucy-keypairs.git"
+                  path ;
+                exit 1 (* check libp2p-keypairs *) )
+              else if
+                not
+                  ( Array.exists keypairs_ls ~f:(String.equal "libp2p-keypairs")
+                  && (Stdlib.Sys.is_directory @@ path ^/ "libp2p-keypairs") )
+              then (
+                [%log fatal]
+                  "No libp2p-keypairs directory present in %s \n\
+                  \ Consider cloning the pre-generated keypairs repo: \n\
+                  \   git clone git@github.com:MinaFoundation/lucy-keypairs.git"
+                  path ;
+                exit 1 )
+              else Deferred.unit )
+    | _ ->
+        [%log debug]
+          "Config file is only used for the abstract engine. It will be \
+           ignored." ;
+        Deferred.unit
 
 let engines : engine list =
-  [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S)) ]
+  [ ("abstract", (module Integration_test_abstract_engine : Intf.Engine.S))
+  ; ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))
+  ]
 
 let tests : test list =
-  [ ( "peers-reliability"
-    , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
-  ; ( "chain-reliability"
-    , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
-  ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
-  ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
-  ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
-  ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))
-  ; ("zkapps-timing", (module Zkapps_timing.Make : Intf.Test.Functor_intf))
-  ; ("zkapps-nonce", (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf))
-  ; ( "verification-key"
-    , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
-  ; ( "block-prod-prio"
-    , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
-  ; ("snarkyjs", (module Snarkyjs.Make : Intf.Test.Functor_intf))
-  ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
-  ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
+  [ (module Peers_reliability_test.Make : Intf.Test.Functor_intf)
+  ; (module Chain_reliability_test.Make : Intf.Test.Functor_intf)
+  ; (module Payments_test.Make : Intf.Test.Functor_intf)
+  ; (module Gossip_consistency.Make : Intf.Test.Functor_intf)
+  ; (module Medium_bootstrap.Make : Intf.Test.Functor_intf)
+  ; (module Zkapps.Make : Intf.Test.Functor_intf)
+  ; (module Zkapps_timing.Make : Intf.Test.Functor_intf)
+  ; (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf)
+  ; (module Verification_key_update.Make : Intf.Test.Functor_intf)
+  ; (module Block_production_priority.Make : Intf.Test.Functor_intf)
+  ; (module Snarkyjs.Make : Intf.Test.Functor_intf)
+  ; (module Block_reward_test.Make : Intf.Test.Functor_intf)
+  ; (module Hard_fork.Make : Intf.Test.Functor_intf)
+  ; (module Mock.Make : Intf.Test.Functor_intf)
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
@@ -112,9 +177,10 @@ let report_test_errors ~log_error_set ~internal_error_set =
     List.fold severities ~init:`None ~f:max_sev
   in
   let combine_errors error_set =
-    Error_accumulator.combine
-      [ Error_accumulator.map error_set.soft_errors ~f:(fun err -> (`Soft, err))
-      ; Error_accumulator.map error_set.hard_errors ~f:(fun err -> (`Hard, err))
+    let open Error_accumulator in
+    combine
+      [ map error_set.soft_errors ~f:(fun err -> (`Soft, err))
+      ; map error_set.hard_errors ~f:(fun err -> (`Hard, err))
       ]
   in
   let internal_errors = combine_errors internal_error_set in
@@ -241,37 +307,16 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       deferred
 
 let main inputs =
-  (* TODO: abstract over which engine is in use, allow engine to be set form CLI *)
   let (Test_inputs_with_cli_inputs ((module Test_inputs), cli_inputs)) =
     inputs.test_inputs
   in
   let open Test_inputs in
-  let test_name, (module Test) = inputs.test in
-  let (module T) =
-    (module Test (Test_inputs) : Intf.Test.S
-      with type network = Engine.Network.t
-       and type node = Engine.Network.Node.t
-       and type dsl = Dsl.t )
-  in
-  (*
-    (module Test (Test_inputs)
-    : Intf.Test.S
-      with type network = Engine.Network.t
-       and type log_engine = Engine.Log_engine.t )
-    *)
-  (* TODO:
-   *   let (module Exec) = (module Execute.Make (Engine)) in
-   *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
-   *)
+  let (module Test) = inputs.test in
+  let test_name = test_name inputs.test (module Test_inputs) in
+  let module T = Test (Test_inputs) in
   let logger = Logger.create () in
   let images =
-    { Test_config.Container_images.mina = inputs.mina_image
-    ; archive_node =
-        Option.value inputs.archive_image ~default:"archive_image_unused"
-    ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
-    ; bots = "minaprotocol/mina-bots:latest"
-    ; points = "codaprotocol/coda-points-hack:32b.4"
-    }
+    Test_config.Container_images.mk inputs.mina_image inputs.archive_image
   in
   let%bind () = validate_inputs ~logger inputs T.config in
   [%log trace] "expanding network config" ;
@@ -285,7 +330,7 @@ let main inputs =
   let error_accumulator_ref = ref None in
   let network_state_writer_ref = ref None in
   let cleanup_deferred_ref = ref None in
-  [%log trace] "preparing up cleanup phase" ;
+  [%log trace] "preparing cleanup phase" ;
   let f_dispatch_cleanup =
     let pause_cleanup_func () =
       if inputs.debug then
@@ -302,7 +347,7 @@ let main inputs =
       ~lift_accumulated_errors_func ~net_manager_ref ~log_engine_ref
       ~network_state_writer_ref ~cleanup_deferred_ref
   in
-  (* run test while gracefully recovering handling exceptions and interrupts *)
+  (* run test while gracefully recovering, handling exceptions, and interrupts *)
   [%log trace] "attaching signal handler" ;
   Signal.handle Signal.terminating ~f:(fun signal ->
       [%log info] "handling signal %s" (Signal.to_string signal) ;
@@ -360,45 +405,50 @@ let main inputs =
         in
         [%log trace] "initializing network abstraction" ;
         let%bind () = Engine.Network.initialize_infra ~logger network in
-
-        [%log info] "Starting the daemons within the pods" ;
-        let start_print (node : Engine.Network.Node.t) =
-          let open Malleable_error.Let_syntax in
-          [%log info] "starting %s ..." (Engine.Network.Node.infra_id node) ;
-          let%bind res = Engine.Network.Node.start ~fresh_state:false node in
-          [%log info] "%s started" (Engine.Network.Node.infra_id node) ;
-          Malleable_error.return res
-        in
-        let seed_nodes =
-          network |> Engine.Network.seeds |> Core.String.Map.data
-        in
-        let non_seed_pods =
-          network |> Engine.Network.all_non_seed_nodes |> Core.String.Map.data
-        in
-        let _offline_node_event_subscription =
-          (* Monitor for offline nodes; abort the test if a node goes down
-             unexpectedly.
-          *)
-          Dsl.Event_router.on (Dsl.event_router dsl) Node_offline
-            ~f:(fun offline_node () ->
-              let node_name = Engine.Network.Node.infra_id offline_node in
-              [%log info] "Detected node offline $node"
-                ~metadata:[ ("node", `String node_name) ] ;
-              if Engine.Network.Node.should_be_running offline_node then (
-                [%log fatal] "Offline $node is required for this test"
+        if String.equal test_name "mock" then (
+          [%log info] "No node interactions in mock network" ;
+          return () )
+        else (
+          [%log info] "Starting the daemons within the pods" ;
+          let start_print (node : Engine.Network.Node.t) =
+            [%log info] "starting %s..." (Engine.Network.Node.infra_id node) ;
+            let%bind res = Engine.Network.Node.start ~fresh_state:false node in
+            [%log info] "%s started" (Engine.Network.Node.infra_id node) ;
+            Malleable_error.return res
+          in
+          let seed_nodes =
+            network |> Engine.Network.seeds |> Core.String.Map.data
+          in
+          let non_seed_pods =
+            network |> Engine.Network.all_non_seed_nodes |> Core.String.Map.data
+          in
+          let _offline_node_event_subscription =
+            (* Monitor for offline nodes; abort the test if a node goes down
+               unexpectedly.
+            *)
+            Dsl.Event_router.on (Dsl.event_router dsl) Node_offline
+              ~f:(fun offline_node () ->
+                let node_name = Engine.Network.Node.infra_id offline_node in
+                [%log info] "Detected node offline $node"
                   ~metadata:[ ("node", `String node_name) ] ;
-                failwith "Aborted because of required offline node" ) ;
-              Async_kernel.Deferred.return `Continue )
-        in
-        (* TODO: parallelize (requires accumlative hard errors) *)
-        let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
-        let%bind () =
-          Dsl.wait_for dsl (Dsl.Wait_condition.nodes_to_initialize seed_nodes)
-        in
-        let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
-        [%log info] "Daemons started" ;
-        [%log trace] "executing test" ;
-        T.run network dsl )
+                if Engine.Network.Node.should_be_running offline_node then (
+                  [%log fatal] "Offline $node is required for this test"
+                    ~metadata:[ ("node", `String node_name) ] ;
+                  failwith "Aborted because of required offline node" ) ;
+                Async_kernel.Deferred.return `Continue )
+          in
+          (* TODO: parallelize (requires accumlative hard errors) *)
+          let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
+          let%bind () =
+            Dsl.(wait_for dsl @@ Wait_condition.nodes_to_initialize seed_nodes)
+          in
+          [%log info] "all seed nodes started" ;
+          let%bind () =
+            Malleable_error.List.iter non_seed_pods ~f:start_print
+          in
+          [%log info] "all nodes started" ;
+          [%log trace] "executing test" ;
+          T.run network dsl ) )
   in
   let exit_reason, test_result =
     match monitor_test_result with
@@ -419,13 +469,38 @@ let start inputs =
   never_returns
     (Async.Scheduler.go_main ~main:(fun () -> don't_wait_for (main inputs)) ())
 
-let test_arg =
-  (* we nest the tests in a redundant index so that we still get the name back after cmdliner evaluates the argument *)
+let test_arg inputs =
   let indexed_tests =
-    List.map tests ~f:(fun (name, test) -> (name, (name, test)))
+    List.map tests ~f:(fun test -> (test_name test inputs, test))
   in
   let doc = "The name of the test to execute." in
   Arg.(required & pos 0 (some (enum indexed_tests)) None & info [] ~doc)
+
+let config_path_arg =
+  let doc = "Path to the CI config file." in
+  let env = Arg.env_var "MINA_CI_CONFIG_PATH" ~doc in
+  Arg.(
+    value
+    & opt (some non_dir_file) None
+    & info [ "config-path"; "config" ] ~env ~docv:"MINA_CI_CONFIG_PATH" ~doc)
+
+let network_runner_arg =
+  let doc = "Alias for the network runner binary." in
+  let env = Arg.env_var "MINA_NETWORK_RUNNER" ~doc in
+  Arg.(
+    value
+    & opt (some string) None
+    & info
+        [ "network-runner-alias"; "network-runner"; "alias" ]
+        ~env ~docv:"MINA_NETWORK_RUNNER" ~doc)
+
+let keypair_dir_path_arg =
+  let doc = "Path to the pre-generated network and libp2p keypair directory." in
+  let env = Arg.env_var "MINA_KEYPAIRS_PATH" ~doc in
+  Arg.(
+    value
+    & opt (some dir) None
+    & info [ "keypairs-path" ] ~env ~docv:"MINA_KEYPAIRS_PATH" ~doc)
 
 let mina_image_arg =
   let doc = "Identifier of the Mina docker image to test." in
@@ -440,8 +515,8 @@ let archive_image_arg =
   let env = Arg.env_var "ARCHIVE_IMAGE" ~doc in
   Arg.(
     value
-      ( opt (some string) None
-      & info [ "archive-image" ] ~env ~docv:"ARCHIVE_IMAGE" ~doc ))
+    & opt (some string) None
+    & info [ "archive-image" ] ~env ~docv:"ARCHIVE_IMAGE" ~doc)
 
 let debug_arg =
   let doc =
@@ -452,28 +527,71 @@ let debug_arg =
 
 let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
+let info engine_name =
+  let doc =
+    match engine_name with
+    | "abstract" ->
+        "Run mina integration tests with the abstract engine."
+    | "cloud" ->
+        "Run mina integration tests on a remote cloud provider."
+    | _ ->
+        assert false
+  in
+  Term.info engine_name ~doc ~exits:Term.default_exits
+
 let engine_cmd ((engine_name, (module Engine)) : engine) =
-  let info =
-    let doc = "Run mina integration test(s) on remote cloud provider." in
-    Term.info engine_name ~doc ~exits:Term.default_exits
+  let info = info engine_name in
+  let module Inputs = Make_test_inputs (Engine) () in
+  let set_config path =
+    Option.iter path ~f:(fun p -> Engine.Network.config_path := p) ;
+    path
+  in
+  let set_keypair path =
+    Option.iter path ~f:(fun p -> Engine.Network.keypairs_path := p) ;
+    path
+  in
+  let set_mina_image image =
+    Engine.Network.mina_image := image ;
+    image
+  in
+  let set_archive_image image =
+    Engine.Network.archive_image := image ;
+    image
+  in
+  let set_network_runner network_runner =
+    Engine.Network.network_runner := network_runner ;
+    network_runner
   in
   let test_inputs_with_cli_inputs_arg =
     let wrap_cli_inputs cli_inputs =
-      Test_inputs_with_cli_inputs
-        ((module Make_test_inputs (Engine) ()), cli_inputs)
+      Test_inputs_with_cli_inputs ((module Inputs), cli_inputs)
     in
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs test_inputs test mina_image archive_image debug =
-      { test_inputs; test; mina_image; archive_image; debug }
+    let cons_inputs test_inputs test debug archive_image mina_image config_path
+        keypairs_path network_runner =
+      { test_inputs
+      ; test
+      ; mina_image
+      ; archive_image
+      ; debug
+      ; config_path
+      ; keypairs_path
+      ; network_runner
+      }
     in
     Term.(
-      const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
-      $ mina_image_arg $ archive_image_arg $ debug_arg)
+      const cons_inputs $ test_inputs_with_cli_inputs_arg
+      $ test_arg (module Inputs)
+      $ debug_arg
+      $ (const set_archive_image $ archive_image_arg)
+      $ (const set_mina_image $ mina_image_arg)
+      $ (const set_config $ config_path_arg)
+      $ (const set_keypair $ keypair_dir_path_arg)
+      $ (const set_network_runner $ network_runner_arg))
   in
-  let term = Term.(const start $ inputs_term) in
-  (term, info)
+  (Term.(const start $ inputs_term), info)
 
 let help_cmd =
   let doc = "Print out test executive documentation." in

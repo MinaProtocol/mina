@@ -61,38 +61,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  type network = Network.t
-
-  type node = Network.Node.t
-
-  type dsl = Dsl.t
+  let test_name = "verification-key"
 
   let config =
     let open Test_config in
+    let open Node_config in
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "whale1-key"
-          ; balance = "9000000000"
-          ; timing = Untimed
-          }
-        ; { account_name = "whale2-key"
-          ; balance = "1000000000"
-          ; timing = Untimed
-          }
-        ; { account_name = "snark-node-key"; balance = "100"; timing = Untimed }
+        [ test_account "whale1-key" "9000000000"
+        ; test_account "whale2-key" "1000000000"
+        ; test_account "snark-node-key" "100"
         ]
-    ; block_producers =
-        [ { node_name = "whale1"; account_name = "whale1-key" }
-        ; { node_name = "whale2"; account_name = "whale2-key" }
-        ]
-    ; num_archive_nodes = 1
-    ; snark_coordinator =
-        Some
-          { node_name = "snark-node"
-          ; account_name = "snark-node-key"
-          ; worker_nodes = 2
-          }
+    ; block_producers = [ bp "whale1"; bp "whale2" ]
+    ; snark_coordinator = snark "snark-node" 2
     ; snark_worker_fee = "0.0001"
     }
 

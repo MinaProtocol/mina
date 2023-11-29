@@ -8,50 +8,33 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
-  type network = Network.t
-
-  type node = Network.Node.t
-
-  type dsl = Dsl.t
-
   let num_extra_keys = 1000
 
   (* let num_sender_nodes = 4 *)
 
+  let test_name = "block-prod-prio"
+
   let config =
     let open Test_config in
+    let open Node_config in
     { default with
-      requires_graphql = true
-    ; genesis_ledger =
-        [ { Test_Account.account_name = "receiver-key"
-          ; balance = "9999999"
-          ; timing = Untimed
-          }
-        ; { account_name = "empty-bp-key"; balance = "0"; timing = Untimed }
-        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
+      genesis_ledger =
+        [ test_account "receiver-key" "9999999"
+        ; test_account "empty-bp-key" "0"
+        ; test_account "snark-node-key" "0"
         ]
         @ List.init num_extra_keys ~f:(fun i ->
               let i_str = Int.to_string i in
-              { Test_Account.account_name =
-                  String.concat [ "sender-account"; i_str ]
-              ; balance = "10000"
-              ; timing = Untimed
-              } )
+              test_account ("sender-account" ^ i_str) "10000" )
     ; block_producers =
-        [ { node_name = "receiver"; account_name = "receiver-key" }
-        ; { node_name = "empty_node-1"; account_name = "empty-bp-key" }
-        ; { node_name = "empty_node-2"; account_name = "empty-bp-key" }
-        ; { node_name = "empty_node-3"; account_name = "empty-bp-key" }
-        ; { node_name = "empty_node-4"; account_name = "empty-bp-key" }
-        ; { node_name = "observer"; account_name = "empty-bp-key" }
+        [ bp "receiver"
+        ; bp "empty_node-1" ~account_name:"empty-bp-key"
+        ; bp "empty_node-2" ~account_name:"empty-bp-key"
+        ; bp "empty_node-3" ~account_name:"empty-bp-key"
+        ; bp "empty_node-4" ~account_name:"empty-bp-key"
+        ; bp "observer" ~account_name:"empty-bp-key"
         ]
-    ; snark_coordinator =
-        Some
-          { node_name = "snark-node"
-          ; account_name = "snark-node-key"
-          ; worker_nodes = 4
-          }
+    ; snark_coordinator = snark "snark-node" 4
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
     ; proof_config =

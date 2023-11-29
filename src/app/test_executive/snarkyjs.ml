@@ -9,21 +9,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  type network = Network.t
-
-  type node = Network.Node.t
-
-  type dsl = Dsl.t
+  let test_name = "snarkyjs"
 
   let config =
     let open Test_config in
+    let open Node_config in
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-key"; balance = "8000000"; timing = Untimed }
-        ; { account_name = "extra-key"; balance = "10"; timing = Untimed }
-        ]
-    ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
+        [ test_account "node-key" "8000000"; test_account "extra-key" "10" ]
+    ; block_producers = [ bp "node" ]
     }
 
   let check_and_print_stout_stderr ~logger process =

@@ -9,20 +9,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
-  type network = Network.t
-
-  type node = Network.Node.t
-
-  type dsl = Dsl.t
+  let test_name = "block-reward"
 
   let config =
     let open Test_config in
+    let open Node_config in
     { default with
       requires_graphql = true
-    ; genesis_ledger =
-        [ { account_name = "node-key"; balance = "1000"; timing = Untimed } ]
-    ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
+    ; genesis_ledger = [ test_account "node-key" "1000" ]
+    ; block_producers = [ bp "node" ]
     }
 
   let run network t =
