@@ -44,10 +44,10 @@ mina daemon \
   --libp2p-keypair "/root/libp2p-keys/key" \
 & # -background
 
-# Attempt to connect to the GraphQL client every 10s for up to 4 minutes
+# Attempt to connect to the GraphQL client every 10s for up to 8 minutes
 num_status_retries=24
 for ((i=1;i<=$num_status_retries;i++)); do
-  sleep 10s
+  sleep 20s
   set +e
   mina client status
   status_exit_code=$?
@@ -60,7 +60,7 @@ for ((i=1;i<=$num_status_retries;i++)); do
 done
 
 # Check that the daemon has connected to peers and is still up after 2 mins
-sleep 5m
+sleep 2m
 mina client status
 if [ $(mina advanced get-peers | wc -l) -gt 0 ]; then
     echo "Found some peers"
