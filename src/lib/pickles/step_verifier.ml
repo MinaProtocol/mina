@@ -1253,3 +1253,7 @@ struct
 end
 
 include Make (Step_main_inputs)
+
+module For_tests_only = struct
+  let side_loaded_domain = side_loaded_domain
+end
