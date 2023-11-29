@@ -19,35 +19,55 @@ let Libp2p = ./Libp2pHelperBuild.dhall
 let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
 let Profiles = ../Constants/Profiles.dhall
+  
+let ArtifactSpec = {
+  Type = {
+    debVersion : DebianVersions.DebVersion,
+    profile: Profiles.Type,
+    mode: PipelineMode.Type,
+    extraEnv: List Text,
+    buildOnlyEssentialDockers: Bool,
+    jobSuffix: Text,
+    stepSuffix: Text,
+    serviceSuffix: Text
+  },
+  default = {
+    debVersion = DebianVersions.DebVersion.Bullseye,
+    profile = Profiles.Type.Standard,
+    mode = PipelineMode.Type.PullRequest,
+    extraEnv = ([]: List Text),
+    buildOnlyEssentialDockers = False,
+    jobSuffix = "",
+    stepSuffix = "",
+    serviceSuffix = ""
+  }
+}
 
-in
-
-let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type -> Pipeline.Config.Type = 
-  \(debVersion : DebianVersions.DebVersion) ->
-  \(profile: Profiles.Type) ->
-  \(mode: PipelineMode.Type) -> 
+let pipeline =  
+  \(spec : ArtifactSpec.Type) ->
     Pipeline.Config::{
       spec =
         JobSpec::{
-          dirtyWhen = DebianVersions.dirtyWhen debVersion,
+          dirtyWhen = DebianVersions.dirtyWhen spec.debVersion,
           path = "Release",
-          name = "MinaArtifact${DebianVersions.capitalName debVersion}${Profiles.toSuffixUppercase profile}",
+          name = "MinaArtifact${DebianVersions.capitalName spec.debVersion}${Profiles.toSuffixUppercase spec.profile}${spec.jobSuffix}",
           tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ],
-          mode = mode
+          mode = spec.mode
         },
       steps = [
-        Libp2p.step debVersion,
+        Libp2p.step spec.debVersion,
         Command.build
           Command.Config::{
-            commands = DebianVersions.toolchainRunner debVersion [
-              "DUNE_PROFILE=${Profiles.duneProfile profile}",
+            commands = DebianVersions.toolchainRunner spec.debVersion ([
+              "DUNE_PROFILE=${Profiles.duneProfile spec.profile}",
               "AWS_ACCESS_KEY_ID",
               "AWS_SECRET_ACCESS_KEY",
               "MINA_BRANCH=$BUILDKITE_BRANCH",
               "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
-              "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
-            ] "./buildkite/scripts/build-artifact.sh",
-            label = "Build Mina for ${DebianVersions.capitalName debVersion} ${Profiles.toSuffixUppercase profile}",
+              "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
+            ] # spec.extraEnv)
+            "./buildkite/scripts/build-artifact.sh",
+            label = "Build Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile}${spec.jobSuffix}",
             key = "build-deb-pkg",
             target = Size.XLarge,
             retries = [
@@ -59,12 +79,12 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
 
         -- daemon berkeley image
         let daemonBerkeleySpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion profile,
-          service="mina-daemon",
+          deps=DebianVersions.dependsOn spec.debVersion spec.profile,
+          service="mina-daemon${spec.serviceSuffix}",
           network="berkeley",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          deb_profile="${Profiles.lowerName profile}",
-          step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
+          deb_codename="${DebianVersions.lowerName spec.debVersion}",
+          deb_profile="${Profiles.lowerName spec.profile}",
+          step_key="daemon-berkeley-${DebianVersions.lowerName spec.debVersion}${Profiles.toLabelSegment spec.profile}${spec.stepSuffix}-docker-image"
         }
 
         in
@@ -73,57 +93,57 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
 
         -- test_executive image
         let testExecutiveSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion profile,
+          deps=DebianVersions.dependsOn spec.debVersion spec.profile,
           service="mina-test-executive",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard'"
+          deb_codename="${DebianVersions.lowerName spec.debVersion}",
+          step_key="test-executive-${DebianVersions.lowerName spec.debVersion}${spec.stepSuffix}-docker-image",
+          `if`=Some "'${Profiles.lowerName spec.profile}' == 'standard' && '${Prelude.Bool.show spec.buildOnlyEssentialDockers}' == 'False'"
         }
         in
         DockerImage.generateStep testExecutiveSpec,
 
         -- batch_txn_tool image
         let batchTxnSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion profile,
+          deps=DebianVersions.dependsOn spec.debVersion spec.profile,
           service="mina-batch-txn",
           network="berkeley",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard'"
+          deb_codename="${DebianVersions.lowerName spec.debVersion}",
+          step_key="batch-txn-${DebianVersions.lowerName spec.debVersion}${spec.stepSuffix}-docker-image",
+          `if`=Some "'${Profiles.lowerName spec.profile}' == 'standard' && '${Prelude.Bool.show spec.buildOnlyEssentialDockers}' == 'False'"
         }
         in
         DockerImage.generateStep batchTxnSpec,
 
         -- archive image
         let archiveSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion profile,
-          service="mina-archive",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          deb_profile="${Profiles.lowerName profile}",
-          step_key="archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
+          deps=DebianVersions.dependsOn spec.debVersion spec.profile,
+          service="mina-archive${spec.serviceSuffix}",
+          deb_codename="${DebianVersions.lowerName spec.debVersion}",
+          deb_profile="${Profiles.lowerName spec.profile}",
+          step_key="archive-${DebianVersions.lowerName spec.debVersion}${Profiles.toLabelSegment spec.profile}${spec.stepSuffix}-docker-image"
         }
         in
         DockerImage.generateStep archiveSpec,
 
         -- rosetta image
         let rosettaSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion profile,
+          deps=DebianVersions.dependsOn spec.debVersion spec.profile,
           service="mina-rosetta",
           network="berkeley",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard'"
+          deb_codename="${DebianVersions.lowerName spec.debVersion}",
+          step_key="rosetta-${DebianVersions.lowerName spec.debVersion}${spec.stepSuffix}-docker-image",
+          `if`=Some "'${Profiles.lowerName spec.profile}' == 'standard' && '${Prelude.Bool.show spec.buildOnlyEssentialDockers}' == 'False'"
         }
         in
         DockerImage.generateStep rosettaSpec,
 
         -- ZkApp test transaction image
         let zkappTestTxnSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion profile,
+          deps=DebianVersions.dependsOn spec.debVersion spec.profile,
           service="mina-zkapp-test-transaction",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
-          `if`=Some "'${Profiles.lowerName profile}' == 'standard'"
+          deb_codename="${DebianVersions.lowerName spec.debVersion}",
+          step_key="zkapp-test-transaction-${DebianVersions.lowerName spec.debVersion}${Profiles.toLabelSegment spec.profile}${spec.stepSuffix}-docker-image",
+          `if`=Some "'${Profiles.lowerName spec.profile}' == 'standard' && '${Prelude.Bool.show spec.buildOnlyEssentialDockers}' == 'False'"
         }
 
         in
@@ -133,10 +153,5 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
       ]
     }
 
-in
-{
-  bullseye  = pipeline DebianVersions.DebVersion.Bullseye Profiles.Type.Standard PipelineMode.Type.PullRequest
-  , bullseye-lightnet  = pipeline DebianVersions.DebVersion.Bullseye Profiles.Type.Lightnet PipelineMode.Type.PullRequest
-  , buster  = pipeline DebianVersions.DebVersion.Buster Profiles.Type.Standard PipelineMode.Type.PullRequest
-  , focal   = pipeline DebianVersions.DebVersion.Focal Profiles.Type.Standard PipelineMode.Type.PullRequest
-  }
+in 
+{ pipeline = pipeline, ArtifactSpec = ArtifactSpec }

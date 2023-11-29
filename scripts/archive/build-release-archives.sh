@@ -41,9 +41,13 @@ case "${DUNE_PROFILE}" in
     ;;
 esac
 
+if [ -z ${DUNE_INSTRUMENT_WITH+x} ]; then
+PROJECT="mina-archive"
+else
+PROJECT="mina-archive-instrumented"
+fi 
 
-
-PROJECT="mina-archive${PROJECT_SUFFIX}"
+PROJECT="${PROJECT}${PROJECT_SUFFIX}"
 BUILD_DIR="deb_build"
 
 ###### archiver deb
