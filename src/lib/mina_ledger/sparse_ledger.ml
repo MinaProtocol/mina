@@ -13,7 +13,7 @@ let of_ledger_subset_exn_impl ~path_query ~path_add (oledger : Ledger.t) keys =
     List.length locations - List.length non_empty_locations
   in
   let accounts = Ledger.get_batch oledger non_empty_locations in
-  let non_empty_paths, empty_paths =
+  let empty_paths, non_empty_paths =
     let next_location_exn loc = Option.value_exn (Ledger.Location.next loc) in
     let empty_address =
       Ledger.Addr.of_directions
@@ -41,8 +41,12 @@ let of_ledger_subset_exn_impl ~path_query ~path_add (oledger : Ledger.t) keys =
         (path_add sl path key account, accs, ne_paths, epaths)
     | None, accs, ne_paths, path :: epaths ->
         (path_add sl path key Account.empty, accs, ne_paths, epaths)
+    | Some _, (_, None) :: _, _, _ ->
+        failwith
+          "of_ledger_subset_exn: account not found for location returned by \
+           location_of_account_batch"
     | _ ->
-        failwith "of_ledger_subset_exn: unexpected case"
+        failwith "of_ledger_subset_exn: mismatched lengths"
   in
   let sl, _, _, _ =
     List.fold locations
