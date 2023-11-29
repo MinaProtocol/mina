@@ -700,7 +700,7 @@ module Make (Inputs : Inputs_intf) :
     List.map2_exn dependency_dirs dependency_hashes ~f:(fun dir hash ->
         Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
 
-  let path_batch_impl ~is_wide mdb locations =
+  let path_batch_impl ~is_wide ~compute_path mdb locations =
     let locations =
       List.map locations ~f:(fun location ->
           if Location.is_account location then
@@ -720,52 +720,60 @@ module Make (Inputs : Inputs_intf) :
       else sibling_locs
     in
     let hashes = get_hash_batch_exn mdb all_locs in
-    let rec go list_of_dependencies sibling_hashes self_hashes acc =
-      match list_of_dependencies with
-      | [] ->
-          acc
-      | deps :: rest_of_deps ->
-          let locs, dirs = List.unzip deps in
-          let length_of_locs = List.length locs in
-          let sibling_hashes, rest_of_sibling_hashes =
-            List.(split_n sibling_hashes length_of_locs)
-          in
-          let self_hashes, rest_of_self_hashes =
-            List.(split_n self_hashes length_of_locs)
-          in
-          let path =
-            List.map3_exn dirs sibling_hashes self_hashes
-              ~f:(fun dir sibling_hash self_hash ->
-                Direction.map dir
-                  ~left:
-                    (`Left
-                      ( if is_wide then (sibling_hash, self_hash)
-                      else (sibling_hash, sibling_hash) ) )
-                  ~right:
-                    (`Right
-                      ( if is_wide then (sibling_hash, self_hash)
-                      else (sibling_hash, sibling_hash) ) ) )
-          in
-          go rest_of_deps rest_of_sibling_hashes rest_of_self_hashes
-            (path :: acc)
+    compute_path ~hashes ~list_of_dependencies
+
+  let merkle_path_batch =
+    let compute_path ~hashes ~list_of_dependencies =
+      let rec go list_of_deps sibling_hashes acc =
+        match list_of_deps with
+        | [] ->
+            acc
+        | deps :: rest_of_deps ->
+            let _, dirs = List.unzip deps in
+            let sibling_hashes, rest_of_sibling_hashes =
+              List.(split_n sibling_hashes (length dirs))
+            in
+            let path =
+              List.map2_exn dirs sibling_hashes ~f:(fun dir sibling_hash ->
+                  Direction.map dir ~left:(`Left sibling_hash)
+                    ~right:(`Right sibling_hash) )
+            in
+            go rest_of_deps rest_of_sibling_hashes (path :: acc)
+      in
+      go list_of_dependencies hashes [] |> List.rev
     in
-    if is_wide then
+    path_batch_impl ~is_wide:false ~compute_path
+
+  let wide_merkle_path_batch =
+    let compute_path ~hashes ~list_of_dependencies =
+      let rec go list_of_deps sibling_hashes self_hashes acc =
+        match list_of_deps with
+        | [] ->
+            acc
+        | deps :: rest_of_deps ->
+            let _, dirs = List.unzip deps in
+            let sibling_hashes, rest_of_sibling_hashes =
+              List.(split_n sibling_hashes (length dirs))
+            in
+            let self_hashes, rest_of_self_hashes =
+              List.(split_n self_hashes (length dirs))
+            in
+            let path =
+              List.map3_exn dirs sibling_hashes self_hashes
+                ~f:(fun dir sibling_hash self_hash ->
+                  Direction.map dir
+                    ~left:(`Left (sibling_hash, self_hash))
+                    ~right:(`Right (sibling_hash, self_hash)) )
+            in
+            go rest_of_deps rest_of_sibling_hashes rest_of_self_hashes
+              (path :: acc)
+      in
       let sibling_hashes, self_hashes =
         List.(split_n hashes (length hashes / 2))
       in
-      go list_of_dependencies sibling_hashes self_hashes []
-    else go list_of_dependencies hashes hashes []
-
-  let merkle_path_batch md locs =
-    path_batch_impl ~is_wide:false md locs
-    |> List.map ~f:(fun p ->
-           List.map p ~f:(function
-             | `Left (h, _) ->
-                 `Left h
-             | `Right (h, _) ->
-                 `Right h ) )
-
-  let wide_merkle_path_batch = path_batch_impl ~is_wide:true
+      go list_of_dependencies sibling_hashes self_hashes [] |> List.rev
+    in
+    path_batch_impl ~is_wide:true ~compute_path
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
 
