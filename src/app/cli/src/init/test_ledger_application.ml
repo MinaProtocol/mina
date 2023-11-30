@@ -110,6 +110,13 @@ let apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
         ; status = Applied
         } )
   in
+  let accounts_accessed =
+    List.fold_left ~init:Account_id.Set.empty zkapps ~f:(fun set txn ->
+        Account_id.Set.(
+          union set (of_list (Zkapp_command.accounts_referenced txn))) )
+    |> Set.to_list
+  in
+  Ledger.unsafe_preload_accounts_from_parent ledger accounts_accessed ;
   let start = Time.now () in
   match%map
     Staged_ledger.For_tests.update_coinbase_stack_and_get_data_impl
