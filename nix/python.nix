@@ -27,12 +27,20 @@ final: prev: {
       inherit pname version;
       hash = "sha256-ea5ew7aF19JcdzoMgLrvlj0GC/wLfbIsABLKRxcT6DQ=";
     };
-    nativeBuildInputs = with final.python3Packages; [
-      setuptools-scm
+    buildInputs = with final.python3Packages; [
       cassandra-driver
+      six
+      setuptools-scm
       final.cassandra-sigv4
       boto3
     ];
+    pythonPath = with final.python3Packages; [
+      cassandra-driver
+      six
+      final.cassandra-sigv4
+      boto3
+    ];
+    permitUserSite = true;
     doCheck = false;
   };
 }

@@ -1,6 +1,7 @@
 { lib, dockerTools, buildEnv, ocamlPackages_mina, runCommand, dumb-init
 , coreutils, bashInteractive, python3, libp2p_helper, procps, postgresql, curl
-, jq, stdenv, rsync, bash, gnutar, gzip, currentTime, flockenzeit, tzdata }:
+, jq, stdenv, rsync, bash, gnutar, gzip, currentTime, flockenzeit, tzdata
+, cqlsh-expansion, python3Packages }:
 let
 
   created = flockenzeit.lib.ISO-8601 currentTime;
@@ -85,12 +86,13 @@ in {
     inherit created;
     contents = [
       ocamlPackages_mina.mina-delegation-verify.out
+      cqlsh-expansion
       coreutils
       bashInteractive
     ];
     config = {
       cmd = [ "/bin/delegation-verify" ];
-      Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" ];
+      Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" "CQLSH=${cqlsh-expansion}/bin/cqlsh-expansion" "USER_SITE=${cqlsh-expansion}/${python3Packages.python.sitePackages}" ];
     };
     
   };
