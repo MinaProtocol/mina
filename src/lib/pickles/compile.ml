@@ -512,10 +512,6 @@ struct
         | rule :: rules ->
             let first =
               Timer.clock __LOC__ ;
-              printf
-                "compile.ml compile Step_branch_data.create custom_gate_type = \
-                 %b\n"
-                rule.custom_gate_type ;
               let res =
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
@@ -605,10 +601,6 @@ struct
                        , index
                        , digest ) )
               in
-              printf
-                "compile.ml compile Cache.Step.read_or_generate \
-                 b.custom_gate_type = %b\n"
-                b.custom_gate_type ;
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
                     Cache.Step.read_or_generate
@@ -688,9 +680,6 @@ struct
             Lazy.return (self_id, header, digest)
       in
       let r =
-        printf
-          "compile.ml compile Cache.Wrap.read_or_generate custom_gate_type = %b\n"
-          custom_gate_type ;
         Common.time "wrap read or generate " (fun () ->
             Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
               ~custom_gate_type
@@ -796,8 +785,6 @@ struct
                   *)
                   Some tweak_statement
             in
-            printf "compile.ml Wrap.wrap custom_gate_type = %b\n"
-              b.custom_gate_type ;
             (* Note: custom_gate_type is passed below because Wrap needs to verify the Step proof *)
             Wrap.wrap ~proof_cache ~max_proofs_verified:Max_proofs_verified.n
               ~feature_flags ~actual_feature_flags:b.feature_flags
@@ -850,8 +837,6 @@ struct
       go step_data step_keypairs
     in
     Timer.clock __LOC__ ;
-    printf "compile.ml compile Types_map custom_gate_type = %b\n"
-      custom_gate_type ;
     let data : _ Types_map.Compiled.t =
       { branches = Branches.n
       ; proofs_verifieds

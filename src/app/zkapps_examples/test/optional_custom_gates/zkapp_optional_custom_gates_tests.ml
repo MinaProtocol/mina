@@ -58,6 +58,7 @@ struct
                   Pickles_optional_custom_gates_circuits.main_body
                     ~feature_flags () )
           ; feature_flags
+          ; custom_gate_type = false
           }
         ] )
       ()

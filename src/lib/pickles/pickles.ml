@@ -1161,9 +1161,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Step_branch_data.t
           end in
           let proofs_verifieds = Vector.singleton 2 in
-          printf
-            "pickles.ml Make_str Step_branch_data.create custom_gate_type = %b\n"
-            custom_gate_type ;
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags ~num_chunks:1
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
@@ -1211,10 +1208,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  , index
                  , digest ) )
             in
-            printf
-              "pickles.ml Make_str Cache.Step.read_or_generate \
-               custom_gate_type = %b\n"
-              custom_gate_type ;
             Cache.Step.read_or_generate ~custom_gate_type
               ~prev_challenges:
                 (Nat.to_int (fst inner_step_data.proofs_verified))
@@ -1287,10 +1280,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                      (Md5.to_hex digest)
                  , digest ) )
             in
-            printf
-              "pickles.ml Make_str Cache.Wrap.read_or_generate \
-               custom_gate_type = %b\n"
-              custom_gate_type ;
             let r =
               Common.time "wrap read or generate " (fun () ->
                   Cache.Wrap.read_or_generate

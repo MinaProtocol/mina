@@ -40,8 +40,6 @@ let verify_one ~custom_gate_type ~srs
           Sponge.absorb sponge (`Field sponge_digest) ;
           sponge
         in
-        printf "step_main.ml verify_one custom_gate_type = %b\n"
-          custom_gate_type ;
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof ~custom_gate_type d.max_proofs_verified
           ~step_domains:d.step_domains ~zk_rows:d.zk_rows ~sponge
@@ -459,9 +457,6 @@ let step_main :
                       | `Side_loaded _ ->
                           ()
                     in
-                    printf
-                      "step_main.ml step_main basic.custom_gate_type = %b\n"
-                      basic.custom_gate_type ;
                     let chals, v =
                       verify_one ~custom_gate_type:d.custom_gate_type ~srs p d
                         messages_for_next_wrap_proof unfinalized should_verify

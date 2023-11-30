@@ -198,8 +198,6 @@ module Wrap = struct
          | Ok (pk, d) ->
              (Keypair.create ~pk ~vk:(Backend.Tock.Keypair.vk pk), d)
          | Error _e ->
-             printf "cache.ml Wrap.read_or_generate custom_gate_type = %b\n"
-               custom_gate_type ;
              let r =
                Common.time "wrapkeygen" (fun () ->
                    constraint_system ~input_typ:typ ~return_typ main

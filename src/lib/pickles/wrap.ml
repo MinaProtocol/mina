@@ -50,8 +50,6 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       (module Tick.Field)
       ~rounds:tick_rounds e.evals
   in
-  printf "wrap.ml combined_inner_product custom_gate_type = %b\n"
-    custom_gate_type ;
   let ft_eval0 : Tick.Field.t =
     if custom_gate_type then
       Type1Plus.ft_eval0
@@ -826,7 +824,6 @@ let wrap
       lte
   in
   [%log internal] "Wrap_compute_deferred_values" ;
-  printf "wrap.ml wrap custom_gate_type = %b\n" custom_gate_type ;
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~sgs ~prev_challenges ~step_vk ~public_input ~proof
       ~actual_proofs_verified ~actual_feature_flags ~custom_gate_type

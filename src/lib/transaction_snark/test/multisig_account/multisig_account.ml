@@ -211,6 +211,7 @@ let%test_module "multisig_account" =
                         ; auxiliary_output = ()
                         } )
                   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+                  ; custom_gate_type = false
                   }
                 in
                 Pickles.compile () ~cache:Cache_dir.cache
@@ -261,6 +262,7 @@ let%test_module "multisig_account" =
                             } )
                       ; feature_flags =
                           Pickles_types.Plonk_types.Features.none_bool
+                      ; custom_gate_type = false
                       }
                     ] )
               in

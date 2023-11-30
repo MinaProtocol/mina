@@ -2086,7 +2086,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         match t with
         | Proved ->
             { identifier = "proved"
-            ; prevs = M.[ side_loaded 0 ]
+            ; prevs = M.[ side_loaded 0 ~custom_gate_type:false ]
             ; main =
                 (fun { public_input = stmt } ->
                   let zkapp_input, `Must_verify must_verify =
@@ -4016,7 +4016,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             | None ->
                 failwith "of_zkapp_command_segment: Expected exactly one proof"
             | Some (p, v) ->
-                Pickles.Side_loaded.in_prover (Base.side_loaded 0) v.data ;
+                Pickles.Side_loaded.in_prover (Base.side_loaded 0 ~custom_gate_type:false) v.data ;
                 proved
                   ~handler:(Base.Zkapp_command_snark.handle_zkapp_proof p)
                   statement )

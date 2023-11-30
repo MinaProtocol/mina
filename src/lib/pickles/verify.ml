@@ -120,10 +120,6 @@ let verify_heterogenous (ts : Instance.t list) =
             Option.value_map ~default:3 chunking_data ~f:(fun x ->
                 x.Instance.zk_rows )
           in
-          printf
-            "verify.ml verify_heterogeneous expand_deferred custom_gate_type = \
-             %b\n"
-            key.index.custom_gate_type ;
           Wrap_deferred_values.expand_deferred ~evals ~zk_rows
             ~old_bulletproof_challenges ~proof_state
             ~custom_gate_type:key.index.custom_gate_type
