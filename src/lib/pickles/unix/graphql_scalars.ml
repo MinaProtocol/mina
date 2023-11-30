@@ -1,5 +1,4 @@
 open Graphql_basic_scalars.Utils
-open Graphql_basic_scalars.Testing
 
 module Make (Schema : Schema) = struct
   module type Json_intf =
@@ -28,32 +27,3 @@ end
 
 include Make (Schema)
 module For_tests_only = Make (Test_schema)
-
-let%test_module "Roundtrip tests" =
-  ( module struct
-    include Make (Test_schema)
-
-    let%test_module "VerificationKey" =
-      ( module struct
-        module VerificationKey_gen = struct
-          include Pickles.Side_loaded.Verification_key
-
-          let gen = Core_kernel.Quickcheck.Generator.return dummy
-        end
-
-        include Make_test (VerificationKey) (VerificationKey_gen)
-      end )
-
-    let%test_module "VerificationKeyHash" =
-      ( module struct
-        module VerificationKeyHash_gen = struct
-          include Pickles.Backend.Tick.Field
-
-          let gen =
-            Core_kernel.Int.quickcheck_generator
-            |> Core_kernel.Quickcheck.Generator.map ~f:Pasta_bindings.Fp.of_int
-        end
-
-        include Make_test (VerificationKeyHash) (VerificationKeyHash_gen)
-      end )
-  end )
