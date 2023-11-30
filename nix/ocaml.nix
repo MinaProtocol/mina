@@ -338,15 +338,13 @@ let
       });
 
       # Stateless verification tool
-      mina-delegation-verify-dev = self.mina-dev.overrideAttrs (oa: {
+      mina-delegation-verify-dev = self.mina-dev.overrideAttrs (_: {
         pname = "mina-delegation-verify";
         version = "dev";
         outputs = [ "out" ];
 
-        buildInputs = oa.buildInputs ++ [ pkgs.cassandra_4 ];
-
         buildPhase = ''
-          dune build --display=short \
+          dune build --display=short --profile=devnet \
             src/app/delegation_verify/delegation_verify.exe
         '';
 
@@ -356,7 +354,7 @@ let
         '';
       });
 
-      mina-delegation-verify = wrapMina self.mina-delegation-verify-dev { deps = [ pkgs.cassandra_4 ]; };
+      mina-delegation-verify = wrapMina self.mina-delegation-verify-dev { };
 
       # Integration test executive
       test_executive-dev = self.mina-dev.overrideAttrs (oa: {
