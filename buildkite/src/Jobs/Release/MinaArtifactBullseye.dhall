@@ -3,4 +3,4 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 in
 
-Pipeline.build (ArtifactPipelines.pipeline ArtifactPipelines.ArtifactSpec::{=})
+Pipeline.build ArtifactPipelines.bullseye
