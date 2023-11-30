@@ -90,7 +90,3 @@ let rec prompt_continue prompt_string =
   print_newline () ;
   if Char.equal c 'y' || Char.equal c 'Y' then Deferred.unit
   else prompt_continue prompt_string
-
-let write_to_file file_name content =
-  Out_channel.with_file file_name ~f:(fun file ->
-      Out_channel.output_string file content )

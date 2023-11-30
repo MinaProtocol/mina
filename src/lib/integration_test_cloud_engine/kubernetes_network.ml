@@ -105,22 +105,6 @@ module Node = struct
     Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
       (base_kube_args config @ [ "cp"; "-c"; container_id; tmp_file; dest_file ])
 
-  (* Downloads file using cat. Method useful in case when pod does not have tar installed thus cp command is not supported *)
-  let download_file_legacy node ~source_file ~target_file =
-    let open Malleable_error.Let_syntax in
-    let%bind content =
-      run_in_container node ~container_id:"mina" ~cmd:[ "cat"; source_file ]
-    in
-    let _ = Util.write_to_file target_file content in
-    Malleable_error.return ()
-
-  let list_files node folder =
-    let open Malleable_error.Let_syntax in
-    let%map folder_content =
-      run_in_container node ~container_id:"mina" ~cmd:[ "ls"; folder ]
-    in
-    String.split folder_content ~on:'\n'
-
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
     node.should_be_running <- true ;
