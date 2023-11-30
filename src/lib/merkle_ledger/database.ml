@@ -154,6 +154,16 @@ module Make (Inputs : Inputs_intf) :
     | None ->
         empty_hash (Location.height ~ledger_depth:mdb.depth location)
 
+  let get_hash_batch mdb locations =
+    List.iter locations ~f:(fun location -> assert (Location.is_hash location)) ;
+    let hashes = get_bin_batch mdb locations Hash.bin_read_t in
+    List.map2_exn locations hashes ~f:(fun location hash ->
+        match hash with
+        | Some hash ->
+            hash
+        | None ->
+            empty_hash (Location.height ~ledger_depth:mdb.depth location) )
+
   let set_raw { kvdb; depth; _ } location bin =
     Kvdb.set kvdb
       ~key:(Location.serialize ~ledger_depth:depth location)
@@ -683,17 +693,12 @@ module Make (Inputs : Inputs_intf) :
         Location.Hash (Location.to_path_exn location)
       else location
     in
-    assert (Location.is_hash location) ;
-    let rec loop k =
-      if Location.height ~ledger_depth:mdb.depth k >= mdb.depth then []
-      else
-        let sibling = Location.sibling k in
-        let sibling_dir = Location.last_direction (Location.to_path_exn k) in
-        let hash = get_hash mdb sibling in
-        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
-        :: loop (Location.parent k)
+    let dependency_locs, dependency_dirs =
+      List.unzip (Location.merkle_path_dependencies_exn location)
     in
-    loop location
+    let dependency_hashes = get_hash_batch mdb dependency_locs in
+    List.map2_exn dependency_dirs dependency_hashes ~f:(fun dir hash ->
+        Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
 
