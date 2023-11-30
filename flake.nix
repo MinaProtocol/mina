@@ -69,6 +69,7 @@
         rust = import ./nix/rust.nix;
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
+        python = import ./nix/python.nix;
         ocaml = final: prev: {
           ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
             inherit inputs;

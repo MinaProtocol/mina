@@ -1,6 +1,7 @@
 { lib, dockerTools, buildEnv, ocamlPackages_mina, runCommand, dumb-init
 , coreutils, bashInteractive, python3, libp2p_helper, procps, postgresql, curl
-, jq, stdenv, rsync, bash, gnutar, gzip, currentTime, flockenzeit, tzdata }:
+, jq, stdenv, rsync, bash, gnutar, gzip, currentTime, flockenzeit, tzdata
+, cqlsh-expansion, python3Packages }:
 let
 
   created = flockenzeit.lib.ISO-8601 currentTime;
@@ -48,29 +49,30 @@ let
     '';
   };
 
-  mkFullImage = name: packages: dockerTools.streamLayeredImage {
-    name = "${name}-full";
-    inherit created;
-    contents = [
-      dumb-init
-      coreutils
-      bashInteractive
-      python3
-      libp2p_helper
-      procps
-      curl
-      jq
-    ] ++ packages;
-    extraCommands = ''
-      mkdir root tmp
-      chmod 777 tmp
-    '';
-    config = {
-      env = [ "MINA_TIME_OFFSET=0" ];
-      WorkingDir = "/root";
-      cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
+  mkFullImage = name: packages:
+    dockerTools.streamLayeredImage {
+      name = "${name}-full";
+      inherit created;
+      contents = [
+        dumb-init
+        coreutils
+        bashInteractive
+        python3
+        libp2p_helper
+        procps
+        curl
+        jq
+      ] ++ packages;
+      extraCommands = ''
+        mkdir root tmp
+        chmod 777 tmp
+      '';
+      config = {
+        env = [ "MINA_TIME_OFFSET=0" ];
+        WorkingDir = "/root";
+        cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
+      };
     };
-  };
 
 in {
   mina-image-slim = dockerTools.streamLayeredImage {
@@ -82,10 +84,15 @@ in {
   mina-delegation-verify-image = dockerTools.streamLayeredImage {
     name = "mina-delegation-verify";
     inherit created;
-    contents = [ ocamlPackages_mina.mina-delegation-verify.out coreutils bashInteractive ];
+    contents = [
+      ocamlPackages_mina.mina-delegation-verify.out
+      cqlsh-expansion
+      coreutils
+      bashInteractive
+    ];
     config = {
       cmd = [ "/bin/delegation-verify" ];
-      Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" ];
+      Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" "CQLSH=${cqlsh-expansion}/bin/cqlsh-expansion" "USER_SITE=${cqlsh-expansion}/${python3Packages.python.sitePackages}" ];
     };
   };
 
@@ -97,11 +104,12 @@ in {
     mina.mainnet
     mina.genesis
   ]);
-  mina-archive-image-full = mkFullImage "mina-archive" (with ocamlPackages_mina; [
-    mina-archive-scripts
-    gnutar
-    gzip
+  mina-archive-image-full = mkFullImage "mina-archive"
+    (with ocamlPackages_mina; [
+      mina-archive-scripts
+      gnutar
+      gzip
 
-    mina.archive
-  ]);
+      mina.archive
+    ]);
 }
