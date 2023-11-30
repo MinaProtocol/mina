@@ -1983,11 +1983,51 @@ module T = struct
         : Ledger.unattached_mask ) ;
     r
 
+  let try_applying_txn (t : t) ?zkapp_cmd_limit ~logger ~validate
+      (valid_seq, invalid_txns, zkapp_count, total_count) txn =
+    let open Continue_or_stop in
+    if total_count < Scan_state.free_space t.scan_state then
+      match txn with
+      | User_command.Zkapp_command _
+        when Option.value_map ~default:false ~f:(( >= ) zkapp_count)
+               zkapp_cmd_limit ->
+          Continue (valid_seq, invalid_txns, zkapp_count, total_count)
+      | _ -> (
+          match
+            O1trace.sync_thread "validate_transaction_against_staged_ledger"
+              (fun () ->
+                validate (Transaction.Command (User_command.forget_check txn)) )
+          with
+          | Error e ->
+              [%log error]
+                ~metadata:
+                  [ ("user_command", User_command.Valid.to_yojson txn)
+                  ; ("error", Error_json.error_to_yojson e)
+                  ]
+                "Staged_ledger_diff creation: Skipping user command: \
+                 $user_command due to error: $error" ;
+              Continue
+                (valid_seq, (txn, e) :: invalid_txns, zkapp_count, total_count)
+          | Ok _txn_partially_applied ->
+              let valid_seq' =
+                Sequence.append (Sequence.singleton txn) valid_seq
+              in
+              let zkapp_count' =
+                match txn with
+                | Zkapp_command _ ->
+                    zkapp_count + 1
+                | Signed_command _ ->
+                    zkapp_count
+              in
+              Continue (valid_seq', invalid_txns, zkapp_count', total_count + 1)
+          )
+    else Stop (valid_seq, invalid_txns)
+
   let create_diff
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(global_slot : Mina_numbers.Global_slot_since_genesis.t)
       ?(log_block_creation = false) t ~coinbase_receiver ~logger
-      ~current_state_view
+      ~current_state_view ~zkapp_cmd_limit
       ~(transactions_by_fee : User_command.Valid.t Sequence.t)
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
@@ -2088,36 +2128,17 @@ module T = struct
                 ; ("proof_count", `Int proof_count)
                 ] ;
             [%log internal] "Validate_and_apply_transactions" ;
+            let validate =
+              Transaction_validator.apply_transaction_first_pass
+                ~constraint_constants ~global_slot validating_ledger
+                ~txn_state_view:current_state_view
+            in
             (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
             let valid_on_this_ledger, invalid_on_this_ledger =
               Sequence.fold_until transactions_by_fee
-                ~init:(Sequence.empty, [], 0)
-                ~f:(fun (valid_seq, invalid_txns, count) txn ->
-                  if count < Scan_state.free_space t.scan_state then
-                    match
-                      O1trace.sync_thread
-                        "validate_transaction_against_staged_ledger" (fun () ->
-                          Transaction_validator.apply_transaction_first_pass
-                            ~constraint_constants ~global_slot validating_ledger
-                            ~txn_state_view:current_state_view
-                            (Command (User_command.forget_check txn)) )
-                    with
-                    | Error e ->
-                        [%log error]
-                          ~metadata:
-                            [ ("user_command", User_command.Valid.to_yojson txn)
-                            ; ("error", Error_json.error_to_yojson e)
-                            ]
-                          "Staged_ledger_diff creation: Skipping user command: \
-                           $user_command due to error: $error" ;
-                        Continue (valid_seq, (txn, e) :: invalid_txns, count)
-                    | Ok _txn_partially_applied ->
-                        let valid_seq' =
-                          Sequence.append (Sequence.singleton txn) valid_seq
-                        in
-                        Continue (valid_seq', invalid_txns, count + 1)
-                  else Stop (valid_seq, invalid_txns) )
-                ~finish:(fun (valid, invalid, _) -> (valid, invalid))
+                ~init:(Sequence.empty, [], 0, 0)
+                ~f:(try_applying_txn t ?zkapp_cmd_limit ~validate ~logger)
+                ~finish:(fun (valid, invalid, _, _) -> (valid, invalid))
             in
             [%log internal] "Generate_staged_ledger_diff" ;
             let diff, log =
@@ -2246,7 +2267,7 @@ let%test_module "staged ledger tests" =
       Sl.can_apply_supercharged_coinbase_exn ~winner ~global_slot ~epoch_ledger
 
     (* Functor for testing with different instantiated staged ledger modules. *)
-    let create_and_apply_with_state_body_hash
+    let create_and_apply_with_state_body_hash ?zkapp_cmd_limit
         ?(coinbase_receiver = coinbase_receiver) ?(winner = self_pk)
         ~(current_state_view : Zkapp_precondition.Protocol_state.View.t)
         ~global_slot ~state_and_body_hash sl txns stmt_to_work =
@@ -2258,7 +2279,7 @@ let%test_module "staged ledger tests" =
         Sl.create_diff ~constraint_constants ~global_slot !sl ~logger
           ~current_state_view ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work ~supercharge_coinbase
-          ~coinbase_receiver
+          ~coinbase_receiver ~zkapp_cmd_limit
       in
       let diff, _invalid_txns =
         match diff with
@@ -3335,7 +3356,7 @@ let%test_module "staged ledger tests" =
                         ~logger ~current_state_view
                         ~transactions_by_fee:cmds_this_iter
                         ~get_completed_work:stmt_to_work ~coinbase_receiver
-                        ~supercharge_coinbase:true
+                        ~supercharge_coinbase:true ~zkapp_cmd_limit:None
                     in
                     match diff_result with
                     | Ok (diff, _invalid_txns) ->
@@ -4164,6 +4185,7 @@ let%test_module "staged ledger tests" =
                   ~transactions_by_fee:(Sequence.of_list [ invalid_command ])
                   ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
                   ~coinbase_receiver ~supercharge_coinbase:false
+                  ~zkapp_cmd_limit:None
               in
               ( match diff_result with
               | Ok (diff, _invalid_txns) ->
@@ -4253,6 +4275,7 @@ let%test_module "staged ledger tests" =
                   ~transactions_by_fee:(Sequence.of_list [ valid_command ])
                   ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
                   ~coinbase_receiver ~supercharge_coinbase:false
+                  ~zkapp_cmd_limit:None
               in
               match diff_result with
               | Error e ->
@@ -4477,6 +4500,7 @@ let%test_module "staged ledger tests" =
                    ] )
               ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
               ~coinbase_receiver ~supercharge_coinbase:false
+              ~zkapp_cmd_limit:None
           with
           | Error e ->
               Error.raise (Pre_diff_info.Error.to_error e)
@@ -4802,6 +4826,7 @@ let%test_module "staged ledger tests" =
                       ~get_completed_work:
                         (stmt_to_work_zero_fee ~prover:self_pk)
                       ~coinbase_receiver ~supercharge_coinbase:false
+                      ~zkapp_cmd_limit:None
                   with
                   | Error e ->
                       Error.raise (Pre_diff_info.Error.to_error e)

@@ -59,6 +59,7 @@ type t =
   ; uptime_submitter_keypair : Keypair.t option [@default None]
   ; uptime_send_node_commit : bool [@default false]
   ; stop_time : int
+  ; zkapp_cmd_limit : int option [@default None]
   ; graphql_control_port : int option [@default None]
   }
 [@@deriving make]

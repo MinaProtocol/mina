@@ -242,6 +242,7 @@ val create_diff :
   -> coinbase_receiver:Public_key.Compressed.t
   -> logger:Logger.t
   -> current_state_view:Zkapp_precondition.Protocol_state.View.t
+  -> zkapp_cmd_limit:int option
   -> transactions_by_fee:User_command.Valid.t Sequence.t
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
