@@ -76,14 +76,14 @@ locals {
 }
 
 module "berkeley" {
-  providers = { google.gke = google.google-us-central1 }
+  providers = { google.gke = google.google-us-east1 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-central1"
-  cluster_region = "us-central1"
-  k8s_context    = "gke_o1labs-192920_us-central1_coda-infra-central1"
+  cluster_name   = "coda-infra-east"
+  cluster_region = "us-east1"
+  k8s_context    = "gke_o1labs-192920_us-east1_coda-infra-east"
   testnet_name   = local.testnet_name
 
   mina_image                  = local.mina_image
@@ -94,7 +94,7 @@ module "berkeley" {
   watchdog_image              = "gcr.io/o1labs-192920/watchdog:0.4.13"
   use_embedded_runtime_config = true
 
-  archive_node_count            = 3
+  archive_node_count            = 2
   mina_archive_schema           = "create_schema.sql"
   mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/8468f29424fa5e70cfedf69ee281f4fa24037dfe/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/8468f29424fa5e70cfedf69ee281f4fa24037dfe/src/app/archive/zkapp_tables.sql"]
 
@@ -107,15 +107,9 @@ module "berkeley" {
     },
     {
       name              = "archive-2"
-      enableLocalDaemon = false
-      enablePostgresDB  = false
-      postgresHost      = "archive-1-postgresql"
-    },
-    {
-      name              = "archive-3"
-      enableLocalDaemon = false
+      enableLocalDaemon = true
       enablePostgresDB  = true
-      postgresHost      = "archive-3-postgresql"
+      postgresHost      = "archive-2-postgresql"
     }
   ]
 
@@ -145,10 +139,12 @@ module "berkeley" {
 
   snark_coordinators = [
     {
+      snark_coordinator_name       = "snark-coordinator"
       snark_worker_replicas        = 5
       snark_worker_fee             = "0.01"
       snark_worker_public_key      = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
       snark_coordinators_host_port = 10401
+      persist_working_dir          = true
     }
   ]
 
@@ -167,10 +163,6 @@ module "berkeley" {
     }
   ]
 
-  # nodes_with_user_agent = ["fish-1-1","fish-2-1"]
-
-
-
   upload_blocks_to_gcloud         = true
   restart_nodes                   = false
   restart_nodes_every_mins        = "60"
@@ -182,8 +174,7 @@ module "berkeley" {
 
   # a pass must be set to connect the zkapps dash to grafana
   # leave empty to lock down the zkapps dashboard
-  
-  # zkapps_dashboard_key = ""
 
+  # zkapps_dashboard_key = ""
 }
 
