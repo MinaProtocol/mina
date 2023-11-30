@@ -75,12 +75,10 @@ macro_rules! impl_srs {
                 srs: &[<Wasm $field_name:camel Srs>],
                 log2_size: i32,
             ) {
-                crate::rayon::run_in_pool(|| {
-                    let ptr: &mut poly_commitment::srs::SRS<$G> =
-                        unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
-                    let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
-                    ptr.add_lagrange_basis(domain);
-                });
+                let ptr: &mut poly_commitment::srs::SRS<$G> =
+                    unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+                let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
+                ptr.add_lagrange_basis(domain);
             }
 
             #[wasm_bindgen]
@@ -215,171 +213,35 @@ macro_rules! impl_srs {
 //
 
 pub mod fp {
-    use std::collections::HashMap;
-
     use super::*;
-    use crate::arkworks::{WasmGVesta as WasmG, WasmPastaFp};
+    use crate::arkworks::{WasmGVesta, WasmPastaFp};
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{Fp, Vesta as G};
-    use poly_commitment::PolyComm;
+    use mina_curves::pasta::{Fp, Vesta};
 
-    impl_srs!(caml_fp_srs, WasmPastaFp, WasmG, Fp, G, WasmPolyComm, Fp);
-
-    #[wasm_bindgen]
-    pub fn caml_fp_srs_create_parallel(depth: i32) -> WasmFpSrs {
-        crate::rayon::run_in_pool(|| Arc::new(SRS::<G>::create_parallel(depth as usize)).into())
-    }
-
-    // return the cloned srs in a form that we can store on the js side
-    #[wasm_bindgen]
-    pub fn caml_fp_srs_get(srs: &WasmFpSrs) -> WasmVector<WasmG> {
-        // return a vector which consists of h, then all the gs
-        let mut h_and_gs: Vec<WasmG> = vec![srs.0.h.clone().into()];
-        h_and_gs.extend(srs.0.g.iter().map(|x: &G| WasmG::from(x.clone())));
-        h_and_gs.into()
-    }
-
-    // set the srs from a vector of h and gs
-    #[wasm_bindgen]
-    pub fn caml_fp_srs_set(h_and_gs: WasmVector<WasmG>) -> WasmFpSrs {
-        // return a vector which consists of h, then all the gs
-        let mut h_and_gs: Vec<G> = h_and_gs.into_iter().map(|x| x.into()).collect();
-        let h = h_and_gs.remove(0);
-        let g = h_and_gs;
-        let srs = SRS::<G> {
-            h,
-            g,
-            lagrange_bases: HashMap::new(),
-        };
-        Arc::new(srs).into()
-    }
-
-    // maybe get lagrange commitment
-    #[wasm_bindgen]
-    pub fn caml_fp_srs_maybe_lagrange_commitment(
-        srs: &WasmFpSrs,
-        domain_size: i32,
-        i: i32,
-    ) -> Option<WasmPolyComm> {
-        let bases = srs.0.lagrange_bases.get(&(domain_size as usize));
-        bases.map(|bases| bases[i as usize].clone().into())
-    }
-
-    // set entire lagrange basis from input
-    #[wasm_bindgen]
-    pub fn caml_fp_srs_set_lagrange_basis(
-        srs: &WasmFpSrs,
-        domain_size: i32,
-        input_bases: WasmVector<WasmPolyComm>,
-    ) {
-        let bases: Vec<PolyComm<G>> = input_bases.into_iter().map(Into::into).collect();
-
-        // add to srs
-        let ptr: &mut poly_commitment::srs::SRS<G> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
-        ptr.lagrange_bases.insert(domain_size as usize, bases);
-    }
-
-    // compute & add lagrange basis internally, return the entire basis
-    #[wasm_bindgen]
-    pub fn caml_fp_srs_get_lagrange_basis(
-        srs: &WasmFpSrs,
-        domain_size: i32,
-    ) -> WasmVector<WasmPolyComm> {
-        // compute lagrange basis
-        crate::rayon::run_in_pool(|| {
-            let ptr: &mut poly_commitment::srs::SRS<G> =
-                unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
-            let domain =
-                EvaluationDomain::<Fp>::new(domain_size as usize).expect("invalid domain size");
-            ptr.add_lagrange_basis(domain);
-        });
-        let bases = &srs.0.lagrange_bases[&(domain_size as usize)];
-        bases.into_iter().map(Into::into).collect()
-    }
+    impl_srs!(
+        caml_fp_srs,
+        WasmPastaFp,
+        WasmGVesta,
+        Fp,
+        Vesta,
+        WasmPolyComm,
+        Fp
+    );
 }
 
 pub mod fq {
-    use std::collections::HashMap;
-
     use super::*;
-    use crate::arkworks::{WasmGPallas as WasmG, WasmPastaFq};
+    use crate::arkworks::{WasmGPallas, WasmPastaFq};
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{Fq, Pallas as G};
-    use poly_commitment::PolyComm;
+    use mina_curves::pasta::{Fq, Pallas as GAffine};
 
-    impl_srs!(caml_fq_srs, WasmPastaFq, WasmG, Fq, G, WasmPolyComm, Fq);
-
-    #[wasm_bindgen]
-    pub fn caml_fq_srs_create_parallel(depth: i32) -> WasmFqSrs {
-        crate::rayon::run_in_pool(|| Arc::new(SRS::<G>::create_parallel(depth as usize)).into())
-    }
-
-    // return the cloned srs in a form that we can store on the js side
-    #[wasm_bindgen]
-    pub fn caml_fq_srs_get(srs: &WasmFqSrs) -> WasmVector<WasmG> {
-        // return a vector which consists of h, then all the gs
-        let mut h_and_gs: Vec<WasmG> = vec![srs.0.h.clone().into()];
-        h_and_gs.extend(srs.0.g.iter().map(|x: &G| WasmG::from(x.clone())));
-        h_and_gs.into()
-    }
-
-    // set the srs from a vector of h and gs
-    #[wasm_bindgen]
-    pub fn caml_fq_srs_set(h_and_gs: WasmVector<WasmG>) -> WasmFqSrs {
-        // return a vector which consists of h, then all the gs
-        let mut h_and_gs: Vec<G> = h_and_gs.into_iter().map(|x| x.into()).collect();
-        let h = h_and_gs.remove(0);
-        let g = h_and_gs;
-        let srs = SRS::<G> {
-            h,
-            g,
-            lagrange_bases: HashMap::new(),
-        };
-        Arc::new(srs).into()
-    }
-
-    // maybe get lagrange commitment
-    #[wasm_bindgen]
-    pub fn caml_fq_srs_maybe_lagrange_commitment(
-        srs: &WasmFqSrs,
-        domain_size: i32,
-        i: i32,
-    ) -> Option<WasmPolyComm> {
-        let bases = srs.0.lagrange_bases.get(&(domain_size as usize));
-        bases.map(|bases| bases[i as usize].clone().into())
-    }
-
-    // set entire lagrange basis from input
-    #[wasm_bindgen]
-    pub fn caml_fq_srs_set_lagrange_basis(
-        srs: &WasmFqSrs,
-        domain_size: i32,
-        input_bases: WasmVector<WasmPolyComm>,
-    ) {
-        let bases: Vec<PolyComm<G>> = input_bases.into_iter().map(Into::into).collect();
-
-        // add to srs
-        let ptr: &mut poly_commitment::srs::SRS<G> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
-        ptr.lagrange_bases.insert(domain_size as usize, bases);
-    }
-
-    // compute & add lagrange basis internally, return the entire basis
-    #[wasm_bindgen]
-    pub fn caml_fq_srs_get_lagrange_basis(
-        srs: &WasmFqSrs,
-        domain_size: i32,
-    ) -> WasmVector<WasmPolyComm> {
-        // compute lagrange basis
-        crate::rayon::run_in_pool(|| {
-            let ptr: &mut poly_commitment::srs::SRS<G> =
-                unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
-            let domain =
-                EvaluationDomain::<Fq>::new(domain_size as usize).expect("invalid domain size");
-            ptr.add_lagrange_basis(domain);
-        });
-        let bases = &srs.0.lagrange_bases[&(domain_size as usize)];
-        bases.into_iter().map(Into::into).collect()
-    }
+    impl_srs!(
+        caml_fq_srs,
+        WasmPastaFq,
+        WasmGPallas,
+        Fq,
+        GAffine,
+        WasmPolyComm,
+        Fq
+    );
 }
