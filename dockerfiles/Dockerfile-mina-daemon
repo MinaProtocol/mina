@@ -6,21 +6,14 @@ ARG deb_release=unstable
 ARG deb_codename=bullseye
 ARG network=mainnet
 ARG deb_profile
-ARG build_profile
 
 # if --build-arg deb_profile is defined, add hypen at beginning.
-ENV PROFILE_SUFFIX=${deb_profile:+-${deb_profile}}
-
-# if --build-arg build_profile is defined, add hypen at beginning.
-ENV INSTRUMENTATION_SUFFIX=${build_profile:+-${build_profile}}
-
+ENV SUFFIX=${deb_profile:+-${deb_profile}}
 # construct mina debian package name based on network and suffix.
 # possible values:
 # - mina-berkeley
-# - mina-berkeley-lightnet
-# - mina-berkeley-instrumented etc.
-
-ENV MINA_DEB=mina-${network}${PROFILE_SUFFIX}${INSTRUMENTATION_SUFFIX}
+# - mina-berkeley-lightnet etc.
+ENV MINA_DEB=mina-${network}${SUFFIX}
 
 ENV DEBIAN_FRONTEND noninteractive
 
