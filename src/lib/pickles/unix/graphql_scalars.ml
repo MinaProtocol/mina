@@ -27,6 +27,7 @@ module Make (Schema : Schema) = struct
 end
 
 include Make (Schema)
+module For_tests_only = Make (Test_schema)
 
 let%test_module "Roundtrip tests" =
   ( module struct
