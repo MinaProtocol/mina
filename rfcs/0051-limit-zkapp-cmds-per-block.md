@@ -36,6 +36,13 @@ The easiest way to control it is through a command line argument
 to the node. Thus changing the setting is as easy as restarting
 the node.
 
+An issue arises when there are signed commands depending on a zkApp
+command that gets skipped. Such a dependency can result from the
+former having a higher nonce than the latter. In that case, if we're
+not careful and accept the command with a higher fee, the skipped one
+becomes invalid. This should be avoided, although it's not exactly
+clear how to do that.
+
 The setting can be stored in the mempool configuration and
 initialized when the mempool is being created at startup.
 It will likely involve some plumbing to transport the setting
