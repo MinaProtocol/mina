@@ -35,6 +35,7 @@
    cohttp-async
    graphql-async
    mirage-crypto-ec
+   base_quickcheck
    ;;local libraries
    snark_profiler_lib
    archive_lib

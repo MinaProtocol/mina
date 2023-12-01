@@ -27,9 +27,11 @@ let mk_tx acc_creation_fee keypair nonce =
   let multispec : Transaction_snark.For_tests.Multiple_transfers_spec.t =
     let fee_payer = None in
     let receivers =
-      List.init num_acc_updates ~f:(fun _ ->
-          let kp = Signature_lib.Keypair.create () in
-          (Signature_lib.Public_key.compress kp.public_key, Currency.Amount.zero) )
+      Quickcheck.random_value
+        ~seed:(`Deterministic ("test-apply-" ^ Unsigned.UInt32.to_string nonce))
+      @@ Base_quickcheck.Generator.list_with_length ~length:num_acc_updates
+      @@ let%map.Base_quickcheck.Generator kp = Signature_lib.Keypair.gen in
+         (Signature_lib.Public_key.compress kp.public_key, Currency.Amount.zero)
     in
     let zkapp_account_keypairs = [] in
     let new_zkapp_account = false in
@@ -71,7 +73,7 @@ let apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
   let to_nonce =
     Fn.compose (Unsigned.UInt32.add init_nonce) Unsigned.UInt32.of_int
   in
-  let mk_txs' = mk_tx constraint_constants.account_creation_fee keypair in
+  let mk_tx' = mk_tx constraint_constants.account_creation_fee keypair in
   let fork_slot =
     Option.value_map ~default:Mina_numbers.Global_slot_since_genesis.zero
       ~f:(fun f -> f.genesis_slot)
@@ -97,7 +99,7 @@ let apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
     |> Mina_numbers.Global_slot_span.of_int
     |> Mina_numbers.Global_slot_since_genesis.add fork_slot
   in
-  let zkapps = List.init num_txs ~f:(Fn.compose mk_txs' to_nonce) in
+  let zkapps = List.init num_txs ~f:(Fn.compose mk_tx' to_nonce) in
   let pending_coinbase =
     Pending_coinbase.create ~depth:constraint_constants.pending_coinbase_depth
       ()
@@ -119,10 +121,12 @@ let apply_txs ~first_partition_slots ~no_new_stack ~has_second_partition
       (prev_protocol_state_hash, prev_protocol_state_body_hash)
   with
   | Ok (b, _, _, _, _) ->
+      let root = Ledger.merkle_root ledger in
       printf
-        !"Result of application %d: %B (took %s)\n%!"
+        !"Result of application %d: %B (took %s): new root %s\n%!"
         i b
         Time.(Span.to_string @@ diff (now ()) start)
+        (Ledger_hash.to_base58_check root)
   | Error e ->
       eprintf
         !"Error applying staged ledger: %s\n%!"
@@ -164,6 +168,8 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
   let stop_tracing =
     if tracing then (fun x -> Mina_tracing.stop () ; x) else ident
   in
+  let init_root = Ledger.merkle_root init_ledger in
+  printf !"Init root %s\n%!" (Ledger_hash.to_base58_check init_root) ;
   Deferred.List.fold (List.init rounds ~f:ident) ~init:(init_ledger, [])
     ~f:(fun (ledger, ledgers) i ->
       let%bind () =
