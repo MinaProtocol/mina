@@ -87,6 +87,16 @@ even get dropped if they are created by the same fee payer as a
 zkApp command waiting for inclusion due to the limit. This cannot
 be helped, unfortunately.
 
+Another risk arises when we decide to turn of the limitation, because
+the underlying issue is fixed. In order to safely turn the limit
+off, a node needs to be updated with the fix. Because this will be
+a non-breaking change, nodes may be slow to adopt it. According to
+rough estimates, if 16% of the stake upgrades and turns the limit
+off, they're capable of taking the non-upgraded nodes down with
+memory over-consumption and taking over the network. To prevent this
+we have to ensure that at least the majority of the stakeholder
+upgrades as quickly as possible.
+
 ## Rationale and alternatives
 
 This is a temporary solution until the scan state storage can be
