@@ -49,6 +49,16 @@ module Make (Inputs : Inputs_intf.S) = struct
   let maps_copy { accounts; token_owners; hashes; locations } =
     { accounts; token_owners; hashes; locations }
 
+  (** Merges second maps object into the first one,
+      potentially overwriting some keys *)
+  let maps_merge base { accounts; token_owners; hashes; locations } =
+    let combine ~key:_ _ v = v in
+    base.accounts <- Map.merge_skewed ~combine base.accounts accounts ;
+    base.token_owners <-
+      Map.merge_skewed ~combine base.token_owners token_owners ;
+    base.hashes <- Map.merge_skewed ~combine base.hashes hashes ;
+    base.locations <- Map.merge_skewed ~combine base.locations locations
+
   type accumulated_t =
     { current : maps_t
     ; next : maps_t
@@ -174,7 +184,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           if Async.Ivar.is_full detached_next_signal then
             t.accumulated <-
               Some
-                { next = empty_maps ()
+                { next = t.maps
                 ; current = next
                 ; detached_next_signal = t.detached_parent_signal
                 ; base
@@ -983,13 +993,24 @@ module Make (Inputs : Inputs_intf.S) = struct
     let location_of_sexp = Location.t_of_sexp
   end
 
-  let set_parent ?accumulated t parent =
+  let set_parent ?accumulated:accumulated_opt t parent =
     assert (Result.is_error t.parent) ;
     assert (Option.is_none (Async.Ivar.peek t.detached_parent_signal)) ;
     assert (Int.equal t.depth (Base.depth parent)) ;
     t.parent <- Ok parent ;
     t.current_location <- Attached.last_filled t ;
-    t.accumulated <- accumulated ;
+    (* If [t.accumulated] isn't empty, then this mask had a parent before
+       and now we just reparent it (which may only happen if both old and new parents
+        have the same merkle root (and some masks in between may have been removed),
+       hence no need to modify [t.accumulated]) *)
+    ( match accumulated_opt with
+    | Some { current; next; base; detached_next_signal }
+      when Option.is_none t.accumulated ->
+        maps_merge current t.maps ;
+        maps_merge next t.maps ;
+        t.accumulated <- Some { current; next; base; detached_next_signal }
+    | _ ->
+        () ) ;
     t
 
   let addr_to_location addr = Location.Account addr
