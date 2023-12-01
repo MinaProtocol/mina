@@ -62,7 +62,7 @@ end = struct
         Direction.map dir ~left:(`Left hash) ~right:(`Right hash)
         :: loop (Location.parent k)
     in
-    loop location
+    `Leaf_to_root (loop location)
 
   let merkle_path_batch t locations = List.map ~f:(merkle_path t) locations
 
@@ -82,7 +82,7 @@ end = struct
         Direction.map dir ~left:(`Left (hash, hash)) ~right:(`Right (hash, hash))
         :: loop (Location.parent k)
     in
-    loop location
+    `Leaf_to_root (loop location)
 
   let wide_merkle_path_batch t locations =
     List.map ~f:(wide_merkle_path t) locations

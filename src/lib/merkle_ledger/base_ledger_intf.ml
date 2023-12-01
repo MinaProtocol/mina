@@ -139,7 +139,8 @@ module type S = sig
   val wide_merkle_path_batch :
        t
     -> Location.t list
-    -> [ `Left of hash * hash | `Right of hash * hash ] list list
+    -> [ `Leaf_to_root of [ `Left of hash * hash | `Right of hash * hash ] list ]
+       list
 
   val get_hash_batch_exn : t -> Location.t list -> hash list
 

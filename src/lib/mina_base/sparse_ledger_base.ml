@@ -189,7 +189,8 @@ let depth t = M.depth t
 let handler t =
   let ledger = ref t in
   let path_exn idx =
-    List.map (path_exn !ledger idx) ~f:(function `Left h -> h | `Right h -> h)
+    let (`Leaf_to_root path_to_root) = path_exn !ledger idx in
+    List.map path_to_root ~f:(function `Left h -> h | `Right h -> h)
   in
   stage (fun (With { request; respond }) ->
       match request with

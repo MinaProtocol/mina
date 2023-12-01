@@ -7,7 +7,7 @@ module type S = sig
 
   val elem_hash : elem -> hash
 
-  type t = elem list [@@deriving sexp, equal]
+  type t = [ `Leaf_to_root of elem list ] [@@deriving sexp, equal]
 
   val implied_root : t -> hash -> hash
 
@@ -25,10 +25,10 @@ end) : S with type hash := Hash.t = struct
 
   let elem_hash = function `Left h | `Right h -> h
 
-  type t = elem list [@@deriving sexp, equal]
+  type t = [ `Leaf_to_root of elem list ] [@@deriving sexp, equal]
 
-  let implied_root (t : t) leaf_hash =
-    List.fold t ~init:(leaf_hash, 0) ~f:(fun (acc, height) elem ->
+  let implied_root (`Leaf_to_root path_to_root : t) leaf_hash =
+    List.fold path_to_root ~init:(leaf_hash, 0) ~f:(fun (acc, height) elem ->
         let acc =
           match elem with
           | `Left h ->

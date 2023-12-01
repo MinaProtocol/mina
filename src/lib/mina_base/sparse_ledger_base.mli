@@ -40,7 +40,10 @@ val get_exn : t -> int -> Account.t
 val set_exn : t -> int -> Account.t -> t
 
 val path_exn :
-  t -> int -> [ `Left of Ledger_hash.t | `Right of Ledger_hash.t ] list
+     t
+  -> int
+  -> [ `Leaf_to_root of
+       [ `Left of Ledger_hash.t | `Right of Ledger_hash.t ] list ]
 
 val find_index_exn : t -> Account_id.t -> int
 
@@ -54,7 +57,7 @@ val empty : depth:int -> unit -> t
 
 val add_path :
      t
-  -> [ `Left of Field.t | `Right of Field.t ] list
+  -> [ `Leaf_to_root of [ `Left of Field.t | `Right of Field.t ] list ]
   -> Account_id.t
   -> Account.t
   -> t
@@ -65,7 +68,8 @@ val add_path :
 *)
 val add_wide_path_unsafe :
      t
-  -> [ `Left of Field.t * Field.t | `Right of Field.t * Field.t ] list
+  -> [ `Leaf_to_root of
+       [ `Left of Field.t * Field.t | `Right of Field.t * Field.t ] list ]
   -> Account_id.t
   -> Account.t
   -> t

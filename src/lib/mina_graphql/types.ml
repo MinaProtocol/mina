@@ -1363,7 +1363,10 @@ module AccountObj = struct
                  in
                  let%bind index = index in
                  Option.try_with (fun () ->
-                     Ledger.merkle_path_at_index_exn ledger index ) )
+                     let (`Leaf_to_root path) =
+                       Ledger.merkle_path_at_index_exn ledger index
+                     in
+                     path ) )
            ] ) )
 
   let account = Lazy.force account
