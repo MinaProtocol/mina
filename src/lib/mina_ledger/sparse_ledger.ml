@@ -6,6 +6,17 @@ module GS = Global_state
 let of_ledger_root ledger =
   of_root ~depth:(Ledger.depth ledger) (Ledger.merkle_root ledger)
 
+(*** [iterate_n ~f init n] returns [[f init, f (f init), ..]] of size [n] *)
+let iterate_n ~f =
+  let rec impl prev = function
+    | 0 ->
+        []
+    | n ->
+        let r = f prev in
+        r :: impl r (n - 1)
+  in
+  impl
+
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let locations = Ledger.location_of_account_batch oledger keys in
   let non_empty_locations = List.filter_map locations ~f:snd in
@@ -27,11 +38,8 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
             ~default:(Ledger.Location.Account empty_address)
             (Ledger.last_filled oledger)
         in
-        let loc = ref first_loc in
         first_loc
-        :: List.init (num_new_accounts - 1) ~f:(fun _ ->
-               loc := next_location_exn !loc ;
-               !loc )
+        :: iterate_n ~f:next_location_exn first_loc (num_new_accounts - 1)
     in
     let merkle_paths =
       Ledger.merkle_path_batch oledger (empty_locations @ non_empty_locations)
