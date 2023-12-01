@@ -1,0 +1,32 @@
+common-utilities:
+  global: {}
+  healthcheck:
+    enabled: true
+    failureThreshold: 60
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    startup:
+      failureThreshold: 30
+      periodSeconds: 10
+  nodeSelector:
+    preemptible: false
+  watchman:
+    enable: false
+image: gcr.io/o1labs-192920/watchdog:0.4.13
+makeReportAccounts: ""
+makeReportDiscordWebhookUrl: ""
+makeReportEveryMins: "5"
+makeReports: true
+mina:
+  image: minaprotocol/mina-daemon:focal-berkeley-latest
+  ports:
+    client: "8301"
+    graphql: "3085"
+    metrics: 8000
+    p2p: "10909"
+  uploadBlocksToGCloud: true
+name: watchdog
+restartEveryMins: "60"
+restartNodes: false
+seedPeersURL: https://storage.googleapis.com/seed-lists/berkeley_seeds.txt
+testnetName: berkeley-luis

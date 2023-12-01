@@ -1,0 +1,64 @@
+common-utilities:
+  global: {}
+  healthcheck:
+    enabled: true
+    failureThreshold: 60
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    startup:
+      failureThreshold: 30
+      periodSeconds: 10
+  nodeSelector:
+    preemptible: false
+  watchman:
+    enable: false
+coordinatorHostName: snark-coordinator-tpc69e.berkeley-luis
+coordinatorHostPort: 10401
+coordinatorName: snark-coordinator-tpc69e
+coordinatorRpcPort: 8301
+healthcheck:
+  enabled: true
+  failureThreshold: 60
+  initialDelaySeconds: 30
+  periodSeconds: 5
+mina:
+  archiveAddress: archive-1:3086
+  cpuRequest: 12
+  customEntrypoint: ""
+  enableArchive: false
+  exposeGraphql: false
+  generateGenesisProof: true
+  genesis:
+    active: true
+    delta: 3
+    genesis_state_timestamp: 2020-04-20 11:00:00-07:00
+    k: 10
+    txpool_max_size: 3000
+  image: minaprotocol/mina-daemon:focal-berkeley-latest
+  logLevel: Info
+  logPrecomputedBlocks: false
+  logSnarkWorkGossip: false
+  logTxnPoolGossip: false
+  memRequest: 16Gi
+  ports:
+    client: "8301"
+    graphql: "3085"
+    metrics: "10001"
+    p2p: "10909"
+  privkeyPass: naughty blue worm
+  runtimeConfig: ""
+  seedPeers:
+  - /dns4/seed-1.berkeley-luis.o1test.net/tcp/10000/p2p/12D3KooWAdgYL6hv18M3iDBdaK1dRygPivSfAfBNDzie6YqydVbs
+  seedPeersURL: https://storage.googleapis.com/seed-lists/berkeley_seeds.txt
+  uploadBlocksToGCloud: true
+  useCustomEntrypoint: false
+nodeSelector:
+  preemptible: true
+publicKey: B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e
+snarkFee: "0.01"
+testnetName: berkeley-luis
+workSelectionAlgorithm: seq
+workerCpuRequest: 4
+workerMemRequest: 6Gi
+workerName: snark-worker-tpc69e
+workerReplicas: 2

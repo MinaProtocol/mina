@@ -1,0 +1,89 @@
+blockProducerConfigs:
+- archiveAddress: archive-1:3086
+  class: whale
+  enableArchive: false
+  enableGossipFlooding: false
+  enablePeerExchange: true
+  externalPort: 10501
+  isolated: false
+  name: whale-1-1
+  privateKeySecret: whale-1-key
+  runWithBots: false
+  runWithUserAgent: false
+- archiveAddress: archive-1:3086
+  class: fish
+  enableArchive: false
+  enableGossipFlooding: false
+  enablePeerExchange: true
+  externalPort: 10501
+  isolated: false
+  name: fish-1-1
+  privateKeySecret: fish-1-key
+  runWithBots: false
+  runWithUserAgent: true
+bots:
+  faucet:
+    amount: "10000000000"
+    fee: "100000000"
+  image: codaprotocol/coda-bots:0.0.13-beta-1
+  ports:
+    graphql: 3085
+common-utilities:
+  global: {}
+  healthcheck:
+    enabled: true
+    failureThreshold: 60
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    startup:
+      failureThreshold: 30
+      periodSeconds: 10
+  nodeSelector:
+    preemptible: false
+  watchman:
+    enable: false
+healthcheck:
+  enabled: true
+  failureThreshold: 60
+  initialDelaySeconds: 30
+  periodSeconds: 5
+mina:
+  cpuRequest: 12
+  customEntrypoint: ""
+  exposeGraphql: false
+  generateGenesisProof: true
+  image: minaprotocol/mina-daemon:focal-berkeley-latest
+  logLevel: Info
+  logPrecomputedBlocks: false
+  logSnarkWorkGossip: false
+  logTxnPoolGossip: false
+  memRequest: 16Gi
+  ports:
+    client: "8301"
+    graphql: "3085"
+    metrics: "10001"
+    p2p: "10909"
+  privkeyPass: naughty blue worm
+  runtimeConfig: ""
+  seedPeers:
+  - /dns4/seed-1.berkeley-luis.o1test.net/tcp/10000/p2p/12D3KooWAdgYL6hv18M3iDBdaK1dRygPivSfAfBNDzie6YqydVbs
+  seedPeersURL: https://storage.googleapis.com/seed-lists/berkeley_seeds.txt
+  uploadBlocksToGCloud: true
+  useCustomEntrypoint: false
+nodeSelector:
+  preemptible: true
+storage:
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  storageClass: standard
+testnetName: berkeley-luis
+userAgent:
+  image: codaprotocol/coda-user-agent:0.1.8
+  maxFee: "0.1"
+  maxTx: "0.0015"
+  minFee: "0.05"
+  minTx: "0.0015"
+  ports:
+    metrics: 8000
+  sendEveryMins: "1"
+  txBatchSize: ""

@@ -1,0 +1,64 @@
+common-utilities:
+  global: {}
+  healthcheck:
+    enabled: true
+    failureThreshold: 60
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    startup:
+      failureThreshold: 30
+      periodSeconds: 10
+  nodeSelector:
+    preemptible: false
+  watchman:
+    enable: false
+healthcheck:
+  enabled: true
+  failureThreshold: 60
+  initialDelaySeconds: 30
+  periodSeconds: 5
+mina:
+  cpuRequest: 6
+  customEntrypoint: ""
+  exposeGraphql: false
+  generateGenesisProof: true
+  image: minaprotocol/mina-daemon:focal-berkeley-latest
+  logLevel: Info
+  logPrecomputedBlocks: true
+  logSnarkWorkGossip: false
+  logTxnPoolGossip: false
+  maxConnections: 200
+  memRequest: 12.0Gi
+  ports:
+    client: "8301"
+    graphql: "3085"
+    metrics: "8081"
+    p2p: "10001"
+  privkeyPass: naughty blue worm
+  runtimeConfig: ""
+  seedPeers:
+  - /dns4/seed-1.berkeley-luis.o1test.net/tcp/10000/p2p/12D3KooWAdgYL6hv18M3iDBdaK1dRygPivSfAfBNDzie6YqydVbs
+  seedPeersURL: https://storage.googleapis.com/seed-lists/berkeley_seeds.txt
+  uploadBlocksToGCloud: true
+  useCustomEntrypoint: false
+nodeSelector:
+  preemptible: false
+seed:
+  active: true
+  discoveryKeypair: CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr
+  fullname: seed-node
+  hostPort: 10001
+  rpcPort: 8301
+seedConfigs:
+- archiveAddress: archive-1:3086
+  class: seed
+  enableArchive: true
+  externalIp: 35.224.75.42
+  externalPort: 10000
+  libp2pSecret: seed-1-key
+  name: seed-1
+storage:
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  storageClass: standard
+testnetName: berkeley-luis
