@@ -822,8 +822,9 @@ module T = struct
       ~f:(fun _ -> check (List.drop data (fst partitions.first)) partitions)
       partitions.second
 
-  let update_coinbase_stack_and_get_data ~logger ~constraint_constants
-      ~global_slot scan_state ledger pending_coinbase_collection transactions
+  let update_coinbase_stack_and_get_data_impl ~logger ~constraint_constants
+      ~global_slot ~first_partition_slots:slots ~no_second_partition
+      ~is_new_stack ledger pending_coinbase_collection transactions
       current_state_view state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let coinbase_exists txns =
@@ -836,101 +837,104 @@ module T = struct
               Continue acc )
         ~finish:Fn.id
     in
+    if no_second_partition then (
+      (*Single partition:
+        1.Check if a new stack is required and get a working stack [working_stack]
+        2.create data for enqueuing onto the scan state *)
+      let%bind working_stack =
+        working_stack pending_coinbase_collection ~is_new_stack
+        |> Deferred.return
+      in
+      [%log internal] "Update_ledger_and_get_statements"
+        ~metadata:[ ("partition", `String "single") ] ;
+      let%map data, updated_stack, _, first_pass_ledger_end =
+        update_ledger_and_get_statements ~constraint_constants ~global_slot
+          ledger working_stack (transactions, None) current_state_view
+          state_and_body_hash
+      in
+      [%log internal] "Update_ledger_and_get_statements_done" ;
+      [%log internal] "Update_coinbase_stack_done"
+        ~metadata:
+          [ ("is_new_stack", `Bool is_new_stack)
+          ; ("transactions_len", `Int (List.length transactions))
+          ; ("data_len", `Int (List.length data))
+          ] ;
+      ( is_new_stack
+      , data
+      , Pending_coinbase.Update.Action.Update_one
+      , `Update_one updated_stack
+      , `First_pass_ledger_end first_pass_ledger_end ) )
+    else
+      (*Two partition:
+        Assumption: Only one of the partition will have coinbase transaction(s)in it.
+        1. Get the latest stack for coinbase in the first set of transactions
+        2. get the first set of scan_state data[data1]
+        3. get a new stack for the second partion because the second set of transactions would start from the begining of the next tree in the scan_state
+        4. Initialize the new stack with the state from the first stack
+        5. get the second set of scan_state data[data2]*)
+      let txns_for_partition1 = List.take transactions slots in
+      let coinbase_in_first_partition = coinbase_exists txns_for_partition1 in
+      let%bind working_stack1 =
+        working_stack pending_coinbase_collection ~is_new_stack:false
+        |> Deferred.return
+      in
+      let txns_for_partition2 = List.drop transactions slots in
+      [%log internal] "Update_ledger_and_get_statements"
+        ~metadata:[ ("partition", `String "both") ] ;
+      let%map data, updated_stack1, updated_stack2, first_pass_ledger_end =
+        update_ledger_and_get_statements ~constraint_constants ~global_slot
+          ledger working_stack1
+          (txns_for_partition1, Some txns_for_partition2)
+          current_state_view state_and_body_hash
+      in
+      [%log internal] "Update_ledger_and_get_statements_done" ;
+      let second_has_data = List.length txns_for_partition2 > 0 in
+      let pending_coinbase_action, stack_update =
+        match (coinbase_in_first_partition, second_has_data) with
+        | true, true ->
+            ( Pending_coinbase.Update.Action.Update_two_coinbase_in_first
+            , `Update_two (updated_stack1, updated_stack2) )
+        (*updated_stack2 does not have coinbase and but has the state from the previous stack*)
+        | true, false ->
+            (*updated_stack1 has some new coinbase but parition 2 has no
+              data and so we have only one stack to update*)
+            (Update_one, `Update_one updated_stack1)
+        | false, true ->
+            (*updated_stack1 just has the new state. [updated stack2] might have coinbase, definitely has some
+              data and therefore will have a non-dummy state.*)
+            ( Update_two_coinbase_in_second
+            , `Update_two (updated_stack1, updated_stack2) )
+        | false, false ->
+            (* a diff consists of only non-coinbase transactions. This is currently not possible because a diff will have a coinbase at the very least, so don't update anything?*)
+            (Update_none, `Update_none)
+      in
+      [%log internal] "Update_coinbase_stack_done"
+        ~metadata:
+          [ ("is_new_stack", `Bool false)
+          ; ("coinbase_in_first_partition", `Bool coinbase_in_first_partition)
+          ; ("second_has_data", `Bool second_has_data)
+          ; ("txns_for_partition1_len", `Int (List.length txns_for_partition1))
+          ; ("txns_for_partition2_len", `Int (List.length txns_for_partition2))
+          ] ;
+      ( false
+      , data
+      , pending_coinbase_action
+      , stack_update
+      , `First_pass_ledger_end first_pass_ledger_end )
+
+  let update_coinbase_stack_and_get_data ~logger ~constraint_constants
+      ~global_slot scan_state ledger pending_coinbase_collection transactions
+      current_state_view state_and_body_hash =
     let { Scan_state.Space_partition.first = slots, _; second } =
       Scan_state.partition_if_overflowing scan_state
     in
-    if not @@ List.is_empty transactions then (
-      match second with
-      | None ->
-          (*Single partition:
-            1.Check if a new stack is required and get a working stack [working_stack]
-            2.create data for enqueuing onto the scan state *)
-          let is_new_stack = Scan_state.next_on_new_tree scan_state in
-          let%bind working_stack =
-            working_stack pending_coinbase_collection ~is_new_stack
-            |> Deferred.return
-          in
-          [%log internal] "Update_ledger_and_get_statements"
-            ~metadata:[ ("partition", `String "single") ] ;
-          let%map data, updated_stack, _, first_pass_ledger_end =
-            update_ledger_and_get_statements ~constraint_constants ~global_slot
-              ledger working_stack (transactions, None) current_state_view
-              state_and_body_hash
-          in
-          [%log internal] "Update_ledger_and_get_statements_done" ;
-          [%log internal] "Update_coinbase_stack_done"
-            ~metadata:
-              [ ("is_new_stack", `Bool is_new_stack)
-              ; ("transactions_len", `Int (List.length transactions))
-              ; ("data_len", `Int (List.length data))
-              ] ;
-          ( is_new_stack
-          , data
-          , Pending_coinbase.Update.Action.Update_one
-          , `Update_one updated_stack
-          , `First_pass_ledger_end first_pass_ledger_end )
-      | Some _ ->
-          (*Two partition:
-            Assumption: Only one of the partition will have coinbase transaction(s)in it.
-            1. Get the latest stack for coinbase in the first set of transactions
-            2. get the first set of scan_state data[data1]
-            3. get a new stack for the second partion because the second set of transactions would start from the begining of the next tree in the scan_state
-            4. Initialize the new stack with the state from the first stack
-            5. get the second set of scan_state data[data2]*)
-          let txns_for_partition1 = List.take transactions slots in
-          let coinbase_in_first_partition =
-            coinbase_exists txns_for_partition1
-          in
-          let%bind working_stack1 =
-            working_stack pending_coinbase_collection ~is_new_stack:false
-            |> Deferred.return
-          in
-          let txns_for_partition2 = List.drop transactions slots in
-          [%log internal] "Update_ledger_and_get_statements"
-            ~metadata:[ ("partition", `String "both") ] ;
-          let%map data, updated_stack1, updated_stack2, first_pass_ledger_end =
-            update_ledger_and_get_statements ~constraint_constants ~global_slot
-              ledger working_stack1
-              (txns_for_partition1, Some txns_for_partition2)
-              current_state_view state_and_body_hash
-          in
-          [%log internal] "Update_ledger_and_get_statements_done" ;
-          let second_has_data = List.length txns_for_partition2 > 0 in
-          let pending_coinbase_action, stack_update =
-            match (coinbase_in_first_partition, second_has_data) with
-            | true, true ->
-                ( Pending_coinbase.Update.Action.Update_two_coinbase_in_first
-                , `Update_two (updated_stack1, updated_stack2) )
-            (*updated_stack2 does not have coinbase and but has the state from the previous stack*)
-            | true, false ->
-                (*updated_stack1 has some new coinbase but parition 2 has no
-                  data and so we have only one stack to update*)
-                (Update_one, `Update_one updated_stack1)
-            | false, true ->
-                (*updated_stack1 just has the new state. [updated stack2] might have coinbase, definitely has some
-                  data and therefore will have a non-dummy state.*)
-                ( Update_two_coinbase_in_second
-                , `Update_two (updated_stack1, updated_stack2) )
-            | false, false ->
-                (* a diff consists of only non-coinbase transactions. This is currently not possible because a diff will have a coinbase at the very least, so don't update anything?*)
-                (Update_none, `Update_none)
-          in
-          [%log internal] "Update_coinbase_stack_done"
-            ~metadata:
-              [ ("is_new_stack", `Bool false)
-              ; ( "coinbase_in_first_partition"
-                , `Bool coinbase_in_first_partition )
-              ; ("second_has_data", `Bool second_has_data)
-              ; ( "txns_for_partition1_len"
-                , `Int (List.length txns_for_partition1) )
-              ; ( "txns_for_partition2_len"
-                , `Int (List.length txns_for_partition2) )
-              ] ;
-          ( false
-          , data
-          , pending_coinbase_action
-          , stack_update
-          , `First_pass_ledger_end first_pass_ledger_end ) )
+    let is_new_stack = Scan_state.next_on_new_tree scan_state in
+    if not @@ List.is_empty transactions then
+      update_coinbase_stack_and_get_data_impl ~logger ~constraint_constants
+        ~global_slot ~first_partition_slots:slots
+        ~no_second_partition:(Option.is_none second) ~is_new_stack ledger
+        pending_coinbase_collection transactions current_state_view
+        state_and_body_hash
     else (
       [%log internal] "Update_coinbase_stack_done" ;
       Deferred.return
@@ -4840,3 +4844,8 @@ let%test_module "staged ledger tests" =
                               "block should be rejected because batch \
                                verification failed" ) ) ) )
   end )
+
+module For_tests = struct
+  let update_coinbase_stack_and_get_data_impl =
+    update_coinbase_stack_and_get_data_impl
+end
