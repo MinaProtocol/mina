@@ -32,9 +32,9 @@ sequence, but not from the mempool).
 
 The exact number of zkApps allowed in each block should be set
 dynamically, so that we can adjust it without redeploying nodes.
-The easiest way to control it is through a command line argument
-to the node. Thus changing the setting is as easy as restarting
-the node.
+Therefore we are going to provide an authorised GraphQL mutation
+to alter the setting at runtime. A sensible default will be compiled
+into the binary as well.
 
 An issue arises when there are signed commands depending on a zkApp
 command that gets skipped. Such a dependency can result from the
@@ -49,17 +49,6 @@ It will likely involve some plumbing to transport the setting
 from the command line arguments to the function which initializes
 the mempool, but other than that the solution is quite
 straightforward to implement.
-
-An example call could look like this:
-
-```shell
-$ mina daemon --limit-zkapp-cmds-per-block 64 ...
-```
-
-The flag will accept either an integer parameter setting the exact
-limit or the string `none` or `null`, which will disable the limit
-entirely. The default will be set by the compilation profile for
-easier adjustments.
 
 ## Drawbacks
 
