@@ -133,59 +133,8 @@ end = struct
 
   let merkle_root { T.tree; _ } = hash tree
 
-  let add_path depth0 tree0 path0 account =
-    let rec build_tree height p =
-      match p with
-      | `Left h_r :: path ->
-          let l = build_tree (height - 1) path in
-          Tree.Node (Hash.merge ~height (hash l) h_r, l, Hash h_r)
-      | `Right h_l :: path ->
-          let r = build_tree (height - 1) path in
-          Node (Hash.merge ~height h_l (hash r), Hash h_l, r)
-      | [] ->
-          assert (height = -1) ;
-          Account account
-    in
-    let rec union height tree path =
-      match (tree, path) with
-      | Tree.Hash h, path ->
-          let t = build_tree height path in
-          [%test_result: Hash.t]
-            ~message:
-              "Hashes in union are not equal, something is wrong with your \
-               ledger"
-            ~expect:h (hash t) ;
-          t
-      | Node (h, l, r), `Left h_r :: path ->
-          assert (Hash.equal h_r (hash r)) ;
-          let l = union (height - 1) l path in
-          Node (h, l, r)
-      | Node (h, l, r), `Right h_l :: path ->
-          assert (Hash.equal h_l (hash l)) ;
-          let r = union (height - 1) r path in
-          Node (h, l, r)
-      | Node _, [] ->
-          failwith "Path too short"
-      | Account _, _ :: _ ->
-          failwith "Path too long"
-      | Account a, [] ->
-          assert (Account.equal a account) ;
-          tree
-    in
-    union (depth0 - 1) tree0 (List.rev path0)
-
-  let add_path (t : t) path account_id account =
-    let index =
-      List.foldi path ~init:0 ~f:(fun i acc x ->
-          match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
-    in
-    { t with
-      tree = add_path t.depth t.tree path account
-    ; indexes = (account_id, index) :: t.indexes
-    }
-
-  let add_wide_path_unsafe tree0 path0 account =
-    (* Traverses the tree along path, collecting node and untraversed sibling hashes
+  let add_path_impl ~replace_self tree0 path0 account =
+    (* Traverses the tree along path, collecting nodes and untraversed sibling hashes
         Stops when encounters `Hash` or `Account` node.
 
        Returns the last visited node (`Hash` or `Account`), remainder of path and
@@ -213,26 +162,27 @@ end = struct
         | h, `Right_preserved r ->
             Tree.Node (h, node, r) )
     in
-    (* Uses wide path to build the tail of path *)
+    let build_tail_f height (prev_l, prev_r) =
+      replace_self ~f:(fun mself ->
+          let self =
+            match mself with
+            | Some self ->
+                self
+            | None ->
+                Hash.merge ~height (hash prev_l) (hash prev_r)
+          in
+          Tree.Node (self, prev_l, prev_r) )
+    in
+    (* Builds the tail of path, i.e. part of the path that is not present in
+       the current ledger and we just add it all the way down to account
+       using the path *)
     let build_tail hash_node_to_bottom_path =
       let bottom_el, bottom_to_hash_node_path =
         Mina_stdlib.Nonempty_list.(rev hash_node_to_bottom_path |> uncons)
       in
       (* Left and right branches of a node that is parent of the bottom node *)
-      let init =
-        match bottom_el with
-        | `Left (_, h_r) ->
-            (Tree.Account account, Tree.Hash h_r)
-        | `Right (h_l, _) ->
-            (Hash h_l, Account account)
-      in
-      let f (prev_l, prev_r) = function
-        | `Left (h_l, h_r) ->
-            (Tree.Node (h_l, prev_l, prev_r), Tree.Hash h_r)
-        | `Right (h_l, h_r) ->
-            (Hash h_l, Node (h_r, prev_l, prev_r))
-      in
-      List.fold ~init bottom_to_hash_node_path ~f
+      let init = replace_self ~f:(Fn.const (Tree.Account account)) bottom_el in
+      List.foldi ~init bottom_to_hash_node_path ~f:build_tail_f
     in
     let hash_to_top_path, hash_node, rest =
       traverse_through_nodes [] (tree0, List.rev path0)
@@ -248,13 +198,35 @@ end = struct
     | `Account _, Some _ ->
         failwith "path is longer than a tree's branch"
 
+  let add_path (t : t) path account_id account =
+    let index =
+      List.foldi path ~init:0 ~f:(fun i acc x ->
+          match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
+    in
+    let replace_self ~f = function
+      | `Left h_r ->
+          (f None, Tree.Hash h_r)
+      | `Right h_l ->
+          (Tree.Hash h_l, f None)
+    in
+    { t with
+      tree = add_path_impl ~replace_self t.tree path account
+    ; indexes = (account_id, index) :: t.indexes
+    }
+
   let add_wide_path_unsafe (t : t) path account_id account =
     let index =
       List.foldi path ~init:0 ~f:(fun i acc x ->
           match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
     in
+    let replace_self ~f = function
+      | `Left (h_l, h_r) ->
+          (f (Some h_l), Tree.Hash h_r)
+      | `Right (h_l, h_r) ->
+          (Tree.Hash h_l, f (Some h_r))
+    in
     { t with
-      tree = add_wide_path_unsafe t.tree path account
+      tree = add_path_impl ~replace_self t.tree path account
     ; indexes = (account_id, index) :: t.indexes
     }
 
