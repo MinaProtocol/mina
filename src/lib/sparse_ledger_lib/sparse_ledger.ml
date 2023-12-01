@@ -134,34 +134,8 @@ end = struct
   let merkle_root { T.tree; _ } = hash tree
 
   let add_path_impl ~replace_self tree0 path0 account =
-    (* Traverses the tree along path, collecting nodes and untraversed sibling hashes
-        Stops when encounters `Hash` or `Account` node.
-
-       Returns the last visited node (`Hash` or `Account`), remainder of path and
-       collected node/sibling hashes in bottom-to-top order.
-    *)
-    let rec traverse_through_nodes acc = function
-      | Tree.Hash h, rest ->
-          (acc, `Hash h, rest)
-      | Account a, rest ->
-          (acc, `Account a, rest)
-      | Node (h, l, r), `Left _ :: rest ->
-          traverse_through_nodes ((h, `Right_preserved r) :: acc) (l, rest)
-      | Node (h, l, r), `Right _ :: rest ->
-          traverse_through_nodes ((h, `Left_preserved l) :: acc) (r, rest)
-      | Node _, [] ->
-          failwith "path is shorter than a tree's branch"
-    in
-    (* Takes a list of collected node/sibling hashes in bottom-to-top order
-       (returned by the function above) and returns a tree that is reconstructed from
-       bottom to top, substituting siblings as necessary. *)
-    let build_to_top bottom_node =
-      List.fold ~init:bottom_node ~f:(fun node -> function
-        | h, `Left_preserved l ->
-            Tree.Node (h, l, node)
-        | h, `Right_preserved r ->
-            Tree.Node (h, node, r) )
-    in
+    (* Takes height, left and right children and builds a pair of sibling nodes
+       one level up *)
     let build_tail_f height (prev_l, prev_r) =
       replace_self ~f:(fun mself ->
           let self =
@@ -184,19 +158,30 @@ end = struct
       let init = replace_self ~f:(Fn.const (Tree.Account account)) bottom_el in
       List.foldi ~init bottom_to_hash_node_path ~f:build_tail_f
     in
-    let hash_to_top_path, hash_node, rest =
-      traverse_through_nodes [] (tree0, List.rev path0)
+    (* Traverses the tree along path, collecting nodes and untraversed sibling hashes
+        Stops when encounters `Hash` or `Account` node.
+
+       Returns the last visited node (`Hash` or `Account`), remainder of path and
+       collected node/sibling hashes in bottom-to-top order.
+    *)
+    let rec traverse_through_nodes = function
+      | Tree.Account _, _ :: _ ->
+          failwith "path is longer than a tree's branch"
+      | Account _, [] | Tree.Hash _, [] ->
+          Tree.Account account
+      | Tree.Hash h, fst_el :: rest ->
+          let tail_l, tail_r =
+            build_tail (Mina_stdlib.Nonempty_list.init fst_el rest)
+          in
+          Tree.Node (h, tail_l, tail_r)
+      | Node (h, l, r), `Left _ :: rest ->
+          Tree.Node (h, traverse_through_nodes (l, rest), r)
+      | Node (h, l, r), `Right _ :: rest ->
+          Tree.Node (h, l, traverse_through_nodes (r, rest))
+      | Node _, [] ->
+          failwith "path is shorter than a tree's branch"
     in
-    match (hash_node, Mina_stdlib.Nonempty_list.of_list_opt rest) with
-    | `Account _, None ->
-        tree0
-    | `Hash _, None ->
-        build_to_top (Tree.Account account) hash_to_top_path
-    | `Hash h, Some hash_to_bottom_path ->
-        let tail_l, tail_r = build_tail hash_to_bottom_path in
-        build_to_top (Tree.Node (h, tail_l, tail_r)) hash_to_top_path
-    | `Account _, Some _ ->
-        failwith "path is longer than a tree's branch"
+    traverse_through_nodes (tree0, List.rev path0)
 
   let add_path (t : t) path account_id account =
     let index =
