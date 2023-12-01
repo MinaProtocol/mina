@@ -50,7 +50,8 @@ module "kubernetes_testnet" {
   agent_send_every_mins = var.agent_send_every_mins
 
   additional_peers = [for peer in local.static_peers : peer.full_peer]
-  runtime_config   = var.use_embedded_runtime_config ? "" : data.local_file.genesis_ledger.content
+  runtime_config   = var.use_embedded_runtime_config ? "" : ""
+  # runtime_config   = var.use_embedded_runtime_config ? "" : data.local_file.genesis_ledger.content
   
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
