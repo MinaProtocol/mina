@@ -271,9 +271,9 @@ module Ledger_inner = struct
 
   let packed t = Any_ledger.cast (module Mask.Attached) t
 
-  let register_mask t =
+  let register_mask t mask =
     let accumulated = Mask.Attached.to_accumulated t in
-    Maskable.register_mask ~accumulated (packed t)
+    Maskable.register_mask ~accumulated (packed t) mask
 
   let unsafe_preload_accounts_from_parent =
     Maskable.unsafe_preload_accounts_from_parent
