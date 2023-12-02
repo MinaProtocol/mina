@@ -156,9 +156,11 @@ let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
   in
   let mask_handler ledger =
     if no_masks then Fn.const ledger
-    else
-      Fn.compose (Ledger.register_mask ledger)
-      @@ Ledger.Mask.create ~depth:constraint_constants.ledger_depth
+    else fun () ->
+      let mask =
+        Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()
+      in
+      Ledger.register_mask ledger mask
   in
   let drop_old_ledger ledger =
     if not no_masks then (
