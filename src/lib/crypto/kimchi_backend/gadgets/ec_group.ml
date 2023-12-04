@@ -205,8 +205,9 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Right input (slope) equal to left input (already checked)
    *           Result (s^2) bound check already tracked by Foreign_field.mul.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
-    (slope0, slope1, slope2) ;
+  Foreign_field.(
+    External_checks.append_bound_check external_checks
+    @@ Element.Standard.of_limbs (slope0, slope1, slope2)) ;
 
   (*
    * Constrain result x-coordinate computation: x = s^2 - Lx - Rx with length 2 chain
@@ -216,7 +217,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   let slope_squared_minus_x =
     Foreign_field.sub
       (module Circuit)
-      ~full:false slope_squared result_x curve.modulus
+      external_checks slope_squared result_x curve.modulus
   in
 
   (* Bounds 2: Left input (s^2) bound check covered by (Bounds 1).
@@ -228,7 +229,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   let expected_right_x =
     Foreign_field.sub
       (module Circuit)
-      ~full:false slope_squared_minus_x left_x curve.modulus
+      external_checks slope_squared_minus_x left_x curve.modulus
   in
 
   (* Bounds 3: Left input (sΔx) is chained (no bound check required).
@@ -247,14 +248,13 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   let right_delta =
     Foreign_field.sub
       (module Circuit)
-      ~full:false expected_right_x result_x curve.modulus
+      external_checks expected_right_x result_x curve.modulus
   in
   (* Bounds 4: Left input (Rx) is chained (no bound check required).
    *           Right input (x) is gadget output (checked by caller).
    *           Addition chain result (right_delta) bound check added below.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
-  @@ Foreign_field.Element.Standard.to_limbs right_delta ;
+  Foreign_field.External_checks.append_bound_check external_checks right_delta ;
 
   (* C5: RxΔ * s = RxΔs *)
   let right_delta_s =
@@ -275,13 +275,14 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* C6:  Rx - Lx = Δx  *)
   let delta_x =
-    Foreign_field.sub (module Circuit) ~full:false right_x left_x curve.modulus
+    Foreign_field.sub
+      (module Circuit)
+      external_checks right_x left_x curve.modulus
   in
   (* Bounds 6: Inputs (Rx and Lx) are gadget inputs (checked by caller).
    *           Addition chain result (delta_x) bound check below.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
-  @@ Foreign_field.Element.Standard.to_limbs delta_x ;
+  Foreign_field.External_checks.append_bound_check external_checks delta_x ;
 
   (* C7: Δx * s = Δxs *)
   let delta_x_s =
@@ -303,7 +304,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   let expected_right_y =
     Foreign_field.add
       (module Circuit)
-      ~full:false delta_x_s left_y curve.modulus
+      external_checks delta_x_s left_y curve.modulus
   in
 
   (* Bounds 8: Left input (delta_x_s) check is tracked by (Bounds 7).
@@ -323,14 +324,14 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* C9: Ry + y = RxΔs *)
   let expected_right_delta_s =
-    Foreign_field.add ~full:false
+    Foreign_field.add
       (module Circuit)
-      expected_right_y result_y curve.modulus
+      external_checks expected_right_y result_y curve.modulus
   in
   (* Result row *)
   Foreign_field.result_row
     (module Circuit)
-    ~label:"Ec_group.add_expected_right_delta_s" expected_right_delta_s ;
+    ~label:"Ec_group.add_expected_right_delta_s" expected_right_delta_s None ;
   (* Bounds 9: Left input (Ry) check is chained (no check required).
    *           Right input (y) check value is gadget output (checked by caller).
    *           Addition chain result (expected_right_delta_s) check already covered by (Bounds 5).
@@ -468,8 +469,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Right input (slope) is equal to left input (no check required).
    *           Result (slope_squared) check already tracked by Foreign_field.mul.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
-    (slope0, slope1, slope2) ;
+  Foreign_field.(External_checks.append_bound_check external_checks slope) ;
 
   (* C2: Constrain result x-coordinate computation: x = s^2 - 2 * Px with length 2 chain
    *     with s^2 - x = 2 * Px
@@ -478,7 +478,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
     (* s^2 - x = 2Px *)
     Foreign_field.sub
       (module Circuit)
-      ~full:false slope_squared result_x curve.modulus
+      external_checks slope_squared result_x curve.modulus
   in
 
   (* Bounds 2: Left input (s^2) check covered by (Bounds 1).
@@ -490,7 +490,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
   let expected_point_x =
     Foreign_field.sub
       (module Circuit)
-      ~full:false point_x2 point_x curve.modulus
+      external_checks point_x2 point_x curve.modulus
   in
   (* Bounds 3: Left input (2Px) is chained (no check required).
    *           Right input (Px) is gadget input (checked by caller).
@@ -509,14 +509,13 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
   let delta_x =
     Foreign_field.sub
       (module Circuit)
-      ~full:false expected_point_x result_x curve.modulus
+      external_checks expected_point_x result_x curve.modulus
   in
   (* Bounds 4: Left input (Px) is chained (no check required).
    *           Right input (x) check value is gadget output (checked by caller).
    *           Addition chain result (delta_x) bound check added below.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
-  @@ Foreign_field.Element.Standard.to_limbs delta_x ;
+  Foreign_field.External_checks.append_bound_check external_checks delta_x ;
 
   (* C5: Δx * s = Δxs *)
   let delta_xs =
@@ -539,7 +538,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
   let expected_point_y =
     Foreign_field.sub
       (module Circuit)
-      ~full:false delta_xs result_y curve.modulus
+      external_checks delta_xs result_y curve.modulus
   in
   (* Bounds 6: Left input (delta_xs) checked by (Bound 5).
    *           Right input is gadget output (checked by caller).
@@ -552,7 +551,9 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* C7: Py + Py = 2Py *)
   let point_y2 =
-    Foreign_field.add (module Circuit) ~full:false point_y point_y curve.modulus
+    Foreign_field.add
+      (module Circuit)
+      external_checks point_y point_y curve.modulus
   in
 
   (* Bounds 7: Left input (Py) is gadget input (checked by caller).
@@ -570,8 +571,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Right input (slope) already checked by (Bound 1).
    *           Result (2Pys) bound check already tracked by Foreign_field.mul.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
-  @@ Foreign_field.Element.Standard.to_limbs point_y2 ;
+  Foreign_field.External_checks.append_bound_check external_checks point_y2 ;
 
   (*
    * Constrain rest slope computation s = (3 * Px^2 + a)/(2 * Py)
@@ -581,14 +581,13 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
   let point_x3 =
     Foreign_field.add
       (module Circuit)
-      ~full:false point_x2 point_x curve.modulus
+      external_checks point_x2 point_x curve.modulus
   in
   (* Bounds 9: Left input (point_x2) bound check added below.
    *           Right input (Px) is gadget input (checked by caller).
    *           Result (3Px) is chained (no check required).
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
-  @@ Foreign_field.Element.Standard.to_limbs point_x2 ;
+  Foreign_field.External_checks.append_bound_check external_checks point_x2 ;
 
   (* Check if the elliptic curve a parameter requires more constraints
    * to be added in order to add final a (e.g. 3Px^2 + a where a != 0).
@@ -598,7 +597,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
     let point_x3_squared =
       Foreign_field.mul
         (module Circuit)
-        external_checks ~bound_check_result:false point_x3 point_x curve.modulus
+        external_checks point_x3 point_x curve.modulus
     in
 
     (* Bounds 10a: Left input (point_x3) bound check added below.
@@ -608,8 +607,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
      *)
 
     (* Add point_x3 bound check (Bounds 101) *)
-    Foreign_field.External_checks.append_bound_check external_checks
-    @@ Foreign_field.Element.Standard.to_limbs point_x3 ;
+    Foreign_field.External_checks.append_bound_check external_checks point_x3 ;
 
     (* Copy point_x3_squared to point_y2s *)
     Foreign_field.Element.Standard.assert_equal
@@ -629,8 +627,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
      *)
 
     (* Add point_x3 bound check (Bounds 10b) *)
-    Foreign_field.External_checks.append_bound_check external_checks
-    @@ Foreign_field.Element.Standard.to_limbs point_x3 ;
+    Foreign_field.External_checks.append_bound_check external_checks point_x3 ;
 
     (* Add curve constant a and constrain rest slope computation
      *   with s = (3 * Px^2 + a)/(2 * Py)
@@ -640,7 +637,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
     let point_x3_squared_plus_a =
       Foreign_field.add
         (module Circuit)
-        ~full:false point_x3_squared curve.a curve.modulus
+        external_checks point_x3_squared curve.a curve.modulus
     in
     (* Bounds 11: Left input (point_x3_squared) already tracked by (Bounds 10b).
        *          Right input (curve.a) is public constant.
@@ -650,7 +647,8 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
     (* Result row *)
     Foreign_field.result_row
       (module Circuit)
-      ~label:"Ec_group.double_point_x3_squared_plus_a" point_x3_squared_plus_a ;
+      ~label:"Ec_group.double_point_x3_squared_plus_a" point_x3_squared_plus_a
+      None ;
 
     (* Copy point_x3_squared_plus_a to point_y2s *)
     Foreign_field.Element.Standard.assert_equal
@@ -676,9 +674,14 @@ let negate (type f) (module Circuit : Snark_intf.Run with type field = f)
       Bignum_bigint.zero
   in
   (* C1: Constrain computation of the negated point *)
+  let external_checks_empty =
+    Foreign_field.External_checks.create (module Circuit)
+  in
   let neg_y =
     (* neg_y = 0 - y *)
-    Foreign_field.sub (module Circuit) ~full:false zero y curve.modulus
+    Foreign_field.sub
+      (module Circuit)
+      external_checks_empty zero y curve.modulus
   in
 
   (* Bounds 1: Left input is public constant
@@ -792,7 +795,7 @@ let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
       let x_squared_a =
         Foreign_field.add
           (module Circuit)
-          ~full:false x_squared curve.a curve.modulus
+          external_checks x_squared curve.a curve.modulus
       in
       (* Bounds 2: Left input already checked by (Bounds 1)
        *           Right input public parameter (no check necessary)
@@ -800,7 +803,7 @@ let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
        *)
       (* Add x_squared_a bound check *)
       Foreign_field.External_checks.append_bound_check external_checks
-      @@ Foreign_field.Element.Standard.to_limbs x_squared_a ;
+        x_squared_a ;
       x_squared_a )
     else x_squared
   in
@@ -824,12 +827,12 @@ let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
       let x_cubed_ax_b =
         Foreign_field.add
           (module Circuit)
-          ~full:false x_cubed_ax curve.b curve.modulus
+          external_checks x_cubed_ax curve.b curve.modulus
       in
       (* Result row *)
       Foreign_field.result_row
         (module Circuit)
-        ~label:"Ec_group.is_on_curve_x_cubed_ax_b" x_cubed_ax_b ;
+        ~label:"Ec_group.is_on_curve_x_cubed_ax_b" x_cubed_ax_b None ;
 
       (* Bounds 4: Left input already checked by (Bounds 3)
        *           Right input public parameter (no check necessary)
@@ -838,7 +841,7 @@ let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
 
       (* Add x_cubed_ax_b bound check *)
       Foreign_field.External_checks.append_bound_check external_checks
-      @@ Foreign_field.Element.Standard.to_limbs x_cubed_ax_b ;
+        x_cubed_ax_b ;
 
       x_cubed_ax_b )
     else x_cubed_ax
@@ -875,8 +878,7 @@ let check_ia (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Result row *)
   Foreign_field.result_row
     (module Circuit)
-    ~label:"Ec_group.check_ia_neg_init_y"
-  @@ Affine.y neg_init_acc ;
+    ~label:"Ec_group.check_ia_neg_init_y" (Affine.y neg_init_acc) None ;
 
   (* Bounds 1: Input is public constant
    *           Result is part of input (checked by caller)
@@ -996,9 +998,9 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
          *   Result bounds check below.
          *)
         Foreign_field.External_checks.append_bound_check external_checks
-        @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x sum ;
+        @@ Affine.x sum ;
         Foreign_field.External_checks.append_bound_check external_checks
-        @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y sum ;
+        @@ Affine.y sum ;
 
         (* Group double: double_base = base + base *)
         let double_base =
@@ -1013,9 +1015,9 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
                *   Result bounds check below.
                *)
               Foreign_field.External_checks.append_bound_check external_checks
-              @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x double_base ;
+              @@ Affine.x double_base ;
               Foreign_field.External_checks.append_bound_check external_checks
-              @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y double_base ;
+              @@ Affine.y double_base ;
               double_base
           | Some doubles ->
               (* When the base point is public (e.g. the secp256k1 generator) we can
@@ -1058,20 +1060,21 @@ let check_subgroup (type f)
    *           Result bound check below
    *)
   Foreign_field.External_checks.append_bound_check external_checks
-  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x n_minus_one_point ;
+  @@ Affine.x n_minus_one_point ;
   Foreign_field.External_checks.append_bound_check external_checks
-  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y n_minus_one_point ;
+  @@ Affine.y n_minus_one_point ;
 
   (* C2: Compute -P *)
   let minus_point = negate (module Circuit) curve point in
   (* Result row *)
-  Foreign_field.result_row (module Circuit) ~label:"minus_point_y"
-  @@ Affine.y minus_point ;
+  Foreign_field.result_row
+    (module Circuit)
+    ~label:"minus_point_y" (Affine.y minus_point) None ;
   (* Bounds 2: Input is gadget input (checked by caller)
    *           Result bound check below
    *)
   Foreign_field.External_checks.append_bound_check external_checks
-  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y minus_point ;
+  @@ Affine.y minus_point ;
 
   (* C3: Assert (n - 1)P = -P *)
   Affine.assert_equal (module Circuit) n_minus_one_point minus_point
@@ -1662,26 +1665,26 @@ let%test_unit "Ec_group.add_full" =
             (* Add left_input to external checks *)
             Foreign_field.(
               External_checks.append_bound_check external_checks
-              @@ Element.Standard.to_limbs @@ Affine.x left_input) ;
+              @@ Affine.x left_input) ;
             Foreign_field.(
               External_checks.append_bound_check external_checks
-              @@ Element.Standard.to_limbs @@ Affine.y left_input) ;
+              @@ Affine.y left_input) ;
 
             (* Add right_input to external checks *)
             Foreign_field.(
               External_checks.append_bound_check external_checks
-              @@ Element.Standard.to_limbs @@ Affine.x right_input) ;
+              @@ Affine.x right_input) ;
             Foreign_field.(
               External_checks.append_bound_check external_checks
-              @@ Element.Standard.to_limbs @@ Affine.y right_input) ;
+              @@ Affine.y right_input) ;
 
             (* Add result to external checks *)
             Foreign_field.(
               External_checks.append_bound_check external_checks
-              @@ Element.Standard.to_limbs @@ Affine.x result) ;
+              @@ Affine.x result) ;
             Foreign_field.(
               External_checks.append_bound_check external_checks
-              @@ Element.Standard.to_limbs @@ Affine.y result) ;
+              @@ Affine.y result) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -2166,18 +2169,18 @@ let%test_unit "Ec_group.double_full" =
             (* Add input point to external checks *)
             Foreign_field.(
               External_checks.append_bound_check external_checks
-              @@ Element.Standard.to_limbs @@ Affine.x point) ;
+              @@ Affine.x point) ;
             Foreign_field.(
               External_checks.append_bound_check external_checks
-              @@ Element.Standard.to_limbs @@ Affine.y point) ;
+              @@ Affine.y point) ;
 
             (* Add result to external checks *)
             Foreign_field.(
               External_checks.append_bound_check external_checks
-              @@ Element.Standard.to_limbs @@ Affine.x result) ;
+              @@ Affine.x result) ;
             Foreign_field.(
               External_checks.append_bound_check external_checks
-              @@ Element.Standard.to_limbs @@ Affine.y result) ;
+              @@ Affine.y result) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -3565,7 +3568,7 @@ let%test_unit "Ec_group.scalar_mul_properties" =
             Foreign_field.result_row
               (module Runner.Impl)
               ~label:"negation_property_check"
-            @@ Affine.y negated_a_result ;
+            (Affine.y negated_a_result) None ;
 
             (* Assert [-a]P = -(aP) *)
             Affine.assert_equal
