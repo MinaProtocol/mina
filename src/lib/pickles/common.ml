@@ -167,7 +167,7 @@ module Ipa = struct
           (Backend.Tock.Keypair.load_urs ())
           (Pickles_types.Vector.to_array (compute_challenges chals))
       in
-      comm.unshifted.(0) |> finite_exn
+      comm.elems.(0) |> finite_exn
   end
 
   module Step = struct
@@ -186,7 +186,7 @@ module Ipa = struct
           (Backend.Tick.Keypair.load_urs ())
           (Pickles_types.Vector.to_array (compute_challenges chals))
       in
-      comm.unshifted.(0) |> finite_exn
+      comm.elems.(0) |> finite_exn
 
     let accumulator_check comm_chals =
       let chals =

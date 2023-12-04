@@ -57,10 +57,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
                     .iter()
                     .map(Into::<Fq>::into)
                     .collect();
-                let comm = PolyComm::<Pallas> {
-                    unshifted: vec![sg],
-                    shifted: None,
-                };
+                let comm = PolyComm::<Pallas> { elems: vec![sg] };
                 RecursionChallenge { chals, comm }
             })
             .collect()
@@ -161,8 +158,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProofWithPublic<CamlGPallas, Cam
     fn comm() -> PolyComm<Pallas> {
         let g = Pallas::prime_subgroup_generator();
         PolyComm {
-            shifted: Some(g),
-            unshifted: vec![g, g, g],
+            elems: vec![g, g, g],
         }
     }
 

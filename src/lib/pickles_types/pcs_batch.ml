@@ -31,8 +31,8 @@ let combine_commitments _t ~scale ~add ~xi (type n)
   | init :: without_degree_bound ->
       let polys =
         Vector.to_list without_degree_bound
-        @ List.concat_map (Vector.to_list with_degree_bound)
-            ~f:(fun (unshifted, shifted) -> [ unshifted; shifted ])
+        @ List.concat_map (Vector.to_list with_degree_bound) ~f:(fun elems ->
+              [ elems ] )
       in
       List.fold_left polys ~init ~f:(fun acc p -> add p (scale acc xi))
 

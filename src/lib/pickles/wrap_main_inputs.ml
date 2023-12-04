@@ -93,7 +93,7 @@ let%test_unit "sponge" =
                (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
                   (Backend.Tick.Keypair.load_urs ())
                   domain_size i )
-                 .unshifted.(0)
+                 .elems.(0)
                |> Common.finite_exn ) )
 
      let _domain = Import.Domain.Pow_2_roots_of_unity 7

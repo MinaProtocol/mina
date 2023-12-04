@@ -93,8 +93,7 @@ module Verifier_index_json = struct
     | Finite of ('f * 'f)
   [@@deriving yojson]
 
-  type 'g polycomm = 'g Kimchi_types.poly_comm =
-    { unshifted : 'g array; shifted : 'g option }
+  type 'g polycomm = 'g Kimchi_types.poly_comm = { elems : 'g array }
   [@@deriving yojson]
 
   let to_yojson fp fq =
@@ -175,9 +174,7 @@ module Stable = struct
         ; srs
         ; evals =
             (let g (x, y) =
-               { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
-               ; shifted = None
-               }
+               { Kimchi_types.elems = [| Kimchi_types.Finite (x, y) |] }
              in
              { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
              ; coefficients_comm =

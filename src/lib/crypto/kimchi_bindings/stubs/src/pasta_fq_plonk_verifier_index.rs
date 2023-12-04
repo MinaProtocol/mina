@@ -110,8 +110,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas, OpeningProof<
         };
 
         // TODO dummy_lookup_value ?
-        let (linearization, powers_of_alpha) =
-            expr_linearization(Some(&feature_flags), true);
+        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
         VerifierIndex::<Pallas, OpeningProof<Pallas>> {
             domain,
@@ -243,8 +242,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
     fn comm() -> CamlPolyComm<CamlGPallas> {
         let g: CamlGPallas = Pallas::prime_subgroup_generator().into();
         CamlPolyComm {
-            shifted: Some(g),
-            unshifted: vec![g, g, g],
+            elems: vec![g, g, g],
         }
     }
     fn vec_comm(num: usize) -> Vec<CamlPolyComm<CamlGPallas>> {

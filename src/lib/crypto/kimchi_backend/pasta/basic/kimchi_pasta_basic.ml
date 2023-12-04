@@ -121,13 +121,11 @@ module Fq_poly_comm = Kimchi_backend_common.Poly_comm.Make (struct
   module Backend = struct
     type t = Curve.Affine.Backend.t Kimchi_types.poly_comm
 
-    let shifted ({ shifted; _ } : t) = shifted
-
-    let unshifted ({ unshifted; _ } : t) = unshifted
+    let elems ({ elems; _ } : t) = elems
 
     let make :
         Curve.Affine.Backend.t array -> Curve.Affine.Backend.t option -> t =
-     fun unshifted shifted : t -> { shifted; unshifted }
+     fun elems : t -> { elems }
   end
 end)
 
@@ -138,13 +136,11 @@ module Fp_poly_comm = Kimchi_backend_common.Poly_comm.Make (struct
   module Backend = struct
     type t = Curve.Affine.Backend.t Kimchi_types.poly_comm
 
-    let shifted ({ shifted; _ } : t) = shifted
-
-    let unshifted ({ unshifted; _ } : t) = unshifted
+    let elems ({ elems; _ } : t) = elems
 
     let make :
         Curve.Affine.Backend.t array -> Curve.Affine.Backend.t option -> t =
-     fun unshifted shifted : t -> { shifted; unshifted }
+     fun elems : t -> { elems }
   end
 end)
 

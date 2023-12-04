@@ -318,8 +318,7 @@ struct
     Vector.map domains ~f:(fun d ->
         let d = Int.pow 2 (Domain.log2_size d.h) in
         let chunks =
-          (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
-            .unshifted
+          (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i).elems
         in
         Array.map chunks ~f:(function
           | Finite g ->
@@ -342,8 +341,7 @@ struct
     Vector.map domains ~f:(fun d ->
         let d = Int.pow 2 (Domain.log2_size d.h) in
         let chunks =
-          (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
-            .unshifted
+          (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i).elems
         in
         Array.map chunks ~f:(function
           | Finite g ->
@@ -375,8 +373,7 @@ struct
         let base_and_correction (h : Domain.t) =
           let d = Int.pow 2 (Domain.log2_size h) in
           let chunks =
-            (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
-              .unshifted
+            (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i).elems
           in
           Array.map chunks ~f:(function
             | Finite g ->

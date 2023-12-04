@@ -84,7 +84,7 @@ module Json = struct
   [@@deriving to_yojson]
 
   type 'caml_g poly_comm = 'caml_g Kimchi_types.poly_comm =
-    { unshifted : 'caml_g array; shifted : 'caml_g option }
+    { elems : 'caml_g array }
   [@@deriving to_yojson]
 
   type lookup_patterns = Kimchi_types.lookup_patterns =

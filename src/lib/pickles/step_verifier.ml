@@ -244,10 +244,8 @@ struct
                 ~reduce_without_degree_bound:Array.to_list
                 ~reduce_with_degree_bound:(fun { Plonk_types.Poly_comm
                                                  .With_degree_bound
-                                                 .unshifted
-                                               ; shifted
-                                               } ->
-                  Array.to_list unshifted @ [ shifted ] )
+                                                 .elems
+                                               } -> Array.to_list elems @ [] )
                 ~scale_and_add:(fun ~(acc :
                                        [ `Maybe_finite of
                                          Boolean.var * Inner_curve.t
@@ -287,11 +285,9 @@ struct
                 (Vector.map with_degree_bound
                    ~f:
                      (let open Plonk_types.Poly_comm.With_degree_bound in
-                     fun { shifted; unshifted } ->
+                     fun { elems } ->
                        let f x = `Maybe_finite x in
-                       { unshifted = Array.map ~f unshifted
-                       ; shifted = f shifted
-                       }) ) )
+                       { elems = Array.map ~f elems }) ) )
           |> function `Finite x -> x | `Maybe_finite _ -> assert false
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
@@ -347,7 +343,7 @@ struct
   let lagrange_commitment ~domain srs i =
     let d = Int.pow 2 (Domain.log2_size domain) in
     match[@warning "-4"]
-      (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs d i).unshifted
+      (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs d i).elems
     with
     | [| Finite g |] ->
         Inner_curve.Constant.of_affine g

@@ -29,9 +29,7 @@ module type Inputs_intf = sig
     val make :
       Curve.Affine.Backend.t array -> Curve.Affine.Backend.t option -> t
 
-    val shifted : t -> Curve.Affine.Backend.t option
-
-    val unshifted : t -> Curve.Affine.Backend.t array
+    val elems : t -> Curve.Affine.Backend.t array
   end
 end
 
@@ -70,13 +68,12 @@ module Make (Inputs : Inputs_intf) = struct
     | Finite (x, y) ->
         Finite (x, y)
 
+  (* TODO @volhovm remove *)
   let with_degree_bound_to_backend
       (commitment :
         (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t
         Pickles_types.Plonk_types.Poly_comm.With_degree_bound.t ) : Backend.t =
-    Backend.make
-      (Array.map ~f:or_infinity_to_backend commitment.unshifted)
-      (Some (or_infinity_to_backend commitment.shifted))
+    Backend.make (Array.map ~f:or_infinity_to_backend commitment.elems)
 
   let without_degree_bound_to_backend
       (commitment :
@@ -94,21 +91,10 @@ module Make (Inputs : Inputs_intf) = struct
     | `Without_degree_bound t ->
         without_degree_bound_to_backend t
 
-  let of_backend' (t : Backend.t) =
-    ( Backend.unshifted t
-    , Option.map (Backend.shifted t) ~f:Curve.Affine.of_backend )
+  let of_backend' (t : Backend.t) = Backend.elems t
 
-  let of_backend_with_degree_bound (t : Backend.t) : t =
-    let open Pickles_types.Plonk_types.Poly_comm in
-    match Backend.shifted t with
-    | None ->
-        assert false
-    | Some shifted ->
-        let shifted = or_infinity_of_backend shifted in
-        let unshifted =
-          Backend.unshifted t |> Array.map ~f:or_infinity_of_backend
-        in
-        `With_degree_bound { unshifted; shifted }
+  (* TODO @volhovm remove *)
+  let of_backend_with_degree_bound (t : Backend.t) : t = assert false
 
   (*
      type 'a t =
@@ -122,17 +108,13 @@ module Make (Inputs : Inputs_intf) = struct
 
   let of_backend_without_degree_bound (t : Backend.t) =
     let open Pickles_types.Plonk_types.Poly_comm in
-    let unshifted = Backend.unshifted t in
-    match Backend.shifted t with
-    | None ->
-        `Without_degree_bound
-          (Array.map unshifted ~f:(function
-            | Infinity ->
-                failwith
-                  "Pickles cannot handle point at infinity. Commitments must \
-                   be representable in affine coordinates"
-            | Finite (x, y) ->
-                (x, y) ) )
-    | _ ->
-        assert false
+    let elems = Backend.elems t in
+    `Without_degree_bound
+      (Array.map elems ~f:(function
+        | Infinity ->
+            failwith
+              "Pickles cannot handle point at infinity. Commitments must be \
+               representable in affine coordinates"
+        | Finite (x, y) ->
+            (x, y) ) )
 end

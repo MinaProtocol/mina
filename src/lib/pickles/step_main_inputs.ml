@@ -98,7 +98,7 @@ end
                     (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
                        (Backend.Tock.Keypair.load_urs ())
                        domain_size i )
-                      .unshifted
+                      .elems
                   in
                   assert (Array.length v = 1) ;
                   v.(0) |> Common.finite_exn ) ) )

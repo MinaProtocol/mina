@@ -111,8 +111,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<V
         };
 
         // TODO dummy_lookup_value ?
-        let (linearization, powers_of_alpha) =
-            expr_linearization(Some(&feature_flags), true);
+        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
         VerifierIndex::<Vesta, OpeningProof<Vesta>> {
             domain,
@@ -244,8 +243,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
     fn comm() -> CamlPolyComm<CamlGVesta> {
         let g: CamlGVesta = Vesta::prime_subgroup_generator().into();
         CamlPolyComm {
-            shifted: Some(g),
-            unshifted: vec![g, g, g],
+            elems: vec![g, g, g],
         }
     }
     fn vec_comm(num: usize) -> Vec<CamlPolyComm<CamlGVesta>> {

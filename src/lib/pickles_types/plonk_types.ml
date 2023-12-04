@@ -1289,10 +1289,7 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g_opt t =
-          { unshifted : 'g_opt Bounded_types.ArrayN16.Stable.V1.t
-          ; shifted : 'g_opt
-          }
+        type 'g_opt t = { elems : 'g_opt Bounded_types.ArrayN16.Stable.V1.t }
         [@@deriving sexp, compare, yojson, hlist, hash, equal]
       end
     end]

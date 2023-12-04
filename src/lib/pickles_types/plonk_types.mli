@@ -104,8 +104,7 @@ module Poly_comm : sig
   end
 
   module With_degree_bound : sig
-    type 'a t =
-      { unshifted : 'a Bounded_types.ArrayN16.Stable.V1.t; shifted : 'a }
+    type 'a t = { elems : 'a Bounded_types.ArrayN16.Stable.V1.t }
   end
 end
 

@@ -39,10 +39,9 @@ Variable length vector of type `T`
 
 ### `PolyComm<T>`
 
-| Field       | Type        | Description |
-| ----------- | ----------- | ----------- |
-| `unshifted` | `Vector<T>` |             |
-| `shifted`   | `Option<T>` |             |
+| Field   | Type        | Description |
+| ------- | ----------- | ----------- |
+| `elems` | `Vector<T>` |             |
 
 ### `CamlPlonkDomain<Fr>`
 
