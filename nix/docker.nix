@@ -92,7 +92,7 @@ in {
     ];
     config = {
       cmd = [ "/bin/delegation-verify" ];
-      Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" "CQLSH=${cqlsh-expansion}/bin/cqlsh-expansion" "USER_SITE=${cqlsh-expansion}/${python3Packages.python.sitePackages}" ];
+      Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" "CQLSH=${cqlsh-expansion}/bin/cqlsh-expansion" "PYTHONUSERBASE=${cqlsh-expansion}" ];
     };
   };
 
