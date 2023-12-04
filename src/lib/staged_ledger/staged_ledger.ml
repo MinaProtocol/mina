@@ -1983,15 +1983,54 @@ module T = struct
         : Ledger.unattached_mask ) ;
     r
 
-  let try_applying_txn (t : t) ?zkapp_cmd_limit ~logger ~validate
-      (valid_seq, invalid_txns, zkapp_count, total_count) txn =
-    let open Continue_or_stop in
-    if total_count < Scan_state.free_space t.scan_state then
+  module Application_state = struct
+    type txn =
+      ( Signed_command.With_valid_signature.t
+      , Zkapp_command.Valid.t )
+      User_command.t_
+
+    type t =
+      { valid_seq : txn Sequence.t
+      ; invalid : (txn * Error.t) list
+      ; skipped_by_fee_payer : txn list Account_id.Map.t
+      ; zkapp_space_remaining : int option
+      ; total_space_remaining : int
+      }
+
+    let init ~total_limit ?zkapp_limit =
+      { valid_seq = Sequence.empty
+      ; invalid = []
+      ; skipped_by_fee_payer = Account_id.Map.empty
+      ; zkapp_space_remaining = zkapp_limit
+      ; total_space_remaining = total_limit
+      }
+
+    let txn_key = function
+      | User_command.Zkapp_command cmd ->
+          Zkapp_command.(Valid.forget cmd |> fee_payer)
+      | User_command.Signed_command cmd ->
+          Signed_command.(forget_check cmd |> fee_payer)
+
+    let add_skipped_txn t (txn : txn) =
+      Account_id.Map.update t.skipped_by_fee_payer (txn_key txn)
+        ~f:(Option.value_map ~default:[ txn ] ~f:(List.cons txn))
+
+    let dependency_skipped txn t =
+      Account_id.Map.find t.skipped_by_fee_payer (txn_key txn) |> Option.is_some
+
+    let try_applying_txn ~logger ~validate (state : t) (txn : txn) =
+      let open Continue_or_stop in
       match txn with
+      | _ when state.total_space_remaining < 1 ->
+          Stop (state.valid_seq, state.invalid)
       | User_command.Zkapp_command _
-        when Option.value_map ~default:false ~f:(( >= ) zkapp_count)
-               zkapp_cmd_limit ->
-          Continue (valid_seq, invalid_txns, zkapp_count, total_count)
+        when Option.value_map ~default:false ~f:(( > ) 1)
+               state.zkapp_space_remaining ->
+          Continue
+            { state with skipped_by_fee_payer = add_skipped_txn state txn }
+      | _ when dependency_skipped txn state ->
+          Continue
+            { state with skipped_by_fee_payer = add_skipped_txn state txn }
       | _ -> (
           match
             O1trace.sync_thread "validate_transaction_against_staged_ledger"
@@ -2006,22 +2045,21 @@ module T = struct
                   ]
                 "Staged_ledger_diff creation: Skipping user command: \
                  $user_command due to error: $error" ;
-              Continue
-                (valid_seq, (txn, e) :: invalid_txns, zkapp_count, total_count)
+              Continue { state with invalid = (txn, e) :: state.invalid }
           | Ok _txn_partially_applied ->
-              let valid_seq' =
-                Sequence.append (Sequence.singleton txn) valid_seq
+              let valid_seq =
+                Sequence.append (Sequence.singleton txn) state.valid_seq
               in
-              let zkapp_count' =
-                match txn with
-                | Zkapp_command _ ->
-                    zkapp_count + 1
-                | Signed_command _ ->
-                    zkapp_count
+              let zkapp_space_remaining =
+                Option.map state.zkapp_space_remaining ~f:(fun limit ->
+                    match txn with
+                    | Zkapp_command _ ->
+                        limit - 1
+                    | Signed_command _ ->
+                        limit )
               in
-              Continue (valid_seq', invalid_txns, zkapp_count', total_count + 1)
-          )
-    else Stop (valid_seq, invalid_txns)
+              Continue { state with valid_seq; zkapp_space_remaining } )
+  end
 
   let create_diff
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -2136,9 +2174,11 @@ module T = struct
             (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
             let valid_on_this_ledger, invalid_on_this_ledger =
               Sequence.fold_until transactions_by_fee
-                ~init:(Sequence.empty, [], 0, 0)
-                ~f:(try_applying_txn t ?zkapp_cmd_limit ~validate ~logger)
-                ~finish:(fun (valid, invalid, _, _) -> (valid, invalid))
+                ~init:
+                  (Application_state.init ?zkapp_limit:zkapp_cmd_limit
+                     ~total_limit:(Scan_state.free_space t.scan_state) )
+                ~f:(Application_state.try_applying_txn ~validate ~logger)
+                ~finish:(fun state -> (state.valid_seq, state.invalid))
             in
             [%log internal] "Generate_staged_ledger_diff" ;
             let diff, log =
