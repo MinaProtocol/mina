@@ -1,7 +1,7 @@
 { lib, dockerTools, buildEnv, ocamlPackages_mina, runCommand, dumb-init
 , coreutils, bashInteractive, python3, libp2p_helper, procps, postgresql, curl
 , jq, stdenv, rsync, bash, gnutar, gzip, currentTime, flockenzeit, tzdata
-, cqlsh-expansion, python3Packages, awscli, xorg }:
+, cqlsh-expansion, python3Packages, awscli }:
 let
 
   created = flockenzeit.lib.ISO-8601 currentTime;
@@ -126,11 +126,7 @@ in {
     ];
     config = {
       cmd = [ "bash" ];
-      Env = [
-        "TZ=Etc/UTC"
-        "TZDIR=${tzdata}/share/zoneinfo"
-        "CQLSH=${cqlsh-expansion}/bin/cqlsh-expansion"
-      ];
+      Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" "CQLSH=${cqlsh-expansion}/bin/cqlsh-expansion" "PYTHONUSERBASE=${cqlsh-expansion}" ];
     };
     
   };
