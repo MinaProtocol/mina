@@ -12,12 +12,14 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 let Command = ../../Command/Base.dhall
 let Size = ../../Command/Size.dhall
 let DockerImage = ../../Command/DockerImage.dhall
+let Profiles = ../../Constants/Profiles.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let spec = DockerImage.ReleaseSpec::{
     service="itn-orchestrator",
     step_key="itn-orchestrator-docker-image",
     network="berkeley",
-    deps = [ { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" } ]
+    deps = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Standard
 }
 
 in	
