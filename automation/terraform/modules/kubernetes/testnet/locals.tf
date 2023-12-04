@@ -28,6 +28,8 @@ locals {
     memRequest= var.mem_request
   }
 
+  bootstrap_vars = {}
+
   healthcheck_vars = {
     enabled             = var.healthcheck_enabled
     failureThreshold    = 60

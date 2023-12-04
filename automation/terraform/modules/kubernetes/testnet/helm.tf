@@ -1,4 +1,4 @@
-# Cluster-Local Seed Node
+
 
 resource "kubernetes_role_binding" "helm_release" {
   metadata {
@@ -19,6 +19,30 @@ resource "kubernetes_role_binding" "helm_release" {
   }
 }
 
+# Cluster-Local Bootstrap: Secrets Management and Operations
+
+resource "helm_release" "bootstrap" {
+  provider = helm.testnet_deploy
+  count    = 1
+
+  name       = "${var.testnet_name}-bootstrap"
+  repository = ""
+  chart      = "../../../../helm/bootstrap"
+  version    = "0.1.0"
+  namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+  values = [
+    yamlencode(local.bootstrap_vars)
+  ]
+  wait    = true
+  timeout = 600
+  depends_on = [
+    kubernetes_role_binding.helm_release,
+    null_resource.copying_keys_to_chart
+  ]
+}
+
+# Cluster-Local Seed Node
+
 resource "helm_release" "seeds" {
   provider = helm.testnet_deploy
   count    = length(local.seed_vars.seedConfigs) > 0 ? 1 : 0
@@ -34,7 +58,7 @@ resource "helm_release" "seeds" {
   wait    = false
   timeout = 600
   depends_on = [
-    kubernetes_role_binding.helm_release
+    helm_release.bootstrap
   ]
 }
 
@@ -102,7 +126,7 @@ resource "helm_release" "archive_node" {
   name       = "archive-${count.index + 1}"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
-  version    = "1.1.3"
+  version    = "1.1.7"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.archive_vars[count.index])
@@ -131,4 +155,3 @@ resource "helm_release" "watchdog" {
   timeout    = 600
   depends_on = [helm_release.seeds]
 }
-

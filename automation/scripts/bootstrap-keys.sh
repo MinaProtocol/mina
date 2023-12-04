@@ -23,11 +23,11 @@ if [ -z "$TESTNET_NAME" ]; then
 fi
 
 # Source keys directory
-BASEDIR="../terraform/testnets"
+BASEDIR="./terraform/testnets"
 SRC_DIR="$BASEDIR/$TESTNET_NAME/keys"
 
 # Target directory
-TARGET_DIR="../../helm/bootstrap/keys/"
+TARGET_DIR="../helm/bootstrap/keys/"
 
 # Check if source directory exists
 if [ ! -d "$SRC_DIR" ]; then
