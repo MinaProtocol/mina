@@ -1,0 +1,6 @@
+keys:
+  glob: "keys/*.pub"
+libP2pKeys:
+  glob: "keys/libp2p-keys/*.peerid"
+gcpKey:
+  path: "keys/gcloud-keyfile.json"
