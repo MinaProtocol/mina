@@ -39,14 +39,14 @@ variable "whale_count" {
   type = number
 
   description = "Number of online whales for the network to run"
-  default     = 1
+  default     = 2
 }
 
 variable "fish_count" {
   type = number
 
   description = "Number of online fish for the network to run"
-  default     = 1
+  default     = 0
 }
 
 variable "seed_count" {
