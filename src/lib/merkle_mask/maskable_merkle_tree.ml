@@ -161,8 +161,8 @@ module Make (Inputs : Inputs_intf) = struct
     List.iter
       (Hashtbl.find registered_masks uuid |> Option.value ~default:[])
       ~f:(fun child_mask ->
-        if f child_mask then
-          iter_descendants ~f (Mask.Attached.get_uuid child_mask) )
+        iter_descendants ~f (Mask.Attached.get_uuid child_mask) ;
+        f child_mask )
 
   let unregister_mask_error_msg ~uuid ~parent_uuid suffix =
     sprintf "Couldn't unregister mask with UUID %s from parent %s, %s"
@@ -212,10 +212,10 @@ module Make (Inputs : Inputs_intf) = struct
           (* You must not retain any references to children of the mask we're
              unregistering if you pass `Recursive, so this is only used in
              with_ephemeral_ledger. *)
-          iter_descendants uuid
-            ~f:
-              ( Fn.compose (Fn.const true)
-              @@ unregister_mask_exn_do ~trigger_signal:true ~loc ) ;
+          iter_descendants uuid ~f:(fun mask ->
+              ignore
+                ( unregister_mask_exn_do ~trigger_signal:true ~loc mask
+                  : Mask.unattached ) ) ;
           true
     in
     unregister_mask_exn_do ~trigger_signal ~loc mask
