@@ -14,9 +14,11 @@ val multi :
 
 (** compact multi-range-check gadget - checks
  *     - v0,v1,v2 \in [0, 2^88)
- *     - v01 = v0 + 2^88 * v1 *)
+ *     - v01 = v0 + 2^88 * v1 
+ *)
 val compact_multi :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
   -> 'f Snarky_backendless.Cvar.t (* v01 *)
   -> 'f Snarky_backendless.Cvar.t (* v2 *)
-  -> unit
+  -> 'f Snarky_backendless.Cvar.t * 'f Snarky_backendless.Cvar.t
+(* v0, v1 *)

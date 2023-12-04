@@ -162,6 +162,8 @@ type nonrec gate_type =
   | ForeignFieldMul
   | Xor16
   | Rot64
+  | KeccakRound
+  | KeccakSponge
 
 type nonrec lookup_pattern = Xor | Lookup | RangeCheck | ForeignFieldMul
 

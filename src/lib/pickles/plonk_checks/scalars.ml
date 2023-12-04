@@ -26,6 +26,8 @@ module Gate_type = struct
       | ForeignFieldMul
       | Xor16
       | Rot64
+      | KeccakRound
+      | KeccakSponge
     [@@deriving hash, eq, compare, sexp]
   end
 
