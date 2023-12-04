@@ -198,7 +198,8 @@ let main_foreign_field_mul () =
     (Raw { kind = Zero; values = [| fresh_int 0 |]; coeffs = [||] })
 
 (* Parameters *)
-let random_table_id = Random.State.int state 1_000
+(* Adding two to avoid conflicts with built-in XOR and RangeCheck *)
+let random_table_id = 2 + Random.State.int state 1_000
 
 let size = 1 + Random.State.int state 1_000
 
@@ -259,7 +260,8 @@ let lookups =
       let idx1 = Random.State.int state table_size in
       let idx2 = Random.State.int state table_size in
       let idx3 = Random.State.int state table_size in
-      ( table_id
+      (* Table ID shifted by 2, to avoid conflict with XOR and RangeCheck *)
+      ( 2 + table_id
       , (idx1, values.(idx1))
       , (idx2, values.(idx2))
       , (idx3, values.(idx3)) ) )
@@ -268,7 +270,9 @@ let main_fixed_lookup_tables_multiple_tables_multiple_lookups () =
   Array.iteri f_lt_data ~f:(fun table_id (indexes, values) ->
       add_plonk_constraint
         (AddFixedLookupTable
-           { id = Int32.of_int_exn table_id; data = [| indexes; values |] } ) ) ;
+           { id = Int32.of_int_exn (2 + table_id)
+           ; data = [| indexes; values |]
+           } ) ) ;
   Array.iter lookups ~f:(fun (table_id, (idx1, v1), (idx2, v2), (idx3, v3)) ->
       add_plonk_constraint
         (Lookup
@@ -282,7 +286,12 @@ let main_fixed_lookup_tables_multiple_tables_multiple_lookups () =
            } ) )
 
 let main_runtime_table_cfg () =
-  let table_ids = Array.init 5 ~f:(fun i -> Int32.of_int_exn i) in
+  (* Adding 1_002 to avoid conflicts with built-in XOR and RangeCheck, and the
+     above defined *)
+  let n_tables = 5 in
+  let table_ids =
+    Array.init n_tables ~f:(fun i -> Int32.of_int_exn (1_002 + i))
+  in
   let size = 10 in
   let first_column = Array.init size ~f:Field.Constant.of_int in
   Array.iter table_ids ~f:(fun table_id ->
@@ -291,10 +300,10 @@ let main_runtime_table_cfg () =
   let rec make_lookup i n =
     if i = n then ()
     else
-      let table_id = 3 in
+      let table_id = Array.get table_ids (Random.int n_tables) in
       add_plonk_constraint
         (Lookup
-           { w0 = fresh_int table_id
+           { w0 = fresh_int (Int.of_int32_exn table_id)
            ; w1 = fresh_int 1
            ; w2 = fresh_int 1
            ; w3 = fresh_int 2
