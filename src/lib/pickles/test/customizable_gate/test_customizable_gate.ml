@@ -78,7 +78,6 @@ let create_customisable_circuit ~custom_gate_type ~valid_witness =
         } )
 
 let test ~step_only ~custom_gate_type ~valid_witness =
-  printf "\n* Compiling STEP proof\n" ;
   let tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
@@ -107,18 +106,15 @@ let test ~step_only ~custom_gate_type ~valid_witness =
   in
 
   let module Proof = (val proof) in
-  printf "\nPROVING\n" ;
   let test_prove () =
     let public_input, (), proof =
       Async.Thread_safe.block_on_async_exn (fun () -> prove ())
     in
-    printf "\nVERIFYING\n" ;
     Or_error.ok_exn
       (Async.Thread_safe.block_on_async_exn (fun () ->
            Proof.verify [ (public_input, proof) ] ) ) ;
 
     if not step_only then (
-      printf "Creating Requests\n" ;
       let module Requests = struct
         type _ Snarky_backendless.Request.t +=
           | Proof :
@@ -132,7 +128,6 @@ let test ~step_only ~custom_gate_type ~valid_witness =
           | _ ->
               respond Unhandled
       end in
-      printf "\nCompiling WRAP proof\n" ;
       let ( _tag
           , _cache_handle
           , recursive_proof
@@ -169,13 +164,11 @@ let test ~step_only ~custom_gate_type ~valid_witness =
             ] )
           ()
       in
-      printf "\nRecursively PROVING\n" ;
       let module Recursive_proof = (val recursive_proof) in
       let public_input, (), recursive_proof' =
         Async.Thread_safe.block_on_async_exn (fun () ->
             recursive_prove ~handler:(Requests.handler proof) () )
       in
-      printf "\nVERIFYING Recursive proof\n" ;
       Or_error.ok_exn
         (Async.Thread_safe.block_on_async_exn (fun () ->
              Recursive_proof.verify [ (public_input, recursive_proof') ] ) ) )
@@ -185,7 +178,6 @@ let test ~step_only ~custom_gate_type ~valid_witness =
 (* Step only tests *)
 let () =
   if perform_step_tests then (
-    printf "Performing step tests\n" ;
     (* Customised as ForeignFieldAdd gate; valid witness *)
     test ~step_only:true ~custom_gate_type:false ~valid_witness:true ;
     (* Customised as Conditional gate; valid witness *)
@@ -217,7 +209,6 @@ let () =
 (* Recursive tests *)
 let () =
   if perform_recursive_tests then (
-    printf "Performing recursive tests\n" ;
     (* Customised as ForeignFieldAdd gate; valid witness *)
     test ~step_only:false ~custom_gate_type:false ~valid_witness:true ;
 
