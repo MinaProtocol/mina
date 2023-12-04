@@ -24,11 +24,14 @@ Since the solution should not affect the protocol, it should be
 implemented at the mempool/block producer boundary. In the mempool
 there is `transactions` function, which returns a sequence of
 transactions from the mempool in the order of decreasing transaction
-fees. The block producer module just takes a number of transactions
-from that sequence and includes them. It is relatively easy to limit
-the number of zkApp commands returned by this functions.  ZkApp
-commands above a certain limit would simply be discarded (from the
-sequence, but not from the mempool).
+fees. The `create_diff` function in `Staged_ledger` then takes that
+sequence and tries to apply as many transactions from it as can fit
+into the block. In the latter function it is possible to simply
+count successfully applied zkApp commands and filter out any
+transactions which:
+- would violate the set zkApp command limit
+- or depend on any previously filtered transactions because of
+  a nonce increase.
 
 The exact number of zkApps allowed in each block should be set
 dynamically, so that we can adjust it without redeploying nodes.
@@ -36,19 +39,11 @@ Therefore we are going to provide an authorised GraphQL mutation
 to alter the setting at runtime. A sensible default will be compiled
 into the binary as well.
 
-An issue arises when there are signed commands depending on a zkApp
-command that gets skipped. Such a dependency can result from the
-former having a higher nonce than the latter. In that case, if we're
-not careful and accept the command with a higher fee, the skipped one
-becomes invalid. This should be avoided, although it's not exactly
-clear how to do that.
-
-The setting can be stored in the mempool configuration and
+The setting can be stored in the Mina_lib configuration and
 initialized when the mempool is being created at startup.
-It will likely involve some plumbing to transport the setting
-from the command line arguments to the function which initializes
-the mempool, but other than that the solution is quite
-straightforward to implement.
+The limit will also be controllable through an authenticated GraphQL
+mutation, which will update the setting in the configuration at
+runtime.
 
 ## Drawbacks
 
@@ -85,6 +80,18 @@ off, they're capable of taking the non-upgraded nodes down with
 memory over-consumption and taking over the network. To prevent this
 we have to ensure that at least the majority of the stakeholder
 upgrades as quickly as possible.
+
+Finally, the limit introduces an attack vector, where a malicious
+party can submit `limit + 1` zkApp commands and arbitrarily many more
+commands depending on them, so that they are guaranteed not to be
+included. They can set up arbitrarily high fees on these commands
+which won't be included in order to kick out other users' transactions
+from the mempool and increase the overall fees on the network. An
+attacker would have to pay the fees for all their included zkApp
+commands, but not for the skipped ones Then they can use another
+account to kick out their expensive transactions form the mempool. So
+conducting such an attack will still be costly, but not as costly as
+it should be.
 
 ## Rationale and alternatives
 
