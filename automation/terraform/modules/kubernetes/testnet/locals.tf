@@ -17,6 +17,8 @@ locals {
     initialDelaySeconds = 30
   }
 
+  bootstrap_vars = {}
+
   seed_vars = {
     testnetName = var.testnet_name
     mina = {

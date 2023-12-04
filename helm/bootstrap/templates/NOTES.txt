@@ -1,0 +1,23 @@
+Keys:
+=====
+{{- range $pubkey, $_ := .Files.Glob (printf "%s" .Values.keys.glob) }}
+{{- $privkey := trimSuffix (ext $pubkey) $pubkey }}
+  {{ trimPrefix "keys/" $privkey }}:
+    Private:
+      {{ printf "- %s" $privkey }}
+    Public:
+      {{ printf "- %s" $pubkey }}
+{{- end }}
+
+LibP2P Keys:
+{{- range $pubkey, $_ := .Files.Glob (printf "%s" .Values.libP2pKeys.glob) }}
+{{- $privkey := trimSuffix (ext $pubkey) $pubkey }}
+  {{ trimPrefix "keys/libp2p-keys/" $privkey }}:
+    Private:
+      {{ printf "- %s" $privkey }}
+    Public:
+      {{ printf "- %s" $pubkey }}
+{{- end }}
+
+GCP Key:
+  Path: {{ .Values.gcpKey.path }}

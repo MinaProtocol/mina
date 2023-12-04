@@ -1,3 +1,44 @@
+resource "kubernetes_role_binding" "helm_release" {
+  metadata {
+    name      = "admin-role"
+    namespace = kubernetes_namespace.testnet_namespace.metadata[0].name
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = "admin"
+  }
+
+  subject {
+    kind      = "ServiceAccount"
+    name      = "default"
+    namespace = kubernetes_namespace.testnet_namespace.metadata[0].name
+  }
+}
+
+# Cluster-Local Bootstrap: Secrets Management and Operations
+
+resource "helm_release" "bootstrap" {
+  provider = helm.testnet_deploy
+  count    = 1
+
+  name       = "${var.testnet_name}-bootstrap"
+  repository = ""
+  chart      = "../../../../helm/bootstrap"
+  version    = "0.1.0"
+  namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+  values = [
+    yamlencode(local.bootstrap_vars)
+  ]
+  wait    = true
+  timeout = 600
+  depends_on = [
+    kubernetes_role_binding.helm_release,
+    null_resource.copying_keys_to_chart
+  ]
+}
+
 # Cluster-Local Seed Node
 
 resource "kubernetes_role_binding" "helm_release" {
