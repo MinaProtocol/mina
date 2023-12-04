@@ -111,7 +111,7 @@ module Block = struct
         ; parent_hash : State_hash.Stable.V1.t
         ; creator : Public_key.Compressed.Stable.V1.t
         ; block_winner : Public_key.Compressed.Stable.V1.t
-        ; last_vrf_output : string
+        ; last_vrf_output : Consensus_vrf.Output.Truncated.Stable.V1.t
         ; snarked_ledger_hash : Frozen_ledger_hash.Stable.V1.t
         ; staking_epoch_data : Mina_base.Epoch_data.Value.Stable.V1.t
         ; next_epoch_data : Mina_base.Epoch_data.Value.Stable.V1.t
