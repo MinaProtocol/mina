@@ -22,6 +22,7 @@ module Ledger_inner = struct
       | Hash of Location_at_depth.Addr.t
     [@@deriving hash, sexp, compare]
 
+    include Comparable.Make_binable (Arg)
     include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
   end
 
@@ -270,6 +271,9 @@ module Ledger_inner = struct
   let packed t = Any_ledger.cast (module Mask.Attached) t
 
   let register_mask t mask = Maskable.register_mask (packed t) mask
+
+  let unsafe_preload_accounts_from_parent =
+    Maskable.unsafe_preload_accounts_from_parent
 
   let unregister_mask_exn ~loc mask = Maskable.unregister_mask_exn ~loc mask
 
