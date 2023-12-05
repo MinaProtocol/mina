@@ -49,6 +49,17 @@ let
     '';
   };
 
+  mina-delegation-verify-init = runCommand "mina-delegation-verify-init"  {} ''
+
+      mkdir -p $out
+
+      export HOME=$out
+      export PYTHONUSERBASE=${cqlsh-expansion}
+
+      ${cqlsh-expansion}/bin/cqlsh-expansion.init
+
+  '';
+
   mkFullImage = name: packages:
     dockerTools.streamLayeredImage {
       name = "${name}-full";
@@ -87,12 +98,15 @@ in {
     contents = [
       ocamlPackages_mina.mina-delegation-verify.out
       cqlsh-expansion
+      mina-delegation-verify-init
       coreutils
       bashInteractive
     ];
     config = {
-      cmd = [ "/bin/delegation-verify" ];
-      Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" "CQLSH=${cqlsh-expansion}/bin/cqlsh-expansion" "USER_SITE=${cqlsh-expansion}/${python3Packages.python.sitePackages}" ];
+      cmd = [ 
+        "bash"
+      ];
+      Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" "CQLSH=${cqlsh-expansion}/bin/cqlsh-expansion" "PYTHONUSERBASE=${cqlsh-expansion}" ];
     };
     
   };
