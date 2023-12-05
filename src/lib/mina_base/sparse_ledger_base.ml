@@ -153,6 +153,7 @@ M.
   , set_exn
   , find_index_exn
   , add_path
+  , add_wide_path_unsafe
   , merkle_root
   , iteri )]
 

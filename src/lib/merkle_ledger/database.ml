@@ -700,7 +700,7 @@ module Make (Inputs : Inputs_intf) :
     List.map2_exn dependency_dirs dependency_hashes ~f:(fun dir hash ->
         Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
 
-  let merkle_path_batch mdb locations =
+  let path_batch_impl ~expand_query ~compute_path mdb locations =
     let locations =
       List.map locations ~f:(fun location ->
           if Location.is_account location then
@@ -709,48 +709,44 @@ module Make (Inputs : Inputs_intf) :
             assert (Location.is_hash location) ;
             location ) )
     in
-    let rev_locations, rev_directions, rev_lengths =
-      let rec loop locations loc_acc dir_acc length_acc =
-        match (locations, length_acc) with
-        | [], _ :: length_acc ->
-            (loc_acc, dir_acc, length_acc)
-        | k :: locations, length :: length_acc ->
-            if Location.height ~ledger_depth:mdb.depth k >= mdb.depth then
-              loop locations loc_acc dir_acc (0 :: length :: length_acc)
-            else
-              let sibling = Location.sibling k in
-              let sibling_dir =
-                Location.last_direction (Location.to_path_exn k)
-              in
-              loop
-                (Location.parent k :: locations)
-                (sibling :: loc_acc) (sibling_dir :: dir_acc)
-                ((length + 1) :: length_acc)
-        | _ ->
-            assert false
-      in
-      loop locations [] [] [ 0 ]
+    let list_of_dependencies =
+      List.map locations ~f:Location.merkle_path_dependencies_exn
     in
-    let rev_hashes = get_hash_batch_exn mdb rev_locations in
-    let rec loop directions hashes lengths acc =
-      match (directions, hashes, lengths, acc) with
-      | [], [], [], _ (* actually [] *) :: acc_tl ->
-          acc_tl
-      | _, _, 0 :: lengths, _ ->
-          loop directions hashes lengths ([] :: acc)
-      | ( direction :: directions
-        , hash :: hashes
-        , length :: lengths
-        , acc_hd :: acc_tl ) ->
-          let dir =
-            Direction.map direction ~left:(`Left hash) ~right:(`Right hash)
-          in
-          loop directions hashes ((length - 1) :: lengths)
-            ((dir :: acc_hd) :: acc_tl)
-      | _ ->
-          failwith "Mismatched lengths"
+    let all_locs =
+      List.map list_of_dependencies ~f:(fun deps -> List.map ~f:fst deps |> expand_query) |> List.concat
     in
-    loop rev_directions rev_hashes rev_lengths [ [] ]
+    let hashes = get_hash_batch_exn mdb all_locs in
+    snd @@ List.fold_map ~init:hashes ~f:compute_path list_of_dependencies
+
+  let merkle_path_batch =
+    path_batch_impl ~expand_query:ident
+      ~compute_path:(fun all_hashes loc_and_dir_list ->
+        let len = List.length loc_and_dir_list in
+        let sibling_hashes, rest_hashes = List.split_n all_hashes len in
+        let res =
+          List.map2_exn loc_and_dir_list sibling_hashes
+            ~f:(fun (_, direction) sibling_hash ->
+              Direction.map direction ~left:(`Left sibling_hash)
+                ~right:(`Right sibling_hash) )
+        in
+        (rest_hashes, res) )
+
+  let wide_merkle_path_batch =
+    path_batch_impl
+      ~expand_query:(fun sib_locs ->
+        sib_locs @ List.map sib_locs ~f:Location.sibling )
+      ~compute_path:(fun all_hashes loc_and_dir_list ->
+        let len = List.length loc_and_dir_list in
+        let sibling_hashes, rest_hashes = List.split_n all_hashes len in
+        let self_hashes, rest_hashes' = List.split_n rest_hashes len in
+        let res =
+          List.map3_exn loc_and_dir_list sibling_hashes self_hashes
+            ~f:(fun (_, direction) sibling_hash self_hash ->
+              Direction.map direction
+                ~left:(`Left (self_hash, sibling_hash))
+                ~right:(`Right (sibling_hash, self_hash)) )
+        in
+        (rest_hashes', res) )
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
 
