@@ -131,7 +131,7 @@ module Make (Config : Config_intf) = struct
              (Printf.sprintf
                 "Problem parsing graphql response\n\
                  Error message: %s, response: %s" (Exn.to_string e)
-                query_obj#query ) )
+                (Yojson.Basic.to_string raw_json) ) )
     |> Deferred.return
 
   let query_exn' ~f query_obj port =
