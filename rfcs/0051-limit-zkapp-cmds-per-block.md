@@ -183,6 +183,9 @@ include:
   signed commands can be applied instead.
   
 Additionally an integration test checking inclusion of transactions
-from the mempool in a newly created block could be written. Properties
-to check are similar to those described above, so maybe it's not that
-useful, though.
+from the mempool in a newly created block could be written. Such a
+test should in particular ensure that the limit does not affect block
+validation. Note that the limit can be changed dynamically, so we
+can initialise a network with all nodes having the same settings and
+then change it for some of them, thus examining different
+configurations.
