@@ -162,6 +162,7 @@
 (package (name protocol_version))
 (package (name prover))
 (package (name quickcheck_lib))
+(package (name ram_fix_math))
 (package (name random_oracle_input))
 (package (name random_oracle))
 (package (name rc_pool))
