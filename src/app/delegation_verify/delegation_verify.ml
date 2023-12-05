@@ -126,7 +126,7 @@ module Make_verifier (Source : Submission.Data_source) = struct
     let%bind result = verify ~validate submission in
     Result.map result ~f:(fun (state_hash, parent, height, slot) ->
         Output.
-          { created_at = Source.created_at submission
+          { submitted_at = Source.submitted_at submission
           ; submitter =
               Signature_lib.Public_key.Compressed.to_base58_check
                 (Source.submitter submission)
