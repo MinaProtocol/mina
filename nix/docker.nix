@@ -102,6 +102,31 @@ let
       };
     };
 
+  mkFullImage = name: packages:
+    dockerTools.streamLayeredImage {
+      name = "${name}-full";
+      inherit created;
+      contents = [
+        dumb-init
+        coreutils
+        bashInteractive
+        python3
+        libp2p_helper
+        procps
+        curl
+        jq
+      ] ++ packages;
+      extraCommands = ''
+        mkdir root tmp
+        chmod 777 tmp
+      '';
+      config = {
+        env = [ "MINA_TIME_OFFSET=0" ];
+        WorkingDir = "/root";
+        cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
+      };
+    };
+
 in {
   mina-image-slim = dockerTools.streamLayeredImage {
     name = "mina";
@@ -125,7 +150,9 @@ in {
       bashInteractive
     ];
     config = {
-      cmd = [ "bash" ];
+      cmd = [ 
+        "bash"
+      ];
       Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" "CQLSH=${cqlsh-expansion}/bin/cqlsh-expansion" "PYTHONUSERBASE=${cqlsh-expansion}" ];
     };
     
