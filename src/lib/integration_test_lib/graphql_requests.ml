@@ -284,6 +284,7 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
     [ ("query", `String query_name)
     ; ("uri", `String (Uri.to_string node_uri))
     ; ("init_delay", `Float initial_delay_sec)
+    ; ("query_obj", `String query_obj#query)
     ]
   in
   [%log info]
