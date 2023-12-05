@@ -41,10 +41,10 @@ val ft_comm :
   -> endoscale:('comm -> 'c -> 'comm)
   -> negate:('comm -> 'comm)
   -> verification_key:'comm array Pickles_types.Plonk_verification_key_evals.t
-  -> alpha:'d
+  -> alpha:'c
   -> plonk:
-       ( 'e
-       , 'f
+       ( 'd
+       , 'e
        , 'scalar
        , 'g
        , 'bool )

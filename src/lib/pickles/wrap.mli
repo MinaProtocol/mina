@@ -25,13 +25,13 @@ val wrap :
              Kimchi_types.scalar_challenge
              Import.Bulletproof_challenge.t
            , Nat.z Backend.Tick.Rounds.plus_n )
-           Vector.t
+           Pickles_types.Vector.t
          , Backend.Tock.Field.t Import.Challenge.t )
          Import.Types.Wrap.Statement.In_circuit.t
       -> unit )
   -> typ:('a, 'b) Impls.Step.Typ.t
   -> step_vk:Kimchi_bindings.Protocol.VerifierIndex.Fp.t
-  -> actual_wrap_domains:(int, 'c) Vector.t
+  -> actual_wrap_domains:(Core_kernel.Int.t, 'c) Pickles_types.Vector.t
   -> step_plonk_indices:'d
   -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> actual_feature_flags:bool Plonk_types.Features.t
@@ -47,13 +47,15 @@ val wrap :
              Reduced_messages_for_next_proof_over_same_field.Wrap.t
            , Import.Types.Digest.Constant.t
            , ( 'b
-             , (Backend.Tock.Proof.G.Affine.t, 'actual_proofs_verified) Vector.t
+             , ( Backend.Tock.Proof.G.Affine.t
+               , 'actual_proofs_verified )
+               Pickles_types.Vector.t
              , ( ( Import.Challenge.Constant.t Kimchi_types.scalar_challenge
                    Import.Bulletproof_challenge.t
                  , 'e )
-                 Vector.t
+                 Pickles_types.Vector.t
                , 'actual_proofs_verified )
-               Vector.t )
+               Pickles_types.Vector.t )
              Reduced_messages_for_next_proof_over_same_field.Step.t
            , Import.Challenge.Constant.t Kimchi_types.scalar_challenge
              Import.Bulletproof_challenge.t
@@ -71,13 +73,15 @@ val wrap :
              Reduced_messages_for_next_proof_over_same_field.Wrap.t
            , Import.Types.Digest.Constant.t
            , ( 'b
-             , (Backend.Tock.Proof.G.Affine.t, 'actual_proofs_verified) Vector.t
+             , ( Backend.Tock.Proof.G.Affine.t
+               , 'actual_proofs_verified )
+               Pickles_types.Vector.t
              , ( ( Import.Challenge.Constant.t Kimchi_types.scalar_challenge
                    Import.Bulletproof_challenge.t
                  , 'e )
-                 Vector.t
+                 Pickles_types.Vector.t
                , 'actual_proofs_verified )
-               Vector.t )
+               Pickles_types.Vector.t )
              Reduced_messages_for_next_proof_over_same_field.Step.t
            , Import.Challenge.Constant.t Kimchi_types.scalar_challenge
              Import.Bulletproof_challenge.t
@@ -92,37 +96,41 @@ val wrap :
          , ( Import.Challenge.Constant.t Kimchi_types.scalar_challenge
              Import.Bulletproof_challenge.t
            , Backend.Tock.Rounds.n )
-           Vector.t
+           Pickles_types.Vector.t
          , Impls.Wrap.Digest.Constant.t
          , bool )
          Import.Types.Step.Proof_state.Per_proof.In_circuit.t
        , 'max_proofs_verified )
-       Vector.t
-     , (Backend.Tock.Proof.G.Affine.t, 'actual_proofs_verified) Vector.t
+       Pickles_types.Vector.t
+     , ( Backend.Tock.Proof.G.Affine.t
+       , 'actual_proofs_verified )
+       Pickles_types.Vector.t
      , ( ( Import.Challenge.Constant.t Kimchi_types.scalar_challenge
            Import.Bulletproof_challenge.t
          , 'e )
-         Vector.t
+         Pickles_types.Vector.t
        , 'actual_proofs_verified )
-       Vector.t
+       Pickles_types.Vector.t
      , 'max_local_max_proofs_verifieds
        Hlist0.H1(Reduced_messages_for_next_proof_over_same_field.Wrap).t
      , ( ( Backend.Tock.Field.t
          , Backend.Tock.Field.t array )
          Plonk_types.All_evals.t
        , 'max_proofs_verified )
-       Vector.t )
+       Pickles_types.Vector.t )
      Proof.Base.Step.t
   -> ( 'max_proofs_verified
        Reduced_messages_for_next_proof_over_same_field.Wrap.t
      , ( 'b
-       , (Backend.Tock.Proof.G.Affine.t, 'actual_proofs_verified) Vector.t
+       , ( Backend.Tock.Proof.G.Affine.t
+         , 'actual_proofs_verified )
+         Pickles_types.Vector.t
        , ( ( Import.Challenge.Constant.t Kimchi_types.scalar_challenge
              Import.Bulletproof_challenge.t
            , 'e )
-           Vector.t
+           Pickles_types.Vector.t
          , 'actual_proofs_verified )
-         Vector.t )
+         Pickles_types.Vector.t )
        Reduced_messages_for_next_proof_over_same_field.Step.t )
      Proof.Base.Wrap.t
      Promise.t
