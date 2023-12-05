@@ -49,14 +49,14 @@ let
     '';
   };
 
-  mina-delegation-verify-init = runCommand "mina-delegation-verify-init"  {} ''
+  mina-delegation-verify-init = runCommand "mina-delegation-verify-init" { } ''
 
-      mkdir -p $out
+    mkdir -p $out
 
-      export HOME=$out
-      export PYTHONUSERBASE=${cqlsh-expansion}
+    export HOME=$out
+    export PYTHONUSERBASE=${cqlsh-expansion}
 
-      ${cqlsh-expansion}/bin/cqlsh-expansion.init
+    ${cqlsh-expansion}/bin/cqlsh-expansion.init
 
   '';
 
@@ -103,10 +103,12 @@ in {
       bashInteractive
     ];
     config = {
-      cmd = [ 
-        "bash"
+      cmd = [ "bash" ];
+      Env = [
+        "TZ=Etc/UTC"
+        "TZDIR=${tzdata}/share/zoneinfo"
+        "CQLSH=${cqlsh-expansion}/bin/cqlsh-expansion"
       ];
-      Env = [ "TZ=Etc/UTC" "TZDIR=${tzdata}/share/zoneinfo" "CQLSH=${cqlsh-expansion}/bin/cqlsh-expansion" "PYTHONUSERBASE=${cqlsh-expansion}" ];
     };
   };
 
