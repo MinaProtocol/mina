@@ -89,6 +89,12 @@ module type S = sig
 
     val to_accumulated : t -> accumulated_t
 
+    (** Drop accumulated structure, a method used in safeguard against
+        unwanted modification of ancestor's mask *)
+    val drop_accumulated : t -> unit
+
+    val is_committing : t -> bool
+
     (** already have module For_testing from include above *)
     module For_testing : sig
       val location_in_mask : t -> location -> bool

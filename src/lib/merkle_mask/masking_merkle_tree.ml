@@ -80,6 +80,7 @@ module Make (Inputs : Inputs_intf.S) = struct
              and for a few ancestors.
              This is used as a lookup cache. *)
     ; mutable accumulated : (accumulated_t[@sexp.opaque]) option
+    ; mutable is_committing : bool
     }
   [@@deriving sexp]
 
@@ -100,6 +101,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; depth
     ; accumulated = None
     ; maps = empty_maps ()
+    ; is_committing = false
     }
 
   let get_uuid { uuid; _ } = uuid
@@ -493,7 +495,6 @@ module Make (Inputs : Inputs_intf.S) = struct
           Base.merkle_root ancestor
 
     let remove_account_and_update_hashes t location =
-      t.accumulated <- None ;
       (* remove account and key from tables *)
       let account = Option.value_exn (Map.find t.maps.accounts location) in
       t.maps.accounts <- Map.remove t.maps.accounts location ;
@@ -550,19 +551,22 @@ module Make (Inputs : Inputs_intf.S) = struct
           self_set_hash t addr hash )
 
     (* if the mask's parent sets an account, we can prune an entry in the mask
-       if the account in the parent is the same in the mask *)
+       if the account in the parent is the same in the mask
+
+        returns true is the mask is in the state of being comitted *)
     let parent_set_notify t account =
       assert_is_attached t ;
-      match Map.find t.maps.locations (Account.identifier account) with
-      | None ->
-          ()
-      | Some location -> (
-          match Map.find t.maps.accounts location with
-          | Some existing_account ->
-              if Account.equal account existing_account then
-                remove_account_and_update_hashes t location
-          | None ->
-              () )
+      Option.value ~default:()
+      @@ let%bind.Option location =
+           Map.find t.maps.locations (Account.identifier account)
+         in
+         let%bind.Option existing_account = Map.find t.maps.accounts location in
+         let%map.Option () =
+           Option.some_if (Account.equal account existing_account) ()
+         in
+         remove_account_and_update_hashes t location
+
+    let is_committing t = t.is_committing
 
     (* as for accounts, we see if we have it in the mask, else delegate to
        parent *)
@@ -614,14 +618,17 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
+      assert (not t.is_committing) ;
+      t.is_committing <- true ;
       assert_is_attached t ;
       let parent = get_parent t in
       let old_root_hash = merkle_root t in
       let account_data = Map.to_alist t.maps.accounts in
-      Base.set_batch parent account_data ;
       t.maps.accounts <- Location_binable.Map.empty ;
       t.maps.hashes <- Addr.Map.empty ;
-      (* TODO why only 2/4 maps are updated ? *)
+      t.maps.locations <- Account_id.Map.empty ;
+      t.maps.token_owners <- Token_id.Map.empty ;
+      Base.set_batch parent account_data ;
       Debug_assert.debug_assert (fun () ->
           [%test_result: Hash.t]
             ~message:
@@ -630,7 +637,8 @@ module Make (Inputs : Inputs_intf.S) = struct
             ~expect:old_root_hash (Base.merkle_root parent) ;
           [%test_result: Hash.t]
             ~message:"Merkle root of the mask should delegate to the parent now"
-            ~expect:(merkle_root t) (Base.merkle_root parent) )
+            ~expect:(merkle_root t) (Base.merkle_root parent) ) ;
+      t.is_committing <- false
 
     (* copy tables in t; use same parent *)
     let copy t =
@@ -648,6 +656,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               ; next = maps_copy acc.next
               ; current = maps_copy acc.current
               } )
+      ; is_committing = false
       }
 
     let last_filled t =
@@ -672,6 +681,8 @@ module Make (Inputs : Inputs_intf.S) = struct
                   failwith
                     "last_filled: expected account locations for the parent \
                      and mask" ) )
+
+    let drop_accumulated t = t.accumulated <- None
 
     include Merkle_ledger.Util.Make (struct
       module Location = Location
