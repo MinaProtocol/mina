@@ -40,12 +40,12 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   type t =
     { uuid : Uuid.Stable.V1.t
-    ; account_tbl : Account.t Location_binable.Table.t
-    ; token_owners : Account_id.t Token_id.Table.t
+    ; accounts : Account.t Location_binable.Map.t ref
+    ; token_owners : Account_id.t Token_id.Map.t ref
     ; mutable parent : Parent.t
     ; detached_parent_signal : Detached_parent_signal.t
-    ; hash_tbl : Hash.t Addr.Table.t
-    ; location_tbl : Location.t Account_id.Table.t
+    ; hashes : Hash.t Addr.Map.t ref
+    ; locations : Location.t Account_id.Map.t ref
     ; mutable current_location : Location.t option
     ; depth : int
     }
@@ -57,10 +57,10 @@ module Make (Inputs : Inputs_intf.S) = struct
     { uuid = Uuid_unix.create ()
     ; parent = Error __LOC__
     ; detached_parent_signal = Async.Ivar.create ()
-    ; account_tbl = Location_binable.Table.create ()
-    ; token_owners = Token_id.Table.create ()
-    ; hash_tbl = Addr.Table.create ()
-    ; location_tbl = Account_id.Table.create ()
+    ; accounts = ref Location_binable.Map.empty
+    ; token_owners = ref Token_id.Map.empty
+    ; hashes = ref Addr.Map.empty
+    ; locations = ref Account_id.Map.empty
     ; current_location = None
     ; depth
     }
@@ -134,11 +134,11 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* don't rely on a particular implementation *)
     let self_find_hash t address =
       assert_is_attached t ;
-      Addr.Table.find t.hash_tbl address
+      Map.find !(t.hashes) address
 
     let self_set_hash t address hash =
       assert_is_attached t ;
-      Addr.Table.set t.hash_tbl ~key:address ~data:hash
+      t.hashes := Map.set !(t.hashes) ~key:address ~data:hash
 
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
@@ -148,11 +148,11 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* don't rely on a particular implementation *)
     let self_find_location t account_id =
       assert_is_attached t ;
-      Account_id.Table.find t.location_tbl account_id
+      Map.find !(t.locations) account_id
 
     let self_set_location t account_id location =
       assert_is_attached t ;
-      Account_id.Table.set t.location_tbl ~key:account_id ~data:location ;
+      t.locations := Map.set !(t.locations) ~key:account_id ~data:location ;
       (* if account is at a hitherto-unused location, that
          becomes the current location
       *)
@@ -166,11 +166,11 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* don't rely on a particular implementation *)
     let self_find_account t location =
       assert_is_attached t ;
-      Location_binable.Table.find t.account_tbl location
+      Map.find !(t.accounts) location
 
     let self_set_account t location account =
       assert_is_attached t ;
-      Location_binable.Table.set t.account_tbl ~key:location ~data:account ;
+      t.accounts := Map.set !(t.accounts) ~key:location ~data:account ;
       self_set_location t (Account.identifier account) location
 
     (* a read does a lookup in the account_tbl; if that fails, delegate to
@@ -181,13 +181,20 @@ module Make (Inputs : Inputs_intf.S) = struct
       | Some account ->
           Some account
       | None ->
-          Base.get (get_parent t) location
+          let is_empty =
+            match t.current_location with
+            | None ->
+                true
+            | Some current_location ->
+                let address = Location.to_path_exn location in
+                let current_address = Location.to_path_exn current_location in
+                Addr.is_further_right ~than:current_address address
+          in
+          if is_empty then None else Base.get (get_parent t) location
 
     let self_find_or_batch_lookup self_find lookup_parent t ids =
       assert_is_attached t ;
-      let self_found_or_none =
-        List.map ids ~f:(fun id -> (id, self_find t id))
-      in
+      let self_found_or_none = List.map ids ~f:self_find in
       let not_found =
         List.filter_map self_found_or_none ~f:(function
           | id, None ->
@@ -196,79 +203,192 @@ module Make (Inputs : Inputs_intf.S) = struct
               None )
       in
       let from_parent = lookup_parent (get_parent t) not_found in
-      let _, res =
-        List.fold_map self_found_or_none ~init:from_parent
-          ~f:(fun from_parent (id, self_found) ->
-            match (self_found, from_parent) with
-            | None, r :: rest ->
-                (rest, r)
-            | Some _, _ ->
-                (from_parent, (id, self_found))
-            | _ ->
-                failwith "unexpected number of results from DB" )
-      in
-      res
+      List.fold_map self_found_or_none ~init:from_parent
+        ~f:(fun from_parent (id, self_found) ->
+          match (self_found, from_parent) with
+          | None, r :: rest ->
+              (rest, r)
+          | Some acc_found_locally, _ ->
+              (from_parent, (id, acc_found_locally))
+          | _ ->
+              failwith "unexpected number of results from DB" )
+      |> snd
 
-    let get_batch = self_find_or_batch_lookup self_find_account Base.get_batch
+    let get_batch t =
+      let self_find id =
+        let res = self_find_account t id in
+        let res =
+          if Option.is_none res then
+            let is_empty =
+              Option.value_map ~default:true t.current_location
+                ~f:(fun current_location ->
+                  let address = Location.to_path_exn id in
+                  let current_address = Location.to_path_exn current_location in
+                  Addr.is_further_right ~than:current_address address )
+            in
+            Option.some_if is_empty None
+          else Some res
+        in
+        (id, res)
+      in
+      self_find_or_batch_lookup self_find Base.get_batch t
+
+    let empty_hash =
+      Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+
+    let self_path_get_hash ~hashes ~current_location height address =
+      match Map.find hashes address with
+      | Some hash ->
+          Some hash
+      | None ->
+          let is_empty =
+            match current_location with
+            | None ->
+                true
+            | Some current_location ->
+                let current_address = Location.to_path_exn current_location in
+                Addr.is_further_right ~than:current_address address
+          in
+          if is_empty then Some (empty_hash height) else None
+
+    let rec self_path_impl ~element ~depth address =
+      let height = Addr.height ~ledger_depth:depth address in
+      if height >= depth then Some []
+      else
+        let%bind.Option el = element height address in
+        let%bind.Option parent_address = Addr.parent address |> Or_error.ok in
+        let%map.Option rest = self_path_impl ~element ~depth parent_address in
+        el :: rest
+
+    let self_merkle_path ~hashes ~current_location =
+      let element height address =
+        let sibling = Addr.sibling address in
+        let dir = Location.last_direction address in
+        let%map.Option sibling_hash =
+          self_path_get_hash ~hashes ~current_location height sibling
+        in
+        Direction.map dir ~left:(`Left sibling_hash) ~right:(`Right sibling_hash)
+      in
+      self_path_impl ~element
+
+    let self_wide_merkle_path ~hashes ~current_location =
+      let element height address =
+        let sibling = Addr.sibling address in
+        let dir = Location.last_direction address in
+        let%bind.Option sibling_hash =
+          self_path_get_hash ~hashes ~current_location height sibling
+        in
+        let%map.Option self_hash =
+          self_path_get_hash ~hashes ~current_location height address
+        in
+        Direction.map dir
+          ~left:(`Left (self_hash, sibling_hash))
+          ~right:(`Right (sibling_hash, self_hash))
+      in
+      self_path_impl ~element
 
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
-
-    let fixup_merkle_path t path address =
-      let rec build_fixed_path path address accum =
-        if List.is_empty path then List.rev accum
-        else
-          (* first element in the path contains hash at sibling of address *)
-          let curr_element = List.hd_exn path in
-          let merkle_node_address = Addr.sibling address in
-          let mask_hash = self_find_hash t merkle_node_address in
-          let parent_hash = match curr_element with `Left h | `Right h -> h in
-          let new_hash = Option.value mask_hash ~default:parent_hash in
-          let new_element =
-            match curr_element with
-            | `Left _ ->
-                `Left new_hash
-            | `Right _ ->
-                `Right new_hash
-          in
-          build_fixed_path (List.tl_exn path) (Addr.parent_exn address)
-            (new_element :: accum)
+    let fixup_merkle_path ~hashes ~address:init =
+      let f address =
+        (* first element in the path contains hash at sibling of address *)
+        let sibling_mask_hash = Map.find hashes (Addr.sibling address) in
+        let parent_addr = Addr.parent_exn address in
+        let open Option in
+        function
+        | `Left h ->
+            (parent_addr, `Left (value sibling_mask_hash ~default:h))
+        | `Right h ->
+            (parent_addr, `Right (value sibling_mask_hash ~default:h))
       in
-      build_fixed_path path address []
+      Fn.compose snd @@ List.fold_map ~init ~f
+
+    (* fixup_merkle_path patches a Merkle path reported by the parent,
+       overriding with hashes which are stored in the mask *)
+    let fixup_wide_merkle_path ~hashes ~address:init =
+      let f address =
+        (* element in the path contains hash at sibling of address *)
+        let sibling_mask_hash = Map.find hashes (Addr.sibling address) in
+        let self_mask_hash = Map.find hashes address in
+        let parent_addr = Addr.parent_exn address in
+        let open Option in
+        function
+        | `Left (h_l, h_r) ->
+            ( parent_addr
+            , `Left
+                ( value self_mask_hash ~default:h_l
+                , value sibling_mask_hash ~default:h_r ) )
+        | `Right (h_l, h_r) ->
+            ( parent_addr
+            , `Right
+                ( value sibling_mask_hash ~default:h_l
+                , value self_mask_hash ~default:h_r ) )
+      in
+      Fn.compose snd @@ List.fold_map ~init ~f
 
     (* the following merkle_path_* functions report the Merkle path for the
        mask *)
 
     let merkle_path_at_addr_exn t address =
       assert_is_attached t ;
-      let parent_merkle_path =
-        Base.merkle_path_at_addr_exn (get_parent t) address
-      in
-      fixup_merkle_path t parent_merkle_path address
+      match
+        self_merkle_path ~depth:t.depth ~hashes:!(t.hashes)
+          ~current_location:t.current_location address
+      with
+      | Some path ->
+          path
+      | None ->
+          let parent_merkle_path =
+            Base.merkle_path_at_addr_exn (get_parent t) address
+          in
+          fixup_merkle_path ~hashes:!(t.hashes) parent_merkle_path ~address
 
     let merkle_path_at_index_exn t index =
-      assert_is_attached t ;
-      let address = Addr.of_int_exn ~ledger_depth:t.depth index in
-      let parent_merkle_path =
-        Base.merkle_path_at_addr_exn (get_parent t) address
-      in
-      fixup_merkle_path t parent_merkle_path address
+      merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:t.depth index)
 
     let merkle_path t location =
-      assert_is_attached t ;
-      let address = Location.to_path_exn location in
-      let parent_merkle_path = Base.merkle_path (get_parent t) location in
-      fixup_merkle_path t parent_merkle_path address
+      merkle_path_at_addr_exn t (Location.to_path_exn location)
 
-    let merkle_path_batch t locations =
+    let path_batch_impl ~fixup_path ~self_lookup ~base_lookup t locations =
       assert_is_attached t ;
-      let addresses = List.map ~f:Location.to_path_exn locations in
-      let parent_merkle_paths =
-        Base.merkle_path_batch (get_parent t) locations
+      let parent = get_parent t in
+      let self_paths =
+        List.map locations ~f:(fun location ->
+            let address = Location.to_path_exn location in
+            self_lookup ~hashes:!(t.hashes) ~current_location:t.current_location
+              ~depth:t.depth address
+            |> Option.value_map
+                 ~default:(Either.Second (location, address))
+                 ~f:Either.first )
       in
-      List.map2_exn
-        ~f:(fun path address -> fixup_merkle_path t path address)
-        parent_merkle_paths addresses
+      let all_parent_paths =
+        let locs =
+          List.filter_map self_paths ~f:(function
+            | Either.First _ ->
+                None
+            | Either.Second (location, _) ->
+                Some location )
+        in
+        if List.is_empty locs then [] else base_lookup parent locs
+      in
+      let f parent_paths = function
+        | Either.First path ->
+            (parent_paths, path)
+        | Either.Second (_, address) ->
+            let path =
+              fixup_path ~hashes:!(t.hashes) ~address (List.hd_exn parent_paths)
+            in
+            (List.tl_exn parent_paths, path)
+      in
+      snd @@ List.fold_map ~init:all_parent_paths ~f self_paths
+
+    let merkle_path_batch =
+      path_batch_impl ~base_lookup:Base.merkle_path_batch
+        ~self_lookup:self_merkle_path ~fixup_path:fixup_merkle_path
+
+    let wide_merkle_path_batch =
+      path_batch_impl ~base_lookup:Base.wide_merkle_path_batch
+        ~self_lookup:self_wide_merkle_path ~fixup_path:fixup_wide_merkle_path
 
     (* given a Merkle path corresponding to a starting address, calculate
        addresses and hashes for each node affected by the starting hash; that is,
@@ -304,14 +424,15 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       (* remove account and key from tables *)
       let account = Option.value_exn (self_find_account t location) in
-      Location_binable.Table.remove t.account_tbl location ;
+      t.accounts := Map.remove !(t.accounts) location ;
       (* Update token info. *)
       let account_id = Account.identifier account in
-      Token_id.Table.remove t.token_owners
-        (Account_id.derive_token_id ~owner:account_id) ;
+      t.token_owners :=
+        Token_id.Map.remove !(t.token_owners)
+          (Account_id.derive_token_id ~owner:account_id) ;
       (* TODO : use stack database to save unused location, which can be used
          when allocating a location *)
-      Account_id.Table.remove t.location_tbl account_id ;
+      t.locations := Map.remove !(t.locations) account_id ;
       (* reuse location if possible *)
       Option.iter t.current_location ~f:(fun curr_loc ->
           if Location.equal location curr_loc then
@@ -331,16 +452,21 @@ module Make (Inputs : Inputs_intf.S) = struct
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           self_set_hash t addr hash )
 
-    (* a write writes only to the mask, parent is not involved need to update
-       both account and hash pieces of the mask *)
-    let set t location account =
+    let set_account_unsafe t location account =
       assert_is_attached t ;
       self_set_account t location account ;
       (* Update token info. *)
       let account_id = Account.identifier account in
-      Token_id.Table.set t.token_owners
-        ~key:(Account_id.derive_token_id ~owner:account_id)
-        ~data:account_id ;
+      t.token_owners :=
+        Map.set !(t.token_owners)
+          ~key:(Account_id.derive_token_id ~owner:account_id)
+          ~data:account_id
+
+    (* a write writes only to the mask, parent is not involved need to update
+       both account and hash pieces of the mask *)
+    let set t location account =
+      assert_is_attached t ;
+      set_account_unsafe t location account ;
       (* Update merkle path. *)
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.hash_account account in
@@ -387,25 +513,40 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       List.map locations ~f:(fun location -> get t location)
 
-    (* NB: rocksdb does not support batch reads; is this needed? *)
-    let get_hash_batch_exn t addrs =
+    let get_hash_batch_exn t locations =
       assert_is_attached t ;
-      List.map addrs ~f:(fun addr ->
-          match self_find_hash t addr with
-          | Some account ->
-              Some account
-          | None -> (
-              try Some (Base.get_inner_hash_at_addr_exn (get_parent t) addr)
-              with _ -> None ) )
+      let self_hashes_rev =
+        List.rev_map locations ~f:(fun location ->
+            (location, self_find_hash t (Location.to_path_exn location)) )
+      in
+      let parent_locations_rev =
+        List.filter_map self_hashes_rev ~f:(fun (location, hash) ->
+            match hash with None -> Some location | Some _ -> None )
+      in
+      let parent_hashes_rev =
+        if List.is_empty parent_locations_rev then []
+        else Base.get_hash_batch_exn (get_parent t) parent_locations_rev
+      in
+      let rec recombine self_hashes_rev parent_hashes_rev acc =
+        match (self_hashes_rev, parent_hashes_rev) with
+        | [], [] ->
+            acc
+        | (_location, None) :: self_hashes_rev, hash :: parent_hashes_rev
+        | (_location, Some hash) :: self_hashes_rev, parent_hashes_rev ->
+            recombine self_hashes_rev parent_hashes_rev (hash :: acc)
+        | _, [] | [], _ ->
+            assert false
+      in
+      recombine self_hashes_rev parent_hashes_rev []
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
       assert_is_attached t ;
       let old_root_hash = merkle_root t in
-      let account_data = Location_binable.Table.to_alist t.account_tbl in
+      let account_data = Map.to_alist !(t.accounts) in
       Base.set_batch (get_parent t) account_data ;
-      Location_binable.Table.clear t.account_tbl ;
-      Addr.Table.clear t.hash_tbl ;
+      t.accounts := Location_binable.Map.empty ;
+      t.hashes := Addr.Map.empty ;
       Debug_assert.debug_assert (fun () ->
           [%test_result: Hash.t]
             ~message:
@@ -423,10 +564,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       { uuid = Uuid_unix.create ()
       ; parent = Ok (get_parent t)
       ; detached_parent_signal = Async.Ivar.create ()
-      ; account_tbl = Location_binable.Table.copy t.account_tbl
-      ; token_owners = Token_id.Table.copy t.token_owners
-      ; location_tbl = Account_id.Table.copy t.location_tbl
-      ; hash_tbl = Addr.Table.copy t.hash_tbl
+      ; accounts = ref !(t.accounts)
+      ; token_owners = ref !(t.token_owners)
+      ; locations = ref !(t.locations)
+      ; hashes = ref !(t.hashes)
       ; current_location = t.current_location
       ; depth = t.depth
       }
@@ -489,14 +630,15 @@ module Make (Inputs : Inputs_intf.S) = struct
         t.current_location <- Some last_location ;
         Mina_stdlib.Nonempty_list.iter account_to_location_list
           ~f:(fun (key, data) ->
-            Account_id.Table.set t.location_tbl ~key ~data )
+            t.locations := Map.set !(t.locations) ~key ~data )
 
       let set_raw_account_batch t locations_and_accounts =
         List.iter locations_and_accounts ~f:(fun (location, account) ->
             let account_id = Account.identifier account in
-            Token_id.Table.set t.token_owners
-              ~key:(Account_id.derive_token_id ~owner:account_id)
-              ~data:account_id ;
+            t.token_owners :=
+              Map.set !(t.token_owners)
+                ~key:(Account_id.derive_token_id ~owner:account_id)
+                ~data:account_id ;
             self_set_account t location account )
     end)
 
@@ -511,7 +653,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let token_owner t tid =
       assert_is_attached t ;
-      match Token_id.Table.find t.token_owners tid with
+      match Map.find !(t.token_owners) tid with
       | Some id ->
           Some id
       | None ->
@@ -520,7 +662,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let token_owners (t : t) : Account_id.Set.t =
       assert_is_attached t ;
       let mask_owners =
-        Hashtbl.fold t.token_owners ~init:Account_id.Set.empty
+        Map.fold !(t.token_owners) ~init:Account_id.Set.empty
           ~f:(fun ~key:_tid ~data:owner acc -> Set.add acc owner)
       in
       Set.union mask_owners (Base.token_owners (get_parent t))
@@ -528,7 +670,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let tokens t pk =
       assert_is_attached t ;
       let mask_tokens =
-        Account_id.Table.keys t.location_tbl
+        Map.keys !(t.locations)
         |> List.filter_map ~f:(fun aid ->
                if Key.equal pk (Account_id.public_key aid) then
                  Some (Account_id.token_id aid)
@@ -559,9 +701,59 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.location_of_account (get_parent t) account_id
 
-    let location_of_account_batch =
-      self_find_or_batch_lookup self_find_location
-        Base.location_of_account_batch
+    let location_of_account_batch t =
+      self_find_or_batch_lookup
+        (fun id -> (id, Option.map ~f:Option.some @@ self_find_location t id))
+        Base.location_of_account_batch t
+
+    (* Adds specified accounts to the mask by laoding them from parent ledger.
+
+       Could be useful for transaction processing when to pre-populate mask with the
+       accounts used in processing a transaction (or a block) to ensure there are not loaded
+       from parent on each lookup. I.e. these accounts will be cached in mask and accessing
+       them during processing of a transaction won't use disk I/O.
+    *)
+    let unsafe_preload_accounts_from_parent t account_ids =
+      assert_is_attached t ;
+      let locations = location_of_account_batch t account_ids in
+      let non_empty_locations = List.filter_map locations ~f:snd in
+      let accounts = get_batch t non_empty_locations in
+      let all_hash_locations =
+        let rec generate_locations account_locations acc =
+          match account_locations with
+          | [] ->
+              acc
+          | location :: account_locations -> (
+              let address = Location.to_path_exn location in
+              match Addr.parent address with
+              | Ok parent ->
+                  let sibling = Addr.sibling address in
+                  generate_locations
+                    (Location.Hash parent :: account_locations)
+                    (Location.Hash address :: Location.Hash sibling :: acc)
+              | Error _ ->
+                  (* This is the root. It's somewhat wasteful to add it for
+                     every account, but makes this logic simpler.
+                  *)
+                  generate_locations account_locations
+                    (Location.Hash address :: acc) )
+        in
+        generate_locations non_empty_locations []
+      in
+      let all_hashes =
+        Base.get_hash_batch_exn (get_parent t) all_hash_locations
+      in
+      (* Batch import merkle paths and self hashes. *)
+      List.iter2_exn all_hash_locations all_hashes ~f:(fun location hash ->
+          let address = Location.to_path_exn location in
+          self_set_hash t address hash ) ;
+      (* Batch import accounts. *)
+      List.iter accounts ~f:(fun (location, account) ->
+          match account with
+          | None ->
+              ()
+          | Some account ->
+              set_account_unsafe t location account )
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for t =
@@ -609,9 +801,9 @@ module Make (Inputs : Inputs_intf.S) = struct
        as sometimes this is desired behavior *)
     let close t =
       assert_is_attached t ;
-      Location_binable.Table.clear t.account_tbl ;
-      Addr.Table.clear t.hash_tbl ;
-      Account_id.Table.clear t.location_tbl ;
+      t.accounts := Location_binable.Map.empty ;
+      t.hashes := Addr.Map.empty ;
+      t.locations := Account_id.Map.empty ;
       Async.Ivar.fill_if_empty t.detached_parent_signal ()
 
     let index_of_account_exn t key =
@@ -655,9 +847,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
       assert_is_attached t ;
-      let locations_and_accounts =
-        Location_binable.Table.to_alist t.account_tbl
-      in
+      let locations_and_accounts = Map.to_alist !(t.accounts) in
       (* parent should ignore accounts in this mask *)
       let mask_accounts =
         List.map locations_and_accounts ~f:(fun (_loc, acct) ->

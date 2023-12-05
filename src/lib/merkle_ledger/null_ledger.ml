@@ -57,14 +57,35 @@ end = struct
       let h = Location.height ~ledger_depth:t.depth k in
       if h >= t.depth then []
       else
-        let sibling_dir = Location.last_direction (Location.to_path_exn k) in
+        let dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
-        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+        Direction.map dir ~left:(`Left hash) ~right:(`Right hash)
         :: loop (Location.parent k)
     in
     loop location
 
   let merkle_path_batch t locations = List.map ~f:(merkle_path t) locations
+
+  let wide_merkle_path t location =
+    let location =
+      if Location.is_account location then
+        Location.Hash (Location.to_path_exn location)
+      else location
+    in
+    assert (Location.is_hash location) ;
+    let rec loop k =
+      let h = Location.height ~ledger_depth:t.depth k in
+      if h >= t.depth then []
+      else
+        let dir = Location.last_direction (Location.to_path_exn k) in
+        let hash = empty_hash_at_height h in
+        Direction.map dir ~left:(`Left (hash, hash)) ~right:(`Right (hash, hash))
+        :: loop (Location.parent k)
+    in
+    loop location
+
+  let wide_merkle_path_batch t locations =
+    List.map ~f:(wide_merkle_path t) locations
 
   let merkle_root t = empty_hash_at_height t.depth
 
@@ -72,6 +93,11 @@ end = struct
 
   let merkle_path_at_index_exn t index =
     merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:t.depth index)
+
+  let get_hash_batch_exn t locations =
+    List.map locations ~f:(fun location ->
+        empty_hash_at_height
+          (Addr.height ~ledger_depth:t.depth (Location.to_path_exn location)) )
 
   let index_of_account_exn _t =
     failwith "index_of_account_exn: null ledgers are empty"

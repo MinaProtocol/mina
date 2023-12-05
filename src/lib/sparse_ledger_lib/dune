@@ -13,6 +13,8 @@
    bin_prot.shape
    result
    ppx_version.runtime
+   ;; mina
+   mina_stdlib
  )
  (preprocess
   (pps ppx_jane ppx_compare ppx_deriving_yojson ppx_version))
