@@ -13,6 +13,7 @@
 (package (name block_producer))
 (package (name block_storage))
 (package (name block_time))
+(package (name bn254_bindings))
 (package (name bootstrap_controller))
 (package (name bowe_gabizon_hash))
 (package (name cache_dir))

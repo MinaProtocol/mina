@@ -1,8 +1,8 @@
 (library
  (inline_tests
   (flags -verbose -show-counts))
- (name kimchi_pasta_basic)
- (public_name kimchi_backend.pasta.basic)
+ (name kimchi_bn254_basic)
+ (public_name kimchi_backend.bn254.basic)
  (flags -warn-error -27)
  (instrumentation
   (backend bisect_ppx))
@@ -16,13 +16,9 @@
   bin_prot.shape
   base.caml
   ;; local libraries
-  sponge
-  pickles_types
   kimchi_backend.common
-  promise
   kimchi_bindings
   kimchi_types
   pasta_bindings
   bn254_bindings
-  snarkette
   ppx_version.runtime))

@@ -3,8 +3,8 @@ use crate::caml::caml_bytes_string::CamlBytesString;
 use ark_ff::bytes::ToBytes;
 use ark_ff::{FftField, Field, FpParameters, One, PrimeField, SquareRootField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use mina_curves::bn254::fp::Fp;
-use mina_curves::bn254::fp::FpParameters as Fp_params;
+use mina_curves::bn254::fields::FpParameters as Fp_params;
+use mina_curves::bn254::Fp;
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::{

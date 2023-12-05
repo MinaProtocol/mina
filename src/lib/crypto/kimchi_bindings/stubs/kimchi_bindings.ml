@@ -32,6 +32,40 @@ module FieldVectors = struct
 
     external set : t -> int -> elt -> unit = "caml_fq_vector_set"
   end
+
+  module Bn254Fp = struct
+    type nonrec t
+
+    type nonrec elt = Bn254_bindings.Bn254Fp.t
+
+    external create : unit -> t = "caml_bn254_fp_vector_create"
+
+    external length : t -> int = "caml_bn254_fp_vector_length"
+
+    external emplace_back : t -> elt -> unit
+      = "caml_bn254_fp_vector_emplace_back"
+
+    external get : t -> int -> elt = "caml_bn254_fp_vector_get"
+
+    external set : t -> int -> elt -> unit = "caml_bn254_fp_vector_set"
+  end
+
+  module Bn254Fq = struct
+    type nonrec t
+
+    type nonrec elt = Bn254_bindings.Bn254Fq.t
+
+    external create : unit -> t = "caml_bn254_fq_vector_create"
+
+    external length : t -> int = "caml_bn254_fq_vector_length"
+
+    external emplace_back : t -> elt -> unit
+      = "caml_bn254_fq_vector_emplace_back"
+
+    external get : t -> int -> elt = "caml_bn254_fq_vector_get"
+
+    external set : t -> int -> elt -> unit = "caml_bn254_fq_vector_set"
+  end
 end
 
 module Protocol = struct

@@ -13,9 +13,10 @@ use std::io::Write;
 use wires_15_stubs::{
     // we must import all here, to have access to the derived functions
     arkworks::{
-        bigint_256::*, bn254_fp::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*,
+        bigint_256::*, bn254_fp::*, bn254_fq::*, group_affine::*, group_projective::*, pasta_fp::*,
+        pasta_fq::*,
     },
-    field_vector::{fp::*, fq::*},
+    field_vector::{bn254_fp::*, bn254_fq::*, fp::*, fq::*},
     gate_vector::{fp::*, fq::*},
     oracles::{fp::*, fq::*, CamlOracles},
     pasta_fp_plonk_index::*,
@@ -28,7 +29,7 @@ use wires_15_stubs::{
         CamlLookupInfo, CamlLookupSelectors, CamlLookupVerifierIndex, CamlLookupsUsed,
         CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
     },
-    projective::{pallas::*, vesta::*},
+    projective::{pallas::*, vesta::*, bn254::*},
     srs::{fp::*, fq::*},
     CamlCircuitGate,
     CamlLookupCommitments,
@@ -348,6 +349,73 @@ fn generate_bn254_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_bn254_fp_of_bytes => "of_bytes");
         decl_func!(w, env, caml_bn254_fp_deep_copy => "deep_copy");
     });
+    decl_module!(w, env, "Bn254Fq", {
+        decl_type!(w, env, CamlBn254Fq => "t");
+
+        decl_func!(w, env, caml_bn254_fq_size_in_bits => "size_in_bits");
+        decl_func!(w, env, caml_bn254_fq_size => "size");
+        decl_func!(w, env, caml_bn254_fq_add => "add");
+        decl_func!(w, env, caml_bn254_fq_sub => "sub");
+        decl_func!(w, env, caml_bn254_fq_negate => "negate");
+        decl_func!(w, env, caml_bn254_fq_mul => "mul");
+        decl_func!(w, env, caml_bn254_fq_div => "div");
+        decl_func!(w, env, caml_bn254_fq_inv => "inv");
+        decl_func!(w, env, caml_bn254_fq_square => "square");
+        decl_func!(w, env, caml_bn254_fq_is_square => "is_square");
+        decl_func!(w, env, caml_bn254_fq_sqrt => "sqrt");
+        decl_func!(w, env, caml_bn254_fq_of_int => "of_int");
+        decl_func!(w, env, caml_bn254_fq_to_string => "to_string");
+        decl_func!(w, env, caml_bn254_fq_of_string => "of_string");
+        decl_func!(w, env, caml_bn254_fq_print => "print");
+        decl_func!(w, env, caml_bn254_fq_print_rust => "print_rust");
+        decl_func!(w, env, caml_bn254_fq_copy => "copy");
+        decl_func!(w, env, caml_bn254_fq_mut_add => "mut_add");
+        decl_func!(w, env, caml_bn254_fq_mut_sub => "mut_sub");
+        decl_func!(w, env, caml_bn254_fq_mut_mul => "mut_mul");
+        decl_func!(w, env, caml_bn254_fq_mut_square => "mut_square");
+        decl_func!(w, env, caml_bn254_fq_compare => "compare");
+        decl_func!(w, env, caml_bn254_fq_equal => "equal");
+        decl_func!(w, env, caml_bn254_fq_random => "random");
+        decl_func!(w, env, caml_bn254_fq_rng => "rng");
+        decl_func!(w, env, caml_bn254_fq_to_bigint => "to_bigint");
+        decl_func!(w, env, caml_bn254_fq_of_bigint => "of_bigint");
+        decl_func!(w, env, caml_bn254_fq_two_adic_root_of_unity => "two_adic_root_of_unity");
+        decl_func!(w, env, caml_bn254_fq_domain_generator => "domain_generator");
+        decl_func!(w, env, caml_bn254_fq_to_bytes => "to_bytes");
+        decl_func!(w, env, caml_bn254_fq_of_bytes => "of_bytes");
+        decl_func!(w, env, caml_bn254_fq_deep_copy => "deep_copy");
+    });
+
+    decl_module!(w, env, "Bn254", {
+        decl_module!(w, env, "BaseField", {
+            decl_type_alias!(w, env, "t" => CamlBn254Fq);
+        });
+
+        decl_module!(w, env, "ScalarField", {
+            decl_type_alias!(w, env, "t" => CamlBn254Fp);
+        });
+
+        decl_module!(w, env, "Affine", {
+            decl_type_alias!(w, env, "t" => CamlGroupAffine<CamlBn254Fq>);
+        });
+
+        decl_type!(w, env, CamlGroupProjectiveBn254 => "t");
+
+        decl_func!(w, env, caml_bn254_one => "one");
+        decl_func!(w, env, caml_bn254_add => "add");
+        decl_func!(w, env, caml_bn254_sub => "sub");
+        decl_func!(w, env, caml_bn254_negate => "negate");
+        decl_func!(w, env, caml_bn254_double => "double");
+        decl_func!(w, env, caml_bn254_scale => "scale");
+        decl_func!(w, env, caml_bn254_random => "random");
+        decl_func!(w, env, caml_bn254_rng => "rng");
+        decl_func!(w, env, caml_bn254_endo_base => "endo_base");
+        decl_func!(w, env, caml_bn254_endo_scalar => "endo_scalar");
+        decl_func!(w, env, caml_bn254_to_affine => "to_affine");
+        decl_func!(w, env, caml_bn254_of_affine => "of_affine");
+        decl_func!(w, env, caml_bn254_of_affine_coordinates => "of_affine_coordinates");
+        decl_func!(w, env, caml_bn254_affine_deep_copy => "deep_copy");
+    });
 }
 
 fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
@@ -372,6 +440,28 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, caml_fq_vector_emplace_back => "emplace_back");
             decl_func!(w, env, caml_fq_vector_get => "get");
             decl_func!(w, env, caml_fq_vector_set => "set");
+        });
+
+        decl_module!(w, env, "Bn254Fp", {
+            decl_type!(w, env, CamlBn254FpVector => "t");
+            decl_type_alias!(w, env, "elt" => CamlBn254Fp);
+
+            decl_func!(w, env, caml_bn254_fp_vector_create => "create");
+            decl_func!(w, env, caml_bn254_fp_vector_length => "length");
+            decl_func!(w, env, caml_bn254_fp_vector_emplace_back => "emplace_back");
+            decl_func!(w, env, caml_bn254_fp_vector_get => "get");
+            decl_func!(w, env, caml_bn254_fp_vector_set => "set");
+        });
+
+        decl_module!(w, env, "Bn254Fq", {
+            decl_type!(w, env, CamlBn254FqVector => "t");
+            decl_type_alias!(w, env, "elt" => CamlBn254Fq);
+
+            decl_func!(w, env, caml_bn254_fq_vector_create => "create");
+            decl_func!(w, env, caml_bn254_fq_vector_length => "length");
+            decl_func!(w, env, caml_bn254_fq_vector_emplace_back => "emplace_back");
+            decl_func!(w, env, caml_bn254_fq_vector_get => "get");
+            decl_func!(w, env, caml_bn254_fq_vector_set => "set");
         });
     });
 
