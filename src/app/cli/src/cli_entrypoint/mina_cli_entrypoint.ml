@@ -14,6 +14,16 @@ let () = Async.Scheduler.set_record_backtraces true
 
 [%%endif]
 
+[%%ifndef zkapp_cmd_limit]
+
+let zkapp_cmd_limit = None
+
+[%%else]
+
+[%%inject "zkapp_cmd_limit", zkapp_cmd_limit]
+
+[%%endif]
+
 type mina_initialization =
   { mina : Mina_lib.t
   ; client_trustlist : Unix.Cidr.t list option
@@ -1358,6 +1368,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                    ; shutdown_on_disconnect = true
                    ; num_threads = snark_worker_parallelism_flag
                    }
+                 ~zkapp_cmd_limit
                  ~snark_coordinator_key:run_snark_coordinator_flag
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
