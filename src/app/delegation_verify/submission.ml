@@ -15,7 +15,7 @@ module type Data_source = sig
 
   type submission
 
-  val created_at : submission -> string
+  val submitted_at : submission -> string
 
   val block_hash : submission -> string
 
@@ -44,14 +44,14 @@ module Filesystem = struct
   type t = { block_dir : string; submission_paths : string list }
 
   type submission =
-    { created_at : string
+    { submitted_at : string
     ; snark_work : Uptime_service.Proof_data.t option
     ; submitter : Public_key.Compressed.t
     ; block_hash : string
     }
 
   type raw =
-    { created_at : string
+    { submitted_at : string
     ; peer_id : string
     ; snark_work : string option [@default None]
     ; remote_addr : string
@@ -77,10 +77,10 @@ module Filesystem = struct
     { submitter
     ; snark_work
     ; block_hash = meta.block_hash
-    ; created_at = meta.created_at
+    ; submitted_at = meta.submitted_at
     }
 
-  let created_at ({ created_at; _ } : submission) = created_at
+  let submitted_at ({ submitted_at; _ } : submission) = submitted_at
 
   let block_hash ({ block_hash; _ } : submission) = block_hash
 
@@ -125,11 +125,7 @@ module Filesystem = struct
 end
 
 module Cassandra = struct
-  type t =
-    { conf : Cassandra.conf
-    ; period_start : string
-    ; period_end : string
-    }
+  type t = { conf : Cassandra.conf; period_start : string; period_end : string }
 
   type block_data = { raw_block : string } [@@deriving yojson]
 
@@ -177,7 +173,7 @@ module Cassandra = struct
       }
       : submission )
 
-  let created_at ({ created_at; _ } : submission) = created_at
+  let submitted_at ({ submitted_at; _ } : submission) = submitted_at
 
   let block_hash ({ block_hash; _ } : submission) = block_hash
 
@@ -185,10 +181,14 @@ module Cassandra = struct
 
   let submitter ({ submitter; _ } : submission) = submitter
 
-  let load_submissions { conf ; period_start; period_end } =
+  let load_submissions { conf; period_start; period_end } =
     let open Deferred.Or_error.Let_syntax in
-    let start_day = Time.of_string period_start |> Time.to_date ~zone:Time.Zone.utc in
-    let end_day = Time.of_string period_end |> Time.to_date ~zone:Time.Zone.utc in
+    let start_day =
+      Time.of_string period_start |> Time.to_date ~zone:Time.Zone.utc
+    in
+    let end_day =
+      Time.of_string period_end |> Time.to_date ~zone:Time.Zone.utc
+    in
     let partition_keys =
       Date.dates_between ~min:start_day ~max:end_day
       |> List.map ~f:(fun d -> Date.format d "%Y-%m-%d")
@@ -197,8 +197,7 @@ module Cassandra = struct
       if List.length partition_keys = 1 then
         sprintf "submitted_at_date = '%s'" (List.hd_exn partition_keys)
       else
-        sprintf
-          "submitted_at_date IN (%s)"
+        sprintf "submitted_at_date IN (%s)"
           (String.concat ~sep:"," @@ List.map ~f:(sprintf "'%s'") partition_keys)
     in
     let%bind raw =
@@ -215,10 +214,8 @@ module Cassandra = struct
           ; "graphql_control_port"
           ]
         ~where:
-          (sprintf
-             "%s AND submitted_at >= '%s' AND submitted_at <= '%s'"
-             partition
-             period_start period_end )
+          (sprintf "%s AND submitted_at >= '%s' AND submitted_at < '%s'"
+             partition period_start period_end )
         "submissions"
     in
     List.fold_right raw ~init:(Ok []) ~f:(fun sub acc ->
@@ -236,8 +233,7 @@ module Cassandra = struct
   let load_block ~block_hash { conf; _ } =
     let open Deferred.Or_error.Let_syntax in
     let%bind block_data =
-      Cassandra.select ~conf ~parse:block_data_of_yojson
-        ~fields:[ "raw_block" ]
+      Cassandra.select ~conf ~parse:block_data_of_yojson ~fields:[ "raw_block" ]
         ~where:(sprintf "block_hash = '%s'" block_hash)
         "blocks"
     in
@@ -251,26 +247,24 @@ module Cassandra = struct
   let output { conf; _ } (submission : submission) = function
     | Ok payload ->
         Output.display payload ;
-        Cassandra.update ~conf
-          ~table:"submissions"
+        Cassandra.update ~conf ~table:"submissions"
           ~where:
             (sprintf
                "submitted_at_date = '%s' and submitted_at = '%s' and submitter \
                 = '%s'"
-               (List.hd_exn @@ String.split ~on:' ' submission.created_at)
-               submission.created_at
+               (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
+               submission.submitted_at
                (Public_key.Compressed.to_base58_check submission.submitter) )
           Output.(valid_payload_to_cassandra_updates payload)
     | Error e ->
         Output.display_error @@ Error.to_string_hum e ;
-        Cassandra.update ~conf
-          ~table:"submissions"
+        Cassandra.update ~conf ~table:"submissions"
           ~where:
             (sprintf
                "submitted_at_date = '%s' and submitted_at = '%s' and submitter \
                 = '%s'"
-               (List.hd_exn @@ String.split ~on:' ' submission.created_at)
-               submission.created_at
+               (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
+               submission.submitted_at
                (Public_key.Compressed.to_base58_check submission.submitter) )
           [ ("validation_error", sprintf "'%s'" (Error.to_string_hum e)) ]
 end

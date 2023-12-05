@@ -2,7 +2,7 @@ open Async
 open Mina_base
 
 type t =
-  { created_at : string
+  { submitted_at : string
   ; submitter : string
   ; state_hash : State_hash.t
   ; parent : State_hash.t
@@ -12,7 +12,7 @@ type t =
 
 let valid_payload_to_yojson (p : t) : Yojson.Safe.t =
   `Assoc
-    [ ("created_at", `String p.created_at)
+    [ ("submitted_at", `String p.submitted_at)
     ; ("submitter", `String p.submitter)
     ; ("state_hash", State_hash.to_yojson p.state_hash)
     ; ("parent", State_hash.to_yojson p.parent)
