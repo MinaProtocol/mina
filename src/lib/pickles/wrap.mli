@@ -13,7 +13,7 @@ val wrap :
   -> (   ( Impls.Wrap.Impl.Field.t
          , Impls.Wrap.Impl.Field.t Import.Types.Scalar_challenge.t
          , Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-         , ( Impls.Wrap.Impl.Field.t Import.Types.Scalar_challenge.t
+         , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
            , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Opt.t
