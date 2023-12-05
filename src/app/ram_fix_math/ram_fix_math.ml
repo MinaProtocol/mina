@@ -12,8 +12,6 @@ module Const = struct
 
   let scan_state_delay = 2
 
-  let scan_state_trees = scan_state_depth + 1 + (scan_state_delay + 1)
-
   (* 2*k for best tip path (including root history), k for duplicate block producers *)
   let est_blocks_in_frontier = 3 * k
 
@@ -31,7 +29,7 @@ module Params = struct
 
   let max_signed_commands_per_block = 0
 
-  let max_txn_pool_size = 3000
+  let _max_txn_pool_size = 3000
 
   let max_accounts_modified_per_zkapp_command =
     1 + max_zkapp_txn_account_updates
@@ -437,11 +435,7 @@ module Sizes = struct
 
   let signed_command = count @@ Values.signed_command ()
 
-  let zkapp_account_update = count @@ Values.zkapp_account_update ()
-
   let zkapp_command = count @@ Values.zkapp_command ()
-
-  let account = count @@ Values.account ()
 
   let ledger_mask = count @@ Values.ledger_mask ()
 
