@@ -167,8 +167,22 @@ alternative, more fine-grained solution viable?
 
 ## Testing
 
-As any change involving mempool and block production, it would require
-an integration test to check. Such a test could generate a lot of
-zkApp commands and observe how they stack in the mempool. It could
-also verify that regular payments get included to fill remainder
-of space available in each block.
+The part of the code responsible for applying transactions from the
+mempool to the ledger is not properly isolated from the surrounding
+code, but it can be isolated and then unit-tested relatively easily.
+This is being done in a loop, which gives us an opportunity to test
+either any single step of that loop or the loop as a whole (ideally
+both). In such tests the most important properties to check would
+include:
+- if the limit is disabled, zkApp commands are applied normally.
+- no zkApp command is applied when the limit is reached.
+- no transaction depending on a skipped zkApp command is ever applied.
+- list of applied transactions contains at most the limit of zkApp
+  commands.
+- if there's less than limit of zkApp commands in the mempool, more
+  signed commands can be applied instead.
+  
+Additionally an integration test checking inclusion of transactions
+from the mempool in a newly created block could be written. Properties
+to check are similar to those described above, so maybe it's not that
+useful, though.
