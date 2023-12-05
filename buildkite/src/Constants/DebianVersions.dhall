@@ -27,11 +27,11 @@ let dependsOn = \(debVersion : DebVersion) -> \(profile : Profiles.Type) ->
   let profileSuffix = Profiles.toSuffixUppercase profile in
   let prefix = "MinaArtifact" in
   merge {
-    Bookworm = [{ name = "${prefix}${profileSuffix}", key = "build-deb-pkg" }]
-    , Bullseye = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "build-deb-pkg" }]
-    , Buster = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "build-deb-pkg" }]
-    , Jammy = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "build-deb-pkg" }]
-    , Focal = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "build-deb-pkg" }]
+    Bookworm = [{ name = "${prefix}${profileSuffix}", key = "upload-deb-pkg" }]
+    , Bullseye = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "upload-deb-pkg" }]
+    , Buster = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "upload-deb-pkg" }]
+    , Jammy = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "upload-deb-pkg" }]
+    , Focal = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "upload-deb-pkg" }]
   } debVersion
 
 -- Most debian builds are only used for public releases
