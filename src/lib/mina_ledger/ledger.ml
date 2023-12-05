@@ -22,6 +22,7 @@ module Ledger_inner = struct
       | Hash of Location_at_depth.Addr.t
     [@@deriving hash, sexp, compare]
 
+    include Comparable.Make_binable (Arg)
     include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
   end
 
