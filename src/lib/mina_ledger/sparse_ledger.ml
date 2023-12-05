@@ -11,26 +11,25 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let locations = Ledger.location_of_account_batch ledger keys in
   let non_empty_locations = List.filter_map ~f:snd locations in
   let accounts = Ledger.get_batch ledger non_empty_locations in
-  let sl, _ =
+  let merkle_paths = Ledger.merkle_path_batch ledger non_empty_locations in
+  let sl, _, _ =
     List.fold locations
-      ~init:(of_ledger_root ledger, accounts)
-      ~f:(fun (sl, accounts) (key, location) ->
+      ~init:(of_ledger_root ledger, accounts, merkle_paths)
+      ~f:(fun (sl, accounts, merkle_paths) (key, location) ->
         match location with
-        | Some loc -> (
-            match accounts with
-            | (_, account) :: rest ->
+        | Some _loc -> (
+            match (accounts, merkle_paths) with
+            | (_, account) :: rest, merkle_path :: rest_merkle_paths ->
                 let sl =
-                  add_path sl
-                    (Ledger.merkle_path ledger loc)
-                    key (Option.value_exn account)
+                  add_path sl merkle_path key (Option.value_exn account)
                 in
-                (sl, rest)
-            | [] ->
+                (sl, rest, rest_merkle_paths)
+            | _ ->
                 failwith "unexpected number of non empty accounts" )
         | None ->
             let path, account = Ledger.create_empty_exn ledger key in
             let sl = add_path sl path key account in
-            (sl, accounts) )
+            (sl, accounts, merkle_paths) )
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
