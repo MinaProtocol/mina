@@ -674,18 +674,16 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* copy tables in t; use same parent *)
     let copy t =
-      let detached_parent_signal = Async.Ivar.create () in
       { uuid = Uuid_unix.create ()
       ; parent = Ok (get_parent t)
-      ; detached_parent_signal
+      ; detached_parent_signal = Async.Ivar.create ()
       ; current_location = t.current_location
       ; depth = t.depth
       ; maps = maps_copy t.maps
       ; accumulated =
           Option.map t.accumulated ~f:(fun acc ->
-              { base = acc.base
-              ; detached_next_signal = detached_parent_signal
-              ; next = maps_copy acc.next
+              { acc with
+                next = maps_copy acc.next
               ; current = maps_copy acc.current
               } )
       ; is_committing = false
