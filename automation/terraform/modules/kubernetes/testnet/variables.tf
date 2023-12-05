@@ -203,15 +203,13 @@ variable "seed_external_port" {
 variable "seed_configs" {
   type = list(
     object({
-      name               = string,
-      class              = string,
-      libp2p_secret      = string,
-      libp2p_secret_pw = string
-      # external_port      = number,
-      external_ip        = string,
-      # private_key_secret = string,
-      enableArchive      = bool,
-      archiveAddress     = string
+      name                = string,
+      class               = string,
+      libp2p_secret       = string,
+      libp2p_secret_pw    = string
+      external_ip         = string,
+      enableArchive       = bool,
+      archiveAddress      = string
       persist_working_dir = bool,
     })
   )
@@ -225,19 +223,18 @@ variable "log_level" {
   default = "Trace"
 }
 
-# variable "block_producer_key_pass" {
-#   type = string
-# }
+variable "block_producer_key_pass" {
+  type    = string
+  default = "naughty blue worm"
+}
 
 variable "block_producer_configs" {
   type = list(
     object({
       name                   = string,
       class                  = string,
-      keypair_name     = string,
-      # private_key            = string,
-      # public_key             = string,
-      privkey_password = string,
+      keypair_name           = string,
+      privkey_password       = string,
       external_port          = number,
       libp2p_secret          = string,
       enable_gossip_flooding = bool,
@@ -259,16 +256,16 @@ variable "plain_node_configs" {
 
 # Snark Worker Vars
 variable "snark_coordinators" {
-  type    = list(    
+  type = list(
     object({
 
-      snark_coordinator_name = string,
-      snark_worker_replicas = number
-      snark_worker_fee      = number
-      snark_worker_public_key = string
+      snark_coordinator_name       = string
+      snark_worker_replicas        = number
+      snark_worker_fee             = number
+      snark_worker_public_key      = string
       snark_coordinators_host_port = number
-      persist_working_dir = bool
-    }))
+      persist_working_dir          = bool
+  }))
   default = []
 }
 
@@ -354,17 +351,17 @@ variable "make_report_accounts" {
 variable "archive_configs" {
   type = list(
     object({
-      name                    = string
-      image                   = string
-      serverPort              = string
-      externalPort            = string
-      enableLocalDaemon       = bool
-      enablePostgresDB        = bool
+      name              = string
+      image             = string
+      serverPort        = string
+      externalPort      = string
+      enableLocalDaemon = bool
+      enablePostgresDB  = bool
 
-      postgresHost            = string
-      postgresPort            = string
-      remoteSchemaFile        = string
-      remoteSchemaAuxFiles        = list(string)
+      postgresHost         = string
+      postgresPort         = string
+      remoteSchemaFile     = string
+      remoteSchemaAuxFiles = list(string)
 
       persistenceEnabled      = bool
       persistenceSize         = string
