@@ -11,6 +11,8 @@ module Stable : sig
   module Latest : module type of V1
 end
 
+include Comparable.S_binable with type t := t
+
 include Hashable.S_binable with type t := t
 
 val of_byte_string : string -> t
