@@ -1492,9 +1492,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                     list ~length:constraint_constants.ledger_depth
                       (Boolean.typ * field))
                   ~compute:(fun () ->
-                    List.map
-                      (Sparse_ledger.path_exn (V.get ledger) (V.get idx))
-                      ~f:(fun x ->
+                    let (`Leaf_to_root path_to_root) =
+                      Sparse_ledger.path_exn (V.get ledger) (V.get idx)
+                    in
+                    List.map path_to_root ~f:(fun x ->
                         match x with
                         | `Left h ->
                             (false, h)

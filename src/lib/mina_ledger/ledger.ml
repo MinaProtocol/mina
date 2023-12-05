@@ -339,11 +339,8 @@ module Ledger_inner = struct
   let _handler t =
     let open Snark_params.Tick in
     let path_exn idx =
-      List.map (merkle_path_at_index_exn t idx) ~f:(function
-        | `Left h ->
-            h
-        | `Right h ->
-            h )
+      let (`Leaf_to_root path_to_root) = merkle_path_at_index_exn t idx in
+      List.map path_to_root ~f:(function `Left h -> h | `Right h -> h)
     in
     stage (fun (With { request; respond }) ->
         match request with

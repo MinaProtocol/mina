@@ -48,7 +48,8 @@ module type S = sig
 
   val order_siblings : t -> 'a -> 'a -> 'a * 'a
 
-  val merkle_path_dependencies_exn : t -> (t * Direction.t) list
+  val merkle_path_dependencies_exn :
+    t -> [ `Leaf_to_root of (t * Direction.t) list ]
 
   include Comparable.S with type t := t
 end

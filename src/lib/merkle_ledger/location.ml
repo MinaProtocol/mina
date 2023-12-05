@@ -153,7 +153,8 @@ module T = struct
      By reverse it means that head of returned list contains direction from
      location's parent to the location along with the location's sibling.
   *)
-  let merkle_path_dependencies_exn (location : t) : (t * Direction.t) list =
+  let merkle_path_dependencies_exn (location : t) :
+      [ `Leaf_to_root of (t * Direction.t) list ] =
     let rec loop k =
       if Addr.depth k = 0 then []
       else
@@ -163,7 +164,7 @@ module T = struct
     in
     match location with
     | Hash addr ->
-        loop addr
+        `Leaf_to_root (loop addr)
     | _ ->
         failwith "can only get merkle path dependencies of a hash location"
 

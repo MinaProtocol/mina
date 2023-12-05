@@ -251,14 +251,18 @@ module Make (Inputs : Inputs_intf.S) = struct
           in
           if is_empty then Some (empty_hash height) else None
 
-    let rec self_path_impl ~element ~depth address =
-      let height = Addr.height ~ledger_depth:depth address in
-      if height >= depth then Some []
-      else
-        let%bind.Option el = element height address in
-        let%bind.Option parent_address = Addr.parent address |> Or_error.ok in
-        let%map.Option rest = self_path_impl ~element ~depth parent_address in
-        el :: rest
+    let self_path_impl ~element ~depth address =
+      let rec loop address =
+        let height = Addr.height ~ledger_depth:depth address in
+        if height >= depth then Some []
+        else
+          let%bind.Option el = element height address in
+          let%bind.Option parent_address = Addr.parent address |> Or_error.ok in
+          let%map.Option rest = loop parent_address in
+          el :: rest
+      in
+      let%map.Option path_to_root = loop address in
+      `Leaf_to_root path_to_root
 
     let self_merkle_path ~hashes ~current_location =
       let element height address =
@@ -289,42 +293,41 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
-    let fixup_merkle_path ~hashes ~address:init =
-      let f address =
+    let fixup_merkle_path ~hashes ~address:init (`Leaf_to_root path_to_root) =
+      let f address dir =
         (* first element in the path contains hash at sibling of address *)
         let sibling_mask_hash = Map.find hashes (Addr.sibling address) in
         let parent_addr = Addr.parent_exn address in
-        let open Option in
-        function
+        match dir with
         | `Left h ->
-            (parent_addr, `Left (value sibling_mask_hash ~default:h))
+            (parent_addr, `Left (Option.value sibling_mask_hash ~default:h))
         | `Right h ->
-            (parent_addr, `Right (value sibling_mask_hash ~default:h))
+            (parent_addr, `Right (Option.value sibling_mask_hash ~default:h))
       in
-      Fn.compose snd @@ List.fold_map ~init ~f
+      `Leaf_to_root (snd @@ List.fold_map path_to_root ~init ~f)
 
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
-    let fixup_wide_merkle_path ~hashes ~address:init =
-      let f address =
+    let fixup_wide_merkle_path ~hashes ~address:init (`Leaf_to_root path_to_root)
+        =
+      let f address dir =
         (* element in the path contains hash at sibling of address *)
         let sibling_mask_hash = Map.find hashes (Addr.sibling address) in
         let self_mask_hash = Map.find hashes address in
         let parent_addr = Addr.parent_exn address in
-        let open Option in
-        function
+        match dir with
         | `Left (h_l, h_r) ->
             ( parent_addr
             , `Left
-                ( value self_mask_hash ~default:h_l
-                , value sibling_mask_hash ~default:h_r ) )
+                ( Option.value self_mask_hash ~default:h_l
+                , Option.value sibling_mask_hash ~default:h_r ) )
         | `Right (h_l, h_r) ->
             ( parent_addr
             , `Right
-                ( value sibling_mask_hash ~default:h_l
-                , value self_mask_hash ~default:h_r ) )
+                ( Option.value sibling_mask_hash ~default:h_l
+                , Option.value self_mask_hash ~default:h_r ) )
       in
-      Fn.compose snd @@ List.fold_map ~init ~f
+      `Leaf_to_root (snd @@ List.fold_map path_to_root ~init ~f)
 
     (* the following merkle_path_* functions report the Merkle path for the
        mask *)
@@ -393,8 +396,9 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* given a Merkle path corresponding to a starting address, calculate
        addresses and hashes for each node affected by the starting hash; that is,
        along the path from the account address to root *)
-    let addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
-        starting_hash : (Addr.t * Hash.t) list =
+    let addresses_and_hashes_from_merkle_path_exn (`Leaf_to_root merkle_path)
+        starting_address starting_hash :
+        [ `Leaf_to_root of (Addr.t * Hash.t) list ] =
       let get_addresses_hashes height accum node =
         let last_address, last_hash = List.hd_exn accum in
         let next_address = Addr.parent_exn last_address in
@@ -407,9 +411,10 @@ module Make (Inputs : Inputs_intf.S) = struct
         in
         (next_address, next_hash) :: accum
       in
-      List.foldi merkle_path
-        ~init:[ (starting_address, starting_hash) ]
-        ~f:get_addresses_hashes
+      `Leaf_to_root
+        (List.foldi merkle_path
+           ~init:[ (starting_address, starting_hash) ]
+           ~f:get_addresses_hashes )
 
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
@@ -445,7 +450,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.empty_account in
       let merkle_path = merkle_path t location in
-      let addresses_and_hashes =
+      let (`Leaf_to_root addresses_and_hashes) =
         addresses_and_hashes_from_merkle_path_exn merkle_path account_address
           account_hash
       in
@@ -471,7 +476,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.hash_account account in
       let merkle_path = merkle_path t location in
-      let addresses_and_hashes =
+      let (`Leaf_to_root addresses_and_hashes) =
         addresses_and_hashes_from_merkle_path_exn merkle_path account_address
           account_hash
       in

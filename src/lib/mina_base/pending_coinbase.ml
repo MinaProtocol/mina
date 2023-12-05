@@ -1037,18 +1037,21 @@ module Make_str (A : Wire_types.Concrete) = struct
         !cached.(i)
 
     let create_exn' ~depth () =
-      let rec create_path height path key =
-        if height < 0 then path
+      let rec create_path_leaf_to_root depth path key =
+        if depth < 0 then path
         else
-          let hash = hash_at_level height in
-          create_path (height - 1)
+          let hash = hash_at_level depth in
+          create_path_leaf_to_root (depth - 1)
             ((if key mod 2 = 0 then `Left hash else `Right hash) :: path)
             (key / 2)
       in
       let rec make_tree t key =
         if Stack_id.( > ) key (Stack_id.of_int @@ (Int.pow 2 depth - 1)) then t
         else
-          let path = create_path (depth - 1) [] (Stack_id.to_int key) in
+          let path =
+            `Leaf_to_root
+              (create_path_leaf_to_root (depth - 1) [] (Stack_id.to_int key))
+          in
           make_tree
             (Merkle_tree.add_path t path key Stack.empty)
             (Or_error.ok_exn (Stack_id.incr_by_one key))
@@ -1183,9 +1186,10 @@ module Make_str (A : Wire_types.Concrete) = struct
     let handler ~depth (t : t) ~is_new_stack =
       let pending_coinbase = ref t in
       let coinbase_stack_path_exn idx =
-        List.map
-          (path !pending_coinbase idx |> Or_error.ok_exn)
-          ~f:(function `Left h -> h | `Right h -> h)
+        let (`Leaf_to_root path_to_root) =
+          Or_error.ok_exn (path !pending_coinbase idx)
+        in
+        List.map path_to_root ~f:(function `Left h -> h | `Right h -> h)
       in
       stage (fun (With { request; respond }) ->
           match request with

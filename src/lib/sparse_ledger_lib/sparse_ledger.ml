@@ -65,14 +65,19 @@ module type S = sig
 
   val get_exn : t -> int -> account
 
-  val path_exn : t -> int -> [ `Left of hash | `Right of hash ] list
+  val path_exn :
+    t -> int -> [ `Leaf_to_root of [ `Left of hash | `Right of hash ] list ]
 
   val set_exn : t -> int -> account -> t
 
   val find_index_exn : t -> account_id -> int
 
   val add_path :
-    t -> [ `Left of hash | `Right of hash ] list -> account_id -> account -> t
+       t
+    -> [ `Leaf_to_root of [ `Left of hash | `Right of hash ] list ]
+    -> account_id
+    -> account
+    -> t
 
   (** Same as [add_path], but using the hashes provided in the wide merkle path
       instead of recomputing them.
@@ -80,7 +85,7 @@ module type S = sig
   *)
   val add_wide_path_unsafe :
        t
-    -> [ `Left of hash * hash | `Right of hash * hash ] list
+    -> [ `Leaf_to_root of [ `Left of hash * hash | `Right of hash * hash ] list ]
     -> account_id
     -> account
     -> t
@@ -181,13 +186,16 @@ end = struct
       | Node _, [] ->
           failwith "path is shorter than a tree's branch"
     in
-    traverse_through_nodes (tree0, List.rev path0)
+    let (`Leaf_to_root path_to_root) = path0 in
+    let path_to_leaf = List.rev path_to_root in
+    traverse_through_nodes (tree0, path_to_leaf)
+
+  let index_from ~path:(`Leaf_to_root dirs) =
+    List.foldi dirs ~init:0 ~f:(fun i acc dir ->
+        match dir with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
 
   let add_path (t : t) path account_id account =
-    let index =
-      List.foldi path ~init:0 ~f:(fun i acc x ->
-          match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
-    in
+    let index = index_from ~path in
     let replace_self ~f = function
       | `Left h_r ->
           (f None, Tree.Hash h_r)
@@ -200,10 +208,7 @@ end = struct
     }
 
   let add_wide_path_unsafe (t : t) path account_id account =
-    let index =
-      List.foldi path ~init:0 ~f:(fun i acc x ->
-          match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
-    in
+    let index = index_from ~path in
     let replace_self ~f = function
       | `Left (h_l, h_r) ->
           (f (Some h_l), Tree.Hash h_r)
@@ -311,7 +316,7 @@ end = struct
             if go_right then go (`Right (hash l) :: acc) (i - 1) r
             else go (`Left (hash r) :: acc) (i - 1) l
     in
-    go [] (depth - 1) tree
+    `Leaf_to_root (go [] (depth - 1) tree)
 end
 
 type ('hash, 'key, 'account) t = ('hash, 'key, 'account) T.t [@@deriving yojson]
