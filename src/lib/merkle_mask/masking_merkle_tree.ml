@@ -59,13 +59,35 @@ module Make (Inputs : Inputs_intf.S) = struct
     base.hashes <- Map.merge_skewed ~combine base.hashes hashes ;
     base.locations <- Map.merge_skewed ~combine base.locations locations
 
+  (** Structure managing cache accumulated since the "base" ledger.
+
+    Its purpose is to optimize lookups through a few consequitive masks
+    (by using just one map lookup instead of [O(number of masks)] map lookups).
+
+    With a number of mask around 290, this trick gives a sizeable performance improvement.
+
+    Accumulator is inherited from parent mask if [set_parent ~accumulated] of a child
+    is called with [to_acumulated t] of the parent mask.
+
+    Structure maintains two caches: [current] and [next], with the former
+    being always a superset of a latter and [next] always being superset of mask's contents
+    from [maps] field. These two caches are being rotated according to a certain rule
+    to ensure that no much more memory is used within accumulator as compared to the case
+    when [accumulated = None] for all masks.
+
+    Garbage-collection/rotation mechanism for [next] and [current] is based on idea to set
+    [current] to [next] and [next] to [t.maps] when the mask at which accumulation of [next] started
+    became detached. *)
   type accumulated_t =
     { current : maps_t
+          (** Currently used cache: contains a superset of contents of masks from base ledger to the current mask *)
     ; next : maps_t
-    ; base : Base.t
+          (** Cache that will be used after the current cache is garbage-collected *)
+    ; base : Base.t  (** Base ledger *)
     ; detached_next_signal : Detached_parent_signal.t
-          (* Ivar for mask from which next was started being built
-             When it's fulfilled, "next" becomes "current".
+          (** Ivar for mask from which next was started being built.
+             When it's fulfilled, [next] becomes [current] (because next contains superset of all masks from [baser],
+            [detached_signal] is reset to the current mask and [next] is set to contents of the current mask.
           *)
     }
 
@@ -163,6 +185,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     let get_parent ({ parent = opt; _ } as t) =
       assert_is_attached t ; Result.ok_or_failwith opt
 
+    (** Check whether mask from which we started computing the [next]
+        accumulator is detached and [current] can be garbage-collected. *)
     let actualize_accumulated t =
       Option.iter t.accumulated
         ~f:(fun { detached_next_signal; next; base; current = _ } ->
@@ -175,6 +199,9 @@ module Make (Inputs : Inputs_intf.S) = struct
                 ; base
                 } )
 
+    (** When [accumulated] is not configured, returns current [t.maps] and parent.
+                    
+                Otherwise, returns the [current] accumulator and [base]. *)
     let maps_and_ancestor t =
       actualize_accumulated t ;
       match t.accumulated with
@@ -183,6 +210,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           (t.maps, get_parent t)
 
+    (** Either copies accumulated or initializes it with the parent being used as the [base]. *)
     let to_accumulated t =
       actualize_accumulated t ;
       match (t.accumulated, t.parent) with
