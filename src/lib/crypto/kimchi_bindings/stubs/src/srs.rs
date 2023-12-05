@@ -192,3 +192,11 @@ pub mod fq {
 
     impl_srs!(CamlFqSrs, CamlFq, CamlGPallas, Fq, Pallas);
 }
+
+pub mod bn254_fp {
+    use super::*;
+    use crate::arkworks::{CamlBn254Fp, CamlGBn254};
+    use mina_curves::bn254::{Bn254, Fp};
+
+    impl_srs!(CamlBn254FpSrs, CamlBn254Fp, CamlGBn254, Fp, Bn254);
+}

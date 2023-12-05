@@ -222,6 +222,63 @@ module Protocol = struct
       external urs_h : t -> Pasta_bindings.Fp.t Kimchi_types.or_infinity
         = "caml_fq_srs_h"
     end
+
+    module Bn254Fp = struct
+      type nonrec t
+
+      module Poly_comm = struct
+        type nonrec t =
+          Bn254_bindings.Bn254Fp.t Kimchi_types.or_infinity
+          Kimchi_types.poly_comm
+      end
+
+      external create : int -> t = "caml_bn254_fp_srs_create"
+
+      external write : bool option -> t -> string -> unit
+        = "caml_bn254_fp_srs_write"
+
+      external read : int option -> string -> t option
+        = "caml_bn254_fp_srs_read"
+
+      external lagrange_commitment :
+           t
+        -> int
+        -> int
+        -> Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity
+           Kimchi_types.poly_comm = "caml_bn254_fp_srs_lagrange_commitment"
+
+      external add_lagrange_basis : t -> int -> unit
+        = "caml_bn254_fp_srs_add_lagrange_basis"
+
+      external commit_evaluations :
+           t
+        -> int
+        -> Bn254_bindings.Bn254Fp.t array
+        -> Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity
+           Kimchi_types.poly_comm = "caml_bn254_fp_srs_commit_evaluations"
+
+      external b_poly_commitment :
+           t
+        -> Bn254_bindings.Bn254Fp.t array
+        -> Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity
+           Kimchi_types.poly_comm = "caml_bn254_fp_srs_b_poly_commitment"
+
+      external batch_accumulator_check :
+           t
+        -> Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity array
+        -> Bn254_bindings.Bn254Fp.t array
+        -> bool = "caml_bn254_fp_srs_batch_accumulator_check"
+
+      external batch_accumulator_generate :
+           t
+        -> int
+        -> Bn254_bindings.Bn254Fp.t array
+        -> Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity array
+        = "caml_bn254_fp_srs_batch_accumulator_generate"
+
+      external urs_h : t -> Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity
+        = "caml_bn254_fp_srs_h"
+    end
   end
 
   module Index = struct

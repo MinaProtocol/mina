@@ -29,8 +29,8 @@ use wires_15_stubs::{
         CamlLookupInfo, CamlLookupSelectors, CamlLookupVerifierIndex, CamlLookupsUsed,
         CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
     },
-    projective::{pallas::*, vesta::*, bn254::*},
-    srs::{fp::*, fq::*},
+    projective::{bn254::*, pallas::*, vesta::*},
+    srs::{bn254_fp::*, fp::*, fq::*},
     CamlCircuitGate,
     CamlLookupCommitments,
     CamlOpeningProof,
@@ -528,6 +528,25 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_fq_srs_batch_accumulator_check => "batch_accumulator_check");
                 decl_func!(w, env, caml_fq_srs_batch_accumulator_generate => "batch_accumulator_generate");
                 decl_func!(w, env, caml_fq_srs_h => "urs_h");
+            });
+
+            decl_module!(w, env, "Bn254Fp", {
+                decl_type!(w, env, CamlBn254FpSrs => "t");
+
+                decl_module!(w, env, "Poly_comm", {
+                    decl_type_alias!(w, env, "t" => CamlPolyComm<CamlGroupAffine<CamlBn254Fp>>);
+                });
+
+                decl_func!(w, env, caml_bn254_fp_srs_create => "create");
+                decl_func!(w, env, caml_bn254_fp_srs_write => "write");
+                decl_func!(w, env, caml_bn254_fp_srs_read => "read");
+                decl_func!(w, env, caml_bn254_fp_srs_lagrange_commitment => "lagrange_commitment");
+                decl_func!(w, env, caml_bn254_fp_srs_add_lagrange_basis=> "add_lagrange_basis");
+                decl_func!(w, env, caml_bn254_fp_srs_commit_evaluations => "commit_evaluations");
+                decl_func!(w, env, caml_bn254_fp_srs_b_poly_commitment => "b_poly_commitment");
+                decl_func!(w, env, caml_bn254_fp_srs_batch_accumulator_check => "batch_accumulator_check");
+                decl_func!(w, env, caml_bn254_fp_srs_batch_accumulator_generate => "batch_accumulator_generate");
+                decl_func!(w, env, caml_bn254_fp_srs_h => "urs_h");
             });
         });
 
