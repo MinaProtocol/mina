@@ -19,7 +19,7 @@ git config --global --add safe.directory /workdir
 source buildkite/scripts/handle-fork.sh
 source buildkite/scripts/export-git-env-vars.sh
 
-pip3 install sexpdata
+pip3 install sexpdata==1.0.0
 
 base_branch=${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
 pr_branch=origin/${BUILDKITE_BRANCH}
