@@ -214,7 +214,7 @@ module Cassandra = struct
           ; "graphql_control_port"
           ]
         ~where:
-          (sprintf "%s AND submitted_at >= '%s' AND submitted_at <= '%s'"
+          (sprintf "%s AND submitted_at >= '%s' AND submitted_at < '%s'"
              partition period_start period_end )
         "submissions"
     in
