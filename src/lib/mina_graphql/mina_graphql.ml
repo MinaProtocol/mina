@@ -2348,6 +2348,10 @@ module Queries = struct
                 | Some (Ledger_db l) ->
                     Ok (Ledger.Any_ledger.cast (module Ledger.Db) l)
               in
+              assert (
+                Mina_base.Ledger_hash.equal
+                  (Ledger.Any_ledger.M.merkle_root staking_ledger)
+                  staking_epoch.ledger.hash ) ;
               let%bind next_epoch_ledger =
                 match Mina_lib.next_epoch_ledger mina with
                 | None ->
@@ -2359,10 +2363,17 @@ module Queries = struct
                 | Some (`Finalized (Ledger_db l)) ->
                     Ok (Some (Ledger.Any_ledger.cast (module Ledger.Db) l))
               in
+              let protocol_state_hash =
+                Transition_frontier.Breadcrumb.state_hash best_tip
+              in
+              Option.iter next_epoch_ledger ~f:(fun ledger ->
+                  assert (
+                    Mina_base.Ledger_hash.equal
+                      (Ledger.Any_ledger.M.merkle_root ledger)
+                      next_epoch.ledger.hash ) ) ;
               Runtime_config.make_fork_config ~staged_ledger ~global_slot
                 ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-                ~next_epoch_seed ~blockchain_length
-                ~protocol_state_hash:protocol_state.previous_state_hash
+                ~next_epoch_seed ~blockchain_length ~protocol_state_hash
                 runtime_config
             with
             | Error e ->

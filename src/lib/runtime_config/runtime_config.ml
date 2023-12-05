@@ -1186,9 +1186,7 @@ let gen =
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
-  Mina_ledger.Ledger.Any_ledger.M.foldi ~init:[]
-    ~f:(fun _ accum act -> act :: accum)
-    ledger
+  Mina_ledger.Ledger.Any_ledger.M.to_list_sequential ledger
   |> map_results ~f:Accounts.Single.of_account
 
 let ledger_of_accounts accounts =
