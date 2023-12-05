@@ -29,7 +29,11 @@ module Params = struct
 
   let max_signed_commands_per_block = 0
 
-  let _max_txn_pool_size = 3000
+  let max_zkapp_events = 100
+
+  let max_zkapp_actions = 100
+
+  let max_txn_pool_size = 3000
 
   let max_accounts_modified_per_zkapp_command =
     1 + max_zkapp_txn_account_updates
@@ -88,8 +92,7 @@ module Values = struct
       Mina_base.Signed_command_memo.empty
 
   let zkapp_uri () : string =
-    bin_copy ~bin_class:String.bin_t
-      (String.init 255 ~f:(Fn.const 'z'))
+    bin_copy ~bin_class:String.bin_t (String.init 255 ~f:(Fn.const 'z'))
 
   let token_symbol () : Mina_base.Account.Token_symbol.t =
     bin_copy ~bin_class:Mina_base.Account.Token_symbol.Stable.Latest.bin_t
@@ -167,18 +170,38 @@ module Values = struct
   let public_key () : Signature_lib.Public_key.Compressed.t =
     Signature_lib.Public_key.compress (keypair ()).public_key
 
-  let verification_key () : Mina_base.Verification_key_wire.t =
-    bin_copy ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t
-      (With_hash.of_data ~hash_data:Mina_base.Verification_key_wire.digest_vk
-         Mina_base.Side_loaded_verification_key.dummy )
-
-  let side_loaded_proof () : Pickles.Side_loaded.Proof.t =
-    let proof =
-      Pickles.Proof.dummy Pickles_types.Nat.N2.n Pickles_types.Nat.N2.n
-        Pickles_types.Nat.N2.n ~domain_log2:16
+  let verification_key : unit -> Mina_base.Verification_key_wire.t =
+    let vk =
+      let `VK vk, `Prover _ =
+        Transaction_snark.For_tests.create_trivial_snapp
+          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+          ()
+      in
+      vk
     in
-    bin_copy ~bin_class:Pickles.Side_loaded.Proof.Stable.Latest.bin_t
-      (Pickles.Side_loaded.Proof.of_proof proof)
+    fun () ->
+      bin_copy ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t vk
+
+  let side_loaded_proof : unit -> Pickles.Side_loaded.Proof.t =
+    let proof =
+      let num_updates = 1 in
+      let _ledger, zkapp_commands =
+        Snark_profiler_lib.create_ledger_and_zkapps ~min_num_updates:num_updates
+          ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
+      in
+      let cmd = List.hd_exn zkapp_commands in
+      let update =
+        List.nth_exn (Mina_base.Zkapp_command.all_account_updates_list cmd) 1
+      in
+      match update.authorization with
+      | Proof proof ->
+          proof
+      | _ ->
+          failwith "woops"
+    in
+    fun () ->
+      bin_copy ~bin_class:Pickles.Side_loaded.Proof.Stable.Latest.bin_t
+        (Pickles.Side_loaded.Proof.of_proof proof)
 
   let ledger_proof () : Ledger_proof.t =
     bin_copy ~bin_class:Ledger_proof.Stable.Latest.bin_t
@@ -297,10 +320,10 @@ module Values = struct
             }
         ; balance_change =
             (* TODO: insure uniqueness *) Currency.Amount.Signed.zero
-        ; increment_nonce = false
-          (* TODO: actions and events sizes *)
-        ; events = [ Array.init 5 ~f:(fun _ -> field ()) ]
-        ; actions = [ Array.init 5 ~f:(fun _ -> field ()) ]
+        ; increment_nonce = false (* TODO: actions and events sizes *)
+        ; events = [ Array.init Params.max_zkapp_events ~f:(fun _ -> field ()) ]
+        ; actions =
+            [ Array.init Params.max_zkapp_actions ~f:(fun _ -> field ()) ]
         ; call_data = field ()
         ; preconditions = preconditions ()
         ; use_full_commitment = false
@@ -421,7 +444,8 @@ module Values = struct
 end
 
 module Sizes = struct
-  let count (type a) (x : a) = Obj.(reachable_words @@ repr x) * (Sys.word_size / 8)
+  let count (type a) (x : a) =
+    Obj.(reachable_words @@ repr x) * (Sys.word_size / 8)
 
   let verification_key = count @@ Values.verification_key ()
 
@@ -656,13 +680,15 @@ let compute_ram_usage (sizes : Sizes.size_params) =
     let delta_referenced_size = refernced_size_per_squashed_tree in
     root_referenced_size + ((Const.est_scan_states - 1) * delta_referenced_size)
   in
-  (* TODO: transaction pool *)
+  (* TODO: measure the actuall network pool memory footprint instead of estimating *)
+  let transaction_pool = Params.max_txn_pool_size * sizes.zkapp_command in
   let usage_categories =
     [ ("baseline", baseline)
     ; ("scan_states", scan_states)
     ; ("ledger_masks", ledger_masks)
     ; ("staged_ledger_diffs", staged_ledger_diffs)
     ; ("snark_pool", snark_pool)
+    ; ("transaction_pool", transaction_pool)
     ]
   in
   List.iter usage_categories ~f:(fun (name, size) ->
@@ -700,4 +726,4 @@ let () =
   serial_bench ~name:"Ledger_proof.t"
     ~bin_class:Ledger_proof.Stable.Latest.bin_t
     ~gen:(Quickcheck.Generator.return (Values.ledger_proof ()))
-    ~equal:Ledger_proof.equal () ;
+    ~equal:Ledger_proof.equal ()
