@@ -288,7 +288,7 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
     ]
   in
   [%log info]
-    "Attempting to send GraphQL request \"$query\" to \"$uri\" after \
+    "Attempting to send GraphQL request \"$query_obj\" to \"$uri\" after \
      $init_delay sec"
     ~metadata ;
   let rec retry n =
