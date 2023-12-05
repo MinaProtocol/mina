@@ -651,6 +651,7 @@ struct
       ; feature_flags = _
       } =
     with_label __LOC__ (fun () ->
+        let () = Printf.printf "Hello, World\n" in
         match[@warning "-4"] (joint_combiner_0, joint_combiner_1) with
         | Nothing, Nothing ->
             ()
