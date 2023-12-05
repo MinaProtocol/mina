@@ -31,7 +31,7 @@ impl CamlFp {
     unsafe extern "C" fn ocaml_compare(x: ocaml::Raw, y: ocaml::Raw) -> i32 {
         let x = x.as_pointer::<Self>();
         let y = y.as_pointer::<Self>();
-        match x.as_ref().0.cmp(&y.as_ref().0) {
+        match x.as_ref().0.into_repr().cmp(&y.as_ref().0.into_repr()) {
             core::cmp::Ordering::Less => -1,
             core::cmp::Ordering::Equal => 0,
             core::cmp::Ordering::Greater => 1,
@@ -240,7 +240,7 @@ pub fn caml_pasta_fp_mut_square(mut x: ocaml::Pointer<CamlFp>) {
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_compare(x: ocaml::Pointer<CamlFp>, y: ocaml::Pointer<CamlFp>) -> ocaml::Int {
-    match x.as_ref().0.cmp(&y.as_ref().0) {
+    match x.as_ref().0.into_repr().cmp(&y.as_ref().0.into_repr()) {
         Less => -1,
         Equal => 0,
         Greater => 1,
