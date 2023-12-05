@@ -421,7 +421,7 @@ module Values = struct
 end
 
 module Sizes = struct
-  let count (type a) (x : a) = Obj.(reachable_words @@ repr x) * Sys.word_size
+  let count (type a) (x : a) = Obj.(reachable_words @@ repr x) * (Sys.word_size / 8)
 
   let verification_key = count @@ Values.verification_key ()
 
@@ -473,7 +473,7 @@ module Sizes = struct
     }
 
   let post_fix =
-    let cache_ref_size = Sys.word_size in
+    let cache_ref_size = Sys.word_size / 8 in
     (* ledger witness (x2) + toplevel accounts list on applied command *)
     let num_accounts_in_zkapp_command_base_work =
       Params.max_accounts_modified_per_zkapp_command * 3
