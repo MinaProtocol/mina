@@ -690,4 +690,12 @@ let () =
   serial_bench ~name:"Pickles.Side_loaded.Proof.t"
     ~bin_class:Pickles.Side_loaded.Proof.Stable.Latest.bin_t
     ~gen:(Quickcheck.Generator.return (Values.side_loaded_proof ()))
-    ~equal:Pickles.Side_loaded.Proof.equal ()
+    ~equal:Pickles.Side_loaded.Proof.equal () ;
+  serial_bench ~name:"Mina_base.Verification_key_wire.t"
+    ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t
+    ~gen:(Quickcheck.Generator.return (Values.verification_key ()))
+    ~equal:Mina_base.Verification_key_wire.equal () ;
+  serial_bench ~name:"Ledger_proof.t"
+    ~bin_class:Ledger_proof.Stable.Latest.bin_t
+    ~gen:(Quickcheck.Generator.return (Values.ledger_proof ()))
+    ~equal:Ledger_proof.equal () ;
