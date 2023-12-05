@@ -1,7 +1,7 @@
 ''' Github api tailored for auto-sync needs'''
 
 import json
-from github import Github,PullRequest
+from github import Github,PullRequest,InputGitTreeElement
 import requests
 
 class GithubException(Exception):
@@ -145,6 +145,42 @@ class GithubApi:
         '''
         self.repository().delete_branch(branch_name)
 
+    def cherry_pick_commits(self,new_branch,commits,skip_merges):
+        '''
+           Cherry picks commits to new branch. It doesn't perform true git cherry pick 
+           but rather manually copies git tree and along with commit messages and applies 
+           it to new base tree
+
+            Parameters:
+                new_branch (string): Branch name to insert commits
+                commits (List of GitCommit): List of commits to apply
+                skip_merges (Bool): Flag which controls if we should apply merge commits
+        '''
+        if skip_merges:
+            commits = list(filter(lambda commit: len(commit.parents) < 2, commits))            
+        
+        for commit in commits:
+            template_tree = self.repository().inner.get_git_tree(commit.sha)
+
+            branch_obj = self.repository().inner.get_branch(new_branch)
+            base_tree = self.repository().inner.get_git_tree(branch_obj.commit.sha)
+
+
+            inputs = []
+            for element in template_tree.tree:
+                inputs.append(InputGitTreeElement(
+                    path=element.path, mode=element.mode, type=element.type, sha=element.sha
+                ))
+
+            tree = self.repository().inner.create_git_tree(inputs, base_tree)
+            commit = self.repository().inner.create_git_commit(
+                message=commit.commit.message,
+                tree=tree,
+                parents=[branch_obj.commit.commit]
+            )
+
+        self.repository().update_ref(new_branch,commit.sha)
+
     def create_pull_request(self,config,source_branch,target_branch,new_branch):
         """ 
             Creates new pull request
@@ -158,7 +194,7 @@ class GithubApi:
             Returns:
                 return PullRequest object
         """
-        title = config.pr["title_prefix"] + f"into {source_branch} from {target_branch}"
+        title = config.pr["title_prefix"] + f" {source_branch} and {target_branch}"
         assignee_tags = list(map(lambda x: "@" + x, config.pr["assignees"]))
         separator = ", "
         body = config.pr["body_prefix"] + "\n" + separator.join(assignee_tags)
@@ -181,7 +217,7 @@ class GithubApi:
             Returns:
                 return PullRequest object
         """
-        title = config.pr["title_prefix"] + f"into {source_branch} from {temp_branch} for commit {self.branch(source_branch).commit.sha[0:6]}"
+        title = config.pr["title_prefix"] + f"{source_branch} from {temp_branch} for commit {self.branch(source_branch).commit.sha[0:6]}"
         assignee_tags = list(map(lambda x: "@" + x, config.pr["assignees"]))
         separator = ", "
         body = config.pr["body_prefix"] + "\n" + separator.join(assignee_tags)
@@ -207,10 +243,19 @@ class GithubApi:
             Parameters:
                 base (string): base branch name
                 head (string): head branch name
-                commit (string): commit message
+                commit (string): commit message 
 
         """
         self.repository().merge(base,head,message)
+    
+    def get_opened_not_draft_prs_from(self,head):
+        """
+            Get prs with given head which are non draft and opened
+
+            Parameters:
+                head (string): head branch name
+        """
+        return list(self.repository().get_pulls_from(head,draft=False,open=True))
                 
 class Repository:
     """
@@ -236,6 +281,18 @@ class Repository:
             print(f'{self.dryrun_suffix} Merge {head} to {base} with message {message}')
         else:
             self.inner.merge(base,head,message)
+
+    def get_pulls_from(self,head,open,draft):
+        """
+            Get prs with given head and  state
+
+            Parameters:
+                head (string): head branch name
+                open (Bool): is opened
+                draft (Bool): is draft PR             
+        """
+        state = "open" if open else "closed"
+        return filter(lambda x: x.draft == draft and x.head.ref == head, self.inner.get_pulls(state,head))
 
     def create_pull(self,title,body,base,head,draft,assignees,labels):
         if self.dryrun:
@@ -285,6 +342,28 @@ class Repository:
             return output["object"]["sha"]
         raise GithubException(f'unable to fast forward branch {source} due to : {res.text}')
     
+    def update_ref(self,source,target_sha):
+        """
+            Force update ref to new sha
+
+            Parameters:
+                source (string): source branch name
+                target_sha (Bool): target ref         
+        """
+        if self.dryrun:
+            print(f"{self.dryrun_suffix} Updating ref '{source}' to '{target_sha}'")
+            return target_sha
+        res = requests.patch(f"https://api.github.com/repos/{self.username}/{self.repo}/git/refs/heads/{source}",
+                        json={"sha": target_sha, "force": True},
+                        headers=self.authorization_header,
+                        timeout=self.timeout
+                        )
+        if res.status_code == 200:
+            output =  json.loads(res.text)
+            return output["object"]["sha"]
+        raise GithubException(f'unable to fast forward branch {source} due to : {res.text}')
+    
+
     def delete_branch(self,branch_name):
         if self.dryrun:
             print(f"{self.dryrun_suffix} Delete branch '{branch_name}'")
