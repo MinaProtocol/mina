@@ -84,4 +84,7 @@ module "kubernetes_testnet" {
 
   #we don't use plain nodes in the intg test
   plain_node_configs = []
+
+  # do not deploy bootstrap Chart, as Secrets are created directly for integration testnets
+  deploy_bootstrap_chart = var.deploy_bootstrap_chart
 }

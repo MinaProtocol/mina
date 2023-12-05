@@ -321,3 +321,8 @@ variable "zkapps_dashboard_key" {
   type    = string
   default = ""
 }
+
+variable "deploy_bootstrap_chart" {
+  type    = bool
+  default = true
+}

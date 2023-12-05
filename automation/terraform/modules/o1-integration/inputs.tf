@@ -149,3 +149,8 @@ variable "block_producer_configs" {
     })
   )
 }
+
+variable "deploy_bootstrap_chart" {
+  type    = bool
+  default = false
+}

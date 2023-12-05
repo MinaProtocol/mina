@@ -119,4 +119,6 @@ module "kubernetes_testnet" {
   # seed_peers_url                  = var.seed_peers_url
 
   zkapps_dashboard_key = var.zkapps_dashboard_key
+
+  deploy_bootstrap_chart = var.deploy_bootstrap_chart
 }

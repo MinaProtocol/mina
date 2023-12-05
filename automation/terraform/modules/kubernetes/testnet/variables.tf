@@ -394,3 +394,8 @@ variable "enable_working_dir_persitence" {
   type    = bool
   default = false
 }
+
+variable "deploy_bootstrap_chart" {
+  type    = bool
+  default = true
+}

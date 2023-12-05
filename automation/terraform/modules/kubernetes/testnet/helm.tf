@@ -21,9 +21,7 @@ resource "kubernetes_role_binding" "helm_release" {
 
 resource "helm_release" "bootstrap" {
   provider = helm.testnet_deploy
-  # Integration module does not deploy bootstrap as Secrets
-  # are created directly
-  count    = length(var.seed_configs) == 0 ? 1 : 0
+  count    = var.deploy_bootstrap_chart ? 1 : 0
 
   name       = "${var.testnet_name}-bootstrap"
   repository = ""
