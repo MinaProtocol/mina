@@ -89,10 +89,9 @@ module Values = struct
     bin_copy ~bin_class:Mina_base.Signed_command_memo.Stable.Latest.bin_t
       Mina_base.Signed_command_memo.empty
 
-  (* TODO: check what the max is here *)
   let zkapp_uri () : string =
     bin_copy ~bin_class:String.bin_t
-      "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+      (String.init 255 ~f:(Fn.const 'z'))
 
   let token_symbol () : Mina_base.Account.Token_symbol.t =
     bin_copy ~bin_class:Mina_base.Account.Token_symbol.Stable.Latest.bin_t
@@ -300,7 +299,8 @@ module Values = struct
             }
         ; balance_change =
             (* TODO: insure uniqueness *) Currency.Amount.Signed.zero
-        ; increment_nonce = false (* TODO: actions and events sizes *)
+        ; increment_nonce = false
+          (* TODO: actions and events sizes *)
         ; events = [ Array.init 5 ~f:(fun _ -> field ()) ]
         ; actions = [ Array.init 5 ~f:(fun _ -> field ()) ]
         ; call_data = field ()
@@ -479,7 +479,6 @@ module Sizes = struct
     }
 
   let post_fix =
-    (* TODO: add fixup math for scan states *)
     let cache_ref_size = Sys.word_size in
     (* ledger witness (x2) + toplevel accounts list on applied command *)
     let num_accounts_in_zkapp_command_base_work =
@@ -603,7 +602,6 @@ let compute_ram_usage (sizes : Sizes.size_params) =
     prover + verifier + vrf_evaluator + daemon + libp2p_helper
   in
   (* TODO: actually measure the entire scan state instead of estimating *)
-  (* TODO: this only computes the delta of each scan state, but also needs to account for the root scan state *)
   let scan_states =
     (* for the deltas, the zkapp commands and ledger proofs a shared references to the staged ledger diff we deserialize from the network *)
     (* we assume accounts loaded are not shared since they can all be loaded from the on-disk ledger separately *)
