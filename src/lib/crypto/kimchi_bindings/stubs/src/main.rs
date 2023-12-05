@@ -12,7 +12,9 @@ use std::fs::File;
 use std::io::Write;
 use wires_15_stubs::{
     // we must import all here, to have access to the derived functions
-    arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
+    arkworks::{
+        bigint_256::*, bn254_fp::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*,
+    },
     field_vector::{fp::*, fq::*},
     gate_vector::{fp::*, fq::*},
     oracles::{fp::*, fq::*, CamlOracles},
@@ -76,7 +78,20 @@ fn main() {
             generate_pasta_bindings(&mut w, env);
         });
     }
-    if let Some(kimchi_bindings) = args.get(3) {
+    if let Some(bn254_bindings) = args.get(3) {
+        let mut file = File::create(bn254_bindings).expect("could not create output file");
+        write!(file, "{}", header).unwrap();
+        let _ = env.new_module("Bn254_bindings");
+        generate_bn254_bindings(&mut file, env);
+        let _ = env.parent();
+    } else {
+        let mut w = std::io::stdout();
+        write!(w, "{}", header).unwrap();
+        decl_module!(w, env, "Bn254_bindings", {
+            generate_bn254_bindings(&mut w, env);
+        });
+    }
+    if let Some(kimchi_bindings) = args.get(4) {
         let mut file = File::create(kimchi_bindings).expect("could not create output file");
         write!(file, "{}", header).unwrap();
         let _ = env.new_module("Kimchi_bindings");
@@ -293,6 +308,45 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_pallas_of_affine => "of_affine");
         decl_func!(w, env, caml_pallas_of_affine_coordinates => "of_affine_coordinates");
         decl_func!(w, env, caml_pallas_affine_deep_copy => "deep_copy");
+    });
+}
+
+fn generate_bn254_bindings(mut w: impl std::io::Write, env: &mut Env) {
+    decl_module!(w, env, "Bn254Fp", {
+        decl_type!(w, env, CamlBn254Fp => "t");
+
+        decl_func!(w, env, caml_bn254_fp_size_in_bits => "size_in_bits");
+        decl_func!(w, env, caml_bn254_fp_size => "size");
+        decl_func!(w, env, caml_bn254_fp_add => "add");
+        decl_func!(w, env, caml_bn254_fp_sub => "sub");
+        decl_func!(w, env, caml_bn254_fp_negate => "negate");
+        decl_func!(w, env, caml_bn254_fp_mul => "mul");
+        decl_func!(w, env, caml_bn254_fp_div => "div");
+        decl_func!(w, env, caml_bn254_fp_inv => "inv");
+        decl_func!(w, env, caml_bn254_fp_square => "square");
+        decl_func!(w, env, caml_bn254_fp_is_square => "is_square");
+        decl_func!(w, env, caml_bn254_fp_sqrt => "sqrt");
+        decl_func!(w, env, caml_bn254_fp_of_int => "of_int");
+        decl_func!(w, env, caml_bn254_fp_to_string => "to_string");
+        decl_func!(w, env, caml_bn254_fp_of_string => "of_string");
+        decl_func!(w, env, caml_bn254_fp_print => "print");
+        decl_func!(w, env, caml_bn254_fp_print_rust => "print_rust");
+        decl_func!(w, env, caml_bn254_fp_copy => "copy");
+        decl_func!(w, env, caml_bn254_fp_mut_add => "mut_add");
+        decl_func!(w, env, caml_bn254_fp_mut_sub => "mut_sub");
+        decl_func!(w, env, caml_bn254_fp_mut_mul => "mut_mul");
+        decl_func!(w, env, caml_bn254_fp_mut_square => "mut_square");
+        decl_func!(w, env, caml_bn254_fp_compare => "compare");
+        decl_func!(w, env, caml_bn254_fp_equal => "equal");
+        decl_func!(w, env, caml_bn254_fp_random => "random");
+        decl_func!(w, env, caml_bn254_fp_rng => "rng");
+        decl_func!(w, env, caml_bn254_fp_to_bigint => "to_bigint");
+        decl_func!(w, env, caml_bn254_fp_of_bigint => "of_bigint");
+        decl_func!(w, env, caml_bn254_fp_two_adic_root_of_unity => "two_adic_root_of_unity");
+        decl_func!(w, env, caml_bn254_fp_domain_generator => "domain_generator");
+        decl_func!(w, env, caml_bn254_fp_to_bytes => "to_bytes");
+        decl_func!(w, env, caml_bn254_fp_of_bytes => "of_bytes");
+        decl_func!(w, env, caml_bn254_fp_deep_copy => "deep_copy");
     });
 }
 

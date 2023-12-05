@@ -18,6 +18,7 @@
 //!
 
 pub mod bigint_256;
+pub mod bn254_fp;
 pub mod group_affine;
 pub mod group_projective;
 pub mod pasta_fp;
