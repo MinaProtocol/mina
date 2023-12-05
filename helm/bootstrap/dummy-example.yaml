@@ -1,0 +1,6 @@
+keys:
+  glob: "keys/*.dummy"
+libP2pKeys:
+  glob: "keys/libp2p-keys-example/*.peerid"
+gcpKey:
+  path: "keys/gcloud-keyfile.example"

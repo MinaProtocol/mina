@@ -48,5 +48,5 @@ if [ -f "$KEYFILE" ]; then
     cp "$KEYFILE" "$TARGET_DIR/"
     echo "gcloud-keyfile.json copied successfully from $KEYFILE to $TARGET_DIR."
 else
-    echo "Error: gcloud-keyfile.json does not exist in $KEYFILE_SRC_DIR."
+    echo "Error: gcloud-keyfile.json does not exist in $BASEDIR/$TESTNET_NAME."
 fi
