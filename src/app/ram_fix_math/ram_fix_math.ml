@@ -674,7 +674,7 @@ let compute_ram_usage (sizes : Sizes.size_params) =
 
 let () =
   Printf.printf
-    "====================================================================================================\n\
+    "==========================================================================================\n\
      PRE FIX SIZES\n\
      ==========================================================================================\n" ;
   Printf.printf !"%{sexp: Sizes.size_params}\n" Sizes.pre_fix ;
@@ -691,10 +691,12 @@ let () =
     ~bin_class:Pickles.Side_loaded.Proof.Stable.Latest.bin_t
     ~gen:(Quickcheck.Generator.return (Values.side_loaded_proof ()))
     ~equal:Pickles.Side_loaded.Proof.equal () ;
+  Printf.printf "\n" ;
   serial_bench ~name:"Mina_base.Verification_key_wire.t"
     ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t
     ~gen:(Quickcheck.Generator.return (Values.verification_key ()))
     ~equal:Mina_base.Verification_key_wire.equal () ;
+  Printf.printf "\n" ;
   serial_bench ~name:"Ledger_proof.t"
     ~bin_class:Ledger_proof.Stable.Latest.bin_t
     ~gen:(Quickcheck.Generator.return (Values.ledger_proof ()))
