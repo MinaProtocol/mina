@@ -133,23 +133,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       Dangling_parent_reference of
         Uuid.t * (* Location where null was set*) string
 
-    let to_accumulated t =
-      match (t.accumulated, t.parent) with
-      | Some { base; detached_next_signal; next; current }, _ ->
-          { base
-          ; detached_next_signal
-          ; next = maps_copy next
-          ; current = maps_copy current
-          }
-      | None, Ok base ->
-          { base
-          ; next = maps_copy t.maps
-          ; current = maps_copy t.maps
-          ; detached_next_signal = t.detached_parent_signal
-          }
-      | None, Error loc ->
-          raise (Dangling_parent_reference (t.uuid, loc))
-
     let create () =
       failwith
         "Mask.Attached.create: cannot create an attached mask; use Mask.create \
@@ -180,7 +163,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let get_parent ({ parent = opt; _ } as t) =
       assert_is_attached t ; Result.ok_or_failwith opt
 
-    let maps_and_ancestor t =
+    let actualize_accumulated t =
       Option.iter t.accumulated
         ~f:(fun { detached_next_signal; next; base; current = _ } ->
           if Async.Ivar.is_full detached_next_signal then
@@ -190,12 +173,33 @@ module Make (Inputs : Inputs_intf.S) = struct
                 ; current = next
                 ; detached_next_signal = t.detached_parent_signal
                 ; base
-                } ) ;
+                } )
+
+    let maps_and_ancestor t =
+      actualize_accumulated t ;
       match t.accumulated with
       | Some { current; base; _ } ->
           (current, base)
       | None ->
           (t.maps, get_parent t)
+
+    let to_accumulated t =
+      actualize_accumulated t ;
+      match (t.accumulated, t.parent) with
+      | Some { base; detached_next_signal; next; current }, _ ->
+          { base
+          ; detached_next_signal
+          ; next = maps_copy next
+          ; current = maps_copy current
+          }
+      | None, Ok base ->
+          { base
+          ; next = maps_copy t.maps
+          ; current = maps_copy t.maps
+          ; detached_next_signal = t.detached_parent_signal
+          }
+      | None, Error loc ->
+          raise (Dangling_parent_reference (t.uuid, loc))
 
     let get_uuid t = assert_is_attached t ; t.uuid
 
