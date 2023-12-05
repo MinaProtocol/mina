@@ -25,10 +25,10 @@ let test () =
       ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
-      ~num_chunks:2 ~override_wrap_domain:N1 ~name:"chunked_circuits"
+      ~num_chunks:4 ~override_wrap_domain:N1 ~name:"chunked_circuits"
       ~constraint_constants (* TODO(mrmr1993): This was misguided.. Delete. *)
       ~choices:(fun ~self:_ ->
-        [ { identifier = "2^17"
+        [ { identifier = "2^18"
           ; prevs = []
           ; main =
               (fun _ ->
@@ -38,7 +38,7 @@ let test () =
                 (* Remember that each of these counts for *half* a row, so we
                    need 2^17 of them to fill 2^16 columns.
                 *)
-                for _ = 0 to 1 lsl 17 do
+                for _ = 0 to 1 lsl 18 do
                   ignore (Field.mul (fresh_zero ()) (fresh_zero ()) : Field.t)
                 done ;
                 (* We must now appease the permutation argument gods, to ensure
@@ -98,7 +98,7 @@ let test () =
       ~name:"recursion over chunks"
       ~constraint_constants (* TODO(mrmr1993): This was misguided.. Delete. *)
       ~choices:(fun ~self:_ ->
-        [ { identifier = "recurse over 2^17"
+        [ { identifier = "recurse over 2^18"
           ; prevs = [ tag ]
           ; main =
               (fun _ ->
@@ -142,4 +142,4 @@ let test () =
 let () =
   test () ;
   Alcotest.run "Chunked circuit"
-    [ ("2^16", [ ("prove and verify", `Quick, test) ]) ]
+    [ ("2^18", [ ("prove and verify", `Quick, test) ]) ]
