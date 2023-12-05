@@ -11,7 +11,7 @@ val wrap :
        Backend.Tock.Curve.Affine.t array
        Pickles_types.Plonk_verification_key_evals.t
   -> (   ( Impls.Wrap.Impl.Field.t
-         , Impls.Wrap.Impl.Field.t Import.Types.Scalar_challenge.t
+         , Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
          , Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
          , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
            , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
@@ -47,7 +47,7 @@ val wrap :
              Reduced_messages_for_next_proof_over_same_field.Wrap.t
            , Import.Types.Digest.Constant.t
            , ( 'b
-             , ( Backend.Tock.Proof.G.Affine.t
+             , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
                , 'actual_proofs_verified )
                Pickles_types.Vector.t
              , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -92,7 +92,7 @@ val wrap :
   -> ( 'b
      , ( ( Impls.Wrap.Challenge.Constant.t
          , Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
-         , Impls.Wrap.Field.Constant.t Shifted_value.Type2.t
+         , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
          , ( Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
              Import.Types.Bulletproof_challenge.t
            , Backend.Tock.Rounds.n )
