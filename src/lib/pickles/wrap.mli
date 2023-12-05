@@ -38,14 +38,14 @@ val wrap :
   -> ?tweak_statement:
        (   ( Import.Challenge.Constant.t
            , Import.Challenge.Constant.t Import.Scalar_challenge.t
-           , Pasta_bindings.Fp.t Shifted_value.Type1.t
+           , Backend.Tick.Field.t Shifted_value.Type1.t
            , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
              , bool )
              Import.Types.Opt.t
            , bool
            , 'max_proofs_verified
              Reduced_messages_for_next_proof_over_same_field.Wrap.t
-           , (int64, Import.Types.Digest.Limbs.n) Vector.t
+           , Import.Types.Digest.Constant.t
            , ( 'b
              , (Backend.Tock.Proof.G.Affine.t, 'actual_proofs_verified) Vector.t
              , ( ( Import.Challenge.Constant.t Kimchi_types.scalar_challenge
@@ -69,7 +69,7 @@ val wrap :
            , bool
            , 'max_proofs_verified
              Reduced_messages_for_next_proof_over_same_field.Wrap.t
-           , (int64, Import.Types.Digest.Limbs.n) Vector.t
+           , Import.Types.Digest.Constant.t
            , ( 'b
              , (Backend.Tock.Proof.G.Affine.t, 'actual_proofs_verified) Vector.t
              , ( ( Import.Challenge.Constant.t Kimchi_types.scalar_challenge
