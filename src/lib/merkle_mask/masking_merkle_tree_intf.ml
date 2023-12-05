@@ -76,6 +76,15 @@ module type S = sig
     (* makes new mask instance with copied tables, re-use parent *)
     val copy : t -> t
 
+    (* Adds specified accounts to the mask by laoding them from parent ledger.
+
+       Could be useful for transaction processing when to pre-populate mask with the
+       accounts used in processing a transaction (or a block) to ensure there are not loaded
+       from parent on each lookup. I.e. these accounts will be cached in mask and accessing
+       them during processing of a transaction won't use disk I/O.
+    *)
+    val unsafe_preload_accounts_from_parent : t -> account_id list -> unit
+
     (** already have module For_testing from include above *)
     module For_testing : sig
       val location_in_mask : t -> location -> bool
