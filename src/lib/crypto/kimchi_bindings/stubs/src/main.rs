@@ -16,8 +16,9 @@ use wires_15_stubs::{
         bigint_256::*, bn254_fp::*, bn254_fq::*, group_affine::*, group_projective::*, pasta_fp::*,
         pasta_fq::*,
     },
+    bn254_fp_plonk_index::*,
     field_vector::{bn254_fp::*, bn254_fq::*, fp::*, fq::*},
-    gate_vector::{fp::*, fq::*},
+    gate_vector::{bn254_fp::*, fp::*, fq::*},
     oracles::{fp::*, fq::*, CamlOracles},
     pairing_srs::bn254_fp::*,
     pasta_fp_plonk_index::*,
@@ -493,6 +494,18 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_digest => "digest");
                     decl_func!(w, env, caml_pasta_fq_plonk_circuit_serialize => "to_json");
                 });
+                decl_module!(w, env, "Bn254Fp", {
+                    decl_type!(w, env, CamlBn254FpPlonkGateVector => "t");
+                    decl_type_alias!(w, env, "elt" => CamlCircuitGate<CamlBn254Fp>);
+
+                    decl_func!(w, env, caml_bn254_fp_plonk_gate_vector_create => "create");
+                    decl_func!(w, env, caml_bn254_fp_plonk_gate_vector_add => "add");
+                    decl_func!(w, env, caml_bn254_fp_plonk_gate_vector_get => "get");
+                    decl_func!(w, env, caml_bn254_fp_plonk_gate_vector_len => "len");
+                    decl_func!(w, env, caml_bn254_fp_plonk_gate_vector_wrap => "wrap");
+                    decl_func!(w, env, caml_bn254_fp_plonk_gate_vector_digest => "digest");
+                    decl_func!(w, env, caml_bn254_fp_plonk_circuit_serialize => "to_json");
+                });
             });
         });
 
@@ -578,18 +591,18 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_index_write => "write");
             });
 
-            // decl_module!(w, env, "Bn254Fp", {
-            //     decl_type!(w, env, CamlPastaFpPlonkIndex => "t");
+            decl_module!(w, env, "Bn254Fp", {
+                decl_type!(w, env, CamlBn254FpPlonkIndex => "t");
 
-            //     decl_func!(w, env, caml_bn254_fp_plonk_index_create => "create");
-            //     decl_func!(w, env, caml_bn254_fp_plonk_index_max_degree => "max_degree");
-            //     decl_func!(w, env, caml_bn254_fp_plonk_index_public_inputs => "public_inputs");
-            //     decl_func!(w, env, caml_bn254_fp_plonk_index_domain_d1_size => "domain_d1_size");
-            //     decl_func!(w, env, caml_bn254_fp_plonk_index_domain_d4_size => "domain_d4_size");
-            //     decl_func!(w, env, caml_bn254_fp_plonk_index_domain_d8_size => "domain_d8_size");
-            //     decl_func!(w, env, caml_bn254_fp_plonk_index_read => "read");
-            //     decl_func!(w, env, caml_bn254_fp_plonk_index_write => "write");
-            // });
+                decl_func!(w, env, caml_bn254_fp_plonk_index_create => "create");
+                decl_func!(w, env, caml_bn254_fp_plonk_index_max_degree => "max_degree");
+                decl_func!(w, env, caml_bn254_fp_plonk_index_public_inputs => "public_inputs");
+                decl_func!(w, env, caml_bn254_fp_plonk_index_domain_d1_size => "domain_d1_size");
+                decl_func!(w, env, caml_bn254_fp_plonk_index_domain_d4_size => "domain_d4_size");
+                decl_func!(w, env, caml_bn254_fp_plonk_index_domain_d8_size => "domain_d8_size");
+                decl_func!(w, env, caml_bn254_fp_plonk_index_read => "read");
+                decl_func!(w, env, caml_bn254_fp_plonk_index_write => "write");
+            });
         });
 
         decl_module!(w, env, "VerifierIndex", {

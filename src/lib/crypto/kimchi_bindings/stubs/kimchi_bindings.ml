@@ -116,6 +116,29 @@ module Protocol = struct
         external to_json : int -> t -> string
           = "caml_pasta_fq_plonk_circuit_serialize"
       end
+
+      module Bn254Fp = struct
+        type nonrec t
+
+        type nonrec elt = Bn254_bindings.Bn254Fp.t Kimchi_types.circuit_gate
+
+        external create : unit -> t = "caml_bn254_fp_plonk_gate_vector_create"
+
+        external add : t -> elt -> unit = "caml_bn254_fp_plonk_gate_vector_add"
+
+        external get : t -> int -> elt = "caml_bn254_fp_plonk_gate_vector_get"
+
+        external len : t -> int = "caml_bn254_fp_plonk_gate_vector_len"
+
+        external wrap : t -> Kimchi_types.wire -> Kimchi_types.wire -> unit
+          = "caml_bn254_fp_plonk_gate_vector_wrap"
+
+        external digest : int -> t -> bytes
+          = "caml_bn254_fp_plonk_gate_vector_digest"
+
+        external to_json : int -> t -> string
+          = "caml_bn254_fp_plonk_circuit_serialize"
+      end
     end
   end
 
@@ -348,6 +371,40 @@ module Protocol = struct
 
       external write : bool option -> t -> string -> unit
         = "caml_pasta_fq_plonk_index_write"
+    end
+
+    module Bn254Fp = struct
+      type nonrec t
+
+      external create :
+           Gates.Vector.Bn254Fp.t
+        -> int
+        -> Bn254_bindings.Bn254Fp.t Kimchi_types.lookup_table array
+        -> Bn254_bindings.Bn254Fp.t Kimchi_types.runtime_table_cfg array
+        -> int
+        -> SRS.Bn254Fp.t
+        -> t
+        = "caml_bn254_fp_plonk_index_create_bytecode" "caml_bn254_fp_plonk_index_create"
+
+      external max_degree : t -> int = "caml_bn254_fp_plonk_index_max_degree"
+
+      external public_inputs : t -> int
+        = "caml_bn254_fp_plonk_index_public_inputs"
+
+      external domain_d1_size : t -> int
+        = "caml_bn254_fp_plonk_index_domain_d1_size"
+
+      external domain_d4_size : t -> int
+        = "caml_bn254_fp_plonk_index_domain_d4_size"
+
+      external domain_d8_size : t -> int
+        = "caml_bn254_fp_plonk_index_domain_d8_size"
+
+      external read : int option -> SRS.Bn254Fp.t -> string -> t
+        = "caml_bn254_fp_plonk_index_read"
+
+      external write : bool option -> t -> string -> unit
+        = "caml_bn254_fp_plonk_index_write"
     end
   end
 
