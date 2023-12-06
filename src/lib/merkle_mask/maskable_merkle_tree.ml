@@ -141,6 +141,9 @@ module Make (Inputs : Inputs_intf) = struct
           Node (summary, List.map masks ~f:(_crawl (module Mask.Attached)))
   end
 
+  let unsafe_preload_accounts_from_parent =
+    Mask.Attached.unsafe_preload_accounts_from_parent
+
   let register_mask t mask =
     let attached_mask = Mask.set_parent mask t in
     List.iter (Uuid.Table.data registered_masks) ~f:(fun ms ->
