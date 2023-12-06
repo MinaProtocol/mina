@@ -460,6 +460,32 @@ module Protocol = struct
       external deep_copy : t -> t
         = "caml_pasta_fq_plonk_verifier_index_deep_copy"
     end
+
+    module Bn254Fp = struct
+      type nonrec t =
+        ( Bn254_bindings.Bn254Fp.t
+        , SRS.Bn254Fp.t
+        , Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity
+          Kimchi_types.poly_comm )
+        Kimchi_types.VerifierIndex.verifier_index
+
+      external create : Index.Bn254Fp.t -> t
+        = "caml_bn254_fp_plonk_verifier_index_create"
+
+      external read : int option -> SRS.Bn254Fp.t -> string -> t
+        = "caml_bn254_fp_plonk_verifier_index_read"
+
+      external write : bool option -> t -> string -> unit
+        = "caml_bn254_fp_plonk_verifier_index_write"
+
+      external shifts : int -> Bn254_bindings.Bn254Fp.t array
+        = "caml_bn254_fp_plonk_verifier_index_shifts"
+
+      external dummy : unit -> t = "caml_bn254_fp_plonk_verifier_index_dummy"
+
+      external deep_copy : t -> t
+        = "caml_bn254_fp_plonk_verifier_index_deep_copy"
+    end
   end
 
   module Oracles = struct

@@ -17,6 +17,7 @@ use wires_15_stubs::{
         pasta_fq::*,
     },
     bn254_fp_plonk_index::*,
+    bn254_fp_plonk_verifier_index::*,
     field_vector::{bn254_fp::*, bn254_fq::*, fp::*, fq::*},
     gate_vector::{bn254_fp::*, fp::*, fq::*},
     oracles::{fp::*, fq::*, CamlOracles},
@@ -626,6 +627,17 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_shifts => "shifts");
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_dummy => "dummy");
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_deep_copy => "deep_copy");
+            });
+
+            decl_module!(w, env, "Bn254Fp", {
+                decl_type_alias!(w, env, "t" => CamlPlonkVerifierIndex<CamlBn254Fp, CamlBn254FpSrs, CamlPolyComm<CamlGBn254>>);
+
+                decl_func!(w, env, caml_bn254_fp_plonk_verifier_index_create => "create");
+                decl_func!(w, env, caml_bn254_fp_plonk_verifier_index_read => "read");
+                decl_func!(w, env, caml_bn254_fp_plonk_verifier_index_write => "write");
+                decl_func!(w, env, caml_bn254_fp_plonk_verifier_index_shifts => "shifts");
+                decl_func!(w, env, caml_bn254_fp_plonk_verifier_index_dummy => "dummy");
+                decl_func!(w, env, caml_bn254_fp_plonk_verifier_index_deep_copy => "deep_copy");
             });
         });
 

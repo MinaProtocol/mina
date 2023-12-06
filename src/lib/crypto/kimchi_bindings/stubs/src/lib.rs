@@ -38,6 +38,7 @@ pub mod pasta_fq_plonk_index;
 /// Verifier indexes/keys
 pub mod plonk_verifier_index;
 
+pub mod bn254_fp_plonk_verifier_index;
 pub mod pasta_fp_plonk_verifier_index;
 pub mod pasta_fq_plonk_verifier_index;
 
