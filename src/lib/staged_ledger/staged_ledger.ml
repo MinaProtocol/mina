@@ -2016,16 +2016,15 @@ module T = struct
         ~f:(Option.value_map ~default:[ txn ] ~f:(List.cons txn))
 
     let dependency_skipped txn t =
-      Account_id.Map.find t.skipped_by_fee_payer (txn_key txn) |> Option.is_some
+      Account_id.Map.mem t.skipped_by_fee_payer (txn_key txn)
 
-    let try_applying_txn ~logger ~validate (state : t) (txn : txn) =
+    let try_applying_txn ~logger ~apply (state : t) (txn : txn) =
       let open Continue_or_stop in
-      match txn with
+      match (state.zkapp_space_remaining, txn) with
       | _ when state.total_space_remaining < 1 ->
           Stop (state.valid_seq, state.invalid)
-      | User_command.Zkapp_command _
-        when Option.value_map ~default:false ~f:(( > ) 1)
-               state.zkapp_space_remaining ->
+      | (Some zkapp_limit, User_command.Zkapp_command _)
+        when zkapp_limit > 1 ->
           Continue
             { state with skipped_by_fee_payer = add_skipped_txn state txn }
       | _ when dependency_skipped txn state ->
@@ -2035,7 +2034,7 @@ module T = struct
           match
             O1trace.sync_thread "validate_transaction_against_staged_ledger"
               (fun () ->
-                validate (Transaction.Command (User_command.forget_check txn)) )
+                apply (Transaction.Command (User_command.forget_check txn)) )
           with
           | Error e ->
               [%log error]
@@ -2166,7 +2165,7 @@ module T = struct
                 ; ("proof_count", `Int proof_count)
                 ] ;
             [%log internal] "Validate_and_apply_transactions" ;
-            let validate =
+            let apply =
               Transaction_validator.apply_transaction_first_pass
                 ~constraint_constants ~global_slot validating_ledger
                 ~txn_state_view:current_state_view
@@ -2177,7 +2176,7 @@ module T = struct
                 ~init:
                   (Application_state.init ?zkapp_limit:zkapp_cmd_limit
                      ~total_limit:(Scan_state.free_space t.scan_state) )
-                ~f:(Application_state.try_applying_txn ~validate ~logger)
+                ~f:(Application_state.try_applying_txn ~apply ~logger)
                 ~finish:(fun state -> (state.valid_seq, state.invalid))
             in
             [%log internal] "Generate_staged_ledger_diff" ;
