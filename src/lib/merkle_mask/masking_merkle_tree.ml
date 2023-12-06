@@ -39,25 +39,22 @@ module Make (Inputs : Inputs_intf.S) = struct
   end
 
   type maps_t =
-    { mutable accounts : Account.t Location_binable.Map.t
-    ; mutable token_owners : Account_id.t Token_id.Map.t
-    ; mutable hashes : Hash.t Addr.Map.t
-    ; mutable locations : Location.t Account_id.Map.t
+    { accounts : Account.t Location_binable.Map.t
+    ; token_owners : Account_id.t Token_id.Map.t
+    ; hashes : Hash.t Addr.Map.t
+    ; locations : Location.t Account_id.Map.t
     }
   [@@deriving sexp]
-
-  let maps_copy { accounts; token_owners; hashes; locations } =
-    { accounts; token_owners; hashes; locations }
 
   (** Merges second maps object into the first one,
       potentially overwriting some keys *)
   let maps_merge base { accounts; token_owners; hashes; locations } =
     let combine ~key:_ _ v = v in
-    base.accounts <- Map.merge_skewed ~combine base.accounts accounts ;
-    base.token_owners <-
-      Map.merge_skewed ~combine base.token_owners token_owners ;
-    base.hashes <- Map.merge_skewed ~combine base.hashes hashes ;
-    base.locations <- Map.merge_skewed ~combine base.locations locations
+    { accounts = Map.merge_skewed ~combine base.accounts accounts
+    ; token_owners = Map.merge_skewed ~combine base.token_owners token_owners
+    ; hashes = Map.merge_skewed ~combine base.hashes hashes
+    ; locations = Map.merge_skewed ~combine base.locations locations
+    }
 
   (** Structure managing cache accumulated since the "base" ledger.
 
@@ -79,9 +76,9 @@ module Make (Inputs : Inputs_intf.S) = struct
     [current] to [next] and [next] to [t.maps] when the mask at which accumulation of [next] started
     became detached. *)
   type accumulated_t =
-    { current : maps_t
+    { mutable current : maps_t
           (** Currently used cache: contains a superset of contents of masks from base ledger to the current mask *)
-    ; next : maps_t
+    ; mutable next : maps_t
           (** Cache that will be used after the current cache is garbage-collected *)
     ; base : Base.t  (** Base ledger *)
     ; detached_next_signal : Detached_parent_signal.t
@@ -97,7 +94,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; detached_parent_signal : Detached_parent_signal.t
     ; mutable current_location : Location.t option
     ; depth : int
-    ; maps : maps_t
+    ; mutable maps : maps_t
           (* If present, contains maps containing changes both for this mask
              and for a few ancestors.
              This is used as a lookup cache. *)
@@ -200,7 +197,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                 } )
 
     (** When [accumulated] is not configured, returns current [t.maps] and parent.
-                    
+
                 Otherwise, returns the [current] accumulator and [base]. *)
     let maps_and_ancestor t =
       actualize_accumulated t ;
@@ -215,15 +212,11 @@ module Make (Inputs : Inputs_intf.S) = struct
       actualize_accumulated t ;
       match (t.accumulated, t.parent) with
       | Some { base; detached_next_signal; next; current }, _ ->
-          { base
-          ; detached_next_signal
-          ; next = maps_copy next
-          ; current = maps_copy current
-          }
+          { base; detached_next_signal; next; current }
       | None, Ok base ->
           { base
-          ; next = maps_copy t.maps
-          ; current = maps_copy t.maps
+          ; next = t.maps
+          ; current = t.maps
           ; detached_next_signal = t.detached_parent_signal
           }
       | None, Error loc ->
@@ -238,13 +231,14 @@ module Make (Inputs : Inputs_intf.S) = struct
     let depth t = assert_is_attached t ; t.depth
 
     let update_maps ~f t =
-      f t.maps ;
-      Option.iter t.accumulated ~f:(fun { current; next; _ } ->
-          f current ; f next )
+      t.maps <- f t.maps ;
+      Option.iter t.accumulated ~f:(fun acc ->
+          acc.current <- f acc.current ;
+          acc.next <- f acc.next )
 
     let self_set_hash t address hash =
       update_maps t ~f:(fun maps ->
-          maps.hashes <- Map.set maps.hashes ~key:address ~data:hash )
+          { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
 
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
@@ -253,8 +247,9 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let self_set_location t account_id location =
       update_maps t ~f:(fun maps ->
-          maps.locations <-
-            Map.set maps.locations ~key:account_id ~data:location ) ;
+          { maps with
+            locations = Map.set maps.locations ~key:account_id ~data:location
+          } ) ;
       (* if account is at a hitherto-unused location, that
          becomes the current location
       *)
@@ -267,13 +262,17 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let self_set_account t location account =
       update_maps t ~f:(fun maps ->
-          maps.accounts <- Map.set maps.accounts ~key:location ~data:account ) ;
+          { maps with
+            accounts = Map.set maps.accounts ~key:location ~data:account
+          } ) ;
       self_set_location t (Account.identifier account) location
 
     let self_set_token_owner t token_id account_id =
       update_maps t ~f:(fun maps ->
-          maps.token_owners <-
-            Map.set maps.token_owners ~key:token_id ~data:account_id )
+          { maps with
+            token_owners =
+              Map.set maps.token_owners ~key:token_id ~data:account_id
+          } )
 
     (* a read does a lookup in the account_tbl; if that fails, delegate to
        parent *)
@@ -529,15 +528,19 @@ module Make (Inputs : Inputs_intf.S) = struct
     let remove_account_and_update_hashes t location =
       (* remove account and key from tables *)
       let account = Option.value_exn (Map.find t.maps.accounts location) in
-      t.maps.accounts <- Map.remove t.maps.accounts location ;
-      (* Update token info. *)
       let account_id = Account.identifier account in
-      t.maps.token_owners <-
-        Token_id.Map.remove t.maps.token_owners
-          (Account_id.derive_token_id ~owner:account_id) ;
-      (* TODO : use stack database to save unused location, which can be used
-         when allocating a location *)
-      t.maps.locations <- Map.remove t.maps.locations account_id ;
+      t.maps <-
+        { t.maps with
+          (* remove account and key from tables *)
+          accounts =
+            Map.remove t.maps.accounts location (* update token info. *)
+        ; token_owners =
+            Token_id.Map.remove t.maps.token_owners
+              (Account_id.derive_token_id ~owner:account_id)
+            (* TODO : use stack database to save unused location, which can be used
+               when allocating a location *)
+        ; locations = Map.remove t.maps.locations account_id
+        } ;
       (* reuse location if possible *)
       Option.iter t.current_location ~f:(fun curr_loc ->
           if Location.equal location curr_loc then
@@ -656,10 +659,12 @@ module Make (Inputs : Inputs_intf.S) = struct
       let parent = get_parent t in
       let old_root_hash = merkle_root t in
       let account_data = Map.to_alist t.maps.accounts in
-      t.maps.accounts <- Location_binable.Map.empty ;
-      t.maps.hashes <- Addr.Map.empty ;
-      t.maps.locations <- Account_id.Map.empty ;
-      t.maps.token_owners <- Token_id.Map.empty ;
+      t.maps <-
+        { t.maps with
+          accounts = Location_binable.Map.empty
+        ; hashes = Addr.Map.empty
+        ; token_owners = Token_id.Map.empty
+        } ;
       Base.set_batch parent account_data ;
       Debug_assert.debug_assert (fun () ->
           [%test_result: Hash.t]
@@ -679,12 +684,13 @@ module Make (Inputs : Inputs_intf.S) = struct
       ; detached_parent_signal = Async.Ivar.create ()
       ; current_location = t.current_location
       ; depth = t.depth
-      ; maps = maps_copy t.maps
+      ; maps = t.maps
       ; accumulated =
           Option.map t.accumulated ~f:(fun acc ->
-              { acc with
-                next = maps_copy acc.next
-              ; current = maps_copy acc.current
+              { base = acc.base
+              ; detached_next_signal = acc.detached_next_signal
+              ; next = acc.next
+              ; current = acc.current
               } )
       ; is_committing = false
       }
@@ -887,9 +893,12 @@ module Make (Inputs : Inputs_intf.S) = struct
        as sometimes this is desired behavior *)
     let close t =
       assert_is_attached t ;
-      t.maps.accounts <- Location_binable.Map.empty ;
-      t.maps.hashes <- Addr.Map.empty ;
-      t.maps.locations <- Account_id.Map.empty ;
+      t.maps <-
+        { t.maps with
+          accounts = Location_binable.Map.empty
+        ; hashes = Addr.Map.empty
+        ; locations = Account_id.Map.empty
+        } ;
       Async.Ivar.fill_if_empty t.detached_parent_signal ()
 
     let index_of_account_exn t key =
@@ -1047,9 +1056,13 @@ module Make (Inputs : Inputs_intf.S) = struct
     ( match accumulated_opt with
     | Some { current; next; base; detached_next_signal }
       when Option.is_none t.accumulated ->
-        maps_merge current t.maps ;
-        maps_merge next t.maps ;
-        t.accumulated <- Some { current; next; base; detached_next_signal }
+        t.accumulated <-
+          Some
+            { current = maps_merge current t.maps
+            ; next = maps_merge next t.maps
+            ; base
+            ; detached_next_signal
+            }
     | _ ->
         () ) ;
     t

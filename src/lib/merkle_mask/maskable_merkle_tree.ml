@@ -234,7 +234,7 @@ module Make (Inputs : Inputs_intf) = struct
             if not (Mask.Attached.is_committing mask) then (
               Mask.Attached.parent_set_notify mask account ;
               let child_uuid = Mask.Attached.get_uuid mask in
-Mask.Attached.drop_accumulated mask;
+              Mask.Attached.drop_accumulated mask ;
               iter_descendants child_uuid ~f:Mask.Attached.drop_accumulated ;
               [%log error]
                 "Update of an account in parent %s conflicted with an account \
@@ -268,7 +268,7 @@ Mask.Attached.drop_accumulated mask;
         List.iter masks ~f:(fun mask ->
             if not (Mask.Attached.is_committing mask) then (
               let child_uuid = Mask.Attached.get_uuid mask in
-Mask.Attached.drop_accumulated mask;
+              Mask.Attached.drop_accumulated mask ;
               iter_descendants child_uuid ~f:Mask.Attached.drop_accumulated ;
               [%log error]
                 "Update of an account in parent %s conflicted with an account \
