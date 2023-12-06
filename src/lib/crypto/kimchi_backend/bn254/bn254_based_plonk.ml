@@ -27,7 +27,7 @@ module R1CS_constraint_system =
   let name = "bn254"
 
   module Rounds = Kimchi_pasta_basic.Rounds
-  module Urs = Kimchi_bindings.Protocol.SRS.Fp
+  module Urs = Kimchi_bindings.Protocol.SRS.Bn254Fp
   module Index = Kimchi_bindings.Protocol.Index.Fp
   module Curve = Curve
   module Poly_comm = Fp_poly_comm

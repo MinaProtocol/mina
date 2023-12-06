@@ -19,6 +19,7 @@ use wires_15_stubs::{
     field_vector::{bn254_fp::*, bn254_fq::*, fp::*, fq::*},
     gate_vector::{fp::*, fq::*},
     oracles::{fp::*, fq::*, CamlOracles},
+    pairing_srs::bn254_fp::*,
     pasta_fp_plonk_index::*,
     pasta_fp_plonk_proof::*,
     pasta_fp_plonk_verifier_index::*,
@@ -30,7 +31,7 @@ use wires_15_stubs::{
         CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
     },
     projective::{bn254::*, pallas::*, vesta::*},
-    srs::{bn254_fp::*, fp::*, fq::*},
+    srs::{fp::*, fq::*},
     CamlCircuitGate,
     CamlLookupCommitments,
     CamlOpeningProof,
@@ -576,6 +577,19 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_index_read => "read");
                 decl_func!(w, env, caml_pasta_fq_plonk_index_write => "write");
             });
+
+            // decl_module!(w, env, "Bn254Fp", {
+            //     decl_type!(w, env, CamlPastaFpPlonkIndex => "t");
+
+            //     decl_func!(w, env, caml_bn254_fp_plonk_index_create => "create");
+            //     decl_func!(w, env, caml_bn254_fp_plonk_index_max_degree => "max_degree");
+            //     decl_func!(w, env, caml_bn254_fp_plonk_index_public_inputs => "public_inputs");
+            //     decl_func!(w, env, caml_bn254_fp_plonk_index_domain_d1_size => "domain_d1_size");
+            //     decl_func!(w, env, caml_bn254_fp_plonk_index_domain_d4_size => "domain_d4_size");
+            //     decl_func!(w, env, caml_bn254_fp_plonk_index_domain_d8_size => "domain_d8_size");
+            //     decl_func!(w, env, caml_bn254_fp_plonk_index_read => "read");
+            //     decl_func!(w, env, caml_bn254_fp_plonk_index_write => "write");
+            // });
         });
 
         decl_module!(w, env, "VerifierIndex", {

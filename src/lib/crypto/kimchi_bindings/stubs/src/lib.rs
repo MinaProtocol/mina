@@ -27,9 +27,11 @@ pub mod gate_vector;
 pub mod projective;
 
 /// SRS
+pub mod pairing_srs;
 pub mod srs;
 
 /// Indexes
+pub mod bn254_fp_plonk_index;
 pub mod pasta_fp_plonk_index;
 pub mod pasta_fq_plonk_index;
 

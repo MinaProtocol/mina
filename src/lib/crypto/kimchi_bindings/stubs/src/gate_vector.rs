@@ -195,3 +195,98 @@ pub mod fq {
         serde_json::to_string(&circuit).expect("couldn't serialize constraints")
     }
 }
+
+//
+// Bn254Fp
+//
+
+pub mod bn254_fp {
+    use super::*;
+    use crate::arkworks::CamlBn254Fp;
+    use mina_curves::bn254::Fp;
+
+    //
+    // CamlBn254FpPlonkGateVector
+    //
+
+    #[derive(ocaml_gen::CustomType)]
+    pub struct CamlBn254FpPlonkGateVector(pub Vec<CircuitGate<Fp>>);
+    pub type CamlBn254FpPlonkGateVectorPtr<'a> = ocaml::Pointer<'a, CamlBn254FpPlonkGateVector>;
+
+    extern "C" fn caml_bn254_fp_plonk_gate_vector_finalize(v: ocaml::Raw) {
+        unsafe {
+            let v: CamlBn254FpPlonkGateVectorPtr = v.as_pointer();
+            v.drop_in_place()
+        };
+    }
+
+    ocaml::custom!(CamlBn254FpPlonkGateVector {
+        finalize: caml_bn254_fp_plonk_gate_vector_finalize,
+    });
+
+    //
+    // Functions
+    //
+
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_bn254_fp_plonk_gate_vector_create() -> CamlBn254FpPlonkGateVector {
+        CamlBn254FpPlonkGateVector(Vec::new())
+    }
+
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_bn254_fp_plonk_gate_vector_add(
+        mut v: CamlBn254FpPlonkGateVectorPtr,
+        gate: CamlCircuitGate<CamlBn254Fp>,
+    ) {
+        let gate: CircuitGate<Fp> = gate.into();
+        v.as_mut().0.push(gate);
+    }
+
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_bn254_fp_plonk_gate_vector_get(
+        v: CamlBn254FpPlonkGateVectorPtr,
+        i: ocaml::Int,
+    ) -> CamlCircuitGate<CamlBn254Fp> {
+        let gate = &(v.as_ref().0)[i as usize];
+        gate.into()
+    }
+
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_bn254_fp_plonk_gate_vector_len(v: CamlBn254FpPlonkGateVectorPtr) -> usize {
+        v.as_ref().0.len()
+    }
+
+    // TODO: remove this function
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_bn254_fp_plonk_gate_vector_wrap(
+        mut v: CamlBn254FpPlonkGateVectorPtr,
+        t: CamlWire,
+        h: CamlWire,
+    ) {
+        (v.as_mut().0)[t.row as usize].wires[t.col as usize] = h.into();
+    }
+
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_bn254_fp_plonk_gate_vector_digest(
+        public_input_size: isize,
+        v: CamlBn254FpPlonkGateVectorPtr,
+    ) -> [u8; 32] {
+        Circuit::new(usize::try_from(public_input_size).unwrap(), &v.as_ref().0).digest()
+    }
+
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_bn254_fp_plonk_circuit_serialize(
+        public_input_size: isize,
+        v: CamlBn254FpPlonkGateVectorPtr,
+    ) -> String {
+        let circuit = Circuit::new(usize::try_from(public_input_size).unwrap(), &v.as_ref().0);
+        serde_json::to_string(&circuit).expect("couldn't serialize constraints")
+    }
+}

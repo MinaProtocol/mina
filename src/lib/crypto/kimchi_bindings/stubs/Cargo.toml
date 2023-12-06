@@ -29,6 +29,7 @@ ark-ff = { version = "0.3.0", features = ["parallel"] }
 ark-serialize = "0.3.0"
 ark-ec = { version = "0.3.0", features = ["parallel"] }
 ark-poly = { version = "0.3.0", features = ["parallel"] }
+ark-bn254 = "0.3.0"
 
 # proof-systems
 poly-commitment = { path = "../../proof-systems/poly-commitment", features = ["ocaml_types"] }
@@ -36,7 +37,7 @@ groupmap = { path = "../../proof-systems/groupmap" }
 mina-curves = { path = "../../proof-systems/curves" }
 o1-utils = { path = "../../proof-systems/utils" }
 mina-poseidon = { path = "../../proof-systems/poseidon" }
-kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types"] }
+kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types", "bn254"] }
 
 # ocaml-specific
 ocaml = { version = "0.22.2", features = ["no-caml-startup"] }
