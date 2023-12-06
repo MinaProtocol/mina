@@ -325,7 +325,7 @@ def ciMetricsDashboard(results: dict) -> None:
         "ci-builds.dat": results["all"]["number_of_builds"],
         "avg-time-per-build-hours.dat": results["all"]["average_build_time_in_hours"],
         "executions.dat" : results["all"]["jobs"]["executions"],
-        "retries-per-passed-test.dat": pd.Series(retries).mean(),
+        "retries-per-passed-test.dat": pd.Series(retries).fillna(0).mean()
     }
 
     for k, v in ciMetrics.items():
