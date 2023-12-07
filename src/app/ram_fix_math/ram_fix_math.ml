@@ -27,7 +27,7 @@ module Params = struct
 
   let max_zkapp_commands_per_block = 128
 
-  let max_signed_commands_per_block = 0
+  let max_signed_commands_per_block = 128 - max_zkapp_commands_per_block
 
   let max_zkapp_events = 100
 
@@ -319,8 +319,8 @@ module Values = struct
             ; voting_for = Set (state_hash ())
             }
         ; balance_change =
-            (* TODO: insure uniqueness *) Currency.Amount.Signed.zero
-        ; increment_nonce = false (* TODO: actions and events sizes *)
+            (* TODO: ensure uniqueness *) Currency.Amount.Signed.zero
+        ; increment_nonce = false
         ; events = [ Array.init Params.max_zkapp_events ~f:(fun _ -> field ()) ]
         ; actions =
             [ Array.init Params.max_zkapp_actions ~f:(fun _ -> field ()) ]
@@ -548,35 +548,44 @@ module Timer : sig
   val time : t -> (unit -> 'a) -> 'a
 
   val total : t -> Time.Span.t
-end = struct
-  type t = { mutable total : Time.Span.t } [@@deriving fields]
 
-  let init () = { total = Time.Span.zero }
+  val average : t -> Time.Span.t
+end = struct
+  type t = { mutable total : Time.Span.t; mutable samples : int }
+  [@@deriving fields]
+
+  let init () = { total = Time.Span.zero; samples = 0 }
 
   let time t f =
     let start = Time.now () in
     let x = f () in
     let elapsed = Time.(abs_diff (now ()) start) in
     t.total <- Time.Span.(t.total + elapsed) ;
+    t.samples <- t.samples + 1 ;
     x
+
+  let average t =
+    Time.Span.of_ns (Time.Span.to_ns t.total /. Int.to_float t.samples)
 end
 
+type serial_bench_measurements = { write : Time.Span.t; read : Time.Span.t }
+
+let print_header name =
+  Printf.printf
+    "==========================================================================================\n\
+     %s\n\
+     ==========================================================================================\n"
+    name
+
 let print_timer name timer =
-  let total = Timer.total timer in
   Printf.printf
     !"%s: %{Time.Span} (total: %{Time.Span})\n"
-    name
-    (Time.Span.of_ns (Time.Span.to_ns total /. Int.to_float bench_count))
-    total
+    name (Timer.average timer) (Timer.total timer)
 
 let serial_bench (type a) ~(name : string)
     ~(bin_class : a Bin_prot.Type_class.t) ~(gen : a Quickcheck.Generator.t)
     ~(equal : a -> a -> bool) ?(size = 0) () =
-  Printf.printf
-    "==========================================================================================\n\
-     SERIALIZATION BENCHMARKS %s\n\
-     ==========================================================================================\n"
-    name ;
+  print_header (Printf.sprintf "SERIALIZATION BENCHMARKS %s" name) ;
   let write_timer = Timer.init () in
   let read_timer = Timer.init () in
   for i = 1 to bench_count do
@@ -596,7 +605,8 @@ let serial_bench (type a) ~(name : string)
     assert (equal sample result)
   done ;
   print_timer "write" write_timer ;
-  print_timer "read" read_timer
+  print_timer "read" read_timer ;
+  { write = Timer.average write_timer; read = Timer.average read_timer }
 
 let compute_ram_usage (sizes : Sizes.size_params) =
   let format_gb size = Int.to_float size /. (1024.0 **. 3.0) in
@@ -699,31 +709,82 @@ let compute_ram_usage (sizes : Sizes.size_params) =
   Printf.printf "TOTAL: %fGB\n" (format_gb total_size)
 
 let () =
-  Printf.printf
-    "==========================================================================================\n\
-     PRE FIX SIZES\n\
-     ==========================================================================================\n" ;
+  print_header "PRE FIX SIZES" ;
   Printf.printf !"%{sexp: Sizes.size_params}\n" Sizes.pre_fix ;
   compute_ram_usage Sizes.pre_fix ;
   Printf.printf "\n" ;
-  Printf.printf
-    "==========================================================================================\n\
-     POST FIX SIZES\n\
-     ==========================================================================================\n" ;
+  print_header "POST FIX SIZES" ;
   Printf.printf !"%{sexp: Sizes.size_params}\n" Sizes.post_fix ;
   compute_ram_usage Sizes.post_fix ;
   Printf.printf "\n" ;
-  serial_bench ~name:"Pickles.Side_loaded.Proof.t"
-    ~bin_class:Pickles.Side_loaded.Proof.Stable.Latest.bin_t
-    ~gen:(Quickcheck.Generator.return (Values.side_loaded_proof ()))
-    ~equal:Pickles.Side_loaded.Proof.equal () ;
+  let side_loaded_proof_serial_times =
+    serial_bench ~name:"Pickles.Side_loaded.Proof.t"
+      ~bin_class:Pickles.Side_loaded.Proof.Stable.Latest.bin_t
+      ~gen:(Quickcheck.Generator.return (Values.side_loaded_proof ()))
+      ~equal:Pickles.Side_loaded.Proof.equal ()
+  in
   Printf.printf "\n" ;
-  serial_bench ~name:"Mina_base.Verification_key_wire.t"
-    ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t
-    ~gen:(Quickcheck.Generator.return (Values.verification_key ()))
-    ~equal:Mina_base.Verification_key_wire.equal () ;
+  let verification_key_serial_times =
+    serial_bench ~name:"Mina_base.Verification_key_wire.t"
+      ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t
+      ~gen:(Quickcheck.Generator.return (Values.verification_key ()))
+      ~equal:Mina_base.Verification_key_wire.equal ()
+  in
   Printf.printf "\n" ;
-  serial_bench ~name:"Ledger_proof.t"
-    ~bin_class:Ledger_proof.Stable.Latest.bin_t
-    ~gen:(Quickcheck.Generator.return (Values.ledger_proof ()))
-    ~equal:Ledger_proof.equal ()
+  let ledger_proof_serial_times =
+    serial_bench ~name:"Ledger_proof.t"
+      ~bin_class:Ledger_proof.Stable.Latest.bin_t
+      ~gen:(Quickcheck.Generator.return (Values.ledger_proof ()))
+      ~equal:Ledger_proof.equal ()
+  in
+  Printf.printf "\n" ;
+  print_header "SERIALIZATION OVERHEAD ESTIMATES" ;
+  Printf.printf
+    !"zkapp command ingest = %{Time.Span}\n"
+    (Time.Span.of_ns
+       ( Int.to_float Params.max_zkapp_txn_account_updates
+       *. Time.Span.to_ns
+            Time.Span.(
+              side_loaded_proof_serial_times.write
+              + verification_key_serial_times.write) ) ) ;
+  Printf.printf
+    !"snark work ingest = %{Time.Span}\n"
+    (Time.Span.of_ns
+       ( 2.0
+       *. Time.Span.to_ns ledger_proof_serial_times.write ) ) ;
+  Printf.printf
+    !"block ingest = %{Time.Span}\n"
+    (let zkapps =
+       Time.Span.of_ns
+         ( Int.to_float
+             ( Params.max_zkapp_commands_per_block
+             * Params.max_zkapp_txn_account_updates )
+         *. Time.Span.to_ns
+              Time.Span.(
+                side_loaded_proof_serial_times.write
+                + verification_key_serial_times.write) )
+     in
+     let snark_works =
+       Time.Span.of_ns
+         ( 2.0 *. Int.to_float Params.max_zkapp_commands_per_block
+         *. Time.Span.to_ns ledger_proof_serial_times.write )
+     in
+     Time.Span.(zkapps + snark_works) ) ;
+  Printf.printf
+    !"block production = %{Time.Span}\n"
+    (let zkapps =
+       Time.Span.of_ns
+         ( Int.to_float
+             ( Params.max_zkapp_commands_per_block
+             * Params.max_zkapp_txn_account_updates )
+         *. Time.Span.to_ns
+              Time.Span.(
+                side_loaded_proof_serial_times.read
+                + verification_key_serial_times.read) )
+     in
+     let snark_works =
+       Time.Span.of_ns
+         ( 2.0 *. Int.to_float Params.max_zkapp_commands_per_block
+         *. Time.Span.to_ns ledger_proof_serial_times.read )
+     in
+     Time.Span.(zkapps + snark_works) )
