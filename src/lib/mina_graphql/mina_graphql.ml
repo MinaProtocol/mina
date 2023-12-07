@@ -2561,7 +2561,19 @@ module Queries = struct
           if not with_seq_no then Error "Missing sequence information"
           else Ok (Itn_logger.get_logs start_log_id) )
 
-    let commands = [ auth; slots_won; internal_logs ]
+    let zkapp_cmd_limit =
+      field "zkAppCommandLimit"
+        ~args:
+          Arg.[ arg "limit" ~doc:"ZkApp commands per block limit." ~typ:int ]
+        ~typ:int
+        ~doc:"Set zkApp commands per block limit for the block producer."
+        ~resolve:(fun { ctx = _with_seq_no, mina; _ } () limit ->
+          let open Mina_lib.Config in
+          let config = Mina_lib.config mina in
+          config.zkapp_cmd_limit <- limit ;
+          limit )
+
+    let commands = [ auth; slots_won; internal_logs; zkapp_cmd_limit ]
   end
 end
 
