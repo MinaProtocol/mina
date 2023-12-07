@@ -1,5 +1,6 @@
 (library
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (name kimchi_bn254)
  (public_name kimchi_backend.bn254)
  (flags -warn-error -27)
@@ -21,9 +22,11 @@
   promise
   kimchi_bindings
   kimchi_bn254_basic
+  kimchi_bn254_constraint_system
   kimchi_pasta_basic
   kimchi_pasta_constraint_system
   kimchi_types
   pasta_bindings
+  bn254_bindings
   snarkette
   ppx_version.runtime))

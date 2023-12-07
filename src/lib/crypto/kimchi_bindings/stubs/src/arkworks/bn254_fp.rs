@@ -204,7 +204,9 @@ pub fn caml_bn254_fp_of_string(s: CamlBytesString) -> Result<CamlBn254Fp, ocaml:
     let camlbigint: CamlBigInteger256 = biguint
         .try_into()
         .map_err(|_| ocaml::Error::Message("caml_bn254_fp_of_string: Biguint is too large"))?;
-    CamlBn254Fp::try_from(camlbigint).map_err(|_| ocaml::Error::Message("caml_bn254_fp_of_string"))
+    CamlBn254Fp::try_from(camlbigint).map_err(|_| {
+        ocaml::Error::Message("caml_bn254_fp_of_string: couldn't cast bigint to Bn254 field")
+    })
 }
 
 //

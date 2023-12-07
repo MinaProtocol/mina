@@ -1,8 +1,8 @@
 module Basic = Kimchi_bn254_basic
 
 module Bn254_based_plonk : sig
-  module Field = Basic.Bn254_fq
-  module Curve = Basic.Bn254
+  module Field = Bn254_based_plonk.Field
+  module Curve = Bn254_based_plonk.Curve
   module Bigint = Bn254_based_plonk.Bigint
 
   val field_size : Pasta_bindings.BigInt256.t
@@ -14,9 +14,9 @@ module Bn254_based_plonk : sig
 end
 
 module Bn254 : sig
-  module Fp = Bn254.Bn254_fp
-  module Fq = Bn254.Bn254_fq
-  module Curve = Bn254.Curve
+  module Fp = Basic.Bn254_fp
+  module Fq = Basic.Bn254_fq
+  module Curve = Basic.Bn254_curve
 end
 
 module Impl : sig

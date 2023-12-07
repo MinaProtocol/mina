@@ -15,7 +15,7 @@ module Bn254_fq = Field.Make (struct
   module Vector = Kimchi_bindings.FieldVectors.Bn254Fq
 end)
 
-module Bn254 = struct
+module Bn254_curve = struct
   module Params = struct
     open Bn254_fq
 
@@ -26,3 +26,24 @@ module Bn254 = struct
 
   include Curve.Make (Bn254_fq) (Bn254_fp) (Params) (Bn254_bindings.Bn254)
 end
+
+module Fp_poly_comm = Poly_comm.Make (struct
+  module Curve = Bn254_curve
+  module Base_field = Bn254_fq
+
+  module Backend = struct
+    type t = Curve.Affine.Backend.t Kimchi_types.poly_comm
+
+    let shifted ({ shifted; _ } : t) = shifted
+
+    let unshifted ({ unshifted; _ } : t) = unshifted
+
+    let make :
+        Curve.Affine.Backend.t array -> Curve.Affine.Backend.t option -> t =
+     fun unshifted shifted : t -> { shifted; unshifted }
+  end
+end)
+
+(* poseidon params *)
+
+let poseidon_params_fp = Sponge.Params.(map pasta_p_kimchi ~f:Bn254_fp.of_string)

@@ -1,8 +1,8 @@
 open Core_kernel
 open Kimchi_backend_common
 open Kimchi_bn254_basic
-module Field = Bn254Fp
-module Curve = Bn254
+module Field = Bn254_fp
+module Curve = Bn254_curve
 
 module Bigint = struct
   include Field.Bigint
@@ -33,10 +33,12 @@ end
 module R1CS_constraint_system =
   Kimchi_bn254_constraint_system.Bn254_constraint_system
 
+module Rounds = Kimchi_pasta_basic.Rounds.Step
+
 module Keypair = Dlog_plonk_based_keypair.Make (struct
   let name = "bn254"
 
-  module Rounds = Kimchi_pasta_basic.Rounds
+  module Rounds = Rounds
   module Urs = Kimchi_bindings.Protocol.SRS.Bn254Fp
   module Index = Kimchi_bindings.Protocol.Index.Bn254Fp
   module Curve = Curve

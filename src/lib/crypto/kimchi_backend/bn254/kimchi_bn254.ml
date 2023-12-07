@@ -16,7 +16,7 @@ end
 module Bn254 = struct
   module Fp = Bn254.Bn254_fp
   module Fq = Bn254.Bn254_fq
-  module Curve = Bn254.Curve
+  module Curve = Bn254.Bn254_curve
 end
 
 module Impl = struct
