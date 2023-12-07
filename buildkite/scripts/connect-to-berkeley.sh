@@ -44,10 +44,10 @@ mina daemon \
   --libp2p-keypair "/root/libp2p-keys/key" \
 & # -background
 
-# Attempt to connect to the GraphQL client every 10s for up to 8 minutes
+# Attempt to connect to the GraphQL client every 30s for up to 12 minutes
 num_status_retries=24
 for ((i=1;i<=$num_status_retries;i++)); do
-  sleep 20s
+  sleep 30s
   set +e
   mina client status
   status_exit_code=$?
