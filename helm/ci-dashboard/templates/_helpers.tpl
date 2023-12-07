@@ -104,7 +104,7 @@ Inserting automatically created Secrets to Retriever Pod
 Also adding .Values.outputEnv Volume to Pod
 */}}
 {{- define "ci-dashboard.insertRetrieverVolumes" -}}
-{{- range $i, $retriever := .Values.retrievers -}}
+{{- range $i, $retriever := .Values.retrievers }}
 {{- with $retriever.script.secret }}
 - name: {{ .name | quote }}
   secret:
@@ -115,4 +115,13 @@ Also adding .Values.outputEnv Volume to Pod
 - name: {{ .name | quote }}
   {{- .volume | toYaml | nindent 2 }}
 {{- end }}
+{{- end }}
+
+{{/*
+Inserting .Values.dbPusher associated Volumes
+*/}}
+{{- define "ci-dashboard.insertDbPusherVolume" -}}
+- name: {{ .Values.dbPusher.script.secret.name | quote }}
+  secret:
+    secretName: {{ .Values.dbPusher.script.secret.name | quote }}
 {{- end }}

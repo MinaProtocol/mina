@@ -21,60 +21,37 @@ spec:
           restartPolicy: "Never"
           containers:
           - name: db-pusher
-            image: postgres:12-alpine
+            image: "{{ .Values.dbPusher.image.name }}:{{ .Values.dbPusher.image.tag }}"
             imagePullPolicy: IfNotPresent
-            tty: true
-            stdin: true
             command: 
             - /bin/bash
             - -c
             - '
-              echo "#####################";
-              echo "Setting DB Connection";
-              echo "#####################";
-              
-              LOCAL_DB_CONNECTION="postgresql://{{ $.Values.postgresql.auth.username }}:{{ $.Values.postgresql.auth.password }}@{{ include "ci-dashboard.fullname" . }}-postgresql:5432/{{ $.Values.postgresql.primary.name }}";
-              echo $LOCAL_DB_CONNECTION;
-
-              
-              echo "#####################";
-              echo "GITHUB metrics";
-              echo "#####################";
-              github_dir=/mnt/output/github;
-              today_prs=`cat $github_dir/today-pull-requests.dat`;
-              echo "Today PRs: $today_prs";
-              checks_per_pr=`cat $github_dir/average-checks-per-pr.dat`;
-              echo "Average CheckSuites per PR: $checks_per_pr";
-
-              echo "#####################";
-              echo "BUILDKITE metrics";
-              echo "#####################";
-              buildkite_dir=/mnt/output/buildkite;
-              reliability=`cat $buildkite_dir/reliability.dat`;
-              echo "Reliability: $reliability";
-              ci_builds=`cat $buildkite_dir/ci-builds.dat`;
-              echo "Num CI Builds: $ci_builds";
-              avg_time_per_build_hours=`cat $buildkite_dir/avg-time-per-build-hours.dat`;
-              echo "Avg. Time per build (hours): $avg_time_per_build_hours";
-              executions=`cat $buildkite_dir/executions.dat`;
-              echo "Number of executions: $executions";
-              retries_per_passed_test=`cat $buildkite_dir/retries-per-passed-test.dat`;
-              echo "Average number of retrieds per passed test: $retries_per_passed_test";
-
-              echo "#####################";
-              echo "Pushing to Database";
-              echo "#####################";
-              psql $LOCAL_DB_CONNECTION -c "INSERT INTO public.ci VALUES (current_timestamp, $today_prs, $checks_per_pr, $reliability, $ci_builds, $avg_time_per_build_hours, $executions, $retries_per_passed_test)";
+                pip install -r {{ .Values.dbPusher.script.mountPath }}/requirements.txt;
+                python {{ .Values.dbPusher.script.mountPath }}/{{ .Values.dbPusher.script.name }};
               '
             volumeMounts:
             - name: {{ .Values.outputEnv.name | quote }}
               mountPath: {{ .Values.outputEnv.value | quote }}
+            - name: {{ .Values.dbPusher.script.secret.name | quote }}
+              mountPath: {{ .Values.dbPusher.script.mountPath | quote }}
+            env:
+            - name: INFLUXDB_URL
+              value: "http://{{ include "ci-dashboard.fullname" . }}-influxdb:8086"
+            - name: {{ .Values.outputEnv.name }}
+              value: {{ .Values.outputEnv.value }}
+            {{- with .Values.dbPusher.env }}
+            {{- . | toYaml | nindent 12 }}
+            {{- end }}
+            resources:
+            {{- toYaml .Values.dbPusher.resources | nindent 14 }}
           initContainers:
           {{- range $i, $retriever := .Values.retrievers }}
           {{- include "ci-dashboard.insertRetriever" (dict "root" $root "retriever" $retriever) | nindent 10 }}
           {{- end }}
           volumes:
           {{- include "ci-dashboard.insertRetrieverVolumes" $root | nindent 10 }}
+          {{- include "ci-dashboard.insertDbPusherVolume" $root | nindent 10 }}
   suspend: false
   startingDeadlineSeconds: 100
   concurrencyPolicy: Replace

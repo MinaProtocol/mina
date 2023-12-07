@@ -1,31 +1,55 @@
 ######################################
 # CronJob Schedule
 ######################################
-schedule: "*/60 * * * *"
+schedule: "*/10 * * * *"
 
 
 ######################################
-# Postgresql DB Configuration
+# InfluxDB Configuration
 ######################################
-postgresql:
-  primary:
-    name: "dashboard-db"
+influxdb:
+  global:
+    storageClass: ssd-delete
+  persistence:
+    enabled: true
+    size: 10Gi
+  auth:
+    admin:
+      username: cidash
+      password: dashboardtest
+      org: o1-labs
+      bucket: dashboard-db
+      token: ''
+  influxdb:
     service:
       type: LoadBalancer
-    persistence:
-      enabled: true
-      size: 1Gi
-      storageClass: ssd-delete
-    initdb:
-      user: "cidash"
-      password: "test"
-      scripts:
-        ci-table.sql: CREATE TABLE ci (time timestamp, today_prs INT, checks_per_pr REAL, reliability REAL, ci_builds INT, avg_time_per_build_hours REAL, executions INT, retries_per_passed_test REAL);
-  auth:
-    username: "cidash"
-    password: "test"
-    database: "dashboard-db"
-    enablePostgresUser: false
+
+######################################
+# DB Pusher Configuration
+######################################
+dbPusher:
+  image:
+    name: python
+    tag: "3.9.18-slim"
+  env:
+  - name: INFLUXDB_TOKEN
+    value: ''
+  - name: INFLUXDB_FILES_SUFFIX
+    value: '.dat'
+  - name: INFLUXDB_BUCKET
+    value: dashboard-db
+  script:
+    name: "dbPusher.py"
+    secret: # Secret to be created with python script
+      name: "db-pusher-script"
+    mountPath: "/mnt/script"
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
 
 
 ######################################
@@ -45,11 +69,11 @@ sources:
   apiUrl: &githubAPI "https://api.github.com/graphql"
   token:
     secretName: &githubTokenSecretName "github-token-secret"
-    secretValue: ""
+    secretValue: ''
 - name: buildkite
   token:
     secretName: &buildkiteTokenSecretName "buildkite-token-secret"
-    secretValue: ""
+    secretValue: ''
 
 
 #############################################
