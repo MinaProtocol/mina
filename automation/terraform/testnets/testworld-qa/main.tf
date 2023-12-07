@@ -48,7 +48,7 @@ variable "fish_count" {
 }
 
 variable "seed_count" {
-  default = 3
+  default = 2
 }
 
 variable "plain_node_count" {
