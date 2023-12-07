@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-berkeley.tfstate"
+    key     = "terraform-testworld-v2.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -36,17 +36,15 @@ provider "google" {
 
 
 variable "whale_count" {
-  type = number
-
+  type        = number
   description = "Number of online whales for the network to run"
-  default     = 16
+  default     = 2
 }
 
 variable "fish_count" {
-  type = number
-
+  type        = number
   description = "Number of online fish for the network to run"
-  default     = 2
+  default     = 0
 }
 
 variable "seed_count" {
@@ -55,35 +53,27 @@ variable "seed_count" {
 
 variable "plain_node_count" {
   default = 0
-  # default     = 10
 }
 
 locals {
-  testnet_name       = "berkeley"
-  mina_image         = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup1-rampup-b1facec-focal-berkeley" #"minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
-  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup1-rampup-b1facec-focal"         #"minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-6f9d956-focal"
-  seed_region        = "us-central1"
-  seed_zone          = "us-central1-b"
-
-  # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
+  testnet_name                    = "testworld-2-0"
+  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-berkeley-itn3-ledger-validate-25f9de2-focal-berkeley"
+  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-berkeley-itn3-ledger-validate-25f9de2-focal"
+  seed_region                     = "us-east1"
+  seed_zone                       = "us-east1-b"
   make_report_discord_webhook_url = ""
-
-  # replace with `make_report_accounts = ""` if not in use (will fail if file not present)
-  # make_report_accounts = <<EOT
-  #   ${file("../../../${local.testnet_name}-accounts.csv")}
-  # EOT
-  make_report_accounts = ""
+  make_report_accounts            = ""
 }
 
-module "berkeley" {
-  providers = { google.gke = google.google-us-central1 }
+module "testworld-2-0" {
+  providers = { google.gke = google.google-us-east1 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-central1"
-  cluster_region = "us-central1"
-  k8s_context    = "gke_o1labs-192920_us-central1_coda-infra-central1"
+  cluster_name   = "coda-infra-east"
+  cluster_region = "us-east1"
+  k8s_context    = "gke_o1labs-192920_us-east1_coda-infra-east"
   testnet_name   = local.testnet_name
 
   mina_image                  = local.mina_image
@@ -96,7 +86,7 @@ module "berkeley" {
 
   archive_node_count            = 2
   mina_archive_schema           = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/b1facecde934ce3969771c34962b878d75321ca7/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/b1facecde934ce3969771c34962b878d75321ca7/src/app/archive/zkapp_tables.sql"]
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/20a2b3ab80546d06a69996e6ad76e112b727b79b/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/20a2b3ab80546d06a69996e6ad76e112b727b79b/src/app/archive/zkapp_tables.sql"]
 
   archive_configs = [
     {
@@ -129,7 +119,7 @@ module "berkeley" {
   log_level           = "Info"
   log_txn_pool_gossip = false
 
-  block_producer_key_pass           = "naughty blue worm"
+  block_producer_key_pass           = ""
   block_producer_starting_host_port = 10501
 
   worker_cpu_request = 4
@@ -170,11 +160,7 @@ module "berkeley" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/berkeley_seeds.txt"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/testworld-2-0_seeds.txt"
 
-  # a pass must be set to connect the zkapps dash to grafana
-  # leave empty to lock down the zkapps dashboard
-
-  # zkapps_dashboard_key = ""
 }
 
