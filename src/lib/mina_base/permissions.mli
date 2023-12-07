@@ -127,61 +127,58 @@ val empty : t
 (* TODO write this more concisely *)
 val deriver :
      (< contramap :
-          (   (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t
-           -> (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t )
+          (   (Auth_required.t, Unsigned.uint32) Poly.t
+           -> (Auth_required.t, Unsigned.uint32) Poly.t )
           ref
       ; graphql_arg :
           (   unit
-           -> (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t
+           -> (Auth_required.t, Unsigned.uint32) Poly.t
               Fields_derivers_graphql.Schema.Arg.arg_typ )
           ref
       ; graphql_arg_accumulator :
-          (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t
-          Fields_derivers_zkapps.Graphql.Args.Acc.T.t
+          (Auth_required.t, Unsigned.uint32) Poly.t
+          Fields_derivers_graphql.Graphql.Args.Acc.T.t
           ref
-      ; graphql_creator :
-          ('a -> (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t) ref
+      ; graphql_creator : ('a -> (Auth_required.t, Unsigned.uint32) Poly.t) ref
       ; graphql_fields :
-          (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t
-          Fields_derivers_zkapps.Graphql.Fields.Input.T.t
+          (Auth_required.t, Unsigned.uint32) Poly.t
+          Fields_derivers_graphql.Graphql.Fields.Input.T.t
           ref
       ; graphql_fields_accumulator :
-          (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t
-          Fields_derivers_zkapps.Graphql.Fields.Accumulator.T.t
+          (Auth_required.t, Unsigned.uint32) Poly.t
+          Fields_derivers_graphql.Graphql.Fields.Accumulator.T.t
           list
           ref
       ; graphql_query : string option ref
       ; graphql_query_accumulator : (string * string option) option list ref
+      ; js_layout : [> `Assoc of (string * Yojson.Safe.t) list ] ref
+      ; js_layout_accumulator :
+          Fields_derivers_zkapps.Js_layout.Accumulator.field option list ref
       ; map :
-          (   (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t
-           -> (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t )
+          (   (Auth_required.t, Unsigned.uint32) Poly.t
+           -> (Auth_required.t, Unsigned.uint32) Poly.t )
           ref
       ; nullable_graphql_arg :
           (unit -> 'b Fields_derivers_graphql.Schema.Arg.arg_typ) ref
       ; nullable_graphql_fields :
-          (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t option
-          Fields_derivers_zkapps.Graphql.Fields.Input.T.t
+          (Auth_required.t, Unsigned.uint32) Poly.t option
+          Fields_derivers_graphql.Graphql.Fields.Input.T.t
           ref
       ; of_json :
           (   [> `Assoc of (string * Yojson.Safe.t) list ]
-           -> (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t )
+           -> (Auth_required.t, Unsigned.uint32) Poly.t )
           ref
       ; of_json_creator : Yojson.Safe.t Core_kernel.String.Map.t ref
+      ; skip : bool ref
       ; to_json :
-          (   (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t
+          (   (Auth_required.t, Unsigned.uint32) Poly.t
            -> [> `Assoc of (string * Yojson.Safe.t) list ] )
           ref
       ; to_json_accumulator :
-          ( string
-          * (   (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t
-             -> Yojson.Safe.t ) )
+          (string * ((Auth_required.t, Unsigned.uint32) Poly.t -> Yojson.Safe.t))
           option
           list
           ref
-      ; skip : bool ref
-      ; js_layout : Yojson.Safe.t ref
-      ; js_layout_accumulator :
-          Fields_derivers_zkapps.Js_layout.Accumulator.field option list ref
       ; .. >
       as
       'a )
