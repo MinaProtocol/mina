@@ -660,10 +660,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       let old_root_hash = merkle_root t in
       let account_data = Map.to_alist t.maps.accounts in
       t.maps <-
-        { t.maps with
-          accounts = Location_binable.Map.empty
+        { accounts = Location_binable.Map.empty
         ; hashes = Addr.Map.empty
         ; token_owners = Token_id.Map.empty
+        ; locations = Account_id.Map.empty
         } ;
       Base.set_batch parent account_data ;
       Debug_assert.debug_assert (fun () ->
