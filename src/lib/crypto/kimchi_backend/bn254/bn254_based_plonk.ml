@@ -46,3 +46,26 @@ module Keypair = Dlog_plonk_based_keypair.Make (struct
   module Gate_vector = Kimchi_bindings.Protocol.Gates.Vector.Bn254Fp
   module Constraint_system = R1CS_constraint_system
 end)
+
+module Proving_key = struct
+  type t = Keypair.t
+
+  include
+    Core_kernel.Binable.Of_binable
+      (Core_kernel.Unit)
+      (struct
+        type nonrec t = t
+
+        let to_binable _ = ()
+
+        let of_binable () = failwith "TODO"
+      end)
+
+  let is_initialized _ = `Yes
+
+  let set_constraint_system _ _ = ()
+
+  let to_string _ = failwith "TODO"
+
+  let of_string _ = failwith "TODO"
+end
