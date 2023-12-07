@@ -57,8 +57,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name                    = "testworld-qa"
-  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-berkeley-itn3-ledger-validate-25f9de2-focal-berkeley"
-  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-berkeley-itn3-ledger-validate-25f9de2-focal"
+  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup6-steven-rampup-ledger-bump-fe2b7e8-focal-berkeley"
+  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup6-steven-rampup-ledger-bump-fe2b7e8-focal"
   seed_region                     = "us-east1"
   seed_zone                       = "us-east1-b"
   make_report_discord_webhook_url = ""
@@ -86,7 +86,7 @@ module "testworld-qa" {
 
   archive_node_count            = 2
   mina_archive_schema           = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/20a2b3ab80546d06a69996e6ad76e112b727b79b/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/20a2b3ab80546d06a69996e6ad76e112b727b79b/src/app/archive/zkapp_tables.sql"]
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/4f8bb8e51f1783b07d143a2e6a8af96e41f36f5d/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/4f8bb8e51f1783b07d143a2e6a8af96e41f36f5d/src/app/archive/zkapp_tables.sql"]
 
   archive_configs = [
     {
