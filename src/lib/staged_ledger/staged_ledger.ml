@@ -1997,7 +1997,7 @@ module T = struct
       ; total_space_remaining : int
       }
 
-    let init ~total_limit ?zkapp_limit =
+    let init ?zkapp_limit ~total_limit =
       { valid_seq = Sequence.empty
       ; invalid = []
       ; skipped_by_fee_payer = Account_id.Map.empty
@@ -2018,7 +2018,7 @@ module T = struct
     let dependency_skipped txn t =
       Account_id.Map.mem t.skipped_by_fee_payer (txn_key txn)
 
-    let try_applying_txn ~logger ~apply (state : t) (txn : txn) =
+    let try_applying_txn ?logger ~apply (state : t) (txn : txn) =
       let open Continue_or_stop in
       match (state.zkapp_space_remaining, txn) with
       | _ when state.total_space_remaining < 1 ->
@@ -2042,13 +2042,14 @@ module T = struct
                 apply (Transaction.Command (User_command.forget_check txn)) )
           with
           | Error e ->
-              [%log error]
-                ~metadata:
-                  [ ("user_command", User_command.Valid.to_yojson txn)
-                  ; ("error", Error_json.error_to_yojson e)
-                  ]
-                "Staged_ledger_diff creation: Skipping user command: \
-                 $user_command due to error: $error" ;
+              Option.iter logger ~f:(fun logger ->
+                  [%log error]
+                    ~metadata:
+                      [ ("user_command", User_command.Valid.to_yojson txn)
+                      ; ("error", Error_json.error_to_yojson e)
+                      ]
+                    "Staged_ledger_diff creation: Skipping user command: \
+                     $user_command due to error: $error" ) ;
               Continue { state with invalid = (txn, e) :: state.invalid }
           | Ok _txn_partially_applied ->
               let valid_seq =
@@ -2268,9 +2269,67 @@ end
 
 include T
 
+module Test_helpers = struct
+  let constraint_constants =
+    Genesis_constants.Constraint_constants.for_unit_tests
+
+  let dummy_state_and_view ?global_slot () =
+    let state =
+      let consensus_constants =
+        let genesis_constants = Genesis_constants.for_unit_tests in
+        Consensus.Constants.create ~constraint_constants
+          ~protocol_constants:genesis_constants.protocol
+      in
+      let compile_time_genesis =
+        let open Staged_ledger_diff in
+        (*not using Precomputed_values.for_unit_test because of dependency cycle*)
+        Mina_state.Genesis_protocol_state.t
+          ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+          ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+          ~constraint_constants ~consensus_constants ~genesis_body_reference
+      in
+      compile_time_genesis.data
+    in
+    let state_with_global_slot =
+      match global_slot with
+      | None ->
+          state
+      | Some global_slot ->
+          (*Protocol state views are always from previous block*)
+          let prev_global_slot =
+            Option.value ~default:Mina_numbers.Global_slot_since_genesis.zero
+              (Mina_numbers.Global_slot_since_genesis.sub global_slot
+                 Mina_numbers.Global_slot_span.one )
+          in
+          let consensus_state =
+            Consensus.Proof_of_stake.Exported.Consensus_state.Unsafe
+            .dummy_advance
+              (Mina_state.Protocol_state.consensus_state state)
+              ~new_global_slot_since_genesis:prev_global_slot
+              ~increase_epoch_count:false
+          in
+          let body =
+            Mina_state.Protocol_state.Body.For_tests.with_consensus_state
+              (Mina_state.Protocol_state.body state)
+              consensus_state
+          in
+          Mina_state.Protocol_state.create
+            ~previous_state_hash:
+              (Mina_state.Protocol_state.previous_state_hash state)
+            ~body
+    in
+    ( state_with_global_slot
+    , Mina_state.Protocol_state.Body.view
+        (Mina_state.Protocol_state.body state_with_global_slot) )
+
+  let dummy_state_view ?global_slot () =
+    dummy_state_and_view ?global_slot () |> snd
+end
+
 let%test_module "staged ledger tests" =
   ( module struct
     module Sl = T
+    open Test_helpers
 
     let () =
       Backtrace.elide := false ;
@@ -2285,9 +2344,6 @@ let%test_module "staged ledger tests" =
         Public_key.Compressed.gen
 
     let proof_level = Genesis_constants.Proof_level.for_unit_tests
-
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
 
     let logger = Logger.null ()
 
@@ -2350,58 +2406,6 @@ let%test_module "staged ledger tests" =
       assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
       (ledger_proof, diff', is_new_stack, pc_update, supercharge_coinbase)
-
-    let dummy_state_and_view ?global_slot () =
-      let state =
-        let consensus_constants =
-          let genesis_constants = Genesis_constants.for_unit_tests in
-          Consensus.Constants.create ~constraint_constants
-            ~protocol_constants:genesis_constants.protocol
-        in
-        let compile_time_genesis =
-          let open Staged_ledger_diff in
-          (*not using Precomputed_values.for_unit_test because of dependency cycle*)
-          Mina_state.Genesis_protocol_state.t
-            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-            ~constraint_constants ~consensus_constants ~genesis_body_reference
-        in
-        compile_time_genesis.data
-      in
-      let state_with_global_slot =
-        match global_slot with
-        | None ->
-            state
-        | Some global_slot ->
-            (*Protocol state views are always from previous block*)
-            let prev_global_slot =
-              Option.value ~default:Mina_numbers.Global_slot_since_genesis.zero
-                (Mina_numbers.Global_slot_since_genesis.sub global_slot
-                   Mina_numbers.Global_slot_span.one )
-            in
-            let consensus_state =
-              Consensus.Proof_of_stake.Exported.Consensus_state.Unsafe
-              .dummy_advance
-                (Mina_state.Protocol_state.consensus_state state)
-                ~new_global_slot_since_genesis:prev_global_slot
-                ~increase_epoch_count:false
-            in
-            let body =
-              Mina_state.Protocol_state.Body.For_tests.with_consensus_state
-                (Mina_state.Protocol_state.body state)
-                consensus_state
-            in
-            Mina_state.Protocol_state.create
-              ~previous_state_hash:
-                (Mina_state.Protocol_state.previous_state_hash state)
-              ~body
-      in
-      ( state_with_global_slot
-      , Mina_state.Protocol_state.Body.view
-          (Mina_state.Protocol_state.body state_with_global_slot) )
-
-    let dummy_state_view ?global_slot () =
-      dummy_state_and_view ?global_slot () |> snd
 
     let create_and_apply ?(coinbase_receiver = coinbase_receiver)
         ?(winner = self_pk) ~global_slot ~protocol_state_view

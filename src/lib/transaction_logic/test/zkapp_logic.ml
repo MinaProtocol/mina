@@ -32,7 +32,9 @@ let%test_module "Test transaction logic." =
     let run_zkapp_cmd ~fee_payer ~fee ~accounts txns =
       let open Result.Let_syntax in
       let cmd =
-        zkapp_cmd ~noncemap:(Ledger_helpers.noncemap accounts) ~fee:(fee_payer, fee) txns
+        zkapp_cmd
+          ~noncemap:(Ledger_helpers.noncemap accounts)
+          ~fee:(fee_payer, fee) txns
       in
       let%bind ledger = Ledger_helpers.ledger_of_accounts accounts in
       let%map txn, _ =

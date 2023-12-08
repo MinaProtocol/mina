@@ -1,0 +1,33 @@
+(tests
+ (names main)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async_kernel
+  async_unix
+  base
+  base.caml
+  core_kernel
+  integers
+  sexplib0
+  yojson
+  ;; local libraries
+  genesis_constants
+  mina_base
+  mina_base_test_helpers
+  mina_generators
+  mina_ledger
+  mina_ledger_test_helpers
+  mina_numbers
+  mina_transaction
+  mina_wire_types
+  staged_ledger
+  transaction_snark)
+ (preprocess
+  (pps
+   ppx_base
+   ppx_let
+   ppx_assert))
+ (instrumentation
+  (backend bisect_ppx)))
+
