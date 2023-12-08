@@ -66,8 +66,6 @@ module type Inputs_intf = sig
       type t = Curve.Affine.Backend.t Kimchi_types.poly_comm
     end
 
-    val of_backend_with_degree_bound : Backend.t -> t
-
     val of_backend_without_degree_bound : Backend.t -> t
 
     val to_backend : t -> Backend.t

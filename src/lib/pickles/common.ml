@@ -56,7 +56,7 @@ let hash_messages_for_next_step_proof ~app_state
 let dlog_pcs_batch (type nat proofs_verified total)
     ((without_degree_bound, _pi) :
       total Nat.t * (proofs_verified, nat, total) Nat.Adds.t ) =
-  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[]
+  Pcs_batch.create ~without_degree_bound
 
 let when_profiling profiling default =
   match Option.map (Sys.getenv_opt "PICKLES_PROFILING") ~f:String.lowercase with

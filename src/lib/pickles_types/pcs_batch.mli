@@ -2,16 +2,11 @@
 
 type ('a, 'n, 'm) t
 
-val map : ('a, 'n, 'm) t -> f:('a -> 'b) -> ('b, 'n, 'm) t
-
 val pow : one:'f -> mul:('f -> 'f -> 'f) -> 'f -> int -> 'f
 
 val num_bits : int -> int
 
-val create :
-     without_degree_bound:'n Nat.t
-  -> with_degree_bound:('a, 'm) Vector.t
-  -> ('a, 'n, 'm) t
+val create : without_degree_bound:'n Nat.t -> ('a, 'n, 'm) t
 
 val combine_commitments :
      (int, 'n, 'm) t
@@ -52,9 +47,7 @@ val combine_split_commitments :
   -> init:('g -> 'g_acc option)
   -> xi:'f
   -> reduce_without_degree_bound:('without_degree_bound -> 'g list)
-  -> reduce_with_degree_bound:('with_degree_bound -> 'g list)
   -> ('without_degree_bound, 'n) Vector.t
-  -> ('with_degree_bound, 'm) Vector.t
   -> 'g_acc
 
 val combine_split_evaluations :

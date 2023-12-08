@@ -468,7 +468,7 @@ struct
       type t = { point : Inner_curve.t; non_zero : Boolean.var }
     end
 
-    let combine batch ~xi without_bound with_bound =
+    let combine batch ~xi without_bound =
       let reduce_point p =
         let point = ref (Point.underlying p.(Array.length p - 1)) in
         for i = Array.length p - 2 downto 0 do
@@ -478,7 +478,6 @@ struct
       in
       let { Curve_opt.non_zero; point } =
         Pcs_batch.combine_split_commitments batch
-          ~reduce_with_degree_bound:(fun _ -> assert false)
           ~reduce_without_degree_bound:(fun x -> [ x ])
           ~scale_and_add:(fun ~(acc : Curve_opt.t) ~xi
                               (p : (Point.t array, Boolean.var) Opt.t) ->
@@ -533,7 +532,7 @@ struct
                   { non_zero = Boolean.(true_ &&& true_)
                   ; point = reduce_point p
                   } )
-          without_bound with_bound
+          without_bound
       in
       Boolean.Assert.is_true non_zero ;
       point
@@ -545,8 +544,7 @@ struct
       ~(xi : Scalar_challenge.t)
       ~(advice :
          Other_field.Packed.t Shifted_value.Type1.t
-         Types.Step.Bulletproof.Advice.t )
-      ~polynomials:(without_degree_bound, with_degree_bound)
+         Types.Step.Bulletproof.Advice.t ) ~polynomials:without_degree_bound
       ~openings_proof:
         ({ lr; delta; z_1; z_2; challenge_polynomial_commitment } :
           ( Inner_curve.t
@@ -567,8 +565,8 @@ struct
         let open Inner_curve in
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
           Split_commitments.combine pcs_batch ~xi without_degree_bound
-            with_degree_bound
         in
+
         let scale_fast =
           scale_fast ~num_bits:Other_field.Packed.Constant.size_in_bits
         in
@@ -1332,11 +1330,10 @@ struct
                  (Max_proofs_verified.add num_commitments_without_degree_bound) )
             ~sponge:sponge_before_evaluations ~xi ~advice ~openings_proof
             ~polynomials:
-              ( Vector.map without_degree_bound
-                  ~f:
-                    (Pickles_types.Opt.map
-                       ~f:(Array.map ~f:(fun x -> `Finite x)) )
-              , [] )
+              (Vector.map without_degree_bound
+                 ~f:
+                   (Pickles_types.Opt.map
+                      ~f:(Array.map ~f:(fun x -> `Finite x)) ) )
         in
         assert_eq_plonk
           { alpha = plonk.alpha

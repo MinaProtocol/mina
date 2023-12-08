@@ -102,10 +102,6 @@ module Poly_comm : sig
   module Without_degree_bound : sig
     type 'a t = 'a Bounded_types.ArrayN16.Stable.V1.t
   end
-
-  module With_degree_bound : sig
-    type 'a t = { elems : 'a Bounded_types.ArrayN16.Stable.V1.t }
-  end
 end
 
 (** The number of wires in the proving system *)

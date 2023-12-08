@@ -26,18 +26,14 @@ module type Inputs_intf = sig
   module Backend : sig
     type t
 
-    val make :
-      Curve.Affine.Backend.t array -> Curve.Affine.Backend.t option -> t
+    val make : Curve.Affine.Backend.t array -> t
 
     val elems : t -> Curve.Affine.Backend.t array
   end
 end
 
 type 'a t =
-  [ `With_degree_bound of
-    ('a * 'a) Pickles_types.Or_infinity.t
-    Pickles_types.Plonk_types.Poly_comm.With_degree_bound.t
-  | `Without_degree_bound of
+  [ `Without_degree_bound of
     ('a * 'a) Pickles_types.Plonk_types.Poly_comm.Without_degree_bound.t ]
 
 module Make (Inputs : Inputs_intf) = struct
@@ -68,13 +64,6 @@ module Make (Inputs : Inputs_intf) = struct
     | Finite (x, y) ->
         Finite (x, y)
 
-  (* TODO @volhovm remove *)
-  let with_degree_bound_to_backend
-      (commitment :
-        (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t
-        Pickles_types.Plonk_types.Poly_comm.With_degree_bound.t ) : Backend.t =
-    Backend.make (Array.map ~f:or_infinity_to_backend commitment.elems)
-
   let without_degree_bound_to_backend
       (commitment :
         (Base_field.t * Base_field.t)
@@ -82,19 +71,11 @@ module Make (Inputs : Inputs_intf) = struct
       =
     Backend.make
       (Array.map ~f:(fun x -> Kimchi_types.Finite (fst x, snd x)) commitment)
-      None
 
   let to_backend (t : t) : Backend.t =
-    match t with
-    | `With_degree_bound t ->
-        with_degree_bound_to_backend t
-    | `Without_degree_bound t ->
-        without_degree_bound_to_backend t
+    match t with `Without_degree_bound t -> without_degree_bound_to_backend t
 
   let of_backend' (t : Backend.t) = Backend.elems t
-
-  (* TODO @volhovm remove *)
-  let of_backend_with_degree_bound (t : Backend.t) : t = assert false
 
   (*
      type 'a t =
@@ -106,6 +87,7 @@ module Make (Inputs : Inputs_intf) = struct
        ]
   *)
 
+  (* TODO @volhovm Is this even used? It's not part of of_backend' *)
   let of_backend_without_degree_bound (t : Backend.t) =
     let open Pickles_types.Plonk_types.Poly_comm in
     let elems = Backend.elems t in

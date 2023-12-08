@@ -123,9 +123,7 @@ module Fq_poly_comm = Kimchi_backend_common.Poly_comm.Make (struct
 
     let elems ({ elems; _ } : t) = elems
 
-    let make :
-        Curve.Affine.Backend.t array -> Curve.Affine.Backend.t option -> t =
-     fun elems : t -> { elems }
+    let make : Curve.Affine.Backend.t array -> t = fun elems : t -> { elems }
   end
 end)
 
@@ -138,9 +136,7 @@ module Fp_poly_comm = Kimchi_backend_common.Poly_comm.Make (struct
 
     let elems ({ elems; _ } : t) = elems
 
-    let make :
-        Curve.Affine.Backend.t array -> Curve.Affine.Backend.t option -> t =
-     fun elems : t -> { elems }
+    let make : Curve.Affine.Backend.t array -> t = fun elems : t -> { elems }
   end
 end)
 
