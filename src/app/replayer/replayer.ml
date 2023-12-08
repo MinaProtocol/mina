@@ -29,6 +29,8 @@ type input =
   { target_epoch_ledgers_state_hash : State_hash.t option [@default None]
   ; start_slot_since_genesis : int64 [@default 0L]
   ; genesis_ledger : Runtime_config.Ledger.t
+  ; first_pass_ledger_hashes : Ledger_hash.t list [@default []]
+  ; last_snarked_ledger_hash : Ledger_hash.t option [@default None]
   }
 [@@deriving yojson]
 
@@ -61,6 +63,42 @@ let create_ledger_as_list ledger =
   let%map accounts = Ledger.to_list ledger in
   List.map accounts ~f:(fun acc ->
       Genesis_ledger_helper.Accounts.Single.of_account acc None )
+
+module First_pass_ledger_hashes = struct
+  (* ledger hashes after 1st pass, indexed by order of occurrence *)
+
+  module T = struct
+    type t = Ledger_hash.Stable.Latest.t * int
+    [@@deriving bin_io_unversioned, compare, sexp, hash]
+  end
+
+  include T
+  include Hashable.Make_binable (T)
+
+  let hash_set = Hash_set.create ()
+
+  let add =
+    let count = ref 0 in
+    fun ledger_hash ->
+      Base.Hash_set.add hash_set (ledger_hash, !count) ;
+      incr count
+
+  let find ledger_hash =
+    Base.Hash_set.find hash_set ~f:(fun (hash, _n) ->
+        Ledger_hash.equal hash ledger_hash )
+
+  (* once we find a snarked ledger hash corresponding to a ledger hash, don't need to store earlier ones *)
+  let flush_older_than ndx =
+    let elts = Base.Hash_set.to_list hash_set in
+    List.iter elts ~f:(fun ((_hash, n) as elt) ->
+        if n < ndx then Base.Hash_set.remove hash_set elt )
+
+  let get_last_snarked_hash, set_last_snarked_hash =
+    let last_snarked_hash = ref Ledger_hash.empty_hash in
+    let getter () = !last_snarked_hash in
+    let setter hash = last_snarked_hash := hash in
+    (getter, setter)
+end
 
 let create_output ~target_epoch_ledgers_state_hash ~target_fork_state_hash
     ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
@@ -106,9 +144,19 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
     ; add_genesis_winner = Some true
     }
   in
+  let first_pass_ledger_hashes =
+    let elts = Base.Hash_set.to_list First_pass_ledger_hashes.hash_set in
+    List.sort elts ~compare:(fun (_h1, n1) (_h2, n2) -> Int.compare n1 n2)
+    |> List.map ~f:(fun (h, _n) -> h)
+  in
+  let last_snarked_ledger_hash =
+    Some (First_pass_ledger_hashes.get_last_snarked_hash ())
+  in
   { target_epoch_ledgers_state_hash = None
   ; start_slot_since_genesis
   ; genesis_ledger
+  ; first_pass_ledger_hashes
+  ; last_snarked_ledger_hash
   }
 
 (* map from global slots (since genesis) to state hash, ledger hash, snarked ledger hash triples *)
@@ -117,42 +165,6 @@ let global_slot_hashes_tbl :
   Int64.Table.create ()
 
 let get_slot_hashes slot = Hashtbl.find global_slot_hashes_tbl slot
-
-module First_pass_ledger_hashes = struct
-  (* ledger hashes after 1st pass, indexed by order of occurrence *)
-
-  module T = struct
-    type t = Ledger_hash.Stable.Latest.t * int
-    [@@deriving bin_io_unversioned, compare, sexp, hash]
-  end
-
-  include T
-  include Hashable.Make_binable (T)
-
-  let hash_set = Hash_set.create ()
-
-  let add =
-    let count = ref 0 in
-    fun ledger_hash ->
-      Base.Hash_set.add hash_set (ledger_hash, !count) ;
-      incr count
-
-  let find ledger_hash =
-    Base.Hash_set.find hash_set ~f:(fun (hash, _n) ->
-        Ledger_hash.equal hash ledger_hash )
-
-  (* once we find a snarked ledger hash corresponding to a ledger hash, don't need to store earlier ones *)
-  let flush_older_than ndx =
-    let elts = Base.Hash_set.to_list hash_set in
-    List.iter elts ~f:(fun ((_hash, n) as elt) ->
-        if n < ndx then Base.Hash_set.remove hash_set elt )
-
-  let get_last_snarked_hash, set_last_snarked_hash =
-    let last_snarked_hash = ref Ledger_hash.empty_hash in
-    let getter () = !last_snarked_hash in
-    let setter hash = last_snarked_hash := hash in
-    (getter, setter)
-end
 
 let process_block_infos_of_state_hash ~logger pool ~state_hash ~start_slot ~f =
   match%bind
@@ -674,6 +686,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               max_slot ;
             try_slot ~logger pool max_slot
       in
+      if not @@ List.is_empty input.first_pass_ledger_hashes then (
+        [%log info] "Populating set of first-pass ledger hashes" ;
+        List.iter input.first_pass_ledger_hashes ~f:First_pass_ledger_hashes.add
+        ) ;
+      Option.iter input.last_snarked_ledger_hash ~f:(fun h ->
+          [%log info] "Setting last snarked ledger hash" ;
+          First_pass_ledger_hashes.set_last_snarked_hash h ) ;
       [%log info]
         "Loading block information using target state hash and start slot" ;
       let%bind block_ids, oldest_block_id =
@@ -1263,7 +1282,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                         "Current snarked ledger hash not among first-pass \
                          ledger hashes, but we haven't yet found one. The \
                          transaction that created this ledger hash might have \
-                         been in a replayer run that created a checkpoint file" ;
+                         been in an older replayer run that created a \
+                         checkpoint file without saved first-pass ledger \
+                         hashes" ;
                       First_pass_ledger_hashes.set_last_snarked_hash
                         snarked_hash )
                     else
@@ -1574,7 +1595,7 @@ let () =
       Command.async ~summary:"Replay transactions from Mina archive database"
         (let%map input_file =
            Param.flag "--input-file"
-             ~doc:"file File containing the genesis ledger"
+             ~doc:"file File containing the starting ledger"
              Param.(required string)
          and output_file_opt =
            Param.flag "--output-file"

@@ -172,13 +172,17 @@ module Output = struct
 
         let of_yojson = function
           | `String s ->
-              Result.map_error
-                  (Base64.decode ~alphabet:Base64.uri_safe_alphabet s)
-                  ~f:(function `Msg err ->
-                  sprintf
-                    "Error decoding vrf output in \
-                     Vrf.Output.Truncated.Stable.V1.of_yojson: %s"
-                    err )
+              (* missing type equation somewhere, add explicit type *)
+              ( match Base64.decode ~alphabet:Base64.uri_safe_alphabet s with
+                | Ok b64 ->
+                    Ppx_deriving_yojson_runtime.Result.Ok b64
+                | Error (`Msg err) ->
+                    Error
+                      (sprintf
+                         "Error decoding vrf output in \
+                          Vrf.Output.Truncated.Stable.V1.of_yojson: %s"
+                         err )
+                : (t, string) Ppx_deriving_yojson_runtime.Result.result )
           | _ ->
               Error
                 "Vrf.Output.Truncated.Stable.V1.of_yojson: Expected a string"
@@ -194,6 +198,9 @@ module Output = struct
 
       let description = "Vrf Truncated Output"
     end)
+
+    (* don't want the yojson functions from Make_base58_check *)
+    [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
     open Tick
 

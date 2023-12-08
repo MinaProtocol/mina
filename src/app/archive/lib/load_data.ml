@@ -1,5 +1,9 @@
 (* load_data.ml -- load archive db data to "native" OCaml data *)
 
+(* these functions are used by the replayer and `extract_blocks` to load particular pieces
+   of archive db data
+*)
+
 open Core_kernel
 open Async
 open Mina_base
