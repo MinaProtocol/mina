@@ -1,6 +1,8 @@
 open Core_kernel
 open Currency
 open Mina_base
+open Mina_base_test_helpers
+open Mina_ledger_test_helpers
 open Mina_numbers
 open Signature_lib
 open Helpers
@@ -30,9 +32,9 @@ let%test_module "Test transaction logic." =
     let run_zkapp_cmd ~fee_payer ~fee ~accounts txns =
       let open Result.Let_syntax in
       let cmd =
-        zkapp_cmd ~noncemap:(noncemap accounts) ~fee:(fee_payer, fee) txns
+        zkapp_cmd ~noncemap:(Ledger_helpers.noncemap accounts) ~fee:(fee_payer, fee) txns
       in
-      let%bind ledger = test_ledger accounts in
+      let%bind ledger = Ledger_helpers.ledger_of_accounts accounts in
       let%map txn, _ =
         Transaction_logic.apply_zkapp_command_unchecked ~constraint_constants
           ~global_slot:Global_slot_since_genesis.(of_int 120)
