@@ -27,7 +27,7 @@ for folder in os.listdir(files):
         metricName = os.path.splitext(file)[0]
         print(f"\t-Metric: {metricName}")
         with open(f"{folderPath}/{file}", 'r') as data_file:
-          data = data_file.read().strip()
+          data = float(data_file.read().strip())
           points.append(
             Point("measurementFile")
             .tag(key="metric", value=metricName)
