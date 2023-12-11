@@ -39,10 +39,6 @@ end = struct
 
   let create ~depth () = { uuid = Uuid_unix.create (); depth }
 
-  let remove_accounts_exn _t keys =
-    if List.is_empty keys then ()
-    else failwith "remove_accounts_exn: null ledgers cannot be mutated"
-
   let empty_hash_at_height =
     Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
@@ -150,8 +146,6 @@ end = struct
   let to_list _t = Async.Deferred.return []
 
   let to_list_sequential _t = []
-
-  let make_space_for _t _tot = ()
 
   let get_all_accounts_rooted_at_exn t addr =
     let first_node, last_node =
