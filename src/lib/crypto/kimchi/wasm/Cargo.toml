@@ -14,9 +14,8 @@ crate-type = ["cdylib"]
 ################################# Dependencies ################################
 
 [dependencies]
-# Strictly enforcing 0.2.84. It seems that 0.2.87 generates unwanted behavior.
-# See https://github.com/MinaProtocol/mina/issues/14253
-wasm-bindgen = { version = "=0.2.85" }
+# Strictly enforcing 0.2.87
+wasm-bindgen = { version = "=0.2.87" }
 console_error_panic_hook = { version = "0.1.6" }
 web-sys = { version = "0.3.35", features = ["Window", "Document", "HtmlElement", "Text", "Node", "Element" ] }
 

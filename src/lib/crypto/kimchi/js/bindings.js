@@ -10,10 +10,6 @@ var tsBindings = globalThis.__snarkyTsBindings;
 // Requires: tsBindings, plonk_wasm
 var tsRustConversion = tsBindings.rustConversion(plonk_wasm);
 
-// Provides: tsSrs
-// Requires: plonk_wasm
-var tsSrs = tsBindings.srs(plonk_wasm);
-
 // Provides: getTsBindings
 // Requires: tsBindings
 function getTsBindings() {
@@ -92,8 +88,10 @@ var free_on_finalize = function (x) {
 // srs
 
 // Provides: caml_fp_srs_create
-// Requires: tsSrs
-var caml_fp_srs_create = tsSrs.fp.create;
+// Requires: plonk_wasm, free_on_finalize
+var caml_fp_srs_create = function (i) {
+  return free_on_finalize(plonk_wasm.caml_fp_srs_create(i));
+};
 
 // Provides: caml_fp_srs_write
 // Requires: plonk_wasm, caml_jsstring_of_string
@@ -123,8 +121,11 @@ var caml_fp_srs_read = function (offset, path) {
 };
 
 // Provides: caml_fp_srs_lagrange_commitment
-// Requires: tsSrs
-var caml_fp_srs_lagrange_commitment = tsSrs.fp.lagrangeCommitment;
+// Requires: plonk_wasm, tsRustConversion
+var caml_fp_srs_lagrange_commitment = function (t, domain_size, i) {
+  var res = plonk_wasm.caml_fp_srs_lagrange_commitment(t, domain_size, i);
+  return tsRustConversion.fp.polyCommFromRust(res);
+};
 
 // Provides: caml_fp_srs_commit_evaluations
 // Requires: plonk_wasm, tsRustConversion
@@ -178,13 +179,11 @@ var caml_fp_srs_h = function (t) {
   return tsRustConversion.fp.pointFromRust(plonk_wasm.caml_fp_srs_h(t));
 };
 
-// Provides: caml_fp_srs_add_lagrange_basis
-// Requires: tsSrs
-var caml_fp_srs_add_lagrange_basis = tsSrs.fp.addLagrangeBasis;
-
 // Provides: caml_fq_srs_create
-// Requires: tsSrs
-var caml_fq_srs_create = tsSrs.fq.create;
+// Requires: plonk_wasm, free_on_finalize
+var caml_fq_srs_create = function (i) {
+  return free_on_finalize(plonk_wasm.caml_fq_srs_create(i));
+};
 
 // Provides: caml_fq_srs_write
 // Requires: plonk_wasm, caml_jsstring_of_string
@@ -214,8 +213,11 @@ var caml_fq_srs_read = function (offset, path) {
 };
 
 // Provides: caml_fq_srs_lagrange_commitment
-// Requires: tsSrs
-var caml_fq_srs_lagrange_commitment = tsSrs.fq.lagrangeCommitment;
+// Requires: plonk_wasm, tsRustConversion
+var caml_fq_srs_lagrange_commitment = function (t, domain_size, i) {
+  var res = plonk_wasm.caml_fq_srs_lagrange_commitment(t, domain_size, i);
+  return tsRustConversion.fq.polyCommFromRust(res);
+};
 
 // Provides: caml_fq_srs_commit_evaluations
 // Requires: plonk_wasm, tsRustConversion
@@ -270,8 +272,10 @@ var caml_fq_srs_h = function (t) {
 };
 
 // Provides: caml_fq_srs_add_lagrange_basis
-// Requires: tsSrs
-var caml_fq_srs_add_lagrange_basis = tsSrs.fq.addLagrangeBasis;
+// Requires: plonk_wasm
+function caml_fq_srs_add_lagrange_basis(srs, log2_size) {
+  return plonk_wasm.caml_fq_srs_add_lagrange_basis(srs, log2_size);
+}
 
 // gate vector
 
