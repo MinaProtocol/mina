@@ -28,6 +28,6 @@
    (run chmod -R +w ../../wasm .)
    (setenv
     CARGO_TARGET_DIR
-    "%{read:../../../../../../crypto/kimchi_bindings/stubs/dune-build-root}/cargo_kimchi_wasm"
+    "%{read:../../../kimchi_bindings/stubs/dune-build-root}/cargo_kimchi_wasm"
     (run ./build.sh))
    (write-file flags.sexp "()"))))
