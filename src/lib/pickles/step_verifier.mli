@@ -175,3 +175,14 @@ val verify :
      Import.Types.Step.Proof_state.Per_proof.In_circuit.t
      (* unfinalized *)
   -> Step_main_inputs.Impl.Boolean.var
+
+module For_tests_only : sig
+  type field := Step_main_inputs.Impl.Field.t
+
+  val side_loaded_domain :
+       log2_size:field
+    -> < generator : field
+       ; log2_size : field
+       ; shifts : field Pickles_types.Plonk_types.Shifts.t
+       ; vanishing_polynomial : field -> field >
+end
