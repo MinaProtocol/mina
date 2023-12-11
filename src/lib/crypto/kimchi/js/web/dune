@@ -1,6 +1,5 @@
 (library
  (name web_backend)
- (public_name bindings_js.web_backend)
  (js_of_ocaml
   (flags
    (:include flags.sexp))
@@ -22,13 +21,13 @@
   ../../wasm/Cargo.lock
   (source_tree ../../wasm/src)
   (source_tree ../../wasm/.cargo/config)
-  (source_tree ../../../proof-systems))
+  (source_tree ../../../../../../crypto/proof-systems))
  (locks /cargo-lock) ; lock for rustup
  (action
   (progn
    (run chmod -R +w ../../wasm .)
    (setenv
     CARGO_TARGET_DIR
-    "%{read:../../../kimchi_bindings/stubs/dune-build-root}/cargo_kimchi_wasm"
+    "%{read:../../../../../../crypto/kimchi_bindings/stubs/dune-build-root}/cargo_kimchi_wasm"
     (run ./build.sh))
    (write-file flags.sexp "()"))))
