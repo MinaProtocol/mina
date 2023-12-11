@@ -135,7 +135,7 @@ function isArchiveSynced() {
     esac; shift; done
 
     highestObserved=$(
-        PGPASSWORD=${password:-zo3moong7moog4Iep7eNgo3iecaesahH} psql -qtAX -h ${host:-localhost} -p ${port:-5432} -d archive -U ${user:-mina} \
+        PGPASSWORD=${password:-foobar} psql -qtAX -h ${host:-localhost} -p ${port:-5432} -d archive -U ${user:-postgres} \
             -w -c "SELECT height FROM blocks ORDER BY height DESC LIMIT 1"
     )
     highestReceived=$(
