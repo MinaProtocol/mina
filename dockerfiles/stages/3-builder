@@ -36,23 +36,25 @@ RUN mkdir ${HOME}/app
 
 # --- Build libp2p_helper
 RUN make libp2p_helper \
-   && mv src/app/libp2p_helper/result/bin/libp2p_helper ${HOME}/app/libp2p_helper
+  && mv src/app/libp2p_helper/result/bin/libp2p_helper ${HOME}/app/libp2p_helper
 
 # --- Make rosetta-crucial components and the generate_keypair tool
+# ---- Rosetta tests also need zkapp_test_transaction
 RUN eval $(opam config env) \
   && dune build --profile=${DUNE_PROFILE} \
-    src/app/cli/src/mina_testnet_signatures.exe \
-    src/app/cli/src/mina_mainnet_signatures.exe \
-    src/app/archive/archive.exe \
-    src/app/archive_blocks/archive_blocks.exe \
-    src/app/extract_blocks/extract_blocks.exe \
-    src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
-    src/app/replayer/replayer.exe \
-    src/app/rosetta/rosetta_testnet_signatures.exe \
-    src/app/rosetta/rosetta_mainnet_signatures.exe \
-    src/app/generate_keypair/generate_keypair.exe \
-    src/app/validate_keypair/validate_keypair.exe \
-    src/app/rosetta/ocaml-signer/signer.exe \
+  src/app/cli/src/mina_testnet_signatures.exe \
+  src/app/cli/src/mina_mainnet_signatures.exe \
+  src/app/archive/archive.exe \
+  src/app/archive_blocks/archive_blocks.exe \
+  src/app/extract_blocks/extract_blocks.exe \
+  src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+  src/app/replayer/replayer.exe \
+  src/app/rosetta/rosetta_testnet_signatures.exe \
+  src/app/rosetta/rosetta_mainnet_signatures.exe \
+  src/app/generate_keypair/generate_keypair.exe \
+  src/app/validate_keypair/validate_keypair.exe \
+  src/app/rosetta/ocaml-signer/signer.exe \
+  src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
   && cp _build/default/src/app/archive_blocks/archive_blocks.exe $HOME/app/mina-archive-blocks \
   && cp _build/default/src/app/extract_blocks/extract_blocks.exe $HOME/app/mina-extract-blocks \
   && cp _build/default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe $HOME/app/mina-missing-blocks-auditor \
@@ -65,6 +67,7 @@ RUN eval $(opam config env) \
   && mv _build/default/src/app/generate_keypair/generate_keypair.exe $HOME/app/mina-generate-keypair \
   && mv _build/default/src/app/validate_keypair/validate_keypair.exe $HOME/app/mina-validate-keypair \
   && mv _build/default/src/app/rosetta/ocaml-signer/signer.exe $HOME/app/mina-ocaml-signer \
+  && mv _build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe $HOME/app/zkapp_test_transaction \
   && rm -rf _build
 
 # --- Clear go module caches to make the container smaller
