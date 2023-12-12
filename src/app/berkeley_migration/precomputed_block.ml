@@ -23,11 +23,10 @@ let make_batch_args ~height ~num_blocks =
   List.init (Int64.to_int_exn actual_num_blocks) ~f:(fun n ->
       sprintf "mainnet-%Ld-*.json" Int64.(start_height + Int64.of_int n) )
 
-let fetch_batch ~height ~num_blocks =
+let fetch_batch ~height ~num_blocks ~bucket =
   let batch_args = make_batch_args ~height ~num_blocks in
   let block_uris =
-    List.map batch_args ~f:(fun arg ->
-        sprintf "gs://mina_network_block_data/%s" arg )
+    List.map batch_args ~f:(fun arg -> sprintf "gs://%s/%s" bucket arg)
   in
   match%map
     Process.run ~prog:"gsutil" ~args:([ "-m"; "cp" ] @ block_uris @ [ "." ]) ()
@@ -48,12 +47,14 @@ let delete_fetched () : unit Deferred.t =
     Array.filter files ~f:(fun file -> Str.string_match block_re file 0)
   in
   let args = Array.to_list block_files in
-  match%map Process.run ~prog:"rm" ~args () with
-  | Ok _ ->
-      ()
-  | Error err ->
-      failwithf "Could not delete fetched precomputed blocks, error %s"
-        (Error.to_string_hum err) ()
+  if List.length args > 0 then
+    match%map Process.run ~prog:"rm" ~args () with
+    | Ok _ ->
+        ()
+    | Error err ->
+        failwithf "Could not delete fetched precomputed blocks, error %s"
+          (Error.to_string_hum err) ()
+  else Deferred.unit
 
 let get_json_item filter ~state_hash ~height =
   let target = make_target ~state_hash ~height in
