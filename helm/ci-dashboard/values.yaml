@@ -108,7 +108,7 @@ retrievers:
   - name: GITHUB_API
     value: *githubAPI
   script:
-    name: "github.py"
+    name: "githubber.py"
     secret: # Secret to be created with python script
       name: "github-retriever-script"
     mountPath: "/mnt/script"
