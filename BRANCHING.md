@@ -5,21 +5,26 @@
   - Never commit to it directly, except to introduce a hotfix.
 - `compatible`: scheduled to be released.
   - It contains all the changes which are literally backwards compatible with what people currently run on the mainnet. Any nodes running a version of mina based off of compatible should connect to the current mainnet.
+- `rampup`: what is deployed on the testnet
+  - Compatible with `mina#compatible`.
+  - Never make PRs to `rampup` unless you're explicitly fixing a testnet bug.
+- `berkeley`/`izmir`: next hardfork branch / release candidate.
+  - Contains all the new features that are scheduled for the release (berkeley or izmir).
+  - On releases. Current release is "mainnet", public. Next release is "berkeley", and the one after is "izmir". The "devnet" testnet is running from `master`, sometimes `compatible`, and features only the current release (not cutting edge/berkeley).
 - `develop`: next non-harmful release, but without cutting edge new protocol features enabled (that might go into the next release).
   - Contains changes which break backwards compatibility, or changes that depend on past compatibility-breaking changes.  “Not backwards compatible” means that a daemon running this version of mina will not connect to mainnet.
   - Major changes to the daemon, protocol, or crypto will sometimes cause backwards-compatibility breaking changes, and of course such changes need to be done with deliberation and are not to be taken lightly.  Changes to infrastructure, auxiliary develop scripts, tests, CI, are usually not be backwards compatibility breaking, and thereby should go into compatible (unless you are doing something very special and you know what you’re doing).
-  - **TODO** how is `develop` different from `berkeley` currently?
-- `berkeley`/`izmir`: next hardfork branch.
-  - Contains all the new features that are scheduled for the release (berkeley or izmir).
-  - On releases. Current release is "mainnet", public. Next release is "berkeley", and the one after is "izmir". The "devnet" testnet is running from `master`, sometimes `compatible`, and features only the current release (not cutting edge/berkeley).
+  - How is `develop` different from `berkeley` currently? `berkeley` is like 2.0 will be the actual hardfork release, and `develop` is like 2.01 subsequent softfork release candidate, softfork after `berkeley`. `develop` is just not tested as rigorously, but it's softfork compatible with `berkeley`.
 - Direction of merge:
-  - The back-merging direction is as follows. `master` merges back to `compatible`, `compatible` merges back to `runpub` (currently running in berkeley incentivized testnet) (ignored). `runpub` merges back into next hardfork (now, `berkeley`), which then merges back into `develop`.
+  - The back-merging direction is as follows. `master` merges back to `compatible`, `compatible` merges back to `rampup` (currently running in berkeley incentivized testnet) (ignored). `rampup` merges back into next hardfork (now, `berkeley`), which then merges back into `develop`.
     - So `develop` contains all the changes from the more stable branches.
   - Merging forward (when introducing features/fixes) is up this stack, but the place the change is introduced can be different (e.g. `compatible` for soft features, `develop` for more experimental/next release).
 - Hard fork/Release:
   - Whenever a hard fork happens, the code in  `develop` is released.  When this happens, the current `compatible` is entirely discarded and a new `compatible` gets created based off of `develop`
   - So after Berkeley release: `berkeley` branch will become the new `master`. `berkeley` will be removed from `proof-systems`. `develop` will be renamed into `compatible`.
-
+- `o1js-main`: compatible with testnet, but has latest `proof-systems` features so that they can be used in `o1js`
+  - mina changes from `rampup`
+  - but `proof-systems#develop`
 
 
 ### Diagram
@@ -52,7 +57,10 @@ Unless it is an emergency, code should flow from feature branches into `compati
 # proof-systems Branching policy
 Generally, proof-systems intends to be synchronized with the mina repository, and so its branching policy is quite similar. However several important distinctions exist that are a result of proof-systems having been created after the mainnet release (**TODO** ?).
 
-- `compatible`: **TODO** ??? Apparently not used in `mina`, and does not have commits after February 2023. Abandoned?
+- `compatible`:
+    - Compatible with `rampup` in `mina`.
+    - **TODO** ??? Apparently not used in `mina`, and does not have commits after February 2023. Abandoned?
+    - After berkeley `compatible` will become properly synced with `mina` compatible.
     - Mina's `compatible`, similarly to mina's `master`, does not have `proof-systems`.
 - `develop`: matches mina's `develop`, soft fork-compatibility.
   - small nuance: `proof-systems#develop` is used as a main branch for o1js.
@@ -63,4 +71,5 @@ Generally, proof-systems intends to be synchronized with the mina repository, an
 - `izmir`: next release after berkeley.
 - In the future: `master`/`develop` will reverse roles and become something like gitflow.
 - Currently `develop` should be back-merged into `master`.
+
 
