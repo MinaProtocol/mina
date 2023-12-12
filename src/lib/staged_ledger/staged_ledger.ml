@@ -2028,12 +2028,14 @@ module T = struct
             { state with
               skipped_by_fee_payer = add_skipped_txn state txn
             ; zkapp_space_remaining = Some (zkapp_limit - 1)
+            ; total_space_remaining = state.total_space_remaining - 1
             }
       | Some zkapp_limit, _ when dependency_skipped txn state ->
           Continue
             { state with
               skipped_by_fee_payer = add_skipped_txn state txn
             ; zkapp_space_remaining = Some (zkapp_limit - 1)
+            ; total_space_remaining = state.total_space_remaining - 1
             }
       | _ -> (
           match

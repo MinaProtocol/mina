@@ -71,6 +71,8 @@ let lift_sync f =
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
          Ivar.fill ivar (f ()) ) )
 
+let zkapp_cmd_limit = ref None
+
 module Singleton_scheduler : sig
   type t
 
@@ -611,8 +613,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
-    ~zkapp_cmd_limit ~block_reward_threshold ~block_produced_bvar
-    ~vrf_evaluation_state ~net =
+    ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state ~net =
   let open Context in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
@@ -753,7 +754,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk:winner_pubkey ~block_reward_threshold
-                ~zkapp_cmd_limit
+                ~zkapp_cmd_limit:!zkapp_cmd_limit
             in
             [%log internal] "Generate_next_state_done" ;
             match next_state_opt with
