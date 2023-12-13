@@ -12,7 +12,7 @@ let Size = ../../Command/Size.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 
 let spec = DockerImage.ReleaseSpec::{
-    service="receipt-chain-hash-fix",
+    service="mina-receipt-chain-hash-fix",
     step_key="receipt-chain-hash-fix-docker-image",
     network="berkeley",
     deps = [ { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" } ]
