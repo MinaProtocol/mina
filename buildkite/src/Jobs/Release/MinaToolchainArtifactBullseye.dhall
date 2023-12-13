@@ -30,7 +30,7 @@ Pipeline.build
         ],
         path = "Release",
         name = "MinaToolchainArtifactBullseye",
-        tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
+        tags = [ PipelineTag.Type.Toolchain ]
       },
     steps = [
 
