@@ -71,7 +71,7 @@ let lift_sync f =
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
          Ivar.fill ivar (f ()) ) )
 
-let zkapp_cmd_limit = ref None
+let zkapp_cmd_limit = ref Mina_compile_config.zkapp_cmd_limit
 
 module Singleton_scheduler : sig
   type t

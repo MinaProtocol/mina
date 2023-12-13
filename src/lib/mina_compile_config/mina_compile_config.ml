@@ -68,3 +68,5 @@ let max_event_elements = 100
 let max_action_elements = 100
 
 [%%inject "network_id", network]
+
+let zkapp_cmd_limit = None
