@@ -27,7 +27,7 @@ Pipeline.build
         dirtyWhen = [
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/ReceiptChainHashFixArtifact"),
           S.strictlyStart (S.contains "src/app/receipt_chain_hash_to_b58"),
-          S.strictlyStart (S.contains "src/app/last_vrf_output_to_b64"),
+          S.strictlyStart (S.contains "src/app/last_vrf_output_to_b64")
         ],
         path = "Release",
         name = "ReceiptChainHashFixArtifact"
