@@ -19,7 +19,7 @@ influxdb:
       password: dashboardtest
       org: o1-labs
       bucket: dashboard-db
-      token: ''
+      token: &influxToken ''
   influxdb:
     service:
       type: LoadBalancer
@@ -33,7 +33,7 @@ dbPusher:
     tag: "3.9.18-slim"
   env:
   - name: INFLUXDB_TOKEN
-    value: ''
+    value: *influxToken
   - name: INFLUXDB_FILES_SUFFIX
     value: '.dat'
   - name: INFLUXDB_BUCKET
@@ -126,4 +126,23 @@ retrievers:
     name: "buildkite.py"
     secret: # Secret with python script
       name: "buildkite-retriever-script"
+    mountPath: "/mnt/script"
+- name: "buildkite-agents"
+  image:
+    name: "python"
+    tag: "3.9.18-slim"
+  env:
+  - name: BUILDKITE_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: *buildkiteTokenSecretName
+        key: token
+  - name: BUILDKITE_ORG
+    value: "o-1-labs-2"
+  - name: BUILDKITE_TRIGGER_INTERVAL_MINUTES
+    value: "200"
+  script:
+    name: "agents.py"
+    secret: # Secret with python script
+      name: "buildkite-agents-retriever-script"
     mountPath: "/mnt/script"

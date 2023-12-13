@@ -88,6 +88,8 @@ Create a standard "retriever" container. It includes:
   {{- end }}
   - name: {{ $outputEnvName | quote }}
     mountPath: {{ .root.Values.outputEnv.value | quote }}
+  resources:
+  {{- toYaml (.retriever.resources | default .root.Values.dbPusher.resources) | nindent 4 }}
   command:
   - /bin/bash
   args:
