@@ -24,6 +24,7 @@
   key_cache
   hex
   kimchi_backend.common
+  kimchi_backend.bn254
   kimchi_backend.pasta
   kimchi_backend.pasta.basic
   kimchi_backend.pasta.constraint_system

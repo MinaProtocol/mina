@@ -46,4 +46,4 @@ end)
 
 (* poseidon params *)
 
-let poseidon_params_fp = Sponge.Params.(map pasta_p_kimchi ~f:Bn254_fp.of_string)
+let poseidon_params_fp = Sponge.Params.(map bn128 ~f:Bn254_fp.of_string)
