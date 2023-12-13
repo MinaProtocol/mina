@@ -1,14 +1,18 @@
 #!/bin/bash
 
-if [ $# -lt 1 ] || [ $# -gt 3 ]; then
+if [ $# -lt 1 ] || [ $# -gt 5 ]; then
     echo "Usage" $0 archive-db [data_file] [update_script]
     echo "'data_file' and 'update_script' are created when running this script"
+    echo "[env] RECEIPT_CHAIN_HASH_TO_B58_APP overrides receipt_chain_hash_to_b58 location"
+    echo "[env] LAST_VRF_OUTPUT_TO_B64_APP overrides last_vrf_output_to_b64 location"
     exit 0
 fi
 
 ARCHIVE_DB=$1
 DATA_FILE=${2:-data_file.tmp}
 UPDATE_SCRIPT=${3:-data_update.sql}
+RECEIPT_CHAIN_HASH_TO_B58_APP=${RECEIPT_CHAIN_HASH_TO_B58_APP:-_build/default/src/app/receipt_chain_hash_to_b58/receipt_chain_hash_to_b58.exe}
+LAST_VRF_OUTPUT_TO_B64_APP=${LAST_VRF_OUTPUT_TO_B64_APP:-_build/default/src/app/last_vrf_output_to_b64/last_vrf_output_to_b64.exe}
 
 echo "Migrating receipt chain hashes in account preconditions in archive db '"$ARCHIVE_DB"'"
 
@@ -24,7 +28,7 @@ for line in `cat $DATA_FILE`
   do  (
     ID=$(echo $line | awk -F , '{print $1}');
     FP=$(echo $line | awk -F , '{print $2}');
-    B58=$(echo $FP | _build/default/src/app/receipt_chain_hash_to_b58/receipt_chain_hash_to_b58.exe);
+    B58=$(echo $FP | $RECEIPT_CHAIN_HASH_TO_B58_APP );
     echo -n .
     echo $ID "'"$B58"'" | awk '{print "UPDATE zkapp_account_precondition SET receipt_chain_hash=" $2 " WHERE id=" $1 ";"}' >> $UPDATE_SCRIPT)
 done
@@ -43,7 +47,7 @@ for line in `cat $DATA_FILE`
   do  (
     ID=$(echo $line | awk -F , '{print $1}');
     FP=$(echo $line | awk -F , '{print $2}');
-    B64=$(echo $FP | _build/default/src/app/last_vrf_output_to_b64/last_vrf_output_to_b64.exe);
+    B64=$(echo $FP | $LAST_VRF_OUTPUT_TO_B64_APP);
     echo -n .
     echo $ID "'"$B64"'" | awk '{print "UPDATE blocks SET last_vrf_output=" $2 " WHERE id=" $1 ";"}' >> $UPDATE_SCRIPT)
 done
