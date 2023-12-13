@@ -204,7 +204,7 @@ create_control_file mina-receipt-chain-hash-fix "${SHARED_DEPS}" 'Tool to run au
 mkdir -p "${BUILDDIR}/etc/mina/receipt-chain-hash-fix-script"
 
 # Binaries
-cp ../src/scripts/migrate-itn-data.sh "${BUILDDIR}/etc/mina/receipt-chain-hash-fix-script/migrate-itn-data.sh"
+cp ../scripts/migrate-itn-data.sh "${BUILDDIR}/etc/mina/receipt-chain-hash-fix-script/migrate-itn-data.sh"
 cp ./default/src/app/last_vrf_output_to_b64/last_vrf_output_to_b64.exe "${BUILDDIR}/usr/local/bin/mina-last-vrf-output-to-b64"
 cp ./default/src/app/receipt_chain_hash_to_b58/receipt_chain_hash_to_b58.exe "${BUILDDIR}/usr/local/bin/mina-receipt-chain-hash-to-b58"
 
