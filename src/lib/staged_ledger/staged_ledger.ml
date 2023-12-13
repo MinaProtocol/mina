@@ -2023,20 +2023,12 @@ module T = struct
       match (state.zkapp_space_remaining, txn) with
       | _ when state.total_space_remaining < 1 ->
           Stop (state.valid_seq, state.invalid)
-      | Some zkapp_limit, User_command.Zkapp_command _ when zkapp_limit > 1 ->
+      | Some zkapp_limit, User_command.Zkapp_command _ when zkapp_limit < 1 ->
           Continue
-            { state with
-              skipped_by_fee_payer = add_skipped_txn state txn
-            ; zkapp_space_remaining = Some (zkapp_limit - 1)
-            ; total_space_remaining = state.total_space_remaining - 1
-            }
-      | Some zkapp_limit, _ when dependency_skipped txn state ->
+            { state with skipped_by_fee_payer = add_skipped_txn state txn }
+      | Some _, _ when dependency_skipped txn state ->
           Continue
-            { state with
-              skipped_by_fee_payer = add_skipped_txn state txn
-            ; zkapp_space_remaining = Some (zkapp_limit - 1)
-            ; total_space_remaining = state.total_space_remaining - 1
-            }
+            { state with skipped_by_fee_payer = add_skipped_txn state txn }
       | _ -> (
           match
             O1trace.sync_thread "validate_transaction_against_staged_ledger"
@@ -2065,7 +2057,12 @@ module T = struct
                     | Signed_command _ ->
                         limit )
               in
-              Continue { state with valid_seq; zkapp_space_remaining } )
+              Continue
+                { state with
+                  valid_seq
+                ; zkapp_space_remaining
+                ; total_space_remaining = state.total_space_remaining - 1
+                } )
   end
 
   let create_diff
