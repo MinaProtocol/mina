@@ -1,5 +1,6 @@
 (library
  (name node_backend)
+ (public_name bindings_js.node_backend)
  (js_of_ocaml
   (flags
    (:include flags.sexp))
@@ -21,7 +22,7 @@
   ../../wasm/Cargo.lock
   (source_tree ../../wasm/src)
   (source_tree ../../wasm/.cargo/config)
-  (source_tree ../../../../../../crypto/proof-systems))
+  (source_tree ../../../proof-systems))
  (locks /cargo-lock) ; lock for rustup
  (action
   (progn
