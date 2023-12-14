@@ -14,9 +14,6 @@ let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let B = ../../External/Buildkite.dhall
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-
 in
 
 Pipeline.build
@@ -39,7 +36,6 @@ Pipeline.build
             Cmd.runInDocker Cmd.Docker::{image = ContainerImages.delegationBackendToolchain} "cd src/app/delegation_backend && mkdir -p result && cp -R /headers result && cd src/delegation_backend && go test"
           ],
           label = "delegation backend unit-tests",
-          soft_fail = Some (B/SoftFail.Boolean True),
           key = "delegation-backend-unit-tests",
           soft_fail = Some (B/SoftFail.Boolean True),
           target = Size.Small,
