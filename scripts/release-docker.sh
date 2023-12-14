@@ -101,6 +101,7 @@ mina-rosetta)
   ;;
 mina-receipt-chain-hash-fix)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-receipt-chain-hash-fix"
+  DOCKER_CONTEXT="dockerfiles/"
   ;;
 mina-zkapp-test-transaction)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
