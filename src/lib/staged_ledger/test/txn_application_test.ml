@@ -15,10 +15,12 @@ let gen_apply_and_txn : (apply * Application_state.txn) Quickcheck.Generator.t =
   let constraint_constants =
     Genesis_constants.Constraint_constants.for_unit_tests
   in
-  let%bind (txn, _, _, validating_ledger) = User_command_generators.zkapp_command_with_ledger () in
+  let%bind txn, _, _, validating_ledger =
+    User_command_generators.zkapp_command_with_ledger ()
+  in
   let%map global_slot = Global_slot_since_genesis.gen in
   let current_state_view = Test_helpers.dummy_state_view ~global_slot () in
-  let apply = 
+  let apply =
     Transaction_snark.Transaction_validator.apply_transaction_first_pass
       ~constraint_constants ~global_slot validating_ledger
       ~txn_state_view:current_state_view
@@ -53,5 +55,7 @@ let apply_against_non_empty_scan_state () =
             (state.total_space_remaining - state'.total_space_remaining)
       | Stop _ when state.total_space_remaining = 0 ->
           ()
-      | Continue _ -> failwith "Application continues when it should have stopped."
-      | Stop _ -> failwith "Application stopped when it should have continued." )
+      | Continue _ ->
+          failwith "Application continues when it should have stopped."
+      | Stop _ ->
+          failwith "Application stopped when it should have continued." )
