@@ -24,10 +24,6 @@
   staged_ledger
   transaction_snark)
  (preprocess
-  (pps
-   ppx_base
-   ppx_let
-   ppx_assert))
+  (pps ppx_base ppx_let ppx_assert ppx_version))
  (instrumentation
   (backend bisect_ppx)))
-
