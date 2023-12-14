@@ -1192,10 +1192,10 @@ module AccountObj = struct
                associated with the account"
             ~args:Arg.[]
             ~resolve:(fun _ (auth, _) -> auth)
-        ; field "txnVersion" ~typ:(non_null int)
+        ; field "txnVersion" ~typ:(non_null string)
             ~args:Arg.[]
             ~resolve:(fun _ (_, version) ->
-              Mina_numbers.Txn_version.to_int version )
+              Mina_numbers.Txn_version.to_string version )
         ] )
 
   let account_permissions =
