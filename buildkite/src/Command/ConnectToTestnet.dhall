@@ -19,7 +19,7 @@ let Cmd = ../Lib/Cmds.dhall in
             }
             "./buildkite/scripts/connect-to-berkeley.sh"
         ],
-        label = "Connect to Berkeley",
+        label = "Connect to TestWorld 2-0",
         soft_fail = Some (B/SoftFail.Boolean True),
         key = "connect-to-berkeley",
         target = Size.Large,

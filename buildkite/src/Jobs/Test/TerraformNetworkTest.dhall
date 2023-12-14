@@ -8,6 +8,9 @@ let Cmd = ../../Lib/Cmds.dhall
 let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
+let B = ../../External/Buildkite.dhall
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineTag = ../../Pipeline/Tag.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
@@ -21,7 +24,8 @@ let buildTestCmd : Size -> Command.Type = \(cmd_target : Size) ->
       label = "Terraform: Test",
       key = "terraform-network-test",
       target = cmd_target,
-      docker = None Docker.Type
+      docker = None Docker.Type,
+      soft_fail = Some (B/SoftFail.Boolean True)
     }
 
 in
