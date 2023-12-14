@@ -113,8 +113,6 @@ module Make_base (Inputs : Inputs_intf) :
 
     module Addr = Location.Addr
 
-    let remove_accounts_exn (T ((module Base), t)) = Base.remove_accounts_exn t
-
     let merkle_path_at_index_exn (T ((module Base), t)) =
       Base.merkle_path_at_index_exn t
 
@@ -183,8 +181,6 @@ module Make_base (Inputs : Inputs_intf) :
     let to_list (T ((module Base), t)) = Base.to_list t
 
     let to_list_sequential (T ((module Base), t)) = Base.to_list_sequential t
-
-    let make_space_for (T ((module Base), t)) = Base.make_space_for t
 
     let get_all_accounts_rooted_at_exn (T ((module Base), t)) =
       Base.get_all_accounts_rooted_at_exn t

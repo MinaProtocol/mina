@@ -24,9 +24,11 @@
    mina_stdlib
    direction
    empty_hashes
+   logger
  )
  (preprocess
   (pps
+    ppx_mina
     ppx_compare
     ppx_deriving.show
     ppx_deriving_yojson
