@@ -199,7 +199,7 @@ build_deb mina-logproc
 
 ##################################### GENERATE RECEIPT CHAIN HASH FIX PACKAGE #######################################
 
-create_control_file mina-receipt-chain-hash-fix "${SHARED_DEPS}" 'Tool to run automated fix against a archive database for receipt chain hash.'
+create_control_file mina-receipt-chain-hash-fix "${SHARED_DEPS}${DAEMON_DEPS}" 'Tool to run automated fix against a archive database for receipt chain hash.'
 
 mkdir -p "${BUILDDIR}/etc/mina/receipt-chain-hash-fix-script"
 
