@@ -1368,7 +1368,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                    ; shutdown_on_disconnect = true
                    ; num_threads = snark_worker_parallelism_flag
                    }
-                 ~zkapp_cmd_limit
                  ~snark_coordinator_key:run_snark_coordinator_flag
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
