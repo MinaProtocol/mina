@@ -1019,6 +1019,14 @@ module T = struct
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
     let transactions, works, commands_count, coinbases = pre_diff_info in
+    let accounts_accessed =
+      List.fold_left ~init:Account_id.Set.empty transactions ~f:(fun set txn ->
+          Account_id.Set.(
+            union set
+              (of_list (Transaction.accounts_referenced txn.With_status.data))) )
+      |> Set.to_list
+    in
+    Ledger.unsafe_preload_accounts_from_parent new_ledger accounts_accessed ;
     [%log internal] "Update_coinbase_stack"
       ~metadata:
         [ ("transactions", `Int (List.length transactions))
@@ -2474,7 +2482,7 @@ let%test_module "staged ledger tests" =
       let sok_digest = Sok_message.Digest.default in
       One_or_two.map stmts ~f:(fun statement ->
           Ledger_proof.create ~statement ~sok_digest
-            ~proof:Proof.transaction_dummy )
+            ~proof:(Lazy.force Proof.transaction_dummy) )
 
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =

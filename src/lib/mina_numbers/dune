@@ -20,7 +20,6 @@
    bignum_bigint
    pickles
    codable
-   ppx_dhall_type
    snarky.backendless
    fold_lib
    tuple_lib

@@ -20,11 +20,15 @@ ARG GO_VERSION=1.19.11
 ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
-ARG RUST_VERSION=1.63.0
+# This should stay in line with:
+# - src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml
+# - src/lib/crypto/proof-systems/rust-toolchain.toml
+ARG RUST_VERSION=1.72
 # Nightly Rust Version used for WebAssembly builds
-ARG RUST_NIGHTLY=2022-09-12
+# - src/lib/snarkyjs/src/bindings/kimchi/wasm/rust-toolchain.toml
+ARG RUST_NIGHTLY=2023-09-01
 # wasm-pack version
-ARG WASM_PACK_VERSION=v0.10.3
+ARG WASM_PACK_VERSION=v0.12.1
 
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
