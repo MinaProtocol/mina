@@ -18,7 +18,7 @@ function install_mina() {
     sudo rm /etc/apt/sources.list.d/mina*.list
     echo "deb [trusted=yes] http://packages.o1test.net/ buster rampup" | sudo tee /etc/apt/sources.list.d/mina-rampup.list
     sudo apt-get update
-    sudo apt-get install -y mina-berkeley=2.0.0rampup7-4a0fff9
+    sudo apt-get install -y mina-berkeley=2.0.0rampup7-4a0fff9 tzdata
     sudo curl https://raw.githubusercontent.com/MinaProtocol/mina/rampup/genesis_ledgers/berkeley.json > /root/berkeley.json
 }
 
@@ -40,8 +40,10 @@ function generate_block_producer_key() {
     # keys are being manually assigned in this case
     # mina-generate-keypair --privkey-path /root/wallet-keys/key
 
-    echo "\"${wallet_privkey}\"" >> /root/wallet-keys/key
-    echo ${wallet_pubkey} >> /root/wallet-keys/key.pub
+    echo '${wallet_privkey}' >> /root/wallet-keys/key
+    echo '${wallet_pubkey}' >> /root/wallet-keys/key.pub
+
+    chmod 600 /root/wallet-keys/key
 }
 
 function start_mina() {
