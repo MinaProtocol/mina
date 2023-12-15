@@ -1,4 +1,5 @@
 use ark_ec::AffineCurve;
+use kimchi::circuits::expr::PolishToken;
 use kimchi::circuits::lookup::index::LookupSelectors;
 use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupInfo};
 use kimchi::verifier_index::LookupVerifierIndex;
@@ -196,5 +197,5 @@ pub struct CamlPlonkVerifierIndex<Fr, SRS, PolyComm> {
     pub shifts: Vec<Fr>,
     pub lookup_index: Option<CamlLookupVerifierIndex<PolyComm>>,
     pub zk_rows: ocaml::Int,
-    pub custom_gate_type: bool,
+    pub custom_gate_type: Option<Vec<PolishToken<Fr>>>,
 }

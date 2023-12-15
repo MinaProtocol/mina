@@ -1,5 +1,5 @@
 use kimchi::circuits::{
-    expr::FeatureFlag,
+    expr::{FeatureFlag, PolishToken},
     lookup::{
         lookups::{LookupFeatures, LookupPattern, LookupPatterns},
         runtime_tables::caml::{CamlRuntimeTable, CamlRuntimeTableCfg},
@@ -115,6 +115,7 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
     decl_type!(w, env, CamlWire => "wire");
     decl_type!(w, env, GateType => "gate_type");
+    decl_type!(w, env, PolishToken::<T1> => "polish_token");
     decl_type!(w, env, LookupPattern => "lookup_pattern");
     decl_type!(w, env, LookupPatterns => "lookup_patterns");
     decl_type!(w, env, LookupFeatures => "lookup_features");

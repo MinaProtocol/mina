@@ -5,7 +5,7 @@ use kimchi::circuits::lookup::runtime_tables::caml::CamlRuntimeTableCfg;
 use kimchi::circuits::lookup::runtime_tables::RuntimeTableCfg;
 use kimchi::circuits::lookup::tables::caml::CamlLookupTable;
 use kimchi::circuits::lookup::tables::LookupTable;
-use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
+use kimchi::circuits::{constraints::ConstraintSystem, expr::PolishToken, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{Fp, Pallas, Vesta, VestaParameters};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
@@ -79,9 +79,7 @@ pub fn caml_pasta_fp_plonk_index_create(
         })
         .build()
     {
-        Err(e) => {
-            return Err(e.into())
-        }
+        Err(e) => return Err(e.into()),
         Ok(cs) => cs,
     };
 
@@ -103,11 +101,10 @@ pub fn caml_pasta_fp_plonk_index_create(
     Ok(CamlPastaFpPlonkIndex(Box::new(index)))
 }
 
-
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_create_plus(
-    custom_gate_type: bool,
+    custom_gate_type: Option<Vec<PolishToken<CamlFp>>>,
     gates: CamlPastaFpPlonkGateVectorPtr,
     public: ocaml::Int,
     lookup_tables: Vec<CamlLookupTable<CamlFp>>,
@@ -131,6 +128,10 @@ pub fn caml_pasta_fp_plonk_index_create_plus(
 
     let lookup_tables: Vec<LookupTable<Fp>> = lookup_tables.into_iter().map(Into::into).collect();
 
+    // Convert custom gate RPN from CamlFp to Fp
+    let custom_gate_type =
+        custom_gate_type.map(|vs| vs.into_iter().map(PolishToken::into).collect());
+
     // create constraint system
     let cs = match ConstraintSystem::<Fp>::create(gates)
         .custom_gate_type(custom_gate_type)
@@ -145,9 +146,7 @@ pub fn caml_pasta_fp_plonk_index_create_plus(
         })
         .build()
     {
-        Err(e) => {
-            return Err(e.into())
-        }
+        Err(e) => return Err(e.into()),
         Ok(cs) => cs,
     };
 
@@ -230,7 +229,11 @@ pub fn caml_pasta_fp_plonk_index_read(
     )?;
     t.srs = srs.clone();
 
-    let (linearization, powers_of_alpha) = expr_linearization(t.cs.custom_gate_type, Some(&t.cs.feature_flags), true);
+    let (linearization, powers_of_alpha) = expr_linearization(
+        t.cs.custom_gate_type.as_ref(),
+        Some(&t.cs.feature_flags),
+        true,
+    );
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

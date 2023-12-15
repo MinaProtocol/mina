@@ -8,6 +8,7 @@ use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use kimchi::circuits::constraints::FeatureFlags;
+use kimchi::circuits::expr::PolishToken;
 use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupPatterns};
 use kimchi::circuits::polynomials::permutation::Shifts;
 use kimchi::circuits::polynomials::permutation::{permutation_vanishing_polynomial, zk_w};
@@ -26,6 +27,10 @@ pub type CamlPastaFpPlonkVerifierIndex =
 
 impl From<VerifierIndex<Vesta, OpeningProof<Vesta>>> for CamlPastaFpPlonkVerifierIndex {
     fn from(vi: VerifierIndex<Vesta, OpeningProof<Vesta>>) -> Self {
+        // Convert custom gate RPN from Fp to CamlFp
+        let custom_gate_type = vi
+            .custom_gate_type
+            .map(|vs| vs.into_iter().map(PolishToken::into).collect());
         Self {
             domain: CamlPlonkDomain {
                 log_size_of_group: vi.domain.log_size_of_group as isize,
@@ -60,7 +65,7 @@ impl From<VerifierIndex<Vesta, OpeningProof<Vesta>>> for CamlPastaFpPlonkVerifie
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
             lookup_index: vi.lookup_index.map(Into::into),
             zk_rows: vi.zk_rows as isize,
-            custom_gate_type: vi.custom_gate_type,
+            custom_gate_type: custom_gate_type,
         }
     }
 }
@@ -111,9 +116,13 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<V
             },
         };
 
+        let custom_gate_type = index
+            .custom_gate_type
+            .map(|vs| vs.into_iter().map(PolishToken::into).collect());
+
         // TODO dummy_lookup_value ?
         let (linearization, powers_of_alpha) =
-            expr_linearization(index.custom_gate_type, Some(&feature_flags), true);
+            expr_linearization(custom_gate_type.as_ref(), Some(&feature_flags), true);
 
         VerifierIndex::<Vesta, OpeningProof<Vesta>> {
             domain,
@@ -162,7 +171,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<V
 
             lookup_index: index.lookup_index.map(Into::into),
             linearization,
-            custom_gate_type: index.custom_gate_type,
+            custom_gate_type: custom_gate_type,
         }
     }
 }
@@ -282,7 +291,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
         lookup_index: None,
         zk_rows: 3,
-        custom_gate_type: false,
+        custom_gate_type: None,
     }
 }
 

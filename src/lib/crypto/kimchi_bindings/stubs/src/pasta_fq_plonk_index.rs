@@ -5,11 +5,11 @@ use kimchi::circuits::lookup::runtime_tables::caml::CamlRuntimeTableCfg;
 use kimchi::circuits::lookup::runtime_tables::RuntimeTableCfg;
 use kimchi::circuits::lookup::tables::caml::CamlLookupTable;
 use kimchi::circuits::lookup::tables::LookupTable;
-use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
+use kimchi::circuits::{constraints::ConstraintSystem, expr::PolishToken, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{Fq, Pallas, PallasParameters, Vesta};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
-use poly_commitment::{evaluation_proof::OpeningProof};
+use poly_commitment::evaluation_proof::OpeningProof;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -78,9 +78,7 @@ pub fn caml_pasta_fq_plonk_index_create(
         })
         .build()
     {
-        Err(e) => {
-            return Err(e.into())
-        }
+        Err(e) => return Err(e.into()),
         Ok(cs) => cs,
     };
 
@@ -105,7 +103,7 @@ pub fn caml_pasta_fq_plonk_index_create(
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_index_create_plus(
-    custom_gate_type: bool,
+    custom_gate_type: Option<Vec<PolishToken<CamlFq>>>,
     gates: CamlPastaFqPlonkGateVectorPtr,
     public: ocaml::Int,
     lookup_tables: Vec<CamlLookupTable<CamlFq>>,
@@ -129,6 +127,10 @@ pub fn caml_pasta_fq_plonk_index_create_plus(
 
     let lookup_tables: Vec<LookupTable<Fq>> = lookup_tables.into_iter().map(Into::into).collect();
 
+    // Convert custom gate RPN from CamlFp to Fq
+    let custom_gate_type =
+        custom_gate_type.map(|vs| vs.into_iter().map(PolishToken::into).collect());
+
     // create constraint system
     let cs = match ConstraintSystem::<Fq>::create(gates)
         .custom_gate_type(custom_gate_type)
@@ -142,9 +144,7 @@ pub fn caml_pasta_fq_plonk_index_create_plus(
         })
         .build()
     {
-        Err(e) => {
-            return Err(e.into())
-        }
+        Err(e) => return Err(e.into()),
         Ok(cs) => cs,
     };
 
@@ -227,7 +227,11 @@ pub fn caml_pasta_fq_plonk_index_read(
     )?;
     t.srs = srs.clone();
 
-    let (linearization, powers_of_alpha) = expr_linearization(t.cs.custom_gate_type, Some(&t.cs.feature_flags), true);
+    let (linearization, powers_of_alpha) = expr_linearization(
+        t.cs.custom_gate_type.as_ref(),
+        Some(&t.cs.feature_flags),
+        true,
+    );
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 
