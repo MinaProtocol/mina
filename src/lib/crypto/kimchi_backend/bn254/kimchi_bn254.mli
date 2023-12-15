@@ -18,27 +18,3 @@ module Bn254 : sig
   module Fq = Basic.Bn254_fq
   module Curve = Basic.Bn254_curve
 end
-
-module Backend : sig
-  module Field = Bn254_based_plonk.Field
-  module Bigint = Bn254_based_plonk.Bigint
-  val field_size : Bigint.t
-  module R1CS_constraint_system = Bn254_based_plonk.R1CS_constraint_system
-end
-
-module Impl : sig
-  (* include module type of Snarky_backendless.Snark.Run.Make (Backend) *)
-  module Verification_key = Bn254_based_plonk.Verification_key
-  module Proving_key = Bn254_based_plonk.Proving_key
-  
-  module Keypair : sig
-    type t = { pk : Proving_key.t; vk : Verification_key.t } [@@deriving fields]
-
-    val create : pk:Proving_key.t -> vk:Verification_key.t -> t
-
-    val generate :
-         prev_challenges:int
-      -> Kimchi_bn254_constraint_system.Bn254_constraint_system.t
-      -> t
-  end
-end

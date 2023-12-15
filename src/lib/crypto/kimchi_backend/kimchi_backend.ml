@@ -15,5 +15,4 @@ end
 module Bn254 = struct
   module Bn254 = Kimchi_bn254.Bn254
   module Bn254_based_plonk = Kimchi_bn254.Bn254_based_plonk
-  module Impl = Kimchi_bn254.Impl
 end

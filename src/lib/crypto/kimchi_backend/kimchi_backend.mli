@@ -222,6 +222,4 @@ module Bn254 : sig
     module R1CS_constraint_system = Kimchi_bn254.Bn254_based_plonk.R1CS_constraint_system
     module Keypair = Kimchi_bn254.Bn254_based_plonk.Keypair
   end
-  
-  module Impl = Kimchi_bn254.Impl
 end
