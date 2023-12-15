@@ -549,7 +549,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          protocol version"
       @@ send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri whale1)
-           invalid_zkapp_command_set_vk_perm_proof "Incompatible version"
+           invalid_zkapp_command_set_vk_perm_proof
+           "Set verification-key permission is updated to an incompatible \
+            version"
     in
     let%bind () =
       section
@@ -557,7 +559,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          protocol version"
       @@ send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri whale1)
-           invalid_zkapp_command_set_vk_perm_impossible "Incompatible version"
+           invalid_zkapp_command_set_vk_perm_impossible
+           "Set verification-key permission is updated to an incompatible \
+            version"
     in
     let%bind () =
       section "Send zkApp to update vk permission to Proof for account B"

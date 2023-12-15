@@ -633,7 +633,6 @@ let of_record { As_record.auth; txn_version } = (auth, txn_version)
 let deriver obj =
   let open Fields_derivers_zkapps.Derivers in
   let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
-
   Poly.Fields.make_creator obj ~edit_state:!.auth_required ~send:!.auth_required
     ~receive:!.auth_required ~set_delegate:!.auth_required
     ~set_permissions:!.auth_required
