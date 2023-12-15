@@ -34,6 +34,13 @@ let applied_str = "applied"
 
 let failed_str = "failed"
 
+let to_base58_check ?(v1_transaction_hash = false) hash =
+  match v1_transaction_hash with
+  | true ->
+      Transaction_hash.to_base58_check_v1 hash
+  | false ->
+      Transaction_hash.to_base58_check hash
+
 module Public_key = struct
   let find (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
     let public_key = Public_key.Compressed.to_base58_check t in
@@ -1860,13 +1867,6 @@ module User_command = struct
           let%bind receiver_id =
             Public_key.add_if_doesn't_exist (module Conn) user_cmd.receiver
           in
-          let to_base58_check hash =
-            match v1_transaction_hash with
-            | true ->
-                Transaction_hash.to_base58_check_v1 hash
-            | false ->
-                Transaction_hash.to_base58_check hash
-          in
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
@@ -1886,7 +1886,7 @@ module User_command = struct
                     (Fn.compose Unsigned.UInt32.to_int64
                        Mina_numbers.Global_slot_since_genesis.to_uint32 )
             ; memo = user_cmd.memo |> Signed_command_memo.to_base58_check
-            ; hash = user_cmd.hash |> to_base58_check
+            ; hash = user_cmd.hash |> to_base58_check ~v1_transaction_hash
             }
   end
 
@@ -1983,7 +1983,7 @@ module Internal_command = struct
 
   let table_name = "internal_commands"
 
-  let find_opt (module Conn : CONNECTION)
+  let find_opt (module Conn : CONNECTION) ~(v1_transaction_hash : bool)
       ~(transaction_hash : Transaction_hash.t) ~(command_type : string) =
     Conn.find_opt
       (Caqti_request.find_opt
@@ -1993,7 +1993,7 @@ module Internal_command = struct
             ~tannot:(function
               | "command_type" -> Some "internal_command_type" | _ -> None )
             ~cols:[ "hash"; "command_type" ] () ) )
-      (Transaction_hash.to_base58_check transaction_hash, command_type)
+      (to_base58_check ~v1_transaction_hash transaction_hash, command_type)
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
@@ -2008,7 +2008,7 @@ module Internal_command = struct
     match%bind
       find_opt
         (module Conn)
-        ~transaction_hash:internal_cmd.hash
+        ~v1_transaction_hash ~transaction_hash:internal_cmd.hash
         ~command_type:internal_cmd.command_type
     with
     | Some internal_command_id ->
@@ -2016,13 +2016,6 @@ module Internal_command = struct
     | None ->
         let%bind receiver_id =
           Public_key.add_if_doesn't_exist (module Conn) internal_cmd.receiver
-        in
-        let to_base58_check hash =
-          match v1_transaction_hash with
-          | true ->
-              Transaction_hash.to_base58_check_v1 hash
-          | false ->
-              Transaction_hash.to_base58_check hash
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -2034,7 +2027,7 @@ module Internal_command = struct
           { command_type = internal_cmd.command_type
           ; receiver_id
           ; fee = Currency.Fee.to_string internal_cmd.fee
-          ; hash = internal_cmd.hash |> to_base58_check
+          ; hash = internal_cmd.hash |> to_base58_check ~v1_transaction_hash
           }
 end
 
@@ -2073,13 +2066,15 @@ module Fee_transfer = struct
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (t : Fee_transfer.Single.t) (kind : [ `Normal | `Via_coinbase ]) =
+      ?(v1_transaction_hash = false) (t : Fee_transfer.Single.t)
+      (kind : [ `Normal | `Via_coinbase ]) =
     let open Deferred.Result.Let_syntax in
     let transaction_hash = Transaction_hash.hash_fee_transfer t in
     match%bind
       Internal_command.find_opt
         (module Conn)
-        ~transaction_hash ~command_type:(Kind.to_string kind)
+        ~v1_transaction_hash ~transaction_hash
+        ~command_type:(Kind.to_string kind)
     with
     | Some internal_command_id ->
         return internal_command_id
@@ -2119,13 +2114,15 @@ module Coinbase = struct
     let rep = Caqti_type.(tup4 string int int64 string) in
     Caqti_type.custom ~encode ~decode rep
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      ?(v1_transaction_hash = false) (t : Coinbase.t) =
     let open Deferred.Result.Let_syntax in
     let transaction_hash = Transaction_hash.hash_coinbase t in
     match%bind
       Internal_command.find_opt
         (module Conn)
-        ~transaction_hash ~command_type:coinbase_command_type
+        ~v1_transaction_hash ~transaction_hash
+        ~command_type:coinbase_command_type
     with
     | Some internal_command_id ->
         return internal_command_id
