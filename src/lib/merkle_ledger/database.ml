@@ -30,8 +30,6 @@ module Make (Inputs : Inputs_intf) :
   module Db_error = struct
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
     [@@deriving sexp]
-
-    exception Db_exception of t
   end
 
   module Path = Merkle_path.Make (Hash)
@@ -198,8 +196,6 @@ module Make (Inputs : Inputs_intf) :
     assert (Addr.depth address <= mdb.depth) ;
     set_bin mdb (Location.Hash address) Hash.bin_size_t Hash.bin_write_t hash
 
-  let make_space_for _t _tot = ()
-
   let get_generic mdb location =
     assert (Location.is_generic location) ;
     get_raw mdb location
@@ -244,8 +240,6 @@ module Make (Inputs : Inputs_intf) :
       List.map keys ~f:build_location
       |> get_generic_batch mdb
       |> List.map ~f:(Option.bind ~f:parse_location)
-
-    let delete mdb key = delete_raw mdb (build_location key)
 
     let set mdb key location =
       set_raw mdb (build_location key)
@@ -361,9 +355,6 @@ module Make (Inputs : Inputs_intf) :
           Account_id.Stable.Latest.bin_size_t
           Account_id.Stable.Latest.bin_write_t account_id
 
-      let remove (mdb : t) (token_id : Token_id.t) : unit =
-        delete_raw mdb (build_location token_id)
-
       let all_owners (t : t) : (Token_id.t * Account_id.t) Sequence.t =
         let deduped_tokens =
           (* First get the sequence of unique tokens *)
@@ -439,17 +430,9 @@ module Make (Inputs : Inputs_intf) :
          most accounts are not going to be managers. *)
       Owner.set mdb (Account_id.derive_token_id ~owner:aid) aid
 
-    let remove mdb pk tid = update mdb pk ~f:(fun tids -> Set.remove tids tid)
-
     let _remove_several mdb pk rem_tids =
       update mdb pk ~f:(fun tids ->
           Set.diff tids (Token_id.Set.of_list rem_tids) )
-
-    let remove_account (mdb : t) (aid : Account_id.t) : unit =
-      let token = Account_id.token_id aid in
-      let key = Account_id.public_key aid in
-      remove mdb key token ;
-      Owner.remove mdb (Account_id.derive_token_id ~owner:aid)
 
     (** Generate a batch of database changes to add the given tokens. *)
     let add_batch_create mdb pks_to_tokens =
@@ -660,32 +643,6 @@ module Make (Inputs : Inputs_intf) :
     List.fold_until accts ~init ~f ~finish
 
   let merkle_root mdb = get_hash mdb Location.root_hash
-
-  let remove_accounts_exn t keys =
-    let locations =
-      (* if we don't have a location for all keys, raise an exception *)
-      let rec loop keys accum =
-        match keys with
-        | [] ->
-            accum (* no need to reverse *)
-        | key :: rest -> (
-            match Account_location.get t key with
-            | Ok loc ->
-                loop rest (loc :: accum)
-            | Error err ->
-                raise (Db_error.Db_exception err) )
-      in
-      loop keys []
-    in
-    (* N.B.: we're not using stack database here to make available newly-freed
-       locations *)
-    List.iter keys ~f:(Account_location.delete t) ;
-    List.iter keys ~f:(Tokens.remove_account t) ;
-    List.iter locations ~f:(fun loc -> delete_raw t loc) ;
-    (* recalculate hashes for each removed account *)
-    List.iter locations ~f:(fun loc ->
-        let hash_loc = Location.Hash (Location.to_path_exn loc) in
-        set_hash t hash_loc Hash.empty_account )
 
   let merkle_path mdb location =
     let location =
