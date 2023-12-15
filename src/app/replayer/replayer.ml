@@ -1574,7 +1574,7 @@ let () =
       Command.async ~summary:"Replay transactions from Mina archive database"
         (let%map input_file =
            Param.flag "--input-file"
-             ~doc:"file File containing the genesis ledger"
+             ~doc:"file File containing the starting ledger"
              Param.(required string)
          and output_file_opt =
            Param.flag "--output-file"
