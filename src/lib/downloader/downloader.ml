@@ -77,6 +77,8 @@ end) : sig
          Deferred.t
   end
 
+  val has_job : t -> Key.t -> bool
+
   val cancel : t -> Key.t -> unit
 
   val create :
@@ -666,6 +668,9 @@ end = struct
              if not (Strict_pipe.Writer.is_closed t.flush_w) then
                Strict_pipe.Writer.write t.flush_w () )
            () )
+
+  let has_job t h =
+    Option.is_some (Q.lookup t.pending h) || Hashtbl.mem t.downloading h
 
   let cancel t h =
     let job =

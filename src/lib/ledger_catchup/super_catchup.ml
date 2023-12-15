@@ -716,10 +716,25 @@ let create_node ~logger ~downloader t x =
   let node =
     { Node.state; state_hash = h; blockchain_length; attempts; parent; result }
   in
-  upon (Ivar.read node.result) (fun _ ->
+  upon (Ivar.read node.result) (fun result ->
+      if Downloader.has_job downloader (h, blockchain_length) then
+        [%log' debug t.logger]
+          ~metadata:
+            [ ("state_hash", h |> State_hash.to_yojson)
+            ; ( "failure"
+              , result |> Result.error |> [%to_yojson: Attempt_history.t option]
+              )
+            ]
+          "cancelling download job for $state_hash" ;
       Downloader.cancel downloader (h, blockchain_length) ) ;
   Transition_frontier.Full_catchup_tree.add_state t.states node ;
   Hashtbl.set t.nodes ~key:h ~data:node ;
+  [%log' debug t.logger]
+    ~metadata:
+      [ ("state_hash", h |> State_hash.to_yojson)
+      ; ("state", state |> Node.State.enum |> Node.State.Enum.to_yojson)
+      ]
+    "created node for $state_hash at $state" ;
   ( try check_invariant ~downloader t
     with e ->
       [%log' debug t.logger]
@@ -814,10 +829,18 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
       let%bind () =
         step (after (Time.Span.of_sec 15.) |> Deferred.map ~f:Result.return)
       in
+      [%log debug] "Retrying $state_hash"
+        ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ] ;
       run_node node
     in
     match node.state with
     | Failed | Finished | Root _ ->
+        [%log debug] "Stopping state machine for $state_hash at $state"
+          ~metadata:
+            [ ("state_hash", node.state_hash |> State_hash.to_yojson)
+            ; ( "state"
+              , node.state |> Node.State.enum |> Node.State.Enum.to_yojson )
+            ] ;
         return ()
     | To_download download_job ->
         let start_time = Time.now () in
@@ -1018,6 +1041,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             in
             failed ~error:e ~sender:av.sender `Build_breadcrumb
         | Ok breadcrumb ->
+            [%log debug] "Finished building breadcrumb for $state_hash"
+              ~metadata:
+                [ ("state_hash", node.state_hash |> State_hash.to_yojson) ] ;
             Mina_metrics.(
               Gauge.set Catchup.build_breadcrumb_time
                 Time.(Span.to_ms @@ diff (now ()) start_time)) ;
@@ -1145,12 +1171,10 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
     Downloader.set_check_invariant (fun downloader ->
         check_invariant ~downloader t )
   in
-  (*
   every ~stop (Time.Span.of_sec 10.) (fun () ->
       [%log debug]
         ~metadata:[ ("states", to_yojson t) ]
-        "Catchup states $states") ;
-  *)
+        "Catchup states $states" ) ;
   let run_state_machine =
     setup_state_machine_runner ~t ~verifier ~downloader
       ~context:(module Context)
