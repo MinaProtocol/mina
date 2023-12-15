@@ -1354,19 +1354,20 @@ ALTER SEQUENCE public.zkapp_nonce_bounds_id_seq OWNED BY public.zkapp_nonce_boun
 
 CREATE TABLE public.zkapp_permissions (
     id integer NOT NULL,
-    edit_state public.zkapp_auth_required_type NOT NULL,
-    send public.zkapp_auth_required_type NOT NULL,
-    receive public.zkapp_auth_required_type NOT NULL,
-    access public.zkapp_auth_required_type NOT NULL,
-    set_delegate public.zkapp_auth_required_type NOT NULL,
-    set_permissions public.zkapp_auth_required_type NOT NULL,
-    set_verification_key public.zkapp_auth_required_type NOT NULL,
-    set_zkapp_uri public.zkapp_auth_required_type NOT NULL,
-    edit_action_state public.zkapp_auth_required_type NOT NULL,
-    set_token_symbol public.zkapp_auth_required_type NOT NULL,
-    increment_nonce public.zkapp_auth_required_type NOT NULL,
-    set_voting_for public.zkapp_auth_required_type NOT NULL,
-    set_timing public.zkapp_auth_required_type NOT NULL
+    edit_state                       public.zkapp_auth_required_type NOT NULL,
+    send                             public.zkapp_auth_required_type NOT NULL,
+    receive                          public.zkapp_auth_required_type NOT NULL,
+    access                           public.zkapp_auth_required_type NOT NULL,
+    set_delegate                     public.zkapp_auth_required_type NOT NULL,
+    set_permissions                  public.zkapp_auth_required_type NOT NULL,
+    set_verification_key_auth        public.zkapp_auth_required_type NOT NULL,
+    set_verification_key_txn_version int                             NOT NULL,
+    set_zkapp_uri                    public.zkapp_auth_required_type NOT NULL,
+    edit_action_state                public.zkapp_auth_required_type NOT NULL,
+    set_token_symbol                 public.zkapp_auth_required_type NOT NULL,
+    increment_nonce                  public.zkapp_auth_required_type NOT NULL,
+    set_voting_for                   public.zkapp_auth_required_type NOT NULL,
+    set_timing                       public.zkapp_auth_required_type NOT NULL
 );
 
 
