@@ -14,16 +14,6 @@ let () = Async.Scheduler.set_record_backtraces true
 
 [%%endif]
 
-[%%ifndef zkapp_cmd_limit]
-
-let zkapp_cmd_limit = None
-
-[%%else]
-
-[%%inject "zkapp_cmd_limit", zkapp_cmd_limit]
-
-[%%endif]
-
 type mina_initialization =
   { mina : Mina_lib.t
   ; client_trustlist : Unix.Cidr.t list option
