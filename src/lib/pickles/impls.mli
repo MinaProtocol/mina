@@ -181,3 +181,21 @@ module Wrap : sig
        , Wrap_impl.field )
        Import.Spec.ETyp.t
 end
+
+module Bn254 : sig
+  module Impl : module type of Snarky_backendless.Snark.Run.Make (Backend.Bn254)
+  include module type of Impl
+  module Verification_key = Backend.Bn254.Verification_key
+  module Proving_key = Backend.Bn254.Proving_key
+  
+  module Keypair : sig
+    type t = { pk : Proving_key.t; vk : Verification_key.t } [@@deriving fields]
+
+    val create : pk:Proving_key.t -> vk:Verification_key.t -> t
+
+    val generate :
+         prev_challenges:int
+      -> Kimchi_bn254_constraint_system.Bn254_constraint_system.t
+      -> t
+  end
+end

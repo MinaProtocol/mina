@@ -19,7 +19,15 @@ module Bn254 = struct
   module Curve = Bn254.Bn254_curve
 end
 
+module Backend = struct
+  module Field = Bn254_based_plonk.Field
+  module Bigint = Bn254_based_plonk.Bigint
+  let field_size = Bn254_based_plonk.field_size
+  module R1CS_constraint_system = Bn254_based_plonk.R1CS_constraint_system
+end
+
 module Impl = struct
+  (* include Snarky_backendless.Snark.Run.Make (Backend) *)
   module Verification_key = Bn254_based_plonk.Verification_key
   module Proving_key = Bn254_based_plonk.Proving_key
 

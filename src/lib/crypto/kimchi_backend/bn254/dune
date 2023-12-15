@@ -17,14 +17,16 @@
   base.caml
   ;; local libraries
   sponge
+  snarky.backendless
   pickles_types
   kimchi_backend.common
   promise
   kimchi_bindings
   kimchi_bn254_basic
   kimchi_bn254_constraint_system
-  kimchi_pasta_basic
-  kimchi_pasta_constraint_system
+  kimchi_backend.pasta
+  kimchi_backend.pasta.basic
+  kimchi_backend.pasta.constraint_system
   kimchi_types
   pasta_bindings
   bn254_bindings

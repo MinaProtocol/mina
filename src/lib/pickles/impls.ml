@@ -266,3 +266,21 @@ module Wrap = struct
       , (fun x -> In_circuit.of_data ~option_map:Opt.map (f x))
       , fun x -> f_inv (In_circuit.to_data ~option_map:Opt.map x) )
 end
+
+module Bn254 = struct
+  module Impl = Snarky_backendless.Snark.Run.Make (Bn254)
+  include Impl
+  module Verification_key = Bn254.Verification_key
+  module Proving_key = Bn254.Proving_key
+
+  module Keypair = struct
+    type t = { pk : Proving_key.t; vk : Verification_key.t } [@@deriving fields]
+
+    let create = Fields.create
+
+    let generate ~prev_challenges cs =
+      let open Bn254.Keypair in
+      let keypair = create ~prev_challenges cs in
+      { pk = pk keypair; vk = vk keypair }
+  end
+end

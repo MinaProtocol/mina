@@ -5,7 +5,7 @@ module Bn254_based_plonk : sig
   module Curve = Bn254_based_plonk.Curve
   module Bigint = Bn254_based_plonk.Bigint
 
-  val field_size : Pasta_bindings.BigInt256.t
+  val field_size : Bigint.t
 
   module Verification_key = Bn254_based_plonk.Verification_key
   module R1CS_constraint_system = Bn254_based_plonk.R1CS_constraint_system
@@ -19,7 +19,15 @@ module Bn254 : sig
   module Curve = Basic.Bn254_curve
 end
 
+module Backend : sig
+  module Field = Bn254_based_plonk.Field
+  module Bigint = Bn254_based_plonk.Bigint
+  val field_size : Bigint.t
+  module R1CS_constraint_system = Bn254_based_plonk.R1CS_constraint_system
+end
+
 module Impl : sig
+  (* include module type of Snarky_backendless.Snark.Run.Make (Backend) *)
   module Verification_key = Bn254_based_plonk.Verification_key
   module Proving_key = Bn254_based_plonk.Proving_key
   

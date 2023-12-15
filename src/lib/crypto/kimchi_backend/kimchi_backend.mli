@@ -218,7 +218,10 @@ module Bn254 : sig
     val field_size : Pasta_bindings.BigInt256.t
     
     module Verification_key = Kimchi_bn254.Bn254_based_plonk.Verification_key
+    module Proving_key = Kimchi_bn254.Bn254_based_plonk.Proving_key
     module R1CS_constraint_system = Kimchi_bn254.Bn254_based_plonk.R1CS_constraint_system
     module Keypair = Kimchi_bn254.Bn254_based_plonk.Keypair
   end
+  
+  module Impl = Kimchi_bn254.Impl
 end
