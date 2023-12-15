@@ -818,7 +818,8 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
         } ) ;
 
   (* Return the result *)
-  (Element.Standard.of_limbs (result0, result1, result2), sign, field_overflow)
+  let ret = (Element.Standard.of_limbs (result0, result1, result2), sign, field_overflow) in
+  ret
 
 (* Gadget for creating an addition or subtraction result row (Zero gate with result) *)
 let result_row (type f) (module Circuit : Snark_intf.Run with type field = f)

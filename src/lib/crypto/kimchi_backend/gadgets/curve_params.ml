@@ -208,3 +208,17 @@ let to_circuit_constants (type field)
               curve.ia.neg_acc
         }
     }
+
+let from_strings (type field)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = field)
+    (a : string) (b : string) (modulus : string) (gen_x : string)
+    (gen_y : string) (order : string) =
+  let a = Bignum_bigint.of_string a in
+  let b = Bignum_bigint.of_string b in
+  let modulus = Bignum_bigint.of_string modulus in
+  let gen_x = Bignum_bigint.of_string gen_x in
+  let gen_y = Bignum_bigint.of_string gen_y in
+  let order = Bignum_bigint.of_string order in
+  to_circuit_constants
+    (module Circuit)
+    { default with a; b; modulus; gen = (gen_x, gen_y); order }

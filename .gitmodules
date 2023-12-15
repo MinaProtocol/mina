@@ -18,4 +18,4 @@
 [submodule "src/lib/snarky_js_bindings/snarkyjs"]
 	path = src/lib/snarkyjs
 	url = https://github.com/lambdaclass/o1js.git
-	branch = wasm_kzg_prover
+	branch = foreign_ec_ops

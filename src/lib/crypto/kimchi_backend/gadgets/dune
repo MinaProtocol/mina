@@ -1,9 +1,12 @@
 (library
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (name kimchi_gadgets)
  (public_name kimchi_backend.gadgets)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane js_of_ocaml-ppx))
  (libraries
   ;; opam libraries
   bignum.bigint
@@ -16,4 +19,6 @@
   kimchi_backend.pasta
   kimchi_gadgets_test_runner
   mina_stdlib
-  snarky.backendless))
+  snarky.backendless
+  ;; js specific libraries
+  js_of_ocaml))
