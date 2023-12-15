@@ -147,6 +147,27 @@ Cassandra will be updated with the data. Any errors will also be
 logged in Cassandra and **will not** cause the verifier to exit
 with a non-zero exit code.
 
+Fallback to AWS S3
+------------------
+
+The Cassandra database (in Amazon Keyspaces) has a limitation 
+of 1MB per row. Consequently, blocks larger than this size will not be 
+present in the database. To address this, a fallback mechanism is implemented 
+to retrieve blocks from AWS S3 when they are not found in Cassandra.
+This mode relies on `aws` cli tool that needs to be installed on the system.
+
+For this mechanism to function properly, the following environment variables must be set:
+
+* `AWS_CLI` - The path to the AWS CLI tool. If not set, the system defaults to using "/bin/aws".
+* `AWS_ACCESS_KEY_ID` - AWS account's access key ID, required for AWS CLI tool to authenticate.
+* `AWS_SECRET_ACCESS_KEY` - The secret key paired with access key ID.
+* `AWS_S3_BUCKET` - The S3 bucket where submissions and blocks are stored.
+* `NETWORK_NAME` - The network name identifier.
+
+The path to access appropriate block data in S3 is constructed based on these variables as follows:
+
+`AWS_S3_BUCKET`/`NETWORK_NAME`/blocks/<block_hash>.dat
+
 Global options
 --------------
 
