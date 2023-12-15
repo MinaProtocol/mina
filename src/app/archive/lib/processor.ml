@@ -1844,7 +1844,7 @@ module User_command = struct
             }
 
     let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
-        (user_cmd : Extensional.User_command.t) =
+        ?(v1_transaction_hash = false) (user_cmd : Extensional.User_command.t) =
       let open Deferred.Result.Let_syntax in
       match%bind find (module Conn) ~transaction_hash:user_cmd.hash with
       | Some id ->
@@ -1859,6 +1859,13 @@ module User_command = struct
           in
           let%bind receiver_id =
             Public_key.add_if_doesn't_exist (module Conn) user_cmd.receiver
+          in
+          let to_base58_check hash =
+            match v1_transaction_hash with
+            | true ->
+                Transaction_hash.to_base58_check_v1 hash
+            | false ->
+                Transaction_hash.to_base58_check hash
           in
           Conn.find
             (Caqti_request.find typ Caqti_type.int
@@ -1879,7 +1886,7 @@ module User_command = struct
                     (Fn.compose Unsigned.UInt32.to_int64
                        Mina_numbers.Global_slot_since_genesis.to_uint32 )
             ; memo = user_cmd.memo |> Signed_command_memo.to_base58_check
-            ; hash = user_cmd.hash |> Transaction_hash.to_base58_check
+            ; hash = user_cmd.hash |> to_base58_check
             }
   end
 
@@ -1995,6 +2002,7 @@ module Internal_command = struct
       id
 
   let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
+      ?(v1_transaction_hash = false)
       (internal_cmd : Extensional.Internal_command.t) =
     let open Deferred.Result.Let_syntax in
     match%bind
@@ -2009,6 +2017,13 @@ module Internal_command = struct
         let%bind receiver_id =
           Public_key.add_if_doesn't_exist (module Conn) internal_cmd.receiver
         in
+        let to_base58_check hash =
+          match v1_transaction_hash with
+          | true ->
+              Transaction_hash.to_base58_check_v1 hash
+          | false ->
+              Transaction_hash.to_base58_check hash
+        in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
@@ -2019,7 +2034,7 @@ module Internal_command = struct
           { command_type = internal_cmd.command_type
           ; receiver_id
           ; fee = Currency.Fee.to_string internal_cmd.fee
-          ; hash = internal_cmd.hash |> Transaction_hash.to_base58_check
+          ; hash = internal_cmd.hash |> to_base58_check
           }
 end
 
@@ -3176,7 +3191,7 @@ module Block = struct
       ~hash:(Protocol_state.hashes t.protocol_state).state_hash
 
   let add_from_extensional (module Conn : CONNECTION)
-      (block : Extensional.Block.t) =
+      ?(v1_transaction_hash = false) (block : Extensional.Block.t) =
     let open Deferred.Result.Let_syntax in
     let%bind block_id =
       match%bind find_opt (module Conn) ~state_hash:block.state_hash with
@@ -3287,7 +3302,7 @@ module Block = struct
             let%map cmd_id =
               User_command.Signed_command.add_extensional_if_doesn't_exist
                 (module Conn)
-                user_cmd
+                user_cmd ~v1_transaction_hash
             in
             cmd_id :: acc )
       in
@@ -3311,7 +3326,7 @@ module Block = struct
             let%map cmd_id =
               Internal_command.add_extensional_if_doesn't_exist
                 (module Conn)
-                internal_cmd
+                internal_cmd ~v1_transaction_hash
             in
             (internal_cmd, cmd_id) :: acc )
       in
@@ -3786,7 +3801,7 @@ let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
 (* used by `archive_blocks` app *)
 let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
-    ~add_block:Block.add_from_extensional
+    ~add_block:(Block.add_from_extensional ~v1_transaction_hash:false)
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
     ~accounts_accessed:block.Extensional.Block.accounts_accessed
     ~accounts_created:block.Extensional.Block.accounts_created
