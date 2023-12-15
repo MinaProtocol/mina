@@ -27,6 +27,7 @@
   - Contains mina changes from `rampup`
   - But `proof-systems/develop` which by default is used by `mina/develop`.
   - Uses `o1js/main` and `o1js-bindings/main` as explained [here](https://github.com/o1-labs/o1js/blob/main/README-dev.md#branch-compatibility?).
+  - When `proof-systems/develop` is too cutting-edge and the adaptations of its changes haven't been landed in mina, `o1js` will use the `proof-systems/o1js-main` branch which is lagging behind `proof-systems/develop` a bit.
 
 
 ### Diagram
