@@ -2567,7 +2567,7 @@ module Queries = struct
           Arg.[ arg "limit" ~doc:"ZkApp commands per block limit." ~typ:int ]
         ~typ:int
         ~doc:"Set zkApp commands per block limit for the block producer."
-        ~resolve:(fun { ctx = _with_seq_no, _mina; _ } () limit ->
+        ~resolve:(fun { ctx = _; _ } () limit ->
           Block_producer.zkapp_cmd_limit := limit ;
           limit )
 
