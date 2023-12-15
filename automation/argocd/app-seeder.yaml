@@ -14,9 +14,9 @@ spec:
   - name: "ArgoCD Application Seeder"
     value: "Installs ArgoCD Applications from a specific folder in Mina repo"
   sources:
-  - repoURL: git@github.com:MinaProtocol/mina.git
-    targetRevision: lsanabria/argocd-deployment
+  - repoURL: "git@github.com:MinaProtocol/mina.git"
+    targetRevision: "lsanabria/argocd-deployment"
     path: "automation/argocd/deployments/infra-canada"
   destination:
-    server: https://kubernetes.default.svc
+    server: "https://kubernetes.default.svc"
     namespace: argocd

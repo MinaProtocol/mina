@@ -57,6 +57,10 @@ argo-cd:
         memory: 64Mi
 
   repoServer:
+    env:
+    ## allowing longer checkouts for e.g., mina repo
+    - name: ARGOCD_EXEC_TIMEOUT
+      value: 5m
     ## Enabling helmfile deployments
     volumes:
     - emptyDir: {}
