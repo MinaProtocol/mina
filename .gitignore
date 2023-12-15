@@ -39,6 +39,8 @@ maintenance/*.png
 scripts/mina-local-network/genesis_ledger.json
 scripts/mina-local-network/annotated_ledger.json
 
+automation/argocd/chart/keys
+automation/argocd/**/*.key
 automation/*config.json
 automation/!bsconfig.json
 automation/*/venv/*

@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-seeder
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+  labels:
+    category: seeder
+    tool: kubectl
+spec:
+  project: default
+  info:
+  - name: "ArgoCD Application Seeder"
+    value: "Installs ArgoCD Applications from a specific folder in Mina repo"
+  sources:
+  - repoURL: git@github.com:MinaProtocol/mina.git
+    targetRevision: lsanabria/argocd-deployment
+    path: "automation/argocd/deployments/infra-canada"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd

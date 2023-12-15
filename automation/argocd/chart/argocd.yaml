@@ -1,0 +1,92 @@
+argo-cd:
+  applicationSet:
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+  configs:
+    params:
+    server.insecure: true
+    server.disable.auth:
+    ## USE SEPARATE SECURED SECRETS INSTEAD e.g., external-secrets
+    # repositories:
+    #   baseline-templates:
+    #     url: "https://github.com/SanabriaRusso/baseline-templates.git"
+    #     name: "my-configs"
+    #     username: "luiss"
+    #     password: ""
+
+  controller:
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  dex:
+    resources:
+      limits:
+        cpu: 50m
+        memory: 64Mi
+      requests:
+        cpu: 10m
+        memory: 32Mi
+
+  notifications:
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+  redis:
+    resources:
+      limits:
+        cpu: 200m
+        memory: 128Mi
+      requests:
+        cpu: 100m
+        memory: 64Mi
+
+  repoServer:
+    ## Enabling helmfile deployments
+    volumes:
+    - emptyDir: {}
+      name: helmfile-cmp-tmp
+    extraContainers:
+    - name: helmfile-plugin
+      image: travisghansen/argo-cd-helmfile:v0.3.6
+      command: [/var/run/argocd/argocd-cmp-server]
+      volumeMounts:
+      - mountPath: /var/run/argocd
+        name: var-files
+      - mountPath: /home/argocd/cmp-server/plugins
+        name: plugins
+      - mountPath: /tmp
+        name: helmfile-cmp-tmp
+    resources:
+      limits:
+        cpu: 50m
+        memory: 128Mi
+      requests:
+        cpu: 10m
+        memory: 64Mi
+
+  server:
+    ingress:
+      enabled: false
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
