@@ -14,6 +14,7 @@
    core
    base.caml
    ;; local libraries
+   bounded_types
    cli_lib
    signature_lib
    secrets
