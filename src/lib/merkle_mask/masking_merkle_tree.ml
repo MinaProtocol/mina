@@ -891,6 +891,15 @@ module Make (Inputs : Inputs_intf.S) = struct
       let locations = location_of_account_batch t account_ids in
       let non_empty_locations = List.filter_map locations ~f:snd in
       let accounts = get_batch t non_empty_locations in
+      let empty_locations =
+        Option.value_map (last_filled t) ~default:[] ~f:(fun init ->
+            snd
+            @@ List.fold_map empty_keys ~init ~f:(fun loc _ ->
+                   Location.next loc
+                   |> Option.value_map ~default:(loc, loc) ~f:(fun loc' ->
+                          (loc', loc') ) ) )
+      in
+      let locations = empty_locations @ non_empty_locations in
       let all_hash_locations =
         let rec generate_locations account_locations acc =
           match account_locations with
@@ -911,7 +920,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                   generate_locations account_locations
                     (Location.Hash address :: acc) )
         in
-        generate_locations non_empty_locations []
+        generate_locations locations []
       in
       let all_hashes = get_hash_batch_exn t all_hash_locations in
       (* Batch import merkle paths and self hashes. *)
@@ -1049,31 +1058,38 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =
       assert_is_attached t ;
-      let { locations; _ }, ancestor = maps_and_ancestor t in
+      let { locations; non_existent_accounts; _ }, ancestor =
+        maps_and_ancestor t
+      in
+      let add_location () =
+        (* not in parent, create new location *)
+        let maybe_location =
+          match t.current_location with
+          | None ->
+              Some (first_location ~ledger_depth:t.depth)
+          | Some loc ->
+              Location.next loc
+        in
+        match maybe_location with
+        | None ->
+            Or_error.error_string "Db_error.Out_of_leaves"
+        | Some location ->
+            (* `set` calls `self_set_location`, which updates
+               the current location
+            *)
+            set t location account ;
+            Ok (`Added, location)
+      in
       match Map.find locations account_id with
       | None -> (
-          (* not in mask, maybe in parent *)
-          match Base.location_of_account ancestor account_id with
-          | Some location ->
-              Ok (`Existed, location)
-          | None -> (
-              (* not in parent, create new location *)
-              let maybe_location =
-                match last_filled t with
-                | None ->
-                    Some (first_location ~ledger_depth:t.depth)
-                | Some loc ->
-                    Location.next loc
-              in
-              match maybe_location with
-              | None ->
-                  Or_error.error_string "Db_error.Out_of_leaves"
-              | Some location ->
-                  (* `set` calls `self_set_location`, which updates
-                     the current location
-                  *)
-                  set t location account ;
-                  Ok (`Added, location) ) )
+          if Set.mem non_existent_accounts account_id then add_location ()
+          else
+            (* not in mask, maybe in parent *)
+            match Base.location_of_account ancestor account_id with
+            | Some location ->
+                Ok (`Existed, location)
+            | None ->
+                add_location () )
       | Some location ->
           Ok (`Existed, location)
   end
