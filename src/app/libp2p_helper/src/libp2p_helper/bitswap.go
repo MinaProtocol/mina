@@ -247,7 +247,7 @@ func (bs *BitswapCtx) Loop() {
 			if err == nil {
 				bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root)
 			} else {
-				bitswapLogger.Errorf("Failed to announce root cid %s (%w)", codanet.BlockHashToCidSuffix(root), err)
+				bitswapLogger.Errorf("Failed to announce root cid %s (%s)", codanet.BlockHashToCidSuffix(root), err)
 			}
 		case cmd := <-bs.deleteCmds:
 			configuredCheck()
@@ -257,7 +257,7 @@ func (bs *BitswapCtx) Loop() {
 				if err == nil {
 					success = append(success, root)
 				} else {
-					bitswapLogger.Errorf("Error processing delete request for %s: %w", codanet.BlockHashToCidSuffix(root), err)
+					bitswapLogger.Errorf("Error processing delete request for %s: %s", codanet.BlockHashToCidSuffix(root), err)
 				}
 			}
 			bs.SendResourceUpdates(ipc.ResourceUpdateType_removed, success...)

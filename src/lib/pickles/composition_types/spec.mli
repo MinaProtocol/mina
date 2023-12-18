@@ -1,5 +1,6 @@
 type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
 
+(** Basic types *)
 type (_, _, _) basic =
   | Unit : (unit, unit, < .. >) basic
   | Field
@@ -37,6 +38,7 @@ module type Bool_intf = sig
   val false_ : var
 end
 
+(** Compound types. These are built from Basic types described above *)
 module rec T : sig
   type (_, _, _) t =
     | B : ('a, 'b, 'env) basic -> ('a, 'b, 'env) t

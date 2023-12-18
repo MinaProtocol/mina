@@ -16,6 +16,9 @@ module type S = sig
   val get_or_create :
     t -> Account_id.t -> (account_state * Account.t * location) Or_error.t
 
+  val get_or_create_account :
+    t -> Account_id.t -> Account.t -> (account_state * location) Or_error.t
+
   val create_new_account : t -> Account_id.t -> Account.t -> unit Or_error.t
 
   val remove_accounts_exn : t -> Account_id.t list -> unit

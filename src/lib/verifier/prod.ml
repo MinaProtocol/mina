@@ -53,7 +53,6 @@ module Worker_state = struct
   type t = (module S)
 
   let create { logger; proof_level; constraint_constants; _ } : t Deferred.t =
-    Memory_stats.log_memory_stats logger ~process:"verifier" ;
     match proof_level with
     | Full ->
         Pickles.Side_loaded.srs_precomputation () ;

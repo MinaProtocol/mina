@@ -14,8 +14,9 @@ include User_command.Gen
 (* using Precomputed_values depth introduces a cyclic dependency *)
 [%%inject "ledger_depth", ledger_depth]
 
-let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
-    ?max_token_updates ?account_state_tbl ?vk ?failure () =
+let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
+    ?num_keypairs ?max_account_updates ?max_token_updates ?account_state_tbl ?vk
+    ?failure () =
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
   (* Need a fee payer keypair, a keypair for the "balancing" account (so that the balance changes
@@ -37,15 +38,36 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
     Option.value num_keypairs
       ~default:((max_account_updates * 2) + (max_token_updates * 3) + 2)
   in
-  let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
+  let%bind new_keypairs =
+    let existing_keypairs =
+      let tbl = Public_key.Compressed.Hash_set.create () in
+      Option.iter ledger_init_state ~f:(fun l ->
+          Array.iter l ~f:(fun (kp, _balance, _nonce, _timing) ->
+              Hash_set.add tbl (Public_key.compress kp.public_key) ) ) ;
+      tbl
+    in
+    let rec go acc n =
+      if n = 0 then return acc
+      else
+        let%bind kp =
+          Quickcheck.Generator.filter Keypair.gen ~f:(fun kp ->
+              not
+                (Hash_set.mem existing_keypairs
+                   (Public_key.compress kp.public_key) ) )
+        in
+        Hash_set.add existing_keypairs (Public_key.compress kp.public_key) ;
+        go (kp :: acc) (n - 1)
+    in
+    go [] num_keypairs
+  in
   let keymap =
-    List.fold keypairs ~init:Public_key.Compressed.Map.empty
+    List.fold new_keypairs ~init:Public_key.Compressed.Map.empty
       ~f:(fun map { public_key; private_key } ->
         let key = Public_key.compress public_key in
         Public_key.Compressed.Map.add_exn map ~key ~data:private_key )
   in
   let num_keypairs_in_ledger = num_keypairs / 2 in
-  let keypairs_in_ledger = List.take keypairs num_keypairs_in_ledger in
+  let keypairs_in_ledger = List.take new_keypairs num_keypairs_in_ledger in
   let account_ids =
     List.map keypairs_in_ledger ~f:(fun { public_key; _ } ->
         Account_id.create (Public_key.compress public_key) Token_id.default )
@@ -110,7 +132,7 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
         let account = Account.create account_id balance in
         if ndx mod 2 = 0 then account else snappify_account account )
   in
-  let fee_payer_keypair = List.hd_exn keypairs in
+  let fee_payer_keypair = List.hd_exn new_keypairs in
   let ledger = Ledger.create ~depth:ledger_depth () in
   List.iter2_exn account_ids accounts ~f:(fun acct_id acct ->
       match Ledger.get_or_create_account ledger acct_id acct with
@@ -147,8 +169,8 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
   return
     (User_command.Zkapp_command zkapp_command, fee_payer_keypair, keymap, ledger)
 
-let sequence_zkapp_command_with_ledger ?max_account_updates ?max_token_updates
-    ?length ?vk ?failure () =
+let sequence_zkapp_command_with_ledger ?ledger_init_state ?max_account_updates
+    ?max_token_updates ?length ?vk ?failure () =
   let open Quickcheck.Let_syntax in
   let%bind length =
     match length with
@@ -169,8 +191,8 @@ let sequence_zkapp_command_with_ledger ?max_account_updates ?max_token_updates
   (* Keep track of account states across multiple zkapp_command transaction *)
   let account_state_tbl = Account_id.Table.create () in
   let%bind zkapp_command, fee_payer_keypair, keymap, ledger =
-    zkapp_command_with_ledger ~num_keypairs ~max_account_updates
-      ~max_token_updates ~account_state_tbl ?vk ?failure ()
+    zkapp_command_with_ledger ?ledger_init_state ~num_keypairs
+      ~max_account_updates ~max_token_updates ~account_state_tbl ?vk ?failure ()
   in
   let rec go zkapp_command_and_fee_payer_keypairs n =
     if n <= 1 then

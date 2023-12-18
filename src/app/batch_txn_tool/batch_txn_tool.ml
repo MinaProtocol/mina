@@ -115,10 +115,11 @@ let get_nonce ~logger ~(ingress_uri : Uri.t) ~(pub_key : Account.key) =
       [ ("pub_key", Signature_lib.Public_key.Compressed.to_yojson pub_key)
       ; ("ingress_uri", `String (Uri.to_string ingress_uri))
       ] ;
+  let account_id = Account_id.create pub_key Mina_base.Token_id.default in
   let%bind nonce =
     let%bind querry_result =
       Integration_test_lib.Graphql_requests.get_account_data ingress_uri ~logger
-        ~public_key:pub_key
+        ~account_id
     in
     match querry_result with
     | Ok res ->
@@ -259,8 +260,8 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     let%bind res =
       Graphql_requests.sign_and_send_payment ~logger node_ingress_uri
         ~sender_keypair:sender_kp ~receiver_pub_key ~amount:base_send_amount
-        ~fee:fee_amount ~nonce ~memo:"" ~token:Token_id.default
-        ~valid_until:Mina_numbers.Global_slot.max_value
+        ~fee:fee_amount ~nonce ~memo:""
+        ~valid_until:Mina_numbers.Global_slot_since_genesis.max_value
     in
     let%bind () =
       match res with

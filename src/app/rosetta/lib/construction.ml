@@ -23,9 +23,6 @@ module Get_options_metadata =
         }
         nonce
       }
-      daemonStatus {
-        chainId
-      }
       initialPeers
      }
 |}]

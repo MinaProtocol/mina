@@ -148,7 +148,7 @@ A number of C libraries are expected to be available in the system and are also 
 If you use vim, add this snippet in your `.vimrc` file to use Merlin. (Note: Be sure to change the HOME directory to match yours.)
 
 ```bash
-let s:ocamlmerlin="/Users/USERNAME/.opam/4.07/share/merlin"
+let s:ocamlmerlin="/Users/USERNAME/.opam/4.14.0/share/merlin"
 execute "set rtp+=".s:ocamlmerlin."/vim"
 execute "set rtp+=".s:ocamlmerlin."/vimbufsync"
 let g:syntastic_ocaml_checkers=['merlin']
@@ -163,7 +163,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 - If you use emacs, install the `opam` packages mentioned above and also install `tuareg`. Add the following to your `.emacs` file:
 
 ```lisp
-(let ((opam-share (ignore-errors (car (process-lines "opam" "config" "var" "share")))))
+(let ((opam-share (ignore-errors (car (process-lines "opam" "var" "share")))))
   (when (and opam-share (file-directory-p opam-share))
     ;; Register Merlin
     (add-to-list 'load-path (expand-file-name "emacs/site-lisp" opam-share))

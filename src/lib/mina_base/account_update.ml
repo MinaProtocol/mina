@@ -955,75 +955,44 @@ module Account_precondition = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-            Mina_wire_types.Mina_base.Account_update.Account_precondition.V1.t =
-        | Full of Zkapp_precondition.Account.Stable.V2.t
-        | Nonce of Account.Nonce.Stable.V1.t
-        | Accept
+      type t = Zkapp_precondition.Account.Stable.V2.t
       [@@deriving sexp, yojson, hash]
+
+      let (_ :
+            ( t
+            , Mina_wire_types.Mina_base.Account_update.Account_precondition.V1.t
+            )
+            Type_equal.t ) =
+        Type_equal.T
 
       let to_latest = Fn.id
 
-      let to_full = function
-        | Full s ->
-            s
-        | Nonce n ->
-            { Zkapp_precondition.Account.accept with
-              nonce = Check { lower = n; upper = n }
-            }
-        | Accept ->
-            Zkapp_precondition.Account.accept
-
-      let equal p q = Zkapp_precondition.Account.equal (to_full p) (to_full q)
-
-      let compare p q =
-        Zkapp_precondition.Account.compare (to_full p) (to_full q)
+      [%%define_locally Zkapp_precondition.Account.(equal, compare)]
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_full, equal, compare)]
+  [%%define_locally Stable.Latest.(equal, compare)]
 
   let gen : t Quickcheck.Generator.t =
+    (* we used to have 3 constructors, Full, Nonce, and Accept for the type t
+       nowadays, the generator creates these 3 different kinds of values, but all mapped to t
+    *)
+    let open Zkapp_basic in
     Quickcheck.Generator.variant3 Zkapp_precondition.Account.gen
       Account.Nonce.gen Unit.quickcheck_generator
     |> Quickcheck.Generator.map ~f:(function
-         | `A x ->
-             Full x
-         | `B x ->
-             Nonce x
+         | `A precondition ->
+             precondition
+         | `B n ->
+             Zkapp_precondition.Account.nonce n
          | `C () ->
-             Accept )
-
-  let of_full (p : Zkapp_precondition.Account.t) =
-    let module A = Zkapp_precondition.Account in
-    if A.equal p A.accept then Accept
-    else
-      match p.nonce with
-      | Ignore ->
-          Full p
-      | Check { lower; upper } as n ->
-          if
-            A.equal p { A.accept with nonce = n }
-            && Account.Nonce.equal lower upper
-          then Nonce lower
-          else Full p
+             Zkapp_precondition.Account.accept )
 
   module Tag = struct
     type t = Full | Nonce | Accept [@@deriving equal, compare, sexp, yojson]
   end
 
-  let tag : t -> Tag.t = function
-    | Full _ ->
-        Full
-    | Nonce _ ->
-        Nonce
-    | Accept ->
-        Accept
-
-  let deriver obj =
-    let open Fields_derivers_zkapps.Derivers in
-    iso_record ~of_record:of_full ~to_record:to_full
-      Zkapp_precondition.Account.deriver obj
+  let deriver obj = Zkapp_precondition.Account.deriver obj
 
   let digest (t : t) =
     let digest x =
@@ -1031,7 +1000,7 @@ module Account_precondition = struct
         hash ~init:Hash_prefix_states.account_update_account_precondition
           (pack_input x))
     in
-    to_full t |> Zkapp_precondition.Account.to_input |> digest
+    t |> Zkapp_precondition.Account.to_input |> digest
 
   module Checked = struct
     type t = Zkapp_precondition.Account.Checked.t
@@ -1048,16 +1017,9 @@ module Account_precondition = struct
   end
 
   let typ () : (Zkapp_precondition.Account.Checked.t, t) Typ.t =
-    Typ.transport (Zkapp_precondition.Account.typ ()) ~there:to_full
-      ~back:(fun s -> Full s)
+    Zkapp_precondition.Account.typ ()
 
-  let nonce = function
-    | Full { nonce; _ } ->
-        nonce
-    | Nonce nonce ->
-        Check { lower = nonce; upper = nonce }
-    | Accept ->
-        Ignore
+  let nonce ({ nonce; _ } : t) = nonce
 end
 
 module Preconditions = struct
@@ -1089,8 +1051,7 @@ module Preconditions = struct
   let to_input ({ network; account; valid_while } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Zkapp_precondition.Protocol_state.to_input network
-      ; Zkapp_precondition.Account.to_input
-          (Account_precondition.to_full account)
+      ; Zkapp_precondition.Account.to_input account
       ; Zkapp_precondition.Valid_while.to_input valid_while
       ]
 
@@ -1139,7 +1100,7 @@ module Preconditions = struct
 
   let accept =
     { network = Zkapp_precondition.Protocol_state.accept
-    ; account = Account_precondition.Accept
+    ; account = Zkapp_precondition.Account.accept
     ; valid_while = Ignore
     }
 end
@@ -1422,7 +1383,7 @@ module Body = struct
                    ; upper = valid_until
                    }
              } )
-        ; account = Account_precondition.Nonce t.nonce
+        ; account = Zkapp_precondition.Account.nonce t.nonce
         ; valid_while = Ignore
         }
     ; use_full_commitment = true
@@ -1454,7 +1415,7 @@ module Body = struct
                    ; upper = valid_until
                    }
              } )
-        ; account = Account_precondition.Nonce t.nonce
+        ; account = Zkapp_precondition.Account.nonce t.nonce
         ; valid_while = Ignore
         }
     ; use_full_commitment = true
@@ -1485,11 +1446,13 @@ module Body = struct
         (balance_change.magnitude |> Currency.Amount.to_uint64)
     in
     let nonce =
-      match preconditions.account with
-      | Nonce nonce ->
-          Mina_numbers.Account_nonce.of_uint32 nonce
-      | Full _ | Accept ->
-          failwith "Expected a nonce for fee payer account precondition"
+      if Zkapp_precondition.Account.is_nonce preconditions.account then
+        match preconditions.account.nonce with
+        | Check { lower; upper = _ } ->
+            lower
+        | Ignore ->
+            failwith "Unexpected Ignore for fee payer precondition nonce"
+      else failwith "Expected a nonce for fee payer account precondition"
     in
     let valid_until =
       match preconditions.network.global_slot_since_genesis with

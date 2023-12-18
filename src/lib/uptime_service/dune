@@ -34,7 +34,6 @@
    signature_lib
    child_processes
    genesis_constants
-   memory_stats
    logger
    mina_base
    snark_worker

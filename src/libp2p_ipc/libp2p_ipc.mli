@@ -105,4 +105,4 @@ val read_incoming_messages :
      string Strict_pipe.Reader.t
   -> incoming_message Or_error.t Strict_pipe.Reader.t
 
-val write_outgoing_message : Writer.t -> outgoing_message -> unit
+val write_outgoing_message : Writer.t -> outgoing_message -> int

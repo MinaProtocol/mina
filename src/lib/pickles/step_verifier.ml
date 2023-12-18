@@ -241,6 +241,13 @@ struct
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
           with_label "combined_polynomial" (fun () ->
               Pcs_batch.combine_split_commitments pcs_batch
+                ~reduce_without_degree_bound:Array.to_list
+                ~reduce_with_degree_bound:(fun { Plonk_types.Poly_comm
+                                                 .With_degree_bound
+                                                 .unshifted
+                                               ; shifted
+                                               } ->
+                  Array.to_list unshifted @ [ shifted ] )
                 ~scale_and_add:(fun ~(acc :
                                        [ `Maybe_finite of
                                          Boolean.var * Inner_curve.t
@@ -572,14 +579,11 @@ struct
           let without_degree_bound =
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
-              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
-              :: [| m.psm_comm |] :: [| m.complete_add_comm |]
-              :: [| m.mul_comm |] :: [| m.emul_comm |]
-              :: [| m.endomul_scalar_comm |]
+              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: m.generic_comm
+              :: m.psm_comm :: m.complete_add_comm :: m.mul_comm :: m.emul_comm
+              :: m.endomul_scalar_comm
               :: Vector.append w_comm
-                   (Vector.append
-                      (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
-                      (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                   (Vector.append m.coefficients_comm sigma_comm_init
                       (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
                    (snd
                       Plonk_types.(
@@ -678,38 +682,6 @@ struct
       in
       domain ~max:(Domain.log2_size max_domains.h)
 
-  let%test_module "side loaded domains" =
-    ( module struct
-      let run k =
-        let y =
-          run_and_check (fun () ->
-              let y = k () in
-              fun () -> As_prover.read_var y )
-          |> Or_error.ok_exn
-        in
-        y
-
-      let%test_unit "side loaded domains" =
-        let open Side_loaded_verification_key in
-        let domains = [ { Domains.h = 10 }; { h = 15 } ] in
-        let pt = Field.Constant.random () in
-        List.iter domains ~f:(fun ds ->
-            let d_unchecked =
-              Plonk_checks.domain
-                (module Field.Constant)
-                (Pow_2_roots_of_unity ds.h) ~shifts:Common.tick_shifts
-                ~domain_generator:Backend.Tick.Field.domain_generator
-            in
-            let checked_domain () =
-              side_loaded_domain ~log2_size:(Field.of_int ds.h)
-            in
-            [%test_eq: Field.Constant.t]
-              (d_unchecked#vanishing_polynomial pt)
-              (run (fun () ->
-                   (checked_domain ())#vanishing_polynomial (Field.constant pt) )
-              ) )
-    end )
-
   (* module Split_evaluations = struct
        open Plonk_types
 
@@ -796,9 +768,6 @@ struct
     Shifted_value.Type2.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
 
-  let%test_unit "endo scalar" =
-    SC.test (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
-
   module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
   module Plonk_checks = struct
@@ -850,7 +819,7 @@ struct
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
       ~(step_domains :
-         [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
+         [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] ) ~zk_rows
       ~(* TODO: Add "actual proofs verified" so that proofs don't
           carry around dummy "old bulletproof challenges" *)
        sponge ~(prev_challenges : (_, b) Vector.t)
@@ -919,8 +888,12 @@ struct
       in
       Sponge.absorb sponge (`Field challenge_digest) ;
       Sponge.absorb sponge (`Field ft_eval1) ;
-      Sponge.absorb sponge (`Field (fst evals.public_input)) ;
-      Sponge.absorb sponge (`Field (snd evals.public_input)) ;
+      Array.iter
+        ~f:(fun x -> Sponge.absorb sponge (`Field x))
+        (fst evals.public_input) ;
+      Array.iter
+        ~f:(fun x -> Sponge.absorb sponge (`Field x))
+        (snd evals.public_input) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
       (* This is a hacky, but much more efficient, version of the opt sponge.
          This uses the assumption that the sponge 'absorption state' will align
@@ -1008,7 +981,7 @@ struct
           Plonk_checks.scalars_env
             (module Env_bool)
             (module Env_field)
-            ~srs_length_log2:Common.Max_degree.step_log2
+            ~srs_length_log2:Common.Max_degree.step_log2 ~zk_rows
             ~endo:(Impl.Field.constant Endo.Step_inner_curve.base)
             ~mds:sponge_params.mds
             ~field_of_hex:(fun s ->
@@ -1048,7 +1021,8 @@ struct
                      Array.map a ~f:(Opt.maybe b) )
           in
           let v =
-            List.append sg_evals ([| Opt.just x_hat |] :: [| Opt.just ft |] :: a)
+            List.append sg_evals
+              (Array.map ~f:Opt.just x_hat :: [| Opt.just ft |] :: a)
           in
           Common.combined_evaluation (module Impl) ~xi v
         in
@@ -1107,8 +1081,9 @@ struct
     let sponge = Sponge.create sponge_params in
     Array.iter
       (Types.index_to_field_elements
-         ~g:(fun (z : Inputs.Inner_curve.t) ->
-           List.to_array (Inner_curve.to_field_elements z) )
+         ~g:
+           (Array.concat_map ~f:(fun (z : Inputs.Inner_curve.t) ->
+                List.to_array (Inner_curve.to_field_elements z) ) )
          index )
       ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
     sponge
@@ -1246,3 +1221,7 @@ struct
 end
 
 include Make (Step_main_inputs)
+
+module For_tests_only = struct
+  let side_loaded_domain = side_loaded_domain
+end

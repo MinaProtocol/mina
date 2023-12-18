@@ -193,7 +193,7 @@ func (m HeartbeatPeerPush) handle(app *app) {
 		peerID, err = peer.Decode(id2)
 	}
 	if err != nil {
-		app.P2p.Logger.Errorf("HeartbeatPeerPush.handle: error %w", err)
+		app.P2p.Logger.Errorf("HeartbeatPeerPush.handle: error %s", err)
 		return
 	}
 	app.P2p.HeartbeatPeer(peerID)

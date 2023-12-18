@@ -259,13 +259,12 @@ let global_slot_since_genesis conf =
       |> to_global_slot)
   in
   match conf.constraint_constants.fork with
-  | Some { previous_global_slot; _ } ->
+  | Some { genesis_slot; _ } ->
       let slot_span =
         Mina_numbers.Global_slot_since_hard_fork.to_uint32 current_slot
         |> Mina_numbers.Global_slot_span.of_uint32
       in
-      Mina_numbers.Global_slot_since_genesis.(
-        add previous_global_slot slot_span)
+      Mina_numbers.Global_slot_since_genesis.(add genesis_slot slot_span)
   | None ->
       (* we're in the genesis "hard fork", so consider current slot as
          since-genesis

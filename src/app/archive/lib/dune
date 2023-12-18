@@ -27,8 +27,8 @@
    child_processes
    precomputed_values
    coda_genesis_ledger
+   consensus.vrf
    mina_runtime_config
-   hex
    sgn
    mina_base.util
    kimchi_backend.pasta
@@ -72,9 +72,10 @@
    mina_version
    staged_ledger_diff
    error_json
+   ppx_deriving_yojson.runtime
    ppx_version.runtime
  )
  (inline_tests (flags -verbose -show-counts))
  (modes native)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_custom_printf ppx_deriving_yojson h_list.ppx)))

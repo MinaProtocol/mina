@@ -53,14 +53,14 @@ function verify_size_and_md5 {
     echo "comparing sizes of $DEB_NAME between http://packages.o1test.net and local file.."
     if [[ "$SIZE" -ne "$FILENAME_SIZE" ]]; then
         echo "local deb file has $FILENAME_SIZE size while remote is $SIZE"
-        exit -1
+        return -1
     fi
     echo "$DEB_NAME has identical size locally and on http://packages.o1test.net"
 
     echo "comparing md5 hashes of $DEB_NAME between http://packages.o1test.net and local file.."
     if [[ "$MD5" != "$FILENAME_MD5" ]]; then
         echo "local deb file has $FILENAME_MD5 md5sum while remote is $MD5"
-        exit -1
+        return -1
     fi
     echo "$DEB_NAME has identical md5 locally and on http://packages.o1test.net"
 
