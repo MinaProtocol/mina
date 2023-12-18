@@ -47,6 +47,9 @@ module Tar = struct
         Ok ()
     | Error err ->
         Error (Error.tag err ~tag:"Error extracting tar file")
+
+  let filename_without_extension =
+    String.chop_suffix_if_exists ~suffix:".tar.gz"
 end
 
 let file_exists ?follow_symlinks filename =
@@ -186,7 +189,9 @@ module Ledger = struct
     [%log trace] "Loading $ledger from $path"
       ~metadata:
         [ ("ledger", `String ledger_name_prefix); ("path", `String filename) ] ;
-    let dirname = Uuid.to_string (Uuid_unix.create ()) in
+    let dirname =
+      Tar.filename_without_extension @@ Filename.basename filename
+    in
     (* Unpack the ledger in the autogen directory, since we know that we have
        write permissions there.
     *)
