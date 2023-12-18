@@ -22,7 +22,8 @@ genesis ledger for the succeeding network. This new genesis ledger should be
 produced from a stabilised staged ledger from the preceding network. This is, we
 define a point in time (slot) where the network continues to operate but with no
 "activity". In detail, after this slot, the network continues to produce blocks
-but without including any transactions, and ensuring any fees paid are 0. This
+but without including any transactions, sets coinbase fees to zero, and ensures
+there are no fees for snark work, by including no snark work in the block. This
 will run for a certain number of slots, after which the network will stop
 producing blocks. This will allow the network to stabilise and produce a new
 genesis ledger from the last ledger produced by the network.
@@ -43,9 +44,9 @@ blocks after a certain slot will be as follows:
 * The node (daemon) will stop accepting new transactions from clients after
   the configured slot.
 * After the configured slot, the block producer will stop including transactions
-  in blocks, and all fees are set to 0.
+  in blocks, as well as any snark work and coinbase fee will be set to zero.
 * The block validator will reject blocks produced after the stop slot that
-  contain any transaction or any non-zero fee.
+  contain any transaction, snark work or a non-zero coinbase fee.
 * The node should start notifying the user every 60 slots (3 hours) when transaction
   processing halts in less than 480 slots (24 hours).
 
@@ -95,18 +96,18 @@ block. If the configured stop slot is not set or it's greater than the current
 global slot, the block producer will then check if the stop transaction slot
 configuration is set. If so, and the current global slot is equal or greater
 than the configured stop slot the block producer will produce a block without
-any transactions and with fees set to 0. If the configured stop slot is not set
-or is greater than the current global slot, the block producer will produce
-blocks as usual.
+any transactions nor snark work and with a coinbase fee of zero. If the
+configured stop slot is not set or is greater than the current global slot, the
+block producer will produce blocks as usual.
 
 This can be done by adding these checks to block production logic. First,
 decide whether or not blocks should be produced. If the stop network slot is set
-and the current global slot is equal or greater than it don't produce blocks. If
-the previous is false, return an empty staged ledger diff instead of the
+and the current global slot is equal or greater than it doesn't produce blocks.
+If the previous is false, return an empty staged ledger diff instead of the
 generated one whenever the stop transaction slot is defined and the current
 global slot is equal or greater than it, ultimately resulting in a block
 produced with no transactions, no internal commands, no completed snark work,
-and no coinbase transaction. When doing these checks, the node will also check
+and a coinbase fee of zero. When doing these checks, the node will also check
 for the conditions to emit the info log messages at the timings and conditions
 expressed earlier.
 
@@ -145,10 +146,10 @@ block validator. The following requirements should be tested:
     global slot is greater or equal to `<slot>`, the block producer should not
     produce blocks.
   * When the stop transaction slot configuration is set to `None`, the block
-    producer processes transactions and fees as usual.
+    producer processes transactions, snark work and coinbase fee as usual.
   * When the stop transaction slot configuration is set to `<slot>` and the
     current global slot is less than `<slot>`, the block producer processes
-    transactions and fees as usual.
+    transactions, snark work and coinbase fee as usual.
   * When the stop transaction slot configuration is set to `<slot>` and the
     current global slot is greater or equal to `<slot>`, the block producer
     produces empty blocks (blocks with an empty staged ledger diff).
