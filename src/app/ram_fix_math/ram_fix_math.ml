@@ -6,6 +6,8 @@ let bench_count = 10_000
 module Const = struct
   let k = 290
 
+  let l = 60
+
   let ledger_depth = 30
 
   let scan_state_depth = 7
@@ -13,10 +15,10 @@ module Const = struct
   let scan_state_delay = 2
 
   (* 2*k for best tip path (including root history), k for duplicate block producers *)
-  let est_blocks_in_frontier = 3 * k
+  let est_blocks_in_frontier = 2 * l
 
   (* k for best tip boath (excluding root history), k for duplicate block producers *)
-  let est_scan_states = 2 * k
+  let est_scan_states = 2 * l
 
   let max_accounts_modified_per_signed_command = 2
 end
@@ -568,7 +570,8 @@ end = struct
     Time.Span.of_ns (Time.Span.to_ns t.total /. Int.to_float t.samples)
 end
 
-type serial_bench_measurements = { write : Time.Span.t; read : Time.Span.t }
+type serial_bench_measurements =
+  { write : Time.Span.t; read : Time.Span.t; hash : Time.Span.t }
 
 let print_header name =
   Printf.printf
@@ -588,6 +591,7 @@ let serial_bench (type a) ~(name : string)
   print_header (Printf.sprintf "SERIALIZATION BENCHMARKS %s" name) ;
   let write_timer = Timer.init () in
   let read_timer = Timer.init () in
+  let hash_timer = Timer.init () in
   for i = 1 to bench_count do
     let random = Splittable_random.State.of_int i in
     let sample = Quickcheck.Generator.generate ~size ~random gen in
@@ -598,6 +602,8 @@ let serial_bench (type a) ~(name : string)
           bin_class.writer.write buf ~pos:0 sample )
     in
     assert (final_pos = size) ;
+    Timer.time hash_timer (fun () ->
+        ignore (Digestif.SHA256.digest_bigstring buf : Digestif.SHA256.t) ) ;
     let result =
       Timer.time read_timer (fun () ->
           bin_class.reader.read buf ~pos_ref:(ref 0) )
@@ -606,7 +612,11 @@ let serial_bench (type a) ~(name : string)
   done ;
   print_timer "write" write_timer ;
   print_timer "read" read_timer ;
-  { write = Timer.average write_timer; read = Timer.average read_timer }
+  print_timer "hash" hash_timer ;
+  { write = Timer.average write_timer
+  ; read = Timer.average read_timer
+  ; hash = Timer.average hash_timer
+  }
 
 let compute_ram_usage (sizes : Sizes.size_params) =
   let format_gb size = Int.to_float size /. (1024.0 **. 3.0) in
@@ -746,12 +756,17 @@ let () =
        *. Time.Span.to_ns
             Time.Span.(
               side_loaded_proof_serial_times.write
-              + verification_key_serial_times.write) ) ) ;
+              + side_loaded_proof_serial_times.hash
+              + verification_key_serial_times.write
+              + verification_key_serial_times.hash) ) ) ;
   Printf.printf
     !"snark work ingest = %{Time.Span}\n"
     (Time.Span.of_ns
        ( 2.0
-       *. Time.Span.to_ns ledger_proof_serial_times.write ) ) ;
+       *. Time.Span.to_ns
+            Time.Span.(
+              ledger_proof_serial_times.write + ledger_proof_serial_times.hash)
+       ) ) ;
   Printf.printf
     !"block ingest = %{Time.Span}\n"
     (let zkapps =
@@ -762,12 +777,18 @@ let () =
          *. Time.Span.to_ns
               Time.Span.(
                 side_loaded_proof_serial_times.write
-                + verification_key_serial_times.write) )
+                + side_loaded_proof_serial_times.hash
+                + verification_key_serial_times.write
+                + verification_key_serial_times.hash) )
      in
      let snark_works =
        Time.Span.of_ns
-         ( 2.0 *. Int.to_float Params.max_zkapp_commands_per_block
-         *. Time.Span.to_ns ledger_proof_serial_times.write )
+         ( 2.0
+         *. Int.to_float Params.max_zkapp_commands_per_block
+         *. Time.Span.to_ns
+              Time.Span.(
+                ledger_proof_serial_times.write + ledger_proof_serial_times.hash)
+         )
      in
      Time.Span.(zkapps + snark_works) ) ;
   Printf.printf
@@ -784,7 +805,8 @@ let () =
      in
      let snark_works =
        Time.Span.of_ns
-         ( 2.0 *. Int.to_float Params.max_zkapp_commands_per_block
+         ( 2.0
+         *. Int.to_float Params.max_zkapp_commands_per_block
          *. Time.Span.to_ns ledger_proof_serial_times.read )
      in
      Time.Span.(zkapps + snark_works) )

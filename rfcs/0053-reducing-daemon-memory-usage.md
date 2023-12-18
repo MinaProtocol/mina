@@ -28,6 +28,8 @@ For this optimization, it is not important that the on-disk cache is persisted a
 
 To prevent disk leaks in the cache, we will use GC finalizers on cache references to count the active references the daemon has to information written to the cache. Since the daemon is always starting with a fresh on-disk cache, this will give an accurate reference count to any data cached on-disk. When a GC finalizer decrements the total reference count of an item stored on the cache to 0, it will delete that item from the cache. With this setup, the on-disk cache can only leak if there is a memory leak within the daemon itself, in which the daemon is leaking references to the cache.
 
+For identifying cached values by their content, we will use the Sha256 hash function, as provided by the `digestif` OCaml library (which is an existing dependency of the daemon). Sha256 is a performant an sufficiently collision resistant hashing algorithm for this use case. The usage of Sha256 here means that cache keys will be 8 bytes long, since Sha256 digests are 256 bits in length.
+
 ## Memory Analysis
 [memory-analysis]: #memory-analysis
 
@@ -64,7 +66,6 @@ As we can see, this brings the estimation down much closer to the current `16GB`
 
 * sharing the prover key allocation across the daemon's subprocesses, reducing the baseline to nearly 1/3rd of what it is now
 * persisting the entire staged ledger diff of each block to disk, given we rarely need to read the commands contained within a staged ledger diff after the diff has been applied
-* throwing out older proofs/commands from scan states once they are no longer required for the remaining work to be included
 
 ### Impact Analysis
 [impact-analysis]: #impact-analysis
@@ -106,13 +107,81 @@ Taking these numbers, we can estimate the relative impact deserialization/serial
 ==========================================================================================
 SERIALIZATION OVERHEAD ESTIMATES
 ==========================================================================================
-zkapp command ingest = 218.46170425415039us
-snark work ingest = 66.01405143737793us
-block ingest = 18.206448364257813ms
-block production = 397.33380432128905ms
+zkapp command ingest = 457.58285522460938us
+snark work ingest = 142.36927032470706us
+block ingest = 76.7938720703125ms
+block production = 844.14577026367192ms
 ```
 
-The estimates for zkapp command and snark work ingest represent the overhead to add a single new max cost zkapp command or snark work bundle to the on-disk cache. The block ingest represents the cost to add resources from max cost block to disk, assuming we did not already have any of the items contained in the block already cached on-disk (in most circumstances, we would). The block production overhead is the amount of time the daemon would spend loading all relevant resources from disk in order to produce a max cost block.
+The estimates for zkapp command and snark work ingest represent the overhead to add a single new max cost zkapp command or snark work bundle to the on-disk cache. The block ingest represents the cost to add resources from max cost block to disk. This is all computed under the assumption that we take the easy-route to implementation and just serialize all values before hashing them (so that we can compute the hash from the serialized format), but the design of the implementation actually allows us to avoid doing this. The block production overhead is the amount of time the daemon would spend loading all relevant resources from disk in order to produce a max cost block.
+
+### Implementation
+
+In order to implement this change, we will create a new `disk_cache_lib` library. There already exists a `cache_lib` library in the codebase, but it's design constraints and intent are different (it represents a shared in-memory cache with explicit rules about "consuming" items from the cache). Still, the `disk_cache_lib` library will follow a similar abstractions as `cache_lib`, without the concerns for requiring consumption of cache items.
+
+A new `Disk_cache.t` type will be added, representing access to the on-disk cache. This value will be initialized globally at daemon startup, but will only be accessible within `disk_cache_lib` library itself. A type `'a Disk_cached.t` will be used to represent items that are stored in the on-disk cache, where the type parameter will is the underlying type of the value stored on-disk. A `'a Disk_cached.t` is initialized from a first-class module that defines the serialization, deserialization, and hashing functionality for the type it stores, with a helper `Disk_cached.Make` functor being provided to abstract over this (the same pattern utilized by `'a Hashtbl.t` and `'a Map.t` from `core`).
+
+Below is a mockup of what the `disk_cache_lib` library would look like, with some commented code detailing the internals of the library which are not exposed.
+
+```ocaml
+open Core
+open Async
+
+module Disk_cache : sig
+  (** Initialize the on-disk cache explicitly before interactions with it take place. *)
+  val initialize : unit -> unit Deferred.t
+
+  (* type t = Lmdb.t *)
+
+  (** Increment the cache ref count, saving a value if the ref count was 0. *)
+  (* val incr : t -> Disk_cached.id -> 'a Bin_prot.Type_class.t -> 'a -> unit *)
+
+  (** Decrement the cache ref count, deleting the value if the ref count becomes 0. *)
+  (* val decr : t -> Disk_cached.id -> unit *)
+
+  (** Read from the cache, crashing if the value cannot be found. *)
+  (* val read : t -> Disk_cached.id -> 'a Bin_prot.Type_class.t -> 'a *)
+end
+
+module Disk_cached : sig
+  module type Element_intf = sig
+    include Binable.S
+
+    val digest : (module Digestif.S with type ctx = 'ctx) -> 'ctx -> t -> 'ctx
+  end
+
+  (* type id = Digestif.Sha256.t *)
+
+  type 'a t (* = T : (module Element_intf with type t = 'a) * id -> 'a t *)
+
+  (** Create a new cached reference from a value. Hashes the incoming value to check if it is already
+      stored in the cache, and stores it in the cache if not. This function does not keep references
+      to the value passed into it so that the value can be garbage collected. The caching library
+      tracks the total number of references created in OCaml to each value stored in the cache, and
+      will automatically delete the value from the cache when all references are garbage collected.
+   *)
+  val create : (module Element_intf with type t = 'a) -> 'a -> 'a t
+
+  (** Reads from the on-disk cache. It is important that the caller does not hold onto the returned
+      value, otherwise they could leak the values read from the cache.
+   *)
+  val get : 'a t -> 'a
+
+  (** Helper functor for wrapping the first-class module logic. *)
+  module Make : functor (Element : Element_intf) -> sig
+    type nonrec t = Element.t t
+
+    val create : 'a -> t
+
+    val get : t -> 'a
+  end
+end
+```
+
+It is important that calls to `Disk_cached.get` do not hold onto the returned value after they are done reading it. This could be somewhat enforced through a more complex design, but it doesn't seem necessary at this time.
+
+To use this library, types that we want to cache on disk merely need to implement a `val digest : (module Digestif.S with type ctx = 'ctx) -> 'ctx -> t -> 'ctx` function in addition to the `bin_prot` functions they already implement. The `Disk_cached.Make` helper can (optionally) be called to create a module which abstracts over the details of working with the polymorphic `'a Disk_cached.t` type. This new `X.Disk_cached.t` (`X.t Disk_cache_lib.Disk_cached.t` for long hand) type can be put in-place of the `X.t` type in any in-memory structures to remove the normal in-memory references we would be maintaining to an `X.t`. When we deserialize an `X.t` from the network, we must call `X.Disk_cached.create` on that value to transfer it into an `X.Disk_cached.t`, and then throw away the `X.t` we deserialized initially.
+
 
 ## Drawbacks
 [drawbacks]: #drawbacks
