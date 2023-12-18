@@ -4508,7 +4508,7 @@ COPY public.zkapp_nonce_bounds (id, nonce_lower_bound, nonce_upper_bound) FROM s
 --
 
 COPY public.zkapp_permissions (id, edit_state, send, receive, access, set_delegate, set_permissions, set_verification_key_auth, set_verification_key_txn_version, set_zkapp_uri, edit_action_state, set_token_symbol, increment_nonce, set_voting_for, set_timing) FROM stdin;
-1	signature	signature	none	none	signature	signature	signature 2	signature	signature	signature	signature	signature	signature
+1	signature	signature	none	none	signature	signature	signature	2	signature	signature	signature	signature	signature	signature
 \.
 
 
