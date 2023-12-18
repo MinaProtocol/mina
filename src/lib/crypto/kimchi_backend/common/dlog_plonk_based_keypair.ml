@@ -85,7 +85,7 @@ module type Inputs_intf = sig
           nb_prev_challanges
           srs] *)
     val create_plus :
-         bool
+         Scalar_field.t Kimchi_types.polish_token array option
       -> Gate_vector.t
       -> int
       -> Scalar_field.t Kimchi_types.lookup_table array

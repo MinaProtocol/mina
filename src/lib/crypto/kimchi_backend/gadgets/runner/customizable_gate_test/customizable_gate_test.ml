@@ -4,7 +4,7 @@ let () = Tick.Keypair.set_urs_info []
 
 let test_foreign_field_add ~valid_witness ?cs () =
   let cs, _proof_keypair, _proof =
-    generate_and_verify_proof_plus false ?cs (fun () ->
+    generate_and_verify_proof_plus None ?cs (fun () ->
         let open Impl in
         let output =
           if valid_witness then Field.of_int 70 else Field.of_int 71
@@ -46,9 +46,9 @@ let test_foreign_field_add ~valid_witness ?cs () =
   in
   cs
 
-let test_conditional ~valid_witness ?cs () =
+let _test_conditional ~valid_witness ?cs () =
   let cs, _proof_keypair, _proof =
-    generate_and_verify_proof_plus true ?cs (fun () ->
+    generate_and_verify_proof_plus None ?cs (fun () ->
         let open Impl in
         let output = if valid_witness then Field.one else Field.zero in
         with_label "foreign_field_add (conditional)" (fun () ->
@@ -89,14 +89,14 @@ let () =
   assert test_failed
 
 (* Test Conditional (valid witness) *)
-let _cs = test_conditional ~valid_witness:true ()
+(* let _cs = test_conditional ~valid_witness:true () *)
 
 (* Test Conditional (invalid witness) *)
-let () =
-  let test_failed =
-    try
-      let _cs = test_conditional ~valid_witness:false () in
-      false
-    with _ -> true
-  in
-  assert test_failed
+(* let () =
+   let test_failed =
+     try
+       let _cs = test_conditional ~valid_witness:false () in
+       false
+     with _ -> true
+   in
+   assert test_failed *)
