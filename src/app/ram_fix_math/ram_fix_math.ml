@@ -6,8 +6,6 @@ let bench_count = 10_000
 module Const = struct
   let k = 290
 
-  let l = 60
-
   let ledger_depth = 30
 
   let scan_state_depth = 7
@@ -15,10 +13,10 @@ module Const = struct
   let scan_state_delay = 2
 
   (* 2*k for best tip path (including root history), k for duplicate block producers *)
-  let est_blocks_in_frontier = 2 * l
+  let est_blocks_in_frontier = 3 * k
 
   (* k for best tip boath (excluding root history), k for duplicate block producers *)
-  let est_scan_states = 2 * l
+  let est_scan_states = 2 * k
 
   let max_accounts_modified_per_signed_command = 2
 end
