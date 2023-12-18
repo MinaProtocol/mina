@@ -11,7 +11,7 @@ var tsBindings = globalThis.__snarkyTsBindings;
 var tsRustConversion = tsBindings.rustConversion(plonk_wasm);
 
 // Provides: tsSrs
-// Requires: plonk_wasm
+// Requires: tsBindings, plonk_wasm
 var tsSrs = tsBindings.srs(plonk_wasm);
 
 // Provides: getTsBindings
