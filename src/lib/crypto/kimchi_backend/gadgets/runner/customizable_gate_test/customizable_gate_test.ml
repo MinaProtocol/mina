@@ -46,9 +46,39 @@ let test_foreign_field_add ~valid_witness ?cs () =
   in
   cs
 
-let _test_conditional ~valid_witness ?cs () =
+let test_conditional ~valid_witness ?cs () =
   let cs, _proof_keypair, _proof =
-    generate_and_verify_proof_plus None ?cs (fun () ->
+    (* User-supplied conditional gate in RPN
+     *     w(0) = w(1) * w(3) + (1 - w(3)) * w(2)
+     *)
+    let conditional_gate =
+      Some
+        Kimchi_types.
+          [| Cell { col = Index ForeignFieldAdd; row = Curr }
+           ; Cell { col = Witness 3; row = Curr }
+           ; Dup
+           ; Mul
+           ; Cell { col = Witness 3; row = Curr }
+           ; Sub
+           ; Alpha
+           ; Pow 1l
+           ; Cell { col = Witness 0; row = Curr }
+           ; Cell { col = Witness 3; row = Curr }
+           ; Cell { col = Witness 1; row = Curr }
+           ; Mul
+           ; Literal (Impl.Field.Constant.of_int 1)
+           ; Cell { col = Witness 3; row = Curr }
+           ; Sub
+           ; Cell { col = Witness 2; row = Curr }
+           ; Mul
+           ; Add
+           ; Sub
+           ; Mul
+           ; Add
+           ; Mul
+          |]
+    in
+    generate_and_verify_proof_plus conditional_gate ?cs (fun () ->
         let open Impl in
         let output = if valid_witness then Field.one else Field.zero in
         with_label "foreign_field_add (conditional)" (fun () ->
@@ -89,14 +119,14 @@ let () =
   assert test_failed
 
 (* Test Conditional (valid witness) *)
-(* let _cs = test_conditional ~valid_witness:true () *)
+let _cs = test_conditional ~valid_witness:true ()
 
 (* Test Conditional (invalid witness) *)
-(* let () =
+let () =
    let test_failed =
      try
        let _cs = test_conditional ~valid_witness:false () in
        false
      with _ -> true
    in
-   assert test_failed *)
+   assert test_failed
