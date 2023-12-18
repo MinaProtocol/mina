@@ -1313,16 +1313,20 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                     ] ;
                 Deferred.unit )
               else
-                let%bind accounts_before = Ledger.to_list ledger in
-                let accounts_before_set = Account_set.of_list accounts_before in
-                let account_ids_before =
-                  Account_id.Set.map accounts_before_set ~f:(fun acct ->
-                      Account_id.create acct.public_key acct.token_id )
+                let%bind accounts_before =
+                  if migration_mode then Ledger.to_list ledger else return []
                 in
                 let%bind () = run_transactions () in
-                let%bind accounts_after = Ledger.to_list ledger in
                 let%bind () =
                   if migration_mode then
+                    let accounts_before_set =
+                      Account_set.of_list accounts_before
+                    in
+                    let account_ids_before =
+                      Account_id.Set.map accounts_before_set ~f:(fun acct ->
+                          Account_id.create acct.public_key acct.token_id )
+                    in
+                    let%bind accounts_after = Ledger.to_list ledger in
                     Deferred.List.iter accounts_after ~f:(fun acct ->
                         let acct_id = Account.identifier acct in
                         let%bind () =
