@@ -192,10 +192,30 @@ module Ledger = struct
     let dirname =
       Tar.filename_without_extension @@ Filename.basename filename
     in
-    (* Unpack the ledger in the autogen directory, since we know that we have
-       write permissions there.
-    *)
     let dirname = genesis_dir ^/ dirname in
+    (* remove dir if it exists *)
+    let%bind () =
+      if%bind file_exists ~follow_symlinks:true dirname then (
+        [%log trace] "Genesis ledger dir $path already exists, removing"
+          ~metadata:[ ("path", `String dirname) ] ;
+        let rec remove_dir dir =
+          let%bind files = Sys.ls_dir dir in
+          let%bind () =
+            Deferred.List.iter files ~f:(fun file ->
+                let file = dir ^/ file in
+                remove file )
+          in
+          Unix.rmdir dir
+        and remove file =
+          match%bind Sys.is_directory file with
+          | `Yes ->
+              remove_dir file
+          | _ ->
+              Unix.unlink file
+        in
+        remove dirname )
+      else Deferred.unit
+    in
     let%bind () = Unix.mkdir ~p:() dirname in
     let open Deferred.Or_error.Let_syntax in
     let%map () = Tar.extract ~root:dirname ~file:filename () in
