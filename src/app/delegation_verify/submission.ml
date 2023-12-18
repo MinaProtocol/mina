@@ -231,21 +231,19 @@ module Cassandra = struct
     |> Deferred.return
 
   let load_from_s3 ~block_hash =
-    let aws_cli =
-      match Sys.getenv "AWS_CLI" with
-      | Some path -> path
-      | _ -> "/bin/aws"
+    let aws_cli = Option.value ~default:"/bin/aws" @@ Sys.getenv "AWS_CLI" in
+    let s3_path =
+      let open Or_error.Let_syntax in
+      let%bind bucket =
+        Or_error.try_with (fun () -> Sys.getenv_exn "AWS_S3_BUCKET")
+      in
+      let%map network =
+        Or_error.try_with (fun () -> Sys.getenv_exn "NETWORK_NAME")
+      in
+      sprintf "s3://%s/%s/blocks/%s.dat" bucket network block_hash
     in
-    let bucket = Sys.getenv_exn "AWS_S3_BUCKET" in
-    let network = Sys.getenv_exn "NETWORK_NAME" in
-    let s3_path = sprintf "s3://%s/%s/blocks/%s.dat" bucket network block_hash in
-  
-    Process.run ~prog:aws_cli ~args:["s3"; "cp"; s3_path; "-"] ()
-    >>= function
-    | Ok stdout ->
-        Deferred.Or_error.return (Some stdout)
-    | Error _ ->
-        Deferred.Or_error.return None
+    Deferred.Or_error.bind (return s3_path) ~f:(fun s3_path ->
+        Process.run ~prog:aws_cli ~args:[ "s3"; "cp"; s3_path; "-" ] () )
     
   let load_block ~block_hash { conf; _ } =
     let open Deferred.Or_error.Let_syntax in
@@ -257,13 +255,7 @@ module Cassandra = struct
     match List.hd block_data with
     | None ->
         (* If not found in Cassandra, try loading from S3 *)
-        begin
-          match%bind load_from_s3 ~block_hash with
-          | None ->
-              Deferred.Or_error.error_string "Block not found in Cassandra or S3"
-          | Some b -> 
-              return b
-        end
+        load_from_s3 ~block_hash
     | Some b ->
         String.chop_prefix_exn b.raw_block ~prefix:"0x"
         |> Hex.Safe.of_hex |> Option.value_exn |> return
