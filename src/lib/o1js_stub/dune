@@ -5,8 +5,8 @@
  (link_flags
   (-noautolink -g))
  (link_deps
-  ../crypto/kimchi/js/node_js/plonk_wasm.js
-  ../crypto/kimchi/js/node_js/plonk_wasm_bg.wasm)
+  ../crypto/kimchi_bindings/js/node_js/plonk_wasm.js
+  ../crypto/kimchi_bindings/js/node_js/plonk_wasm_bg.wasm)
  (libraries
   ;; opam libraries ;;
   core_kernel
