@@ -187,13 +187,53 @@ type nonrec feature_flag =
   | TableWidth of int
   | LookupsPerRow of int
 
+type nonrec row_offset = { zk_rows : bool; offset : int32 }
+
+type nonrec column =
+  | Witness of int
+  | Z
+  | LookupSorted of int
+  | LookupAggreg
+  | LookupTable
+  | LookupKindIndex of lookup_pattern
+  | LookupRuntimeSelector
+  | LookupRuntimeTable
+  | Index of gate_type
+  | Coefficient of int
+  | Permutation of int
+
+type nonrec curr_or_next = Curr | Next
+
+type nonrec variable = { col : column; row : curr_or_next }
+
+type nonrec mds = { row : int; col : int }
+
+type nonrec 'f polish_token =
+  | Alpha
+  | Beta
+  | Gamma
+  | JointCombiner
+  | EndoCoefficient
+  | Mds of mds
+  | Literal of 'f
+  | Cell of variable
+  | Dup
+  | Pow of int32
+  | Add
+  | Mul
+  | Sub
+  | VanishesOnZeroKnowledgeAndPreviousRows
+  | UnnormalizedLagrangeBasis of row_offset
+  | Store
+  | Load of int
+  | SkipIf of feature_flag * int
+  | SkipIfNot of feature_flag * int
+
 type nonrec 'f circuit_gate =
   { typ : gate_type
   ; wires : wire * wire * wire * wire * wire * wire * wire
   ; coeffs : 'f array
   }
-
-type nonrec curr_or_next = Curr | Next
 
 type nonrec 'f oracles =
   { o : 'f random_oracles
@@ -255,6 +295,6 @@ module VerifierIndex = struct
     ; shifts : 'fr array
     ; lookup_index : 'poly_comm Lookup.t option
     ; zk_rows : int
-    ; custom_gate_type : bool
+    ; custom_gate_type : 'fr polish_token array option
     }
 end

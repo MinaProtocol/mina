@@ -205,7 +205,7 @@ module Protocol = struct
         = "caml_pasta_fp_plonk_index_create_bytecode" "caml_pasta_fp_plonk_index_create"
 
       external create_plus :
-           bool
+           Pasta_bindings.Fp.t Kimchi_types.polish_token array option
         -> Gates.Vector.Fp.t
         -> int
         -> Pasta_bindings.Fp.t Kimchi_types.lookup_table array
@@ -250,7 +250,7 @@ module Protocol = struct
         = "caml_pasta_fq_plonk_index_create_bytecode" "caml_pasta_fq_plonk_index_create"
 
       external create_plus :
-           bool
+           Pasta_bindings.Fq.t Kimchi_types.polish_token array option
         -> Gates.Vector.Fq.t
         -> int
         -> Pasta_bindings.Fq.t Kimchi_types.lookup_table array
