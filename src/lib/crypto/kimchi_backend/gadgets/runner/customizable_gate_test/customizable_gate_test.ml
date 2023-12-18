@@ -46,7 +46,7 @@ let test_foreign_field_add ~valid_witness ?cs () =
   in
   cs
 
-let test_conditional ~valid_witness ?cs () =
+let test_configurable_gate ~valid_witness ?cs () =
   let cs, _proof_keypair, _proof =
     (* User-supplied conditional gate in RPN
      *     w(0) = w(1) * w(3) + (1 - w(3)) * w(2)
@@ -119,14 +119,14 @@ let () =
   assert test_failed
 
 (* Test Conditional (valid witness) *)
-let _cs = test_conditional ~valid_witness:true ()
+let _cs = test_configurable_gate ~valid_witness:true ()
 
 (* Test Conditional (invalid witness) *)
 let () =
-   let test_failed =
-     try
-       let _cs = test_conditional ~valid_witness:false () in
-       false
-     with _ -> true
-   in
-   assert test_failed
+  let test_failed =
+    try
+      let _cs = test_configurable_gate ~valid_witness:false () in
+      false
+    with _ -> true
+  in
+  assert test_failed
