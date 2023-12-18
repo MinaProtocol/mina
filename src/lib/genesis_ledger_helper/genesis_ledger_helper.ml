@@ -135,38 +135,36 @@ module Ledger = struct
               ] ;
           return None
     in
-    let%bind hash_filename =
-      match config.hash with
-      | Some hash -> (
-          let hash_filename = hash_filename hash ~ledger_name_prefix in
-          let%bind tar_path =
-            Deferred.List.find_map ~f:(file_exists hash_filename) search_paths
-          in
-          match tar_path with
-          | Some _ ->
-              return tar_path
-          | None ->
-              load_from_s3 hash_filename )
-      | None ->
-          return None
+    let search_local filename =
+      Deferred.List.find_map ~f:(file_exists filename) search_paths
     in
-    let search_local_and_s3 ?other_data name =
-      let named_filename =
-        named_filename ~constraint_constants ~num_accounts:config.num_accounts
-          ~balances:config.balances ~ledger_name_prefix ?other_data name
-      in
-      match%bind
-        Deferred.List.find_map ~f:(file_exists named_filename) search_paths
-      with
+    let search_local_and_s3 filename =
+      match%bind search_local filename with
       | Some path ->
           return (Some path)
       | None ->
-          load_from_s3 named_filename
+          load_from_s3 filename
+    in
+    let%bind hash_filename =
+      match config.hash with
+      | Some hash ->
+          let hash_filename = hash_filename hash ~ledger_name_prefix in
+          search_local_and_s3 hash_filename
+      | None ->
+          return None
     in
     match hash_filename with
     | Some filename ->
         return (Some filename)
     | None -> (
+        let search_local_and_s3 ?other_data name =
+          let named_filename =
+            named_filename ~constraint_constants
+              ~num_accounts:config.num_accounts ~balances:config.balances
+              ~ledger_name_prefix ?other_data name
+          in
+          search_local_and_s3 named_filename
+        in
         match (config.base, config.name) with
         | Named name, _ ->
             let named_filename =
@@ -174,7 +172,7 @@ module Ledger = struct
                 ~num_accounts:config.num_accounts ~balances:config.balances
                 ~ledger_name_prefix name
             in
-            Deferred.List.find_map ~f:(file_exists named_filename) search_paths
+            search_local named_filename
         | Accounts accounts, _ ->
             search_local_and_s3 ~other_data:(accounts_hash accounts) "accounts"
         | Hash hash, None ->
