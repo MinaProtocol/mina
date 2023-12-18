@@ -2543,7 +2543,6 @@ COPY public.zkapp_account_update (id, body_id, authorization_kind) FROM stdin;
 3	3	proof
 \.
 
-
 --
 -- Data for Name: zkapp_account_update_body; Type: TABLE DATA; Schema: public;
 --
@@ -2567,12 +2566,12 @@ COPY public.zkapp_account_update_failures (id, index, failures) FROM stdin;
 -- Data for Name: zkapp_permissions; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_permissions (id, edit_state, send, receive, set_delegate, set_permissions, set_verification_key, set_zkapp_uri, edit_action_state, set_token_symbol, increment_nonce, set_voting_for, set_timing) FROM stdin;
-1	signature	signature	none	signature	proof	signature	none	signature	signature	none	none    none
-2	signature	signature	signature	signature	signature	signature	none	none	none	none	none    none
-3	signature	signature	none	signature	signature	signature	none	none	none	none	none    none
-4	signature	signature	proof	signature	signature	signature	none	none	none	none	none    none
-5	proof	signature	none	signature	signature	signature	signature	proof	signature	signature	signature   signature
+COPY public.zkapp_permissions (id, edit_state, send, receive, set_delegate, set_permissions, set_verification_key_auth, set_verification_key_txn_version, set_zkapp_uri, edit_action_state, set_token_symbol, increment_nonce, set_voting_for, set_timing) FROM stdin;
+1	signature	signature	none	signature	proof	signature	2	none	signature	signature	none	none    none
+2	signature	signature	signature	signature	signature	signature	2	none	none	none	none	none    none
+3	signature	signature	none	signature	signature	signature	2	none	none	none	none	none    none
+4	signature	signature	proof	signature	signature	signature	2	none	none	none	none	none    none
+5	proof	signature	none	signature	signature	signature	2	signature	proof	signature	signature	signature   signature
 \.
 
 
