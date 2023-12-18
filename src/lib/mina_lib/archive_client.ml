@@ -71,12 +71,13 @@ let transfer ~logger ~precomputed_values ~archive_location
       Transition_frontier.Extensions.New_breadcrumbs.view
       Broadcast_pipe.Reader.t ) breadcrumb_writer =
   Broadcast_pipe.Reader.iter breadcrumb_reader ~f:(fun breadcrumbs ->
-      Linear_pipe.write breadcrumb_writer breadcrumbs )
+      Async.Pipe.write_without_pushback breadcrumb_writer breadcrumbs ;
+      Deferred.unit )
 
 let run ~logger ~precomputed_values
     ~(frontier_broadcast_pipe :
        Transition_frontier.t option Broadcast_pipe.Reader.t ) archive_location =
-  let reader, writer = Pipe_lib.Linear_pipe.create () in
+  let reader, writer = Async.Pipe.create () in
   O1trace.background_thread "enqueue_diffs_for_archiver" (fun () ->
       Broadcast_pipe.Reader.iter frontier_broadcast_pipe
         ~f:
@@ -92,7 +93,7 @@ let run ~logger ~precomputed_values
                transfer ~logger ~precomputed_values ~archive_location
                  breadcrumb_reader writer ) ) ) ;
   O1trace.background_thread "send_diffs_to_archiver" (fun () ->
-      Linear_pipe.iter reader ~f:(fun breadcrumbs ->
+      Async.Pipe.iter reader ~f:(fun breadcrumbs ->
           Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
               let start = Time.now () in
               let diff =
