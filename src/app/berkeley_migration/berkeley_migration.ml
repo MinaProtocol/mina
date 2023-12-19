@@ -507,7 +507,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
             query_migrated_db ~f:(fun db ->
                 match%map
                   Archive_lib.Processor.Block.add_from_extensional db
-                    extensional_block
+                    extensional_block ~v1_transaction_hash:true
                 with
                 | Ok _id ->
                     Ok ()
