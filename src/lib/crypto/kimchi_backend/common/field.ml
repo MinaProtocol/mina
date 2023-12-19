@@ -180,10 +180,10 @@ module Make (F : Input_intf) :
       let two_to_32 = Bignum_bigint.of_int64 4294967296L
 
       let to_bignum_bigint n =
-        let result = ref Bignum_bigint.zero in
-        for i = 7 downto 0 do
+        let result = ref (Bignum_bigint.of_int (Bigint.test_uint32 n 7)) in
+        for i = 6 downto 0 do
           let ni = Bignum_bigint.of_int (Bigint.test_uint32 n i) in
-          result := Bignum_bigint.(ni + (!result * two_to_32))
+          result := Bignum_bigint.(ni + (two_to_32 * !result))
         done ;
         !result
 
