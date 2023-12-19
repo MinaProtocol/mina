@@ -100,7 +100,7 @@ in
     };
 
   kimchi-rust = rustChannelFromToolchainFileOf
-    ../src/lib/crypto/kimchi/wasm/rust-toolchain.toml;
+    ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml;
 
   # TODO: raise issue on nixpkgs and remove workaround when fix is applied
   kimchi-rust-wasm = (final.kimchi-rust.rust.override {
@@ -124,7 +124,7 @@ in
   plonk_wasm =
     let
 
-      lock = ../src/lib/crypto/kimchi/wasm/Cargo.lock;
+      lock = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
 
       deps = builtins.listToAttrs (map
         (pkg: {
@@ -168,7 +168,7 @@ in
         "^lib(/crypto(/kimchi(/wasm(/.*)?)?)?)?$"
         "^lib(/crypto(/proof-systems(/.*)?)?)?$"
       ];
-      sourceRoot = "source/lib/crypto/kimchi/wasm";
+      sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
       nativeBuildInputs = [ final.wasm-pack wasm-bindgen-cli ];
       buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
       cargoLock.lockFile = lock;
