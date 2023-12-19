@@ -35,11 +35,8 @@ let applied_str = "applied"
 let failed_str = "failed"
 
 let to_base58_check ?(v1_transaction_hash = false) hash =
-  match v1_transaction_hash with
-  | true ->
-      Transaction_hash.to_base58_check_v1 hash
-  | false ->
-      Transaction_hash.to_base58_check hash
+  if v1_transaction_hash then Transaction_hash.to_base58_check_v1 hash
+  else Transaction_hash.to_base58_check hash
 
 module Public_key = struct
   let find (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
