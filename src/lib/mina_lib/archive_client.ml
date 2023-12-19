@@ -66,7 +66,7 @@ let dispatch_precomputed_block =
 let dispatch_extensional_block =
   make_dispatch_block Archive_lib.Rpc.extensional_block
 
-let transfer ~logger ~precomputed_values
+let transfer
     (breadcrumb_reader :
       Transition_frontier.Extensions.New_breadcrumbs.view
       Broadcast_pipe.Reader.t ) breadcrumb_writer =
@@ -90,8 +90,7 @@ let run ~logger ~precomputed_values
                  Transition_frontier.Extensions.get_view_pipe extensions
                    Transition_frontier.Extensions.New_breadcrumbs
                in
-               transfer ~logger ~precomputed_values breadcrumb_reader writer )
-          ) ) ;
+               transfer breadcrumb_reader writer ) ) ) ;
   O1trace.background_thread "send_diffs_to_archiver" (fun () ->
       Async.Pipe.iter reader ~f:(fun breadcrumbs ->
           Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
