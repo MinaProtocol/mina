@@ -1899,11 +1899,6 @@ end = struct
         let lookup3 = (red_w0, (red_w5, red_w6)) in
         (* We populate with the first lookup. In the case the user uses the same
            index multiple times, the last value will be used *)
-        (* @volhovm: perhaps it would be better if runtime_lookups_rev was a set
-           and we would panic if a lookup (k2,v2) is requested when (k2,v1) with
-           v1 != v2 was requested before. Current behaviour is that it will produce
-           an unsatisfiable circuit that will fail with ValueNotInTable(i) which is
-           not descriptive. *)
         sys.runtime_lookups_rev <-
           lookup3 :: lookup2 :: lookup1 :: sys.runtime_lookups_rev ;
         add_row sys vars Lookup [||]
