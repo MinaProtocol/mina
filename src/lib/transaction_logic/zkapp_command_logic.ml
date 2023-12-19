@@ -505,7 +505,7 @@ module type Controller_intf = sig
 
   val check : proof_verifies:bool -> signature_verifies:bool -> t -> bool
 
-  val fallback : t -> t
+  val verification_key_perm_fallback_to_signature_with_older_version : t -> t
 end
 
 module type Txn_version_intf = sig
@@ -1572,7 +1572,10 @@ module Make (Inputs : Inputs_intf) = struct
       let original_auth = Account.Permissions.set_verification_key_auth a in
       let auth =
         Controller.if_ older_than_current_version
-          ~then_:(Controller.fallback original_auth)
+          ~then_:
+            (Controller
+             .verification_key_perm_fallback_to_signature_with_older_version
+               original_auth )
           ~else_:original_auth
       in
       let has_permission =

@@ -1459,7 +1459,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                     Permissions.Auth_required.Checked.eval_no_proof
                       ~signature_verifies perm
 
-            let fallback = Permissions.Auth_required.Checked.fallback
+            let verification_key_perm_fallback_to_signature_with_older_version =
+              Permissions.Auth_required.Checked
+              .verification_key_perm_fallback_to_signature_with_older_version
           end
 
           module Txn_version = struct

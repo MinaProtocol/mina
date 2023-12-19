@@ -74,7 +74,11 @@ module Auth_required = struct
     | None_given ->
         None
 
-  let fallback = function Impossible | Proof -> Signature | t -> t
+  let verification_key_perm_fallback_to_signature_with_older_version = function
+    | Impossible | Proof ->
+        Signature
+    | t ->
+        t
 
   (* permissions such that [check permission (Proof _)] is true *)
   let gen_for_proof_authorization : t Quickcheck.Generator.t =
@@ -304,7 +308,8 @@ module Auth_required = struct
          that the proof should verify. *)
       (result, `proof_must_verify (didn't_fail_yet &&& not signature_sufficient))
 
-    let fallback ({ signature_sufficient; _ } as t : t) =
+    let verification_key_perm_fallback_to_signature_with_older_version
+        ({ signature_sufficient; _ } as t : t) =
       if_
         Pickles.Impls.Step.Boolean.(not signature_sufficient)
         ~then_:(constant Signature) ~else_:t
