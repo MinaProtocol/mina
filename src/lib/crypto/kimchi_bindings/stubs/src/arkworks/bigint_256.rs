@@ -201,6 +201,15 @@ pub fn caml_bigint_256_test_bit(
 
 #[ocaml_gen::func]
 #[ocaml::func]
+pub fn caml_bigint_256_test_uint32(
+    x: ocaml::Pointer<CamlBigInteger256>,
+    i: ocaml::Int,
+) -> Result<ocaml::Int, ocaml::Error> {
+    panic!("caml_bigint_256_test_uint32: not implemented");
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
 pub fn caml_bigint_256_to_bytes(
     x: ocaml::Pointer<CamlBigInteger256>,
 ) -> [u8; std::mem::size_of::<BigInteger256>()] {

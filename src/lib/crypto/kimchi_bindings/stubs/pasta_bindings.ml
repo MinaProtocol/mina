@@ -21,6 +21,8 @@ module BigInt256 = struct
 
   external test_bit : t -> int -> bool = "caml_bigint_256_test_bit"
 
+  external test_uint32 : t -> int -> int = "caml_bigint_256_test_uint32"
+
   external to_bytes : t -> bytes = "caml_bigint_256_to_bytes"
 
   external of_bytes : bytes -> t = "caml_bigint_256_of_bytes"

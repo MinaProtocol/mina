@@ -13,6 +13,8 @@ module type Bindings = sig
 
   val test_bit : t -> int -> bool
 
+  val test_uint32 : t -> int -> int
+
   val print : t -> unit
 
   val to_string : t -> string

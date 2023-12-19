@@ -154,6 +154,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_bigint_256_print => "print");
         decl_func!(w, env, caml_bigint_256_to_string => "to_string");
         decl_func!(w, env, caml_bigint_256_test_bit => "test_bit");
+        decl_func!(w, env, caml_bigint_256_test_uint32 => "test_uint32");
         decl_func!(w, env, caml_bigint_256_to_bytes => "to_bytes");
         decl_func!(w, env, caml_bigint_256_of_bytes => "of_bytes");
         decl_func!(w, env, caml_bigint_256_deep_copy => "deep_copy");
