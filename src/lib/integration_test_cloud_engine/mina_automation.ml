@@ -178,7 +178,7 @@ module Network_config = struct
     let add_accounts accounts_and_keypairs =
       List.map accounts_and_keypairs
         ~f:(fun
-             ( { Test_config.Test_Account.balance
+             ( { Test_config.Test_account.balance
                ; account_name
                ; timing
                ; permissions
@@ -218,8 +218,8 @@ module Network_config = struct
     let ledger_is_prefix ledger1 ledger2 =
       List.is_prefix ledger2 ~prefix:ledger1
         ~equal:(fun
-                 ({ account_name = name1; _ } : Test_config.Test_Account.t)
-                 ({ account_name = name2; _ } : Test_config.Test_Account.t)
+                 ({ account_name = name1; _ } : Test_config.Test_account.t)
+                 ({ account_name = name2; _ } : Test_config.Test_account.t)
                -> String.equal name1 name2 )
     in
     let runtime_config =
@@ -275,7 +275,7 @@ module Network_config = struct
                 |> Result.ok_or_failwith
               in
               let ledger_of_epoch_accounts
-                  (epoch_accounts : Test_config.Test_Account.t list) =
+                  (epoch_accounts : Test_config.Test_account.t list) =
                 let epoch_ledger_accounts =
                   List.map epoch_accounts
                     ~f:(fun

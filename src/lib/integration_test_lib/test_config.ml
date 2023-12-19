@@ -10,7 +10,7 @@ module Container_images = struct
     }
 end
 
-module Test_Account = struct
+module Test_account = struct
   type t =
     { account_name : string
     ; balance : string
@@ -18,12 +18,25 @@ module Test_Account = struct
     ; permissions : Mina_base.Permissions.t option
     ; zkapp : Mina_base.Zkapp_account.t option
     }
+
+  let create ~account_name ~balance ?timing ?permissions ?zkapp () =
+    { account_name
+    ; balance
+    ; timing =
+        ( match timing with
+        | None ->
+            Mina_base.Account_timing.Untimed
+        | Some timing ->
+            timing )
+    ; permissions
+    ; zkapp
+    }
 end
 
 module Epoch_data = struct
   module Data = struct
     (* the seed is a field value in Base58Check format *)
-    type t = { epoch_ledger : Test_Account.t list; epoch_seed : string }
+    type t = { epoch_ledger : Test_account.t list; epoch_seed : string }
   end
 
   type t = { staking : Data.t; next : Data.t option }
@@ -48,7 +61,7 @@ type t =
   { requires_graphql : bool
         (* temporary flag to enable/disable graphql ingress deployments *)
         (* testnet topography *)
-  ; genesis_ledger : Test_Account.t list
+  ; genesis_ledger : Test_account.t list
   ; epoch_data : Epoch_data.t option
   ; block_producers : Block_producer_node.t list
   ; snark_coordinator : Snark_coordinator_node.t option

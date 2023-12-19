@@ -80,25 +80,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "whale1-key"
-          ; balance = "9000000000"
-          ; timing = Untimed
-          ; permissions = None
-          ; zkapp = None
-          }
-        ; { account_name = "whale2-key"
-          ; balance = "1000000000"
-          ; timing = Untimed
-          ; permissions = None
-          ; zkapp = None
-          }
-        ; { account_name = "snark-node-key"
-          ; balance = "100"
-          ; timing = Untimed
-          ; permissions = None
-          ; zkapp = None
-          }
-        ]
+        (let open Test_account in
+        [ create ~account_name:"whale1-key" ~balance:"9000000000" ()
+        ; create ~account_name:"whale2-key" ~balance:"1000000000" ()
+        ; create ~account_name:"snark-node-key" ~balance:"100" ()
+        ])
     ; block_producers =
         [ { node_name = "whale1"; account_name = "whale1-key" }
         ; { node_name = "whale2"; account_name = "whale2-key" }
