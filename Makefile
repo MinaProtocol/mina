@@ -115,18 +115,6 @@ build_intgtest: ocaml_checks
 	dune build --profile=$(DUNE_PROFILE) src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 	$(info Build complete)
 
-snarkyjs: ocaml_checks
-	$(info Starting Build)
-	((ulimit -s 65532) || true) && (ulimit -n 10240 || true) \
-	&& bash ./src/lib/snarkyjs/src/bindings/scripts/build-snarkyjs-node.sh
-	$(info Build complete)
-
-snarkyjs_no_types: ocaml_checks
-	$(info Starting Build)
-	((ulimit -s 65532) || true) && (ulimit -n 10240 || true) \
-	&& bash ./src/lib/snarkyjs/src/bindings/scripts/build-snarkyjs-node-artifacts.sh
-	$(info Build complete)
-
 rosetta_lib_encodings: ocaml_checks
 	$(info Starting Build)
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/lib/rosetta_lib/test/test_encodings.exe --profile=mainnet
