@@ -165,7 +165,7 @@ in
       pname = "plonk_wasm";
       version = "0.1.0";
       src = final.lib.sourceByRegex ../src [
-        "^lib(/crypto(/kimchi(/wasm(/.*)?)?)?)?$"
+        "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
         "^lib(/crypto(/proof-systems(/.*)?)?)?$"
       ];
       sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
