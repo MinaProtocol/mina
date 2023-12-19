@@ -177,17 +177,15 @@ module Make (F : Input_intf) :
             let of_sexpable = of_bigint
           end)
 
+      let two_to_32 = Bignum_bigint.of_int64 4294967296L
+
       let to_bignum_bigint n =
-        let rec go i two_to_the_i acc =
-          if Int.equal i size_in_bits then acc
-          else
-            let acc' =
-              if Bigint.test_bit n i then Bignum_bigint.(acc + two_to_the_i)
-              else acc
-            in
-            go (i + 1) Bignum_bigint.(two_to_the_i + two_to_the_i) acc'
-        in
-        go 0 Bignum_bigint.one Bignum_bigint.zero
+        let result = ref Bignum_bigint.zero in
+        for i = 7 downto 0 do
+          let ni = Bignum_bigint.of_int (Bigint.test_uint32 n i) in
+          result := Bignum_bigint.(ni + (!result * two_to_32))
+        done ;
+        !result
 
       let hash_fold_t s x =
         Bignum_bigint.hash_fold_t s (to_bignum_bigint (to_bigint x))
