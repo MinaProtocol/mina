@@ -94,7 +94,7 @@ let sample_block_sexp =
        (last_vrf_output
         "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000")
        (total_currency 10016120000000000)
-       (curr_global_slot
+       (curr_global_slot_since_hard_fork
         ((slot_number 6) (slots_per_epoch 576)))
        (global_slot_since_genesis 6)
        (staking_epoch_data
@@ -621,7 +621,7 @@ let sample_block_json =
           ],
           "last_vrf_output": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
           "total_currency": "10016120000000000",
-          "curr_global_slot": {
+          "curr_global_slot_since_hard_fork": {
             "slot_number": "6",
             "slots_per_epoch": "576"
           },
