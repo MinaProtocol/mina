@@ -1295,7 +1295,9 @@ module Make (L : Ledger_intf.S) :
         in
         Permissions.Auth_required.check perm tag
 
-      let fallback = Permissions.Auth_required.fallback
+      let verification_key_perm_fallback_to_signature_with_older_version =
+        Permissions.Auth_required
+        .verification_key_perm_fallback_to_signature_with_older_version
     end
 
     module Txn_version = struct

@@ -27,7 +27,7 @@ module Auth_required : sig
 
   val of_string : string -> t
 
-  val fallback : t -> t
+  val verification_key_perm_fallback_to_signature_with_older_version : t -> t
 
   [%%ifdef consensus_mechanism]
 
@@ -47,7 +47,7 @@ module Auth_required : sig
       -> signature_verifies:Boolean.var
       -> Boolean.var * [ `proof_must_verify of Boolean.var ]
 
-    val fallback : t -> t
+    val verification_key_perm_fallback_to_signature_with_older_version : t -> t
   end
 
   val typ : (Checked.t, t) Typ.t
