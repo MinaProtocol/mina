@@ -9,16 +9,6 @@ let p2p_dir = "mina_test_libp2p_keypair"
 
 let default_root_path = "/tmp"
 
-(* executable location relative to src/default/lib/command_line_tests
-
-   dune won't allow running it via "dune exec", because it's outside its
-   workspace, so we invoke the executable directly
-
-   the mina.exe executable must have been built before running the test
-   here, else it will fail
-*)
-let default_mina_exe = "_build/default/src/app/cli/src/mina.exe"
-
 module ConfigDirs = struct
   type t =
     { root_path : string
@@ -54,7 +44,7 @@ module Config = struct
 
   let create port dirs mina_exe clean_up = { port; dirs; mina_exe; clean_up }
 
-  let default port =
+  let default port mina_path =
     let dirs = ConfigDirs.create default_root_path in
-    create port dirs default_mina_exe true
+    create port dirs mina_path true
 end

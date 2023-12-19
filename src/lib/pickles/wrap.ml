@@ -33,7 +33,7 @@ let tick_rounds = Nat.to_int Tick.Rounds.n
 let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
     ~actual_proofs_verified:
       (module AB : Nat.Add.Intf with type n = actual_proofs_verified)
-    (e : _ Plonk_types.All_evals.With_public_input.t)
+    (e : (_ array * _ array, _) Plonk_types.All_evals.With_public_input.t)
     ~(old_bulletproof_challenges : (_, actual_proofs_verified) Vector.t) ~r
     ~plonk ~xi ~zeta ~zetaw =
   let combined_evals =
@@ -61,7 +61,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
     let v : Tick.Field.t array list =
       List.append
         (List.map (Vector.to_list challenge_polys) ~f:(fun f -> [| f pt |]))
-        ([| f e.public_input |] :: [| ft |] :: a)
+        (f e.public_input :: [| ft |] :: a)
     in
     let open Tick.Field in
     Pcs_batch.combine_split_evaluations ~xi ~init:Fn.id
@@ -77,7 +77,7 @@ module Deferred_values = Types.Wrap.Proof_state.Deferred_values
 type scalar_challenge_constant = Challenge.Constant.t Scalar_challenge.t
 
 type deferred_values_and_hints =
-  { x_hat_evals : Backend.Tick.Field.t * Backend.Tick.Field.t
+  { x_hat_evals : Backend.Tick.Field.t array * Backend.Tick.Field.t array
   ; sponge_digest_before_evaluations : Tick.Field.t
   ; deferred_values :
       ( ( Challenge.Constant.t
@@ -99,11 +99,12 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     ~actual_feature_flags
     ~(prev_challenges : ((Backend.Tick.Field.t, _) Vector.t, n) Vector.t)
     ~(step_vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
-    ~(public_input : Backend.Tick.Field.t list) ~(proof : Backend.Tick.Proof.t)
+    ~(public_input : Backend.Tick.Field.t list)
+    ~(proof : Backend.Tick.Proof.with_public_evals)
     ~(actual_proofs_verified : n Nat.t) : deferred_values_and_hints =
   let module O = Tick.Oracles in
   let o =
-    O.create step_vk
+    O.create_with_public_evals step_vk
       Vector.(
         map2 sgs prev_challenges ~f:(fun commitment cs ->
             { Tick.Proof.Challenge_polynomial.commitment
@@ -112,7 +113,13 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
         |> to_list)
       public_input proof
   in
-  let x_hat = O.(p_eval_1 o, p_eval_2 o) in
+  let x_hat =
+    match proof.public_evals with
+    | Some x ->
+        x
+    | None ->
+        O.([| p_eval_1 o |], [| p_eval_2 o |])
+  in
   let scalar_chal f =
     Scalar_challenge.map ~f:Challenge.Constant.of_tick_field (f o)
   in
@@ -159,7 +166,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
   let tick_combined_evals =
     Plonk_checks.evals_of_split_evals
       (module Tick.Field)
-      proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
+      proof.proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
       ~zeta:As_field.zeta ~zetaw
     |> Plonk_types.Evals.to_in_circuit
   in
@@ -194,7 +201,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
       (module Env_bool)
       (module Env_field)
       ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
-      ~srs_length_log2:Common.Max_degree.step_log2
+      ~zk_rows:step_vk.zk_rows ~srs_length_log2:Common.Max_degree.step_log2
       ~field_of_hex:(fun s ->
         Kimchi_pasta.Pasta.Bigint256.of_hex_string s
         |> Kimchi_pasta.Pasta.Fp.of_bigint )
@@ -236,10 +243,11 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
             As_field.(
               combined_inner_product (* Note: We do not pad here. *)
                 ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
-                { evals = proof.openings.evals; public_input = x_hat }
+                { evals = proof.proof.openings.evals; public_input = x_hat }
                 ~r ~xi ~zeta ~zetaw ~old_bulletproof_challenges:prev_challenges
                 ~env:tick_env ~domain:tick_domain
-                ~ft_eval1:proof.openings.ft_eval1 ~plonk:tick_plonk_minimal)
+                ~ft_eval1:proof.proof.openings.ft_eval1
+                ~plonk:tick_plonk_minimal)
       ; branch_data =
           { proofs_verified =
               ( match actual_proofs_verified with
@@ -332,7 +340,8 @@ let%test_module "gate finalization" =
         (feature_flags : Plonk_types.Features.options)
         (public_input : Pasta_bindings.Fp.t list)
         (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
-        (proof : Backend.Tick.Proof.t) : Impls.Step.Boolean.value =
+        (proof : Backend.Tick.Proof.with_public_evals) :
+        Impls.Step.Boolean.value =
       (* Constants helper - takes an OCaml value and converts it to a snarky value, where
                             all values here are constant literals.  N.b. this should be
                             encapsulated as Snarky internals, but it never got merged. *)
@@ -417,9 +426,12 @@ let%test_module "gate finalization" =
          for use in the circuit *)
       and evals =
         constant
-          (Plonk_types.All_evals.typ (module Impls.Step) full_features)
-          { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
-          ; ft_eval1 = proof.openings.ft_eval1
+          (Plonk_types.All_evals.typ ~num_chunks:1
+             (module Impls.Step)
+             full_features )
+          { evals =
+              { public_input = x_hat_evals; evals = proof.proof.openings.evals }
+          ; ft_eval1 = proof.proof.openings.ft_eval1
           }
       in
 
@@ -449,7 +461,7 @@ let%test_module "gate finalization" =
                 (`Known
                   [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ]
                   )
-              ~sponge ~prev_challenges:[] deferred_values evals
+              ~zk_rows:3 ~sponge ~prev_challenges:[] deferred_values evals
           in
 
           (* Read the boolean result from the circuit and make it available
@@ -499,7 +511,7 @@ let%test_module "gate finalization" =
 
       let runtest feature_flags =
         run_recursive_proof_test S.actual_feature_flags feature_flags
-          public_input vk proof.proof
+          public_input vk proof
 
       let%test "true -> yes" = runtest test_feature_flags_configs.true_is_yes
 
@@ -734,9 +746,9 @@ let wrap
         in
         k (M.f messages_for_next_wrap_proof)
     | Messages ->
-        k proof.messages
+        k proof.proof.messages
     | Openings_proof ->
-        k proof.openings.proof
+        k proof.proof.openings.proof
     | Proof_state ->
         k prev_statement_with_hashes.proof_state
     | Which_branch ->
@@ -802,7 +814,7 @@ let wrap
     let messages_for_next_wrap_proof :
         _ P.Base.Messages_for_next_proof_over_same_field.Wrap.t =
       { challenge_polynomial_commitment =
-          proof.openings.proof.challenge_polynomial_commitment
+          proof.proof.openings.proof.challenge_polynomial_commitment
       ; old_bulletproof_challenges =
           Vector.map prev_statement.proof_state.unfinalized_proofs ~f:(fun t ->
               t.deferred_values.bulletproof_challenges )
@@ -870,6 +882,10 @@ let wrap
                       ~public_input:public_inputs
                   with
                   | None ->
+                      if
+                        Proof_cache.is_env_var_set_requesting_error_for_proofs
+                          ()
+                      then failwith "Regenerated proof" ;
                       let%map.Promise proof = create_proof () in
                       Proof_cache.set_wrap_proof proof_cache ~keypair:pk
                         ~public_input:public_inputs proof.proof ;
@@ -913,8 +929,8 @@ let wrap
           ~to_option:Opt.to_option_unsafe
     ; prev_evals =
         { Plonk_types.All_evals.evals =
-            { public_input = x_hat_evals; evals = proof.openings.evals }
-        ; ft_eval1 = proof.openings.ft_eval1
+            { public_input = x_hat_evals; evals = proof.proof.openings.evals }
+        ; ft_eval1 = proof.proof.openings.ft_eval1
         }
     }
     : _ P.Base.Wrap.t )

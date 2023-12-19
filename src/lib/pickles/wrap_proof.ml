@@ -38,7 +38,7 @@ let typ : (Checked.t, Constant.t) Typ.t =
         (module Impl)
         Inner_curve.typ Plonk_types.Features.Full.none ~bool:Boolean.typ
         ~dummy:Inner_curve.Params.one
-        ~commitment_lengths:Commitment_lengths.default
+        ~commitment_lengths:(Commitment_lengths.default ~num_chunks:1)
     ; Types.Step.Bulletproof.typ ~length:(Nat.to_int Tock.Rounds.n)
         ( Typ.transport Other_field.typ
             ~there:(fun x ->

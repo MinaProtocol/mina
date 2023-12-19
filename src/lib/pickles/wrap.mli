@@ -158,7 +158,7 @@ val combined_inner_product :
   -> ft_eval1:Backend.Tick.Field.t
   -> actual_proofs_verified:
        (module Pickles_types.Nat.Add.Intf with type n = 'actual_proofs_verified)
-  -> ( Backend.Tick.Field.t * Backend.Tick.Field.t
+  -> ( Backend.Tick.Field.t array * Backend.Tick.Field.t array
      , Backend.Tick.Field.t array * Backend.Tick.Field.t array )
      Pickles_types.Plonk_types.All_evals.With_public_input.t
   -> old_bulletproof_challenges:

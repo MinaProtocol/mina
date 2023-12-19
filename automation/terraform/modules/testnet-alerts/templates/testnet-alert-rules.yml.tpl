@@ -255,7 +255,6 @@ groups:
       description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
       runbook: "https://www.notion.so/minaprotocol/FewBlocksPerHour-47a6356f093242d988b0d9527ce23478"
 
-
 - name: Warnings
   rules:
   - alert: HighBlockGossipLatency
@@ -620,7 +619,25 @@ groups:
       summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last 30m)"
       description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
       runbook: "https://www.notion.so/minaprotocol/FewBlocksPerHour-47a6356f093242d988b0d9527ce23478"
- 
+
+  - alert: StuckInBootstrap
+    expr: max by (testnet) (increase(Coda_Runtime_process_uptime_ms_total{${berkeley_testnet},syncStatus = "BOOTSTRAP"}[2h])) >= 6000000
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at bootstrap for more than 100 mins within the recent 2 hours"
+
+  - alert: StuckInCatchup
+    expr: max by (testnet) (increase(Coda_Runtime_process_uptime_ms_total{${berkeley_testnet},syncStatus = "CATCHUP"}[2h])) >= 6000000
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at catchup for more than 100 mins within the recent 2 hours"
+
   - alert: HighBlockGossipLatency
     expr: max by (testnet) (max_over_time(Coda_Block_latency_gossip_time {${berkeley_testnet},${synced_status_filter}}  [${alert_timeframe}])) > 200
     for: ${alert_evaluation_duration}
