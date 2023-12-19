@@ -252,40 +252,40 @@ let fixed_lt_data =
   in
   Array.map fixed_table_ids ~f:(fun table_id ->
       let max_table_size = 1 + Random.State.int state 100 in
-      let indices =
+      let indexes =
         Int.Set.to_array
           (Int.Set.of_list
              (List.init max_table_size ~f:(fun _ ->
                   1 + Random.State.int state (max_table_size * 4) ) ) )
       in
-      let table_size = Array.length indices in
+      let table_size = Array.length indexes in
       let values =
         Array.init table_size ~f:(fun _ -> Random.State.int state 100_000_000)
       in
-      (table_id, indices, values) )
+      (table_id, indexes, values) )
 
 (* lookup queries; selected random rows from f_lt_data *)
 let lookups =
   Array.init fixed_lt_queries_n ~f:(fun _ ->
-      let table_id, indices, values =
+      let table_id, indexes, values =
         fixed_lt_data.(Random.State.int state (Array.length fixed_lt_data))
       in
-      let table_size = Array.length indices in
+      let table_size = Array.length indexes in
       let idx1 = Random.State.int state table_size in
       let idx2 = Random.State.int state table_size in
       let idx3 = Random.State.int state table_size in
       ( table_id
-      , (indices.(idx1), values.(idx1))
-      , (indices.(idx2), values.(idx2))
-      , (indices.(idx3), values.(idx3)) ) )
+      , (indexes.(idx1), values.(idx1))
+      , (indexes.(idx2), values.(idx2))
+      , (indexes.(idx3), values.(idx3)) ) )
 
 let main_fixed_lookup_tables_multiple_tables_multiple_lookups () =
-  Array.iter fixed_lt_data ~f:(fun (table_id, indices, values) ->
+  Array.iter fixed_lt_data ~f:(fun (table_id, indexes, values) ->
       add_plonk_constraint
         (AddFixedLookupTable
            { id = Int32.of_int_exn table_id
            ; data =
-               [| Array.map ~f:Field.Constant.of_int indices
+               [| Array.map ~f:Field.Constant.of_int indexes
                 ; Array.map ~f:Field.Constant.of_int values
                |]
            } ) ) ;
@@ -348,10 +348,10 @@ let runtime_lt_data =
             ~f:(fun (fixed_table_id, _, _) -> fixed_table_id = table_id)
             fixed_lt_data
         with
-        | Some (_, indices, values) ->
+        | Some (_, indexes, values) ->
             (* This is O(n^2), can be O(nlogn) *)
             Array.map first_column ~f:(fun k ->
-                match Array.findi ~f:(fun _ k2 -> k2 = k) indices with
+                match Array.findi ~f:(fun _ k2 -> k2 = k) indexes with
                 | Some (ix, _) ->
                     values.(ix)
                 | None ->
