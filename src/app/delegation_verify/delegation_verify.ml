@@ -86,8 +86,14 @@ module Make_verifier (Source : Submission.Data_source) = struct
     let block_hash = Source.block_hash sub in
     if Known_blocks.is_known block_hash then ()
     else
-      Known_blocks.add ?validate ~verify_blockchain_snarks ~block_hash
-        (Source.load_block src ~block_hash)
+      let load_block_action =
+        if Source.is_cassandra src then
+          Source.load_block_from_submission sub
+        else
+          Source.load_block src ~block_hash
+      in
+      Known_blocks.add ?validate ~verify_blockchain_snarks ~block_hash load_block_action
+
 
   let verify ~validate (submission : Source.submission) =
     let open Deferred.Result.Let_syntax in
@@ -161,6 +167,8 @@ let filesystem_command =
         let module V = Make_verifier (struct
           include Submission.Filesystem
 
+          let is_cassandra _ = false
+
           let verify_blockchain_snarks = verify_blockchain_snarks
 
           let verify_transaction_snarks = verify_transaction_snarks
@@ -192,6 +200,8 @@ let cassandra_command =
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
+
+          let is_cassandra _ = true
 
           let verify_blockchain_snarks = verify_blockchain_snarks
 

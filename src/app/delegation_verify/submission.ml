@@ -15,6 +15,8 @@ module type Data_source = sig
 
   type submission
 
+  val is_cassandra : t -> bool
+  
   val submitted_at : submission -> string
 
   val block_hash : submission -> string
@@ -26,6 +28,8 @@ module type Data_source = sig
   val load_submissions : t -> submission list Deferred.Or_error.t
 
   val load_block : block_hash:string -> t -> string Deferred.Or_error.t
+  
+  val load_block_from_submission : submission -> string Deferred.Or_error.t
 
   val verify_blockchain_snarks :
        (Mina_wire_types.Mina_state_protocol_state.Value.V2.t * Mina_base.Proof.t)
@@ -115,6 +119,13 @@ module Filesystem = struct
           with _ -> Error (Error.of_string "Fail to load block") )
         |> Ivar.fill ivar )
 
+  (* Dummy impl, not to be used in the context of Filesystem module. 
+     It is only intended to fulfill the interface requirements of the 
+     Data_source module signature for the Filesystem module *)
+  let load_block_from_submission submission =
+    let _ = submission in
+    Deferred.Or_error.return "dummy block data"
+
   let output _ (_submission : submission) = function
     | Ok payload ->
         Output.display payload ;
@@ -136,6 +147,7 @@ module Cassandra = struct
     ; block_hash : string
     ; submitted_at : string
     ; submitted_at_date : string
+    ; raw_block : string option [@default None]
     }
 
   type raw =
@@ -148,6 +160,7 @@ module Cassandra = struct
     ; graphql_control_port : int option [@default None]
     ; submitted_at : string
     ; submitted_at_date : string
+    ; raw_block : string option [@default None]
     }
   [@@deriving yojson]
 
@@ -170,6 +183,7 @@ module Cassandra = struct
       ; created_at = meta.created_at
       ; submitted_at_date = meta.submitted_at_date
       ; submitted_at = meta.submitted_at
+      ; raw_block = meta.raw_block
       }
       : submission )
 
@@ -212,6 +226,7 @@ module Cassandra = struct
           ; "submitter"
           ; "block_hash"
           ; "graphql_control_port"
+          ; "raw_block"
           ]
         ~where:
           (sprintf "%s AND submitted_at >= '%s' AND submitted_at < '%s'"
@@ -245,6 +260,19 @@ module Cassandra = struct
     Deferred.Or_error.bind (return s3_path) ~f:(fun s3_path ->
         Process.run ~prog:aws_cli ~args:[ "s3"; "cp"; s3_path; "-" ] () )
     
+  let load_block_from_submission (submission : submission) =
+    let open Deferred.Or_error.Let_syntax in
+    match submission.raw_block with
+    | None ->
+      (* If not found in Submission, try loading from S3 *)
+      load_from_s3 ~block_hash:submission.block_hash
+    | Some b ->
+        String.chop_prefix_exn b ~prefix:"0x"
+        |> Hex.Safe.of_hex |> Option.value_exn |> return 
+
+  (* The 'blocks' table is no longer actively used in the Cassandra schema.
+     However, 'load_block' is retained for reference purposes and in case of 
+     schema rollbacks or data migration needs. *)
   let load_block ~block_hash { conf; _ } =
     let open Deferred.Or_error.Let_syntax in
     let%bind block_data =
