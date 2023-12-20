@@ -125,6 +125,9 @@ module type Signed_intf = sig
 
   val create : magnitude:magnitude -> sgn:Sgn.t -> t
 
+  (* allows creation of negative 0 *)
+  val create_preserve_zero_sign : magnitude:magnitude -> sgn:Sgn.t -> t
+
   val sgn : t -> Sgn.t
 
   val magnitude : t -> magnitude
