@@ -397,7 +397,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       Hash_prefix_create.salt "PendingCoinbaseMerkleTree"
       |> Random_oracle.digest |> of_hash
 
-    let of_digest = Fn.compose Fn.id of_hash
+    let of_digest = of_hash
   end
 
   module Update = struct
