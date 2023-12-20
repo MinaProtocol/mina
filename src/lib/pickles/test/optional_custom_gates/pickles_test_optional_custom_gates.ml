@@ -236,92 +236,145 @@ let main_fixed_lookup_tables () =
 
 (* Parameters *)
 (* nb of fixed lookup tables *)
-let fixed_lt_n = 1 + Random.State.int state 10
+let max_fixed_lt_n = 1 + Random.State.int state 10
 
 (* number of fixed lookups *)
-let fixed_lt_queries_n = 1 + Random.State.int state 10
+let fixed_lt_queries_n = 1 + Random.State.int state 100
 
 (* fixed lookup tables data *)
 let fixed_lt_data =
-  Array.init fixed_lt_n ~f:(fun i ->
-      let table_id = 1 + i in
-      let table_size = 1 + Random.State.int state 100 in
-      let indexes = Array.init table_size ~f:Field.Constant.of_int in
+  (* generate some random unique table ids *)
+  let fixed_table_ids =
+    Int.Set.to_array
+      (Int.Set.of_list
+         (List.init max_fixed_lt_n ~f:(fun _ ->
+              1 + Random.State.int state (max_fixed_lt_n * 4) ) ) )
+  in
+  Array.map fixed_table_ids ~f:(fun table_id ->
+      let max_table_size = 1 + Random.State.int state 100 in
+      let indexes =
+        Int.Set.to_array
+          (Int.Set.of_list
+             (List.init max_table_size ~f:(fun _ ->
+                  1 + Random.State.int state (max_table_size * 4) ) ) )
+      in
+      let table_size = Array.length indexes in
       let values =
-        Array.init table_size ~f:(fun _ ->
-            Field.Constant.of_int (Random.State.int state 100_000_000) )
+        Array.init table_size ~f:(fun _ -> Random.State.int state 100_000_000)
       in
       (table_id, indexes, values) )
 
 (* lookup queries; selected random rows from f_lt_data *)
 let lookups =
   Array.init fixed_lt_queries_n ~f:(fun _ ->
-      let table_ix = Random.State.int state fixed_lt_n in
-      let table_id, indexes, values = fixed_lt_data.(table_ix) in
+      let table_id, indexes, values =
+        fixed_lt_data.(Random.State.int state (Array.length fixed_lt_data))
+      in
       let table_size = Array.length indexes in
       let idx1 = Random.State.int state table_size in
       let idx2 = Random.State.int state table_size in
       let idx3 = Random.State.int state table_size in
       ( table_id
-      , (idx1, values.(idx1))
-      , (idx2, values.(idx2))
-      , (idx3, values.(idx3)) ) )
+      , (indexes.(idx1), values.(idx1))
+      , (indexes.(idx2), values.(idx2))
+      , (indexes.(idx3), values.(idx3)) ) )
 
 let main_fixed_lookup_tables_multiple_tables_multiple_lookups () =
   Array.iter fixed_lt_data ~f:(fun (table_id, indexes, values) ->
       add_plonk_constraint
         (AddFixedLookupTable
-           { id = Int32.of_int_exn table_id; data = [| indexes; values |] } ) ) ;
+           { id = Int32.of_int_exn table_id
+           ; data =
+               [| Array.map ~f:Field.Constant.of_int indexes
+                ; Array.map ~f:Field.Constant.of_int values
+               |]
+           } ) ) ;
   Array.iter lookups ~f:(fun (table_id, (idx1, v1), (idx2, v2), (idx3, v3)) ->
       add_plonk_constraint
         (Lookup
            { w0 = fresh_int table_id
            ; w1 = fresh_int idx1
-           ; w2 = exists Field.typ ~compute:(fun () -> v1)
+           ; w2 = fresh_int v1
            ; w3 = fresh_int idx2
-           ; w4 = exists Field.typ ~compute:(fun () -> v2)
+           ; w4 = fresh_int v2
            ; w5 = fresh_int idx3
-           ; w6 = exists Field.typ ~compute:(fun () -> v3)
+           ; w6 = fresh_int v3
            } ) )
 
-(* nb of runtime lookup tables *)
-let runtime_lt_tables_n = 1 + Random.State.int state 10
+(* maximum number of runtime lookup tables *)
+let max_runtime_lt_n = 1 + Random.State.int state 10
 
 (* number of runtime lookups *)
-let runtime_lt_table_queries_n = 1 + Random.State.int state 20
+let runtime_lt_queries_n = 1 + Random.State.int state 100
 
 (* runtime lookup tables data *)
 let runtime_lt_data =
-  Array.init runtime_lt_tables_n ~f:(fun i ->
-      let table_id = i in
-      let table_size = 1 + Random.State.int state 100 in
-      let indices_offset = Random.State.int state 100 in
-      let first_column =
-        Array.init table_size ~f:(fun i -> indices_offset + i)
+  let runtime_table_ids =
+    (* have at least one collision between runtime and fixed table ids *)
+    let random_fixed_table_id =
+      let table_id, _, _ =
+        fixed_lt_data.(Random.State.int state (Array.length fixed_lt_data))
       in
-      (* The runtime values are not specified on setup, but they must be
-         consistent nevertheless *)
+      table_id
+    in
+    (* and generate some random table ids *)
+    let other_ids =
+      List.init (max_runtime_lt_n - 1) ~f:(fun _ ->
+          1 + Random.State.int state 100 )
+    in
+    (* making sure they're all unique *)
+    Int.Set.to_array
+      (Int.Set.of_list (List.cons random_fixed_table_id other_ids))
+  in
+
+  Array.map runtime_table_ids ~f:(fun table_id ->
+      let max_table_size = 1 + Random.State.int state 100 in
+      let first_column =
+        Int.Set.to_array
+          (Int.Set.of_list
+             (List.init max_table_size ~f:(fun _ ->
+                  1 + Random.State.int state (max_table_size * 4) ) ) )
+      in
+      let table_size = Array.length first_column in
+      (* We must make sure that if runtime table_id collides with some
+         fixed table_id created earlier then elements in first_column
+         and (fixed) indexes are either disjoint (k1 != k2), or they
+         map to the same value (v1 = v2). In other words, in the case
+         that this fixed table already contains (k,v) with k =
+         first_column[i], we have to set second_column[i] to v. *)
       let second_column =
-        Array.init table_size ~f:(fun _ -> Random.State.int state 1_000_000)
+        match
+          Array.find
+            ~f:(fun (fixed_table_id, _, _) -> fixed_table_id = table_id)
+            fixed_lt_data
+        with
+        | Some (_, indexes, values) ->
+            (* This is O(n^2), can be O(nlogn) *)
+            Array.map first_column ~f:(fun k ->
+                match Array.findi ~f:(fun _ k2 -> k2 = k) indexes with
+                | Some (ix, _) ->
+                    values.(ix)
+                | None ->
+                    Random.State.int state 1_000_000 )
+        | None ->
+            Array.init table_size ~f:(fun _ -> Random.State.int state 1_000_000)
       in
       (table_id, first_column, second_column) )
 
 (* runtime lookup queries *)
 let runtime_lookups =
-  Array.init runtime_lt_table_queries_n ~f:(fun _ ->
-      let table_ix = Random.State.int state runtime_lt_tables_n in
-      let table_id, first_column, second_column = runtime_lt_data.(table_ix) in
+  Array.init runtime_lt_queries_n ~f:(fun _ ->
+      let table_id, first_column, second_column =
+        runtime_lt_data.(Random.State.int state (Array.length runtime_lt_data))
+      in
       let table_size = Array.length first_column in
       let idx1 = Random.State.int state table_size in
       let idx2 = Random.State.int state table_size in
       let idx3 = Random.State.int state table_size in
-      let k1 = first_column.(idx1) in
-      let k2 = first_column.(idx2) in
-      let k3 = first_column.(idx3) in
-      let v1 = second_column.(idx1) in
-      let v2 = second_column.(idx2) in
-      let v3 = second_column.(idx3) in
-      (table_id, (k1, v1), (k2, v2), (k3, v3)) )
+      ( table_id
+      , (first_column.(idx1), second_column.(idx1))
+      , (first_column.(idx2), second_column.(idx2))
+      , (first_column.(idx3), second_column.(idx3)) ) )
 
 let main_runtime_table_cfg () =
   Array.iter runtime_lt_data ~f:(fun (table_id, first_column, _) ->
