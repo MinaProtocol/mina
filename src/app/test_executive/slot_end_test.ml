@@ -28,13 +28,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { Test_Account.account_name = "bp-receiver-key"
+        [ { Test_Account.account_name = "receiver-key"
           ; balance = "9999999"
           ; timing = Untimed
           }
-        ; { account_name = "bp-sender-key-1"; balance = "0"; timing = Untimed }
-        ; { account_name = "bp-sender-key-2"; balance = "0"; timing = Untimed }
-        ; { account_name = "bp-sender-key-3"; balance = "0"; timing = Untimed }
+        ; { account_name = "sender-1-key"; balance = "0"; timing = Untimed }
+        ; { account_name = "sender-2-key"; balance = "0"; timing = Untimed }
+        ; { account_name = "sender-3-key"; balance = "0"; timing = Untimed }
         ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
         ]
         @ List.init num_extra_keys ~f:(fun i ->
@@ -44,10 +44,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ; timing = Untimed
               } )
     ; block_producers =
-        [ { node_name = "bp-receiver"; account_name = "bp-receiver-key" }
-        ; { node_name = "bp-sender-1"; account_name = "bp-sender-key-1" }
-        ; { node_name = "bp-sender-2"; account_name = "bp-sender-key-2" }
-        ; { node_name = "bp-sender-3"; account_name = "bp-sender-key-3" }
+        [ { node_name = "receiver"; account_name = "receiver-key" }
+        ; { node_name = "sender-1"; account_name = "sender-1-key" }
+        ; { node_name = "sender-2"; account_name = "sender-2-key" }
+        ; { node_name = "sender-3"; account_name = "sender-3-key" }
         ]
     ; snark_coordinator =
         Some
@@ -88,11 +88,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Mina_numbers.Global_slot.to_int slot + 5
       in
       let receiver =
-        String.Map.find_exn (Network.block_producers network) "bp-receiver"
+        String.Map.find_exn (Network.block_producers network) "receiver"
       in
       let%bind receiver_pub_key = pub_key_of_node receiver in
       let bp_senders =
-        String.Map.remove (Network.block_producers network) "bp-receiver"
+        String.Map.remove (Network.block_producers network) "receiver"
         |> String.Map.data
       in
       let sender_kps =
@@ -153,7 +153,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            >>| const () )
       in
       let%bind () =
-        section "wait for payments to be processed"
+        section
+          (Printf.sprintf "wait until slot %d" num_slots)
           Async.(at end_t >>= const Malleable_error.ok_unit)
       in
       let ok_if_true s =
@@ -166,10 +167,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (Network.Node.get_ingress_uri receiver)
       in
       let%bind () =
-        section "check blocks after slot_tx_end"
-          (Malleable_error.List.iter blocks ~f:(fun block ->
-               Option.value_map slot_tx_end ~default:Malleable_error.ok_unit
-                 ~f:(fun slot_tx_end ->
+        section "non-empty blocks produced before slot_tx_end"
+          (Option.value_map slot_tx_end ~default:Malleable_error.ok_unit
+             ~f:(fun slot_tx_end ->
+               ok_if_true "only empty blocks were produced before slot_tx_end"
+               @@ List.exists blocks ~f:(fun block ->
+                      Mina_numbers.Global_slot.(
+                        of_uint32 block.slot_since_genesis < slot_tx_end )
+                      && ( block.command_transaction_count <> 0
+                         || block.snark_work_count <> 0
+                         || block.coinbase <> 0 ) ) ) )
+      in
+      let%bind () =
+        section "only empty blocks produced after slot_tx_end"
+          (Option.value_map slot_tx_end ~default:Malleable_error.ok_unit
+             ~f:(fun slot_tx_end ->
+               Malleable_error.List.iter blocks ~f:(fun block ->
                    let msg =
                      Printf.sprintf
                        "block with transactions after slot_tx_end. block slot \
@@ -182,23 +195,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    in
                    ok_if_true msg
                      ( Mina_numbers.Global_slot.(
-                         of_uint32 block.slot_since_genesis < slot_tx_end)
+                         of_uint32 block.slot_since_genesis < slot_tx_end )
                      || block.command_transaction_count = 0
                         && block.snark_work_count = 0 && block.coinbase = 0 ) ) )
           )
       in
-      section "check for blocks after slot_chain_end"
-        (Malleable_error.List.iter blocks ~f:(fun block ->
-             Option.value_map slot_chain_end ~default:Malleable_error.ok_unit
-               ~f:(fun slot_chain_end ->
-                 let msg =
-                   Printf.sprintf
-                     "block produced for slot %s after slot_chain_end (%s)"
-                     (Mina_numbers.Global_slot.to_string
-                        block.slot_since_genesis )
-                     (Mina_numbers.Global_slot.to_string slot_chain_end)
-                 in
-                 ok_if_true msg
-                   Mina_numbers.Global_slot.(
-                     of_uint32 block.slot_since_genesis < slot_chain_end) ) ) )
+      let%bind () =
+        section "blocks produced before slot_chain_end"
+          (Option.value_map slot_chain_end ~default:Malleable_error.ok_unit
+             ~f:(fun slot_chain_end ->
+               ok_if_true "no block produced before slot_chain_end"
+               @@ List.exists blocks ~f:(fun block ->
+                      Mina_numbers.Global_slot.(
+                        of_uint32 block.slot_since_genesis < slot_chain_end ) ) )
+          )
+      in
+      section "no blocks produced after slot_chain_end"
+        (Option.value_map slot_chain_end ~default:Malleable_error.ok_unit
+           ~f:(fun slot_chain_end ->
+             ok_if_true "blocks produced after slot_chain_end"
+             @@ not
+             @@ List.exists blocks ~f:(fun block ->
+                    Mina_numbers.Global_slot.(
+                      of_uint32 block.slot_since_genesis >= slot_chain_end ) ) )
+        )
 end
