@@ -63,8 +63,8 @@ TOTAL: 16.749612GB
 
 As we can see, this brings the estimation down much closer to the current `16GB` hardware requirement. From here, we can look into additional optimizations to bring it down even further to fit within the current hardware requirements. Such optimizations could include:
 
-* sharing the prover key allocation across the daemon's subprocesses, reducing the baseline to nearly 1/3rd of what it is now
-* persisting the entire staged ledger diff of each block to disk, given we rarely need to read the commands contained within a staged ledger diff after the diff has been applied
+* Sharing the prover key allocation across the daemon's subprocesses, reducing the baseline to nearly 1/3rd of what it is now.
+* Persisting the entire staged ledger diff of each block to disk, given we rarely need to read the commands contained within a staged ledger diff after the diff has been applied. The diffs only need to be sent to peers after they've been applied to the ledger, so we can just store the diffs in `bin_prot` format and not bother deserializing them when we serve them to other nodes.
 
 ### Impact Analysis
 [impact-analysis]: #impact-analysis
