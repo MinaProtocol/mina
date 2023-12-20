@@ -224,3 +224,104 @@ let sequence_zkapp_command_with_ledger ?ledger_init_state ?max_account_updates
       go zkapp_command_and_fee_payer_keypairs' (n - 1)
   in
   go [] length
+
+let signed_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
+    ?num_keypairs ?max_token_updates () =
+  let open Quickcheck.Let_syntax in
+  let open Signature_lib in
+  let max_token_updates =
+    Option.value max_token_updates
+      ~default:Zkapp_command_generators.max_token_updates
+  in
+  let num_keypairs =
+    Option.value num_keypairs ~default:(2 + (max_token_updates * 3) + 2)
+  in
+  let%bind new_keypairs =
+    let existing_keypairs =
+      let tbl = Public_key.Compressed.Hash_set.create () in
+      Option.iter ledger_init_state ~f:(fun l ->
+          Array.iter l ~f:(fun (kp, _balance, _nonce, _timing) ->
+              Hash_set.add tbl (Public_key.compress kp.public_key) ) ) ;
+      tbl
+    in
+    let rec go acc n =
+      if n = 0 then return acc
+      else
+        let%bind kp =
+          Quickcheck.Generator.filter Keypair.gen ~f:(fun kp ->
+              not
+                (Hash_set.mem existing_keypairs
+                   (Public_key.compress kp.public_key) ) )
+        in
+        Hash_set.add existing_keypairs (Public_key.compress kp.public_key) ;
+        go (kp :: acc) (n - 1)
+    in
+    go [] num_keypairs
+  in
+  let keymap =
+    List.fold new_keypairs ~init:Public_key.Compressed.Map.empty
+      ~f:(fun map { public_key; private_key } ->
+        let key = Public_key.compress public_key in
+        Public_key.Compressed.Map.add_exn map ~key ~data:private_key )
+  in
+  let num_keypairs_in_ledger = num_keypairs / 2 in
+  let keypairs_in_ledger = List.take new_keypairs num_keypairs_in_ledger in
+  let account_ids =
+    List.map keypairs_in_ledger ~f:(fun { public_key; _ } ->
+        Account_id.create (Public_key.compress public_key) Token_id.default )
+  in
+  let%bind balances =
+    let min_cmd_fee = Currency.Fee.minimum_user_command_fee in
+    let min_balance =
+      Currency.Fee.to_nanomina_int min_cmd_fee
+      |> Int.( + ) 100_000_000_000_000_000
+      |> Currency.Balance.of_nanomina_int_exn
+    in
+    (* max balance to avoid overflow when adding deltas *)
+    let max_balance =
+      let max_bal = Currency.Balance.of_mina_string_exn "2000000000.0" in
+      match
+        Currency.Balance.add_amount min_balance
+          (Currency.Balance.to_amount max_bal)
+      with
+      | None ->
+          failwith "zkapp_command_with_ledger: overflow for max_balance"
+      | Some _ ->
+          max_bal
+    in
+    Quickcheck.Generator.list_with_length num_keypairs_in_ledger
+      (Currency.Balance.gen_incl min_balance max_balance)
+  in
+  let account_ids_and_balances = List.zip_exn account_ids balances in
+  (* half zkApp accounts, half non-zkApp accounts *)
+  let accounts =
+    List.map account_ids_and_balances ~f:(fun (account_id, balance) ->
+        Account.create account_id balance )
+  in
+  let fee_payer_keypair = List.hd_exn new_keypairs in
+  let ledger = Ledger.create ~depth:ledger_depth () in
+  List.iter2_exn account_ids accounts ~f:(fun acct_id acct ->
+      match Ledger.get_or_create_account ledger acct_id acct with
+      | Error err ->
+          failwithf
+            "zkapp_command: error adding account for account id: %s, error: \
+             %s@."
+            (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
+            (Error.to_string_hum err) ()
+      | Ok (`Existed, _) ->
+          failwithf "zkapp_command: account for account id already exists: %s@."
+            (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
+            ()
+      | Ok (`Added, _) ->
+          () ) ;
+  (* to keep track of account states across transactions *)
+  let%bind signed_command = User_command.gen_signed in
+  (* include generated ledger in result *)
+  let (`If_this_is_used_it_should_have_a_comment_justifying_it signed_command) =
+    Signed_command.to_valid_unsafe signed_command
+  in
+  return
+    ( User_command.Signed_command signed_command
+    , fee_payer_keypair
+    , keymap
+    , ledger )
