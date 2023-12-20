@@ -9,6 +9,23 @@ end
 
 include T
 
+(* Base58Check functions for original mainnet transaction hashes *)
+module V1_base58_check = Codable.Make_base58_check (struct
+  (* top tag needed for compatibility *)
+  type t = Stable.Latest.With_top_version_tag.t [@@deriving bin_io_unversioned]
+
+  let version_byte = Base58_check.Version_bytes.v1_transaction_hash
+
+  let description = "V1 Transaction hash"
+end)
+
+let to_base58_check_v1 = V1_base58_check.to_base58_check
+
+let of_base58_check_v1 = V1_base58_check.of_base58_check
+
+let of_base58_check_exn_v1 = V1_base58_check.of_base58_check_exn
+
+(* Base58Check functions for current hard fork *)
 module Base58_check = Codable.Make_base58_check (struct
   type t = Stable.Latest.t [@@deriving bin_io_unversioned]
 
@@ -240,6 +257,17 @@ let%test_module "Transaction hashes" =
             failwithf "Error getting hash: %s" (Error.to_string_hum err) ()
       in
       String.equal hash expected_hash
+
+    let%test "decode, recode v1 hashes" =
+      let v1_hashes =
+        [ "CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa"
+        ; "CkpZB4WE3wDRJ4CqCXqS4dqF8hoRQDVK8banePKUgTR6kvhTfyjRp"
+        ; "CkpYeG32dVJUjs6iq3oroXWitXar1eBtV3GVFyH5agw7HPp9bG4yQ"
+        ]
+      in
+      let decoded = List.map v1_hashes ~f:of_base58_check_exn_v1 in
+      let recoded = List.map decoded ~f:to_base58_check_v1 in
+      List.equal String.equal v1_hashes recoded
 
     let%test "signed command v1 hash from transaction id" =
       let transaction_id =

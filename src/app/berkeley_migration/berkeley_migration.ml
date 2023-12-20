@@ -75,7 +75,8 @@ let internal_commands_from_block_id ~mainnet_pool block_id =
         internal_cmd.fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
       in
       let hash =
-        Mina_transaction.Transaction_hash.of_base58_check_exn internal_cmd.hash
+        Mina_transaction.Transaction_hash.of_base58_check_exn_v1
+          internal_cmd.hash
       in
       let status = "applied" in
       let failure_reason = None in
@@ -142,7 +143,7 @@ let user_commands_from_block_id ~mainnet_pool block_id =
           ~f:mainnet_transaction_failure_of_string
       in
       let hash =
-        Mina_transaction.Transaction_hash.of_base58_check_exn user_cmd.hash
+        Mina_transaction.Transaction_hash.of_base58_check_exn_v1 user_cmd.hash
       in
       let cmd : Archive_lib.Extensional.User_command.t =
         { sequence_no
@@ -506,7 +507,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
             query_migrated_db ~f:(fun db ->
                 match%map
                   Archive_lib.Processor.Block.add_from_extensional db
-                    extensional_block
+                    extensional_block ~v1_transaction_hash:true
                 with
                 | Ok _id ->
                     Ok ()
