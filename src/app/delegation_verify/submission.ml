@@ -310,5 +310,9 @@ module Cassandra = struct
                (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
                submission.submitted_at
                (Public_key.Compressed.to_base58_check submission.submitter) )
-          [ ("validation_error", sprintf "'%s'" (Error.to_string_hum e)) ]
+          [ ("validation_error", sprintf "'%s'" (Error.to_string_hum e)) 
+          ; ("raw_block", "NULL")
+          ; ("snark_work", "NULL")
+          ; ("verified", "true")
+          ]
 end

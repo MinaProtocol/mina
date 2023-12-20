@@ -26,6 +26,9 @@ let valid_payload_to_cassandra_updates (p : t) =
   ; ("parent", Printf.sprintf "'%s'" @@ State_hash.to_base58_check p.parent)
   ; ( "state_hash"
     , Printf.sprintf "'%s'" @@ State_hash.to_base58_check p.state_hash )
+  ; ("raw_block", "NULL")
+  ; ("snark_work", "NULL")
+  ; ("verified", "true")
   ]
 
 let display valid_payload =
