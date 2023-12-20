@@ -4,6 +4,7 @@ BRANCH=$1
 CURRENT=$(git branch --show-current)
 echo 'Testing for conflicts between the current branch `'"${CURRENT}"'` and `'"${BRANCH}"'`...'
 
+
 # Adapted from this stackoverflow answer: https://stackoverflow.com/a/10856937
 # The git merge-tree command shows the content of a 3-way merge without
 # touching the index, which we can then search for conflict markers.
@@ -24,7 +25,7 @@ git config --global user.name "It's me, CI"
 # * `--no-commit` stops us from updating the index with a merge commit,
 # * `--no-ff` stops us from updating the index to the HEAD, if the merge is a
 #   straightforward fast-forward
-git merge --no-commit --no-ff origin/$BRANCH
+git merge --no-commit --no-ff ${REMOTE}/$BRANCH
 
 RET=$?
 
