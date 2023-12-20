@@ -474,88 +474,82 @@ module Accounts = struct
 
     let default = Json_layout.Accounts.Single.default
 
-      let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
-        let open Result.Let_syntax in
-        let open Signature_lib in
-        return
-          { pk = Public_key.Compressed.to_base58_check a.public_key
-          ; sk = None
-          ; balance = a.balance
-          ; delegate =
-              Option.map a.delegate ~f:(fun pk ->
-                  Public_key.Compressed.to_base58_check pk )
-          ; timing =
-              ( match a.timing with
-              | Untimed ->
-                  None
-              | Timed t ->
-                  let open Timed in
-                  Some
-                    { initial_minimum_balance = t.initial_minimum_balance
-                    ; cliff_time = t.cliff_time
-                    ; cliff_amount = t.cliff_amount
-                    ; vesting_period = t.vesting_period
-                    ; vesting_increment = t.vesting_increment
-                    } )
-          ; token = Some (Mina_base.Token_id.to_string a.token_id)
-          ; token_symbol = Some a.token_symbol
-          ; zkapp =
-              Option.map a.zkapp ~f:(fun zkapp ->
-                  let open Zkapp_account in
-                  { app_state = Mina_base.Zkapp_state.V.to_list zkapp.app_state
-                  ; verification_key =
-                      Option.map zkapp.verification_key ~f:With_hash.data
-                  ; zkapp_version = zkapp.zkapp_version
-                  ; action_state =
-                      Pickles_types.Vector.Vector_5.to_list zkapp.action_state
-                  ; last_action_slot =
-                      Unsigned.UInt32.to_int
-                      @@ Mina_numbers.Global_slot_since_genesis.to_uint32
-                           zkapp.last_action_slot
-                  ; proved_state = zkapp.proved_state
-                  ; zkapp_uri = zkapp.zkapp_uri
+    let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
+      let open Result.Let_syntax in
+      let open Signature_lib in
+      return
+        { pk = Public_key.Compressed.to_base58_check a.public_key
+        ; sk = None
+        ; balance = a.balance
+        ; delegate =
+            Option.map a.delegate ~f:(fun pk ->
+                Public_key.Compressed.to_base58_check pk )
+        ; timing =
+            ( match a.timing with
+            | Untimed ->
+                None
+            | Timed t ->
+                let open Timed in
+                Some
+                  { initial_minimum_balance = t.initial_minimum_balance
+                  ; cliff_time = t.cliff_time
+                  ; cliff_amount = t.cliff_amount
+                  ; vesting_period = t.vesting_period
+                  ; vesting_increment = t.vesting_increment
                   } )
-          ; nonce = a.nonce
-          ; receipt_chain_hash =
-              Some
-                (Mina_base.Receipt.Chain_hash.to_base58_check
-                   a.receipt_chain_hash )
-          ; voting_for =
-              Some (Mina_base.State_hash.to_base58_check a.voting_for)
-          ; permissions =
-              Some
-                Permissions.
-                  { edit_state =
-                      Auth_required.of_account_perm a.permissions.edit_state
-                  ; send = Auth_required.of_account_perm a.permissions.send
-                  ; receive =
-                      Auth_required.of_account_perm a.permissions.receive
-                  ; set_delegate =
-                      Auth_required.of_account_perm a.permissions.set_delegate
-                  ; set_permissions =
-                      Auth_required.of_account_perm
-                        a.permissions.set_permissions
-                  ; set_verification_key =
-                      Auth_required.of_account_perm
-                        a.permissions.set_verification_key
-                  ; set_token_symbol =
-                      Auth_required.of_account_perm
-                        a.permissions.set_token_symbol
-                  ; access = Auth_required.of_account_perm a.permissions.access
-                  ; edit_action_state =
-                      Auth_required.of_account_perm
-                        a.permissions.edit_action_state
-                  ; set_zkapp_uri =
-                      Auth_required.of_account_perm a.permissions.set_zkapp_uri
-                  ; increment_nonce =
-                      Auth_required.of_account_perm
-                        a.permissions.increment_nonce
-                  ; set_timing =
-                      Auth_required.of_account_perm a.permissions.set_timing
-                  ; set_voting_for =
-                      Auth_required.of_account_perm a.permissions.set_voting_for
-                  }
-          }
+        ; token = Some (Mina_base.Token_id.to_string a.token_id)
+        ; token_symbol = Some a.token_symbol
+        ; zkapp =
+            Option.map a.zkapp ~f:(fun zkapp ->
+                let open Zkapp_account in
+                { app_state = Mina_base.Zkapp_state.V.to_list zkapp.app_state
+                ; verification_key =
+                    Option.map zkapp.verification_key ~f:With_hash.data
+                ; zkapp_version = zkapp.zkapp_version
+                ; action_state =
+                    Pickles_types.Vector.Vector_5.to_list zkapp.action_state
+                ; last_action_slot =
+                    Unsigned.UInt32.to_int
+                    @@ Mina_numbers.Global_slot_since_genesis.to_uint32
+                         zkapp.last_action_slot
+                ; proved_state = zkapp.proved_state
+                ; zkapp_uri = zkapp.zkapp_uri
+                } )
+        ; nonce = a.nonce
+        ; receipt_chain_hash =
+            Some
+              (Mina_base.Receipt.Chain_hash.to_base58_check a.receipt_chain_hash)
+        ; voting_for = Some (Mina_base.State_hash.to_base58_check a.voting_for)
+        ; permissions =
+            Some
+              Permissions.
+                { edit_state =
+                    Auth_required.of_account_perm a.permissions.edit_state
+                ; send = Auth_required.of_account_perm a.permissions.send
+                ; receive = Auth_required.of_account_perm a.permissions.receive
+                ; set_delegate =
+                    Auth_required.of_account_perm a.permissions.set_delegate
+                ; set_permissions =
+                    Auth_required.of_account_perm a.permissions.set_permissions
+                ; set_verification_key =
+                    Auth_required.of_account_perm
+                      a.permissions.set_verification_key
+                ; set_token_symbol =
+                    Auth_required.of_account_perm a.permissions.set_token_symbol
+                ; access = Auth_required.of_account_perm a.permissions.access
+                ; edit_action_state =
+                    Auth_required.of_account_perm
+                      a.permissions.edit_action_state
+                ; set_zkapp_uri =
+                    Auth_required.of_account_perm a.permissions.set_zkapp_uri
+                ; increment_nonce =
+                    Auth_required.of_account_perm a.permissions.increment_nonce
+                ; set_timing =
+                    Auth_required.of_account_perm a.permissions.set_timing
+                ; set_voting_for =
+                    Auth_required.of_account_perm a.permissions.set_voting_for
+                }
+        }
 
     let gen =
       Quickcheck.Generator.map Mina_base.Account.gen ~f:(fun a ->
@@ -1203,11 +1197,15 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
     ~protocol_state_hash ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
     ~next_epoch_seed (runtime_config : t) =
   let open Result.Let_syntax in
-  let global_slot = Mina_numbers.Global_slot_since_hard_fork.to_int global_slot in
+  let global_slot =
+    Mina_numbers.Global_slot_since_hard_fork.to_int global_slot
+  in
   let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
   let%bind accounts =
     ledger_accounts
-    @@ Mina_ledger.Ledger.Any_ledger.cast (module Mina_ledger.Ledger) staged_ledger
+    @@ Mina_ledger.Ledger.Any_ledger.cast
+         (module Mina_ledger.Ledger)
+         staged_ledger
   in
   let ledger = Option.value_exn runtime_config.ledger in
   let previous_length =
