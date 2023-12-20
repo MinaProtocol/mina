@@ -45,9 +45,16 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
+case "${DUNE_PROFILE}" in
+  devnet)
+    MINA_DEB_NAME="mina-berkeley"
+    ;;
+  *)
+    MINA_DEB_NAME="mina-berkeley-${DUNE_PROFILE}"
+    ;;
+esac
 
 BUILDDIR="deb_build"
-
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -233,6 +240,20 @@ cp ./default/src/app/batch_txn_tool/batch_txn_tool.exe "${BUILDDIR}/usr/local/bi
 
 build_deb mina-batch-txn
 
+##################################### END BATCH TXN TOOL PACKAGE #######################################
+
+##################################### GENERATE TEST SUITE PACKAGE #######################################
+
+
+create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
+
+# Binaries
+cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
+
+build_deb mina-test-suite
+
+##################################### END TEST SUITE PACKAGE #######################################
+
 ##################################### MAINNET PACKAGE #######################################
 if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
 then
@@ -283,11 +304,11 @@ echo "------------------------------------------------------------"
 echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
 mkdir -p "${BUILDDIR}/DEBIAN"
-create_control_file mina-berkeley "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
 copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
 
-build_deb mina-berkeley
+build_deb "${MINA_DEB_NAME}"
 
 ##################################### END BERKELEY PACKAGE #######################################
 

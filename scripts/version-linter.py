@@ -7,20 +7,11 @@ For the PR branch, PR base branch, and release branch, download the
 type shapes file from Google storage There should be a type shape file
 available for every commit in a PR branch.
 
-For each branch, store the type shape information in a Python dictionary, truncating
-the shapes at a maximum depth.
+For each branch, store the type shape information in a Python dictionary.
 
 For each type, compare the type shapes of each branch. If the shapes don't match, print an
 error message. The exact comparison rules are given in RFC 0047 (with some embellishments
-mentioned below).
-
-The maximum depth should be set high enough so that all differences are caught
-(no false negatives).
-
-There may be some false positives, where a difference is reported for
-type t1 due to a change to a type t2 contained in t1. The
-difference will always also be reported for t2 directly.  The maximum
-depth should be set low enough to minimize such false positives.
+mentioned below). We print the minimum S-expression depth where the shapes differ.
 
 There are some special rules for the types associated with signed commands and zkApp commands;
 see `check_command_types`, below. There is also a special rule for RPC types; see
@@ -35,9 +26,6 @@ import re
 import sexpdata
 
 exit_code=0
-
-# type shape truncation depth
-max_depth = 9
 
 def set_error():
   global exit_code
@@ -62,22 +50,43 @@ def type_shape_file(sha1) :
   # loaded to cloud bucket
   return sha1 + '-type_shape.txt'
 
-# truncate type shapes to avoid false positives
-def truncate_type_shape (type_shape) :
-  def truncate_at_depth (sexp,curr_depth) :
-    if curr_depth >= max_depth :
-      return sexpdata.Symbol('.')
-    else :
-      if isinstance(sexp,list) :
-        return list(map(lambda item : truncate_at_depth (item,curr_depth+1),sexp))
-      else :
-        return sexp
-  fp = io.StringIO()
-  sexp = sexpdata.loads(type_shape)
-  sexpdata.dump(truncate_at_depth(sexp,0),fp)
-  truncated = fp.getvalue ()
-  # remove double-quotes
-  return truncated[1:-1]
+def type_shapes_diff_depth(type_shape1,type_shape2) :
+
+  def find_diff_depth(sexp1,sexp2,curr_depth):
+    is_list1 = isinstance(sexp1,list)
+    is_list2 = isinstance(sexp2,list)
+
+    if not is_list1 and is_list2:
+      return curr_depth
+
+    if is_list1 and not is_list2:
+      return curr_depth
+
+    if not is_list1 and not is_list2:
+      # both atoms
+      if sexp1==sexp2:
+        return None
+      else:
+        return curr_depth
+
+    # lists of unequal length
+    if not len(sexp1)==len(sexp2):
+      # the difference is inside the lists
+      return curr_depth + 1
+
+    # lists, same length
+    raw_depths = list(map(lambda sub1, sub2: find_diff_depth(sub1,sub2,curr_depth+1), sexp1, sexp2))
+    depths = list(filter(lambda n : not n is None,raw_depths))
+
+    if depths==[]:
+      return None
+    else:
+      return min(depths)
+
+  sexp1=sexpdata.loads(type_shape1)
+  sexp2=sexpdata.loads(type_shape2)
+
+  return (find_diff_depth(sexp1,sexp2,0))
 
 def make_type_shape_dict(type_shape_file):
   shape_dict=dict()
@@ -88,7 +97,7 @@ def make_type_shape_dict(type_shape_file):
       fields=entry.split(', ')
       path=fields[0]
       digest=fields[1]
-      shape=truncate_type_shape(fields[2])
+      shape=fields[2]
       type_=fields[3]
       shape_dict[path]=[digest,shape,type_]
   return shape_dict
@@ -173,11 +182,15 @@ def check_type_shapes(pr_branch_dict,base_branch,base_type_dict,release_branch,r
       if not pr_shape==release_shape and not pr_shape==base_shape:
         print(f'At path {path}:')
         print(f'  Type shape in PR differs from shapes in release branch \'{release_branch}\' and base branch \'{base_branch}\'')
+        release_diff_depth=type_shapes_diff_depth(pr_shape,release_shape)
         print ('  In release branch:')
+        print ('    Shape differs from PR branch shape at depth',release_diff_depth)
         print ('    Digest:',release_digest)
         print ('    Shape :',release_shape)
         print ('    Type  :',release_type)
+        base_diff_depth=type_shapes_diff_depth(pr_shape,base_shape)
         print ('  In base branch:')
+        print ('    Shape differs from PR branch shape at depth',base_diff_depth)
         print ('    Digest:',base_digest)
         print ('    Shape :',base_shape)
         print ('    Type  :',base_type)
@@ -192,7 +205,9 @@ def check_type_shapes(pr_branch_dict,base_branch,base_type_dict,release_branch,r
       if not pr_shape==release_shape:
         print(f'At path {path}:')
         print(f'  Type shape in PR differs from shape in release branch \'{release_branch}\' (was deleted in base branch \'{base_branch}\')')
+        release_diff_depth=type_shapes_diff_depth(pr_shape,release_shape)
         print ('  In release branch:')
+        print ('    Shape differs from PR branch shape at depth',release_diff_depth)
         print ('    Digest:',release_digest)
         print ('    Shape :',release_shape)
         print ('    Type  :',release_type)
