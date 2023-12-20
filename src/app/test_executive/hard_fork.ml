@@ -429,6 +429,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "Check that timed2 account is partially vested"
         (let%bind best_chain =
            Integration_test_lib.Graphql_requests.must_get_best_chain ~logger
+             ~max_length:1
              (Network.Node.get_ingress_uri node_b)
          in
          let best_tip = List.hd_exn best_chain in
