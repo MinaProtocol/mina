@@ -43,12 +43,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let archive_node =
       List.hd_exn @@ Core.String.Map.data (Network.archive_nodes network)
     in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     (* waiting for archive_node does not seem to work *)
     [%log info] "archive node test: waiting for block producers to initialize" ;
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
     in
     [%log info] "archive node test: waiting for archive node to initialize" ;
     let%bind () = wait_for t (Wait_condition.node_to_initialize archive_node) in
@@ -62,8 +63,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     [%log info] "archive node test: collecting block logs" ;
     let%map () =
-      Malleable_error.List.iter (Core.String.Map.data all_nodes) ~f:(fun bp ->
-          Network.Node.dump_precomputed_blocks ~logger bp )
+      Malleable_error.List.iter (Core.String.Map.data all_mina_nodes)
+        ~f:(fun bp -> Network.Node.dump_precomputed_blocks ~logger bp)
     in
     [%log info] "archive node test: succesfully completed"
 end

@@ -56,15 +56,15 @@ let parse_event_from_log_entry ~logger log_entry =
       in
       event )
 
-let rec poll_get_filtered_log_entries_node ~logger ~event_writer
-    ~last_log_index_seen node =
+let rec filtered_log_entries_poll node ~logger ~event_writer
+    ~last_log_index_seen =
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then (
     let%bind () = after (Time.Span.of_ms 10000.0) in
     match%bind
       Integration_test_lib.Graphql_requests.get_filtered_log_entries
-        ~last_log_index_seen
         (Node.get_ingress_uri node)
+        ~last_log_index_seen
     with
     | Ok log_entries ->
         Array.iter log_entries ~f:(fun log_entry ->
@@ -77,12 +77,12 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
         let last_log_index_seen =
           Array.length log_entries + last_log_index_seen
         in
-        poll_get_filtered_log_entries_node ~logger ~event_writer
-          ~last_log_index_seen node
+        filtered_log_entries_poll node ~logger ~event_writer
+          ~last_log_index_seen
     | Error err ->
         [%log error] "Encountered an error while polling $node for logs: $err"
           ~metadata:
-            [ ("node", `String node.app_id)
+            [ ("node", `String (Node.infra_id node))
             ; ("err", Error_json.error_to_yojson err)
             ] ;
         (* Declare the node to be offline. *)
@@ -92,7 +92,7 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
         return (Ok ()) )
   else Deferred.Or_error.error_string "Event writer closed"
 
-let rec poll_start_filtered_log_node ~logger ~log_filter ~event_writer node =
+let rec start_filtered_log node ~logger ~log_filter ~event_writer =
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then
     match%bind
@@ -103,27 +103,24 @@ let rec poll_start_filtered_log_node ~logger ~log_filter ~event_writer node =
     | Ok () ->
         return (Ok ())
     | Error _ ->
-        poll_start_filtered_log_node ~logger ~log_filter ~event_writer node
+        start_filtered_log node ~logger ~log_filter ~event_writer
   else Deferred.Or_error.error_string "Event writer closed"
 
 let rec poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
     (node : Node.t) =
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Requesting for $node to start its filtered logs"
-    ~metadata:[ ("node", `String node.app_id) ] ;
-  let%bind () =
-    poll_start_filtered_log_node ~logger ~log_filter ~event_writer node
-  in
+    ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
+  let%bind () = start_filtered_log ~logger ~log_filter ~event_writer node in
   [%log info] "$node has started its filtered logs. Beginning polling"
-    ~metadata:[ ("node", `String node.app_id) ] ;
+    ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
   let%bind () =
-    poll_get_filtered_log_entries_node ~last_log_index_seen:0 ~logger
-      ~event_writer node
+    filtered_log_entries_poll node ~last_log_index_seen:0 ~logger ~event_writer
   in
   poll_node_for_logs_in_background ~log_filter ~logger ~event_writer node
 
 let poll_for_logs_in_background ~log_filter ~logger ~network ~event_writer =
-  Kubernetes_network.all_pods network
+  Kubernetes_network.all_nodes network
   |> Core.String.Map.data
   |> Deferred.Or_error.List.iter ~how:`Parallel
        ~f:(poll_node_for_logs_in_background ~log_filter ~logger ~event_writer)
