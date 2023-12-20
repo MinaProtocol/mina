@@ -687,15 +687,15 @@ let compute_ram_usage (sizes : Sizes.size_params) =
        being built across each tree, they squash down into (delay+1) full trees of work referenced *)
     (* the size of works referenced per a squashed tree; 127 bundles of 2 proofs, 1 bundle of 1
        proof for the root (under the assumption every block is full) *)
-    let refernced_size_per_squashed_tree =
+    let referenced_size_per_squashed_tree =
       (127 * sizes.two_priced_proof) + sizes.one_priced_proof
     in
     (* the size of work referenced by the root of the frontier *)
     let root_referenced_size =
-      (Const.scan_state_delay + 1) * refernced_size_per_squashed_tree
+      (Const.scan_state_delay + 1) * referenced_size_per_squashed_tree
     in
     (* the size of delta references added by each full block in the frontier after the root *)
-    let delta_referenced_size = refernced_size_per_squashed_tree in
+    let delta_referenced_size = referenced_size_per_squashed_tree in
     root_referenced_size + ((Const.est_scan_states - 1) * delta_referenced_size)
   in
   (* TODO: measure the actuall network pool memory footprint instead of estimating *)
