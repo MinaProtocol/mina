@@ -25,7 +25,7 @@ end
 module Params = struct
   let max_zkapp_txn_account_updates = 6
 
-  let max_zkapp_commands_per_block = 128
+  let max_zkapp_commands_per_block = 8
 
   let max_signed_commands_per_block = 128 - max_zkapp_commands_per_block
 
@@ -683,6 +683,8 @@ let compute_ram_usage (sizes : Sizes.size_params) =
     * (zkapp_commands_size_per_block + signed_commands_size_per_block)
   in
   let snark_pool =
+    Printf.printf "snark pool references = %d\n"
+      (128 * (Const.scan_state_delay+1) + 128 * (Const.est_scan_states-1)) ;
     (* NB: the scan state is split up into (depth+1)+(delay+1) trees, but with different layers
        being built across each tree, they squash down into (delay+1) full trees of work referenced *)
     (* the size of works referenced per a squashed tree; 127 bundles of 2 proofs, 1 bundle of 1

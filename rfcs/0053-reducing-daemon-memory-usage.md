@@ -33,8 +33,7 @@ For identifying cached values by their content, we will use the Sha256 hash func
 ## Memory Analysis
 [memory-analysis]: #memory-analysis
 
-<!-- TODO: better name for this script so that it's not so custom-tailored to this conversation -->
-In order to accurately estimate the memory usage of the daemon in the fully saturated max-cost transaction environment, we have written a program `src/app/ram_fix_math/ram_fix_math.exe`. This program counts the size of GC allocations on various data structures used by the daemon, and does so by carefully ensuring every value is a unique allocation and that there are no shared references within data structures. We do this by transporting values back and forth via bin_prot, simulating the same behavior the daemon will have when it reads and deserializes data from the network. We then use these measurements to estimate the expected worst-case memory footprint of larger data structures in the system, such as the mempools and the frontier. Expectations around shared references across these larger data structures are directly subtracted from the estimates.
+In order to accurately estimate the memory usage of the daemon in the fully saturated max-cost transaction environment, we have written a program `src/app/disk_caching_stats/disk_caching_stats.exe`. See the [README.md](src/app/disk_caching_stats/README.md) for more information on how the program calculates these estimates.
 
 Below is the output of the script when all of the parameters are tuned to what we have planned for the Berkeley release.
 

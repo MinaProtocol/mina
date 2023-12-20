@@ -1,5 +1,5 @@
 (executable
- (name ram_fix_math)
+ (name disk_caching_stats)
  (libraries pickles pickles_types pickles.backend snark_params crypto_params network_pool mina_base
             signature_lib one_or_two currency ledger_proof mina_state mina_base_import mina_wire_types
             mina_numbers random_oracle random_oracle_input kimchi_pasta_basic data_hash_lib with_hash
