@@ -54,7 +54,7 @@ Pipeline.build
         },
       Command.build
         Command.Config::{
-          commands = [ ] : List Cmd.Type
+          commands = [ Cmd.run "true" ] : List Cmd.Type
           , label = "pr"
           , key = "pr"
           , target = Size.Small
