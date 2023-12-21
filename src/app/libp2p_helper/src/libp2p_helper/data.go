@@ -15,8 +15,8 @@ import (
 	"codanet"
 
 	capnp "capnproto.org/go/capnp/v3"
-	net "github.com/libp2p/go-libp2p-core/network"
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	net "github.com/libp2p/go-libp2p/core/network"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 

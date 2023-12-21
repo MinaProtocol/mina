@@ -1,0 +1,3 @@
+(lang dune 2.8)
+(name zkapp_test_transaction)
+(implicit_transitive_deps false)

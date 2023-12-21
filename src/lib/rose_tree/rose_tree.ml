@@ -35,15 +35,23 @@ let rec of_list_exn ?(subtrees = []) = function
 
 let of_non_empty_list ?(subtrees = []) =
   Fn.compose
-    (Non_empty_list.fold
-       ~init:(fun x -> T (x, subtrees))
-       ~f:(fun acc x -> T (x, [ acc ])) )
-    Non_empty_list.rev
+    (fun l ->
+      Mina_stdlib.Nonempty_list.fold ~init:None
+        ~f:(fun acc x ->
+          match acc with
+          | None ->
+              Some (T (x, subtrees))
+          | Some acc ->
+              Some (T (x, [ acc ])) )
+        l
+      |> Stdlib.Option.get )
+    Mina_stdlib.Nonempty_list.rev
 
 let rec equal ~f (T (value1, children1)) (T (value2, children2)) =
   f value1 value2 && List.equal (equal ~f) children1 children2
 
-let subset ~f xs ys = List.for_all xs ~f:(fun x -> List.mem ys x ~equal:f)
+let subset : type a. f:(a -> a -> bool) -> a list -> a list -> bool =
+ fun ~f xs ys -> List.for_all xs ~f:(fun x -> List.mem ys x ~equal:f)
 
 let bag_equiv ~f xs ys = subset ~f xs ys && subset ~f ys xs
 

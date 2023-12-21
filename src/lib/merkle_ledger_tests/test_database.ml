@@ -426,7 +426,8 @@ let%test_module "test functor on in memory databases" =
                 List.map ~f:snd
                 @@ MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in
-              assert (List.length accounts = List.length retrieved_accounts) ;
+              assert (
+                Stdlib.List.compare_lengths accounts retrieved_accounts = 0 ) ;
               assert (List.equal Account.equal accounts retrieved_accounts) )
 
       let%test_unit "removing accounts restores Merkle root" =
@@ -461,7 +462,7 @@ let%test_module "test functor on in memory databases" =
             in
             let total =
               List.fold balances ~init:0 ~f:(fun accum balance ->
-                  Balance.to_int balance + accum )
+                  Balance.to_nanomina_int balance + accum )
             in
             let accounts =
               List.map2_exn account_ids balances ~f:Account.create
@@ -470,7 +471,7 @@ let%test_module "test functor on in memory databases" =
                 ignore @@ create_new_account_exn mdb account ) ;
             let retrieved_total =
               MT.foldi mdb ~init:0 ~f:(fun _addr total account ->
-                  Balance.to_int (Account.balance account) + total )
+                  Balance.to_nanomina_int (Account.balance account) + total )
             in
             assert (Int.equal retrieved_total total) )
 
