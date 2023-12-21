@@ -27,7 +27,7 @@ let rec rmrf path =
 
 let try_finally ~(f : unit -> 'a Deferred.t) ~(finally : unit -> unit Deferred.t)
     =
-  try_with f
+  try_with ~here:[%here] f
   >>= function
   | Ok x ->
       Deferred.map (finally ()) ~f:(Fn.const x)

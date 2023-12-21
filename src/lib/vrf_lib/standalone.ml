@@ -51,7 +51,7 @@ module Make
         val to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
 
         module Assert : sig
-          val equal : var -> var -> (unit, _) Checked.t
+          val equal : var -> var -> unit Checked.t
         end
       end
     end) (Group : sig
@@ -88,7 +88,7 @@ module Make
       val hash_to_group : value -> Group.t
 
       module Checked : sig
-        val hash_to_group : var -> (Group.var, _) Checked.t
+        val hash_to_group : var -> Group.var Checked.t
       end
     end) (Output_hash : sig
       type t
@@ -100,7 +100,7 @@ module Make
       val hash : Message.value -> Group.t -> t
 
       module Checked : sig
-        val hash : Message.var -> Group.var -> (var, _) Impl.Checked.t
+        val hash : Message.var -> Group.var -> var Impl.Checked.t
       end
     end) (Hash : sig
       (* I believe this has to be a random oracle *)
@@ -114,7 +114,7 @@ module Make
           -> Group.var
           -> Group.var
           -> Group.var
-          -> (Scalar.var, _) Impl.Checked.t
+          -> Scalar.var Impl.Checked.t
       end
     end) : sig
   module Public_key : sig
@@ -157,7 +157,7 @@ module Make
            (module Group.Checked.Shifted.S with type t = 'shifted)
         -> var
         -> Context.var
-        -> (Output_hash.var, _) Impl.Checked.t
+        -> Output_hash.var Impl.Checked.t
     end
   end
 end = struct

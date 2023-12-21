@@ -37,6 +37,7 @@ var pushMesssageExtractors = map[ipc.Libp2pHelperInterface_PushMessage_Which]ext
 	ipc.Libp2pHelperInterface_PushMessage_Which_deleteResource:   fromDeleteResourcePush,
 	ipc.Libp2pHelperInterface_PushMessage_Which_downloadResource: fromDownloadResourcePush,
 	ipc.Libp2pHelperInterface_PushMessage_Which_validation:       fromValidationPush,
+	ipc.Libp2pHelperInterface_PushMessage_Which_heartbeatPeer:    fromHeartbeatPeerPush,
 }
 
 func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {
@@ -68,7 +69,7 @@ func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {
 		if err == nil {
 			app.writeMsg(resp)
 		} else {
-			app.P2p.Logger.Errorf("Failed to process rpc message: %w", err)
+			app.P2p.Logger.Errorf("Failed to process rpc message: %s", err)
 		}
 	} else if msg.HasPushMessage() {
 		err := func() error {
@@ -92,7 +93,7 @@ func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {
 			return nil
 		}()
 		if err != nil {
-			app.P2p.Logger.Errorf("Failed to process push message: %w", err)
+			app.P2p.Logger.Errorf("Failed to process push message: %s", err)
 		}
 	} else {
 		app.P2p.Logger.Error("Received message of an unknown type")

@@ -1,7 +1,7 @@
 (library
   (name allocation_functor)
   (public_name allocation_functor)
-  (inline_tests)
+  (inline_tests (flags -verbose -show-counts))
   (libraries
    ;; opam libraries
    core_kernel
@@ -10,6 +10,7 @@
    sexplib0
    ;; local libraries
    mina_metrics
+   ppx_version.runtime
   )
   (instrumentation (backend bisect_ppx))
   (preprocess (pps ppx_jane ppx_compare ppx_deriving_yojson ppx_version))

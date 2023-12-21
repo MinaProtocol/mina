@@ -58,7 +58,7 @@ let sign ~(keys : Keys.t) ~unsigned_transaction_string =
   (* TODO: Should we use the signer_input explicitly here to dogfood it? *)
   (* Should we just inline that here? *)
   let signature =
-    Schnorr.sign keys.keypair.private_key
+    Schnorr.Legacy.sign keys.keypair.private_key
       unsigned_transaction.random_oracle_input
   in
   let signature' =
@@ -82,11 +82,11 @@ let verify ~public_key_hex_bytes ~signed_transaction_string =
   let user_command_payload =
     User_command_info.Partial.to_user_command_payload
       ~nonce:signed_transaction.nonce
-      signed_transaction.Transaction.Signed.command
+      signed_transaction.command
     |> Result.ok
     |> Option.value_exn ~here:[%here] ?error:None ?message:None
   in
-  let message = Signed_command.to_input user_command_payload in
-  Schnorr.verify signed_transaction.signature
+  let message = Signed_command.to_input_legacy user_command_payload in
+  Schnorr.Legacy.verify signed_transaction.signature
     (Snark_params.Tick.Inner_curve.of_affine public_key)
     message
