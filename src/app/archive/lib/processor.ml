@@ -3980,22 +3980,30 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
-  let reader, writer = Strict_pipe.create ~name:"archive" Synchronous in
+  let reader, writer =
+    Strict_pipe.create ~name:"archive"
+      (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
+  in
   let precomputed_block_reader, precomputed_block_writer =
-    Strict_pipe.create ~name:"precomputed_archive_block" Synchronous
+    Strict_pipe.create ~name:"precomputed_archive_block"
+      (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
   in
   let extensional_block_reader, extensional_block_writer =
-    Strict_pipe.create ~name:"extensional_archive_block" Synchronous
+    Strict_pipe.create ~name:"extensional_archive_block"
+      (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
   in
   let implementations =
     [ Async.Rpc.Rpc.implement Archive_rpc.t (fun () archive_diff ->
-          Strict_pipe.Writer.write writer archive_diff )
+          Strict_pipe.Writer.write writer archive_diff ;
+          Deferred.unit )
     ; Async.Rpc.Rpc.implement Archive_rpc.precomputed_block
         (fun () precomputed_block ->
-          Strict_pipe.Writer.write precomputed_block_writer precomputed_block )
+          Strict_pipe.Writer.write precomputed_block_writer precomputed_block ;
+          Deferred.unit )
     ; Async.Rpc.Rpc.implement Archive_rpc.extensional_block
         (fun () extensional_block ->
-          Strict_pipe.Writer.write extensional_block_writer extensional_block )
+          Strict_pipe.Writer.write extensional_block_writer extensional_block ;
+          Deferred.unit )
     ]
   in
   match Caqti_async.connect_pool ~max_size:30 postgres_address with
