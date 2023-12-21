@@ -54,7 +54,7 @@ Pipeline.build
         },
       Command.build
         Command.Config::{
-          commands = [ ]
+          commands = [ ] : List Cmd.Type
           , label = "PR placeholder job (ask @amc-ie)"
           , key = "pr"
           , target = Size.Small
