@@ -398,7 +398,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     in
     let denominator = (zeta - env.omega_to_minus_zk_rows) * (zeta - one) in
     let ft_eval0 = ft_eval0 + (nominator / denominator) in
-    let constant_term = Sc.constant_term env in
+    (* (1) Create ScalarsMinus, without ffAdd *)
+    let constant_term =
+      Sc.constant_term env
+      (* (2) ~override_ffadd: optional... Sc.evaluate_custom_gate ~env ~polish_gate *)
+    in
     ft_eval0 - constant_term
 
   (** Computes the list of scalars used in the linearization. *)

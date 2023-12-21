@@ -138,10 +138,10 @@ let () =
   let configurations =
     [ ( "customizable gate (ffadd)"
       , Plonk_types.Features.{ none_bool with foreign_field_add = true }
-      , false )
+      , None )
     ; ( "customizable gate (conditional)"
       , Plonk_types.Features.{ none_bool with foreign_field_add = true }
-      , true )
+      , None (* JES: TODO: set to gate definition *) )
     ]
   in
   List.iter ~f:register_feature_test configurations ;

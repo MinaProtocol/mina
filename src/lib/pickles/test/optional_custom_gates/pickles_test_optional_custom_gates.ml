@@ -228,32 +228,32 @@ let register_feature_test (name, specific_feature_flags, custom_gate_type) =
 
 let () =
   let configurations =
-    [ ("xor", Plonk_types.Features.{ none_bool with xor = true }, false)
+    [ ("xor", Plonk_types.Features.{ none_bool with xor = true }, None)
     ; ( "range check 0"
       , Plonk_types.Features.{ none_bool with range_check0 = true }
-      , false )
+      , None )
     ; ( "range check 1"
       , Plonk_types.Features.{ none_bool with range_check1 = true }
-      , false )
-    ; ("rot", Plonk_types.Features.{ none_bool with rot = true }, false)
+      , None )
+    ; ("rot", Plonk_types.Features.{ none_bool with rot = true }, None)
     ; ( "foreign field addition"
       , Plonk_types.Features.{ none_bool with foreign_field_add = true }
-      , false )
+      , None )
     ; ( "foreign field multiplication"
       , Plonk_types.Features.{ none_bool with foreign_field_mul = true }
-      , false )
+      , None )
     ; ( "Fixed lookup tables"
       , Plonk_types.Features.{ none_bool with lookup = true }
-      , false )
+      , None )
     ; ( "Runtime lookup tables"
       , Plonk_types.Features.
           { none_bool with lookup = true; runtime_tables = true }
-      , false )
+      , None )
     ]
   in
   List.iter ~f:register_feature_test configurations ;
   register_test "different sizes of lookup"
     Plonk_types.Features.{ none_bool with foreign_field_mul = true }
     Plonk_types.Features.{ none_bool with xor = true }
-    false false ;
+    None None ;
   Alcotest.run "Custom gates" (get_tests ())

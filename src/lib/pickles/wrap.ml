@@ -25,9 +25,9 @@ module Type1Plus =
   Plonk_checks.Make
     (Shifted_value.Type1)
     (struct
-      let constant_term = Plonk_checks.Scalars.TickPlus.constant_term
+      let constant_term = Plonk_checks.Scalars.TickMinus.constant_term
 
-      let index_terms = Plonk_checks.Scalars.TickPlus.index_terms
+      let index_terms = Plonk_checks.Scalars.TickMinus.index_terms
     end)
 
 let _vector_of_list (type a t)
@@ -51,7 +51,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       ~rounds:tick_rounds e.evals
   in
   let ft_eval0 : Tick.Field.t =
-    if custom_gate_type then
+    if Option.is_some custom_gate_type then
       Type1Plus.ft_eval0
         (module Tick.Field)
         plonk ~env ~domain
@@ -531,13 +531,12 @@ let%test_module "gate finalization" =
           custom_gate_type public_input vk proof
 
       let%test "true -> yes" =
-        runtest test_feature_flags_configs.true_is_yes false
+        runtest test_feature_flags_configs.true_is_yes None
 
       let%test "true -> maybe" =
-        runtest test_feature_flags_configs.true_is_maybe false
+        runtest test_feature_flags_configs.true_is_maybe None
 
-      let%test "all maybes" =
-        runtest test_feature_flags_configs.all_maybes false
+      let%test "all maybes" = runtest test_feature_flags_configs.all_maybes None
     end
 
     (* Small combinators to lift gate example signatures to the expected

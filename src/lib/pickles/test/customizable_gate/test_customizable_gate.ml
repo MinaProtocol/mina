@@ -30,7 +30,7 @@ let create_customisable_circuit ~custom_gate_type ~valid_witness =
      gate as either ForeignFieldAdd or Conditional gate
      and make it either valid or invalid *)
   let cell1, cell2, cell3, cell4, result =
-    if custom_gate_type then
+    if Option.is_some custom_gate_type then
       ( ( if valid_witness then Field.one
         else Field.zero (* Conditional output *) )
       , Field.one (* Conditional x *)
@@ -114,7 +114,7 @@ let test ~step_only ~custom_gate_type ~valid_witness =
       (Async.Thread_safe.block_on_async_exn (fun () ->
            Proof.verify [ (public_input, proof) ] ) ) ;
 
-    if not step_only then (
+    if not step_only then
       let module Requests = struct
         type _ Snarky_backendless.Request.t +=
           | Proof :
@@ -159,7 +159,7 @@ let test ~step_only ~custom_gate_type ~valid_witness =
                     ; auxiliary_output = ()
                     } )
               ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
-              ; custom_gate_type = false
+              ; custom_gate_type = None
               }
             ] )
           ()
@@ -171,7 +171,7 @@ let test ~step_only ~custom_gate_type ~valid_witness =
       in
       Or_error.ok_exn
         (Async.Thread_safe.block_on_async_exn (fun () ->
-             Recursive_proof.verify [ (public_input, recursive_proof') ] ) ) )
+             Recursive_proof.verify [ (public_input, recursive_proof') ] ) )
   in
   test_prove ()
 
@@ -179,16 +179,16 @@ let test ~step_only ~custom_gate_type ~valid_witness =
 let () =
   if perform_step_tests then (
     (* Customised as ForeignFieldAdd gate; valid witness *)
-    test ~step_only:true ~custom_gate_type:false ~valid_witness:true ;
+    test ~step_only:true ~custom_gate_type:None ~valid_witness:true ;
     (* Customised as Conditional gate; valid witness *)
     (* Note: Requires Cache.Wrap.read_or_generate to have custom_gate_type passed to it *)
-    test ~step_only:true ~custom_gate_type:true ~valid_witness:true ;
+    test ~step_only:true ~custom_gate_type:None (* JES: TODO: custom gate def *) ~valid_witness:true ;
 
     (* Customised as ForeignFieldAdd gate; invalid witness *)
     let test_failed =
       try
         let _cs =
-          test ~step_only:true ~custom_gate_type:false ~valid_witness:false
+          test ~step_only:true ~custom_gate_type:None ~valid_witness:false
         in
         false
       with _ -> true
@@ -199,7 +199,7 @@ let () =
     let test_failed =
       try
         let _cs =
-          test ~step_only:true ~custom_gate_type:true ~valid_witness:false
+          test ~step_only:true ~custom_gate_type:None (* JES: TODO: custom gate def *) ~valid_witness:false
         in
         false
       with _ -> true
@@ -210,16 +210,16 @@ let () =
 let () =
   if perform_recursive_tests then (
     (* Customised as ForeignFieldAdd gate; valid witness *)
-    test ~step_only:false ~custom_gate_type:false ~valid_witness:true ;
+    test ~step_only:false ~custom_gate_type:None ~valid_witness:true ;
 
     (* Customised as Conditional gate; valid witness *)
-    test ~step_only:false ~custom_gate_type:true ~valid_witness:true ;
+    test ~step_only:false ~custom_gate_type:None (* JES: TODO: custom gate def *) ~valid_witness:true ;
 
     (* Customised as ForeignFieldAdd gate; invalid witness *)
     let test_failed =
       try
         let _cs =
-          test ~step_only:false ~custom_gate_type:false ~valid_witness:false
+          test ~step_only:false ~custom_gate_type:None ~valid_witness:false
         in
         false
       with _ -> true
@@ -230,7 +230,7 @@ let () =
     let test_failed =
       try
         let _cs =
-          test ~step_only:false ~custom_gate_type:true ~valid_witness:false
+          test ~step_only:false ~custom_gate_type:None (* JES: TODO: custom gate def *) ~valid_witness:false
         in
         false
       with _ -> true
@@ -261,7 +261,7 @@ let () =
                   ; prevs = []
                   ; main =
                       (fun _ ->
-                        create_customisable_circuit ~custom_gate_type:true
+                        create_customisable_circuit ~custom_gate_type:None (* JES: TODO: custom gate def *)
                           ~valid_witness:true ;
 
                         { previous_proof_statements = []
@@ -271,13 +271,13 @@ let () =
                   ; feature_flags =
                       Pickles_types.Plonk_types.Features.
                         { none_bool with foreign_field_add = true }
-                  ; custom_gate_type = true
+                  ; custom_gate_type = None (* JES: TODO: custom gate def *)
                   }
                 ; { identifier = "customizable gate (choice 2)"
                   ; prevs = []
                   ; main =
                       (fun _ ->
-                        create_customisable_circuit ~custom_gate_type:false
+                        create_customisable_circuit ~custom_gate_type:None
                           ~valid_witness:true ;
 
                         { previous_proof_statements = []
@@ -287,7 +287,7 @@ let () =
                   ; feature_flags =
                       Pickles_types.Plonk_types.Features.
                         { none_bool with foreign_field_add = true }
-                  ; custom_gate_type = false
+                  ; custom_gate_type = None
                   }
                 ] )
               ()

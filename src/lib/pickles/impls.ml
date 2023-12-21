@@ -44,7 +44,7 @@ module Step = struct
     let generate ~custom_gate_type ~prev_challenges cs =
       let open Tick.Keypair in
       let keypair =
-        if custom_gate_type then
+        if Option.is_some custom_gate_type then
           create_plus custom_gate_type ~prev_challenges cs
         else create ~prev_challenges cs
       in
@@ -168,7 +168,7 @@ module Wrap = struct
     let generate ~custom_gate_type ~prev_challenges cs =
       let open Tock.Keypair in
       let keypair =
-        if custom_gate_type then
+        if Option.is_some custom_gate_type then
           create_plus custom_gate_type ~prev_challenges cs
         else create ~prev_challenges cs
       in

@@ -24,7 +24,7 @@ val expand_deferred :
          Step_bp_vec.t
        , Branch_data.t )
        Types.Wrap.Proof_state.Minimal.t
-  -> custom_gate_type:bool
+  -> custom_gate_type:Pasta_bindings.Fp.t Kimchi_types.polish_token array option
   -> ( ( Challenge.Constant.t
        , Challenge.Constant.t Kimchi_types.scalar_challenge
        , Pasta_bindings.Fp.t Shifted_value.Type1.t

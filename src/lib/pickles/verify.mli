@@ -8,6 +8,7 @@ module Instance : sig
         (module Pickles_types.Nat.Intf with type n = 'n)
         * (module Intf.Statement_value with type t = 'a)
         * chunking_data option
+        * Backend.Tick.Field.t Kimchi_types.polish_token array option
         * Verification_key.t
         * 'a
         * ('n, 'n) Proof.t
@@ -16,6 +17,7 @@ end
 
 val verify :
      ?chunking_data:Instance.chunking_data
+  -> ?custom_gate_type:Backend.Tick.Field.t Kimchi_types.polish_token array
   -> (module Pickles_types.Nat.Intf with type n = 'n)
   -> (module Intf.Statement_value with type t = 'a)
   -> Verification_key.t

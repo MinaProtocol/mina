@@ -19,7 +19,7 @@ module Basic = struct
     ; wrap_key : Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
-    ; custom_gate_type : bool
+    ; custom_gate_type : Backend.Tick.Field.t Kimchi_types.polish_token array option
     ; num_chunks : int
     ; zk_rows : int
     }
@@ -42,7 +42,7 @@ module Side_loaded = struct
       { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
       ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
-      ; custom_gate_type : bool
+      ; custom_gate_type : Backend.Tick.Field.t Kimchi_types.polish_token array option
       ; branches : 'n2 Nat.t
       ; num_chunks : int
       ; zk_rows : int
@@ -102,7 +102,7 @@ module Compiled = struct
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
-    ; custom_gate_type : bool
+    ; custom_gate_type : Backend.Tick.Field.t Kimchi_types.polish_token array option
     ; num_chunks : int
     ; zk_rows : int
     }
@@ -123,7 +123,7 @@ module Compiled = struct
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
-    ; custom_gate_type : bool
+    ; custom_gate_type : Backend.Tick.Field.t Kimchi_types.polish_token array option
     ; num_chunks : int
     ; zk_rows : int
     }
@@ -173,7 +173,7 @@ module For_step = struct
           Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
-    ; custom_gate_type : bool
+    ; custom_gate_type : Backend.Tick.Field.t Kimchi_types.polish_token array option
     ; num_chunks : int
     ; zk_rows : int
     }

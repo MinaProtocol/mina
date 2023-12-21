@@ -83,8 +83,10 @@ module Step = struct
                 (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path ) )
 
-  let read_or_generate ~(custom_gate_type : bool) ~prev_challenges cache k_p k_v
-      typ return_typ main =
+  let read_or_generate
+      ~(custom_gate_type :
+         Backend.Tick.Field.t Kimchi_types.polish_token array option )
+      ~prev_challenges cache k_p k_v typ return_typ main =
     let s_p = storable in
     let s_v = vk_storable in
     let open Impls.Step in
@@ -183,8 +185,10 @@ module Wrap = struct
                 (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
               header path ) )
 
-  let read_or_generate ~(custom_gate_type : bool) ~prev_challenges cache k_p k_v
-      typ return_typ main =
+  let read_or_generate
+      ~(custom_gate_type : (* TODO: JES: Delete this *)
+      Backend.Tick.Field.t Kimchi_types.polish_token array option )
+      ~prev_challenges cache k_p k_v typ return_typ main =
     let module Vk = Verification_key in
     let open Impls.Wrap in
     let s_p = storable in
@@ -201,7 +205,7 @@ module Wrap = struct
              let r =
                Common.time "wrapkeygen" (fun () ->
                    constraint_system ~input_typ:typ ~return_typ main
-                   |> Keypair.generate ~custom_gate_type ~prev_challenges )
+                   |> Keypair.generate ~custom_gate_type:None ~prev_challenges )
              in
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)

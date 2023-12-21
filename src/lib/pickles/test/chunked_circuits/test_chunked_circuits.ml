@@ -73,7 +73,7 @@ let test () =
                 ; auxiliary_output = ()
                 } )
           ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
-          ; custom_gate_type = false
+          ; custom_gate_type = None
           }
         ] )
       ()
@@ -118,7 +118,7 @@ let test () =
                 ; auxiliary_output = ()
                 } )
           ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
-          ; custom_gate_type = false
+          ; custom_gate_type = None
           }
         ] )
       ()

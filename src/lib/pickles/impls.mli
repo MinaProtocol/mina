@@ -21,7 +21,7 @@ module Step : sig
     val create : pk:Proving_key.t -> vk:Verification_key.t -> t
 
     val generate :
-         custom_gate_type:bool
+         custom_gate_type:Impl.Field.Constant.t Kimchi_types.polish_token array option
       -> prev_challenges:int
       -> Kimchi_pasta_constraint_system.Vesta_constraint_system.t
       -> t
@@ -110,7 +110,7 @@ module Wrap : sig
     val create : pk:Proving_key.t -> vk:Verification_key.t -> t
 
     val generate :
-         custom_gate_type:bool
+         custom_gate_type:Impl.Field.Constant.t Kimchi_types.polish_token array option
       -> prev_challenges:int
       -> Kimchi_pasta_constraint_system.Pallas_constraint_system.t
       -> t

@@ -818,7 +818,7 @@ struct
         end)
 
     module Type1Plus =
-      Plonk_checks.Make (Shifted_value.Type1) (Scalars.TickPlus)
+      Plonk_checks.Make (Shifted_value.Type1) (Scalars.TickMinus)
   end
 
   let domain_for_compiled (type branches)
@@ -856,7 +856,7 @@ struct
      Meaning it needs opt sponge. *)
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
-      ?(custom_gate_type = false)
+      ?custom_gate_type
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] ) ~zk_rows
       ~(* TODO: Add "actual proofs verified" so that proofs don't
@@ -1035,7 +1035,7 @@ struct
       in
       let ft_eval0 : Field.t =
         with_label "ft_eval0" (fun () ->
-            if custom_gate_type then
+            if Option.is_some custom_gate_type then
               Plonk_checks.Type1Plus.ft_eval0
                 (module Field)
                 ~env ~domain plonk_minimal combined_evals evals1.public_input
@@ -1106,7 +1106,7 @@ struct
     in
     let plonk_checks_passed =
       with_label "plonk_checks_passed" (fun () ->
-          if custom_gate_type then
+          if Option.is_some custom_gate_type then
             Plonk_checks.Type1Plus.checked
               (module Impl)
               ~env ~shift:shift1 plonk combined_evals

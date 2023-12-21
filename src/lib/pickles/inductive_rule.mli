@@ -114,7 +114,7 @@ type ( 'prev_vars
          'a_var main_input
       -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
   ; feature_flags : bool Pickles_types.Plonk_types.Features.t
-  ; custom_gate_type : bool
+  ; custom_gate_type : Backend.Tick.Field.t Kimchi_types.polish_token array option
   }
 
 module T

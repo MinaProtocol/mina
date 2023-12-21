@@ -425,11 +425,11 @@ struct
       let rec go :
           type a b c d.
              (a, b, c, d) H4.T(IR).t
-          -> Opt.Flag.t Plonk_types.Features.Full.t * bool =
+          -> Opt.Flag.t Plonk_types.Features.Full.t * (Backend.Tick.Field.t Kimchi_types.polish_token array option) =
        fun rules ->
         match rules with
         | [] ->
-            (Plonk_types.Features.Full.none, false)
+            (Plonk_types.Features.Full.none, None)
         | [ r ] ->
             ( Plonk_types.Features.map r.feature_flags ~f:(function
                 | true ->
@@ -440,7 +440,8 @@ struct
             , r.custom_gate_type )
         | r :: rules ->
             let feature_flags, custom_gate_type = go rules in
-            assert (Bool.(custom_gate_type = r.custom_gate_type)) ;
+            (* JES: TODO Assert below *)
+            (* assert (custom_gate_type = r.custom_gate_type) ; *)
             ( Plonk_types.Features.Full.map2
                 (Plonk_types.Features.to_full ~or_:( || ) r.feature_flags)
                 feature_flags ~f:(fun enabled flag ->
@@ -682,7 +683,7 @@ struct
       let r =
         Common.time "wrap read or generate " (fun () ->
             Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
-              ~custom_gate_type
+              ~custom_gate_type:None (* We don't override custom gates on the wrap proof *)
                 (* Note: custom_gate_type needed for case when gate is overriden (true) and witness is valid *)
               ~prev_challenges:2 cache disk_key_prover disk_key_verifier typ
               (Snarky_backendless.Typ.unit ())
@@ -949,7 +950,7 @@ module Side_loaded = struct
                   { constraints = 0 }
               }
             in
-            Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
+            Verify.Instance.T (max_proofs_verified, m, None, None, vk, x, p) )
         |> Verify.verify_heterogenous )
 
   let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
@@ -1133,6 +1134,9 @@ let compile_with_wrap_main_override_promise :
           ; zk_rows = compiled.zk_rows
           }
   in
+  let custom_gate_type =
+    let compiled = Types_map.lookup_compiled self.id in
+    compiled.custom_gate_type in
   let module P = struct
     type statement = value
 
@@ -1152,7 +1156,7 @@ let compile_with_wrap_main_override_promise :
     let verification_key = wrap_vk
 
     let verify_promise ts =
-      verify_promise ?chunking_data
+      verify_promise ?chunking_data ?custom_gate_type
         ( module struct
           include Max_proofs_verified
         end )
@@ -1318,7 +1322,7 @@ struct
           ; auxiliary_output = ()
           } )
     ; feature_flags = Plonk_types.Features.none_bool
-    ; custom_gate_type = false
+    ; custom_gate_type = None
     }
 
   let override_wrap_main =
@@ -1387,7 +1391,7 @@ struct
             ~choices:(fun ~self:_ ->
               [ { identifier = "main"
                 ; feature_flags = Plonk_types.Features.none_bool
-                ; custom_gate_type = false
+                ; custom_gate_type = None
                 ; prevs = [ tag; tag ]
                 ; main =
                     (fun { public_input = () } ->

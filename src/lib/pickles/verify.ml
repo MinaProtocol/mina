@@ -11,6 +11,7 @@ module Instance = struct
         (module Nat.Intf with type n = 'n)
         * (module Intf.Statement_value with type t = 'a)
         * chunking_data option
+        * Backend.Tick.Field.t Kimchi_types.polish_token array option
         * Verification_key.t
         * 'a
         * ('n, 'n) Proof.t
@@ -45,6 +46,7 @@ let verify_heterogenous (ts : Instance.t list) =
              ( _max_proofs_verified
              , _statement
              , chunking_data
+             , custom_gate_type
              , key
              , _app_state
              , T
@@ -122,7 +124,9 @@ let verify_heterogenous (ts : Instance.t list) =
           in
           Wrap_deferred_values.expand_deferred ~evals ~zk_rows
             ~old_bulletproof_challenges ~proof_state
-            ~custom_gate_type:key.index.custom_gate_type
+            ~custom_gate_type:custom_gate_type
+            (* ~custom_gate_type:branch_data.custom_gate_type *)
+            (* ~custom_gate_type:proof_state.deferred_values.branch_data.custom_gate_type *)
           (* TODO: This is not working *)
         in
         Timer.clock __LOC__ ;
@@ -155,7 +159,7 @@ let verify_heterogenous (ts : Instance.t list) =
   [%log internal] "Accumulator_check" ;
   let%bind accumulator_check =
     Ipa.Step.accumulator_check
-      (List.map ts ~f:(fun (T (_, _, _, _, _, T t)) ->
+      (List.map ts ~f:(fun (T (_, _, _, _, _, _, T t)) ->
            ( t.statement.proof_state.messages_for_next_wrap_proof
                .challenge_polynomial_commitment
            , Ipa.Step.compute_challenges
@@ -173,6 +177,7 @@ let verify_heterogenous (ts : Instance.t list) =
              ( (module Max_proofs_verified)
              , (module A_value)
              , _chunking_data
+             , _custom_gate_type
              , key
              , app_state
              , T t ) )
@@ -243,11 +248,11 @@ let verify_heterogenous (ts : Instance.t list) =
   Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
   result ()
 
-let verify (type a n) ?chunking_data
+let verify (type a n) ?chunking_data ?custom_gate_type
     (max_proofs_verified : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous
     (List.map ts ~f:(fun (x, p) ->
-         Instance.T (max_proofs_verified, a_value, chunking_data, key, x, p) )
+         Instance.T (max_proofs_verified, a_value, chunking_data, custom_gate_type, key, x, p) )
     )

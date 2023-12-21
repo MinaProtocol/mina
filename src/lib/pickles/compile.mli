@@ -49,6 +49,7 @@ type chunking_data = Verify.Instance.chunking_data =
 
 val verify_promise :
      ?chunking_data:chunking_data
+  -> ?custom_gate_type:Backend.Tick.Field.t Kimchi_types.polish_token array
   -> (module Nat.Intf with type n = 'n)
   -> (module Statement_value_intf with type t = 'a)
   -> Verification_key.t
@@ -124,7 +125,7 @@ module Side_loaded : sig
        name:string
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
     -> feature_flags:Opt.Flag.t Plonk_types.Features.t
-    -> custom_gate_type:bool
+    -> custom_gate_type:Backend.Tick.Field.t Kimchi_types.polish_token array option
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
