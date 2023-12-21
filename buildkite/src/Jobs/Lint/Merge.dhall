@@ -55,7 +55,7 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [ ] : List Cmd.Type
-          , label = "PR placeholder job (ask @amc-ie)"
+          , label = "pr"
           , key = "pr"
           , target = Size.Small
           , docker = Some Docker::{
