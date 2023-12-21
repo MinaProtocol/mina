@@ -163,7 +163,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         @@ List.exists blocks ~f:(fun block ->
                Option.value_map slot_tx_end ~default:true ~f:(fun slot_tx_end ->
                    Mina_numbers.Global_slot.(
-                     of_uint32 block.slot_since_genesis < slot_tx_end ) )
+                     of_uint32 block.slot_since_genesis < slot_tx_end) )
                && ( block.command_transaction_count <> 0
                   || block.snark_work_count <> 0
                   || block.coinbase <> 0 ) ) )
@@ -185,7 +185,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  in
                  ok_if_true msg
                    ( Mina_numbers.Global_slot.(
-                       of_uint32 block.slot_since_genesis < slot_tx_end )
+                       of_uint32 block.slot_since_genesis < slot_tx_end)
                    || block.command_transaction_count = 0
                       && block.snark_work_count = 0 && block.coinbase = 0 ) ) )
         )
@@ -197,8 +197,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Option.value_map slot_chain_end ~default:true
                  ~f:(fun slot_chain_end ->
                    Mina_numbers.Global_slot.(
-                     of_uint32 block.slot_since_genesis < slot_chain_end ) ) )
-        )
+                     of_uint32 block.slot_since_genesis < slot_chain_end) ) ) )
     in
     section "no blocks produced after slot_chain_end"
       (Option.value_map slot_chain_end ~default:Malleable_error.ok_unit
@@ -207,6 +206,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            @@ not
            @@ List.exists blocks ~f:(fun block ->
                   Mina_numbers.Global_slot.(
-                    of_uint32 block.slot_since_genesis >= slot_chain_end ) ) )
-      )
+                    of_uint32 block.slot_since_genesis >= slot_chain_end) ) ) )
 end
