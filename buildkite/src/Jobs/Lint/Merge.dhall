@@ -52,5 +52,15 @@ Pipeline.build
               image = (../../Constants/ContainerImages.dhall).toolchainBase
             }
         }
+      Command.build
+        Command.Config::{
+          commands = [ ]
+          , label = "PR placeholder job (ask @amc-ie)"
+          , key = "pr"
+          , target = Size.Small
+          , docker = Some Docker::{
+              image = (../../Constants/ContainerImages.dhall).toolchainBase
+            }
+        }
     ]
   }
