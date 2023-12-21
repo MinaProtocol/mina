@@ -977,7 +977,7 @@ end
 module Daemon = struct
   (* Peer list URL should usually be None. This option is better provided with
      a command line argument. Putting it in the config makes the network explicitly
-     rely on a certain number of nodes, reducing decentralisation. *)
+     rely on a certain number of nodes, reducing decentralisation. See #14766 *)
   type t = Json_layout.Daemon.t =
     { txpool_max_size : int option
     ; peer_list_url : string option
