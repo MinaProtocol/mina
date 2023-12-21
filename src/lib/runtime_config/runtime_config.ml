@@ -58,14 +58,14 @@ let of_yojson_generic ~fields of_yojson json =
   dump_on_error json @@ of_yojson
   @@ yojson_strip_fields ~keep_fields:fields json
 
-let rec map_results ~f = function
-  | [] ->
-      Result.return []
-  | r :: rs ->
-      let open Result.Let_syntax in
-      let%bind r' = f r in
-      let%map rs = map_results ~f rs in
-      r' :: rs
+let map_results ls ~f =
+  let open Result.Let_syntax in
+  let%map r =
+    List.fold_result ls ~init:[] ~f:(fun t el ->
+        let%map h = f el in
+        h :: t )
+  in
+  List.rev r
 
 module Json_layout = struct
   module Accounts = struct
@@ -975,6 +975,9 @@ module Genesis = struct
 end
 
 module Daemon = struct
+  (* Peer list URL should usually be None. This option is better provided with
+     a command line argument. Putting it in the config makes the network explicitly
+     rely on a certain number of nodes, reducing decentralisation. *)
   type t = Json_layout.Daemon.t =
     { txpool_max_size : int option
     ; peer_list_url : string option
@@ -1019,9 +1022,6 @@ module Daemon = struct
         opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
     }
 
-  (* Peer list URL should usually be None. This option is better provided with
-     a command line argument. Putting it in the config makes the network explicitly
-     rely on a certain number of nodes, reducing decentralisation. *)
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%bind zkapp_proof_update_cost = Float.gen_incl 0. 1000. in
@@ -1046,6 +1046,12 @@ module Epoch_data = struct
   module Data = struct
     type t = { ledger : Ledger.t; seed : string }
     [@@deriving bin_io_unversioned, yojson]
+
+    let gen =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind ledger = Ledger.gen in
+      let%map seed = String.gen_nonempty in
+      { ledger; seed }
   end
 
   type t =
@@ -1092,6 +1098,12 @@ module Epoch_data = struct
 
   let of_yojson json =
     Result.bind ~f:of_json_layout (Json_layout.Epoch_data.of_yojson json)
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind staking = Data.gen in
+    let%map next = Option.quickcheck_generator Data.gen in
+    { staking; next }
 end
 
 type t =
@@ -1170,13 +1182,13 @@ let gen =
   let%map daemon = Daemon.gen
   and genesis = Genesis.gen
   and proof = Proof_keys.gen
-  and ledger = Ledger.gen in
+  and ledger = Ledger.gen
+  and epoch_data = Epoch_data.gen in
   { daemon = Some daemon
   ; genesis = Some genesis
   ; proof = Some proof
   ; ledger = Some ledger
-  ; epoch_data =
-      None (* Leave it empty until we know better what should go there. *)
+  ; epoch_data = Some epoch_data
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
