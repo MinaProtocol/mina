@@ -1,6 +1,6 @@
 (library
  (name runtime_config)
- (public_name coda_runtime_config)
+ (public_name mina_runtime_config)
  (libraries
    ;; opam libraries
    core_kernel
@@ -8,22 +8,26 @@
    base.caml
    base
    base64
-   sexplib0
+   integers
    result
+   sexplib0
    ;; local libraries
    currency
    data_hash_lib
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_base
+   mina_base.import
    mina_numbers
+   signature_lib
    ppx_dhall_type
    snark_params
    unsigned_extended
-   pasta
    pickles
    pickles.backend
    pickles_types
-   signature_lib
    with_hash
    )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson ppx_dhall_type ppx_version ppx_compare)))
+ (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson
+                  ppx_fields_conv ppx_dhall_type ppx_version ppx_compare)))

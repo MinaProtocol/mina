@@ -99,6 +99,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                       Transition_frontier.Breadcrumb.build ~logger
                         ~precomputed_values ~verifier ~trust_system ~parent
                         ~transition:mostly_validated_transition
+                        ~get_completed_work:(Fn.const None)
                         ~sender:(Some sender) ~transition_receipt_time () )
                 with
                 | Error _ ->

@@ -34,7 +34,7 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [
-            Cmd.runInDocker Cmd.Docker::{image = ContainerImages.delegationBackendToolchain} "cd src/app/delegation_backend && mkdir -p result && cp -R /headers result && cd src && go test"
+            Cmd.runInDocker Cmd.Docker::{image = ContainerImages.delegationBackendToolchain} "cd src/app/delegation_backend && mkdir -p result && cp -R /headers result && cd src/delegation_backend && go test"
           ],
           label = "delegation backend unit-tests",
           soft_fail = Some (B/SoftFail.Boolean True),

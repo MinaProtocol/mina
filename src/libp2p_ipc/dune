@@ -2,7 +2,7 @@
  (name libp2p_ipc)
  (public_name libp2p_ipc)
  (flags -w -53)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    result

@@ -12,6 +12,8 @@ val to_libp2p_ipc : t -> Libp2p_ipc.multiaddr
 
 val to_peer : t -> Peer.t option
 
+val of_peer : Peer.t -> t
+
 val valid_as_peer : t -> bool
 
 val of_file_contents : string -> t list

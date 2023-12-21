@@ -1,1 +1,1 @@
-<XLarge|Large|Medium|Small|Integration>
+<XLarge|Large|Medium|Small|Integration|QA>

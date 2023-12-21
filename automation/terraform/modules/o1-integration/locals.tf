@@ -2,6 +2,7 @@ locals {
   graphql_ingress_dns = "${var.testnet_name}.graphql.test.o1test.net"
   snark_worker_host_port            = 10001
   block_producer_starting_host_port = 10010
+  
 
   # seed_peer = {
   #   multiaddr = "/dns4/seed.${var.testnet_name}/tcp/10401/p2p/12D3KooWCoGWacXE4FRwAX8VqhnWVKhz5TTEecWEuGmiNrDt2XLf",
@@ -14,14 +15,15 @@ locals {
   seed_external_port = 10001
 
   seed_config = {
-    name               = "seed",
-    class              = "seed",
-    libp2p_secret      = "seed-discovery-keys",
-    libp2p_secret_pw   = "naughty blue worm"
-    external_ip        = null,
+    name                 = "seed",
+    class                = "seed",
+    libp2p_secret        = "seed-discovery-keys",
+    libp2p_secret_pw     = "naughty blue worm"
+    external_ip          = null,
     # private_key_secret = null,
-    enableArchive      = false,
-    archiveAddress     = null
+    enableArchive        = false,
+    archiveAddress       = null
+    persist_working_dir  = var.enable_working_dir_persitence
   }
   
 
@@ -45,6 +47,7 @@ locals {
     persistenceStorageClass = "ssd-delete"
     persistenceAccessModes  = ["ReadWriteOnce"]
     spotAllowed             = "true"
+    persist_working_dir     = var.enable_working_dir_persitence
   }
 
   archive_node_configs = var.archive_configs != null ? [for item in var.archive_configs : merge(local.default_archive_node, item)] : [

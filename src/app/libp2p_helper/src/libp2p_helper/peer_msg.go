@@ -11,7 +11,8 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
+	peer "github.com/libp2p/go-libp2p/core/peer"
+	peerstore "github.com/libp2p/go-libp2p/core/peerstore"
 )
 
 type AddPeerReqT = ipc.Libp2pHelperInterface_AddPeer_Request
@@ -40,7 +41,7 @@ func (m AddPeerReq) handle(app *app, seqno uint64) *capnp.Message {
 	}
 
 	app.AddedPeers = append(app.AddedPeers, *info)
-	app.P2p.GatingState().TrustedPeers.Add(info.ID)
+	app.P2p.GatingState().TrustedPeers[info.ID] = struct{}{}
 
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
@@ -171,4 +172,29 @@ func (msg ListPeersReq) handle(app *app, seqno uint64) *capnp.Message {
 		panicOnErr(err)
 		setPeerInfoList(lst, peerInfos)
 	})
+}
+
+type HeartbeatPeerPushT = ipc.Libp2pHelperInterface_HeartbeatPeer
+type HeartbeatPeerPush HeartbeatPeerPushT
+
+func fromHeartbeatPeerPush(m ipcPushMessage) (pushMessage, error) {
+	i, err := m.HeartbeatPeer()
+	return HeartbeatPeerPush(i), err
+}
+
+func (m HeartbeatPeerPush) handle(app *app) {
+	id1, err := HeartbeatPeerPushT(m).Id()
+	var id2 string
+	var peerID peer.ID
+	if err == nil {
+		id2, err = id1.Id()
+	}
+	if err == nil {
+		peerID, err = peer.Decode(id2)
+	}
+	if err != nil {
+		app.P2p.Logger.Errorf("HeartbeatPeerPush.handle: error %s", err)
+		return
+	}
+	app.P2p.HeartbeatPeer(peerID)
 }
