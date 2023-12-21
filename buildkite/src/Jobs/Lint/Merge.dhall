@@ -51,8 +51,8 @@ Pipeline.build
           , docker = Some Docker::{
               image = (../../Constants/ContainerImages.dhall).toolchainBase
             }
-        },
-      Command.build
+        }
+    , Command.build
         Command.Config::{
           commands = [ Cmd.run "true" ] : List Cmd.Type
           , label = "pr"
