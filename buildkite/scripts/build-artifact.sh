@@ -29,7 +29,6 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/extract_blocks/extract_blocks.exe \
   src/app/archive_blocks/archive_blocks.exe \
   src/app/berkeley_migration/berkeley_migration.exe \
-  src/app/berkeley_account_tables/berkeley_account_tables.exe \
   src/app/batch_txn_tool/batch_txn_tool.exe \
   src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
   src/app/swap_bad_balances/swap_bad_balances.exe \
