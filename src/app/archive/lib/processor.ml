@@ -2909,6 +2909,8 @@ module Block = struct
               (failed_str, Some display)
         in
         let%bind _seq_no =
+          Metrics.time ~label:"adding_transactions"
+          @@ fun () ->
           Mina_caqti.deferred_result_list_fold transactions ~init:0
             ~f:(fun sequence_no -> function
             | { Mina_base.With_status.status
@@ -3473,9 +3475,12 @@ module Block = struct
         then
           (* a new block, allows marking some pending blocks as canonical *)
           let%bind subchain_blocks =
-            get_subchain
-              (module Conn)
-              ~start_block_id:highest_canonical_block_id ~end_block_id:block_id
+            Metrics.time ~label:"get_subchain (> canonical_height + k)"
+              (fun () ->
+                get_subchain
+                  (module Conn)
+                  ~start_block_id:highest_canonical_block_id
+                  ~end_block_id:block_id )
           in
           let block_height_less_k_int64 = Int64.( - ) block.height k_int64 in
           (* mark canonical, orphaned blocks in subchain at least k behind the new block *)
@@ -3483,38 +3488,45 @@ module Block = struct
             List.filter subchain_blocks ~f:(fun subchain_block ->
                 Int64.( <= ) subchain_block.height block_height_less_k_int64 )
           in
-          Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
-            ~f:(fun () block ->
-              let%bind () =
-                mark_as_canonical (module Conn) ~state_hash:block.state_hash
-              in
-              mark_as_orphaned
-                (module Conn)
-                ~state_hash:block.state_hash ~height:block.height )
+          Metrics.time ~label:"mark_as_canonical (> canonical_height + k)"
+            (fun () ->
+              Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
+                ~f:(fun () block ->
+                  let%bind () =
+                    mark_as_canonical (module Conn) ~state_hash:block.state_hash
+                  in
+                  mark_as_orphaned
+                    (module Conn)
+                    ~state_hash:block.state_hash ~height:block.height ) )
         else if Int64.( < ) block.height greatest_canonical_height then
           (* a missing block added in the middle of canonical chain *)
           let%bind canonical_block_above_id, _above_height =
-            get_nearest_canonical_block_above (module Conn) block.height
+            Metrics.time ~label:"get_nearest_canonical_block_above" (fun () ->
+                get_nearest_canonical_block_above (module Conn) block.height )
           in
           let%bind canonical_block_below_id, _below_height =
-            get_nearest_canonical_block_below (module Conn) block.height
+            Metrics.time ~label:"get_neareast_canonical_block_below" (fun () ->
+                get_nearest_canonical_block_below (module Conn) block.height )
           in
           (* we can always find this chain: the genesis block should be marked as canonical, and we've found a
              canonical block above this one *)
           let%bind canonical_blocks =
-            get_subchain
-              (module Conn)
-              ~start_block_id:canonical_block_below_id
-              ~end_block_id:canonical_block_above_id
+            Metrics.time ~label:"get_subchain (< canonical_height)" (fun () ->
+                get_subchain
+                  (module Conn)
+                  ~start_block_id:canonical_block_below_id
+                  ~end_block_id:canonical_block_above_id )
           in
-          Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
-            ~f:(fun () block ->
-              let%bind () =
-                mark_as_canonical (module Conn) ~state_hash:block.state_hash
-              in
-              mark_as_orphaned
-                (module Conn)
-                ~state_hash:block.state_hash ~height:block.height )
+          Metrics.time ~label:"mark_as_canonical (< canonical_height)"
+            (fun () ->
+              Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
+                ~f:(fun () block ->
+                  let%bind () =
+                    mark_as_canonical (module Conn) ~state_hash:block.state_hash
+                  in
+                  mark_as_orphaned
+                    (module Conn)
+                    ~state_hash:block.state_hash ~height:block.height ) )
         else
           (* a block at or above highest canonical block, not high enough to mark any blocks as canonical *)
           Deferred.Result.return ()
@@ -3644,7 +3656,10 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
           [%log info] "Attempting to add block data for $state_hash"
             ~metadata:
               [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
-          let%bind block_id = add_block (module Conn : CONNECTION) block in
+          let%bind block_id =
+            Metrics.time ~label:"add_block" (fun () ->
+                add_block (module Conn : CONNECTION) block )
+          in
           (* if an existing block has a parent hash that's for the block just added,
              set its parent id
           *)
@@ -3654,7 +3669,10 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
               ~parent_hash:(hash block) ~parent_id:block_id
           in
           (* update chain status for existing blocks *)
-          let%bind () = Block.update_chain_status (module Conn) ~block_id in
+          let%bind () =
+            Metrics.time ~label:"update_chain_status" (fun () ->
+                Block.update_chain_status (module Conn) ~block_id )
+          in
           let%bind () =
             match delete_older_than with
             | Some num_blocks ->
