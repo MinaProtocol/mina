@@ -349,22 +349,24 @@ module Mutations = struct
         Some (Mina_commands.reset_trust_status mina ip_address) )
 
   let send_user_command mina user_command_input =
-    match
-      Mina_commands.setup_and_submit_user_command mina user_command_input
-    with
-    | `Active f -> (
-        match%map f with
-        | Ok user_command ->
-            Ok
-              { Types.User_command.With_status.data = user_command
-              ; status = Enqueued
-              }
-        | Error e ->
-            Error
+    match Mina_compile_config.slot_tx_end with
+    | _ -> (
+        match
+          Mina_commands.setup_and_submit_user_command mina user_command_input
+        with
+        | `Active f -> (
+            match%map f with
+            | Ok user_command ->
+                Ok
+                  { Types.User_command.With_status.data = user_command
+                  ; status = Enqueued
+                  }
+            | Error e ->
+                Error
               (sprintf "Couldn't send user command: %s" (Error.to_string_hum e))
         )
-    | `Bootstrapping ->
-        return (Error "Daemon is bootstrapping")
+        | `Bootstrapping ->
+            return (Error "Daemon is bootstrapping") )
 
   let internal_send_zkapp_commands mina zkapp_commands =
     match Mina_commands.setup_and_submit_zkapp_commands mina zkapp_commands with
