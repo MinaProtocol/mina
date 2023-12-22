@@ -2920,6 +2920,8 @@ module Block = struct
                   { Mina_base.With_status.status; data = command }
                 in
                 let%bind id =
+                  Metrics.time ~label:"user_command.add_if_doesn't_exist"
+                  @@ fun () ->
                   User_command.add_if_doesn't_exist
                     (module Conn)
                     user_command.data
@@ -2927,6 +2929,9 @@ module Block = struct
                 let%map () =
                   match command with
                   | Signed_command _ ->
+                      Metrics.time
+                        ~label:"block_and_signed_command.add_with_status"
+                      @@ fun () ->
                       Block_and_signed_command.add_with_status
                         (module Conn)
                         ~block_id ~user_command_id:id ~sequence_no
@@ -2936,6 +2941,9 @@ module Block = struct
                       let status, failure_reasons =
                         failure_reasons user_command.status
                       in
+                      Metrics.time
+                        ~label:"block_and_zkapp_command.add_if_doesn't_exist"
+                      @@ fun () ->
                       Block_and_zkapp_command.add_if_doesn't_exist
                         (module Conn)
                         ~block_id ~zkapp_command_id:id ~sequence_no ~status
@@ -2944,6 +2952,8 @@ module Block = struct
                 in
                 sequence_no + 1
             | { data = Fee_transfer fee_transfer_bundled; status } ->
+                Metrics.time ~label:"fee_transfer.add"
+                @@ fun () ->
                 let fee_transfers =
                   Mina_base.Fee_transfer.to_numbered_list fee_transfer_bundled
                 in
@@ -3046,6 +3056,8 @@ module Block = struct
                 in
                 sequence_no + 1
             | { data = Coinbase coinbase; status } ->
+                Metrics.time ~label:"conbase.add"
+                @@ fun () ->
                 let fee_transfer_via_coinbase =
                   Mina_base.Coinbase.fee_transfer coinbase
                 in
