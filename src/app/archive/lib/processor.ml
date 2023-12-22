@@ -1600,6 +1600,8 @@ module Zkapp_account_update = struct
       (account_update : Account_update.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let%bind body_id =
+      Metrics.time ~label:"Zkapp_account_update_body.add"
+      @@ fun () ->
       Zkapp_account_update_body.add_if_doesn't_exist
         (module Conn)
         account_update.body
@@ -1897,11 +1899,15 @@ module User_command = struct
       let open Deferred.Result.Let_syntax in
       let zkapp_command = Zkapp_command.to_simple ps in
       let%bind zkapp_fee_payer_body_id =
+        Metrics.time ~label:"Zkapp_fee_payer_body.add"
+        @@ fun () ->
         Zkapp_fee_payer_body.add_if_doesn't_exist
           (module Conn)
           zkapp_command.fee_payer.body
       in
       let%bind zkapp_account_updates_ids =
+        Metrics.time ~label:"Zkapp_account_update.add"
+        @@ fun () ->
         Mina_caqti.deferred_result_list_map zkapp_command.account_updates
           ~f:(Zkapp_account_update.add_if_doesn't_exist (module Conn))
         >>| Array.of_list
