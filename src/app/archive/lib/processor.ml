@@ -1491,13 +1491,16 @@ module Zkapp_account_update_body = struct
       Account_identifiers.add_if_doesn't_exist (module Conn) account_identifier
     in
     let%bind update_id =
+      Metrics.time ~label:"zkapp_updates.add" @@ fun () ->
       Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
     in
     let increment_nonce = body.increment_nonce in
     let%bind events_id =
+      Metrics.time ~label:"Zkapp_events.add" @@ fun () ->
       Zkapp_events.add_if_doesn't_exist (module Conn) body.events
     in
     let%bind actions_id =
+      Metrics.time ~label:"Zkapp_actions.add" @@ fun () ->
       Zkapp_events.add_if_doesn't_exist (module Conn) body.actions
     in
     let%bind call_data_id =
