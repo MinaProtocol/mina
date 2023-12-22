@@ -27,6 +27,39 @@ let validate_transition ~context:(module Context : CONTEXT) ~frontier
   let transition_hash = State_hash.With_state_hashes.state_hash transition in
   [%log internal] "Validate_transition" ;
   let root_breadcrumb = Transition_frontier.root frontier in
+  let transition_data = With_hash.data transition in
+  let block_slot =
+    Consensus.Data.Consensus_state.curr_global_slot
+    @@ Protocol_state.consensus_state
+    @@ Mina_block.(Header.protocol_state @@ header transition_data)
+  in
+  let%bind () =
+    match Mina_compile_config.slot_chain_end with
+    | Some slot_chain_end
+      when Mina_numbers.Global_slot_since_hard_fork.(
+             block_slot >= of_int slot_chain_end) ->
+        [%log info] "Block after slot_chain_end, rejecting" ;
+        Result.fail `Block_after_after_stop_slot
+    | None | Some _ ->
+        Result.return ()
+  in
+  let%bind () =
+    match Mina_compile_config.slot_tx_end with
+    | Some slot_tx_end
+      when Mina_numbers.Global_slot_since_hard_fork.(
+             block_slot >= of_int slot_tx_end) ->
+        [%log info] "Block after slot_tx_end, validating it is empty" ;
+        let staged_ledger_diff =
+          Mina_block.(Body.staged_ledger_diff @@ body transition_data)
+        in
+        Result.ok_if_true
+          ( Staged_ledger_diff.compare Staged_ledger_diff.empty_diff
+              staged_ledger_diff
+          = 0 )
+          ~error:`Non_empty_staged_ledger_diff_after_stop_slot
+    | None | Some _ ->
+        Result.(Ok ())
+  in
   let blockchain_length =
     Envelope.Incoming.data enveloped_transition
     |> Mina_block.Validation.block |> Mina_block.blockchain_length
@@ -189,4 +222,36 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
                         , Envelope.Sender.to_yojson
                             (Envelope.Incoming.sender transition_env) )
                       ; ("transition", Mina_block.to_yojson transition)
-                      ] ) ) ) )
+                      ] ) )
+          | Error `Non_empty_staged_ledger_diff_after_stop_slot ->
+              [%log error]
+                ~metadata:
+                  [ ("state_hash", State_hash.to_yojson transition_hash)
+                  ; ( "reason"
+                    , `String "not empty staged ledger diff after slot_tx_end"
+                    )
+                  ; ( "block_slot"
+                    , Mina_numbers.Global_slot_since_hard_fork.to_yojson
+                      @@ Consensus.Data.Consensus_state.curr_global_slot
+                      @@ Protocol_state.consensus_state
+                      @@ Mina_block.(Header.protocol_state @@ header transition)
+                    )
+                  ]
+                "Validation error: external transition with state hash \
+                 $state_hash was rejected for reason $reason" ;
+              Deferred.unit
+          | Error `Block_after_after_stop_slot ->
+              [%log error]
+                ~metadata:
+                  [ ("state_hash", State_hash.to_yojson transition_hash)
+                  ; ("reason", `String "block after slot_chain_end")
+                  ; ( "block_slot"
+                    , Mina_numbers.Global_slot_since_hard_fork.to_yojson
+                      @@ Consensus.Data.Consensus_state.curr_global_slot
+                      @@ Protocol_state.consensus_state
+                      @@ Mina_block.(Header.protocol_state @@ header transition)
+                    )
+                  ]
+                "Validation error: external transition with state hash \
+                 $state_hash was rejected for reason $reason" ;
+              Deferred.unit ) )

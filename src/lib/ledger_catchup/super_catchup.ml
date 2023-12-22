@@ -282,6 +282,17 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
         ~metadata:[ ("state_hash", state_hash) ]
         "initial_validate: disconnected chain" ;
       Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
+  | Error `Non_empty_staged_ledger_diff_after_stop_slot ->
+      [%log warn]
+        ~metadata:[ ("state_hash", state_hash) ]
+        "initial_validate: transition with non empty staged ledger diff after \
+         slot_tx_end" ;
+      Deferred.Or_error.fail @@ Error.of_string "non empty staged ledger diff"
+  | Error `Block_after_after_stop_slot ->
+      [%log warn]
+        ~metadata:[ ("state_hash", state_hash) ]
+        "initial_validate: block after slot_chain_end" ;
+      Deferred.Or_error.fail @@ Error.of_string "block after stop slot"
 
 let find_map_ok ?how xs ~f =
   let res = Ivar.create () in
