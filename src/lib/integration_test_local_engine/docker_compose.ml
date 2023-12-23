@@ -9,26 +9,10 @@ module Dockerfile = struct
       [@@deriving to_yojson]
 
       let create source target = { type_ = "bind"; source; target }
-
-      let write_config docker_dir ~filename ~data =
-        Out_channel.with_file ~fail_if_exists:false
-          (docker_dir ^ "/" ^ filename)
-          ~f:(fun ch -> data |> Out_channel.output_string ch) ;
-        ignore (Util.run_cmd_exn docker_dir "chmod" [ "600"; filename ])
     end
 
     module Environment = struct
       type t = (string * string) list
-
-      let default =
-        [ ("DAEMON_REST_PORT", "3085")
-        ; ("DAEMON_CLIENT_PORT", "8301")
-        ; ("DAEMON_METRICS_PORT", "10001")
-        ; ("DAEMON_EXTERNAL_PORT", "10101")
-        ; ("MINA_PRIVKEY_PASS", "naughty blue worm")
-        ; ("MINA_LIBP2P_PASS", "")
-        ; ("RAYON_NUM_THREADS", "6")
-        ]
 
       let to_yojson env = `Assoc (List.map env ~f:(fun (k, v) -> (k, `String v)))
     end

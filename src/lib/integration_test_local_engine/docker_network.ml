@@ -253,7 +253,7 @@ module Service_to_deploy = struct
   let get_node_from_service t =
     let%bind cwd = Unix.getcwd () in
     let open Malleable_error.Let_syntax in
-    let service_id = t.stack_name ^ "_" ^ t.service_name in
+    let service_id = sprintf "%s_%s" t.stack_name t.service_name in
     let%bind container_id = get_container_id service_id in
     if String.is_empty container_id then
       Malleable_error.hard_error_format "No container id found for service %s"

@@ -290,8 +290,10 @@ module Network_config = struct
     let seed_config =
       let config : Seed_config.config =
         { archive_address = None
-        ; peer = None
-        ; runtime_config_path = Base_node_config.container_runtime_config_path
+        ; base_config =
+            Base_node_config.default ~peer:None
+              ~runtime_config_path:
+                (Some Base_node_config.container_runtime_config_path)
         }
       in
       Seed_config.create
@@ -340,8 +342,10 @@ module Network_config = struct
           let config : Archive_node_config.config =
             { postgres_config
             ; server_port = archive_server_port.target
-            ; runtime_config_path =
-                Base_node_config.container_runtime_config_path
+            ; base_config =
+                Base_node_config.default ~peer:None
+                  ~runtime_config_path:
+                    (Some Base_node_config.container_runtime_config_path)
             }
           in
           let archive_rest_port =
@@ -364,9 +368,10 @@ module Network_config = struct
                 Some
                   (sprintf "%s:%d" archive_config.service_name
                      PortManager.mina_internal_server_port )
-            ; peer = seed_config_peer
-            ; runtime_config_path =
-                Base_node_config.container_runtime_config_path
+            ; base_config =
+                Base_node_config.default ~peer:seed_config_peer
+                  ~runtime_config_path:
+                    (Some Base_node_config.container_runtime_config_path)
             }
           in
           Seed_config.create
@@ -407,13 +412,13 @@ module Network_config = struct
           in
           let block_producer_config : Block_producer_config.config =
             { keypair
-            ; runtime_config_path =
-                Base_node_config.container_runtime_config_path
-            ; peer = seed_config_peer
             ; priv_key_path
             ; enable_peer_exchange = true
             ; enable_flooding = true
-            ; libp2p_secret = ""
+            ; base_config =
+                Base_node_config.default ~peer:seed_config_peer
+                  ~runtime_config_path:
+                    (Some Base_node_config.container_runtime_config_path)
             }
           in
           Block_producer_config.create ~service_name:node.node_name
@@ -462,6 +467,8 @@ module Network_config = struct
             { daemon_address = snark_node_service_name
             ; daemon_port = Int.to_string daemon_port.target
             ; proof_level = "full"
+            ; base_config =
+                Base_node_config.default ~peer:None ~runtime_config_path:None
             }
           in
           let worker_nodes =
@@ -479,11 +486,12 @@ module Network_config = struct
           let snark_coordinator_config : Snark_coordinator_config.config =
             { worker_nodes
             ; snark_worker_fee
-            ; runtime_config_path =
-                Base_node_config.container_runtime_config_path
             ; snark_coordinator_key = public_key
-            ; peer = seed_config_peer
             ; work_selection = "seq"
+            ; base_config =
+                Base_node_config.default ~peer:seed_config_peer
+                  ~runtime_config_path:
+                    (Some Base_node_config.container_runtime_config_path)
             }
           in
           Some
@@ -504,12 +512,12 @@ module Network_config = struct
         ; mina_points_image = images.points
         ; mina_archive_image = images.archive_node
         ; runtime_config = Runtime_config.to_yojson runtime_config
-        ; log_precomputed_blocks (* Node configs *)
+        ; log_precomputed_blocks
         ; block_producer_configs
         ; seed_configs
         ; mina_archive_schema_aux_files
         ; snark_coordinator_config
-        ; archive_node_configs (* Resource configs *)
+        ; archive_node_configs
         }
     }
 

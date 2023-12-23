@@ -122,7 +122,9 @@ module Base_node_config = struct
     }
 
   let default ?(runtime_config_path = None) ?(peer = None) =
-    { log_snark_work_gossip = true
+    { runtime_config_path
+    ; peer
+    ; log_snark_work_gossip = true
     ; log_txn_pool_gossip = true
     ; generate_genesis_proof = true
     ; log_level = "Debug"
@@ -130,11 +132,19 @@ module Base_node_config = struct
     ; rest_port = PortManager.mina_internal_rest_port |> Int.to_string
     ; metrics_port = PortManager.mina_internal_metrics_port |> Int.to_string
     ; external_port = PortManager.mina_internal_external_port |> Int.to_string
-    ; runtime_config_path
     ; libp2p_key_path = container_libp2p_key_path
     ; libp2p_secret = ""
-    ; peer
     }
+
+  let to_docker_env_vars t =
+    [ ("DAEMON_REST_PORT", t.rest_port)
+    ; ("DAEMON_CLIENT_PORT", t.client_port)
+    ; ("DAEMON_METRICS_PORT", t.metrics_port)
+    ; ("DAEMON_EXTERNAL_PORT", t.external_port)
+    ; ("RAYON_NUM_THREADS", "8")
+    ; ("MINA_PRIVKEY_PASS", "naughty blue worm")
+    ; ("MINA_LIBP2P_PASS", "")
+    ]
 
   let to_list t =
     let base_args =
@@ -181,9 +191,7 @@ module Block_producer_config = struct
     ; priv_key_path : string
     ; enable_flooding : bool
     ; enable_peer_exchange : bool
-    ; peer : string option
-    ; libp2p_secret : string
-    ; runtime_config_path : string
+    ; base_config : Base_node_config.t
     }
   [@@deriving to_yojson]
 
@@ -195,12 +203,7 @@ module Block_producer_config = struct
   [@@deriving to_yojson]
 
   let create_cmd config =
-    let base_args =
-      Base_node_config.to_list
-        (Base_node_config.default
-           ~runtime_config_path:(Some config.runtime_config_path)
-           ~peer:config.peer )
-    in
+    let base_args = Base_node_config.to_list config.base_config in
     let block_producer_args =
       [ "daemon"
       ; "-block-producer-key"
@@ -225,9 +228,10 @@ module Block_producer_config = struct
 
   let create ~service_name ~image ~ports ~volumes ~config =
     let entrypoint = Some [ "/root/entrypoint.sh" ] in
+    let environment = Base_node_config.to_docker_env_vars config.base_config in
     let docker_config =
-      create_docker_config ~image ~ports ~volumes
-        ~environment:Dockerfile.Service.Environment.default ~entrypoint ~config
+      create_docker_config ~image ~ports ~volumes ~environment ~entrypoint
+        ~config
     in
     { service_name; config; docker_config }
 end
@@ -242,10 +246,7 @@ module Seed_config = struct
     Printf.sprintf "/dns4/%s/tcp/%d/p2p/%s" peer_name external_port peer_id
 
   type config =
-    { archive_address : string option
-    ; peer : string option
-    ; runtime_config_path : string
-    }
+    { archive_address : string option; base_config : Base_node_config.t }
   [@@deriving to_yojson]
 
   type t =
@@ -262,12 +263,7 @@ module Seed_config = struct
     }
 
   let create_cmd config =
-    let base_args =
-      Base_node_config.to_list
-        (Base_node_config.default
-           ~runtime_config_path:(Some config.runtime_config_path)
-           ~peer:config.peer )
-    in
+    let base_args = Base_node_config.to_list config.base_config in
     let seed_args =
       match config.archive_address with
       | Some archive_address ->
@@ -289,16 +285,21 @@ module Seed_config = struct
 
   let create ~service_name ~image ~ports ~volumes ~config =
     let entrypoint = Some [ "/root/entrypoint.sh" ] in
+    let environment = Base_node_config.to_docker_env_vars config.base_config in
     let docker_config =
-      create_docker_config ~image ~ports ~volumes
-        ~environment:Dockerfile.Service.Environment.default ~entrypoint ~config
+      create_docker_config ~image ~ports ~volumes ~environment ~entrypoint
+        ~config
     in
     { service_name; config; docker_config }
 end
 
 module Snark_worker_config = struct
   type config =
-    { daemon_address : string; daemon_port : string; proof_level : string }
+    { daemon_address : string
+    ; daemon_port : string
+    ; proof_level : string
+    ; base_config : Base_node_config.t
+    }
   [@@deriving to_yojson]
 
   type t =
@@ -331,9 +332,10 @@ module Snark_worker_config = struct
 
   let create ~service_name ~image ~ports ~volumes ~config =
     let entrypoint = Some [ "/root/entrypoint.sh" ] in
+    let environment = Base_node_config.to_docker_env_vars config.base_config in
     let docker_config =
-      create_docker_config ~image ~ports ~volumes
-        ~environment:Dockerfile.Service.Environment.default ~entrypoint ~config
+      create_docker_config ~image ~ports ~volumes ~environment ~entrypoint
+        ~config
     in
     { service_name; config; docker_config }
 end
@@ -344,8 +346,7 @@ module Snark_coordinator_config = struct
     ; snark_worker_fee : string
     ; work_selection : string
     ; worker_nodes : Snark_worker_config.t list
-    ; peer : string option
-    ; runtime_config_path : string
+    ; base_config : Base_node_config.t
     }
   [@@deriving to_yojson]
 
@@ -365,12 +366,7 @@ module Snark_coordinator_config = struct
     ]
 
   let create_cmd config =
-    let base_args =
-      Base_node_config.to_list
-        (Base_node_config.default
-           ~runtime_config_path:(Some config.runtime_config_path)
-           ~peer:config.peer )
-    in
+    let base_args = Base_node_config.to_list config.base_config in
     let snark_coordinator_args =
       [ "daemon"
       ; "-run-snark-coordinator"
@@ -400,7 +396,7 @@ module Snark_coordinator_config = struct
         ~snark_coordinator_key:config.snark_coordinator_key
         ~snark_worker_fee:config.snark_worker_fee
         ~work_selection:config.work_selection
-      @ Dockerfile.Service.Environment.default
+      @ Base_node_config.to_docker_env_vars config.base_config
     in
     let docker_config =
       create_docker_config ~image ~ports ~volumes ~environment ~entrypoint
@@ -475,8 +471,8 @@ psql -U postgres -d archive -f ./create_schema.sql
     ]
 
   let create_connection_uri ~host ~username ~password ~database ~port =
-    Printf.sprintf "postgres://%s:%s@%s:%s/%s" username password host
-      (Int.to_string port) database
+    Printf.sprintf "postgres://%s:%s@%s:%d/%s" username password host port
+      database
 
   let to_connection_uri t =
     create_connection_uri ~host:t.host ~port:t.port ~username:t.username
@@ -492,14 +488,13 @@ psql -U postgres -d archive -f ./create_schema.sql
     }
 
   let create ~service_name ~image ~ports ~volumes ~config =
-    let entrypoint = None in
     let environment =
       postgres_default_envs ~username:config.username ~password:config.password
         ~database:config.database
         ~port:(Int.to_string config.port)
     in
     let docker_config =
-      create_docker_config ~image ~ports ~volumes ~environment ~entrypoint
+      create_docker_config ~image ~ports ~volumes ~environment ~entrypoint:None
     in
     { service_name; config; docker_config }
 end
@@ -508,7 +503,7 @@ module Archive_node_config = struct
   type config =
     { postgres_config : Postgres_config.t
     ; server_port : int
-    ; runtime_config_path : string
+    ; base_config : Base_node_config.t
     }
   [@@deriving to_yojson]
 
@@ -520,15 +515,23 @@ module Archive_node_config = struct
   [@@deriving to_yojson]
 
   let create_cmd config =
-    [ "mina-archive"
-    ; "run"
-    ; "-postgres-uri"
-    ; Postgres_config.to_connection_uri config.postgres_config.config
-    ; "-server-port"
-    ; Int.to_string config.server_port
-    ; "-config-file"
-    ; config.runtime_config_path
-    ]
+    let base_args =
+      [ "mina-archive"
+      ; "run"
+      ; "-postgres-uri"
+      ; Postgres_config.to_connection_uri config.postgres_config.config
+      ; "-server-port"
+      ; Int.to_string config.server_port
+      ]
+    in
+    let runtime_config_path =
+      match config.base_config.runtime_config_path with
+      | Some path ->
+          [ "-config-file"; path ]
+      | None ->
+          []
+    in
+    List.concat [ base_args; runtime_config_path ]
 
   let create_docker_config ~image ~entrypoint ~ports ~volumes ~environment
       ~config =
@@ -541,10 +544,10 @@ module Archive_node_config = struct
     }
 
   let create ~service_name ~image ~ports ~volumes ~config =
-    let entrypoint = None in
+    let environment = Base_node_config.to_docker_env_vars config.base_config in
     let docker_config =
-      create_docker_config ~image ~ports ~volumes
-        ~environment:Dockerfile.Service.Environment.default ~entrypoint ~config
+      create_docker_config ~image ~ports ~volumes ~environment ~entrypoint:None
+        ~config
     in
     { service_name; config; docker_config }
 end
