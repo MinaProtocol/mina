@@ -1077,14 +1077,14 @@ let get_metrics ~logger node_uri =
       ; transaction_pool_size
       }
 
-let start_filtered_log ~logger ~log_filter node_uri =
+let start_filtered_log ~logger ~log_filter node_uri ~retry_delay_sec =
   let open Deferred.Let_syntax in
   let query_obj =
     Graphql.StartFilteredLog.(make @@ makeVariables ~filter:log_filter ())
   in
   let%bind res =
-    exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec:0.25
-      ~num_tries:100 ~node_uri ~query_name:"StartFilteredLog" query_obj
+    exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec ~node_uri
+      ~query_name:"StartFilteredLog" query_obj
   in
   match res with
   | Ok query_result_obj ->
