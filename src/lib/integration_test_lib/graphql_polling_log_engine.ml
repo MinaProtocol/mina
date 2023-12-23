@@ -4,7 +4,7 @@ module Timeout = Timeout_lib.Core_time
 
 (** This implements Log_engine_intf for integration tests, by creating a simple system that polls a mina daemon's graphql endpoint for fetching logs*)
 
-module Make_GraphQL_Polling_log_engine
+module Make_GraphQL_polling_log_engine
     (Network : Intf.Engine.Network_intf) (Polling_interval : sig
       val interval : Time.Span.t
     end) =

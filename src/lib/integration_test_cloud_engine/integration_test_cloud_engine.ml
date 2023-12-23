@@ -10,6 +10,6 @@ end
 
 module Log_engine =
   Integration_test_lib.Graphql_polling_log_engine
-  .Make_GraphQL_Polling_log_engine
+  .Make_GraphQL_polling_log_engine
     (Kubernetes_network)
     (Kubernetes_polling_interval)
