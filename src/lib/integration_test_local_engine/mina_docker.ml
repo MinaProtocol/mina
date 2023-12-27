@@ -358,7 +358,11 @@ module Network_config = struct
               (sprintf "archive-%d-%s" (index + 1) (generate_random_id ()))
             ~image:images.archive_node
             ~ports:[ archive_server_port; archive_rest_port ]
-            ~volumes:docker_volumes ~config )
+            ~volumes:
+              [ Base_node_config.runtime_config_volume
+              ; Archive_node_config.archive_entrypoint_volume
+              ]
+            ~config )
     in
     (* Each archive node has it's own seed node *)
     let seed_configs =
@@ -693,6 +697,15 @@ module Network_manager = struct
     Out_channel.with_file ~fail_if_exists:true
       (docker_dir ^/ entrypoint_filename) ~f:(fun ch ->
         entrypoint_script |> Out_channel.output_string ch ) ;
+    [%log info]
+      "Writing custom archive entrypoint script (wait for postgres to \
+       initialize)" ;
+    let archive_filename, archive_script =
+      Docker_node_config.Archive_node_config.archive_entrypoint_script
+    in
+    Out_channel.with_file ~fail_if_exists:true (docker_dir ^/ archive_filename)
+      ~f:(fun ch -> archive_script |> Out_channel.output_string ch) ;
+    ignore (Util.run_cmd_exn docker_dir "chmod" [ "+x"; archive_filename ]) ;
     let%bind _ =
       Deferred.List.iter network_config.docker.mina_archive_schema_aux_files
         ~f:(fun schema_url ->
@@ -710,6 +723,7 @@ module Network_manager = struct
       |> Deferred.return
     in
     ignore (Util.run_cmd_exn docker_dir "chmod" [ "+x"; entrypoint_filename ]) ;
+    [%log info] "Writing custom postgres entrypoint script (create schema)" ;
     let postgres_entrypoint_filename, postgres_entrypoint_script =
       Docker_node_config.Postgres_config.postgres_script
     in
