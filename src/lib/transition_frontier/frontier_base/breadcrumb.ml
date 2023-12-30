@@ -494,26 +494,33 @@ module For_tests = struct
       in
       List.rev ls
 
-  let build_fail ?skip_staged_ledger_verification:_ ~logger:_ ~precomputed_values:_
-      ~verifier:_ ~trust_system:_ ~parent:_
-      ~transition:_ ~sender:_
-      ~transition_receipt_time:_ () : (t,
-      [> `Fatal_error of exn
-       | `Invalid_staged_ledger_diff of Core_kernel.Error.t
-       | `Invalid_staged_ledger_hash of Core_kernel.Error.t ])
-     result Async_kernel.Deferred.t =
-       Deferred.return (Error (`Fatal_error (failwith "deliberately failing for unit tests")))
+  let build_fail ?skip_staged_ledger_verification:_ ~logger:_
+      ~precomputed_values:_ ~verifier:_ ~trust_system:_ ~parent:_ ~transition:_
+      ~sender:_ ~transition_receipt_time:_ () :
+      ( t
+      , [> `Fatal_error of exn
+        | `Invalid_staged_ledger_diff of Core_kernel.Error.t
+        | `Invalid_staged_ledger_hash of Core_kernel.Error.t ] )
+      result
+      Async_kernel.Deferred.t =
+    Deferred.return
+      (Error (`Fatal_error (failwith "deliberately failing for unit tests")))
+  
+  let to_precomputed_block t ~logger ~precomputed_values =
+    let block = block t in
+    let scheduled_time =
+          Mina_block.(Header.protocol_state @@ header block)
+          |> Mina_state.Protocol_state.blockchain_state
+          |> Mina_state.Blockchain_state.timestamp
+        in
+        Mina_block.Precomputed.of_block 
+          ~scheduled_time
+          block
+      
+  let blockchain_length t =
+    let block = block t in
+    let block_with_hash = Mina_block.wrap_with_hash block in
+    let block = With_hash.data block_with_hash in
+    Mina_block.blockchain_length block
+
 end
-
-
-(*         match%bind
-          External_transition.Staged_ledger_validation
-          .validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
-            ~precomputed_values ~verifier
-            ~parent_staged_ledger:(staged_ledger parent)
-            ~parent_protocol_state:
-              (External_transition.Validated.protocol_state
-                 parent.validated_transition)
-            transition_with_validation
-        with
-        | Ok  *)

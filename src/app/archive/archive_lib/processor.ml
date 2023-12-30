@@ -2501,4 +2501,139 @@ module For_test = struct
           actual
     | None ->
         failwith "Failed to find parent block in database"
+
+  let breadcrumb_as_runtime_config breadcrumb =
+    let create_ledger_as_list ledger =
+      let%map accounts = Ledger.to_list ledger in
+      List.map accounts ~f:(fun acc ->
+          Genesis_ledger_helper.Accounts.Single.of_account acc None )
+    in
+    let staged_ledger =
+      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+    in
+    let%bind accounts =
+      create_ledger_as_list (Staged_ledger.ledger staged_ledger)
+    in
+    let runtime_config : Runtime_config.Ledger.t =
+      { base = Accounts accounts
+      ; num_accounts = None
+      ; balances = []
+      ; hash = None
+      ; name = None
+      ; add_genesis_winner = Some true
+      }
+    in
+    Deferred.return runtime_config
+
+  let breadcumb_as_precomputed_block_with_attributes breadcrumb
+      ~precomputed_values ~logger =
+    let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
+    let state_hash = Mina_base.State_hash.to_base58_check state_hash in
+    let precomputed =
+      Transition_frontier.Breadcrumb.For_tests.to_precomputed_block breadcrumb
+        ~precomputed_values ~logger
+    in
+
+    let blockchain_length =
+      Transition_frontier.Breadcrumb.For_tests.blockchain_length breadcrumb
+    in
+    let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
+
+    (precomputed, blockchain_length, state_hash)
+
+  let gen_blocks ~trials ~size ~precomputed_values ~logger ~verifier
+      ~accounts_with_secret_keys ~f =
+    Quickcheck.test ~trials
+      ( Quickcheck.Generator.with_size ~size
+      @@ Quickcheck_lib.gen_imperative_list
+           (Transition_frontier.For_tests.gen_genesis_breadcrumb
+              ~precomputed_values ~verifier () )
+           (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred ~logger
+              ~precomputed_values ~verifier ?trust_system:None
+              ~accounts_with_secret_keys ) )
+      ~f
+
+  let archive_random_blocks ~trials ~size ~precomputed_values ~logger ~verifier
+      ~accounts_with_secret_keys ~pool ~f_check =
+    gen_blocks ~trials ~size ~precomputed_values ~logger ~verifier
+      ~accounts_with_secret_keys ~f:(fun breadcrumbs ->
+        Thread_safe.block_on_async_exn
+        @@ fun () ->
+        let reader, writer =
+          Strict_pipe.create ~name:"archive"
+            (Buffered (`Capacity 100, `Overflow Crash))
+        in
+        let diffs =
+          List.map
+            ~f:(fun breadcrumb ->
+              Diff.Transition_frontier
+                (Diff.Builder.breadcrumb_added breadcrumb) )
+            breadcrumbs
+        in
+        List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
+        Strict_pipe.Writer.close writer ;
+        let%bind () =
+          run ~constraint_constants:precomputed_values.constraint_constants pool
+            reader ~logger ~delete_older_than:None
+        in
+        f_check breadcrumbs )
+
+  let dump_blocks ~size ~precomputed_values ~logger ~verifier
+      ~accounts_with_secret_keys ~path =
+    gen_blocks ~size ~precomputed_values ~logger ~verifier
+      ~accounts_with_secret_keys ~f:(fun breadcrumbs ->
+        Thread_safe.block_on_async_exn
+        @@ fun () ->
+        let create_ledger_as_list ledger =
+          let%map accounts = Ledger.to_list ledger in
+          List.map accounts ~f:(fun acc ->
+              Genesis_ledger_helper.Accounts.Single.of_account acc None )
+        in
+        let breadcrumb_as_runtime_config breadcrumb =
+          let staged_ledger =
+            Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+          in
+          let%bind accounts =
+            create_ledger_as_list (Staged_ledger.ledger staged_ledger)
+          in
+          let runtime_config : Runtime_config.Ledger.t =
+            { base = Accounts accounts
+            ; num_accounts = None
+            ; balances = []
+            ; hash = None
+            ; name = None
+            ; add_genesis_winner = Some true
+            }
+          in
+          Deferred.return runtime_config
+        in
+        let save_runtime_config runtime_config =
+          let json = Runtime_config.Ledger.to_yojson runtime_config in
+          Yojson.Safe.to_file
+            (String.concat [ path; "/"; "runtime_config.json" ])
+            json
+        in
+        let genesis = List.hd_exn breadcrumbs in
+        let%bind runtime_config = breadcrumb_as_runtime_config genesis in
+        save_runtime_config runtime_config ;
+        List.iter breadcrumbs ~f:(fun breadcrumb ->
+            let precomputed =
+              Transition_frontier.Breadcrumb.For_tests.to_precomputed_block
+                breadcrumb ~logger ~precomputed_values
+            in
+            let state_hash =
+              Transition_frontier.Breadcrumb.state_hash breadcrumb
+            in
+            let state_hash = Mina_base.State_hash.to_base58_check state_hash in
+            let blockchain_length =
+              Transition_frontier.Breadcrumb.For_tests.blockchain_length
+                breadcrumb
+            in
+            let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
+            let filename =
+              Printf.sprintf "mainnet_%d_%s.json" blockchain_length state_hash
+            in
+            let json = Mina_block.Precomputed.to_yojson precomputed in
+            Yojson.Safe.to_file (String.concat [ path; "/"; filename ]) json ) ;
+        Deferred.unit )
 end

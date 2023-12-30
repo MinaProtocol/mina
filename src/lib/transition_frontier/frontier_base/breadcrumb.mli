@@ -107,20 +107,24 @@ module For_tests : sig
     -> (t -> t list Deferred.t) Quickcheck.Generator.t
 
   val build_fail :
-    ?skip_staged_ledger_verification:[`All | `Proofs]
- -> logger:Logger.t
- -> precomputed_values:Precomputed_values.t
- -> verifier:Verifier.t
- -> trust_system:Trust_system.t
- -> parent:t
- -> transition:Mina_block.almost_valid_block
- -> sender:Envelope.Sender.t option
- -> transition_receipt_time:Time.t option
- -> unit
- -> ( t
-    , [> `Invalid_staged_ledger_diff of Error.t
-      | `Invalid_staged_ledger_hash of Error.t
-      | `Fatal_error of exn ] )
-    Result.t
-    Deferred.t
+       ?skip_staged_ledger_verification:[ `All | `Proofs ]
+    -> logger:Logger.t
+    -> precomputed_values:Precomputed_values.t
+    -> verifier:Verifier.t
+    -> trust_system:Trust_system.t
+    -> parent:t
+    -> transition:Mina_block.almost_valid_block
+    -> sender:Envelope.Sender.t option
+    -> transition_receipt_time:Time.t option
+    -> unit
+    -> ( t
+       , [> `Invalid_staged_ledger_diff of Error.t
+         | `Invalid_staged_ledger_hash of Error.t
+         | `Fatal_error of exn ] )
+       Result.t
+       Deferred.t
+  
+  val to_precomputed_block: t  -> logger:Logger.t -> precomputed_values:Precomputed_values.t -> Mina_block.Precomputed.t
+
+  val blockchain_length: t -> Mina_numbers.Length.t         
 end
