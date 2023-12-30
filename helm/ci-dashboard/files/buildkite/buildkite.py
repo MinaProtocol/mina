@@ -6,7 +6,7 @@ import json
 import os
 from pybuildkite.buildkite import Buildkite, BuildState
 
-DEBUG = False
+DEBUG = True
 OUTPUTDIR = os.environ.get("OUTPUTDIR", ".")
 TOKEN = os.environ.get("BUILDKITE_TOKEN", "")
 
@@ -315,18 +315,31 @@ def ciMetricsDashboard(results: dict) -> None:
     Computes metrics to be pushed to the CI Metrics Dashboard
     """
 
-    passedWithRetries = results["all"]["jobs"]["passed"]["retried"]
-    retries = []
-    for _,stat in passedWithRetries["stats"].items():
-        retries.append(int(stat["('name', 'count')"]))
+    retries = [0.0]
+    try:
+        passedWithRetries = results["all"]["jobs"]["passed"]["retried"]
+        for _,stat in passedWithRetries["stats"].items():
+            retries.append(int(stat["('name', 'count')"]))
+    except KeyError as e:
+        print(f"Error: {e}")
 
-    ciMetrics = {
-        "reliability.dat": results["all"]["reliability"],
-        "ci-builds.dat": results["all"]["number_of_builds"],
-        "avg-time-per-build-hours.dat": results["all"]["average_build_time_in_hours"],
-        "executions.dat" : results["all"]["jobs"]["executions"],
-        "retries-per-passed-test.dat": pd.Series(retries).fillna(0).mean()
-    }
+    try:
+        ciMetrics = {
+            "reliability.dat": results["all"]["reliability"],
+            "ci-builds.dat": results["all"]["number_of_builds"],
+            "avg-time-per-build-hours.dat": results["all"]["average_build_time_in_hours"],
+            "executions.dat" : results["all"]["jobs"]["executions"],
+            "retries-per-passed-test.dat": pd.Series(retries).fillna(0).mean()
+        }
+    except KeyError as e:
+        print(f"Error: {e}")
+        ciMetrics = {
+            "reliability.dat": 0.0,
+            "ci-builds.dat": 0.0,
+            "avg-time-per-build-hours.dat": 0.0,
+            "executions.dat" : 0.0,
+            "retries-per-passed-test.dat": pd.Series(retries).fillna(0).mean()
+        }
 
     for k, v in ciMetrics.items():
         print(f"{k}: {v}")

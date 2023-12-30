@@ -67,7 +67,7 @@ dynamic_metrics = { k + "-jobs.dat": v for k,v in jobs_per_agent.items() }
 average_jobs_per_agent = 0.0
 for jobs in jobs_per_agent.values():
     average_jobs_per_agent += float(jobs)
-average_jobs_per_agent /= len(jobs_per_agent)
+average_jobs_per_agent /= len(jobs_per_agent) if len(jobs_per_agent) != 0 else 1
 
 # static metrics with defined filenames
 static_metrics = {

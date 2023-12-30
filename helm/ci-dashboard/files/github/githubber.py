@@ -64,7 +64,11 @@ for repo in repos:
     
 g.close()
 
-average_checks_per_pr = float(average_checks_per_pr / today_pull_requests)
+try:
+    average_checks_per_pr = float(average_checks_per_pr / today_pull_requests)
+except ZeroDivisionError:
+    average_checks_per_pr = 0.0
+
 metrics = {
     "today-pull-requests.dat": today_pull_requests,
     "average-checks-per-pr.dat": average_checks_per_pr
