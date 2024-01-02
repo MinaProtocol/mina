@@ -5,7 +5,7 @@ module Network_config = Mina_automation.Network_config
 module Network_manager = Mina_automation.Network_manager
 
 module Kubernetes_polling_interval = struct
-  let interval = Core.Time.Span.of_sec 10.0
+  let start_filtered_logs_interval = Core.Time.Span.of_sec 10.0
 end
 
 module Log_engine =

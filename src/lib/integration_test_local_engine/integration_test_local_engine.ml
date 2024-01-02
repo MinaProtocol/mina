@@ -5,7 +5,7 @@ module Network_config = Mina_docker.Network_config
 module Network_manager = Mina_docker.Network_manager
 
 module Docker_polling_interval = struct
-  let interval = Core.Time.Span.of_sec 0.25
+  let start_filtered_logs_interval = Core.Time.Span.of_sec 0.25
 end
 
 module Log_engine =

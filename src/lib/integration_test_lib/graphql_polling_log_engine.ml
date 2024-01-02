@@ -6,7 +6,7 @@ module Timeout = Timeout_lib.Core_time
 
 module Make_GraphQL_polling_log_engine
     (Network : Intf.Engine.Network_intf) (Polling_interval : sig
-      val interval : Time.Span.t
+      val start_filtered_logs_interval : Time.Span.t
     end) =
 struct
   module Node = Network.Node
@@ -102,7 +102,8 @@ struct
     if not (Pipe.is_closed event_writer) then
       match%bind
         Graphql_requests.start_filtered_log ~logger ~log_filter
-          ~retry_delay_sec:(Polling_interval.interval |> Time.Span.to_sec)
+          ~retry_delay_sec:
+            (Polling_interval.start_filtered_logs_interval |> Time.Span.to_sec)
           (Node.get_ingress_uri node)
       with
       | Ok () ->
