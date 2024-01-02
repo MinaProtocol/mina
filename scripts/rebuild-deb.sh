@@ -12,14 +12,12 @@ cd "${SCRIPTPATH}/../_build"
 GITHASH=$(git rev-parse --short=7 HEAD)
 GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
-mode="${1-buildkite}"
-
 # Load in env vars for githash/branch/etc.
-case $mode in
-    local) source "${SCRIPTPATH}/export-local-git-env-vars.sh";;
-    buildkite)"${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh";;
-    *) echo "Unknown mode passed: $mode"; exit 1;;
-esac
+if [[ "$1" == "local" ]]; then
+    source "${SCRIPTPATH}/export-local-git-env-vars.sh"
+else
+    source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+fi
 
 MINA_DEB_CODENAME=stretch
 
