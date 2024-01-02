@@ -60,7 +60,6 @@
    graphql_lib
    block_time
    currency
-   merkle_ledger
    mina_lib
    mina_commands
    mina_state
