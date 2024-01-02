@@ -3,19 +3,20 @@ open Snarky_backendless
 open Snark_params.Tick
 open Unsigned
 module Length = Mina_numbers.Length
+module Global_slot_since_hard_fork = Mina_numbers.Global_slot_since_hard_fork
 
 module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('length, 'time, 'timespan) t =
+      type ('length, 'global_slot_since_hard_fork, 'time, 'timespan) t =
         { k : 'length
         ; delta : 'length
         ; slots_per_sub_window : 'length
         ; slots_per_window : 'length
         ; sub_windows_per_window : 'length
         ; slots_per_epoch : 'length (* The first slot after the grace period. *)
-        ; grace_period_end : 'length
+        ; grace_period_end : 'global_slot_since_hard_fork
         ; checkpoint_window_slots_per_year : 'length
         ; checkpoint_window_size_in_slots : 'length
         ; block_window_duration_ms : 'timespan
@@ -34,6 +35,7 @@ module Stable = struct
   module V2 = struct
     type t =
       ( Length.Stable.V1.t
+      , Global_slot_since_hard_fork.Stable.V1.t
       , Block_time.Stable.V1.t
       , Block_time.Span.Stable.V1.t )
       Poly.Stable.V2.t
@@ -44,12 +46,18 @@ module Stable = struct
 end]
 
 type var =
-  (Length.Checked.t, Block_time.Checked.t, Block_time.Span.Checked.t) Poly.t
+  ( Length.Checked.t
+  , Global_slot_since_hard_fork.Checked.t
+  , Block_time.Checked.t
+  , Block_time.Span.Checked.t )
+  Poly.t
 
 module type M_intf = sig
   type t
 
   type length
+
+  type global_slot_since_hard_fork
 
   type time
 
@@ -62,6 +70,8 @@ module type M_intf = sig
   val of_length : length -> t
 
   val to_length : t -> length
+
+  val to_global_slot_since_hard_fork : t -> global_slot_since_hard_fork
 
   val of_timespan : timespan -> t
 
@@ -87,11 +97,14 @@ end
 module Constants_UInt32 :
   M_intf
     with type length = Length.t
+     and type global_slot_since_hard_fork = Global_slot_since_hard_fork.t
      and type time = Block_time.t
      and type timespan = Block_time.Span.t = struct
   type t = UInt32.t
 
   type length = Length.t
+
+  type global_slot_since_hard_fork = Global_slot_since_hard_fork.t
 
   type time = Block_time.t
 
@@ -108,6 +121,8 @@ module Constants_UInt32 :
   let of_length = Fn.id
 
   let to_length = Fn.id
+
+  let to_global_slot_since_hard_fork = Global_slot_since_hard_fork.of_uint32
 
   let of_time = Fn.compose UInt32.of_int64 Block_time.to_int64
 
@@ -134,11 +149,15 @@ module N =
 module Constants_checked :
   M_intf
     with type length = Length.Checked.t
+     and type global_slot_since_hard_fork =
+      Global_slot_since_hard_fork.Checked.t
      and type time = Block_time.Checked.t
      and type timespan = Block_time.Span.Checked.t = struct
   type t = N.var
 
   type length = Length.Checked.t
+
+  type global_slot_since_hard_fork = Global_slot_since_hard_fork.Checked.t
 
   type time = Block_time.Checked.t
 
@@ -155,6 +174,9 @@ module Constants_checked :
   let of_length = Fn.compose N.Unsafe.of_field Length.Checked.to_field
 
   let to_length = Fn.compose Length.Checked.Unsafe.of_field N.to_field
+
+  let to_global_slot_since_hard_fork =
+    Fn.compose Global_slot_since_hard_fork.Checked.Unsafe.of_field N.to_field
 
   let of_time : Block_time.Checked.t -> t =
     Fn.compose N.Unsafe.of_field Block_time.Checked.to_field
@@ -177,14 +199,16 @@ module Constants_checked :
   let min x y = Run.run_checked (N.min x y)
 end
 
-let create' (type a b c)
+let create' (type length global_slot_since_hard_fork time timespan)
     (module M : M_intf
-      with type length = a
-       and type time = b
-       and type timespan = c )
+      with type length = length
+       and type global_slot_since_hard_fork = global_slot_since_hard_fork
+       and type time = time
+       and type timespan = timespan )
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~(protocol_constants : (a, a, b) Genesis_constants.Protocol.Poly.t) :
-    (a, b, c) Poly.t =
+    ~(protocol_constants :
+       (length, length, time) Genesis_constants.Protocol.Poly.t ) :
+    (length, global_slot_since_hard_fork, time, timespan) Poly.t =
   let open M in
   let block_window_duration_ms =
     constant constraint_constants.block_window_duration_ms
@@ -211,7 +235,7 @@ let create' (type a b c)
     let duration = Slot.duration_ms * size
   end in
   let delta_duration = Slot.duration_ms * (delta + M.one) in
-  let num_days = 3. in
+  let num_days = 4.5 in
   assert (Float.(num_days < 14.)) ;
   (* We forgo updating the min density for the first [num_days] days (or epoch, whichever comes first)
       of the network's operation. The reasoning is as follows:
@@ -223,26 +247,16 @@ let create' (type a b c)
         which means the long fork rule will not come into play during the grace period,
         and then we still have several days to compute min-density for the next epoch. *)
   let grace_period_end =
-    let slots =
-      let n_days =
-        let n_days_ms =
-          Time_ns.Span.(to_ms (of_day num_days))
-          |> Float.round_up |> Float.to_int |> M.constant
-        in
-        M.( / ) n_days_ms block_window_duration_ms
+    let n_days =
+      let n_days_ms =
+        Time_ns.Span.(to_ms (of_day num_days))
+        |> Float.round_up |> Float.to_int |> M.constant
       in
-      M.min n_days slots_per_epoch
+      M.(n_days_ms / block_window_duration_ms)
     in
-    match constraint_constants.fork with
-    | None ->
-        slots
-    | Some f ->
-        M.( + )
-          (M.constant
-             (Mina_numbers.Global_slot_since_genesis.to_int f.genesis_slot) )
-          slots
+    M.to_global_slot_since_hard_fork (M.min n_days slots_per_epoch)
   in
-  let res : (a, b, c) Poly.t =
+  let res : (length, global_slot_since_hard_fork, time, timespan) Poly.t =
     { Poly.k = to_length k
     ; delta = to_length delta
     ; block_window_duration_ms = to_timespan block_window_duration_ms
@@ -250,7 +264,7 @@ let create' (type a b c)
     ; slots_per_window = to_length slots_per_window
     ; sub_windows_per_window = to_length sub_windows_per_window
     ; slots_per_epoch = to_length slots_per_epoch
-    ; grace_period_end = to_length grace_period_end
+    ; grace_period_end
     ; slot_duration_ms = to_timespan Slot.duration_ms
     ; epoch_duration = to_timespan Epoch.duration
     ; checkpoint_window_slots_per_year = to_length zero
@@ -318,7 +332,7 @@ let typ =
     ; Length.Checked.typ
     ; Length.Checked.typ
     ; Length.Checked.typ
-    ; Length.Checked.typ
+    ; Global_slot_since_hard_fork.Checked.typ
     ; Length.Checked.typ
     ; Length.Checked.typ
     ; Block_time.Span.Checked.typ
@@ -340,8 +354,10 @@ let to_input (t : t) =
             ; t.slots_per_window
             ; t.sub_windows_per_window
             ; t.slots_per_epoch
-            ; t.grace_period_end
-            ; t.checkpoint_window_slots_per_year
+           |]
+       ; [| Global_slot_since_hard_fork.to_input t.grace_period_end |]
+       ; Array.map ~f:Length.to_input
+           [| t.checkpoint_window_slots_per_year
             ; t.checkpoint_window_size_in_slots
            |]
        ; Array.map ~f:Block_time.Span.to_input
@@ -379,8 +395,10 @@ module Checked = struct
               ; t.slots_per_window
               ; t.sub_windows_per_window
               ; t.slots_per_epoch
-              ; t.grace_period_end
-              ; t.checkpoint_window_slots_per_year
+             |]
+         ; [| Global_slot_since_hard_fork.Checked.to_input t.grace_period_end |]
+         ; Array.map ~f:Length.Checked.to_input
+             [| t.checkpoint_window_slots_per_year
               ; t.checkpoint_window_size_in_slots
              |]
          ; Array.map ~f:Block_time.Span.Checked.to_input
