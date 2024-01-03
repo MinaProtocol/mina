@@ -84,23 +84,28 @@ module Inner_curve : sig
     end
 
     module Constant : sig
-      include module type of Kimchi_bn254.Bn254.Curve_inv.Affine
+      include module type of Kimchi_bn254.Bn254.Curve.Affine
 
-      module Scalar = Impl.Field.Constant
+      type t = Kimchi_bn254.Basic.Bn254_fq.t * Kimchi_bn254.Basic.Bn254_fq.t
+
+      module Scalar : sig
+        include module type of Kimchi_bn254.Basic.Bn254_fp
+        val project : bool list -> t
+      end
 
       val scale : t -> Scalar.t -> t
 
       val random : unit -> t
 
-      val zero : Impl.Field.Constant.t * Impl.Field.Constant.t
+      val zero : Kimchi_bn254.Basic.Bn254_fq.t * Kimchi_bn254.Basic.Bn254_fq.t
 
       val ( + ) : t -> t -> t
 
       val negate : t -> t
 
-      val to_affine_exn : 'a -> 'a
+      val to_affine_exn : t -> Impl.field * Impl.field
 
-      val of_affine : 'a -> 'a
+      val of_affine : Impl.field * Impl.field -> t
     end
   end
 
@@ -240,18 +245,18 @@ module Inner_curve : sig
     -> Inputs.F.t * Inputs.F.t
 
   val ( + ) :
-       Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
-    -> Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
-    -> Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
+       Impl.field Snarky_backendless.Cvar.t
+       * Impl.field Snarky_backendless.Cvar.t
+    -> Impl.field Snarky_backendless.Cvar.t
+       * Impl.field Snarky_backendless.Cvar.t
+    -> Impl.field Snarky_backendless.Cvar.t
+       * Impl.field Snarky_backendless.Cvar.t
 
   val double :
-       Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
-    -> Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
+       Impl.field Snarky_backendless.Cvar.t
+       * Impl.field Snarky_backendless.Cvar.t
+    -> Impl.field Snarky_backendless.Cvar.t
+       * Impl.field Snarky_backendless.Cvar.t
 
   val scale : t -> Inputs.Impl.Boolean.var list -> Inputs.F.t * Inputs.F.t
 

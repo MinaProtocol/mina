@@ -17,5 +17,4 @@ module Bn254 : sig
   module Fp = Basic.Bn254_fp
   module Fq = Basic.Bn254_fq
   module Curve = Basic.Bn254_curve
-  module Curve_inv = Basic.Bn254_curve_inv
 end
