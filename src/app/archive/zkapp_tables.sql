@@ -83,6 +83,9 @@ CREATE TABLE zkapp_events
 , element_ids              int[]            NOT NULL
 );
 
+create index idx_zkapp_events_element_ids ON zkapp_events(element_ids);
+
+
 /* field elements derived from verification keys */
 CREATE TABLE zkapp_verification_key_hashes
 ( id                                    serial          PRIMARY KEY
