@@ -1158,10 +1158,8 @@ let gen =
   }
 
 let ledger_accounts (ledger : Mina_base.Ledger.Any_ledger.witness) =
-  Mina_base.Ledger.Any_ledger.M.foldi ~init:[]
-    ~f:(fun _ accum act -> act :: accum)
-    ledger
-  |> map_results ~f:Accounts.Single.of_account
+  Mina_base.Ledger.Any_ledger.M.to_list ledger
+  |> Async.Deferred.map ~f:(map_results ~f:Accounts.Single.of_account)
 
 let ledger_of_accounts accounts =
   Ledger.
@@ -1176,12 +1174,12 @@ let ledger_of_accounts accounts =
 let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
     ~protocol_state_hash ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
     ~next_epoch_seed (runtime_config : t) =
-  let open Result.Let_syntax in
+  let open Async.Deferred.Result.Let_syntax in
   let global_slot = Mina_numbers.Global_slot.to_int global_slot in
   let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
   let%bind accounts =
-    ledger_accounts
-    @@ Mina_base.Ledger.Any_ledger.cast (module Mina_base.Ledger) staged_ledger
+    Mina_base.Ledger.Any_ledger.cast (module Mina_base.Ledger) staged_ledger
+    |> ledger_accounts
   in
   let ledger = Option.value_exn runtime_config.ledger in
   let previous_length =

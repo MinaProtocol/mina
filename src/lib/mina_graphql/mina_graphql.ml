@@ -4287,7 +4287,7 @@ module Queries = struct
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
 
   let fork_config =
-    field "fork_config"
+    io_field "fork_config"
       ~doc:
         "The runtime configuration for a blockchain fork intended to be a \
          continuation of the current one."
@@ -4296,8 +4296,9 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () ->
         match Mina_lib.best_tip mina with
         | `Bootstrapping ->
-            `Assoc [ ("error", `String "Daemon is bootstrapping") ]
-        | `Active best_tip -> (
+            Deferred.Result.fail "Daemon is bootstrapping"
+        | `Active best_tip ->
+            let open Deferred.Result.Let_syntax in
             let block = Transition_frontier.Breadcrumb.(block best_tip) in
             let blockchain_length = Mina_block.blockchain_length block in
             let global_slot =
@@ -4331,49 +4332,45 @@ module Queries = struct
                 next_epoch.Mina_base.Epoch_data.Poly.seed
             in
             let runtime_config = Mina_lib.runtime_config mina in
-            match
-              let open Result.Let_syntax in
-              let%bind staking_ledger =
-                match Mina_lib.staking_ledger mina with
-                | None ->
-                    Error "Staking ledger is not initialized."
-                | Some (Genesis_epoch_ledger l) ->
-                    Ok (Ledger.Any_ledger.cast (module Ledger) l)
-                | Some (Ledger_db l) ->
-                    Ok (Ledger.Any_ledger.cast (module Ledger.Db) l)
-              in
-              assert (
-                Mina_base.Ledger_hash.equal
-                  (Ledger.Any_ledger.M.merkle_root staking_ledger)
-                  staking_epoch.ledger.hash ) ;
-              let%bind next_epoch_ledger =
-                match Mina_lib.next_epoch_ledger mina with
-                | None ->
-                    Error "Next epoch ledger is not initialized."
-                | Some `Notfinalized ->
-                    Ok None
-                | Some (`Finalized (Genesis_epoch_ledger l)) ->
-                    Ok (Some (Ledger.Any_ledger.cast (module Ledger) l))
-                | Some (`Finalized (Ledger_db l)) ->
-                    Ok (Some (Ledger.Any_ledger.cast (module Ledger.Db) l))
-              in
-              let protocol_state_hash =
-                Transition_frontier.Breadcrumb.state_hash best_tip
-              in
-              Option.iter next_epoch_ledger ~f:(fun ledger ->
-                  assert (
-                    Mina_base.Ledger_hash.equal
-                      (Ledger.Any_ledger.M.merkle_root ledger)
-                      next_epoch.ledger.hash ) ) ;
+            let%bind staking_ledger =
+              match Mina_lib.staking_ledger mina with
+              | None ->
+                  Deferred.Result.fail "Staking ledger is not initialized."
+              | Some (Genesis_epoch_ledger l) ->
+                  return (Ledger.Any_ledger.cast (module Ledger) l)
+              | Some (Ledger_db l) ->
+                  return (Ledger.Any_ledger.cast (module Ledger.Db) l)
+            in
+            assert (
+              Mina_base.Ledger_hash.equal
+                (Ledger.Any_ledger.M.merkle_root staking_ledger)
+                staking_epoch.ledger.hash ) ;
+            let%bind next_epoch_ledger =
+              match Mina_lib.next_epoch_ledger mina with
+              | None ->
+                  Deferred.Result.fail "Next epoch ledger is not initialized."
+              | Some `Notfinalized ->
+                  return None
+              | Some (`Finalized (Genesis_epoch_ledger l)) ->
+                  return (Some (Ledger.Any_ledger.cast (module Ledger) l))
+              | Some (`Finalized (Ledger_db l)) ->
+                  return (Some (Ledger.Any_ledger.cast (module Ledger.Db) l))
+            in
+            let protocol_state_hash =
+              Transition_frontier.Breadcrumb.state_hash best_tip
+            in
+            Option.iter next_epoch_ledger ~f:(fun ledger ->
+                assert (
+                  Mina_base.Ledger_hash.equal
+                    (Ledger.Any_ledger.M.merkle_root ledger)
+                    next_epoch.ledger.hash ) ) ;
+            let%map new_config =
               Runtime_config.make_fork_config ~staged_ledger ~global_slot
                 ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
                 ~next_epoch_seed ~blockchain_length ~protocol_state_hash
                 runtime_config
-            with
-            | Error e ->
-                `Assoc [ ("error", `String e) ]
-            | Ok new_config ->
-                Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic ) )
+            in
+            Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic )
 
   let thread_graph =
     field "threadGraph"

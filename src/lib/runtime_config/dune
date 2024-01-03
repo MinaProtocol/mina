@@ -3,6 +3,8 @@
  (public_name coda_runtime_config)
  (libraries
    ;; opam libraries
+   async
+   async_kernel
    core_kernel
    bin_prot.shape
    base.caml
