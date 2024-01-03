@@ -282,20 +282,31 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
   let open Deferred.Result.Let_syntax in
+  let start = Time.now () in
   Conn.find_opt
     ( Caqti_request.find_opt (snd cols) (snd select)
     @@ select_cols ~select:(fst select) ~table_name ?tannot ~cols:(fst cols) ()
     )
     value
-  >>= function
+  >>= fun res ->
+  let search_time = Time.now () in 
+  [%log' info (Logger.create ())]
+    "select from table takes %s" Time.(Span.to_string_hum (diff search_time start)) ;
+    match res with
   | Some id ->
       return id
   | None ->
+      let%map res =
       Conn.find
         ( Caqti_request.find (snd cols) (snd select)
         @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
              ~cols:(fst cols) () )
         value
+  in
+  let insert_time = Time.now () in 
+  [%log' info (Logger.create ())]
+  "insert into table takes %s" Time.(Span.to_string_hum (diff insert_time search_time)) ;
+        res
 
 let query ~f pool =
   match%bind Caqti_async.Pool.use f pool with

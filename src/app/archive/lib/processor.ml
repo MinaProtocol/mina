@@ -287,10 +287,13 @@ module Zkapp_field_array = struct
       (fps : Pickles.Backend.Tick.Field.t array) =
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int array) =
+      Metrics.time ~label:"zkapp_field.add"
+      @@ fun () ->
       Mina_caqti.deferred_result_list_map (Array.to_list fps)
         ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
+    Metrics.time ~label:"select_insert_into zkapp_field_array" @@ fun () ->
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name
       ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
@@ -1421,6 +1424,8 @@ module Zkapp_events = struct
       (events : Account_update.Body.Events'.t) =
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int array) =
+      Metrics.time ~label:"zkapp_field_array.add"
+      @@ fun () ->
       Mina_caqti.deferred_result_list_map events
         ~f:(Zkapp_field_array.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
@@ -1491,17 +1496,17 @@ module Zkapp_account_update_body = struct
       Account_identifiers.add_if_doesn't_exist (module Conn) account_identifier
     in
     let%bind update_id =
-      Metrics.time ~label:"zkapp_updates.add" @@ fun () ->
-      Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
+      Metrics.time ~label:"zkapp_updates.add"
+      @@ fun () -> Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
     in
     let increment_nonce = body.increment_nonce in
     let%bind events_id =
-      Metrics.time ~label:"Zkapp_events.add" @@ fun () ->
-      Zkapp_events.add_if_doesn't_exist (module Conn) body.events
+      Metrics.time ~label:"Zkapp_events.add"
+      @@ fun () -> Zkapp_events.add_if_doesn't_exist (module Conn) body.events
     in
     let%bind actions_id =
-      Metrics.time ~label:"Zkapp_actions.add" @@ fun () ->
-      Zkapp_events.add_if_doesn't_exist (module Conn) body.actions
+      Metrics.time ~label:"Zkapp_actions.add"
+      @@ fun () -> Zkapp_events.add_if_doesn't_exist (module Conn) body.actions
     in
     let%bind call_data_id =
       Zkapp_field.add_if_doesn't_exist (module Conn) body.call_data

@@ -11,6 +11,7 @@
    async_kernel
    ;; local libraries
    mina_base
+   logger
    )
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx))
