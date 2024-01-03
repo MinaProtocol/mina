@@ -2,8 +2,6 @@ open Core_kernel
 open Async
 open Integration_test_lib
 
-[@@@warning "-27"]
-
 let get_container_id service_id =
   let%bind cwd = Unix.getcwd () in
   let open Malleable_error.Let_syntax in
@@ -251,7 +249,6 @@ module Service_to_deploy = struct
     { network_keypair; postgres_connection_uri; graphql_port }
 
   let get_node_from_service t =
-    let%bind cwd = Unix.getcwd () in
     let open Malleable_error.Let_syntax in
     let service_id = sprintf "%s_%s" t.stack_name t.service_name in
     let%bind container_id = get_container_id service_id in
@@ -327,4 +324,7 @@ let all_ids t =
   List.fold deployments ~init:[] ~f:(fun acc (_, node) ->
       List.cons node.config.service_id acc )
 
-let initialize_infra ~logger network = Malleable_error.return ()
+let initialize_infra ~logger network =
+  let _ = logger in
+  let _ = network in
+  Malleable_error.return ()
