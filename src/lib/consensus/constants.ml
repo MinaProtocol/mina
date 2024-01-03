@@ -16,6 +16,7 @@ module Poly = struct
         ; slots_per_window : 'length
         ; sub_windows_per_window : 'length
         ; slots_per_epoch : 'length (* The first slot after the grace period. *)
+        ; grace_period_slots : 'length
         ; grace_period_end : 'global_slot_since_hard_fork
         ; checkpoint_window_slots_per_year : 'length
         ; checkpoint_window_size_in_slots : 'length
@@ -235,26 +236,8 @@ let create' (type length global_slot_since_hard_fork time timespan)
     let duration = Slot.duration_ms * size
   end in
   let delta_duration = Slot.duration_ms * (delta + M.one) in
-  let num_days = 4.5 in
-  assert (Float.(num_days < 14.)) ;
-  (* We forgo updating the min density for the first [num_days] days (or epoch, whichever comes first)
-      of the network's operation. The reasoning is as follows:
-
-      - There may be many empty slots in the beginning of the network, as everyone
-        gets their nodes up and running. [num_days] days gives all involved in the project
-        a chance to observe the actual fill rate and try to fix what's keeping it down.
-      - With actual network parameters, 1 epoch = 2 weeks > [num_days] days,
-        which means the long fork rule will not come into play during the grace period,
-        and then we still have several days to compute min-density for the next epoch. *)
   let grace_period_end =
-    let n_days =
-      let n_days_ms =
-        Time_ns.Span.(to_ms (of_day num_days))
-        |> Float.round_up |> Float.to_int |> M.constant
-      in
-      M.(n_days_ms / block_window_duration_ms)
-    in
-    M.to_global_slot_since_hard_fork (M.min n_days slots_per_epoch)
+    of_length protocol_constants.grace_period_slots + slots_per_window
   in
   let res : (length, global_slot_since_hard_fork, time, timespan) Poly.t =
     { Poly.k = to_length k
@@ -264,7 +247,8 @@ let create' (type length global_slot_since_hard_fork time timespan)
     ; slots_per_window = to_length slots_per_window
     ; sub_windows_per_window = to_length sub_windows_per_window
     ; slots_per_epoch = to_length slots_per_epoch
-    ; grace_period_end
+    ; grace_period_slots = protocol_constants.grace_period_slots
+    ; grace_period_end = to_global_slot_since_hard_fork grace_period_end
     ; slot_duration_ms = to_timespan Slot.duration_ms
     ; epoch_duration = to_timespan Epoch.duration
     ; checkpoint_window_slots_per_year = to_length zero
@@ -274,6 +258,20 @@ let create' (type length global_slot_since_hard_fork time timespan)
     }
   in
   res
+
+let check_invariants (constants : Stable.Latest.t) =
+  let slots_per_epoch = Length.to_uint32 constants.slots_per_epoch in
+  let slots_per_window = Length.to_uint32 constants.slots_per_window in
+  let grace_period_end =
+    Global_slot_since_hard_fork.to_uint32 constants.grace_period_end
+  in
+  (* the time before any captured chain densities will effect the chain quality metric *)
+  let grace_period_effective_end =
+    UInt32.Infix.(grace_period_end - slots_per_window)
+  in
+  assert (
+    UInt32.(
+      compare grace_period_effective_end (div slots_per_epoch (of_int 3)) < 0) )
 
 let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~(protocol_constants : Genesis_constants.Protocol.t) : t =
@@ -296,10 +294,13 @@ let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     in
     (Length.of_int slots_per_year, Length.of_int size_in_slots)
   in
-  { constants with
-    checkpoint_window_size_in_slots
-  ; checkpoint_window_slots_per_year
-  }
+  let constants =
+    { constants with
+      checkpoint_window_size_in_slots
+    ; checkpoint_window_slots_per_year
+    }
+  in
+  check_invariants constants ; constants
 
 let for_unit_tests =
   lazy
@@ -314,6 +315,7 @@ let to_protocol_constants
      ; genesis_state_timestamp
      ; slots_per_sub_window
      ; slots_per_epoch
+     ; grace_period_slots
      ; _
      } :
       _ Poly.t ) =
@@ -322,11 +324,13 @@ let to_protocol_constants
   ; genesis_state_timestamp
   ; slots_per_sub_window
   ; slots_per_epoch
+  ; grace_period_slots
   }
 
 let typ =
   Typ.of_hlistable
     [ Length.Checked.typ
+    ; Length.Checked.typ
     ; Length.Checked.typ
     ; Length.Checked.typ
     ; Length.Checked.typ
