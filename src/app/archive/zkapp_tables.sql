@@ -33,6 +33,8 @@ CREATE TABLE zkapp_field_array
 , element_ids              int[]   NOT NULL
 );
 
+create INDEX idx_zkapp_field_array_element_ids ON zkapp_field_array(element_ids);
+
 /* Fixed-width arrays of algebraic fields, given as id's from
    zkapp_field
 
