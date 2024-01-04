@@ -4256,7 +4256,7 @@ module Tock : S = struct
 end
 
 (* The constraints for overriden gate *)
-module TickMinus : S = struct
+module TickPlus : S = struct
   let constant_term (type a)
       ({ add = ( + )
        ; sub = ( - )
@@ -6269,6 +6269,24 @@ module TickMinus : S = struct
                         "0x0000000000000000000000000000000000000000000000000000000000001000"
                     * cell (var (Witness 2, Curr))
                   - cell (var (Witness 0, Curr)) ) ) )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( ForeignFieldAdd
+        , (fun () ->
+            cell (var (Index ForeignFieldAdd, Curr))
+            * ( square (cell (var (Witness 3, Curr)))
+              - cell (var (Witness 3, Curr))
+              + alpha_pow 1
+                * ( cell (var (Witness 0, Curr))
+                  - ( cell (var (Witness 3, Curr))
+                      * cell (var (Witness 1, Curr))
+                    + ( field
+                          "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      - cell (var (Witness 3, Curr)) )
+                      * cell (var (Witness 2, Curr)) ) ) ) )
         , fun () ->
             field
               "0x0000000000000000000000000000000000000000000000000000000000000000"

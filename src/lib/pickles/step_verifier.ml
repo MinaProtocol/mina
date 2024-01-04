@@ -818,7 +818,7 @@ struct
         end)
 
     module Type1Plus =
-      Plonk_checks.Make (Shifted_value.Type1) (Scalars.TickMinus)
+      Plonk_checks.Make (Shifted_value.Type1) (Scalars.TickPlus)
   end
 
   let domain_for_compiled (type branches)

@@ -25,9 +25,9 @@ module Type1Plus =
   Plonk_checks.Make
     (Shifted_value.Type1)
     (struct
-      let constant_term = Plonk_checks.Scalars.TickMinus.constant_term
+      let constant_term = Plonk_checks.Scalars.TickPlus.constant_term
 
-      let index_terms = Plonk_checks.Scalars.TickMinus.index_terms
+      let index_terms = Plonk_checks.Scalars.TickPlus.index_terms
     end)
 
 let _vector_of_list (type a t)

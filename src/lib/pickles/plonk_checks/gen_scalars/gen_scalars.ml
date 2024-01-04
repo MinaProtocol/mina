@@ -248,7 +248,7 @@ let () =
   output_string
     {ocaml|
  (* The constraints for overriden gate *)
- module TickMinus : S = struct
+ module TickPlus : S = struct
    let constant_term (type a)
        ({ add = ( + )
         ; sub = ( - )
@@ -277,10 +277,10 @@ let () =
         a Env.t) =
 |ocaml}
 
-external fp_linearization_minus : bool -> string * (string * string) array
-  = "fp_linearization_strings_minus"
+external fp_linearization_plus : bool -> string * (string * string) array
+  = "fp_linearization_strings_plus"
 
-let fp_constant_term, fp_index_terms = fp_linearization_minus true
+let fp_constant_term, fp_index_terms = fp_linearization_plus true
 
 let () = output_string fp_constant_term
 
