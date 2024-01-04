@@ -12,7 +12,7 @@ PRECONDITION_DATA_TMP=zkapp_precondition_table.tmp
 PRECONDITION_UPDATE_SCRIPT=zkapp_precondition_script.sql
 BODY_UPDATE_SCRIPT=zkapp_update_body_script.sql
 
-echo "This script will produce two scripts which will remove duplicated zkppp account preconditions rows in archive db" "$ARCHIVE_DB"
+echo "This Shell script will produce two SQL scripts that will remove duplicated zkApp account preconditions rows in the archive DB" "$ARCHIVE_DB"
 
 rm -f $BODY_DATA_BCK
 rm -f $PRECONDITION_DATA_BCK
@@ -53,4 +53,4 @@ do
 done
 
 echo
-echo "Scripts are ready $PRECONDITION_UPDATE_SCRIPT, $BODY_UPDATE_SCRIPT !"
+echo "SQL scripts are ready: $PRECONDITION_UPDATE_SCRIPT, $BODY_UPDATE_SCRIPT !"
