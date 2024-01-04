@@ -482,7 +482,7 @@ struct
           , `Global_slot_since_genesis global_slot_since_genesis ) ->
           [ ( "valid_until"
             , Mina_numbers.Global_slot_since_genesis.to_yojson valid_until )
-          ; ( "current_global_slot"
+          ; ( "current_global_slot_since_genesis"
             , Mina_numbers.Global_slot_since_genesis.to_yojson
                 global_slot_since_genesis )
           ]
