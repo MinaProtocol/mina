@@ -1417,20 +1417,97 @@ module Zkapp_events = struct
 
   let table_name = "zkapp_events"
 
+  let sep_by_comma ?(parenthesis = false) xs =
+    List.map xs ~f:(if parenthesis then sprintf "('%s')" else sprintf "'%s'")
+    |> String.concat ~sep:", "
+
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (events : Account_update.Body.Events'.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind (element_ids : int array) =
-      Mina_caqti.deferred_result_list_map events
-        ~f:(Zkapp_field_array.add_if_doesn't_exist (module Conn))
-      >>| Array.of_list
+    let%bind field_array_id_list =
+      if not @@ List.is_empty events then
+        let field_list_list =
+          List.map events ~f:(fun field_array ->
+              Array.map field_array ~f:Pickles.Backend.Tick.Field.to_string
+              |> Array.to_list )
+        in
+        let fields = field_list_list |> List.concat in
+        let%bind field_id_list_list =
+          if not @@ List.is_empty fields then
+            let field_insert =
+              sprintf
+                {sql| INSERT INTO zkapp_field (field) VALUES %s 
+                  ON CONFLICT (field)
+                  DO NOTHING |sql}
+                (sep_by_comma ~parenthesis:true fields)
+            in
+            let%bind () =
+              Conn.exec (Caqti_request.exec Caqti_type.unit field_insert) ()
+            in
+            let field_search =
+              sprintf
+                {sql| SELECT field, id FROM zkapp_field
+              WHERE field in (%s) |sql}
+              @@ sep_by_comma fields
+            in
+            let%map field_map =
+              Conn.collect_list
+                (Caqti_request.collect Caqti_type.unit
+                   Caqti_type.(tup2 string int)
+                   field_search )
+                ()
+              >>| String.Map.of_alist_exn
+            in
+
+            List.map field_list_list ~f:(List.map ~f:(Map.find_exn field_map))
+          else return @@ List.map field_list_list ~f:(fun _ -> [])
+        in
+        let field_array_list =
+          List.map field_id_list_list ~f:(fun id_list ->
+              List.map id_list ~f:Int.to_string
+              |> String.concat ~sep:", " |> sprintf "{%s}" )
+        in
+        let field_array_insert =
+          sprintf
+            {sql| INSERT INTO zkapp_field_array (element_ids) VALUES %s
+              ON CONFLICT (element_ids) 
+              DO NOTHING |sql}
+          @@ sep_by_comma ~parenthesis:true field_array_list
+        in
+        let%bind () =
+          Conn.exec (Caqti_request.exec Caqti_type.unit field_array_insert) ()
+        in
+        let field_array_search =
+          sprintf
+            {sql| SELECT element_ids, id FROM zkapp_field_array
+              WHERE element_ids in (%s) |sql}
+          @@ sep_by_comma field_array_list
+        in
+        let module Field_array_map = Map.Make (struct
+          type t = int array [@@deriving sexp]
+
+          let compare = Array.compare Int.compare
+        end) in
+        let%map field_array_map =
+          Conn.collect_list
+            (Caqti_request.collect Caqti_type.unit
+               Caqti_type.(tup2 Mina_caqti.array_int_typ int)
+               field_array_search )
+            ()
+          >>| Field_array_map.of_alist_exn
+        in
+
+        List.map field_id_list_list ~f:(fun field_id_list ->
+            Map.find_exn field_array_map (Array.of_list field_id_list) )
+        |> Array.of_list
+      else return @@ Array.of_list []
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name
       ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
       ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
       (module Conn)
-      element_ids
+      field_array_id_list
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -3644,7 +3721,10 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
           [%log info] "Attempting to add block data for $state_hash"
             ~metadata:
               [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
-          let%bind block_id = add_block (module Conn : CONNECTION) block in
+          let%bind block_id =
+            Metrics.time ~label:"add_block"
+            @@ fun () -> add_block (module Conn : CONNECTION) block
+          in
           (* if an existing block has a parent hash that's for the block just added,
              set its parent id
           *)
