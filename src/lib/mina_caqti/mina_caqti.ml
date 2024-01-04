@@ -287,15 +287,19 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     @@ select_cols ~select:(fst select) ~table_name ?tannot ~cols:(fst cols) ()
     )
     value
-  >>= function
+  >>= fun res ->
+    match res with
   | Some id ->
       return id
   | None ->
+      let%map res =
       Conn.find
         ( Caqti_request.find (snd cols) (snd select)
         @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
              ~cols:(fst cols) () )
         value
+  in
+        res
 
 let query ~f pool =
   match%bind Caqti_async.Pool.use f pool with
