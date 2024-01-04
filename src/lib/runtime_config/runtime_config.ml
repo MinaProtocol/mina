@@ -144,6 +144,20 @@ module Json_layout = struct
                 Both
             | Impossible ->
                 Impossible
+
+          let to_account_perm = function
+            | None ->
+                Mina_base.Permissions.Auth_required.None
+            | Either ->
+                Either
+            | Proof ->
+                Proof
+            | Signature ->
+                Signature
+            | Both ->
+                Both
+            | Impossible ->
+                Impossible
         end
 
         type t =
@@ -568,6 +582,87 @@ module Accounts = struct
                   Auth_required.of_account_perm
                     a.permissions.set_verification_key
               }
+      }
+
+    let to_account (a : t) : Mina_base.Account.t =
+      let open Signature_lib in
+      let open Mina_base.Account.Poly.Stable.V1 in
+      let token_permissions =
+        match a.token_permissions with
+        | None ->
+            Mina_base.Token_permissions.Stable.V1.Not_owned
+              { account_disabled = false }
+        | Some { token_owned; account_disabled; disable_new_accounts } ->
+            if token_owned then
+              Mina_base.Token_permissions.Stable.V1.Token_owned
+                { disable_new_accounts }
+            else
+              Mina_base.Token_permissions.Stable.V1.Not_owned
+                { account_disabled }
+      in
+      let timing =
+        let open Mina_base.Account_timing.Poly.Stable.V1 in
+        match a.timing with
+        | None ->
+            Untimed
+        | Some
+            { initial_minimum_balance
+            ; cliff_time
+            ; cliff_amount
+            ; vesting_period
+            ; vesting_increment
+            } ->
+            Timed
+              { initial_minimum_balance
+              ; cliff_time
+              ; cliff_amount
+              ; vesting_period
+              ; vesting_increment
+              }
+      in
+      let permissions =
+        let perms = Option.value_exn a.permissions in
+        Mina_base.Permissions.Poly.Stable.V1.
+          { stake = perms.stake
+          ; edit_state =
+              Json_layout.Accounts.Single.Permissions.Auth_required
+              .to_account_perm perms.edit_state
+          ; send =
+              Json_layout.Accounts.Single.Permissions.Auth_required
+              .to_account_perm perms.send
+          ; receive =
+              Json_layout.Accounts.Single.Permissions.Auth_required
+              .to_account_perm perms.receive
+          ; set_delegate =
+              Json_layout.Accounts.Single.Permissions.Auth_required
+              .to_account_perm perms.set_delegate
+          ; set_permissions =
+              Json_layout.Accounts.Single.Permissions.Auth_required
+              .to_account_perm perms.set_permissions
+          ; set_verification_key =
+              Json_layout.Accounts.Single.Permissions.Auth_required
+              .to_account_perm perms.set_verification_key
+          }
+      in
+      { public_key =
+          Public_key.Compressed.of_base58_check_exn (Option.value_exn a.pk)
+      ; token_id =
+          Mina_base.Token_id.(Option.value_map ~f:of_uint64 ~default a.token)
+      ; token_permissions
+      ; balance = a.balance
+      ; nonce = a.nonce
+      ; receipt_chain_hash =
+          Mina_base.Receipt.Chain_hash.of_base58_check_exn
+            (Option.value_exn a.receipt_chain_hash)
+      ; delegate =
+          Option.map ~f:Public_key.Compressed.of_base58_check_exn a.delegate
+      ; voting_for =
+          Mina_base.State_hash.of_base58_check_exn
+            (Option.value_exn a.voting_for)
+      ; timing
+      ; permissions
+      ; snapp =
+          None (* Snapps are not going to happen anyway, so ignore them. *)
       }
 
     let gen =
