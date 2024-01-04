@@ -1,4 +1,4 @@
-use ark_ec::{AffineCurve, ProjectiveCurve};
+use ark_ec::{AffineRepr, CurveGroup, Group};
 use ark_ff::UniformRand;
 use paste::paste;
 use rand::rngs::StdRng;
@@ -10,7 +10,7 @@ macro_rules! impl_projective {
             #[ocaml_gen::func]
             #[ocaml::func]
             pub fn [<caml_ $name:snake _one>]() -> $GroupProjective {
-                $Projective::prime_subgroup_generator().into()
+                $Projective::generator().into()
             }
 
             #[ocaml_gen::func]
@@ -54,7 +54,7 @@ macro_rules! impl_projective {
                 y: $CamlScalarField,
             ) -> $GroupProjective {
                 let y: ark_ff::BigInteger256 = y.0.into();
-                x.as_ref().mul(&y).into()
+                x.as_ref().mul_bigint(&y).into()
             }
 
             #[ocaml_gen::func]
@@ -98,7 +98,7 @@ macro_rules! impl_projective {
             #[ocaml_gen::func]
             #[ocaml::func]
             pub fn [<caml_ $name:snake _of_affine>](x: $CamlG) -> $GroupProjective {
-                Into::<GAffine>::into(x).into_projective().into()
+                Into::<GAffine>::into(x).into_group().into()
             }
 
             #[ocaml_gen::func]

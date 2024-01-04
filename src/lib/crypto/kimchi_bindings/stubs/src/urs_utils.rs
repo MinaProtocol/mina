@@ -1,4 +1,4 @@
-use ark_ec::{msm::VariableBaseMSM, ProjectiveCurve};
+use ark_ec::{VariableBaseMSM, CurveGroup};
 use ark_ff::{batch_inversion, One, PrimeField, UniformRand, Zero};
 use poly_commitment::{
     commitment::{b_poly_coefficients, CommitmentCurve},
@@ -64,8 +64,8 @@ pub fn batch_dlog_accumulator_check<G: CommitmentCurve>(
         }
     }
 
-    let scalars: Vec<_> = scalars.iter().map(|x| x.into_repr()).collect();
-    VariableBaseMSM::multi_scalar_mul(&points, &scalars) == G::Projective::zero()
+    let scalars: Vec<_> = scalars.iter().map(|x| x.into_bigint()).collect();
+    G::Group::msm_bigint(&points, &scalars) == G::Group::zero()
 }
 
 pub fn batch_dlog_accumulator_generate<G: CommitmentCurve>(
@@ -90,10 +90,10 @@ pub fn batch_dlog_accumulator_generate<G: CommitmentCurve>(
             let chals: Vec<G::ScalarField> = chals.into_iter().copied().collect();
             let scalars: Vec<_> = b_poly_coefficients(&chals)
                 .into_iter()
-                .map(|x| x.into_repr())
+                .map(|x| x.into_bigint())
                 .collect();
             let points: Vec<_> = urs.g.clone();
-            VariableBaseMSM::multi_scalar_mul(&points, &scalars).into_affine()
+            G::Group::msm_bigint(&points, &scalars).into_affine()
         })
         .collect();
 

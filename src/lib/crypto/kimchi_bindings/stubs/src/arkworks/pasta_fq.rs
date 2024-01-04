@@ -1,9 +1,9 @@
 use crate::arkworks::CamlBigInteger256;
 use crate::caml::caml_bytes_string::CamlBytesString;
-use ark_ff::ToBytes;
-use ark_ff::{FftField, Field, FpParameters, One, PrimeField, SquareRootField, UniformRand, Zero};
+use ark_ff::{FftField, Field, One, PrimeField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use mina_curves::pasta::{fields::fq::FqParameters as Fq_params, Fq};
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+use mina_curves::pasta::{fields::{fq::FqParameters as Fq_params, fft::FpParameters}, Fq};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::{
@@ -36,7 +36,7 @@ impl CamlFq {
     unsafe extern "C" fn ocaml_compare(x: ocaml::Raw, y: ocaml::Raw) -> i32 {
         let x = x.as_pointer::<Self>();
         let y = y.as_pointer::<Self>();
-        match x.as_ref().0.into_repr().cmp(&y.as_ref().0.into_repr()) {
+        match x.as_ref().0.into_bigint().cmp(&y.as_ref().0.into_bigint()) {
             core::cmp::Ordering::Less => -1,
             core::cmp::Ordering::Equal => 0,
             core::cmp::Ordering::Greater => 1,
@@ -88,7 +88,7 @@ impl From<&CamlFq> for Fq {
 impl TryFrom<CamlBigInteger256> for CamlFq {
     type Error = ocaml::Error;
     fn try_from(x: CamlBigInteger256) -> Result<Self, Self::Error> {
-        Fq::from_repr(x.0)
+        Fq::from_bigint(x.0)
             .map(Into::into)
             .ok_or(ocaml::Error::Message(
                 "TryFrom<CamlBigInteger256>: integer is larger than order",
@@ -180,7 +180,7 @@ pub fn caml_pasta_fq_of_int(i: ocaml::Int) -> CamlFq {
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_to_string(x: ocaml::Pointer<CamlFq>) -> String {
-    CamlBigInteger256(x.as_ref().into_repr()).to_string()
+    CamlBigInteger256(x.as_ref().into_bigint()).to_string()
 }
 
 #[ocaml_gen::func]
@@ -204,7 +204,7 @@ pub fn caml_pasta_fq_of_string(s: CamlBytesString) -> Result<CamlFq, ocaml::Erro
 pub fn caml_pasta_fq_print(x: ocaml::Pointer<CamlFq>) {
     println!(
         "{}",
-        CamlBigInteger256(x.as_ref().0.into_repr()).to_string()
+        CamlBigInteger256(x.as_ref().0.into_bigint()).to_string()
     );
 }
 
@@ -241,7 +241,7 @@ pub fn caml_pasta_fq_mut_square(mut x: ocaml::Pointer<CamlFq>) {
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_compare(x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) -> ocaml::Int {
-    match x.as_ref().0.into_repr().cmp(&y.as_ref().0.into_repr()) {
+    match x.as_ref().0.into_bigint().cmp(&y.as_ref().0.into_bigint()) {
         Less => -1,
         Equal => 0,
         Greater => 1,
@@ -274,13 +274,13 @@ pub fn caml_pasta_fq_rng(i: ocaml::Int) -> CamlFq {
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_to_bigint(x: ocaml::Pointer<CamlFq>) -> CamlBigInteger256 {
-    CamlBigInteger256(x.as_ref().0.into_repr())
+    CamlBigInteger256(x.as_ref().0.into_bigint())
 }
 
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_of_bigint(x: CamlBigInteger256) -> Result<CamlFq, ocaml::Error> {
-    Fq::from_repr(x.0).map(CamlFq).ok_or_else(|| {
+    Fq::from_bigint(x.0).map(CamlFq).ok_or_else(|| {
         let err = format!(
             "caml_pasta_fq_of_bigint was given an invalid CamlBigInteger256: {}",
             x.0
@@ -292,7 +292,7 @@ pub fn caml_pasta_fq_of_bigint(x: CamlBigInteger256) -> Result<CamlFq, ocaml::Er
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_two_adic_root_of_unity() -> CamlFq {
-    let res: Fq = FftField::two_adic_root_of_unity();
+    let res: Fq = FftField::TWO_ADIC_ROOT_OF_UNITY;
     CamlFq(res)
 }
 
@@ -308,19 +308,15 @@ pub fn caml_pasta_fq_domain_generator(log2_size: ocaml::Int) -> Result<CamlFq, o
 #[ocaml::func]
 pub fn caml_pasta_fq_to_bytes(x: ocaml::Pointer<CamlFq>) -> [u8; std::mem::size_of::<Fq>()] {
     let mut res = [0u8; std::mem::size_of::<Fq>()];
-    x.as_ref().0.write(&mut res[..]).unwrap();
+    x.as_ref().0.serialize_compressed(&mut res[..]).unwrap();
     res
 }
 
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_of_bytes(x: &[u8]) -> Result<CamlFq, ocaml::Error> {
-    let len = std::mem::size_of::<CamlFq>();
-    if x.len() != len {
-        ocaml::Error::failwith("caml_pasta_fq_of_bytes")?;
-    };
-    let x = unsafe { *(x.as_ptr() as *const CamlFq) };
-    Ok(x)
+    let x = Fq::deserialize_compressed(x)?;
+    Ok(CamlFq(x))
 }
 
 #[ocaml_gen::func]
