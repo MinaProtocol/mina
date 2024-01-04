@@ -1,4 +1,4 @@
-(** Implement a Sponge for the field Bn254 *)
+(** Implement a Sponge for the field Tick *)
 
 include module type of Make_sponge.Make (Backend.Bn254.Field)
 

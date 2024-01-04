@@ -6,8 +6,10 @@ module type S = sig
   open Pickles_types
   open Hlist
   module Tick_field_sponge = Tick_field_sponge
+  module Bn254_field_sponge = Bn254_field_sponge
   module Util = Util
   module Step_main_inputs = Step_main_inputs
+  module Bn254_main_inputs = Bn254_main_inputs
   module Backend = Backend
   module Sponge_inputs = Sponge_inputs
   module Impls = Impls

@@ -35,6 +35,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Sponge_inputs = Sponge_inputs
   module Util = Util
   module Tick_field_sponge = Tick_field_sponge
+  module Bn254_field_sponge = Bn254_field_sponge
   module Impls = Impls
   module Inductive_rule = Inductive_rule
   module Tag = Tag
@@ -42,6 +43,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Dirty = Dirty
   module Cache_handle = Cache_handle
   module Step_main_inputs = Step_main_inputs
+  module Bn254_main_inputs = Bn254_main_inputs
   module Step_verifier = Step_verifier
   module Proof_cache = Proof_cache
 
