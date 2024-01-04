@@ -22,6 +22,7 @@
   - Merging forward (when introducing features/fixes) is up this stack, but the place the change is introduced can be different (e.g. `compatible` for softfork features, `develop` for more experimental/next release).
 - Hard fork/Release:
   - Whenever a hard fork happens, the code in  `develop` is released.  When this happens, the current `compatible` is entirely discarded and a new `compatible` gets created based off of `develop`
+  - `release/1.X.X` branches are made off of `compatible` and tagged with alpha and beta tags until the code is deemed stable, then the `release/1.X.X` branch is merged into `master` and given a stable tag. Whenever code is tagged, if anything is missing in in the upstream branches (compatible, develop) then the tagged branch is also merged back for consistency.
   - So after Berkeley release: `berkeley` branch will become the new `master`. `berkeley` will be removed from `proof-systems`. `develop` will be renamed into `compatible`.
 - `o1js-main`: compatible with testnet, but has latest `proof-systems` features so that they can be used in `o1js`
   - Contains mina changes from `rampup`
@@ -32,9 +33,9 @@
 
 ### Diagram
 
-**TODO** fix diagram
+**TODO** improve diagram
 
-![git-flow_david-wong.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/09e92777-0232-401b-be44-9689d39ce22a/git-flow_david-wong.png)
+![git-flow_david-wong.png](./git-flow_david-wong.png)
 
 ## Day to day: which branch should I use?
 
@@ -47,15 +48,7 @@ When developing a feature, if it’s not something that breaks compatibility, th
 - Once `foo_DEVELOP` is fully landed into `develop`, then go and manually re-run the `merges cleanly to develop` CI job in the original `foo_COMP` PR.  The CI job should now pass and go green.  You can now merge `foo_COMP`
 - If after making `foo_DEVELOP`, you need to make changes to `foo_COMP`, then make sure to merge the newly updated `foo_COMP` into `foo_DEVELOP`.  In order for the git magic to work, `foo_DEVELOP` needs to be a superset of the commits from `foo`, and it also needs to merge first.  You can make further changes post-merge in `foo_DEVELOP` as needed to ensure correctness
 
-### Releases
 
-(**TODO** is this outdated/needs to be removed?)
-
-`release/1.X.X` branches are made off of `compatible` and tagged with alpha and beta tags until the code is deemed stable, then the `release/1.X.X` branch is merged into `master` and given a stable tag. Whenever code is tagged, if anything is missing in in the upstream branches (compatible, develop) then the tagged branch is also merged back for consistency.
-
-`release/2.0.0`is the branch where Berkeley QA Net releases are being cut, between `compatible`and `develop` in the tree. So far nothing has been tagged there but there will be `2.0.0alphaX` tags once the code is more stable and we are closer to the Incentivized testnet.
-
-Unless it is an emergency, code should flow from feature branches into `compatible` then in batches into the release branch for tagging and testing
 
 # proof-systems Branching policy
 Generally, proof-systems intends to be synchronized with the mina repository, and so its branching policy is quite similar. However several important distinctions exist that are a result of proof-systems having been created after the mainnet release (**TODO** ?).
