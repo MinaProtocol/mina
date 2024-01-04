@@ -33,7 +33,7 @@ module Value = struct
     let%bind delta = Int.gen_incl 0 5000 in
     let%bind slots_per_epoch = Int.gen_incl k (8 * k) >>| ( * ) 3
     and slots_per_sub_window = Int.gen_incl 1 ((k + 9) / 9) in
-    let%bind grace_period_slots = Int.gen_incl 0 (slots_per_epoch / 3) in
+    let%bind grace_period_slots = Int.gen_incl 0 ((slots_per_epoch / 3) - 1) in
     (*TODO: Bug -> Block_time.(to_time x |> of_time) != x for certain values.
       Eg: 34702788243129 <--> 34702788243128, 8094 <--> 8093*)
     let%bind ms = Int64.(gen_log_uniform_incl 0L 9999999999999L) in
