@@ -1,8 +1,8 @@
 #!/bin/bash
 
-BLOCKS_BUCKET="${BLOCKS_BUCKET:=https://storage.googleapis.com/mina_network_block_data}"
+BLOCKS_BUCKET="${BLOCKS_BUCKET:=gs://mina_network_block_data}"
 
-set -u
+set -ux
 
 MINA_NETWORK=${1}
 # Postgres database connection string and related variables
@@ -25,7 +25,7 @@ function populate_db() {
 
 function download_block() {
     echo "Downloading $1 block"
-    curl -sO "${BLOCKS_BUCKET}/${1}"
+    gsutil cp "${BLOCKS_BUCKET}/${1}" .
 }
 
 HASH='map(select(.metadata.parent_hash != null and .metadata.parent_height != null)) | .[0].metadata.parent_hash'
