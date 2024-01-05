@@ -1417,9 +1417,11 @@ module Zkapp_events = struct
 
   let table_name = "zkapp_events"
 
-  let sep_by_comma ?(parenthesis = false) xs =
-    List.map xs ~f:(if parenthesis then sprintf "('%s')" else sprintf "'%s'")
-    |> String.concat ~sep:", "
+  module Field_array_map = Map.Make (struct
+    type t = int array [@@deriving sexp]
+
+    let compare = Array.compare Int.compare
+  end)
 
   (* Account_update.Body.Events'.t is defined as `field array list`,
      which is ismorphic to a list of list of fields.
@@ -1450,28 +1452,11 @@ module Zkapp_events = struct
         let fields = field_list_list |> List.concat in
         let%bind field_id_list_list =
           if not @@ List.is_empty fields then
-            let field_insert =
-              sprintf
-                {sql| INSERT INTO zkapp_field (field) VALUES %s 
-                  ON CONFLICT (field)
-                  DO NOTHING |sql}
-                (sep_by_comma ~parenthesis:true fields)
-            in
-            let%bind () =
-              Conn.exec (Caqti_request.exec Caqti_type.unit field_insert) ()
-            in
-            let field_search =
-              sprintf
-                {sql| SELECT field, id FROM zkapp_field
-              WHERE field in (%s) |sql}
-              @@ sep_by_comma fields
-            in
             let%map field_map =
-              Conn.collect_list
-                (Caqti_request.collect Caqti_type.unit
-                   Caqti_type.(tup2 string int)
-                   field_search )
-                ()
+              Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field"
+                ~col:("field", Caqti_type.string)
+                (module Conn)
+                fields
               >>| String.Map.of_alist_exn
             in
             let field_id_list_list =
@@ -1482,38 +1467,17 @@ module Zkapp_events = struct
             (* if there's no fields, then we must have some list of empty lists *)
             return @@ List.map field_list_list ~f:(fun _ -> [])
         in
+        (* this conversion should be done by caqti using `typ`, FIX this in the future *)
         let field_array_list =
           List.map field_id_list_list ~f:(fun id_list ->
               List.map id_list ~f:Int.to_string
               |> String.concat ~sep:", " |> sprintf "{%s}" )
         in
-        let field_array_insert =
-          sprintf
-            {sql| INSERT INTO zkapp_field_array (element_ids) VALUES %s
-              ON CONFLICT (element_ids) 
-              DO NOTHING |sql}
-          @@ sep_by_comma ~parenthesis:true field_array_list
-        in
-        let%bind () =
-          Conn.exec (Caqti_request.exec Caqti_type.unit field_array_insert) ()
-        in
-        let field_array_search =
-          sprintf
-            {sql| SELECT element_ids, id FROM zkapp_field_array
-              WHERE element_ids in (%s) |sql}
-          @@ sep_by_comma field_array_list
-        in
-        let module Field_array_map = Map.Make (struct
-          type t = int array [@@deriving sexp]
-
-          let compare = Array.compare Int.compare
-        end) in
         let%map field_array_map =
-          Conn.collect_list
-            (Caqti_request.collect Caqti_type.unit
-               Caqti_type.(tup2 Mina_caqti.array_int_typ int)
-               field_array_search )
-            ()
+          Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field_array"
+            ~col:("element_ids", Mina_caqti.array_int_typ)
+            (module Conn)
+            field_array_list
           >>| Field_array_map.of_alist_exn
         in
         let field_array_id_list =

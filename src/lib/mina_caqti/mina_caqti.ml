@@ -287,19 +287,45 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     @@ select_cols ~select:(fst select) ~table_name ?tannot ~cols:(fst cols) ()
     )
     value
-  >>= fun res ->
-  match res with
+  >>= function
   | Some id ->
       return id
   | None ->
-      let%map res =
-        Conn.find
-          ( Caqti_request.find (snd cols) (snd select)
-          @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
-               ~cols:(fst cols) () )
-          value
-      in
-      res
+      Conn.find
+        ( Caqti_request.find (snd cols) (snd select)
+        @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
+             ~cols:(fst cols) () )
+        value
+
+let sep_by_comma ?(parenthesis = false) xs =
+  List.map xs ~f:(if parenthesis then sprintf "('%s')" else sprintf "'%s'")
+  |> String.concat ~sep:", "
+
+let insert_multi_into_col ~(table_name : string)
+    ~(col : string * 'col Caqti_type.t) (module Conn : CONNECTION)
+    (values : string list) =
+  let open Deferred.Result.Let_syntax in
+  let insert =
+    sprintf
+      {sql| INSERT INTO %s (%s) VALUES %s
+            ON CONFLICT (%s)
+            DO NOTHING |sql}
+      table_name (fst col)
+      (sep_by_comma ~parenthesis:true values)
+      (fst col)
+  in
+  let%bind () = Conn.exec (Caqti_request.exec Caqti_type.unit insert) () in
+  let search =
+    sprintf
+      {sql| SELECT %s, id FROM %s
+            WHERE %s in (%s) |sql}
+      (fst col) table_name (fst col) (sep_by_comma values)
+  in
+  Conn.collect_list
+    (Caqti_request.collect Caqti_type.unit
+       Caqti_type.(tup2 (snd col) int)
+       search )
+    ()
 
 let query ~f pool =
   match%bind Caqti_async.Pool.use f pool with
