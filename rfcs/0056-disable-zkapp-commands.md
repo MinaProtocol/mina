@@ -7,8 +7,5 @@ Previously, there was a zkApp Softcap Limit that could be configured either on s
 ## Detailed design
 Similar to the softcap case, the limit should be configurable at compile time. However, unlike in the softcap case the limit needs to be implemented at the block application level, rather than the block production level, as this change impacts non-BP mina nodes, as well. One candidate for the location is the `create_diff` function in the `staged_ledger.ml`. There is already a `Validate_and_apply_transactions` section in the function that could be coopted.
 
-## Drawbacks
-
-
 ## Testing
 A simple test would be to run two nodes in a local network, with different configurations. Have the first node be a BP without this fix, and another be a non-BP node with this fix (set the limit to zero). Firing an excessive amout of zkApp command transactions at the BP node will cause it to produce a block which exceeds the zkApp command limit. Consequently, the non-BP node should stay constant at its initial block-height.
