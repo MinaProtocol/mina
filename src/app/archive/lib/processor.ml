@@ -293,7 +293,8 @@ module Zkapp_field_array = struct
         ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
-    Metrics.time ~label:"select_insert_into zkapp_field_array" @@ fun () ->
+    Metrics.time ~label:"select_insert_into zkapp_field_array"
+    @@ fun () ->
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name
       ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
@@ -1424,6 +1425,22 @@ module Zkapp_events = struct
     List.map xs ~f:(if parenthesis then sprintf "('%s')" else sprintf "'%s'")
     |> String.concat ~sep:", "
 
+  (* Account_update.Body.Events'.t is defined as `field array list`,
+     which is ismorphic to a list of list of fields.
+
+     We are batching the insertion of field and field_array to optimize
+     the speed of archiving max-cost zkapps.
+
+     1. we flatten the list of list of fields to get all the field elements
+     2. insert all the field elements in one query
+     3. construct a map "M" from `field_id` to `field` by querying against the zkapp_field table
+     4. use "M" and the list of list of fields to compute the list of list of field_ids
+     5. insert all list of `list of field_ids` in one query
+     6. construct a map "M'" from `field_array_id` to `field_id array` by querying against
+        the zkapp_field_array table
+     7. use "M'" and the list of list of field_ids to compute the list of field_array_ids
+     8. insert the list of field_arrays
+  *)
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (events : Account_update.Body.Events'.t) =
     let open Deferred.Result.Let_syntax in
@@ -1461,9 +1478,13 @@ module Zkapp_events = struct
                 ()
               >>| String.Map.of_alist_exn
             in
-
-            List.map field_list_list ~f:(List.map ~f:(Map.find_exn field_map))
-          else return @@ List.map field_list_list ~f:(fun _ -> [])
+            let field_id_list_list =
+              List.map field_list_list ~f:(List.map ~f:(Map.find_exn field_map))
+            in
+            field_id_list_list
+          else
+            (* if there's no fields, then we must have some list of empty lists *)
+            return @@ List.map field_list_list ~f:(fun _ -> [])
         in
         let field_array_list =
           List.map field_id_list_list ~f:(fun id_list ->
@@ -1499,9 +1520,12 @@ module Zkapp_events = struct
             ()
           >>| Field_array_map.of_alist_exn
         in
-        List.map field_id_list_list ~f:(fun field_id_list ->
-            Map.find_exn field_array_map (Array.of_list field_id_list) )
-        |> Array.of_list
+        let field_array_id_list =
+          List.map field_id_list_list ~f:(fun field_id_list ->
+              Map.find_exn field_array_map (Array.of_list field_id_list) )
+          |> Array.of_list
+        in
+        field_array_id_list
       else return @@ Array.of_list []
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
