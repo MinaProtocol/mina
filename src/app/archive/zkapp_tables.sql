@@ -33,7 +33,7 @@ CREATE TABLE zkapp_field_array
 , element_ids              int[]   NOT NULL
 );
 
-create INDEX idx_zkapp_field_array_element_ids ON zkapp_field_array(element_ids);
+CREATE INDEX idx_zkapp_field_array_element_ids ON zkapp_field_array(element_ids);
 
 /* Fixed-width arrays of algebraic fields, given as id's from
    zkapp_field
@@ -83,7 +83,7 @@ CREATE TABLE zkapp_events
 , element_ids              int[]            NOT NULL
 );
 
-create index idx_zkapp_events_element_ids ON zkapp_events(element_ids);
+CREATE INDEX idx_zkapp_events_element_ids ON zkapp_events(element_ids);
 
 
 /* field elements derived from verification keys */
