@@ -287,14 +287,10 @@ module Zkapp_field_array = struct
       (fps : Pickles.Backend.Tick.Field.t array) =
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int array) =
-      Metrics.time ~label:"zkapp_field.add"
-      @@ fun () ->
       Mina_caqti.deferred_result_list_map (Array.to_list fps)
         ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
-    Metrics.time ~label:"select_insert_into zkapp_field_array"
-    @@ fun () ->
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name
       ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
@@ -3041,9 +3037,6 @@ module Block = struct
                 let%map () =
                   match command with
                   | Signed_command _ ->
-                      Metrics.time
-                        ~label:"block_and_signed_command.add_with_status"
-                      @@ fun () ->
                       Block_and_signed_command.add_with_status
                         (module Conn)
                         ~block_id ~user_command_id:id ~sequence_no
@@ -3064,8 +3057,6 @@ module Block = struct
                 in
                 sequence_no + 1
             | { data = Fee_transfer fee_transfer_bundled; status } ->
-                Metrics.time ~label:"fee_transfer.add"
-                @@ fun () ->
                 let fee_transfers =
                   Mina_base.Fee_transfer.to_numbered_list fee_transfer_bundled
                 in
@@ -3168,8 +3159,6 @@ module Block = struct
                 in
                 sequence_no + 1
             | { data = Coinbase coinbase; status } ->
-                Metrics.time ~label:"conbase.add"
-                @@ fun () ->
                 let fee_transfer_via_coinbase =
                   Mina_base.Coinbase.fee_transfer coinbase
                 in
