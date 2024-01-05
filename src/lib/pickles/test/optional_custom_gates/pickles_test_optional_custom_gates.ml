@@ -198,7 +198,7 @@ let main_foreign_field_mul () =
     (Raw { kind = Zero; values = [| fresh_int 0 |]; coeffs = [||] })
 
 (* Parameters *)
-let random_table_id = Random.State.int state 1_000
+let random_table_id = 1 + Random.State.int state 1_000
 
 let size = 1 + Random.State.int state 1_000
 

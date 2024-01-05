@@ -210,7 +210,7 @@ module Block_produced = struct
       (* the associated field looks like "slot_number":1 *)
       let%map global_slot_since_hard_fork =
         find string breadcrumb_consensus_state
-          [ "curr_global_slot"; "slot_number" ]
+          [ "curr_global_slot_since_hard_fork"; "slot_number" ]
       in
       Int.of_string global_slot_since_hard_fork
     in
@@ -862,7 +862,7 @@ let%test_unit "parse breadcrumb functions properly" =
                     "last_vrf_output": "0uRC1o3WvALejoQPlC3Axpz2jgIJopZr20cr3f0FPgE=",
                     "coinbase_receiver": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
                     "block_creator": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
-                    "curr_global_slot": {
+                    "curr_global_slot_since_hard_fork": {
                       "slots_per_epoch": "480",
                       "slot_number": "14"
                     },
