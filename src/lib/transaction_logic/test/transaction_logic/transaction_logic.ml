@@ -1,6 +1,8 @@
 open Core_kernel
 open Currency
 open Mina_base
+open Mina_base_test_helpers
+open Mina_ledger_test_helpers
 open Mina_transaction_logic
 open Signature_lib
 open Transaction_logic_tests
@@ -86,7 +88,11 @@ let simple_payment () =
       let txn = signed_command ~fee ~sender ~receiver amount in
       let txn_state_view = protocol_state in
       let ledger =
-        match test_ledger accounts with Ok l -> l | Error _ -> assert false
+        match Ledger_helpers.ledger_of_accounts accounts with
+        | Ok l ->
+            l
+        | Error _ ->
+            assert false
       in
       [%test_pred: Transaction_applied.t list Or_error.t] Or_error.is_ok
         (Transaction_logic.apply_transactions ~constraint_constants ~global_slot
@@ -98,7 +104,11 @@ let simple_payment_signer_different_from_fee_payer () =
       let txn = signed_command ~signer:receiver ~fee ~sender ~receiver amount in
       let txn_state_view = protocol_state in
       let ledger =
-        match test_ledger accounts with Ok l -> l | Error _ -> assert false
+        match Ledger_helpers.ledger_of_accounts accounts with
+        | Ok l ->
+            l
+        | Error _ ->
+            assert false
       in
       expect_failure
         ~error:
