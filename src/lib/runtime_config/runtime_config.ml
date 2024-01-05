@@ -414,7 +414,11 @@ module Json_layout = struct
 
   module Epoch_data = struct
     module Data = struct
-      type t = { accounts : Accounts.t; seed : string }
+      type t =
+        { accounts : Accounts.t option [@default None]
+        ; seed : string
+        ; hash : string option [@default None]
+        }
       [@@deriving yojson, fields]
 
       let fields = Fields.names |> Array.of_list
@@ -926,26 +930,48 @@ module Epoch_data = struct
   let to_json_layout : t -> Json_layout.Epoch_data.t =
    fun { staking; next } ->
     let accounts (ledger : Ledger.t) =
-      match ledger.base with Accounts acc -> acc | _ -> assert false
+      match ledger.base with Accounts acc -> Some acc | _ -> None
     in
     let staking =
       { Json_layout.Epoch_data.Data.accounts = accounts staking.ledger
       ; seed = staking.seed
+      ; hash = staking.ledger.hash
       }
     in
     let next =
       Option.map next ~f:(fun n ->
           { Json_layout.Epoch_data.Data.accounts = accounts n.ledger
           ; seed = n.seed
+          ; hash = n.ledger.hash
           } )
     in
     { Json_layout.Epoch_data.staking; next }
 
   let of_json_layout : Json_layout.Epoch_data.t -> (t, string) Result.t =
    fun { staking; next } ->
-    let data accounts seed =
+    let open Result.Let_syntax in
+    let data (t : [ `Staking | `Next ])
+        { Json_layout.Epoch_data.Data.accounts; seed; hash } =
+      let%map base =
+        match accounts with
+        | Some accounts ->
+            return @@ Ledger.Accounts accounts
+        | None -> (
+            match hash with
+            | Some hash ->
+                return @@ Ledger.Hash hash
+            | None ->
+                let ledger_name =
+                  match t with `Staking -> "staking" | `Next -> "next"
+                in
+                Error
+                  (sprintf
+                     "Runtime_config.Epoch_data.of_json_layout: Expected a \
+                      field 'accounts', or 'hash' in '%s' ledger"
+                     ledger_name ) )
+      in
       let ledger =
-        { Ledger.base = Accounts accounts
+        { Ledger.base
         ; num_accounts = None
         ; balances = []
         ; hash = None
@@ -955,9 +981,12 @@ module Epoch_data = struct
       in
       { Data.ledger; seed }
     in
-    let staking = data staking.accounts staking.seed in
-    let next = Option.map next ~f:(fun n -> data n.accounts n.seed) in
-    Ok { staking; next }
+    let%bind staking = data `Staking staking in
+    let%map next =
+      Option.value_map next ~default:(Ok None) ~f:(fun next ->
+          Result.map ~f:Option.some @@ data `Next next )
+    in
+    { staking; next }
 
   let to_yojson x = Json_layout.Epoch_data.to_yojson (to_json_layout x)
 
