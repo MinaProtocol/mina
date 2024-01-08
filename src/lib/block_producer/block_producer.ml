@@ -111,7 +111,7 @@ end
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
-    ~log_block_creation ~block_reward_threshold ~consensus_constants =
+    ~log_block_creation ~block_reward_threshold =
   let open Interruptible.Let_syntax in
   let global_slot =
     Consensus.Data.Block_data.global_slot_since_genesis block_data
@@ -125,22 +125,6 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           ] ;
       Interruptible.return None
   | None | Some _ -> (
-      let current_global_slot =
-        Consensus.Data.Consensus_time.(
-          to_global_slot
-            (of_time_exn ~constants:consensus_constants
-               (Block_time.now time_controller) ))
-      in
-      let slot_diff slot =
-        let open Mina_numbers.Global_slot in
-        Option.map ~f:to_int @@ sub slot current_global_slot
-      in
-      Option.iter (Option.bind Mina_compile_config.slot_chain_end ~f:slot_diff)
-        ~f:(fun slot_diff' ->
-          if slot_diff' <= 480 && slot_diff' mod 60 = 0 then
-            [%log info]
-              "Block producer will stop producing blocks after $slot_diff slots"
-              ~metadata:[ ("slot_diff", `Int slot_diff') ] ) ;
       let previous_protocol_state_body_hash =
         Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
       in
@@ -177,14 +161,6 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                 Result.return
                   Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
             | Some _ | None ->
-                Option.iter
-                  (Option.bind Mina_compile_config.slot_tx_end ~f:slot_diff)
-                  ~f:(fun slot_diff' ->
-                    if slot_diff' <= 480 && slot_diff' mod 60 = 0 then
-                      [%log info]
-                        "Block producer will begin producing only empty blocks \
-                         after $slot_diff slots"
-                        ~metadata:[ ("slot_diff", `Int slot_diff') ] ) ;
                 O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
                     let diff =
                       Staged_ledger.create_diff ~constraint_constants
@@ -717,7 +693,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 ~block_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
-                ~winner_pk ~block_reward_threshold ~consensus_constants
+                ~winner_pk ~block_reward_threshold
             in
             match next_state_opt with
             | None ->
@@ -969,6 +945,39 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 in
                 let i' = Mina_numbers.Length.succ epoch_data_for_vrf.epoch in
                 let new_global_slot = epoch_data_for_vrf.global_slot in
+                let log_if_slot_diff_is_less_than =
+                  let current_global_slot =
+                    Consensus.Data.Consensus_time.(
+                      to_global_slot
+                        (of_time_exn ~constants:consensus_constants
+                           (Block_time.now time_controller) ))
+                  in
+                  fun ~diff_limit ~every ~message -> function
+                    | None ->
+                        ()
+                    | Some slot ->
+                        let slot_diff =
+                          let open Mina_numbers.Global_slot in
+                          Option.map ~f:to_int @@ sub slot current_global_slot
+                        in
+                        Option.iter slot_diff ~f:(fun slot_diff' ->
+                            if
+                              slot_diff' <= diff_limit
+                              && slot_diff' mod every = 0
+                            then
+                              [%log info] message
+                                ~metadata:[ ("slot_diff", `Int slot_diff') ] )
+                in
+                log_if_slot_diff_is_less_than ~diff_limit:480 ~every:60
+                  ~message:
+                    "Block producer will stop producing blocks after \
+                     $slot_diff slots"
+                  Mina_compile_config.slot_chain_end ;
+                log_if_slot_diff_is_less_than ~diff_limit:480 ~every:60
+                  ~message:
+                    "Block producer will begin producing only empty blocks \
+                     after $slot_diff slots"
+                  Mina_compile_config.slot_tx_end ;
                 let generate_genesis_proof_if_needed () =
                   match Broadcast_pipe.Reader.peek frontier_reader with
                   | Some transition_frontier ->
