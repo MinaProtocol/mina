@@ -29,11 +29,6 @@ TESTNET_NAME="berkeley"
 
 git config --global --add safe.directory /workdir
 
-echo "Installing mina daemon package: mina-test-executive"
-echo "deb [trusted=yes] http://packages.o1test.net ubuntu stable" | tee /etc/apt/sources.list.d/mina.list
-apt-get update
-apt-get install -y "minimina"
-
 echo "deb [trusted=yes] https://apt.releases.hashicorp.com $MINA_DEB_CODENAME main" | tee /etc/apt/sources.list.d/hashicorp.list
 apt-get update
 apt-get install -y "terraform" "docker" "docker-compose-plugin" "docker-ce"
