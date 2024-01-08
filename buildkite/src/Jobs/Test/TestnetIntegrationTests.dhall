@@ -43,6 +43,6 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.executeLocal "zkapps" dependsOn,
     TestExecutive.executeLocal "zkapps-timing" dependsOn,
     TestExecutive.executeLocal "zkapps-nonce" dependsOn,
-    TestExecutive.executeLocal "verification-key" dependsOn,
+    TestExecutive.executeLocal "verification-key" dependsOn
   ]
 }
