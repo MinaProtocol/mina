@@ -1,4 +1,6 @@
 let ContainerImages = ../../Constants/ContainerImages.dhall
+let B = ../../External/Buildkite.dhall
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let Cmd = ../../Lib/Cmds.dhall
 let S = ../../Lib/SelectFiles.dhall
