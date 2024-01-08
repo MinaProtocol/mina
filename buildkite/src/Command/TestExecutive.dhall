@@ -15,7 +15,7 @@ let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 in
 
 {
-  executCloud = \(testName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
+  executeCloud = \(testName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
     Command.build
       Command.Config::{
         commands =
