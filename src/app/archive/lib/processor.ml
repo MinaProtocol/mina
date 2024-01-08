@@ -2992,8 +2992,6 @@ module Block = struct
                   { Mina_base.With_status.status; data = command }
                 in
                 let%bind id =
-                  Metrics.time ~label:"user_command.add_if_doesn't_exist"
-                  @@ fun () ->
                   User_command.add_if_doesn't_exist
                     (module Conn)
                     user_command.data
@@ -3734,6 +3732,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
             ~metadata:
               [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
           let%bind block_id =
+            O1trace.thread "archive_processor.add_block"
+            @@ fun () ->
             Metrics.time ~label:"add_block"
             @@ fun () -> add_block (module Conn : CONNECTION) block
           in
