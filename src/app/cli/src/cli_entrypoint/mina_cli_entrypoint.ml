@@ -19,7 +19,6 @@ type mina_initialization =
   ; client_trustlist : Unix.Cidr.t list option
   ; rest_server_port : int
   ; limited_graphql_port : int option
-  ; itn_graphql_port : int option
   }
 
 (* keep this code in sync with Client.chain_id_inputs, Mina_commands.chain_id_inputs, and
@@ -99,14 +98,6 @@ let setup_daemon logger =
          likely get tracked in your history. Mainly to be used from the \
          daemon.json config file"
       (optional string)
-  and itn_keys =
-    if Mina_compile_config.itn_features then
-      flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
-        ~doc:
-          "PUBLICKEYS A comma-delimited list of Ed25519 public keys that are \
-           permitted to send signed requests to the incentivized testnet \
-           GraphQL server"
-    else Command.Param.return None
   and itn_max_logs =
     if Mina_compile_config.itn_features then
       flag "--itn-max-logs" ~aliases:[ "itn-max-logs" ] (optional int)
@@ -1373,12 +1364,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
                  ~node_status_url ~graphql_control_port:itn_graphql_port () )
           in
-          { mina
-          ; client_trustlist
-          ; rest_server_port
-          ; limited_graphql_port
-          ; itn_graphql_port
-          }
+          { mina; client_trustlist; rest_server_port; limited_graphql_port }
         in
         (* Breaks a dependency cycle with monitor initilization and coda *)
         let mina_ref : Mina_lib.t option ref = ref None in
@@ -1401,7 +1387,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ; client_trustlist
                  ; rest_server_port
                  ; limited_graphql_port
-                 ; itn_graphql_port
                  } =
           mina_initialization_deferred ()
         in
@@ -1413,7 +1398,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~f:ignore ) ;
         Mina_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
-          ?itn_graphql_port ?auth_keys:itn_keys mina ;
+          mina ;
         let%bind () =
           Option.map metrics_server_port ~f:(fun port ->
               let forward_uri =

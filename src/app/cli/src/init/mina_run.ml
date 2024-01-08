@@ -211,7 +211,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_trustlist = []) ?rest_server_port
-    ?limited_graphql_port ?auth_keys ?(open_limited_graphql_port = false)
+    ?limited_graphql_port ?(open_limited_graphql_port = false)
     ?(insecure_rest_server = false) mina =
   let client_trustlist =
     ref
