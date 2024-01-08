@@ -985,7 +985,7 @@ module Epoch_data = struct
         { Ledger.base
         ; num_accounts = None
         ; balances = []
-        ; hash = None
+        ; hash
         ; name = None
         ; add_genesis_winner = Some false
         }
