@@ -32,7 +32,6 @@ in Pipeline.build Pipeline.Config::{
     mode = PipelineMode.Type.Stable
   },
   steps = [
-    TestExecutive.build "integration_tests",
     TestExecutive.executeLocal "peers-reliability" dependsOn,
     TestExecutive.executeLocal "chain-reliability" dependsOn,
     TestExecutive.executeLocal "payment" dependsOn,
