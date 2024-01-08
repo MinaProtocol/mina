@@ -126,8 +126,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         section_hard "wait for 3 blocks to be produced (warm-up)"
           (wait_for t (Wait_condition.blocks_to_be_produced 3))
       in
+      let genesis_timestamp =
+        Block_time.to_time
+        @@ Block_time.of_int64
+             (Network.genesis_constants network).protocol
+               .genesis_state_timestamp
+      in
       let end_t =
-        Time.add (Time.now ())
+        Time.add genesis_timestamp
           (Time.Span.of_ms @@ float_of_int (num_slots * window_ms))
       in
       let%bind () =

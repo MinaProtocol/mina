@@ -42,6 +42,7 @@
    graph_algorithms
    visualization
    mina_compile_config
+   block_time
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_jane ppx_deriving_yojson ppx_coda ppx_version)))
