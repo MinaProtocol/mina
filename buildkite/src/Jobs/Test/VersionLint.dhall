@@ -48,7 +48,7 @@ Pipeline.build
       let lintDirtyWhen = [
         S.strictlyStart (S.contains "src"),
         S.exactly "buildkite/src/Jobs/Test/VersionLint" "dhall",
-        S.exactly "buildkite/scripts/version_linter" "sh"
+        S.exactly "buildkite/scripts/version-linter" "sh"
       ]
 
       in

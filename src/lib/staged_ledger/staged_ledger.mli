@@ -232,6 +232,32 @@ val apply_diff_unchecked :
 
 val current_ledger_proof : t -> Ledger_proof.t option
 
+(* Internals of the txn application. This is only exposed to facilitate
+   writing unit tests. *)
+module Application_state : sig
+  type txn =
+    ( Signed_command.With_valid_signature.t
+    , Zkapp_command.Valid.t )
+    User_command.t_
+
+  type t =
+    { valid_seq : txn Sequence.t
+    ; invalid : (txn * Error.t) list
+    ; skipped_by_fee_payer : txn list Account_id.Map.t
+    ; zkapp_space_remaining : int option
+    ; total_space_remaining : int
+    }
+
+  val init : ?zkapp_limit:int -> total_limit:int -> t
+
+  val try_applying_txn :
+       ?logger:Logger.t
+    -> apply:(User_command.t Transaction.t_ -> ('a, Error.t) Result.t)
+    -> t
+    -> txn
+    -> (t, txn Sequence.t * (txn * Error.t) list) Continue_or_stop.t
+end
+
 (* This should memoize the snark verifications *)
 
 val create_diff :
@@ -242,6 +268,7 @@ val create_diff :
   -> coinbase_receiver:Public_key.Compressed.t
   -> logger:Logger.t
   -> current_state_view:Zkapp_precondition.Protocol_state.View.t
+  -> zkapp_cmd_limit:int option
   -> transactions_by_fee:User_command.Valid.t Sequence.t
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
@@ -302,3 +329,16 @@ val check_commands :
 *)
 val latest_block_accounts_created :
   t -> previous_block_state_hash:State_hash.t -> Account_id.t list
+
+module Test_helpers : sig
+  val dummy_state_and_view :
+       ?global_slot:Mina_numbers.Global_slot_since_genesis.t
+    -> unit
+    -> Mina_state.Protocol_state.value
+       * Zkapp_precondition.Protocol_state.View.t
+
+  val dummy_state_view :
+       ?global_slot:Mina_numbers.Global_slot_since_genesis.t
+    -> unit
+    -> Zkapp_precondition.Protocol_state.View.t
+end

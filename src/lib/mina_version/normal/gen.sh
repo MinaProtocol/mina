@@ -12,7 +12,12 @@ pushd "$root" > /dev/null
   if [[ -e .git ]] && ! git diff --quiet; then id="[DIRTY]$id"; fi
   commit_date="${MINA_COMMIT_DATE-$(git show HEAD -s --format="%cI" || echo "<unknown>")}"
 
-  pushd src/lib/crypto/proof-systems > /dev/null
+  mina_submodule=$(git submodule status | grep "mina" || true)
+  if [[ -n "$mina_submodule" ]]; then
+    pushd src/mina/src/lib/crypto/proof-systems > /dev/null
+  else
+    pushd src/lib/crypto/proof-systems > /dev/null
+  fi
     marlin_commit_id="${MARLIN_COMMIT_ID-$(git rev-parse --verify HEAD || echo "<unknown>")}"
     marlin_commit_id_short="$(printf '%s' "$marlin_commit_id" | cut -c1-8)"
     if [[ -e .git ]] && ! git diff --quiet; then marlin_commit_id="[DIRTY]$marlin_commit_id"; fi
