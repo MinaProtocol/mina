@@ -46,59 +46,6 @@ let result_field2 ~resolve =
   Schema.io_field ~resolve:(fun resolve_info src input1 input2 ->
       Deferred.return @@ resolve resolve_info src input1 input2 )
 
-module Itn_sequencing = struct
-  (* we don't have compare, etc. for pubkey type to use Core_kernel.Hashtbl *)
-  module Hashtbl = Stdlib.Hashtbl
-
-  let uuid = Uuid.create_random Random.State.default
-
-  let sequence_tbl : (Itn_crypto.pubkey, Unsigned.uint16) Hashtbl.t =
-    Hashtbl.create ~random:true 1023
-
-  let get_sequence_number pubkey =
-    let key = pubkey in
-    match Hashtbl.find_opt sequence_tbl key with
-    | None ->
-        let data = Unsigned.UInt16.zero in
-        Hashtbl.add sequence_tbl key data ;
-        data
-    | Some n ->
-        n
-
-  (* used for `auth` queries, so we can return
-     the sequence number for the pubkey that signed
-     the query
-
-     this is stateful, but appears to be safe
-  *)
-  let set_sequence_number_for_auth, get_sequence_no_for_auth =
-    let pubkey_sequence_no = ref Unsigned.UInt16.zero in
-    let setter pubkey =
-      let seq_no = get_sequence_number pubkey in
-      pubkey_sequence_no := seq_no
-    in
-    let getter () = !pubkey_sequence_no in
-    (setter, getter)
-
-  let valid_sequence_number query_uuid pubkey seqno_str =
-    let%bind.Option () = Option.some_if (Uuid.equal query_uuid uuid) () in
-    let seqno = get_sequence_number pubkey in
-    if String.equal (Unsigned.UInt16.to_string seqno) seqno_str then Some seqno
-    else None
-
-  let incr_sequence_number pubkey =
-    let key = pubkey in
-    match Hashtbl.find_opt sequence_tbl key with
-    | None ->
-        failwithf
-          "Expected to find sequence number for UUID %s and public key %s"
-          (Uuid.to_string uuid)
-          (Itn_crypto.pubkey_to_base64 pubkey)
-          ()
-    | Some n ->
-        Hashtbl.replace sequence_tbl key (Unsigned.UInt16.succ n)
-end
-
 module Subscriptions = struct
   open Schema
 

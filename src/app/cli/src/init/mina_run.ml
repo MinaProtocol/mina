@@ -211,8 +211,8 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_trustlist = []) ?rest_server_port
-    ?limited_graphql_port ?itn_graphql_port ?auth_keys
-    ?(open_limited_graphql_port = false) ?(insecure_rest_server = false) mina =
+    ?limited_graphql_port ?auth_keys ?(open_limited_graphql_port = false)
+    ?(insecure_rest_server = false) mina =
   let client_trustlist =
     ref
       (Unix.Cidr.Set.of_list
@@ -550,19 +550,6 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
             ~require_auth:false rest_server_port ) ) ;
-  if Mina_compile_config.itn_features then
-    (* Third graphql server with ITN-particular queries exposed *)
-    Option.iter itn_graphql_port ~f:(fun rest_server_port ->
-        O1trace.background_thread "serve_itn_graphql" (fun () ->
-            create_graphql_server_with_auth
-              ~mk_context:(fun ~with_seq_no _req -> (with_seq_no, mina))
-              ?auth_keys
-              ~bind_to_address:
-                Tcp.Bind_to_address.(
-                  if insecure_rest_server then All_addresses else Localhost)
-              ~schema:Mina_graphql.schema_itn
-              ~server_description:"GraphQL server for ITN queries"
-              ~require_auth:true rest_server_port ) ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Mina_lib.client_port mina))
