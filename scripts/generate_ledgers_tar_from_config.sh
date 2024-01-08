@@ -15,7 +15,7 @@ config_file_output=$3
 
 # preprocess config file
 config_file_tmp=$(mktemp)
-echo "proprocessing config file..."
+echo "preprocessing config file..."
 jq -r 'if .proof.fork | has("previous_global_slot") then .proof.fork.genesis_slot = .proof.fork.previous_global_slot | del(.proof.fork.previous_global_slot) else . end' "$config_file_input" >"$config_file_tmp"
 
 echo "generating genesis ledger... (this may take a while)"
