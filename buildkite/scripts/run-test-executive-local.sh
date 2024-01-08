@@ -2,7 +2,10 @@
 set -oe pipefail -x
 
 # Set up a local docker swarm
-docker swarm init --advertise-addr 127.0.0.1
+# Check if the current host is part of a Docker Swarm
+if docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'inactive'; then
+    docker swarm init --advertise-addr 127.0.0.1
+fi
 
 TEST_NAME="$1"
 
