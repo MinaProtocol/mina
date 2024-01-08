@@ -13,10 +13,6 @@ val wrap :
   -> (   ( Impls.Wrap.Impl.Field.t
          , Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
          , Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-         , ( Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-           , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-             Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Opt.t
          , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
            , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
@@ -30,7 +26,6 @@ val wrap :
              Composition_types.Bulletproof_challenge.t
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
-           Pickles_types.Hlist0.Id.t
          , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t )
          Import.Types.Wrap.Statement.In_circuit.t
       -> unit )
@@ -43,17 +38,14 @@ val wrap :
   -> ?tweak_statement:
        (   ( Import.Challenge.Constant.t
            , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-           , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-           , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-             , bool )
-             Import.Types.Opt.t
+           , Backend.Tick.Field.t Shifted_value.Type1.t
            , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
              , bool )
              Import.Types.Opt.t
            , bool
            , 'max_proofs_verified
-             Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-           , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
+             Reduced_messages_for_next_proof_over_same_field.Wrap.t
+           , Import.Types.Digest.Constant.t
            , ( 'b
              , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
                , 'actual_proofs_verified )
@@ -64,7 +56,7 @@ val wrap :
                  Pickles_types.Vector.t
                , 'actual_proofs_verified )
                Pickles_types.Vector.t )
-             Proof.Base.Messages_for_next_proof_over_same_field.Step.t
+             Reduced_messages_for_next_proof_over_same_field.Step.t
            , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
              Import.Types.Bulletproof_challenge.t
              Import.Types.Step_bp_vec.t
@@ -72,19 +64,14 @@ val wrap :
            Import.Types.Wrap.Statement.In_circuit.t
         -> ( Import.Challenge.Constant.t
            , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-           , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-           , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-             , bool )
-             Import.Types.Opt.t
+           , Backend.Tick.Field.t Shifted_value.Type1.t
            , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
              , bool )
              Import.Types.Opt.t
            , bool
            , 'max_proofs_verified
-             Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-           , ( Limb_vector.Constant.Hex64.t
-             , Composition_types.Digest.Limbs.n )
-             Pickles_types.Vector.vec
+             Reduced_messages_for_next_proof_over_same_field.Wrap.t
+           , Import.Types.Digest.Constant.t
            , ( 'b
              , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
                , 'actual_proofs_verified )
@@ -95,7 +82,7 @@ val wrap :
                  Pickles_types.Vector.t
                , 'actual_proofs_verified )
                Pickles_types.Vector.t )
-             Proof.Base.Messages_for_next_proof_over_same_field.Step.t
+             Reduced_messages_for_next_proof_over_same_field.Step.t
            , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
              Import.Types.Bulletproof_challenge.t
              Import.Types.Step_bp_vec.t
@@ -115,8 +102,7 @@ val wrap :
          Import.Types.Step.Proof_state.Per_proof.In_circuit.t
        , 'max_proofs_verified )
        Pickles_types.Vector.t
-     , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
-         * Kimchi_pasta.Basic.Fp.Stable.Latest.t
+     , ( Backend.Tock.Proof.G.Affine.t
        , 'actual_proofs_verified )
        Pickles_types.Vector.t
      , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -127,7 +113,7 @@ val wrap :
        Pickles_types.Vector.t
      , 'max_local_max_proofs_verifieds
        Pickles_types.Hlist.H1.T
-         (Proof.Base.Messages_for_next_proof_over_same_field.Wrap)
+         (Reduced_messages_for_next_proof_over_same_field.Wrap)
        .t
      , ( ( Backend.Tock.Field.t
          , Backend.Tock.Field.t array )
@@ -136,10 +122,9 @@ val wrap :
        Pickles_types.Vector.t )
      Proof.Base.Step.t
   -> ( 'max_proofs_verified
-       Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+       Reduced_messages_for_next_proof_over_same_field.Wrap.t
      , ( 'b
-       , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
-           * Kimchi_pasta.Basic.Fp.Stable.Latest.t
+       , ( Backend.Tock.Proof.G.Affine.t
          , 'actual_proofs_verified )
          Pickles_types.Vector.t
        , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -148,7 +133,7 @@ val wrap :
            Pickles_types.Vector.t
          , 'actual_proofs_verified )
          Pickles_types.Vector.t )
-       Proof.Base.Messages_for_next_proof_over_same_field.Step.t )
+       Reduced_messages_for_next_proof_over_same_field.Step.t )
      Proof.Base.Wrap.t
      Promise.t
 

@@ -75,7 +75,6 @@ module Wrap : sig
         module V1 : sig
           type ( 'challenge
                , 'scalar_challenge
-               , 'fp
                , 'bool
                , 'bulletproof_challenges
                , 'branch_data )
@@ -113,7 +112,6 @@ module Wrap : sig
       module V1 : sig
         type ( 'challenge
              , 'scalar_challenge
-             , 'fp
              , 'bool
              , 'messages_for_next_wrap_proof
              , 'digest
@@ -123,7 +121,6 @@ module Wrap : sig
           { deferred_values :
               ( 'challenge
               , 'scalar_challenge
-              , 'fp
               , 'bool
               , 'bp_chals
               , 'index )
@@ -163,7 +160,6 @@ module Wrap : sig
       module V1 : sig
         type ( 'challenge
              , 'scalar_challenge
-             , 'fp
              , 'bool
              , 'messages_for_next_wrap_proof
              , 'digest
@@ -174,7 +170,6 @@ module Wrap : sig
           { proof_state :
               ( 'challenge
               , 'scalar_challenge
-              , 'fp
               , 'bool
               , 'messages_for_next_wrap_proof
               , 'digest

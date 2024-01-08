@@ -104,7 +104,6 @@ struct
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
         , Tick.Field.t Shifted_value.Type1.t
-        , Tick.Field.t Shifted_value.Type1.t option
         , Challenge.Constant.t Scalar_challenge.t option
         , bool
         , Digest.Constant.t
@@ -243,7 +242,6 @@ struct
           ( _
           , _
           , _ Shifted_value.Type1.t
-          , _
           , _
           , _
           , _
