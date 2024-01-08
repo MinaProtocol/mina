@@ -71,6 +71,8 @@ let lift_sync f =
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
          Ivar.fill ivar (f ()) ) )
 
+let zkapp_cmd_limit = ref Mina_compile_config.zkapp_cmd_limit
+
 module Singleton_scheduler : sig
   type t
 
@@ -160,10 +162,10 @@ let report_transaction_inclusion_failures ~logger failed_txns =
       let leftover_bytes = available_bytes - base_error_size - 2 in
       wrap_error (`List (generate_errors failed_txns leftover_bytes)) )
 
-let generate_next_state ~constraint_constants ~previous_protocol_state
-    ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
-    ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
-    ~log_block_creation ~block_reward_threshold =
+let generate_next_state ~zkapp_cmd_limit ~constraint_constants
+    ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
+    ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
+    ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold =
   let open Interruptible.Let_syntax in
   let previous_protocol_state_body_hash =
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
@@ -200,7 +202,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                 staged_ledger ~coinbase_receiver ~logger
                 ~current_state_view:previous_state_view
                 ~transactions_by_fee:transactions ~get_completed_work
-                ~log_block_creation ~supercharge_coinbase
+                ~log_block_creation ~supercharge_coinbase ~zkapp_cmd_limit
               |> Result.map ~f:(fun (diff, failed_txns) ->
                      if not (List.is_empty failed_txns) then
                        don't_wait_for
@@ -752,6 +754,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk:winner_pubkey ~block_reward_threshold
+                ~zkapp_cmd_limit:!zkapp_cmd_limit
             in
             [%log internal] "Generate_next_state_done" ;
             match next_state_opt with
