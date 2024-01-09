@@ -35,7 +35,7 @@ if [ "${BUILDKITE_REPO}" != "${MINA_REPO}" ]; then
 
   # We don't want to use tags (as this can replace our dockers/debian packages). Instead we are using repo name
   # For example: for given repo 'https://github.com/dkijania/mina.git' we convert it to 'dkijania_mina' 
-  export GITTAG=1.0.0$(echo ${BUILDKITE_REPO} | sed -e "s/https:\/\/github.com\///g" | sed -e "s/.git//g" | sed -e "s/\//-/g")
+  export GITTAG=1.0.0$(echo ${BUILDKITE_REPO} | sed -e 's/^.*github.com[:\/]\(.*\)\.git$/\1/' -e 's/\//-/')
   export THIS_COMMIT_TAG=""
   RELEASE=unstable
 
