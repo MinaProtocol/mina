@@ -1,15 +1,12 @@
 // use kimchi::circuits::expr::{Linearization, PolishToken, Variable, Column};
 // use kimchi::circuits::gate::{GateType, CurrOrNext};
 use crate::wasm_flat_vector::WasmFlatVector;
-use crate::wasm_vector::fp::WasmVecVecFp;
-use crate::wasm_vector::fq::WasmVecVecFq;
 use crate::wasm_vector::WasmVector;
 use paste::paste;
 use std::convert::TryInto;
 use wasm_bindgen::prelude::*;
 // use std::sync::Arc;
 // use poly_commitment::srs::SRS;
-use kimchi::circuits::lookup::runtime_tables::RuntimeTable;
 // use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
 // use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use ark_ec::AffineCurve;
@@ -58,8 +55,34 @@ macro_rules! impl_proof {
      $WasmVerifierIndex: ty,
      $field_name: ident
      ) => {
+
         paste! {
+            #[wasm_bindgen]
+            pub struct [<WasmVecVec $field_name:camel>](Vec<Vec<$F>>);
             type WasmVecVecF = [<WasmVecVec $field_name:camel>];
+
+            #[wasm_bindgen]
+            impl [<WasmVecVec $field_name:camel>] {
+                #[wasm_bindgen(constructor)]
+                pub fn create(n: i32) -> Self {
+                    [<WasmVecVec $field_name:camel>](Vec::with_capacity(n as usize))
+                }
+
+                #[wasm_bindgen]
+                pub fn push(&mut self, x: WasmFlatVector<$WasmF>) {
+                    self.0.push(x.into_iter().map(Into::into).collect())
+                }
+
+                #[wasm_bindgen]
+                pub fn get(&self, i: i32) -> WasmFlatVector<$WasmF> {
+                    self.0[i as usize].clone().into_iter().map(Into::into).collect()
+                }
+
+                #[wasm_bindgen]
+                pub fn set(&mut self, i: i32, x: WasmFlatVector<$WasmF>) {
+                    self.0[i as usize] = x.into_iter().map(Into::into).collect()
+                }
+            }
 
             #[derive(Clone)]
             pub struct [<Wasm $field_name:camel ProofEvaluations>](
@@ -228,7 +251,7 @@ macro_rules! impl_proof {
                 #[wasm_bindgen(skip)]
                 pub t_comm: $WasmPolyComm,
                 #[wasm_bindgen(skip)]
-                pub lookup: Option<WasmLookupCommitments>,
+                pub lookup: Option<WasmLookupCommitments>
             }
             type WasmProverCommitments = [<Wasm $field_name:camel ProverCommitments>];
 
@@ -287,7 +310,7 @@ macro_rules! impl_proof {
                         w_comm: x.w_comm.iter().map(Into::into).collect(),
                         z_comm: x.z_comm.clone().into(),
                         t_comm: x.t_comm.clone().into(),
-                        lookup: x.lookup.clone().map(Into::into)
+                        lookup: x.lookup.clone().map(Into::into),
                     }
                 }
             }
@@ -461,8 +484,8 @@ macro_rules! impl_proof {
             }
             type WasmProverProof = [<Wasm $field_name:camel ProverProof>];
 
-            impl From<(&ProverProof<$G, OpeningProof<$G>>, &Vec<$F>)> for WasmProverProof {
-                fn from((x, public): (&ProverProof<$G, OpeningProof<$G>>, &Vec<$F>)) -> Self {
+            impl From<(&ProverProof<$G>, &Vec<$F>)> for WasmProverProof {
+                fn from((x, public): (&ProverProof<$G>, &Vec<$F>)) -> Self {
                     let (scalars, comms) =
                         x.prev_challenges
                             .iter()
@@ -482,8 +505,8 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<(ProverProof<$G, OpeningProof<$G>>, Vec<$F>)> for WasmProverProof {
-                fn from((x, public): (ProverProof<$G, OpeningProof<$G>>, Vec<$F>)) -> Self {
+            impl From<(ProverProof<$G>, Vec<$F>)> for WasmProverProof {
+                fn from((x, public): (ProverProof<$G>, Vec<$F>)) -> Self {
                     let ProverProof {ft_eval1, commitments, proof, evals , prev_challenges} = x;
                     let (scalars, comms) =
                         prev_challenges
@@ -502,7 +525,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<&WasmProverProof> for (ProverProof<$G, OpeningProof<$G>>, Vec<$F>) {
+            impl From<&WasmProverProof> for (ProverProof<$G>, Vec<$F>) {
                 fn from(x: &WasmProverProof) -> Self {
                     let proof = ProverProof {
                         commitments: x.commitments.clone().into(),
@@ -526,7 +549,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<WasmProverProof> for (ProverProof<$G, OpeningProof<$G>>, Vec<$F>) {
+            impl From<WasmProverProof> for (ProverProof<$G>, Vec<$F>) {
                 fn from(x: WasmProverProof) -> Self {
                     let proof =ProverProof {
                         commitments: x.commitments.into(),
@@ -631,34 +654,9 @@ macro_rules! impl_proof {
             }
 
             #[wasm_bindgen]
-            pub struct [<Wasm $field_name:camel RuntimeTable>] {
-                id: i32,
-                data: WasmFlatVector<$WasmF>
-            }
-            type WasmRuntimeTable = [<Wasm $field_name:camel RuntimeTable>];
-
-            #[wasm_bindgen]
-            impl [<Wasm $field_name:camel RuntimeTable>] {
-                #[wasm_bindgen(constructor)]
-                pub fn new(id: i32, data: WasmFlatVector<$WasmF>) -> WasmRuntimeTable {
-                    WasmRuntimeTable {id, data}
-                }
-            }
-
-            impl From<[<Wasm $field_name:camel RuntimeTable>]> for RuntimeTable<$F> {
-                fn from(wasm_rt: WasmRuntimeTable) -> RuntimeTable<$F> {
-                    RuntimeTable {
-                        id: wasm_rt.id.into(),
-                        data: wasm_rt.data.into_iter().map(Into::into).collect()
-                    }
-                }
-            }
-
-            #[wasm_bindgen]
             pub fn [<$name:snake _create>](
                 index: &$WasmIndex,
                 witness: WasmVecVecF,
-                wasm_runtime_tables: WasmVector<WasmRuntimeTable>,
                 prev_challenges: WasmFlatVector<$WasmF>,
                 prev_sgs: WasmVector<$WasmG>,
             ) -> Result<WasmProverProof, JsError> {
@@ -694,13 +692,11 @@ macro_rules! impl_proof {
                         }
                     };
 
-                    let rust_runtime_tables: Vec<RuntimeTable<$F>> = wasm_runtime_tables.into_iter().map(Into::into).collect();
-
                     let witness: [Vec<_>; COLUMNS] = witness.0
                         .try_into()
                         .expect("the witness should be a column of 15 vectors");
 
-                    let index: &ProverIndex<$G, OpeningProof<$G>> = &index.0.as_ref();
+                    let index: &ProverIndex<$G> = &index.0.as_ref();
 
                     let public_input = witness[0][0..index.cs.public].to_vec();
 
@@ -709,7 +705,7 @@ macro_rules! impl_proof {
                     let maybe_proof = ProverProof::create_recursive::<
                         DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
                         DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-                        >(&group_map, witness, &rust_runtime_tables, index, prev, None);
+                        >(&group_map, witness, &[], index, prev, None);
                     (maybe_proof, public_input)
                 });
 
@@ -732,7 +728,6 @@ macro_rules! impl_proof {
                         $G,
                         DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
                         DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-                        OpeningProof<$G>
                     >(
                         &group_map,
                         &[Context { verifier_index, proof, public_input }]
@@ -774,7 +769,6 @@ macro_rules! impl_proof {
                         $G,
                         DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
                         DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-                        OpeningProof<$G>
                     >(&group_map, &ts)
                     .is_ok()
                 })
@@ -834,7 +828,6 @@ macro_rules! impl_proof {
                     lookup_gate_lookup_selector: None,
                     range_check_lookup_selector: None,
                     foreign_field_mul_lookup_selector: None,
-                    public: None,
                 };
 
                 let dlogproof = ProverProof {
