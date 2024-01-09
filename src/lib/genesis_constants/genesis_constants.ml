@@ -337,6 +337,7 @@ module T = struct
     ; zkapp_transaction_cost_limit : float
     ; max_event_elements : int
     ; max_action_elements : int
+    ; zkapp_command_limit : int
     }
   [@@deriving to_yojson, sexp_of, bin_io_unversioned]
 
@@ -394,6 +395,7 @@ let compiled : t =
       Mina_compile_config.zkapp_transaction_cost_limit
   ; max_event_elements = Mina_compile_config.max_event_elements
   ; max_action_elements = Mina_compile_config.max_action_elements
+  ; zkapp_command_limit = Mina_compile_config.zkapp_command_limit
   }
 
 let for_unit_tests = compiled

@@ -570,6 +570,9 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
       Option.value_map ~default:default.num_accounts
         (config.ledger >>= fun cfg -> cfg.num_accounts)
         ~f:(fun num_accounts -> Some num_accounts)
+  ; zkapp_command_limit =
+      Option.value ~default:default.zkapp_command_limit
+        (config.daemon >>= fun cfg -> cfg.zkapp_command_limit)
   }
 
 let runtime_config_of_genesis_constants (genesis_constants : Genesis_constants.t)
@@ -610,6 +613,8 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
               Some precomputed_values.genesis_constants.max_event_elements
           ; max_action_elements =
               Some precomputed_values.genesis_constants.max_action_elements
+          ; zkapp_command_limit =
+              Some precomputed_values.genesis_constants.zkapp_command_limit
           }
     ; genesis =
         Some

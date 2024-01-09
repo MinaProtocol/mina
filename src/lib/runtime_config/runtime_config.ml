@@ -414,6 +414,7 @@ module Json_layout = struct
       ; zkapp_transaction_cost_limit : float option [@default None]
       ; max_event_elements : int option [@default None]
       ; max_action_elements : int option [@default None]
+      ; zkapp_command_limit : int option [@default None]
       }
     [@@deriving yojson, fields, dhall_type]
 
@@ -887,6 +888,7 @@ module Daemon = struct
     ; zkapp_transaction_cost_limit : float option [@default None]
     ; max_event_elements : int option [@default None]
     ; max_action_elements : int option [@default None]
+    ; zkapp_command_limit : int option [@default None]
     }
   [@@deriving bin_io_unversioned]
 
@@ -920,6 +922,8 @@ module Daemon = struct
         opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
     ; max_action_elements =
         opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
+    ; zkapp_command_limit =
+        opt_fallthrough ~default:t1.zkapp_command_limit t2.zkapp_command_limit
     }
 end
 
