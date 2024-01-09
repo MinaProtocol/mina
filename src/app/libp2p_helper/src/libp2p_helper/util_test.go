@@ -12,12 +12,12 @@ import (
 
 	"codanet"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	net "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	ma "github.com/multiformats/go-multiaddr"
 
@@ -74,7 +74,7 @@ func newTestAppWithMaxConnsAndCtxAndGrace(t *testing.T, privkey crypto.PrivKey, 
 	)
 	require.NoError(t, err)
 
-	helper.ResetGatingConfigTrustedAddrFilters()
+	helper.SetTrustedAddrFilters(ma.NewFilters())
 	helper.Host.SetStreamHandler(testProtocol, testStreamHandler)
 
 	t.Cleanup(func() {
@@ -89,12 +89,11 @@ func newTestAppWithMaxConnsAndCtxAndGrace(t *testing.T, privkey crypto.PrivKey, 
 	return &app{
 		P2p:                      helper,
 		Ctx:                      ctx,
-		Subs:                     make(map[uint64]subscription),
-		Topics:                   make(map[string]*pubsub.Topic),
-		ValidatorMutex:           &sync.Mutex{},
-		Validators:               make(map[uint64]*validationStatus),
-		Streams:                  make(map[uint64]net.Stream),
-		AddedPeers:               make([]peer.AddrInfo, 0, 512),
+		_subs:                    make(map[uint64]subscription),
+		_topics:                  make(map[string]*pubsub.Topic),
+		_validators:              make(map[uint64]*validationStatus),
+		_streams:                 make(map[uint64]*stream),
+		_addedPeers:              make([]peer.AddrInfo, 0, 512),
 		OutChan:                  outChan,
 		MetricsRefreshTime:       time.Second * 2,
 		NoUpcalls:                noUpcalls,
@@ -196,7 +195,8 @@ func beginAdvertisingSendAndCheckDo(app *app, rpcSeqno uint64) (*capnp.Message, 
 	if err != nil {
 		return nil, err
 	}
-	return BeginAdvertisingReq(m).handle(app, rpcSeqno), nil
+	r, _ := BeginAdvertisingReq(m).handle(app, rpcSeqno)
+	return r, nil
 }
 
 func checkBeginAdvertisingResponse(t *testing.T, rpcSeqno uint64, resMsg *capnp.Message) {
