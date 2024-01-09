@@ -545,6 +545,8 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
           { txpool_max_size =
               Some precomputed_values.genesis_constants.txpool_max_size
           ; peer_list_url = None
+          ; slot_tx_end = None
+          ; slot_chain_end = None
           }
     ; genesis =
         Some

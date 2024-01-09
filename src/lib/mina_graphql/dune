@@ -78,7 +78,6 @@
    o1trace
    graphql_wrapper
    either
-   mina_compile_config
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make)))

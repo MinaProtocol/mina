@@ -120,7 +120,8 @@ let write_graph (_ : t) =
   ()
 
 let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
-    ~unprocessed_transition_cache enveloped_transition =
+    ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
+    enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
@@ -139,8 +140,8 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
         ~f:(Fn.const initially_validated_transition)
     in
     Transition_handler.Validator.validate_transition ~logger ~frontier
-      ~consensus_constants ~unprocessed_transition_cache
-      enveloped_initially_validated_transition
+      ~consensus_constants ~unprocessed_transition_cache ~slot_tx_end
+      ~slot_chain_end enveloped_initially_validated_transition
   in
   let state_hash =
     Validation.block_with_hash transition_with_hash
@@ -617,9 +618,15 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
       ; ("state_hash", state_hash)
       ]
     "initial_validate: verification of proofs complete" ;
+  let slot_tx_end =
+    Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
+  in
+  let slot_chain_end =
+    Runtime_config.slot_chain_end_or_default precomputed_values.runtime_config
+  in
   verify_transition ~logger
     ~consensus_constants:precomputed_values.consensus_constants ~trust_system
-    ~frontier ~unprocessed_transition_cache tv
+    ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end tv
   |> Deferred.map ~f:(Result.map_error ~f:(fun e -> `Error e))
 
 open Frontier_base

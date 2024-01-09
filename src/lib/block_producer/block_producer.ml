@@ -111,12 +111,12 @@ end
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
-    ~log_block_creation ~block_reward_threshold =
+    ~log_block_creation ~block_reward_threshold ~slot_tx_end ~slot_chain_end =
   let open Interruptible.Let_syntax in
   let global_slot =
     Consensus.Data.Block_data.global_slot_since_genesis block_data
   in
-  match Mina_compile_config.slot_chain_end with
+  match slot_chain_end with
   | Some slot_chain_end
     when Mina_numbers.Global_slot.(global_slot >= slot_chain_end) ->
       [%log info] "Reached slot_chain_end $slot_chain_end, not producing blocks"
@@ -149,7 +149,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             Consensus.Data.Block_data.coinbase_receiver block_data
           in
           let diff =
-            match Mina_compile_config.slot_tx_end with
+            match slot_tx_end with
             | Some slot_tx_end
               when Mina_numbers.Global_slot.(global_slot >= slot_tx_end) ->
                 [%log info]
@@ -610,6 +610,13 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
       let log_bootstrap_mode () =
         [%log info] "Pausing block production while bootstrapping"
       in
+      let slot_tx_end =
+        Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
+      in
+      let slot_chain_end =
+        Runtime_config.slot_chain_end_or_default
+          precomputed_values.runtime_config
+      in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let produce ivar (scheduled_time, block_data, winner_pk) =
         let open Interruptible.Let_syntax in
@@ -693,7 +700,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 ~block_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
-                ~winner_pk ~block_reward_threshold
+                ~winner_pk ~block_reward_threshold ~slot_tx_end ~slot_chain_end
             in
             match next_state_opt with
             | None ->
@@ -972,12 +979,12 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                   ~message:
                     "Block producer will stop producing blocks after \
                      $slot_diff slots"
-                  Mina_compile_config.slot_chain_end ;
+                  slot_chain_end ;
                 log_if_slot_diff_is_less_than ~diff_limit:480 ~every:60
                   ~message:
                     "Block producer will begin producing only empty blocks \
                      after $slot_diff slots"
-                  Mina_compile_config.slot_tx_end ;
+                  slot_tx_end ;
                 let generate_genesis_proof_if_needed () =
                   match Broadcast_pipe.Reader.peek frontier_reader with
                   | Some transition_frontier ->

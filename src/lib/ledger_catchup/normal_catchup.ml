@@ -46,7 +46,8 @@ open Network_peer
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
 let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
-    ~unprocessed_transition_cache enveloped_transition =
+    ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
+    enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
@@ -67,7 +68,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
     in
     Transition_handler.Validator.validate_transition ~logger ~frontier
       ~consensus_constants ~unprocessed_transition_cache
-      enveloped_initially_validated_transition
+      enveloped_initially_validated_transition ~slot_tx_end ~slot_chain_end
   in
   let open Deferred.Let_syntax in
   match cached_initially_validated_transition_result with
@@ -515,13 +516,20 @@ let verify_transitions_and_build_breadcrumbs ~logger
                 @@ diff verification_end_time verification_start_time) )
         ]
       "verification of proofs complete" ;
+    let slot_tx_end =
+      Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
+    in
+    let slot_chain_end =
+      Runtime_config.slot_chain_end_or_default precomputed_values.runtime_config
+    in
     fold_until (List.rev tvs) ~init:[]
       ~f:(fun acc transition ->
         let open Deferred.Let_syntax in
         match%bind
           verify_transition ~logger
             ~consensus_constants:precomputed_values.consensus_constants
-            ~trust_system ~frontier ~unprocessed_transition_cache transition
+            ~trust_system ~frontier ~unprocessed_transition_cache ~slot_tx_end
+            ~slot_chain_end transition
         with
         | Error e ->
             List.iter acc ~f:(fun (node, vc) ->

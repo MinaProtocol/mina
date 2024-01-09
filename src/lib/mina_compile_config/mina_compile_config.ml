@@ -51,7 +51,7 @@ let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
 
 [%%ifndef slot_tx_end]
 
-let slot_tx_end = None
+let slot_tx_end : Mina_numbers.Global_slot.t option = None
 
 [%%else]
 
@@ -63,7 +63,7 @@ let slot_tx_end = Some (Mina_numbers.Global_slot.of_int slot_tx_end)
 
 [%%ifndef slot_chain_end]
 
-let slot_chain_end = None
+let slot_chain_end : Mina_numbers.Global_slot.t option = None
 
 [%%else]
 

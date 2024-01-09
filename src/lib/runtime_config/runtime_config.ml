@@ -426,10 +426,13 @@ module Json_layout = struct
     type t =
       { txpool_max_size : int option [@default None]
       ; peer_list_url : string option [@default None]
+      ; slot_tx_end : int option [@default None]
+      ; slot_chain_end : int option [@default None]
       }
     [@@deriving yojson, dhall_type]
 
-    let fields = [| "txpool_max_size"; "peer_list_url" |]
+    let fields =
+      [| "txpool_max_size"; "peer_list_url"; "slot_tx_end"; "slot_chain_end" |]
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -887,7 +890,11 @@ end
 
 module Daemon = struct
   type t = Json_layout.Daemon.t =
-    { txpool_max_size : int option; peer_list_url : string option }
+    { txpool_max_size : int option
+    ; peer_list_url : string option
+    ; slot_tx_end : int option
+    ; slot_chain_end : int option
+    }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout : t -> Json_layout.Daemon.t = Fn.id
@@ -904,6 +911,9 @@ module Daemon = struct
     { txpool_max_size =
         opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
     ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
+    ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
+    ; slot_chain_end =
+        opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
     }
 end
 
@@ -1016,6 +1026,16 @@ let combine t1 t2 =
   ; ledger = opt_fallthrough ~default:t1.ledger t2.ledger
   ; epoch_data = opt_fallthrough ~default:t1.epoch_data t2.epoch_data
   }
+
+let slot_tx_end_or_default, slot_chain_end_or_default =
+  let f compile get_runtime t =
+    Option.value_map t.daemon ~default:compile ~f:(fun daemon ->
+        Option.merge compile ~f:(fun _c r -> r)
+        @@ Option.map ~f:Mina_numbers.Global_slot.of_int
+        @@ get_runtime daemon )
+  in
+  ( f Mina_compile_config.slot_tx_end (fun d -> d.slot_tx_end)
+  , f Mina_compile_config.slot_chain_end (fun d -> d.slot_chain_end) )
 
 module Test_configs = struct
   let bootstrap =

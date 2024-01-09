@@ -3065,7 +3065,10 @@ module Mutations = struct
         Some (Mina_commands.reset_trust_status coda ip_address) )
 
   let send_user_command coda user_command_input =
-    match Mina_compile_config.slot_tx_end with
+    let slot_tx_end =
+      Runtime_config.slot_tx_end_or_default @@ Mina_lib.runtime_config coda
+    in
+    match slot_tx_end with
     | _ -> (
         match
           Mina_commands.setup_and_submit_user_command coda user_command_input
