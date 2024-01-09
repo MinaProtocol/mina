@@ -36,8 +36,25 @@ echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_
 apt-get update
 apt-get install --allow-downgrades -y "mina-test-executive=$MINA_DEB_VERSION" "mina-logproc=$MINA_DEB_VERSION"
 
+function cleanup
+{
+  remove_active_stacks() {
+      for stack in $(docker stack ls --format "{{.Name}}"); do
+          echo "Removing stack: $stack"
+          docker stack rm $stack
+      done
+  }
+  while [[ $(docker stack ls | wc -l) -gt 1 ]]; do
+      echo "Active Docker stacks found. Removing them..."
+      remove_active_stacks
+      sleep 5 
+  done
+}
+
 mina-test-executive local "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
-  --archive-image "$ARCHIVE_IMAGE"
+  --archive-imge "$ARCHIVE_IMAGE"
   | tee "$TEST_NAME.local.test.log" \
   | mina-logproc -i inline -f '!(.level in ["Debug", "Spam"])'
+
+trap cleanup EXIT
