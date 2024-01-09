@@ -15,8 +15,11 @@ module Thread : sig
   val dump_thread_graph : unit -> bytes
 
   module Fiber : sig
-    type t = Thread.Fiber.t = { id : int; parent : t option; thread : Thread.t }
+    type t = Thread.Fiber.t =
+      { id : int; parent : t option; thread : Thread.t; key : string list }
   end
+
+  val iter_fibers : f:(Fiber.t -> unit) -> unit
 end
 
 module Plugins : module type of Plugins

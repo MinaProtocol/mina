@@ -5,14 +5,14 @@ module Scheduler = Async_kernel_scheduler
 
 let current_wr = ref None
 
-let emit_event =
-  fun event ->
-    Option.iter !current_wr ~f:(fun wr ->
-        let buf = Bigstring.create 512 in
-        try Webkit_trace_event_binary_output.emit_event ~buf wr event
-        with exn ->
-          Writer.writef wr "failed to write o1trace event: %s\n"
-            (Exn.to_string exn) )
+let emit_event' wr event =
+  let buf = Bigstring.create 512 in
+  try Webkit_trace_event_binary_output.emit_event ~buf wr event
+  with exn ->
+    Writer.writef wr "failed to write o1trace event: %s\n" (Exn.to_string exn)
+
+let emit_event event =
+  Option.iter !current_wr ~f:(fun wr -> emit_event' wr event)
 
 let timestamp () =
   Time_stamp_counter.now () |> Time_stamp_counter.to_int63 |> Int63.to_int_exn
@@ -28,21 +28,10 @@ let new_event (k : event_kind) : event =
   ; tid = 0
   }
 
-(* This will track ids per thread. If we need to track ids per fiber,
-   we will need to feed the fiber id into the plugin hooks. *)
-let id_of_thread =
-  let ids = String.Table.create () in
-  let next_id = ref 0 in
-  let alloc_id () =
-    let id = !next_id in
-    incr next_id ; id
-  in
-  fun thread_name -> Hashtbl.find_or_add ids thread_name ~default:alloc_id
-
-let new_thread_event ?(include_name = false) thread_name event_kind =
+let new_thread_event ?(include_name = false) thread_key tid event_kind =
   { (new_event event_kind) with
-    tid = id_of_thread thread_name
-  ; name = (if include_name then thread_name else "")
+    tid
+  ; name = (if include_name then String.concat ~sep:"/" thread_key else "")
   }
 
 (*
@@ -97,34 +86,36 @@ module T = struct
       end)
       ()
 
-  let most_recent_id = ref (-1)
+  let most_recent_id = ref 0
 
   let on_job_enter (fiber : O1trace.Thread.Fiber.t) =
     if fiber.id <> !most_recent_id then (
       most_recent_id := fiber.id ;
-      emit_event
-        (new_thread_event (O1trace.Thread.name fiber.thread) Thread_switch) )
+      emit_event (new_thread_event fiber.key fiber.id Thread_switch) )
 
   let on_job_exit _fiber _time_elapsed = ()
 
-  (*
-  let on_cycle_end () =
-    let sch = Scheduler.t () in
-    emit_event (new_thread_event thread_name Cycle_end) ;
-  *)
+  let on_new_fiber (fiber : O1trace.Thread.Fiber.t) =
+    emit_event (new_thread_event ~include_name:true fiber.key fiber.id New_thread)
 end
+
+let cancel = ref (ref false)
 
 let start_tracing wr =
   if Option.is_some !current_wr then (* log an error, do nothing *)
     ()
   else (
     current_wr := Some wr ;
+    let cancel = !cancel in
+    (* FIXME: these handlers cannot be removed without further
+       changes to async_kernel. Instead, we will leak a ref and
+       accumulate a bunch of NOOPs every time we call [stop_tracing] *)
+    Scheduler.Expert.run_every_cycle_end (fun () ->
+        if not !cancel then emit_event (new_event Cycle_end) ) ;
     emit_event (new_event Pid_is) ;
-    O1trace.Thread.iter_threads ~f:(fun thread ->
+    O1trace.Thread.iter_fibers ~f:(fun fiber ->
         emit_event
-          (new_thread_event ~include_name:true
-             (O1trace.Thread.name thread)
-             New_thread ) ) ;
+          (new_thread_event ~include_name:true fiber.key fiber.id New_thread) ) ;
     O1trace.Plugins.enable_plugin (module T) )
 
 let stop_tracing () =
@@ -132,5 +123,7 @@ let stop_tracing () =
     ()
   else (
     emit_event (new_event Trace_end) ;
+    !cancel := true ;
+    cancel := ref false ;
     current_wr := None ;
     O1trace.Plugins.disable_plugin (module T) )
