@@ -474,6 +474,7 @@ let%test_module "gate finalization" =
             (* Call finalisation with all of the required details *)
             Step_verifier.finalize_other_proof
               (module Nat.N0)
+              ~custom_gate_type:None
               ~step_domains:
                 (`Known
                   [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ]

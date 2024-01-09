@@ -38,7 +38,8 @@ val assert_n_bits :
 
 val finalize_other_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)
-  -> ?custom_gate_type:Backend.Tick.Field.t Kimchi_types.polish_token array option
+  -> custom_gate_type:
+       Backend.Tick.Field.t Kimchi_types.polish_token array option
   -> step_domains:
        [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
        | `Side_loaded ]

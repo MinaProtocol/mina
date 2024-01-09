@@ -186,8 +186,9 @@ module Wrap = struct
               header path ) )
 
   let read_or_generate
-      ~(custom_gate_type : (* TODO: JES: Delete this *)
-      Backend.Tick.Field.t Kimchi_types.polish_token array option )
+      ~(custom_gate_type :
+         (* TODO: JES: Delete this *)
+         Backend.Tick.Field.t Kimchi_types.polish_token array option )
       ~prev_challenges cache k_p k_v typ return_typ main =
     let module Vk = Verification_key in
     let open Impls.Wrap in
@@ -203,6 +204,7 @@ module Wrap = struct
              (Keypair.create ~pk ~vk:(Backend.Tock.Keypair.vk pk), d)
          | Error _e ->
              let r =
+               (* JES: TODO: Try removing custom_gate_type here *)
                Common.time "wrapkeygen" (fun () ->
                    constraint_system ~input_typ:typ ~return_typ main
                    |> Keypair.generate ~custom_gate_type:None ~prev_challenges )

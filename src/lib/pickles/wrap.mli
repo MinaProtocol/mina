@@ -40,7 +40,8 @@ val wrap :
   -> step_plonk_indices:'d
   -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> actual_feature_flags:bool Plonk_types.Features.t
-  -> custom_gate_type:Impls.Step.Impl.field Kimchi_types.polish_token array option
+  -> custom_gate_type:
+       Impls.Step.Impl.field Kimchi_types.polish_token array option
   -> ?tweak_statement:
        (   ( Import.Challenge.Constant.t
            , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
@@ -175,7 +176,8 @@ val combined_inner_product :
   -> xi:Backend.Tick.Field.t
   -> zeta:Backend.Tick.Field.t
   -> zetaw:Backend.Tick.Field.t
-  -> custom_gate_type:Backend.Tick.Field.t Kimchi_types.polish_token array option
+  -> custom_gate_type:
+       Backend.Tick.Field.t Kimchi_types.polish_token array option
   -> Backend.Tick.Field.t
 
 val challenge_polynomial :

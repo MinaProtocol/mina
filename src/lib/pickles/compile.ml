@@ -420,12 +420,12 @@ struct
     in
     let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
     Timer.clock __LOC__ ;
-    (* Note: we have the limitation that the custom_gate_type for all choices must be the same *)
     let feature_flags, custom_gate_type =
       let rec go :
           type a b c d.
              (a, b, c, d) H4.T(IR).t
-          -> Opt.Flag.t Plonk_types.Features.Full.t * (Backend.Tick.Field.t Kimchi_types.polish_token array option) =
+          -> Opt.Flag.t Plonk_types.Features.Full.t
+             * Backend.Tick.Field.t Kimchi_types.polish_token array option =
        fun rules ->
         match rules with
         | [] ->
@@ -440,8 +440,12 @@ struct
             , r.custom_gate_type )
         | r :: rules ->
             let feature_flags, custom_gate_type = go rules in
-            (* JES: TODO Assert below *)
-            (* assert (custom_gate_type = r.custom_gate_type) ; *)
+            (* Note: For now we only support one choice when custom gates are defined *)
+            if
+              Option.is_some custom_gate_type
+              || Option.is_some r.custom_gate_type
+            then
+              failwith "Only a single choice is allowed with configurable gates" ;
             ( Plonk_types.Features.Full.map2
                 (Plonk_types.Features.to_full ~or_:( || ) r.feature_flags)
                 feature_flags ~f:(fun enabled flag ->
@@ -682,8 +686,11 @@ struct
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
-            Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
-              ~custom_gate_type:None (* We don't override custom gates on the wrap proof *)
+            Cache.Wrap.read_or_generate
+            (* Due to Wrap_hack *)
+            (* JES: TODO: Try removing custom_gate_type here *)
+              ~custom_gate_type:None
+                (* We don't override custom gates on the wrap proof *)
                 (* Note: custom_gate_type needed for case when gate is overriden (true) and witness is valid *)
               ~prev_challenges:2 cache disk_key_prover disk_key_verifier typ
               (Snarky_backendless.Typ.unit ())
@@ -1136,7 +1143,8 @@ let compile_with_wrap_main_override_promise :
   in
   let custom_gate_type =
     let compiled = Types_map.lookup_compiled self.id in
-    compiled.custom_gate_type in
+    compiled.custom_gate_type
+  in
   let module P = struct
     type statement = value
 

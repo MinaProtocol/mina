@@ -21,7 +21,8 @@ module Step : sig
   end
 
   val read_or_generate :
-       custom_gate_type:Impls.Step.Field.Constant.t Kimchi_types.polish_token array option
+       custom_gate_type:
+         Impls.Step.Field.Constant.t Kimchi_types.polish_token array option
     -> prev_challenges:int
     -> Key_cache.Spec.t list
     -> Key.Proving.t lazy_t
@@ -61,7 +62,8 @@ module Wrap : sig
   end
 
   val read_or_generate :
-       custom_gate_type:Impls.Step.Field.Constant.t Kimchi_types.polish_token array option
+       custom_gate_type:
+         Impls.Step.Field.Constant.t Kimchi_types.polish_token array option
     -> prev_challenges:Core_kernel.Int.t
     -> Key_cache.Spec.t list
     -> Key.Proving.t Core_kernel.Lazy.t

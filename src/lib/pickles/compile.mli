@@ -125,7 +125,8 @@ module Side_loaded : sig
        name:string
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
     -> feature_flags:Opt.Flag.t Plonk_types.Features.t
-    -> custom_gate_type:Backend.Tick.Field.t Kimchi_types.polish_token array option
+    -> custom_gate_type:
+         Backend.Tick.Field.t Kimchi_types.polish_token array option
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 

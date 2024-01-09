@@ -134,6 +134,36 @@ let register_feature_test (name, specific_feature_flags, custom_gate_type) =
     specific_feature_flags Plonk_types.Features.none_bool custom_gate_type
     custom_gate_type
 
+(* User-supplied conditional gate in RPN
+ *     w(0) = w(1) * w(3) + (1 - w(3)) * w(2)
+ *)
+let conditional_gate =
+  Some
+    Kimchi_types.
+      [| Cell { col = Index ForeignFieldAdd; row = Curr }
+       ; Cell { col = Witness 3; row = Curr }
+       ; Dup
+       ; Mul
+       ; Cell { col = Witness 3; row = Curr }
+       ; Sub
+       ; Alpha
+       ; Pow 1l
+       ; Cell { col = Witness 0; row = Curr }
+       ; Cell { col = Witness 3; row = Curr }
+       ; Cell { col = Witness 1; row = Curr }
+       ; Mul
+       ; Literal (Impl.Field.Constant.of_int 1)
+       ; Cell { col = Witness 3; row = Curr }
+       ; Sub
+       ; Cell { col = Witness 2; row = Curr }
+       ; Mul
+       ; Add
+       ; Sub
+       ; Mul
+       ; Add
+       ; Mul
+      |]
+
 let () =
   let configurations =
     [ ( "customizable gate (ffadd)"
@@ -141,7 +171,7 @@ let () =
       , None )
     ; ( "customizable gate (conditional)"
       , Plonk_types.Features.{ none_bool with foreign_field_add = true }
-      , None (* JES: TODO: set to gate definition *) )
+      , conditional_gate )
     ]
   in
   List.iter ~f:register_feature_test configurations ;
