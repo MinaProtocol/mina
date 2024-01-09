@@ -96,7 +96,8 @@ module T = struct
   let on_job_exit _fiber _time_elapsed = ()
 
   let on_new_fiber (fiber : O1trace.Thread.Fiber.t) =
-    emit_event (new_thread_event ~include_name:true fiber.key fiber.id New_thread)
+    emit_event
+      (new_thread_event ~include_name:true fiber.key fiber.id New_thread)
 end
 
 let cancel = ref (ref false)
@@ -110,8 +111,6 @@ let start_tracing wr =
     (* FIXME: these handlers cannot be removed without further
        changes to async_kernel. Instead, we will leak a ref and
        accumulate a bunch of NOOPs every time we call [stop_tracing] *)
-    Scheduler.Expert.run_every_cycle_end (fun () ->
-        if not !cancel then emit_event (new_event Cycle_end) ) ;
     emit_event (new_event Pid_is) ;
     O1trace.Thread.iter_fibers ~f:(fun fiber ->
         emit_event
