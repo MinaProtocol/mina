@@ -38,7 +38,6 @@ apt-get install --allow-downgrades -y "mina-test-executive=$MINA_DEB_VERSION" "m
 
 mina-test-executive local "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
-  --archive-image "$ARCHIVE_IMAGE" \
-  --debug
+  --archive-image "$ARCHIVE_IMAGE"
   | tee "$TEST_NAME.local.test.log" \
   | mina-logproc -i inline -f '!(.level in ["Debug", "Spam"])'
