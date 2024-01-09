@@ -1661,12 +1661,11 @@ let () =
              ~doc:"file File containing the resulting ledger"
              Param.(optional string)
          and migration_mode =
-           Param.flag "--migration-mode"
+           Param.flag "--zkapp-migration-mode"
              ~doc:
-               "If this flag is turned on then migration mode would be \
-                started, which means ledger hash check would be disabled and \
-                this app would populates the `accounts_accessed` and \
-                `accounts_created` tables"
+               "Disable ledger hash check and populate accounts_accessed \
+                table. Used only for migrating mainnet database for berkeley \
+                upgrade"
              Param.no_arg
          and archive_uri =
            Param.flag "--archive-uri"
