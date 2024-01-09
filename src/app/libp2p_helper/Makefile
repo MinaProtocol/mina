@@ -14,18 +14,18 @@ libp2p_helper: ../../libp2p_ipc/libp2p_ipc.capnp.go
 test: ../../libp2p_ipc/libp2p_ipc.capnp.go
 	cd src/libp2p_helper \
 		&& (ulimit -n 65536 || true) \
-		&& $(GO) test -short -timeout 40m
+		&& $(GO) test -race -short -timeout 40m
 
 test-bs-qc: ../../libp2p_ipc/libp2p_ipc.capnp.go
 	cd src/libp2p_helper \
 		&& (ulimit -n 65536 || true) \
-		&& $(GO) test -timeout 60m -run "^TestBitswapQC$$"
+		&& $(GO) test -race -timeout 60m -run "^TestBitswapQC$$"
 
 test-large: ../../libp2p_ipc/libp2p_ipc.capnp.go
 	cd src/libp2p_helper \
 		&& (ulimit -n 65536 || true) \
-		&& $(GO) test -timeout 40m -run "^TestBitswapMedium$$" \
-		&& $(GO) test -timeout 40m -run "^TestBitswapJumbo$$"
+		&& $(GO) test -race -timeout 40m -run "^TestBitswapMedium$$" \
+		&& $(GO) test -race -timeout 40m -run "^TestBitswapJumbo$$"
 
 clean:
 	rm -rf result ../../libp2p_ipc/libp2p_ipc.capnp.go
