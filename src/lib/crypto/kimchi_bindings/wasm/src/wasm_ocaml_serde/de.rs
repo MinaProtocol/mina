@@ -273,9 +273,8 @@ impl<'de> de::Deserializer<'de> for Deserializer {
         }
     }
 
-    #[inline]
     fn is_human_readable(&self) -> bool {
-        false
+        true
     }
 }
 

@@ -643,7 +643,7 @@ let _ =
                |> Backend.Keypair.create ~prev_challenges:0 )
          in
          let x = Backend.Field.of_int 2 in
-         let (pi : Backend.Proof.with_public_evals) =
+         let (pi : Backend.Proof.t) =
            time "generate witness conv" (fun () ->
                Impl.generate_witness_conv ~input_typ:Typ.field
                  ~return_typ:Typ.unit main
@@ -920,16 +920,8 @@ let _ =
            vec
          in
          let urs = Pasta_fp_urs.create 16 in
-         (* TODO(dw) write tests with lookup tables *)
-         let lookup_tables = [||] in
-         (* TODO(dw) write tests with runtime tables *)
-         let runtime_table_cfg = [||] in
-         let index0 =
-           create gate_vector 0 lookup_tables runtime_table_cfg 0 urs
-         in
-         let index2 =
-           create gate_vector 2 lookup_tables runtime_table_cfg 0 urs
-         in
+         let index0 = create gate_vector 0 0 urs in
+         let index2 = create gate_vector 2 0 urs in
          assert (max_degree index0 = 16) ;
          assert (max_degree index2 = 16) ;
          assert (public_inputs index0 = 0) ;
@@ -975,16 +967,8 @@ let _ =
            vec
          in
          let urs = Pasta_fq_urs.create 16 in
-         (* TODO(dw) write tests with lookup tables *)
-         let lookup_tables = [||] in
-         (* TODO(dw) write tests with runtime tables *)
-         let runtime_table_cfg = [||] in
-         let index0 =
-           create gate_vector 0 lookup_tables runtime_table_cfg 0 urs
-         in
-         let index2 =
-           create gate_vector 2 lookup_tables runtime_table_cfg 0 urs
-         in
+         let index0 = create gate_vector 0 0 urs in
+         let index2 = create gate_vector 2 0 urs in
          assert (max_degree index0 = 16) ;
          assert (max_degree index2 = 16) ;
          assert (public_inputs index0 = 0) ;
@@ -1008,28 +992,10 @@ let verification_evals_to_list
     ; mul_comm : 'PolyComm
     ; emul_comm : 'PolyComm
     ; endomul_scalar_comm : 'PolyComm
-    ; xor_comm : 'PolyComm option
-    ; range_check0_comm : 'PolyComm option
-    ; range_check1_comm : 'PolyComm option
-    ; foreign_field_add_comm : 'PolyComm option
-    ; foreign_field_mul_comm : 'PolyComm option
-    ; rot_comm : 'PolyComm option
     } =
-  let non_opt_comms =
-    generic_comm :: psm_comm :: complete_add_comm :: mul_comm :: emul_comm
-    :: endomul_scalar_comm
-    :: (Array.append sigma_comm coefficients_comm |> Array.to_list)
-  in
-  let opt_comms =
-    [ xor_comm
-    ; range_check0_comm
-    ; range_check1_comm
-    ; foreign_field_add_comm
-    ; foreign_field_mul_comm
-    ; rot_comm
-    ]
-  in
-  List.map Option.some non_opt_comms @ opt_comms
+  generic_comm :: psm_comm :: complete_add_comm :: mul_comm :: emul_comm
+  :: endomul_scalar_comm
+  :: (Array.append sigma_comm coefficients_comm |> Array.to_list)
 
 let eq_verifier_index ~field_equal ~other_field_equal
     { VerifierIndex.domain = { log_size_of_group = i1_1; group_gen = f1 }
@@ -1052,14 +1018,7 @@ let eq_verifier_index ~field_equal ~other_field_equal
     } =
   i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2
   && List.for_all2
-       (fun x y ->
-         match (x, y) with
-         | Some x, Some y ->
-             eq_poly_comm ~field_equal:other_field_equal x y
-         | None, None ->
-             true
-         | _, _ ->
-             false )
+       (eq_poly_comm ~field_equal:other_field_equal)
        (verification_evals_to_list evals1)
        (verification_evals_to_list evals2)
   && eq_verification_shifts ~field_equal shifts1 shifts2
@@ -1100,18 +1059,8 @@ let _ =
              ~other_field_equal:Pasta_fq.equal
          in
          let urs = Pasta_fp_urs.create 16 in
-         (* TODO(dw) write tests with lookup tables *)
-         let lookup_tables = [||] in
-         (* TODO(dw) write tests with runtime tables *)
-         let runtime_table_cfg = [||] in
-         let index0 =
-           Pasta_fp_index.create gate_vector 0 lookup_tables runtime_table_cfg 0
-             urs
-         in
-         let index2 =
-           Pasta_fp_index.create gate_vector 2 lookup_tables runtime_table_cfg 0
-             urs
-         in
+         let index0 = Pasta_fp_index.create gate_vector 0 0 urs in
+         let index2 = Pasta_fp_index.create gate_vector 2 0 urs in
          let vindex0_0 = create index0 in
          let vindex0_1 = create index0 in
          assert (eq vindex0_0 vindex0_1) ;
@@ -1160,18 +1109,8 @@ let _ =
              ~other_field_equal:Pasta_fp.equal
          in
          let urs = Pasta_fq_urs.create 16 in
-         (* TODO(dw) write tests with lookup tables *)
-         let lookup_tables = [||] in
-         (* TODO(dw) write tests with runtime tables *)
-         let runtime_table_cfg = [||] in
-         let index0 =
-           Pasta_fq_index.create gate_vector 0 lookup_tables runtime_table_cfg 0
-             urs
-         in
-         let index2 =
-           Pasta_fq_index.create gate_vector 2 lookup_tables runtime_table_cfg 0
-             urs
-         in
+         let index0 = Pasta_fq_index.create gate_vector 0 0 urs in
+         let index2 = Pasta_fq_index.create gate_vector 2 0 urs in
          let vindex0_0 = create index0 in
          let vindex0_1 = create index0 in
          assert (eq vindex0_0 vindex0_1) ;
