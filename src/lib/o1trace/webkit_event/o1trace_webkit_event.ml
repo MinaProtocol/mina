@@ -97,9 +97,13 @@ module T = struct
       end)
       ()
 
+  let most_recent_id = ref (-1)
+
   let on_job_enter (fiber : O1trace.Thread.Fiber.t) =
-    emit_event
-      (new_thread_event (O1trace.Thread.name fiber.thread) Thread_switch)
+    if fiber.id <> !most_recent_id then (
+      most_recent_id := fiber.id ;
+      emit_event
+        (new_thread_event (O1trace.Thread.name fiber.thread) Thread_switch) )
 
   let on_job_exit _fiber _time_elapsed = ()
 
