@@ -10,6 +10,8 @@ open Pickles_types
 module Wrap = Pickles__Wrap
 module Import = Pickles__Import
 
+(* Type to list test configurations, that is, how to interpret feature flags in
+   the tests. *)
 type test_options =
   { true_is_yes : Plonk_types.Features.options
   ; true_is_maybe : Plonk_types.Features.options
