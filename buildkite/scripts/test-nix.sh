@@ -16,6 +16,7 @@ echo 'experimental-features = nix-command flakes' > "${XDG_CONFIG_HOME-${HOME}/.
 
 git config --global --add safe.directory /workdir
 
+git fetch 
 # Nix has issue when performing operations on detached head
 # On Ci machine it spit out issues like:
 # fatal: reference is not a tree: ....

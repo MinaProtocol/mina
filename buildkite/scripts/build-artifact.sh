@@ -28,13 +28,18 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/replayer/replayer.exe \
   src/app/extract_blocks/extract_blocks.exe \
   src/app/archive_blocks/archive_blocks.exe \
+  src/app/berkeley_migration/berkeley_migration.exe \
+  src/app/berkeley_account_tables/berkeley_account_tables.exe \
+  src/app/last_vrf_output_to_b64/last_vrf_output_to_b64.exe \
+  src/app/receipt_chain_hash_to_b58/receipt_chain_hash_to_b58.exe \
   src/app/batch_txn_tool/batch_txn_tool.exe \
   src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
   src/app/swap_bad_balances/swap_bad_balances.exe \
   src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
   src/app/rosetta/rosetta_testnet_signatures.exe \
   src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
-  src/app/test_executive/test_executive.exe # 2>&1 | tee /tmp/buildocaml.log
+  src/app/test_executive/test_executive.exe  \
+  src/test/command_line_tests/command_line_tests.exe # 2>&1 | tee /tmp/buildocaml.log
 
 echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
 echo " Includes mina daemon, archive-node, rosetta, generate keypair for berkeley"
