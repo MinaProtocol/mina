@@ -20,6 +20,12 @@ ARG MINA_DIR=mina
 
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
+RUN echo "Current user is: $(whoami)"
+
+RUN echo "Current dir is: $(pwd)"
+
+RUN echo "Path is: $PATH"
+
 # git will clone into an empty dir, but this also helps us set the workdir in advance
 RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
   && git clone \
@@ -33,6 +39,7 @@ WORKDIR $HOME/${MINA_DIR}
 
 RUN git submodule sync && git submodule update --init --recursive
 
+
 RUN mkdir ${HOME}/app
 
 # HACK: build without special cpu features to allow more people to run delegation verification tool
@@ -44,9 +51,18 @@ RUN eval $(opam config env) \
   && cp _build/default/src/app/delegation_verify/delegation_verify.exe ./delegation-verify \
   && rm -rf _build
 
-RUN rm -rf $HOME/${MINA_DIR}
-
 USER root
+
+# copy binary to /bin
+RUN cp ./delegation-verify /bin/delegation-verify
+
+# add authenticate.sh to image
+RUN cp src/app/delegation_verify/scripts/authenticate.sh /bin/authenticate.sh
+
+# make binary and script executable
+RUN chmod +x /bin/authenticate.sh /bin/delegation-verify
+
+RUN rm -rf $HOME/${MINA_DIR}
 
 # awscli and cqlsh-expansion are used by the delegation verification tool
 RUN apt-get update && apt-get install -y python3 python3-pip
