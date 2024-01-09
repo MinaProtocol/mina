@@ -258,21 +258,21 @@ end
    inputs from either no public inputs, a single one or a pair of inputs
    returned by the gate example. *)
 
-let no_public_input gate_example srs =
+let without_public_input gate_example srs =
   let index, proof = gate_example srs in
   (index, [], proof)
 
-let public_input_1 gate_example srs =
+let with_one_public_input gate_example srs =
   let index, public_input, proof = gate_example srs in
   (index, [ public_input ], proof)
 
-let public_input_2 gate_example srs =
+let with_two_public_inputs gate_example srs =
   let index, (public_input1, public_input2), proof = gate_example srs in
   (index, [ public_input1; public_input2 ], proof)
 
 module Lookup = Make (struct
   let example =
-    public_input_1 Kimchi_bindings.Protocol.Proof.Fp.example_with_lookup
+    with_one_public_input Kimchi_bindings.Protocol.Proof.Fp.example_with_lookup
 
   let actual_feature_flags =
     { Plonk_types.Features.none_bool with lookup = true; runtime_tables = true }
@@ -280,7 +280,8 @@ end)
 
 module Range_check = Make (struct
   let example =
-    no_public_input Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check
+    without_public_input
+      Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check
 
   let actual_feature_flags =
     { Plonk_types.Features.none_bool with
@@ -291,7 +292,8 @@ end)
 
 module Range_check_64 = Make (struct
   let example =
-    no_public_input Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check0
+    without_public_input
+      Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check0
 
   let actual_feature_flags =
     { Plonk_types.Features.none_bool with range_check0 = true }
@@ -299,14 +301,14 @@ end)
 
 module Xor = Make (struct
   let example =
-    public_input_2 Kimchi_bindings.Protocol.Proof.Fp.example_with_xor
+    with_two_public_inputs Kimchi_bindings.Protocol.Proof.Fp.example_with_xor
 
   let actual_feature_flags = { Plonk_types.Features.none_bool with xor = true }
 end)
 
 module Rot = Make (struct
   let example =
-    public_input_2 Kimchi_bindings.Protocol.Proof.Fp.example_with_rot
+    with_two_public_inputs Kimchi_bindings.Protocol.Proof.Fp.example_with_rot
 
   let actual_feature_flags =
     { Plonk_types.Features.none_bool with range_check0 = true; rot = true }
@@ -314,7 +316,7 @@ end)
 
 module FFAdd = Make (struct
   let example =
-    public_input_1 Kimchi_bindings.Protocol.Proof.Fp.example_with_ffadd
+    with_one_public_input Kimchi_bindings.Protocol.Proof.Fp.example_with_ffadd
 
   let actual_feature_flags =
     { Plonk_types.Features.none_bool with
