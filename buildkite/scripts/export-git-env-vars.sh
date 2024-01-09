@@ -30,7 +30,8 @@ export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bullseye}
 
 if [ "${BUILDKITE_REPO}" != "${MINA_REPO}" ]; then 
   # Abort if `BUILDKITE_REPO` doesn't have the expected format
-  echo ${BUILDKITE_REPO} | grep -P '^.*github.com[:\/](.*)\.git$' > /dev/null
+  echo ${BUILDKITE_REPO} | grep -P '^.*github.com[:\/](.*)\.git$' > /dev/null || \
+      (echo "BUILDKITE_REPO does not have the expected format" && false)
 
   # We don't want to allow some operations on fork repository which should be done on main repo only. 
   # Publish to docker hub or publish to unstable debian channel should be exclusive to main repo as it can override 
