@@ -119,6 +119,7 @@ module Constraint_constants = struct
         (Fork_config.t option
         [@to_yojson Fork_config.opt_to_yojson]
         [@of_yojson Fork_config.opt_of_yojson] )
+    ; zkapps_per_block : int
     }
   [@@deriving yojson, sexp, ord, equal]
 end
@@ -232,6 +233,7 @@ let%test_module "Check parsing of header" =
           ; supercharged_coinbase_factor = 1
           ; account_creation_fee = Unsigned.UInt64.of_int 1
           ; fork = None
+          ; zkapps_per_block = 128
           }
       ; commits =
           { mina = "7e1fb2cd9138af1d0f24e78477efd40a2a0fcd07"

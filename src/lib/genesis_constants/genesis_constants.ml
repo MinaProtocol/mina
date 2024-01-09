@@ -53,6 +53,7 @@ module Constraint_constants = struct
     ; supercharged_coinbase_factor : int
     ; account_creation_fee : Currency.Fee.Stable.Latest.t
     ; fork : Fork_constants.t option
+    ; zkapps_per_block : int
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 
@@ -80,6 +81,7 @@ module Constraint_constants = struct
               }
         | None ->
             None )
+    ; zkapps_per_block = t.zkapps_per_block
     }
 
   (* Generate the compile-time constraint constants, using a signature to hide
@@ -180,6 +182,8 @@ module Constraint_constants = struct
 
       [%%endif]
 
+      let zkapps_per_block = 1
+
       let compiled =
         { sub_windows_per_window
         ; ledger_depth
@@ -193,6 +197,7 @@ module Constraint_constants = struct
         ; account_creation_fee =
             Currency.Fee.of_mina_string_exn account_creation_fee_string
         ; fork
+        ; zkapps_per_block
         }
     end :
       sig
@@ -337,7 +342,6 @@ module T = struct
     ; zkapp_transaction_cost_limit : float
     ; max_event_elements : int
     ; max_action_elements : int
-    ; zkapp_command_limit : int
     }
   [@@deriving to_yojson, sexp_of, bin_io_unversioned]
 
@@ -395,7 +399,6 @@ let compiled : t =
       Mina_compile_config.zkapp_transaction_cost_limit
   ; max_event_elements = Mina_compile_config.max_event_elements
   ; max_action_elements = Mina_compile_config.max_action_elements
-  ; zkapp_command_limit = Mina_compile_config.zkapp_command_limit
   }
 
 let for_unit_tests = compiled

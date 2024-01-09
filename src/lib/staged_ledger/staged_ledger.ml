@@ -59,6 +59,7 @@ module T = struct
       | Mismatched_statuses of
           Transaction.t With_status.t * Transaction_status.t
       | Invalid_public_key of Public_key.Compressed.t
+      | ZkApps_exceed_limit of int * int
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -102,6 +103,11 @@ module T = struct
             !"A transaction contained an invalid public key %{sexp: \
               Public_key.Compressed.t}"
             pk
+      | ZkApps_exceed_limit (count, limit) ->
+          Format.asprintf
+            !"There are %{sexp: int} ZkApps in the block when there is a \
+              configured limit of %{sexp: int}"
+            count limit
       | Unexpected e ->
           Error.to_string_hum e
 
@@ -965,6 +971,25 @@ module T = struct
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
     let transactions, works, commands_count, coinbases = pre_diff_info in
+    [%log internal] "Check #zkApp does not exceed hardcap" ;
+    let%bind () =
+      O1trace.thread "Check #zkApp does not exceed hardcap" (fun () ->
+          let zkAppCount =
+            transactions
+            |> List.filter ~f:(fun (txn, _) ->
+                   match txn with
+                   | Transaction.Command (User_command.Zkapp_command _) ->
+                       true
+                   | _ ->
+                       false )
+            |> List.length
+          in
+          if zkAppCount > constraint_constants.zkapps_per_block then
+            Deferred.Result.fail
+              (Staged_ledger_error.ZkApps_exceed_limit
+                 (zkAppCount, constraint_constants.zkapps_per_block) )
+          else Deferred.Result.return () )
+    in
     [%log internal] "Update_coinbase_stack"
       ~metadata:
         [ ("transactions", `Int (List.length transactions))

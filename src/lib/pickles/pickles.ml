@@ -168,6 +168,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ; supercharged_coinbase_factor = 0
               ; account_creation_fee = Unsigned.UInt64.of_int 0
               ; fork = None
+              ; zkapps_per_block = 128
               }
           ; commits = { mina = ""; marlin = "" }
           ; length = 0
@@ -431,6 +432,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
@@ -494,6 +496,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
@@ -561,6 +564,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
@@ -669,6 +673,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
@@ -803,6 +808,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
@@ -927,6 +933,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
@@ -992,6 +999,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
@@ -1073,6 +1081,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; supercharged_coinbase_factor = 0
         ; account_creation_fee = Unsigned.UInt64.of_int 0
         ; fork = None
+        ; zkapps_per_block = 128
         }
 
       let tag =
@@ -2104,6 +2113,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
@@ -2157,6 +2167,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
@@ -2211,6 +2222,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
@@ -2288,6 +2300,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
@@ -2452,6 +2465,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
@@ -2505,6 +2519,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
@@ -2559,6 +2574,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
@@ -2640,6 +2656,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; supercharged_coinbase_factor = 0
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
+                  ; zkapps_per_block = 128
                   }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
