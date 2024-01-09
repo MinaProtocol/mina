@@ -35,6 +35,7 @@ type output_type = [ `Chunks | `Lines ]
 *)
 val start_custom :
      ?allow_multiple_instances:bool
+  -> ?env:Unix.env
   -> logger:Logger.t
   -> name:string
        (** The name of the executable file, without any coda- prefix *)

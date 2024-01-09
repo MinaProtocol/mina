@@ -174,6 +174,7 @@ let reader_to_strict_pipe reader output_type =
 
 let start_custom :
        ?allow_multiple_instances:bool
+    -> ?env:Unix.env
     -> logger:Logger.t
     -> name:string
     -> git_root_relative_path:string
@@ -192,8 +193,8 @@ let start_custom :
          | `Ignore ]
     -> unit
     -> t Deferred.Or_error.t =
- fun ?(allow_multiple_instances = false) ~logger ~name ~git_root_relative_path
-     ~conf_dir ~args ~stdout ~stderr ~termination () ->
+ fun ?(allow_multiple_instances = false) ?(env = `Extend []) ~logger ~name
+     ~git_root_relative_path ~conf_dir ~args ~stdout ~stderr ~termination () ->
   let open Deferred.Or_error.Let_syntax in
   let%bind () =
     Sys.is_directory conf_dir
@@ -234,7 +235,7 @@ let start_custom :
          ; Some ("mina-" ^ name)
          ; Some ("coda-" ^ name)
          ] )
-      ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
+      ~f:(fun prog -> Process.create ~stdin:"" ~env ~prog ~args ())
   in
   [%log info] "Custom child process $name started with pid $pid"
     ~metadata:

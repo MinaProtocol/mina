@@ -226,8 +226,9 @@ let spawn ?(allow_multiple_instances = false) ~logger ~pids ~conf_dir
   let termination_handler = ref (fun ~killed:_ _result -> Deferred.unit) in
   match%map
     O1trace.thread "manage_libp2p_helper_subprocess" (fun () ->
-        Child_processes.start_custom ~allow_multiple_instances ~logger
-          ~name:"libp2p_helper"
+        Child_processes.start_custom ~allow_multiple_instances
+          ~env:(`Extend [ ("GORACE", "halt_on_error=1") ])
+          ~logger ~name:"libp2p_helper"
           ~git_root_relative_path:
             "src/app/libp2p_helper/result/bin/libp2p_helper" ~conf_dir ~args:[]
           ~stdout:`Chunks ~stderr:`Lines

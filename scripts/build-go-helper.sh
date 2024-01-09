@@ -27,8 +27,8 @@ mkdir -p "$RESULT_BIN" || echo "Can't create $RESULT_BIN"
 
 for f in "$@"; do
   if [[ "$cmd" == "test" ]]; then
-    ( cd "src/$f" && "$GO" "$cmd" )
+    ( cd "src/$f" && "$GO" "$cmd" "-race")
   else
-    ( cd "src/$f" && "$GO" "$cmd" -buildvcs=false -o "$RESULT_BIN/$f" )
+    ( cd "src/$f" && "$GO" "$cmd" "-race" -buildvcs=false -o "$RESULT_BIN/$f" )
   fi
 done
