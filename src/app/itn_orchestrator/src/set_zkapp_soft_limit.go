@@ -15,7 +15,7 @@ func SetZkappSoftLimit(config Config, params SetZkappSoftLimitParams, output fun
 		if err == nil {
 			output(address)
 		} else {
-			config.Log.Warnf("Failed to set soft limit to %d for %s: %s", params.Limit, address, err)
+			config.Log.Warnf("Failed to set soft limit for %s: %s", address, err)
 		}
 	}
 	return nil
