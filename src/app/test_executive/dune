@@ -41,7 +41,6 @@
    participating_state
    graph_algorithms
    visualization
-   mina_compile_config
    block_time
  )
  (instrumentation (backend bisect_ppx))
