@@ -77,7 +77,7 @@ module type Concrete = sig
             ; sub_window_densities : 'length list
             ; last_vrf_output : 'vrf_output
             ; total_currency : 'amount
-            ; curr_global_slot : 'global_slot
+            ; curr_global_slot_since_hard_fork : 'global_slot
             ; global_slot_since_genesis : 'global_slot_since_genesis
             ; staking_epoch_data : 'staking_epoch_data
             ; next_epoch_data : 'next_epoch_data
