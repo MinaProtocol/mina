@@ -165,13 +165,9 @@ module Wrap = struct
 
     let create = Fields.create
 
-    let generate ~custom_gate_type ~prev_challenges cs =
+    let generate ~prev_challenges cs =
       let open Tock.Keypair in
-      let keypair =
-        if Option.is_some custom_gate_type then
-          create_plus custom_gate_type ~prev_challenges cs
-        else create ~prev_challenges cs
-      in
+      let keypair = create ~prev_challenges cs in
       { pk = pk keypair; vk = vk keypair }
   end
 

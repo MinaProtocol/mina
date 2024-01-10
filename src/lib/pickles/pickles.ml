@@ -1282,11 +1282,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
             in
             let r =
               Common.time "wrap read or generate " (fun () ->
-                  Cache.Wrap.read_or_generate
-                    ~custom_gate_type
-                      (* Note: custom_gate_type not needed here, but needed when called from compile.ml *)
-                    ~prev_challenges:2 [] disk_key_prover disk_key_verifier typ
-                    Typ.unit main )
+                  Cache.Wrap.read_or_generate ~prev_challenges:2 []
+                    disk_key_prover disk_key_verifier typ Typ.unit main )
             in
             (r, disk_key_verifier)
           in

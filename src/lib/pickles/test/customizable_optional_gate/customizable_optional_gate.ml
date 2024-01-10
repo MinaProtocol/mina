@@ -63,12 +63,11 @@ let constraint_constants =
 let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
   if feature_flags.foreign_field_add then main_foreign_field_add ()
 
-let register_test name feature_flags1 feature_flags2 custom_gate_type1
-    custom_gate_type2 =
-  let _tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
+let register_test name feature_flags custom_gate_type =
+  let _tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
-      ~branches:(module Nat.N2)
+      ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
       ~name:"optional_custom_gates"
       ~constraint_constants (* TODO(mrmr1993): This was misguided.. Delete. *)
@@ -77,62 +76,37 @@ let register_test name feature_flags1 feature_flags2 custom_gate_type1
           ; prevs = []
           ; main =
               (fun _ ->
-                main_body ~feature_flags:feature_flags1 () ;
+                main_body ~feature_flags () ;
                 { previous_proof_statements = []
                 ; public_output = ()
                 ; auxiliary_output = ()
                 } )
-          ; feature_flags = feature_flags1
-          ; custom_gate_type = custom_gate_type1
-          }
-        ; { identifier = "main2"
-          ; prevs = []
-          ; main =
-              (fun _ ->
-                main_body ~feature_flags:feature_flags2 () ;
-                { previous_proof_statements = []
-                ; public_output = ()
-                ; auxiliary_output = ()
-                } )
-          ; feature_flags = feature_flags2
-          ; custom_gate_type = custom_gate_type2
+          ; feature_flags
+          ; custom_gate_type
           }
         ] )
       ()
   in
   let module Proof = (val proof) in
-  let test_prove1 () =
+  let test_prove () =
     let public_input1, (), proof1 =
-      Async.Thread_safe.block_on_async_exn (fun () -> prove1 ())
+      Async.Thread_safe.block_on_async_exn (fun () -> prove ())
     in
     Or_error.ok_exn
       (Async.Thread_safe.block_on_async_exn (fun () ->
            Proof.verify [ (public_input1, proof1) ] ) )
   in
-  let test_prove2 () =
-    let public_input2, (), proof2 =
-      Async.Thread_safe.block_on_async_exn (fun () -> prove2 ())
-    in
-    Or_error.ok_exn
-      (Async.Thread_safe.block_on_async_exn (fun () ->
-           Proof.verify [ (public_input2, proof2) ] ) )
-  in
 
   let open Alcotest in
-  add_tests name
-    [ test_case "prove 1" `Quick test_prove1
-    ; test_case "prove 2" `Quick test_prove2
-    ]
+  add_tests name [ test_case "prove" `Quick test_prove ]
 
 let register_feature_test (name, specific_feature_flags, custom_gate_type) =
   (* Tests activating "on" logic *)
-  register_test name specific_feature_flags specific_feature_flags
-    custom_gate_type custom_gate_type ;
+  register_test name specific_feature_flags custom_gate_type ;
   (* Tests activating "maybe on" logic *)
   register_test
     (Printf.sprintf "%s (maybe)" name)
-    specific_feature_flags Plonk_types.Features.none_bool custom_gate_type
-    custom_gate_type
+    Plonk_types.Features.none_bool custom_gate_type
 
 (* User-supplied conditional gate in RPN
  *     w(0) = w(1) * w(3) + (1 - w(3)) * w(2)

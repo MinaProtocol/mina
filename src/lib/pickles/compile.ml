@@ -686,12 +686,7 @@ struct
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
-            Cache.Wrap.read_or_generate
-            (* Due to Wrap_hack *)
-            (* JES: TODO: Try removing custom_gate_type here *)
-              ~custom_gate_type:None
-                (* We don't override custom gates on the wrap proof *)
-                (* Note: custom_gate_type needed for case when gate is overriden (true) and witness is valid *)
+            Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
               ~prev_challenges:2 cache disk_key_prover disk_key_verifier typ
               (Snarky_backendless.Typ.unit ())
               main )
