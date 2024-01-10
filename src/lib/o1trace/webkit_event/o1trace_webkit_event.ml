@@ -113,9 +113,6 @@ let start_tracing wr =
     ()
   else (
     current_wr := Some wr ;
-    (* FIXME: these handlers cannot be removed without further
-       changes to async_kernel. Instead, we will leak a ref and
-       accumulate a bunch of NOOPs every time we call [stop_tracing] *)
     emit_event (new_event Pid_is) ;
     O1trace.Thread.iter_fibers ~f:(fun fiber ->
         emit_event
