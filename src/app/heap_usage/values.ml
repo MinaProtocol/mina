@@ -413,7 +413,7 @@ let protocol_state =
       ],
       "last_vrf_output": "q4zrn2ZlIeTV8_8XPb3PZu4eQusG0n5ieUNy5gyZAAA=",
       "total_currency": "1014488754000001000",
-      "curr_global_slot": {
+      "curr_global_slot_since_hard_fork": {
         "slot_number": "2831",
         "slots_per_epoch": "7140"
       },
