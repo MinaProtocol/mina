@@ -53,7 +53,7 @@ function cleanup
 
 mina-test-executive local "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
-  --archive-imge "$ARCHIVE_IMAGE"
+  --archive-image "$ARCHIVE_IMAGE"
   | tee "$TEST_NAME.local.test.log" \
   | mina-logproc -i inline -f '!(.level in ["Debug", "Spam"])'
 
