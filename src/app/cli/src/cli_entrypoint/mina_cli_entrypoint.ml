@@ -1680,43 +1680,49 @@ let internal_commands logger =
   ; ( "run-snark-worker-single"
     , Command.async
         ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
-        (Command.Param.return (fun () ->
-             let logger = Logger.create () in
-             Parallel.init_master () ;
-             match%bind
-               Reader.with_file "./failure.sexp" ~f:(fun reader ->
-                   [%log info] "Created reader for failure.sexp" ;
-                   Reader.read_sexp reader )
-             with
-             | `Ok sexp -> (
-                 let%bind worker_state =
-                   Snark_worker.Prod.Inputs.Worker_state.create
-                     ~proof_level:Genesis_constants.Proof_level.compiled
-                     ~constraint_constants:
-                       Genesis_constants.Constraint_constants.compiled ()
-                 in
-                 let sok_message =
-                   { Mina_base.Sok_message.fee = Currency.Fee.of_int 0
-                   ; prover = Quickcheck.random_value Public_key.Compressed.gen
-                   }
-                 in
-                 let spec =
-                   [%of_sexp:
-                     ( Transaction_witness.t
-                     , Ledger_proof.t )
-                     Snark_work_lib.Work.Single.Spec.t] sexp
-                 in
-                 match%map
-                   Snark_worker.Prod.Inputs.perform_single worker_state
-                     ~message:sok_message spec
-                 with
-                 | Ok _ ->
-                     [%log info] "Successfully worked"
-                 | Error err ->
-                     [%log error] "Work didn't work: $err"
-                       ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
-             | `Eof ->
-                 failwith "early EOF while reading sexp" ) ) )
+        (let open Command.Let_syntax in
+        let%map_open filename =
+          flag "--file" (required string)
+            ~doc:"File containing the s-expression of the snark work to execute"
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          let logger = Logger.create () in
+          Parallel.init_master () ;
+          match%bind
+            Reader.with_file filename ~f:(fun reader ->
+                [%log info] "Created reader for %s" filename ;
+                Reader.read_sexp reader )
+          with
+          | `Ok sexp -> (
+              let%bind worker_state =
+                Snark_worker.Prod.Inputs.Worker_state.create
+                  ~proof_level:Genesis_constants.Proof_level.compiled
+                  ~constraint_constants:
+                    Genesis_constants.Constraint_constants.compiled ()
+              in
+              let sok_message =
+                { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
+                ; prover = Quickcheck.random_value Public_key.Compressed.gen
+                }
+              in
+              let spec =
+                [%of_sexp:
+                  ( Transaction_witness.t
+                  , Ledger_proof.t )
+                  Snark_work_lib.Work.Single.Spec.t] sexp
+              in
+              match%map
+                Snark_worker.Prod.Inputs.perform_single worker_state
+                  ~message:sok_message spec
+              with
+              | Ok _ ->
+                  [%log info] "Successfully worked"
+              | Error err ->
+                  [%log error] "Work didn't work: $err"
+                    ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
+          | `Eof ->
+              failwith "early EOF while reading sexp") )
   ; ( "run-verifier"
     , Command.async
         ~summary:"Run verifier on a proof provided on a single line of stdin"
