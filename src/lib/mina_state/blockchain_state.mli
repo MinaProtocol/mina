@@ -7,11 +7,12 @@ module Poly : sig
   module Stable : sig
     module V1 : sig
       type ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) t =
-        { staged_ledger_hash: 'staged_ledger_hash
-        ; snarked_ledger_hash: 'snarked_ledger_hash
-        ; genesis_ledger_hash: 'snarked_ledger_hash
-        ; snarked_next_available_token: 'token_id
-        ; timestamp: 'time }
+        { staged_ledger_hash : 'staged_ledger_hash
+        ; snarked_ledger_hash : 'snarked_ledger_hash
+        ; genesis_ledger_hash : 'snarked_ledger_hash
+        ; snarked_next_available_token : 'token_id
+        ; timestamp : 'time
+        }
       [@@deriving sexp, equal, compare, fields, yojson]
     end
   end]
@@ -34,13 +35,13 @@ end
 
 include
   Snarkable.S
-  with type var =
-              ( Staged_ledger_hash.var
-              , Frozen_ledger_hash.var
-              , Token_id.var
-              , Block_time.Unpacked.var )
-              Poly.t
-   and type value := Value.t
+    with type var =
+      ( Staged_ledger_hash.var
+      , Frozen_ledger_hash.var
+      , Token_id.var
+      , Block_time.Unpacked.var )
+      Poly.t
+     and type value := Value.t
 
 val staged_ledger_hash :
   ('staged_ledger_hash, _, _, _) Poly.t -> 'staged_ledger_hash

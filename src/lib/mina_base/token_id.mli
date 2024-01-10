@@ -1,15 +1,11 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
 
-[%%else]
+[%%ifndef consensus_mechanism]
 
-open Snark_params_nonconsensus
 open Import
 
 [%%endif]

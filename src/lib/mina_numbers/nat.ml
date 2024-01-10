@@ -1,15 +1,12 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 open Fold_lib
 include Intf
 module Intf = Intf
-
-[%%ifdef
-consensus_mechanism]
-
 open Snark_bits
+
+[%%ifdef consensus_mechanism]
 
 let zero_checked =
   Snarky_integer.Integer.constant ~m:Snark_params.Tick.m Bigint.zero
@@ -62,7 +59,7 @@ struct
       in
       Typ.Read.map (Field.typ.read (Integer.to_field v)) ~f:of_field_elt
     in
-    {alloc; store; check; read}
+    { alloc; store; check; read }
 
   type t = var
 
@@ -115,10 +112,6 @@ struct
   let zero = zero_checked
 end
 
-[%%else]
-
-open Snark_bits_nonconsensus
-
 [%%endif]
 
 module Make (N : sig
@@ -143,8 +136,7 @@ struct
 
   let sub x y = if x < y then None else Some (N.sub x y)
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Checked = Make_checked (N) (Bits)
 
@@ -171,7 +163,7 @@ struct
     Quickcheck.Generator.map
       ~f:(fun n -> N.of_string (Bignum_bigint.to_string n))
       (Bignum_bigint.gen_incl Bignum_bigint.zero
-         (Bignum_bigint.of_string N.(to_string max_int)))
+         (Bignum_bigint.of_string N.(to_string max_int)) )
 
   let gen_incl min max =
     let open Quickcheck.Let_syntax in
@@ -198,17 +190,19 @@ module Make32 () : UInt32 = struct
     end
   end]
 
-  include Make (struct
-              include UInt32
+  include
+    Make
+      (struct
+        include UInt32
 
-              let random () =
-                let mask = if Random.bool () then one else zero in
-                let open UInt32.Infix in
-                logor (mask lsl 31)
-                  ( Int32.max_value |> Random.int32 |> Int64.of_int32
-                  |> UInt32.of_int64 )
-            end)
-            (Bits.UInt32)
+        let random () =
+          let mask = if Random.bool () then one else zero in
+          let open UInt32.Infix in
+          logor (mask lsl 31)
+            ( Int32.max_value |> Random.int32 |> Int64.of_int32
+            |> UInt32.of_int64 )
+      end)
+      (Bits.UInt32)
 
   let to_uint32 = Unsigned_extended.UInt32.to_uint32
 
@@ -230,16 +224,18 @@ module Make64 () : UInt64 = struct
     end
   end]
 
-  include Make (struct
-              include UInt64
+  include
+    Make
+      (struct
+        include UInt64
 
-              let random () =
-                let mask = if Random.bool () then one else zero in
-                let open UInt64.Infix in
-                logor (mask lsl 63)
-                  (Int64.max_value |> Random.int64 |> UInt64.of_int64)
-            end)
-            (Bits.UInt64)
+        let random () =
+          let mask = if Random.bool () then one else zero in
+          let open UInt64.Infix in
+          logor (mask lsl 63)
+            (Int64.max_value |> Random.int64 |> UInt64.of_int64)
+      end)
+      (Bits.UInt64)
 
   let to_uint64 = Unsigned_extended.UInt64.to_uint64
 

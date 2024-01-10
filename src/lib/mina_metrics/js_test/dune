@@ -1,0 +1,7 @@
+(executable
+ (name mina_metrics_js_test)
+ (libraries mina_metrics mina_metrics.none)
+ (modes js)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version))
+ (forbidden_libraries async core re2))

@@ -12,15 +12,15 @@ let%test_module "vrf-test" =
       include (
         Snark_params.Tick.Inner_curve.Scalar :
           module type of Snark_params.Tick.Inner_curve.Scalar
-          with type t = Snark_params.Tick.Inner_curve.Scalar.t
-           and type var := Snark_params.Tick.Inner_curve.Scalar.var
-          with module Checked := Snark_params.Tick.Inner_curve.Scalar.Checked )
+            with type t = Snark_params.Tick.Inner_curve.Scalar.t
+             and type var := Snark_params.Tick.Inner_curve.Scalar.var
+            with module Checked := Snark_params.Tick.Inner_curve.Scalar.Checked )
 
       let of_bits = Other_impl.Field.project
 
       include (Other_impl.Field : Sexpable.S with type t := t)
 
-      include Binable.Of_sexpable (Other_impl.Field)
+      include Binable.Of_sexpable_without_uuid (Other_impl.Field)
 
       let length_in_bits = size_in_bits
 
@@ -55,8 +55,8 @@ let%test_module "vrf-test" =
       include (
         Snark_params.Tick.Inner_curve :
           module type of Snark_params.Tick.Inner_curve
-          with type var := Snark_params.Tick.Inner_curve.var
-          with module Checked := Snark_params.Tick.Inner_curve.Checked )
+            with type var := Snark_params.Tick.Inner_curve.var
+            with module Checked := Snark_params.Tick.Inner_curve.Checked )
 
       type 'a or_infinity = 'a Marlin_plonk_bindings_types.Or_infinity.t =
         | Infinity
@@ -69,13 +69,14 @@ let%test_module "vrf-test" =
             (to_affine_or_infinity y))
 
       module Checked = struct
-        include Snarky_curves.Make_weierstrass_checked
-                  (Snarky_field_extensions.Field_extensions.F (Impl)) (Scalar)
-                  (Snark_params.Tick.Inner_curve)
-                  (Snark_params.Tick.Inner_curve.Params)
-                  (struct
-                    let add = None
-                  end)
+        include
+          Snarky_curves.Make_weierstrass_checked
+            (Snarky_field_extensions.Field_extensions.F (Impl)) (Scalar)
+            (Snark_params.Tick.Inner_curve)
+            (Snark_params.Tick.Inner_curve.Params)
+            (struct
+              let add = None
+            end)
 
         let add_known_unsafe t x = add_unsafe t (constant x)
       end
@@ -89,20 +90,22 @@ let%test_module "vrf-test" =
       module T = struct
         type t = Curve.t
 
-        include Sexpable.Of_sexpable (struct
-                    type t = Field.t * Field.t [@@deriving sexp]
-                  end)
-                  (struct
-                    type t = Curve.t
+        include
+          Sexpable.Of_sexpable
+            (struct
+              type t = Field.t * Field.t [@@deriving sexp]
+            end)
+            (struct
+              type t = Curve.t
 
-                    let to_sexpable = Curve.to_affine_exn
+              let to_sexpable = Curve.to_affine_exn
 
-                    let of_sexpable = Curve.of_affine
-                  end)
+              let of_sexpable = Curve.of_affine
+            end)
       end
 
       include T
-      include Binable.Of_sexpable (T)
+      include Binable.Of_sexpable_without_uuid (T)
 
       let equal = Curve.equal
 
@@ -134,8 +137,8 @@ let%test_module "vrf-test" =
             let res = add x (negate x) in
             if not (equal res zero) then
               failwithf
-                !"inv failured, x = %{sexp:t}, x + inv x = %{sexp:t}, \
-                  expected %{sexp:t}"
+                !"inv failured, x = %{sexp:t}, x + inv x = %{sexp:t}, expected \
+                  %{sexp:t}"
                 x res zero () )
 
       let%test_unit "scaling associates" =
@@ -170,9 +173,7 @@ let%test_module "vrf-test" =
       Snarky.Pedersen.Make (Impl) (Curve)
         (struct
           let params =
-            Array.map
-              ~f:(Tuple_lib.Quadruple.map ~f:Curve.to_affine_exn)
-              params
+            Array.map ~f:(Tuple_lib.Quadruple.map ~f:Curve.to_affine_exn) params
         end)
 
     module Message = struct
@@ -180,16 +181,18 @@ let%test_module "vrf-test" =
 
       type t = Curve.t
 
-      include Sexpable.Of_sexpable (struct
-                  type t = Field.t * Field.t [@@deriving sexp]
-                end)
-                (struct
-                  type t = Curve.t
+      include
+        Sexpable.Of_sexpable
+          (struct
+            type t = Field.t * Field.t [@@deriving sexp]
+          end)
+          (struct
+            type t = Curve.t
 
-                  let to_sexpable = Curve.to_affine_exn
+            let to_sexpable = Curve.to_affine_exn
 
-                  let of_sexpable = Curve.of_affine
-                end)
+            let of_sexpable = Curve.of_affine
+          end)
 
       type value = t [@@deriving sexp]
 
@@ -209,17 +212,17 @@ let%test_module "vrf-test" =
           (b0, b1, b2) :: bits_to_triples ~default bs
       | [] ->
           []
-      | [b] ->
-          [(b, default, default)]
-      | [b1; b2] ->
-          [(b1, b2, default)]
+      | [ b ] ->
+          [ (b, default, default) ]
+      | [ b1; b2 ] ->
+          [ (b1, b2, default) ]
 
     let hash_bits bits =
       List.foldi ~init:Curve.zero (bits_to_triples ~default:false bits)
         ~f:(fun i acc triple ->
           Curve.add acc
             (Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
-               triple) )
+               triple ) )
       |> Curve.to_affine_exn |> fst
 
     let hash_bits_checked bits =
@@ -249,14 +252,16 @@ let%test_module "vrf-test" =
       open Impl
 
       let hash_for_proof m g1 g2 g3 =
-        let x = hash_bits (List.concat_map ~f:Group.to_bits [m; g1; g2; g3]) in
+        let x =
+          hash_bits (List.concat_map ~f:Group.to_bits [ m; g1; g2; g3 ])
+        in
         Scalar.of_bits (List.take (Field.unpack x) Scalar.length_in_bits)
 
       module Checked = struct
         let hash_for_proof m g1 g2 g3 =
           let%bind bs =
             Checked.map
-              (Checked.List.map ~f:Group.Checked.to_bits [m; g1; g2; g3])
+              (Checked.List.map ~f:Group.Checked.to_bits [ m; g1; g2; g3 ])
               ~f:List.concat
           in
           let%map xs =
@@ -276,9 +281,8 @@ let%test_module "vrf-test" =
       in
       Quickcheck.test gen ~trials:50 ~f:(fun (priv, public_key, message) ->
           let eval = Vrf.Evaluation.create priv message in
-          let ctx : Vrf.Context.t = {message; public_key} in
-          if not (Option.is_some (Vrf.Evaluation.verified_output eval ctx))
-          then
+          let ctx : Vrf.Context.t = { message; public_key } in
+          if not (Option.is_some (Vrf.Evaluation.verified_output eval ctx)) then
             failwithf
               !"%{sexp:Vrf.Context.t}, %{sexp:Vrf.Evaluation.t}"
               ctx eval () )

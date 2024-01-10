@@ -1,12 +1,12 @@
-{{- if .Values.coda.runtimeConfig }}
+{{- if .Values.mina.runtimeConfig }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: snark-coordinator-daemon-config
+  name: {{$.Values.coordinatorName }}-daemon-config
   labels:
     app: snark-coordinator
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
 data:
-  daemon.json: {{ .Values.coda.runtimeConfig | quote }}
+  daemon.json: {{ .Values.mina.runtimeConfig | quote }}
 {{- end }}

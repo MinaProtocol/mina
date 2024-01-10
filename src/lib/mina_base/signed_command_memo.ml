@@ -1,12 +1,10 @@
-(* user_command_memo.ml *)
+(* signed_command_memo.ml *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Crypto_params
 
@@ -25,16 +23,16 @@ module Stable = struct
       let version_byte = Base58_check.Version_bytes.user_command_memo
     end)
 
-    let to_string (memo : t) : string = Base58_check.encode memo
+    let to_base58_check (memo : t) : string = Base58_check.encode memo
 
-    let of_string (s : string) : t = Base58_check.decode_exn s
+    let of_base58_check_exn (s : string) : t = Base58_check.decode_exn s
 
     module T = struct
       type nonrec t = t
 
-      let to_string = to_string
+      let to_string = to_base58_check
 
-      let of_string = of_string
+      let of_string = of_base58_check_exn
     end
 
     include Codable.Make_of_string (T)
@@ -42,7 +40,7 @@ module Stable = struct
 end]
 
 [%%define_locally
-Stable.Latest.(to_yojson, of_yojson, to_string, of_string)]
+Stable.Latest.(to_yojson, of_yojson, to_base58_check, of_base58_check_exn)]
 
 exception Too_long_user_memo_input
 
@@ -53,7 +51,7 @@ let max_digestible_string_length = 1000
 (* 0th byte is a tag to distinguish digests from other data
    1st byte is length, always 32 for digests
    bytes 2 to 33 are data, 0-right-padded if length is less than 32
- *)
+*)
 
 let digest_tag = '\x00'
 
@@ -75,6 +73,8 @@ let max_input_length = digest_length
 let tag (memo : t) = memo.[tag_index]
 
 let length memo = Char.to_int memo.[length_index]
+
+let is_bytes memo = Char.equal (tag memo) bytes_tag
 
 let is_digest memo = Char.equal (tag memo) digest_tag
 
@@ -144,8 +144,31 @@ let dummy = (create_by_digesting_string_exn "" :> t)
 
 let empty = create_from_string_exn ""
 
+type raw = Digest of string | Bytes of string
+
+let to_raw_exn memo =
+  let tag = tag memo in
+  if Char.equal tag digest_tag then Digest (to_base58_check memo)
+  else if Char.equal tag bytes_tag then
+    let len = length memo in
+    Bytes (String.init len ~f:(fun idx -> memo.[idx - 2]))
+  else failwithf "Unknown memo tag %c" tag ()
+
+let to_raw_bytes_exn memo =
+  match to_raw_exn memo with
+  | Digest _ ->
+      failwith "Cannot convert a digest to raw bytes"
+  | Bytes str ->
+      str
+
+let of_raw_exn = function
+  | Digest base58_check ->
+      of_base58_check_exn base58_check
+  | Bytes str ->
+      create_from_string_exn str
+
 let fold_bits t =
-  { Fold_lib.Fold.fold=
+  { Fold_lib.Fold.fold =
       (fun ~init ~f ->
         let n = 8 * String.length t in
         let rec go acc i =
@@ -154,19 +177,38 @@ let fold_bits t =
             let b = (Char.to_int t.[i / 8] lsr (i mod 8)) land 1 = 1 in
             go (f acc b) (i + 1)
         in
-        go init 0 ) }
+        go init 0 )
+  }
 
 let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
 
-[%%ifdef
-consensus_mechanism]
+let to_plaintext (memo : t) : string Or_error.t =
+  if is_bytes memo then Ok (String.sub memo ~pos:2 ~len:(length memo))
+  else Error (Error.of_string "Memo does not contain text bytes")
+
+let to_digest (memo : t) : string Or_error.t =
+  if is_digest memo then Ok (String.sub memo ~pos:2 ~len:digest_length)
+  else Error (Error.of_string "Memo does not contain a digest")
+
+let to_string_hum (memo : t) =
+  match to_plaintext memo with
+  | Ok text ->
+      text
+  | Error _ -> (
+      match to_digest memo with
+      | Ok digest ->
+          sprintf "0x%s" (Hex.encode digest)
+      | Error _ ->
+          "(Invalid memo, neither text nor a digest)" )
+
+[%%ifdef consensus_mechanism]
 
 module Boolean = Tick.Boolean
 module Typ = Tick.Typ
 
 (* the code below is much the same as in Random_oracle.Digest; tag and length bytes
    make it a little different
- *)
+*)
 
 module Checked = struct
   type unchecked = t
@@ -220,8 +262,7 @@ let%test_module "user_command_memo" =
         false
       with Too_long_user_memo_input -> true
 
-    [%%ifdef
-    consensus_mechanism]
+    [%%ifdef consensus_mechanism]
 
     let%test_unit "typ is identity" =
       let s = "this is a string" in
@@ -237,8 +278,7 @@ let%test_module "user_command_memo" =
             Snarky_backendless.Cvar.Constant x )
       in
       let memo_read =
-        Snarky_backendless.Typ_monads.Read.run (typ.read memo_var)
-          read_constant
+        Snarky_backendless.Typ_monads.Read.run (typ.read memo_var) read_constant
       in
       [%test_eq: string] memo memo_read
 

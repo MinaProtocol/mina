@@ -2,6 +2,8 @@ open Core
 open Signature_lib
 open Mina_base
 
+let () = Key_cache_native.linkme (* Ensure that we use the native key cache. *)
+
 module Accounts = struct
   module Single = struct
     let to_account_with_pk :
@@ -34,10 +36,11 @@ module Accounts = struct
             ; cliff_time
             ; cliff_amount
             ; vesting_period
-            ; vesting_increment } ->
+            ; vesting_increment
+            } ->
             Mina_base.Account.create_timed account_id t.balance
-              ~initial_minimum_balance ~cliff_time ~cliff_amount
-              ~vesting_period ~vesting_increment
+              ~initial_minimum_balance ~cliff_time ~cliff_amount ~vesting_period
+              ~vesting_increment
             |> Or_error.ok_exn
         | None ->
             Mina_base.Account.create account_id t.balance
@@ -53,11 +56,11 @@ module Accounts = struct
             ; receive
             ; set_delegate
             ; set_permissions
-            ; set_verification_key } ->
+            ; set_verification_key
+            } ->
             let auth_required a =
               match a with
-              | Runtime_config.Accounts.Single.Permissions.Auth_required.None
-                ->
+              | Runtime_config.Accounts.Single.Permissions.Auth_required.None ->
                   Mina_base.Permissions.Auth_required.None
               | Either ->
                   Either
@@ -71,25 +74,26 @@ module Accounts = struct
                   Impossible
             in
             { Mina_base.Permissions.Poly.stake
-            ; edit_state= auth_required edit_state
-            ; send= auth_required send
-            ; receive= auth_required receive
-            ; set_delegate= auth_required set_delegate
-            ; set_permissions= auth_required set_permissions
-            ; set_verification_key= auth_required set_verification_key }
+            ; edit_state = auth_required edit_state
+            ; send = auth_required send
+            ; receive = auth_required receive
+            ; set_delegate = auth_required set_delegate
+            ; set_permissions = auth_required set_permissions
+            ; set_verification_key = auth_required set_verification_key
+            }
       in
       let token_permissions =
         Option.value_map t.token_permissions ~default:account.token_permissions
-          ~f:(fun {token_owned; disable_new_accounts; account_disabled} ->
+          ~f:(fun { token_owned; disable_new_accounts; account_disabled } ->
             if token_owned then
-              Mina_base.Token_permissions.Token_owned {disable_new_accounts}
-            else Not_owned {account_disabled} )
+              Mina_base.Token_permissions.Token_owned { disable_new_accounts }
+            else Not_owned { account_disabled } )
       in
       let%map snapp =
         match t.snapp with
         | None ->
             Ok None
-        | Some {state; verification_key} ->
+        | Some { state; verification_key } ->
             let%bind app_state =
               if
                 Pickles_types.Vector.Nat.to_int Snapp_state.Max_state_size.n
@@ -105,7 +109,7 @@ module Accounts = struct
               (* Use a URI-safe alphabet to make life easier for maintaining json
                    We prefer this to base58-check here because users should not
                    be manually entering verification keys.
-                *)
+              *)
               Option.value_map ~default:(Ok None) verification_key
                 ~f:(fun verification_key ->
                   let%map vk =
@@ -121,29 +125,28 @@ module Accounts = struct
                            (Binable.of_string
                               ( module Pickles.Side_loaded.Verification_key
                                        .Stable
-                                       .Latest ))
+                                       .Latest ) )
                   in
-                  Some
-                    (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk)
-              )
+                  Some (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk) )
             in
-            Some {Snapp_account.verification_key; app_state}
+            Some { Snapp_account.verification_key; app_state }
       in
       { account with
-        delegate=
+        delegate =
           (if Option.is_some delegate then delegate else account.delegate)
       ; token_id
       ; token_permissions
-      ; nonce= Account.Nonce.of_uint32 t.nonce
-      ; receipt_chain_hash=
+      ; nonce = Account.Nonce.of_uint32 t.nonce
+      ; receipt_chain_hash =
           Option.value_map t.receipt_chain_hash
             ~default:account.receipt_chain_hash
             ~f:Mina_base.Receipt.Chain_hash.of_base58_check_exn
-      ; voting_for=
+      ; voting_for =
           Option.value_map ~default:account.voting_for
             ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
       ; snapp
-      ; permissions }
+      ; permissions
+      }
 
     let of_account :
            Mina_base.Account.t
@@ -156,26 +159,29 @@ module Accounts = struct
             None
         | Timed t ->
             Some
-              { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
+              { Runtime_config.Accounts.Single.Timed.initial_minimum_balance =
                   t.initial_minimum_balance
-              ; cliff_time= t.cliff_time
-              ; cliff_amount= t.cliff_amount
-              ; vesting_period= t.vesting_period
-              ; vesting_increment= t.vesting_increment }
+              ; cliff_time = t.cliff_time
+              ; cliff_amount = t.cliff_amount
+              ; vesting_period = t.vesting_period
+              ; vesting_increment = t.vesting_increment
+              }
       in
       let token_permissions =
         match account.token_permissions with
-        | Mina_base.Token_permissions.Token_owned {disable_new_accounts} ->
+        | Mina_base.Token_permissions.Token_owned { disable_new_accounts } ->
             Some
-              { Runtime_config.Accounts.Single.Token_permissions.token_owned=
+              { Runtime_config.Accounts.Single.Token_permissions.token_owned =
                   true
               ; disable_new_accounts
-              ; account_disabled= false }
-        | Not_owned {account_disabled} ->
+              ; account_disabled = false
+              }
+        | Not_owned { account_disabled } ->
             Some
-              { token_owned= false
-              ; disable_new_accounts= false
-              ; account_disabled }
+              { token_owned = false
+              ; disable_new_accounts = false
+              ; account_disabled
+              }
       in
       let permissions =
         let auth_required a =
@@ -199,20 +205,22 @@ module Accounts = struct
             ; receive
             ; set_delegate
             ; set_permissions
-            ; set_verification_key } =
+            ; set_verification_key
+            } =
           account.permissions
         in
         Some
           { Runtime_config.Accounts.Single.Permissions.stake
-          ; edit_state= auth_required edit_state
-          ; send= auth_required send
-          ; receive= auth_required receive
-          ; set_delegate= auth_required set_delegate
-          ; set_permissions= auth_required set_permissions
-          ; set_verification_key= auth_required set_verification_key }
+          ; edit_state = auth_required edit_state
+          ; send = auth_required send
+          ; receive = auth_required receive
+          ; set_delegate = auth_required set_delegate
+          ; set_permissions = auth_required set_permissions
+          ; set_verification_key = auth_required set_verification_key
+          }
       in
       let snapp =
-        Option.map account.snapp ~f:(fun {app_state; verification_key} ->
+        Option.map account.snapp ~f:(fun { app_state; verification_key } ->
             let state = Snapp_state.V.to_list app_state in
             let verification_key =
               Option.map verification_key ~f:(fun vk ->
@@ -223,43 +231,45 @@ module Accounts = struct
                   |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet )
             in
             { Runtime_config.Accounts.Single.Snapp_account.state
-            ; verification_key } )
+            ; verification_key
+            } )
       in
-      { pk=
+      { pk =
           Some
             (Signature_lib.Public_key.Compressed.to_base58_check
-               account.public_key)
-      ; sk= Option.map ~f:Signature_lib.Private_key.to_base58_check sk
-      ; balance= account.balance
-      ; delegate=
+               account.public_key )
+      ; sk = Option.map ~f:Signature_lib.Private_key.to_base58_check sk
+      ; balance = account.balance
+      ; delegate =
           Option.map ~f:Signature_lib.Public_key.Compressed.to_base58_check
             account.delegate
       ; timing
-      ; token= Some (Mina_base.Token_id.to_uint64 account.token_id)
+      ; token = Some (Mina_base.Token_id.to_uint64 account.token_id)
       ; token_permissions
-      ; nonce= account.nonce
-      ; receipt_chain_hash=
+      ; nonce = account.nonce
+      ; receipt_chain_hash =
           Some
             (Mina_base.Receipt.Chain_hash.to_base58_check
-               account.receipt_chain_hash)
-      ; voting_for=
+               account.receipt_chain_hash )
+      ; voting_for =
           Some (Mina_base.State_hash.to_base58_check account.voting_for)
       ; snapp
-      ; permissions }
+      ; permissions
+      }
   end
 
   let to_full :
       Runtime_config.Accounts.t -> (Private_key.t option * Account.t) list =
     List.mapi
-      ~f:(fun i ({Runtime_config.Accounts.pk; sk; _} as account_config) ->
+      ~f:(fun i ({ Runtime_config.Accounts.pk; sk; _ } as account_config) ->
         let sk =
           match sk with
           | Some sk -> (
-            match Private_key.of_yojson (`String sk) with
-            | Ok sk ->
-                Some sk
-            | Error err ->
-                Error.(raise (of_string err)) )
+              match Private_key.of_yojson (`String sk) with
+              | Ok sk ->
+                  Some sk
+              | Error err ->
+                  Error.(raise (of_string err)) )
           | None ->
               None
         in
@@ -272,11 +282,11 @@ module Accounts = struct
                 (Quickcheck.random_value
                    ~seed:
                      (`Deterministic
-                       ("fake pk for genesis ledger " ^ string_of_int i))
-                   Public_key.Compressed.gen)
+                       ("fake pk for genesis ledger " ^ string_of_int i) )
+                   Public_key.Compressed.gen )
         in
         let account =
-          Single.to_account_with_pk {account_config with pk= Some pk}
+          Single.to_account_with_pk { account_config with pk = Some pk }
           |> Or_error.ok_exn
         in
         (sk, account) )
@@ -366,9 +376,7 @@ let make_constraint_constants
     ~(default : Genesis_constants.Constraint_constants.t)
     (config : Runtime_config.Proof_keys.t) :
     Genesis_constants.Constraint_constants.t =
-  let work_delay =
-    Option.value ~default:default.work_delay config.work_delay
-  in
+  let work_delay = Option.value ~default:default.work_delay config.work_delay in
   let block_window_duration_ms =
     Option.value ~default:default.block_window_duration_ms
       config.block_window_duration_ms
@@ -393,8 +401,7 @@ let make_constraint_constants
               unit tests pass.
         *)
         1
-        + Core_kernel.Int.ceil_log2
-            (max_user_commands_per_block + max_coinbases)
+        + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
     | None ->
         default.transaction_capacity_log_2
   in
@@ -402,40 +409,42 @@ let make_constraint_constants
     Core_kernel.Int.ceil_log2
       (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
   in
-  { sub_windows_per_window=
+  { sub_windows_per_window =
       Option.value ~default:default.sub_windows_per_window
         config.sub_windows_per_window
-  ; ledger_depth=
+  ; ledger_depth =
       Option.value ~default:default.ledger_depth config.ledger_depth
   ; work_delay
   ; block_window_duration_ms
   ; transaction_capacity_log_2
   ; pending_coinbase_depth
-  ; coinbase_amount=
+  ; coinbase_amount =
       Option.value ~default:default.coinbase_amount config.coinbase_amount
-  ; supercharged_coinbase_factor=
+  ; supercharged_coinbase_factor =
       Option.value ~default:default.supercharged_coinbase_factor
         config.supercharged_coinbase_factor
-  ; account_creation_fee=
+  ; account_creation_fee =
       Option.value ~default:default.account_creation_fee
         config.account_creation_fee
-  ; fork=
+  ; fork =
       ( match config.fork with
       | None ->
           default.fork
-      | Some {previous_state_hash; previous_length; previous_global_slot} ->
+      | Some { previous_state_hash; previous_length; previous_global_slot } ->
           Some
-            { previous_state_hash=
+            { previous_state_hash =
                 State_hash.of_base58_check_exn previous_state_hash
-            ; previous_length= Mina_numbers.Length.of_int previous_length
-            ; previous_global_slot=
-                Mina_numbers.Global_slot.of_int previous_global_slot } ) }
+            ; previous_length = Mina_numbers.Length.of_int previous_length
+            ; previous_global_slot =
+                Mina_numbers.Global_slot.of_int previous_global_slot
+            } )
+  }
 
 let runtime_config_of_constraint_constants
     ~(proof_level : Genesis_constants.Proof_level.t)
     (constraint_constants : Genesis_constants.Constraint_constants.t) :
     Runtime_config.Proof_keys.t =
-  { level=
+  { level =
       ( match proof_level with
       | Full ->
           Some Full
@@ -443,25 +452,28 @@ let runtime_config_of_constraint_constants
           Some Check
       | None ->
           Some None )
-  ; sub_windows_per_window= Some constraint_constants.sub_windows_per_window
-  ; ledger_depth= Some constraint_constants.ledger_depth
-  ; work_delay= Some constraint_constants.work_delay
-  ; block_window_duration_ms=
+  ; sub_windows_per_window = Some constraint_constants.sub_windows_per_window
+  ; ledger_depth = Some constraint_constants.ledger_depth
+  ; work_delay = Some constraint_constants.work_delay
+  ; block_window_duration_ms =
       Some constraint_constants.block_window_duration_ms
-  ; transaction_capacity=
+  ; transaction_capacity =
       Some (Log_2 constraint_constants.transaction_capacity_log_2)
-  ; coinbase_amount= Some constraint_constants.coinbase_amount
-  ; supercharged_coinbase_factor=
+  ; coinbase_amount = Some constraint_constants.coinbase_amount
+  ; supercharged_coinbase_factor =
       Some constraint_constants.supercharged_coinbase_factor
-  ; account_creation_fee= Some constraint_constants.account_creation_fee
-  ; fork=
+  ; account_creation_fee = Some constraint_constants.account_creation_fee
+  ; fork =
       Option.map constraint_constants.fork
-        ~f:(fun {previous_state_hash; previous_length; previous_global_slot} ->
-          { Runtime_config.Fork_config.previous_state_hash=
+        ~f:(fun { previous_state_hash; previous_length; previous_global_slot }
+           ->
+          { Runtime_config.Fork_config.previous_state_hash =
               State_hash.to_base58_check previous_state_hash
-          ; previous_length= Mina_numbers.Length.to_int previous_length
-          ; previous_global_slot=
-              Mina_numbers.Global_slot.to_int previous_global_slot } ) }
+          ; previous_length = Mina_numbers.Length.to_int previous_length
+          ; previous_global_slot =
+              Mina_numbers.Global_slot.to_int previous_global_slot
+          } )
+  }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =
@@ -479,7 +491,7 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
         [%log error]
           "Could not build genesis constants from the configuration file: \
            $error"
-          ~metadata:[("error", `String msg)] ;
+          ~metadata:[ ("error", `String msg) ] ;
         Or_error.errorf
           "Could not build genesis constants from the configuration file: %s"
           msg
@@ -487,57 +499,62 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
         Ok None
   in
   let open Option.Let_syntax in
-  { Genesis_constants.protocol=
-      { k=
+  { Genesis_constants.protocol =
+      { k =
           Option.value ~default:default.protocol.k
             (config.genesis >>= fun cfg -> cfg.k)
-      ; delta=
+      ; delta =
           Option.value ~default:default.protocol.delta
             (config.genesis >>= fun cfg -> cfg.delta)
-      ; slots_per_epoch=
+      ; slots_per_epoch =
           Option.value ~default:default.protocol.slots_per_epoch
             (config.genesis >>= fun cfg -> cfg.slots_per_epoch)
-      ; slots_per_sub_window=
+      ; slots_per_sub_window =
           Option.value ~default:default.protocol.slots_per_sub_window
             (config.genesis >>= fun cfg -> cfg.slots_per_sub_window)
-      ; genesis_state_timestamp=
+      ; genesis_state_timestamp =
           Option.value ~default:default.protocol.genesis_state_timestamp
-            genesis_state_timestamp }
-  ; txpool_max_size=
+            genesis_state_timestamp
+      }
+  ; txpool_max_size =
       Option.value ~default:default.txpool_max_size
         (config.daemon >>= fun cfg -> cfg.txpool_max_size)
-  ; num_accounts=
+  ; num_accounts =
       Option.value_map ~default:default.num_accounts
         (config.ledger >>= fun cfg -> cfg.num_accounts)
-        ~f:(fun num_accounts -> Some num_accounts) }
+        ~f:(fun num_accounts -> Some num_accounts)
+  }
 
-let runtime_config_of_genesis_constants
-    (genesis_constants : Genesis_constants.t) : Runtime_config.Genesis.t =
-  { k= Some genesis_constants.protocol.k
-  ; delta= Some genesis_constants.protocol.delta
-  ; slots_per_epoch= Some genesis_constants.protocol.slots_per_epoch
-  ; slots_per_sub_window= Some genesis_constants.protocol.slots_per_sub_window
-  ; genesis_state_timestamp=
+let runtime_config_of_genesis_constants (genesis_constants : Genesis_constants.t)
+    : Runtime_config.Genesis.t =
+  { k = Some genesis_constants.protocol.k
+  ; delta = Some genesis_constants.protocol.delta
+  ; slots_per_epoch = Some genesis_constants.protocol.slots_per_epoch
+  ; slots_per_sub_window = Some genesis_constants.protocol.slots_per_sub_window
+  ; genesis_state_timestamp =
       Some
         (Genesis_constants.genesis_timestamp_to_string
-           genesis_constants.protocol.genesis_state_timestamp) }
+           genesis_constants.protocol.genesis_state_timestamp )
+  }
 
 let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
     : Runtime_config.t =
   Runtime_config.combine precomputed_values.runtime_config
-    { daemon=
+    { daemon =
         Some
-          { txpool_max_size=
+          { txpool_max_size =
               Some precomputed_values.genesis_constants.txpool_max_size
-          ; peer_list_url= None }
-    ; genesis=
+          ; peer_list_url = None
+          }
+    ; genesis =
         Some
           (runtime_config_of_genesis_constants
-             precomputed_values.genesis_constants)
-    ; proof=
+             precomputed_values.genesis_constants )
+    ; proof =
         Some
           (runtime_config_of_constraint_constants
              ~proof_level:precomputed_values.proof_level
-             precomputed_values.constraint_constants)
-    ; ledger= None
-    ; epoch_data= None }
+             precomputed_values.constraint_constants )
+    ; ledger = None
+    ; epoch_data = None
+    }

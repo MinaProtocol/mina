@@ -13,7 +13,7 @@ module type Inputs_intf = sig
 end
 
 module Input = struct
-  type ('g1, 'g2, 'gt) t = {g1s: 'g1 list; g2s: 'g2 list; gts: 'gt list}
+  type ('g1, 'g2, 'gt) t = { g1s : 'g1 list; g2s : 'g2 list; gts : 'gt list }
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -31,7 +31,7 @@ module Make (Inputs : Inputs_intf) = struct
     let signs = g1_count + g2_count + gt_count in
     (elts * Field.size_in_bits) + signs
 
-  let summary {Input.g1s; g2s; gts} =
+  let summary { Input.g1s; g2s; gts } =
     let%map elts =
       List.map g1s ~f:(fun (x, _) -> x)
       @ List.concat_map g2s ~f:(fun (x, _) -> Fqe.to_list x)
@@ -56,7 +56,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     elts @ signs
 
-  let summary_unchecked {Input.g1s; g2s; gts} =
+  let summary_unchecked { Input.g1s; g2s; gts } =
     let parity x = Bigint.(test_bit (of_field x) 0) in
     let elts =
       List.map g1s ~f:(fun (x, _) -> x)

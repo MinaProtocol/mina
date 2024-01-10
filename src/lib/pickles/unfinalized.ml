@@ -40,8 +40,8 @@ module Constant = struct
     let beta = chal () in
     let gamma = chal () in
     let zeta = scalar_chal () in
-    { deferred_values=
-        { plonk=
+    { deferred_values =
+        { plonk =
             { ( Plonk_checks.derive_plonk
                   (module Tock.Field)
                   ~shift ~endo:Endo.Wrap_inner_curve.base
@@ -50,22 +50,26 @@ module Constant = struct
                     (Plonk_checks.domain
                        (module Tock.Field)
                        wrap_domains.h ~shifts:Common.tock_shifts
-                       ~domain_generator:Tock.Field.domain_generator)
-                  { alpha= Common.Ipa.Wrap.endo_to_field alpha
-                  ; beta= Challenge.Constant.to_tock_field beta
-                  ; gamma= Challenge.Constant.to_tock_field gamma
-                  ; zeta= Common.Ipa.Wrap.endo_to_field zeta }
+                       ~domain_generator:Tock.Field.domain_generator )
+                  { alpha = Common.Ipa.Wrap.endo_to_field alpha
+                  ; beta = Challenge.Constant.to_tock_field beta
+                  ; gamma = Challenge.Constant.to_tock_field gamma
+                  ; zeta = Common.Ipa.Wrap.endo_to_field zeta
+                  }
                   Dummy.evals_combined Tock.Field.zero
               |> fst )
               with
               alpha
             ; beta
             ; gamma
-            ; zeta }
-        ; combined_inner_product= Shifted_value (tock ())
-        ; xi= Scalar_challenge one_chal
-        ; bulletproof_challenges= Dummy.Ipa.Wrap.challenges
-        ; b= Shifted_value (tock ()) }
-    ; should_finalize= false
-    ; sponge_digest_before_evaluations= Digest.Constant.dummy }
+            ; zeta
+            }
+        ; combined_inner_product = Shifted_value (tock ())
+        ; xi = Scalar_challenge one_chal
+        ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
+        ; b = Shifted_value (tock ())
+        }
+    ; should_finalize = false
+    ; sponge_digest_before_evaluations = Digest.Constant.dummy
+    }
 end

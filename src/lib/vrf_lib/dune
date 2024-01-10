@@ -3,7 +3,23 @@
  (public_name vrf_lib)
  (flags :standard -short-paths)
  (library_flags -linkall)
- (libraries core genesis_constants snarky.backendless snarky_curves test_util)
+ (libraries
+   ;; opam libraries
+   zarith
+   bignum.bigint
+   bin_prot.shape
+   base.caml
+   core
+   sexplib0
+   core_kernel
+   bignum
+   ppx_inline_test.config
+   ;; local libraries
+   snarky.backendless
+   genesis_constants
+   snarky_curves
+   bitstring_lib
+ )
  (preprocess
   (pps
     h_list.ppx

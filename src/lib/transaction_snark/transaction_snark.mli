@@ -21,7 +21,7 @@ module Pending_coinbase_stack_state : sig
     module Stable : sig
       module V1 : sig
         type 'pending_coinbase t =
-          {source: 'pending_coinbase; target: 'pending_coinbase}
+          { source : 'pending_coinbase; target : 'pending_coinbase }
         [@@deriving compare, equal, fields, hash, sexp, yojson]
 
         val to_latest :
@@ -37,7 +37,7 @@ module Pending_coinbase_stack_state : sig
   end
 
   type 'pending_coinbase poly = 'pending_coinbase Poly.t =
-    {source: 'pending_coinbase; target: 'pending_coinbase}
+    { source : 'pending_coinbase; target : 'pending_coinbase }
   [@@deriving sexp, hash, compare, equal, fields, yojson]
 
   [%%versioned:
@@ -71,14 +71,15 @@ module Statement : sig
              , 'token_id
              , 'sok_digest )
              t =
-          { source: 'ledger_hash
-          ; target: 'ledger_hash
-          ; supply_increase: 'amount
-          ; pending_coinbase_stack_state: 'pending_coinbase
-          ; fee_excess: 'fee_excess
-          ; next_available_token_before: 'token_id
-          ; next_available_token_after: 'token_id
-          ; sok_digest: 'sok_digest }
+          { source : 'ledger_hash
+          ; target : 'ledger_hash
+          ; supply_increase : 'amount
+          ; pending_coinbase_stack_state : 'pending_coinbase
+          ; fee_excess : 'fee_excess
+          ; next_available_token_before : 'token_id
+          ; next_available_token_after : 'token_id
+          ; sok_digest : 'sok_digest
+          }
         [@@deriving compare, equal, hash, sexp, yojson]
 
         val to_latest :
@@ -120,14 +121,15 @@ module Statement : sig
         , 'token_id
         , 'sok_digest )
         Poly.t =
-    { source: 'ledger_hash
-    ; target: 'ledger_hash
-    ; supply_increase: 'amount
-    ; pending_coinbase_stack_state: 'pending_coinbase
-    ; fee_excess: 'fee_excess
-    ; next_available_token_before: 'token_id
-    ; next_available_token_after: 'token_id
-    ; sok_digest: 'sok_digest }
+    { source : 'ledger_hash
+    ; target : 'ledger_hash
+    ; supply_increase : 'amount
+    ; pending_coinbase_stack_state : 'pending_coinbase
+    ; fee_excess : 'fee_excess
+    ; next_available_token_before : 'token_id
+    ; next_available_token_after : 'token_id
+    ; sok_digest : 'sok_digest
+    }
   [@@deriving compare, equal, hash, sexp, yojson]
 
   [%%versioned:
@@ -349,7 +351,8 @@ module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val proof_level : Genesis_constants.Proof_level.t
-end) : S [@@warning "-67"]
+end) : S
+[@@warning "-67"]
 
 val constraint_system_digests :
      constraint_constants:Genesis_constants.Constraint_constants.t

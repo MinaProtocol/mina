@@ -12,16 +12,16 @@ let make_local_uri port address =
 
 module type S = sig
   val query_or_error :
-       < parse: Yojson.Basic.t -> 'response
-       ; query: string
-       ; variables: Yojson.Basic.t >
+       < parse : Yojson.Basic.t -> 'response
+       ; query : string
+       ; variables : Yojson.Basic.t >
     -> int
     -> 'response Deferred.Or_error.t
 
   val query :
-       < parse: Yojson.Basic.t -> 'response
-       ; query: string
-       ; variables: Yojson.Basic.t >
+       < parse : Yojson.Basic.t -> 'response
+       ; query : string
+       ; variables : Yojson.Basic.t >
     -> int
     -> 'response Deferred.t
 end
@@ -48,12 +48,11 @@ let graphql_error_to_string e =
       error_obj_to_string e
 
 module Connection_error = struct
-  type t = [`Failed_request of Error.t | `Graphql_error of Error.t]
+  type t = [ `Failed_request of Error.t | `Graphql_error of Error.t ]
 
   let ok_exn = function
     | `Failed_request e ->
-        eprintf "❌ Error connecting to graphql server. Error message: %s\n%!"
-          e ;
+        eprintf "❌ Error connecting to graphql server. Error message: %s\n%!" e ;
         exit 17
     | `Graphql_error e ->
         eprintf "❌ Error: %s\n" e ;
@@ -105,7 +104,7 @@ module Make (Config : Config_intf) = struct
           Deferred.return
             (Error
                (`Failed_request
-                 (Printf.sprintf "Status code %d -- %s" code body_str)))
+                 (Printf.sprintf "Status code %d -- %s" code body_str) ) )
     in
     let open Yojson.Basic.Util in
     ( match (member "errors" body_json, member "data" body_json) with
@@ -119,7 +118,7 @@ module Make (Config : Config_intf) = struct
                `Graphql_error
                  (Printf.sprintf
                     "Problem parsing graphql response\nError message: %s"
-                    (Exn.to_string e)) ) )
+                    (Exn.to_string e) ) ) )
     |> Deferred.return
 
   let query_exn query_obj port =

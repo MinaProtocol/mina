@@ -61,7 +61,8 @@ module Digit = struct
       makes the typechecker understand existentials under or-patterns isn't
       in our compiler version. (ocaml/ocaml#2110)
   *)
-  let addable_elim : type a r.
+  let addable_elim :
+      type a r.
          ((addable, r, 'e) t -> 'o) (** Function handling addable case *)
       -> ((not_addable, removable, 'e) t -> 'o)
          (** Function handling non-addable case *)
@@ -70,7 +71,8 @@ module Digit = struct
    fun f g t ->
     match t with One _ -> f t | Two _ -> f t | Three _ -> f t | Four _ -> g t
 
-  let removable_elim : type a r.
+  let removable_elim :
+      type a r.
          ((a, removable, 'e) t -> 'o) (** Function handling removable case*)
       -> ((addable, not_removable, 'e) t -> 'o)
          (** Function handling non-removable case *)
@@ -173,7 +175,8 @@ module Digit = struct
       [ Mk_any_ar (One a)
       ; Mk_any_ar (Two (a, b))
       ; Mk_any_ar (Three (a, b, c))
-      ; Mk_any_ar (Four (a, b, c, d)) ]
+      ; Mk_any_ar (Four (a, b, c, d))
+      ]
 
   (** Given a measurement function, compute the total measure of a digit.
       See below for an explanation of what measure is.
@@ -182,7 +185,8 @@ module Digit = struct
    fun measure' -> foldl (fun m e -> m + measure' e) 0
 
   (** Split a digit by measure. Again see below. *)
-  let split : type a r.
+  let split :
+      type a r.
          ('e -> int)
       -> int
       -> int
@@ -192,7 +196,8 @@ module Digit = struct
     (* Addable inputs go to addable outputs, but non-addable inputs may go to
        either. We use a separate function for addables to represent this and
        minimizing the amount of Obj.magicking we need to do. *)
-    let rec split_addable : type r.
+    let rec split_addable :
+        type r.
            int
         -> (addable, r, 'e) t
         -> (addable, 'e) t_any_r option * 'e * (addable, 'e) t_any_r option =
@@ -226,12 +231,10 @@ module Digit = struct
     addable_elim
       (fun t' ->
         let lhs, m, rhs = split_addable acc t' in
-        (Option.map ~f:broaden_any_r lhs, m, Option.map ~f:broaden_any_r rhs)
-        )
+        (Option.map ~f:broaden_any_r lhs, m, Option.map ~f:broaden_any_r rhs) )
       (fun t' ->
         let head, Mk_any_r tail = uncons t' in
-        if acc + measure' head >= target then
-          (None, head, Some (Mk_any_ar tail))
+        if acc + measure' head >= target then (None, head, Some (Mk_any_ar tail))
         else
           let lhs, m, rhs = split_addable (acc + measure' head) tail in
           match lhs with
@@ -258,7 +261,7 @@ module Digit = struct
       ~f:(fun (Mk_any_ar dig, target) ->
         let lhs_opt, m, rhs_opt = split Fn.id target 0 dig in
         let lhs', rhs' = (opt_to_list lhs_opt, opt_to_list rhs_opt) in
-        [%test_eq: int list] (lhs' @ [m] @ rhs') (to_list dig) )
+        [%test_eq: int list] (lhs' @ [ m ] @ rhs') (to_list dig) )
 
   let%test_unit "Digit.split matches list implementation" =
     Quickcheck.test
@@ -341,8 +344,7 @@ module Node = struct
   let measure : 'e t -> int =
    fun t -> match t with Two (m, _, _) -> m | Three (m, _, _, _) -> m
 
-  let to_digit : 'e t -> (Digit.addable, Digit.removable, 'e) Digit.t =
-    function
+  let to_digit : 'e t -> (Digit.addable, Digit.removable, 'e) Digit.t = function
     | Two (_m, a, b) ->
         Digit.Two (a, b)
     | Three (_m, a, b, c) ->
@@ -561,8 +563,7 @@ let unsnoc : 'e t -> ('e t * 'e) option = fun t -> unsnoc' (Fn.const 1) t
 
 let head_exn : 'e t -> 'e = fun t -> Option.value_exn (uncons t) |> Tuple2.get1
 
-let last_exn : 'e t -> 'e =
- fun t -> unsnoc t |> Option.value_exn |> Tuple2.get2
+let last_exn : 'e t -> 'e = fun t -> unsnoc t |> Option.value_exn |> Tuple2.get2
 
 let rec foldl : ('a -> 'e -> 'a) -> 'a -> 'e t -> 'a =
  fun f acc t ->
@@ -641,11 +642,11 @@ let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
         , (* right part of digit split + subtree + suffix *)
           match dr with
           | None -> (
-            match uncons' Node.measure @@ force middle with
-            | None ->
-                tree_of_digit measure' suffix
-            | Some (head, tail) ->
-                deep measure' (Node.to_digit head) tail suffix )
+              match uncons' Node.measure @@ force middle with
+              | None ->
+                  tree_of_digit measure' suffix
+              | Some (head, tail) ->
+                  deep measure' (Node.to_digit head) tail suffix )
           | Some (Mk_any_ar dig) ->
               deep measure' dig (force middle) suffix )
       else
@@ -664,11 +665,11 @@ let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
                them midpoint of the subtree *)
             ( match m_lhs with
             | None -> (
-              match unsnoc' Node.measure lhs with
-              | None ->
-                  tree_of_digit measure' prefix
-              | Some (liat, deah) ->
-                  deep measure' prefix liat (Node.to_digit deah) )
+                match unsnoc' Node.measure lhs with
+                | None ->
+                    tree_of_digit measure' prefix
+                | Some (liat, deah) ->
+                    deep measure' prefix liat (Node.to_digit deah) )
             | Some (Mk_any_ar dig) ->
                 deep measure' prefix lhs dig )
           , (* midpoint of the split of the subtree *)
@@ -677,11 +678,11 @@ let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
                split of the subtree + suffix *)
             match m_rhs with
             | None -> (
-              match uncons' Node.measure rhs with
-              | None ->
-                  tree_of_digit measure' suffix
-              | Some (head, tail) ->
-                  deep measure' (Node.to_digit head) tail suffix )
+                match uncons' Node.measure rhs with
+                | None ->
+                    tree_of_digit measure' suffix
+                | Some (head, tail) ->
+                    deep measure' (Node.to_digit head) tail suffix )
             | Some (Mk_any_ar dig) ->
                 deep measure' dig rhs suffix )
         else
@@ -692,11 +693,11 @@ let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
             ( (* prefix + subtree + left part of digit split *)
               ( match dl with
               | None -> (
-                match unsnoc' Node.measure (force middle) with
-                | None ->
-                    tree_of_digit measure' prefix
-                | Some (liat, deah) ->
-                    deep measure' prefix liat (Node.to_digit deah) )
+                  match unsnoc' Node.measure (force middle) with
+                  | None ->
+                      tree_of_digit measure' prefix
+                  | Some (liat, deah) ->
+                      deep measure' prefix liat (Node.to_digit deah) )
               | Some (Mk_any_ar dig) ->
                   deep measure' prefix (force middle) dig )
             , (* midpoint of digit split *)
@@ -784,7 +785,7 @@ let%test_unit "alternating cons/snoc" =
         | `A x :: rest ->
             go (x :: list) (cons x fseq) rest
         | `B x :: rest ->
-            go (list @ [x]) (snoc fseq x) rest
+            go (list @ [ x ]) (snoc fseq x) rest
       in
       go [] empty cmds )
 
@@ -871,7 +872,8 @@ let%test_module "random sequence generation, with splits" =
                 [ List.take acts (List.length acts / 2)
                 ; List.take acts (List.length acts - 1)
                 ; List.map acts ~f:(function `Snoc x -> `Cons x | x -> x)
-                ; List.map acts ~f:(function `Cons x -> `Snoc x | x -> x) ] )
+                ; List.map acts ~f:(function `Cons x -> `Snoc x | x -> x)
+                ] )
       in
       Quickcheck.test gen ~trials:100_000 ~shrinker
         ~sexp_of:(List.sexp_of_t sexp_of_action) ~f:(fun acts ->

@@ -4,7 +4,7 @@ open Async_kernel
 open Core_kernel
 open Signature_lib
 open Mina_base
-open Mina_transition
+open Mina_block
 open Frontier_base
 open Deferred.Let_syntax
 
@@ -69,7 +69,7 @@ let%test_module "Full_frontier tests" =
           ~epoch_ledger_location
           ~ledger_depth:constraint_constants.ledger_depth
           ~genesis_state_hash:
-            (With_hash.hash precomputed_values.protocol_state_with_hash)
+            (State_hash.With_state_hashes.state_hash precomputed_values.protocol_state_with_hashes)
       in
       let root_ledger =
         Or_error.ok_exn
@@ -77,17 +77,34 @@ let%test_module "Full_frontier tests" =
              ~src:(Lazy.force Genesis_ledger.t)
              ~dest:(Ledger.create ~depth:ledger_depth ()))
       in
+      Protocol_version.(set_current zero) ;
       let root_data =
         let open Root_data in
-        { transition= External_transition.For_tests.genesis ~precomputed_values
+        { transition= External_transition.Validated.lift @@ Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
         ; staged_ledger=
             Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
         ; protocol_states= [] }
+      in
+      let persistent_root =
+        Persistent_root.create ~logger
+          ~directory:(Filename.temp_file "snarked_ledger" "")
+          ~ledger_depth
+      in
+      Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
+      let persistent_root_instance =
+        Persistent_root.create_instance_exn persistent_root
       in
       Full_frontier.create ~logger ~root_data
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger) root_ledger)
         ~consensus_local_state ~max_length ~precomputed_values
         ~time_controller:(Block_time.Controller.basic ~logger)
+        ~persistent_root_instance
+
+    let clean_up_persistent_root ~frontier =
+      let persistent_root_instance =
+        Full_frontier.persistent_root_instance frontier
+      in
+      Persistent_root.Instance.destroy persistent_root_instance
 
     let%test_unit "Should be able to find a breadcrumbs after adding them" =
       Quickcheck.test gen_breadcrumb ~trials:4 ~f:(fun make_breadcrumb ->
@@ -100,7 +117,8 @@ let%test_module "Full_frontier tests" =
                 Full_frontier.find_exn frontier
                   (Breadcrumb.state_hash breadcrumb)
               in
-              [%test_eq: Breadcrumb.t] breadcrumb queried_breadcrumb ) )
+              [%test_eq: Breadcrumb.t] breadcrumb queried_breadcrumb ;
+              clean_up_persistent_root ~frontier ) )
 
     let%test_unit "Constructing a better branch should change the best tip" =
       let gen_branches =
@@ -135,8 +153,8 @@ let%test_module "Full_frontier tests" =
               add_breadcrumbs frontier (List.tl_exn long_branch) ;
               test_best_tip
                 (List.last_exn long_branch)
-                ~message:"best tip should change when all of best tip is added"
-          ) )
+                ~message:"best tip should change when all of best tip is added" ;
+              clean_up_persistent_root ~frontier ) )
 
     let%test_unit "The root should be updated after (> max_length) nodes are \
                    added in sequence" =
@@ -169,7 +187,8 @@ let%test_module "Full_frontier tests" =
                          ~message:
                            "roots should be the same before max_length \
                             breadcrumbs" ;
-                     i + 1 ) ) )
+                     i + 1 ) ;
+              clean_up_persistent_root ~frontier ) )
 
     let%test_unit "Protocol states are available for every transaction in the \
                    frontier" =
@@ -192,8 +211,9 @@ let%test_module "Full_frontier tests" =
                     ~f:(fun hash ->
                       ignore
                         ( Full_frontier.For_tests.find_protocol_state_exn
-                            frontier hash
-                          : Mina_state.Protocol_state.value ) ) ) ) )
+                             frontier hash
+                          : Mina_state.Protocol_state.value ) ) ) ;
+              clean_up_persistent_root ~frontier ) )
 
     let%test_unit "The length of the longest branch should never be greater \
                    than max_length" =
@@ -211,8 +231,8 @@ let%test_module "Full_frontier tests" =
                   [%test_pred: int] (( >= ) max_length)
                     (List.length
                        Full_frontier.(
-                         path_map frontier (best_tip frontier) ~f:Fn.id)) ) )
-      )
+                         path_map frontier (best_tip frontier) ~f:Fn.id)) ) ;
+              clean_up_persistent_root ~frontier ) )
 
     let%test_unit "Common ancestor can be reliably found" =
       let ancestor_length = (max_length / 2) - 1 in
@@ -243,5 +263,6 @@ let%test_module "Full_frontier tests" =
               add_breadcrumbs frontier (branch_a @ branch_b) ;
               [%test_eq: State_hash.t]
                 (Full_frontier.common_ancestor frontier tip_a tip_b)
-                (Breadcrumb.state_hash youngest_ancestor) ) )
+                (Breadcrumb.state_hash youngest_ancestor) ;
+              clean_up_persistent_root ~frontier ) )
   end )

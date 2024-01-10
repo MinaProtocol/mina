@@ -1,26 +1,20 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef
-consensus_mechanism]
-
 open Snark_bits
+
+[%%ifdef consensus_mechanism]
+
 open Bitstring_lib
 open Snark_params
 open Tick
 open Let_syntax
 
-[%%else]
-
-open Snark_bits_nonconsensus
-module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
-
 [%%endif]
 
 open Intf
 module Signed_poly = Signed_poly
+module Wire_types = Mina_wire_types.Currency
 
 type uint64 = Unsigned.uint64
 
@@ -85,9 +79,9 @@ end = struct
   let of_formatted_string input =
     let parts = String.split ~on:'.' input in
     match parts with
-    | [whole] ->
+    | [ whole ] ->
         of_string (whole ^ String.make precision '0')
-    | [whole; decimal] ->
+    | [ whole; decimal ] ->
         let decimal_length = String.length decimal in
         if Int.(decimal_length > precision) then
           of_string (whole ^ String.sub decimal ~pos:0 ~len:precision)
@@ -133,16 +127,14 @@ end = struct
     let get t i = Infix.((t lsr i) land one = one)
 
     let set v i b =
-      if b then Infix.(v lor (one lsl i))
-      else Infix.(v land lognot (one lsl i))
+      if b then Infix.(v lor (one lsl i)) else Infix.(v land lognot (one lsl i))
   end
 
   module B = Bits.Vector.Make (Vector)
 
   include (B : Bits_intf.Convertible_bits with type t := t)
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
   include Unpacked
@@ -193,19 +185,47 @@ end = struct
 
   module Signed = struct
     type ('magnitude, 'sgn) typ = ('magnitude, 'sgn) Signed_poly.t =
-      {magnitude: 'magnitude; sgn: 'sgn}
+      { magnitude : 'magnitude; sgn : 'sgn }
     [@@deriving sexp, hash, compare, yojson, hlist]
 
-    type t = (Unsigned.t, Sgn.t) Signed_poly.t
-    [@@deriving sexp, hash, compare, equal, yojson]
+    type t = (Unsigned.t, Sgn.t) Signed_poly.t [@@deriving sexp, hash, yojson]
+
+    let compare : t -> t -> int =
+      let cmp = [%compare: (Unsigned.t, Sgn.t) Signed_poly.t] in
+      fun t1 t2 ->
+        if Unsigned.(equal t1.magnitude zero && equal t2.magnitude zero) then 0
+        else cmp t1 t2
+
+    let equal : t -> t -> bool =
+      let eq = [%equal: (Unsigned.t, Sgn.t) Signed_poly.t] in
+      fun t1 t2 ->
+        if Unsigned.(equal t1.magnitude zero && equal t2.magnitude zero) then
+          true
+        else eq t1 t2
+
+    let is_zero (t : t) : bool = Unsigned.(equal t.magnitude zero)
+
+    let is_positive (t : t) : bool =
+      match t.sgn with
+      | Pos ->
+          not Unsigned.(equal zero t.magnitude)
+      | Neg ->
+          false
+
+    let is_negative (t : t) : bool =
+      match t.sgn with
+      | Neg ->
+          not Unsigned.(equal zero t.magnitude)
+      | Pos ->
+          false
 
     type magnitude = Unsigned.t [@@deriving sexp, compare]
 
-    let create ~magnitude ~sgn = {magnitude; sgn}
+    let create ~magnitude ~sgn = { magnitude; sgn }
 
-    let sgn {sgn; _} = sgn
+    let sgn { sgn; _ } = sgn
 
-    let magnitude {magnitude; _} = magnitude
+    let magnitude { magnitude; _ } = magnitude
 
     let zero = create ~magnitude:zero ~sgn:Sgn.Pos
 
@@ -216,7 +236,7 @@ end = struct
 
     let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
-    let to_bits ({sgn; magnitude} : t) = sgn_to_bool sgn :: to_bits magnitude
+    let to_bits ({ sgn; magnitude } : t) = sgn_to_bool sgn :: to_bits magnitude
 
     let to_input t = Random_oracle.Input.bitstring (to_bits t)
 
@@ -239,45 +259,45 @@ end = struct
 
     let negate t =
       if Unsigned.(equal zero t.magnitude) then zero
-      else {t with sgn= Sgn.negate t.sgn}
+      else { t with sgn = Sgn.negate t.sgn }
 
     let of_unsigned magnitude = create ~magnitude ~sgn:Sgn.Pos
 
     let ( + ) = add
 
-    [%%ifdef
-    consensus_mechanism]
+    [%%ifdef consensus_mechanism]
 
     type nonrec var = (var, Sgn.var) Signed_poly.t
 
     let typ =
-      Typ.of_hlistable [typ; Sgn.typ] ~var_to_hlist:typ_to_hlist
+      Typ.of_hlistable [ typ; Sgn.typ ] ~var_to_hlist:typ_to_hlist
         ~var_of_hlist:typ_of_hlist ~value_to_hlist:typ_to_hlist
         ~value_of_hlist:typ_of_hlist
 
     module Checked = struct
       type t = var
 
-      let to_bits {magnitude; sgn} =
+      let to_bits { magnitude; sgn } =
         Sgn.Checked.is_pos sgn :: (var_to_bits magnitude :> Boolean.var list)
 
       let to_input t = Random_oracle.Input.bitstring (to_bits t)
 
-      let constant {magnitude; sgn} =
-        {magnitude= var_of_t magnitude; sgn= Sgn.Checked.constant sgn}
+      let constant { magnitude; sgn } =
+        { magnitude = var_of_t magnitude; sgn = Sgn.Checked.constant sgn }
 
-      let of_unsigned magnitude = {magnitude; sgn= Sgn.Checked.pos}
+      let of_unsigned magnitude = { magnitude; sgn = Sgn.Checked.pos }
 
-      let negate {magnitude; sgn} = {magnitude; sgn= Sgn.Checked.negate sgn}
+      let negate { magnitude; sgn } =
+        { magnitude; sgn = Sgn.Checked.negate sgn }
 
       let if_ cond ~then_ ~else_ =
         let%map sgn = Sgn.Checked.if_ cond ~then_:then_.sgn ~else_:else_.sgn
         and magnitude =
           if_ cond ~then_:then_.magnitude ~else_:else_.magnitude
         in
-        {sgn; magnitude}
+        { sgn; magnitude }
 
-      let to_field_var ({magnitude; sgn} : var) =
+      let to_field_var ({ magnitude; sgn } : var) =
         Field.Checked.mul (pack_var magnitude) (sgn :> Field.Var.t)
 
       let add (x : var) (y : var) =
@@ -293,7 +313,7 @@ end = struct
           Tick.Field.Checked.mul (sgn :> Field.Var.t) (Field.Var.add xv yv)
         in
         let%map magnitude = unpack_var res in
-        {magnitude; sgn}
+        { magnitude; sgn }
 
       let ( + ) = add
 
@@ -332,19 +352,18 @@ end = struct
           let%map l = unpack_var l and r = unpack_var r in
           (l, r)
         in
-        ({sgn= l_sgn; magnitude= l_mag}, {sgn= r_sgn; magnitude= r_mag})
+        ({ sgn = l_sgn; magnitude = l_mag }, { sgn = r_sgn; magnitude = r_mag })
 
       let scale (f : Field.Var.t) (t : var) =
         let%bind x = Field.Checked.mul (pack_var t.magnitude) f in
         let%map x = unpack_var x in
-        {sgn= t.sgn; magnitude= x}
+        { sgn = t.sgn; magnitude = x }
     end
 
     [%%endif]
   end
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Checked = struct
     module N = Mina_numbers.Nat.Make_checked (Unsigned) (B)
@@ -519,14 +538,14 @@ end = struct
                            (sprintf
                               !"formatting: num=%{Unsigned} middle=%{String} \
                                 after=%{Unsigned}"
-                              num (to_formatted_string num) after_format)))
+                              num (to_formatted_string num) after_format ) ))
               | exception e ->
                   let err = Error.of_exn e in
                   Error.(
                     raise
                       (tag
                          ~tag:(sprintf !"formatting: num=%{Unsigned}" num)
-                         err)) )
+                         err )) )
 
         let%test_unit "formatting_trailing_zeros" =
           let generator = gen_incl Unsigned.zero Unsigned.max_int in
@@ -540,7 +559,7 @@ end = struct
                     (of_string
                        (sprintf
                           !"formatting: num=%{Unsigned} formatted=%{String}"
-                          num (to_formatted_string num)))) )
+                          num (to_formatted_string num) ) )) )
       end )
   end
 
@@ -567,8 +586,7 @@ module Fee = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, equal]
 
-      [%%define_from_scope
-      to_yojson, of_yojson, dhall_type]
+      [%%define_from_scope to_yojson, of_yojson, dhall_type]
 
       let to_latest = Fn.id
     end
@@ -578,65 +596,145 @@ module Fee = struct
 end
 
 module Amount = struct
-  module T =
-    Make
-      (Unsigned_extended.UInt64)
-      (struct
-        let length = currency_length
-      end)
+  (* See documentation for {!module:Mina_wire_types} *)
+  module Make_sig (A : sig
+    type t
+  end) =
+  struct
+    module type S = sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t = A.t [@@deriving sexp, compare, hash, equal, yojson]
 
-  [%%ifdef
-  consensus_mechanism]
+          (* not automatically derived *)
+          val dhall_type : Ppx_dhall_type.Dhall_type.t
+        end
+      end]
 
-  include (
-    T :
-      module type of T
-      with type var = T.var
-       and module Signed = T.Signed
-       and module Checked := T.Checked )
+      [%%ifdef consensus_mechanism]
 
-  [%%else]
+      (* Give a definition to var, it will be hidden at the interface level *)
+      include
+        Basic
+          with type t := Stable.Latest.t
+           and type var =
+            field Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t list
 
-  include (T : module type of T with module Signed = T.Signed)
+      [%%else]
 
-  [%%endif]
+      include Basic with type t := Stable.Latest.t
 
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
+      [%%endif]
 
-    module V1 = struct
-      type t = Unsigned_extended.UInt64.Stable.V1.t
-      [@@deriving sexp, compare, hash, equal, yojson]
+      include Arithmetic_intf with type t := t
 
-      [%%define_from_scope
-      to_yojson, of_yojson, dhall_type]
+      include Codable.S with type t := t
 
-      let to_latest = Fn.id
+      [%%ifdef consensus_mechanism]
+
+      module Signed :
+        Signed_intf with type magnitude := t and type magnitude_var := var
+
+      [%%else]
+
+      module Signed : Signed_intf with type magnitude := t
+
+      [%%endif]
+
+      (* TODO: Delete these functions *)
+
+      val of_fee : Fee.t -> t
+
+      val to_fee : t -> Fee.t
+
+      val add_fee : t -> Fee.t -> t option
+
+      [%%ifdef consensus_mechanism]
+
+      module Checked : sig
+        include
+          Checked_arithmetic_intf
+            with type var := var
+             and type signed_var := Signed.var
+             and type value := t
+
+        val add_signed : var -> Signed.var -> (var, _) Checked.t
+
+        val of_fee : Fee.var -> var
+
+        val to_fee : var -> Fee.var
+
+        val add_fee : var -> Fee.var -> (var, _) Checked.t
+      end
+
+      [%%endif]
     end
-  end]
+  end
+  [@@warning "-32"]
 
-  let of_fee (fee : Fee.t) : t = fee
+  module Make_str (A : sig
+    type t = Unsigned_extended.UInt64.Stable.V1.t
+  end) : Make_sig(A).S = struct
+    module T =
+      Make
+        (Unsigned_extended.UInt64)
+        (struct
+          let length = currency_length
+        end)
 
-  let to_fee (fee : t) : Fee.t = fee
+    [%%ifdef consensus_mechanism]
 
-  let add_fee (t : t) (fee : Fee.t) = add t (of_fee fee)
+    include (
+      T :
+        module type of T
+          with type var = T.var
+           and module Signed = T.Signed
+           and module Checked := T.Checked )
 
-  [%%ifdef
-  consensus_mechanism]
+    [%%else]
 
-  module Checked = struct
-    include T.Checked
+    include (T : module type of T with module Signed = T.Signed)
 
-    let of_fee (fee : Fee.var) : var = fee
+    [%%endif]
 
-    let to_fee (t : var) : Fee.var = t
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
 
-    let add_fee (t : var) (fee : Fee.var) =
-      Tick.Field.Var.add (pack_var t) (Fee.pack_var fee) |> unpack_var
+      module V1 = struct
+        type t = Unsigned_extended.UInt64.Stable.V1.t
+        [@@deriving sexp, compare, hash, equal, yojson]
+
+        [%%define_from_scope to_yojson, of_yojson, dhall_type]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let of_fee (fee : Fee.t) : t = fee
+
+    let to_fee (fee : t) : Fee.t = fee
+
+    let add_fee (t : t) (fee : Fee.t) = add t (of_fee fee)
+
+    [%%ifdef consensus_mechanism]
+
+    module Checked = struct
+      include T.Checked
+
+      let of_fee (fee : Fee.var) : var = fee
+
+      let to_fee (t : var) : Fee.var = t
+
+      let add_fee (t : var) (fee : Fee.var) =
+        Tick.Field.Var.add (pack_var t) (Fee.pack_var fee) |> unpack_var
+    end
+
+    [%%endif]
   end
 
-  [%%endif]
+  include Wire_types.Make.Amount (Make_sig) (Make_str)
 end
 
 module Balance = struct
@@ -653,8 +751,7 @@ module Balance = struct
     end
   end]
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   include (Amount : Basic with type t := t with type var = Amount.var)
 
@@ -674,8 +771,7 @@ module Balance = struct
 
   let ( - ) = sub_amount
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Checked = struct
     include Amount.Checked
@@ -702,8 +798,7 @@ end
 
 let%test_module "sub_flagged module" =
   ( module struct
-    [%%ifdef
-    consensus_mechanism]
+    [%%ifdef consensus_mechanism]
 
     open Tick
 
@@ -725,7 +820,7 @@ let%test_module "sub_flagged module" =
 
       module Checked : sig
         val sub_flagged :
-          var -> var -> (var * [`Underflow of Boolean.var], 'a) Tick.Checked.t
+          var -> var -> (var * [ `Underflow of Boolean.var ], 'a) Tick.Checked.t
       end
     end
 

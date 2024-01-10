@@ -1,5 +1,5 @@
 module S = Sponge
-open Core
+open Core_kernel
 open Pickles_types
 open Common
 open Poly_types
@@ -10,28 +10,26 @@ open Step_main_inputs
 module B = Inductive_rule.B
 
 (* The SNARK function corresponding to the input inductive rule. *)
-let step_main
-    : type branching self_branches prev_vars prev_values a_var a_value max_branching local_branches local_signature.
+let step_main :
+    type branching self_branches prev_vars prev_values a_var a_value max_branching local_branches local_signature.
        (module Requests.Step.S
           with type local_signature = local_signature
            and type local_branches = local_branches
            and type statement = a_value
            and type prev_values = prev_values
-           and type max_branching = max_branching)
+           and type max_branching = max_branching )
     -> (module Nat.Add.Intf with type n = max_branching)
     -> self_branches:self_branches Nat.t
     -> local_signature:local_signature H1.T(Nat).t
     -> local_signature_length:(local_signature, branching) Hlist.Length.t
-    -> local_branches:(* For each inner proof of type T , the number of branches that type T has. *)
-       local_branches H1.T(Nat).t
+    -> local_branches:
+         (* For each inner proof of type T , the number of branches that type T has. *)
+         local_branches H1.T(Nat).t
     -> local_branches_length:(local_branches, branching) Hlist.Length.t
     -> branching:(prev_vars, branching) Hlist.Length.t
     -> lte:(branching, max_branching) Nat.Lte.t
-    -> basic:( a_var
-             , a_value
-             , max_branching
-             , self_branches )
-             Types_map.Compiled.basic
+    -> basic:
+         (a_var, a_value, max_branching, self_branches) Types_map.Compiled.basic
     -> self:(a_var, a_value, max_branching, self_branches) Tag.t
     -> ( prev_vars
        , prev_values
@@ -44,9 +42,9 @@ let step_main
            , Field.t
            , (Field.t, max_branching) Vector.t )
            Types.Pairing_based.Statement.t
-        -> unit)
+        -> unit )
        Staged.t =
- fun (module Req) (module Max_branching) ~self_branches ~local_signature
+ fun (module Req) max_branching ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length ~branching
      ~lte ~basic ~self rule ->
   let module T (F : T4) = struct
@@ -64,7 +62,8 @@ let step_main
       Typ.t
   end in
   let prev_typs =
-    let rec join : type e pvars pvals ns1 ns2 br.
+    let rec join :
+        type e pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> ns1 H1.T(Nat).t
         -> ns2 H1.T(Nat).t
@@ -84,18 +83,18 @@ let step_main
                 | Some T ->
                     (basic.step_domains, basic.typ)
                 | None -> (
-                  (* TODO: Abstract this into a function in Types_map *)
-                  match d.kind with
-                  | Compiled ->
-                      let d = Types_map.lookup_compiled d.id in
-                      (d.step_domains, d.typ)
-                  | Side_loaded ->
-                      let d = Types_map.lookup_side_loaded d.id in
-                      (* TODO: This replication to please the type checker is
-                       pointless... *)
-                      ( Vector.init d.permanent.branches ~f:(fun _ ->
-                            Side_loaded_verification_key.max_domains_with_x )
-                      , d.permanent.typ ) )
+                    (* TODO: Abstract this into a function in Types_map *)
+                    match d.kind with
+                    | Compiled ->
+                        let d = Types_map.lookup_compiled d.id in
+                        (d.step_domains, d.typ)
+                    | Side_loaded ->
+                        let d = Types_map.lookup_side_loaded d.id in
+                        (* TODO: This replication to please the type checker is
+                           pointless... *)
+                        ( Vector.init d.permanent.branches ~f:(fun _ ->
+                              Side_loaded_verification_key.max_domains_with_x )
+                        , d.permanent.typ ) )
               in
               typ )
               d
@@ -121,6 +120,9 @@ let step_main
     let open Requests.Step in
     let open Impls.Step in
     with_label "step_main" (fun () ->
+        let module Max_branching = ( val max_branching : Nat.Add.Intf
+                                       with type n = max_branching )
+        in
         let T = Max_branching.eq in
         let dlog_plonk_index =
           exists
@@ -129,7 +131,7 @@ let step_main
                (Typ.array Inner_curve.typ
                   ~length:
                     (index_commitment_length ~max_degree:Max_degree.wrap
-                       basic.wrap_domains.h)))
+                       basic.wrap_domains.h ) ) )
         in
         let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
         let prevs =
@@ -156,34 +158,36 @@ let step_main
               , max_branching
               , self_branches )
               Types_map.For_step.t =
-            { branches= self_branches
-            ; branchings= Vector.map basic.branchings ~f:Field.of_int
-            ; max_branching= (module Max_branching)
-            ; max_width= None
-            ; typ= basic.typ
-            ; var_to_field_elements= basic.var_to_field_elements
-            ; value_to_field_elements= basic.value_to_field_elements
-            ; wrap_domains= basic.wrap_domains
-            ; step_domains= `Known basic.step_domains
-            ; wrap_key= dlog_plonk_index }
+            { branches = self_branches
+            ; branchings = Vector.map basic.branchings ~f:Field.of_int
+            ; max_branching
+            ; max_width = None
+            ; typ = basic.typ
+            ; var_to_field_elements = basic.var_to_field_elements
+            ; value_to_field_elements = basic.value_to_field_elements
+            ; wrap_domains = basic.wrap_domains
+            ; step_domains = `Known basic.step_domains
+            ; wrap_key = dlog_plonk_index
+            }
           in
           let module M =
             H4.Map (Tag) (Types_map.For_step)
               (struct
-                let f : type a b n m.
+                let f :
+                    type a b n m.
                     (a, b, n, m) Tag.t -> (a, b, n, m) Types_map.For_step.t =
                  fun tag ->
                   match Type_equal.Id.same_witness self.id tag.id with
                   | Some T ->
                       self_data
                   | None -> (
-                    match tag.kind with
-                    | Compiled ->
-                        Types_map.For_step.of_compiled
-                          (Types_map.lookup_compiled tag.id)
-                    | Side_loaded ->
-                        Types_map.For_step.of_side_loaded
-                          (Types_map.lookup_side_loaded tag.id) )
+                      match tag.kind with
+                      | Compiled ->
+                          Types_map.For_step.of_compiled
+                            (Types_map.lookup_compiled tag.id)
+                      | Side_loaded ->
+                          Types_map.For_step.of_side_loaded
+                            (Types_map.lookup_side_loaded tag.id) )
               end)
           in
           M.f rule.prevs
@@ -204,12 +208,10 @@ let step_main
         in
         let sgs =
           let module M =
-            H3.Map
-              (Per_proof_witness)
-              (E03 (Inner_curve))
+            H3.Map (Per_proof_witness) (E03 (Inner_curve))
               (struct
-                let f : type a b c.
-                    (a, b, c) Per_proof_witness.t -> Inner_curve.t =
+                let f :
+                    type a b c. (a, b, c) Per_proof_witness.t -> Inner_curve.t =
                  fun (_, _, _, _, _, (opening, _)) -> opening.sg
               end)
           in
@@ -218,7 +220,8 @@ let step_main
         in
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
-              let rec go : type vars vals ns1 ns2 n.
+              let rec go :
+                  type vars vals ns1 ns2 n.
                      (vars, ns1, ns2) H3.T(Per_proof_witness).t
                   -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
                   -> vars H1.T(E01(Digest)).t
@@ -275,14 +278,16 @@ let step_main
                     let state =
                       with_label __LOC__ (fun () ->
                           { state with
-                            deferred_values=
+                            deferred_values =
                               { state.deferred_values with
-                                which_branch=
+                                which_branch =
                                   Pseudo.choose
                                     ( state.deferred_values.which_branch
                                     , Vector.init d.branches ~f:Field.of_int )
                                     ~f:Fn.id
-                                  |> Types.Index.of_field (module Impl) } } )
+                                  |> Types.Index.of_field (module Impl)
+                              }
+                          } )
                     in
                     let statement =
                       let prev_me_only =
@@ -291,19 +296,21 @@ let step_main
                               (* TODO: Don't rehash when it's not necessary *)
                               unstage
                                 (hash_me_only_opt ~index:d.wrap_key
-                                   d.var_to_field_elements)
+                                   d.var_to_field_elements )
                             in
                             hash ~widths:d.branchings
                               ~max_width:(Nat.Add.n d.max_branching)
                               ~which_branch
                               (* Use opt sponge for cutting off the bulletproof challenges early *)
                               { app_state
-                              ; dlog_plonk_index= d.wrap_key
-                              ; sg= sg_old
-                              ; old_bulletproof_challenges } )
+                              ; dlog_plonk_index = d.wrap_key
+                              ; sg = sg_old
+                              ; old_bulletproof_challenges
+                              } )
                       in
-                      { Types.Dlog_based.Statement.pass_through= prev_me_only
-                      ; proof_state= {state with me_only= pass_through} }
+                      { Types.Dlog_based.Statement.pass_through = prev_me_only
+                      ; proof_state = { state with me_only = pass_through }
+                      }
                     in
                     let verified =
                       with_label __LOC__ (fun () ->
@@ -344,16 +351,17 @@ let step_main
               let hash_me_only =
                 unstage
                   (hash_me_only ~index:dlog_plonk_index
-                     basic.var_to_field_elements)
+                     basic.var_to_field_elements )
               in
               Field.Assert.equal stmt.proof_state.me_only
                 (hash_me_only
                    { app_state
                    ; dlog_plonk_index
-                   ; sg= sgs
-                   ; old_bulletproof_challenges=
+                   ; sg = sgs
+                   ; old_bulletproof_challenges =
                        (* Note: the bulletproof_challenges here are unpadded! *)
-                       bulletproof_challenges }) )
+                       bulletproof_challenges
+                   } ) )
         in
         () )
   in

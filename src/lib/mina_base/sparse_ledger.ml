@@ -11,7 +11,7 @@ module Stable = struct
       , Account.Stable.V1.t
       , Token_id.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-    [@@deriving to_yojson, sexp]
+    [@@deriving yojson, sexp]
 
     let to_latest = Fn.id
   end
@@ -32,7 +32,7 @@ end
 module M =
   Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Token_id) (Account_id) (Account)
 
-type account_state = [`Added | `Existed] [@@deriving equal]
+type account_state = [ `Added | `Existed ] [@@deriving equal]
 
 module L = struct
   type t = M.t ref
@@ -40,7 +40,12 @@ module L = struct
   type location = int
 
   let get : t -> location -> Account.t option =
-   fun t loc -> Option.try_with (fun () -> M.get_exn !t loc)
+   fun t loc ->
+    Option.try_with (fun () ->
+        let account = M.get_exn !t loc in
+        if Public_key.Compressed.(equal empty account.public_key) then None
+        else Some account )
+    |> Option.bind ~f:Fn.id
 
   let location_of_account : t -> Account_id.t -> location option =
    fun t id -> Option.try_with (fun () -> M.find_index_exn !t id)
@@ -57,9 +62,10 @@ module L = struct
       let public_key = Account_id.public_key id in
       let account' : Account.t =
         { account with
-          delegate= Some public_key
+          delegate = Some public_key
         ; public_key
-        ; token_id= Account_id.token_id id }
+        ; token_id = Account_id.token_id id
+        }
       in
       set t loc account' ;
       (`Added, account', loc) )
@@ -90,7 +96,7 @@ module L = struct
    fun t -> M.next_available_token !t
 
   let set_next_available_token : t -> Token_id.t -> unit =
-   fun t token -> t := {!t with next_available_token= token}
+   fun t token -> t := { !t with next_available_token = token }
 end
 
 module T = Transaction_logic.Make (L)
@@ -99,6 +105,7 @@ module T = Transaction_logic.Make (L)
 M.
   ( of_hash
   , to_yojson
+  , of_yojson
   , get_exn
   , path_exn
   , set_exn
@@ -122,14 +129,13 @@ let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
     ~init:
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
-         ~next_available_token:
-           (Ledger.Any_ledger.M.next_available_token ledger)
-         (Ledger.Any_ledger.M.merkle_root ledger))
+         ~next_available_token:(Ledger.Any_ledger.M.next_available_token ledger)
+         (Ledger.Any_ledger.M.merkle_root ledger) )
     ~f:(fun _addr sparse_ledger account ->
       let loc =
         Option.value_exn
           (Ledger.Any_ledger.M.location_of_account ledger
-             (Account.identifier account))
+             (Account.identifier account) )
       in
       add_path sparse_ledger
         (Ledger.Any_ledger.M.merkle_path ledger loc)
@@ -157,8 +163,7 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
-        ((merkle_root sparse :> Random_oracle.Digest.t) |> Ledger_hash.of_hash)
-  ) ;
+        ((merkle_root sparse :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) ) ;
   sparse
 
 let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
@@ -166,9 +171,8 @@ let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
     ~init:
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
-         ~next_available_token:
-           (Ledger.Any_ledger.M.next_available_token ledger)
-         (Ledger.Any_ledger.M.merkle_root ledger))
+         ~next_available_token:(Ledger.Any_ledger.M.next_available_token ledger)
+         (Ledger.Any_ledger.M.merkle_root ledger) )
     ~f:(fun acc i ->
       let account = Ledger.Any_ledger.M.get_at_index_exn ledger i in
       add_path acc
@@ -188,7 +192,7 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
       let _, pub2 = keygen () in
       let aid1 = Account_id.create pub1 Token_id.default in
       let aid2 = Account_id.create pub2 Token_id.default in
-      let sl = of_ledger_subset_exn ledger [aid1; aid2] in
+      let sl = of_ledger_subset_exn ledger [ aid1; aid2 ] in
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
         ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) )
@@ -206,7 +210,8 @@ let get_or_initialize_exn account_id t idx =
     , { account with
         delegate
       ; public_key
-      ; token_id= Account_id.token_id account_id } )
+      ; token_id = Account_id.token_id account_id
+      } )
   else (`Existed, account)
 
 let sub_account_creation_fee
@@ -221,7 +226,7 @@ let sub_account_creation_fee
 let apply_user_command_exn
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~txn_global_slot t
-    ({signer; payload; signature= _} as user_command : Signed_command.t) =
+    ({ signer; payload; signature = _ } as user_command : Signed_command.t) =
   let open Currency in
   let signer_pk = Public_key.compress signer in
   let current_global_slot = txn_global_slot in
@@ -244,14 +249,15 @@ let apply_user_command_exn
     in
     ( idx
     , { account with
-        nonce= Account.Nonce.succ account.nonce
-      ; balance=
+        nonce = Account.Nonce.succ account.nonce
+      ; balance =
           Balance.sub_amount account.balance (Amount.of_fee fee)
           |> Option.value_exn ?here:None ?error:None ?message:None
-      ; receipt_chain_hash=
+      ; receipt_chain_hash =
           Receipt.Chain_hash.cons (Signed_command payload)
             account.receipt_chain_hash
-      ; timing } )
+      ; timing
+      } )
   in
   (* Charge the fee. *)
   let t = set_exn t fee_payer_idx fee_payer_account in
@@ -263,15 +269,15 @@ let apply_user_command_exn
     let balance =
       Option.value_exn
         (Balance.sub_amount account.balance
-           (Amount.of_fee constraint_constants.account_creation_fee))
+           (Amount.of_fee constraint_constants.account_creation_fee) )
     in
-    let account = {account with balance} in
+    let account = { account with balance } in
     let timing =
       Or_error.ok_exn
         (Transaction_logic.validate_timing ~txn_amount:Amount.zero
-           ~txn_global_slot:current_global_slot ~account)
+           ~txn_global_slot:current_global_slot ~account )
     in
-    {account with timing}
+    { account with timing }
   in
   let compute_updates () =
     (* Raise an exception if any of the invariants for the user command are not
@@ -313,8 +319,7 @@ let apply_user_command_exn
         let receiver_account = get_exn t @@ find_index_exn t receiver in
         (* Check that receiver account exists. *)
         assert (
-          not Public_key.Compressed.(equal empty receiver_account.public_key)
-        ) ;
+          not Public_key.Compressed.(equal empty receiver_account.public_key) ) ;
         let source_idx = find_index_exn t source in
         let source_account = get_exn t source_idx in
         (* Check that source account exists. *)
@@ -330,11 +335,12 @@ let apply_user_command_exn
                  ~txn_global_slot:current_global_slot ~account:source_account
           in
           { source_account with
-            delegate= Some (Account_id.public_key receiver)
-          ; timing }
+            delegate = Some (Account_id.public_key receiver)
+          ; timing
+          }
         in
-        [(source_idx, source_account)]
-    | Payment {amount; token_id= token; _} ->
+        [ (source_idx, source_account) ]
+    | Payment { amount; token_id = token; _ } ->
         let receiver_idx = find_index_exn t receiver in
         let action, receiver_account =
           get_or_initialize_exn receiver t receiver_idx
@@ -348,9 +354,10 @@ let apply_user_command_exn
         in
         let receiver_account =
           { receiver_account with
-            balance=
+            balance =
               Balance.add_amount receiver_account.balance receiver_amount
-              |> Option.value_exn ?here:None ?error:None ?message:None }
+              |> Option.value_exn ?here:None ?error:None ?message:None
+          }
         in
         let source_idx = find_index_exn t source in
         let source_account =
@@ -364,21 +371,22 @@ let apply_user_command_exn
           assert (not Public_key.Compressed.(equal empty account.public_key)) ;
           try
             { account with
-              balance=
+              balance =
                 Balance.sub_amount account.balance amount
                 |> Option.value_exn ?here:None ?error:None ?message:None
-            ; timing=
+            ; timing =
                 Or_error.ok_exn
                 @@ Transaction_logic.validate_timing ~txn_amount:amount
-                     ~txn_global_slot:current_global_slot ~account }
+                     ~txn_global_slot:current_global_slot ~account
+            }
           with exn when Account_id.equal fee_payer source ->
             (* Don't process transactions with insufficient balance from the
                fee-payer.
             *)
             raise (Reject exn)
         in
-        [(receiver_idx, receiver_account); (source_idx, source_account)]
-    | Create_new_token {disable_new_accounts; _} ->
+        [ (receiver_idx, receiver_account); (source_idx, source_account) ]
+    | Create_new_token { disable_new_accounts; _ } ->
         (* NOTE: source and receiver are definitionally equal here. *)
         let fee_payer_account =
           try charge_account_creation_fee_exn fee_payer_account
@@ -392,21 +400,24 @@ let apply_user_command_exn
           raise
             (Reject
                (Failure
-                  "Token owner account for newly created token already exists")) ;
+                  "Token owner account for newly created token already exists"
+               ) ) ;
         let receiver_account =
           { receiver_account with
-            token_permissions=
-              Token_permissions.Token_owned {disable_new_accounts} }
+            token_permissions =
+              Token_permissions.Token_owned { disable_new_accounts }
+          }
         in
-        [(fee_payer_idx, fee_payer_account); (receiver_idx, receiver_account)]
-    | Create_token_account {account_disabled; _} ->
+        [ (fee_payer_idx, fee_payer_account); (receiver_idx, receiver_account) ]
+    | Create_token_account { account_disabled; _ } ->
         if
           account_disabled
           && Token_id.(equal default) (Account_id.token_id receiver)
         then
           raise
             (Reject
-               (Failure "Cannot open a disabled account in the default token")) ;
+               (Failure "Cannot open a disabled account in the default token")
+            ) ;
         let fee_payer_account =
           try charge_account_creation_fee_exn fee_payer_account
           with exn -> raise (Reject exn)
@@ -419,7 +430,7 @@ let apply_user_command_exn
           failwith "Attempted to create an account that already exists" ;
         let receiver_account =
           { receiver_account with
-            token_permissions= Token_permissions.Not_owned {account_disabled}
+            token_permissions = Token_permissions.Not_owned { account_disabled }
           }
         in
         let source_idx = find_index_exn t source in
@@ -435,7 +446,7 @@ let apply_user_command_exn
         in
         let () =
           match source_account.token_permissions with
-          | Token_owned {disable_new_accounts} ->
+          | Token_owned { disable_new_accounts } ->
               if
                 not
                   ( Bool.equal account_disabled disable_new_accounts
@@ -445,8 +456,7 @@ let apply_user_command_exn
                   "The fee-payer is not authorised to create token accounts \
                    for this token"
           | Not_owned _ ->
-              if Token_id.(equal default) (Account_id.token_id receiver) then
-                ()
+              if Token_id.(equal default) (Account_id.token_id receiver) then ()
               else failwith "Token owner account does not own the token"
         in
         let source_account =
@@ -455,16 +465,17 @@ let apply_user_command_exn
             @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
                  ~txn_global_slot:current_global_slot ~account:source_account
           in
-          {source_account with timing}
+          { source_account with timing }
         in
         if Account_id.equal source receiver then
           (* For token_id= default, we allow this *)
-          [(fee_payer_idx, fee_payer_account); (source_idx, source_account)]
+          [ (fee_payer_idx, fee_payer_account); (source_idx, source_account) ]
         else
           [ (receiver_idx, receiver_account)
           ; (fee_payer_idx, fee_payer_account)
-          ; (source_idx, source_account) ]
-    | Mint_tokens {token_id= token; amount; _} ->
+          ; (source_idx, source_account)
+          ]
+    | Mint_tokens { token_id = token; amount; _ } ->
         assert (not (Token_id.(equal default) token)) ;
         let receiver_idx = find_index_exn t receiver in
         let action, receiver_account =
@@ -473,9 +484,10 @@ let apply_user_command_exn
         assert (equal_account_state action `Existed) ;
         let receiver_account =
           { receiver_account with
-            balance=
+            balance =
               Balance.add_amount receiver_account.balance amount
-              |> Option.value_exn ?here:None ?error:None ?message:None }
+              |> Option.value_exn ?here:None ?error:None ?message:None
+          }
         in
         let source_idx = find_index_exn t source in
         let source_account =
@@ -492,17 +504,18 @@ let apply_user_command_exn
                 ()
             | Not_owned _ ->
                 failwithf
-                  !"The claimed token owner %{sexp: Account_id.t} does not \
-                    own the token %{sexp: Token_id.t}"
+                  !"The claimed token owner %{sexp: Account_id.t} does not own \
+                    the token %{sexp: Token_id.t}"
                   source token ()
           in
           { account with
-            timing=
+            timing =
               Or_error.ok_exn
               @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
-                   ~txn_global_slot:current_global_slot ~account }
+                   ~txn_global_slot:current_global_slot ~account
+          }
         in
-        [(receiver_idx, receiver_account); (source_idx, source_account)]
+        [ (receiver_idx, receiver_account); (source_idx, source_account) ]
   in
   try
     let indexed_accounts = compute_updates () in
@@ -551,7 +564,7 @@ let apply_fee_transfer_exn ~constraint_constants ~txn_global_slot =
       in
       Option.value_exn (Balance.add_amount account.balance amount')
     in
-    set_exn t index {account with balance; timing}
+    set_exn t index { account with balance; timing }
   in
   fun t transfer ->
     match Fee_transfer.to_singles transfer with
@@ -563,7 +576,7 @@ let apply_fee_transfer_exn ~constraint_constants ~txn_global_slot =
         apply_single ~update_timing:true t' s2
 
 let apply_coinbase_exn ~constraint_constants ~txn_global_slot t
-    ({receiver; fee_transfer; amount= coinbase_amount} : Coinbase.t) =
+    ({ receiver; fee_transfer; amount = coinbase_amount } : Coinbase.t) =
   let open Currency in
   let add_to_balance ~update_timing t pk amount =
     let idx = find_index_exn t pk in
@@ -578,14 +591,14 @@ let apply_coinbase_exn ~constraint_constants ~txn_global_slot t
       in
       Option.value_exn (Balance.add_amount a.balance amount')
     in
-    set_exn t idx {a with balance; timing}
+    set_exn t idx { a with balance; timing }
   in
   (* Note: Updating coinbase receiver timing only if there is no fee transfer. This is so as to not add any extra constraints in transaction snark for checking "receiver" timings. This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account(#5973)*)
   let receiver_reward, t, update_coinbase_receiver_timing =
     match fee_transfer with
     | None ->
         (coinbase_amount, t, true)
-    | Some ({receiver_pk= _; fee} as ft) ->
+    | Some ({ receiver_pk = _; fee } as ft) ->
         let fee = Amount.of_fee fee in
         let reward =
           Amount.sub coinbase_amount fee
@@ -618,8 +631,7 @@ let has_locked_tokens_exn ~global_slot ~account_id t =
   let _, account = get_or_initialize_exn account_id t idx in
   Account.has_locked_tokens ~global_slot account
 
-let merkle_root t =
-  Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
+let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
 let depth t = M.depth t
 
@@ -628,7 +640,7 @@ let handler t =
   let path_exn idx =
     List.map (path_exn !ledger idx) ~f:(function `Left h -> h | `Right h -> h)
   in
-  stage (fun (With {request; respond}) ->
+  stage (fun (With { request; respond }) ->
       match request with
       | Ledger_hash.Get_element idx ->
           let elt = get_exn !ledger idx in

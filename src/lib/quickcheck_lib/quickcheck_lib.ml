@@ -1,18 +1,8 @@
 (* quickcheck_lib.ml *)
 
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Quickcheck.Generator
 open Quickcheck.Let_syntax
-
-[%%ifndef
-consensus_mechanism]
-
-module Currency = Currency_nonconsensus.Currency
-
-[%%endif]
 
 let of_array array = Quickcheck.Generator.of_list @@ Array.to_list array
 
@@ -125,8 +115,8 @@ let gen_division_generic (type t) (module M : Int_s with type t = t) (n : t)
              impossible. "
       | head :: rest ->
           (* Going through floating point land may have caused some rounding error. We
-           tack it onto the first result so that the sum of the output is equal to n.
-         *)
+             tack it onto the first result so that the sum of the output is equal to n.
+          *)
           if M.( > ) n total then M.(head + (n - total)) :: rest
           else M.(head - (total - n)) :: rest )
 
@@ -167,8 +157,8 @@ let gen_imperative_rose_tree ?(p = 0.75) (root_gen : 'a t)
             Rose_tree.T
               (parent, List.map forks ~f:(fun (this, f) -> f (this parent))) )
 
-let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t)
-    (node_gen : ('a -> 'a) t) =
+let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t) (node_gen : ('a -> 'a) t)
+    =
   let%bind root = root_gen in
   imperative_fixed_point root ~f:(fun self ->
       match%bind size with
@@ -177,7 +167,7 @@ let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t)
       (* this case is optional but more effecient *)
       | 1 ->
           let%map this = node_gen in
-          fun parent -> [this parent]
+          fun parent -> [ this parent ]
       | n ->
           let%bind this = node_gen in
           let%bind fork_count = geometric ~p 1 >>| Int.max n in

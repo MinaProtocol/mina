@@ -30,7 +30,8 @@ module V = struct
 end
 
 let () =
-  let _f : type a.
+  let _f :
+      type a.
       unit -> (a V.t, a Vector.With_length(Max_state_size).t) Type_equal.t =
    fun () -> Type_equal.T
   in

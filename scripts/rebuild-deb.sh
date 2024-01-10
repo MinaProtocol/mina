@@ -8,36 +8,38 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../_build"
 
 GITHASH=$(git rev-parse --short=7 HEAD)
-GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-GITTAG=$(git describe --always --abbrev=0)
 GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
-# Identify All Artifacts by Branch and Git Hash
 set +u
-
-
-# TODO: be smarter about this when we introduce a devnet package
-#if [[ "$GITBRANCH" == "master" ]] ; then
-DUNE_PROFILE="mainnet"
-#fi
-
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
+set -u
 
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 
-VERSION="${MINA_DEB_VERSION}"
-
 cd "${SCRIPTPATH}/../_build"
 
-if [[ "$1" == "optimized" ]] ; then
-    echo "Optimized deb"
-    VERSION=${VERSION}_optimized
-else
-    echo "Standard deb"
-    VERSION=${VERSION}
-fi
+# Set dependencies based on debian release
+SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata"
+case "${MINA_DEB_CODENAME}" in
+  bookworm|jammy)
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
+    ;;
+  bullseye|focal)
+    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
+    ;;
+  buster)
+    DAEMON_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps7, mina-logproc"
+    ;;
+  stretch|bionic)
+    DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6, mina-logproc"
+    ;;
+  *)
+    echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
+    ;;
+esac
+
 
 BUILDDIR="deb_build"
 
@@ -47,13 +49,13 @@ mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 
 Package: mina-generate-keypair
-Version: ${GENERATE_KEYPAIR_VERSION}
+Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
 Vendor: none
 Architecture: amd64
 Maintainer: o(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: libffi6, libssl1.1, libgmp10, libgomp1
+Depends: ${SHARED_DEPS}
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
@@ -67,6 +69,7 @@ echo "Control File:"
 cat "${BUILDDIR}/DEBIAN/control"
 
 # Binaries
+rm -rf "${BUILDDIR}/usr/local/bin"
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
 cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
@@ -78,10 +81,54 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${GENERATE_KEYPAIR_VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
+
+##################################### GENERATE KEYPAIR PACKAGE #######################################
+
+mkdir -p "${BUILDDIR}/DEBIAN"
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+
+Package: mina-logproc
+Version: ${MINA_DEB_VERSION}
+License: Apache-2.0
+Vendor: none
+Architecture: amd64
+Maintainer: o(1)Labs <build@o1labs.org>
+Installed-Size:
+Depends: ${SHARED_DEPS}
+Section: base
+Priority: optional
+Homepage: https://minaprotocol.com/
+Description: Utility for processing mina-daemon log output
+ Utility for processing mina-daemon log output
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+# Binaries
+rm -rf "${BUILDDIR}/usr/local/bin"
+mkdir -p "${BUILDDIR}/usr/local/bin"
+cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-logproc_${MINA_DEB_VERSION}.deb
+ls -lh mina*.deb
+
+##################################### END LOGPROC PACKAGE #######################################
+
+##################################### GENERATE MINA MAINNET PACKAGE #######################################
 
 ###### deb without the proving keys
 echo "------------------------------------------------------------"
@@ -91,11 +138,11 @@ rm -rf "${BUILDDIR}"
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: mina-mainnet
-Version: ${VERSION}
+Version: ${MINA_DEB_VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6, libjemalloc1, libssl1.1, libgmp10, libgomp1, libpq-dev
+Depends: ${SHARED_DEPS}${DAEMON_DEPS}
 Suggests: postgresql
 Conflicts: mina-devnet
 License: Apache-2.0
@@ -124,15 +171,15 @@ chmod +w $p2p_path
 # Only for nix builds
 # patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 chmod -w $p2p_path
-cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
+# cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
 
 mkdir -p "${BUILDDIR}/usr/lib/systemd/user"
-cp ../scripts/mina.service "${BUILDDIR}/usr/lib/systemd/user/"
+sed s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt% ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
 
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
-cp ../src/config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
+cp ../src/config/mainnet.mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
 rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
 # Copy the genesis ledgers and proofs as these are fairly small and very valueable to have l
@@ -165,8 +212,12 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-mainnet_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-mainnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
+
+##################################### END GENERATE MINA MAINNET PACKAGE #######################################
+
+##################################### GENERATE MINA DEVNET PACKAGE #######################################
 
 ###### deb with testnet signatures
 echo "------------------------------------------------------------"
@@ -174,11 +225,11 @@ echo "Building testnet signatures deb without keys:"
 
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: mina-devnet
-Version: ${VERSION}
+Version: ${MINA_DEB_VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6, libjemalloc1, libssl1.1, libgmp10, libgomp1, libpq-dev
+Depends: ${SHARED_DEPS}${DAEMON_DEPS}
 Suggests: postgresql
 Conflicts: mina-mainnet
 License: Apache-2.0
@@ -202,6 +253,11 @@ sudo cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/us
 # Switch the default configuration to devnet.json:
 sudo cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
+# Overwrite the mina.service with a new default PEERS_URL
+rm -f "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+sed s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/seed-lists/devnet_seeds.txt% ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+
+
 # echo contents of deb
 echo "------------------------------------------------------------"
 echo "Deb Contents:"
@@ -209,8 +265,10 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-devnet_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-devnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
+
+##################################### END GENERATE MINA DEVNET PACKAGE #######################################
 
 # TODO: Find a way to package keys properly without blocking/locking in CI
 # TODO: Keys should be their own package, which this 'non-noprovingkeys' deb depends on
@@ -259,5 +317,5 @@ done
 rm -rf "${BUILDDIR}"
 
 # Build mina block producer sidecar 
-source ../automation/services/mina-bp-stats/sidecar/build.sh
+../automation/services/mina-bp-stats/sidecar/build.sh
 ls -lh mina*.deb

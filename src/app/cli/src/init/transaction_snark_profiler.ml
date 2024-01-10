@@ -33,17 +33,18 @@ let create_ledger_and_transactions num_transitions =
         ~valid_until:None
         ~body:
           (Payment
-             { source_pk= from_pk
-             ; receiver_pk= to_pk
-             ; token_id= Token_id.default
-             ; amount })
+             { source_pk = from_pk
+             ; receiver_pk = to_pk
+             ; token_id = Token_id.default
+             ; amount
+             } )
     in
     Signed_command.sign from_kp payload
   in
   let nonces =
     Public_key.Compressed.Table.of_alist_exn
       (List.map (Array.to_list keys) ~f:(fun k ->
-           (Public_key.compress k.public_key, Account.Nonce.zero) ))
+           (Public_key.compress k.public_key, Account.Nonce.zero) ) )
   in
   let random_transaction () : Signed_command.With_valid_signature.t =
     let sender_idx = Random.int num_accounts in
@@ -60,8 +61,7 @@ let create_ledger_and_transactions num_transitions =
   | `Count n ->
       let num_transactions = n - 2 in
       let transactions =
-        List.rev
-          (List.init num_transactions ~f:(fun _ -> random_transaction ()))
+        List.rev (List.init num_transactions ~f:(fun _ -> random_transaction ()))
       in
       let fee_transfer =
         let open Currency.Fee in
@@ -69,8 +69,7 @@ let create_ledger_and_transactions num_transitions =
           List.fold transactions ~init:zero ~f:(fun acc t ->
               Option.value_exn
                 (add acc
-                   (Signed_command.Payload.fee (t :> Signed_command.t).payload))
-          )
+                   (Signed_command.Payload.fee (t :> Signed_command.t).payload) ) )
         in
         Fee_transfer.create_single
           ~receiver_pk:(Public_key.compress keys.(0).public_key)
@@ -85,7 +84,7 @@ let create_ledger_and_transactions num_transitions =
       let transitions =
         List.map transactions ~f:(fun t ->
             Transaction.Command (User_command.Signed_command t) )
-        @ [Coinbase coinbase; Fee_transfer fee_transfer]
+        @ [ Coinbase coinbase; Fee_transfer fee_transfer ]
       in
       (ledger, transitions)
   | `Two_from_same ->
@@ -100,7 +99,7 @@ let create_ledger_and_transactions num_transitions =
           Currency.Fee.zero
           (Account.Nonce.succ Account.Nonce.zero)
       in
-      (ledger, [Command (Signed_command a); Command (Signed_command b)])
+      (ledger, [ Command (Signed_command a); Command (Signed_command b) ])
 
 let time thunk =
   let start = Time.now () in
@@ -121,13 +120,11 @@ let precomputed_values = Precomputed_values.compiled_inputs
 let state_body =
   Mina_state.(
     Lazy.map precomputed_values ~f:(fun values ->
-        values.protocol_state_with_hash.data |> Protocol_state.body ))
+        values.protocol_state_with_hashes.data |> Protocol_state.body ))
 
-let curr_state_view =
-  Lazy.map state_body ~f:Mina_state.Protocol_state.Body.view
+let curr_state_view = Lazy.map state_body ~f:Mina_state.Protocol_state.Body.view
 
-let state_body_hash =
-  Lazy.map ~f:Mina_state.Protocol_state.Body.hash state_body
+let state_body_hash = Lazy.map ~f:Mina_state.Protocol_state.Body.hash state_body
 
 let pending_coinbase_stack_target (t : Transaction.t) stack =
   let stack_with_state =
@@ -175,11 +172,13 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                     ~init_stack:coinbase_stack_source
                     ~next_available_token_before ~next_available_token_after
                     ~pending_coinbase_stack_state:
-                      { source= coinbase_stack_source
-                      ; target= coinbase_stack_target }
+                      { source = coinbase_stack_source
+                      ; target = coinbase_stack_target
+                      }
                     ~snapp_account1:None ~snapp_account2:None
-                    { Transaction_protocol_state.Poly.transaction= t
-                    ; block_data= Lazy.force state_body }
+                    { Transaction_protocol_state.Poly.transaction = t
+                    ; block_data = Lazy.force state_body
+                    }
                     (unstage (Sparse_ledger.handler sparse_ledger)) ) )
         in
         ( (Time.Span.max span max_span, sparse_ledger', coinbase_stack_target)
@@ -187,7 +186,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
   in
   let rec merge_all serial_time proofs =
     match proofs with
-    | [_] ->
+    | [ _ ] ->
         serial_time
     | _ ->
         let layer_time, new_proofs =
@@ -239,12 +238,14 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
               ~init_stack:Pending_coinbase.Stack.empty
               ~next_available_token_before ~next_available_token_after
               ~pending_coinbase_stack_state:
-                { source= Pending_coinbase.Stack.empty
-                ; target= coinbase_stack_target }
+                { source = Pending_coinbase.Stack.empty
+                ; target = coinbase_stack_target
+                }
               ~snapp_account1:None ~snapp_account2:None
-              { Transaction_protocol_state.Poly.block_data=
+              { Transaction_protocol_state.Poly.block_data =
                   Lazy.force state_body
-              ; transaction= t }
+              ; transaction = t
+              }
               (unstage (Sparse_ledger.handler sparse_ledger))
           in
           sparse_ledger' )
@@ -284,12 +285,14 @@ let generate_base_snarks_witness sparse_ledger0
               ~init_stack:Pending_coinbase.Stack.empty
               ~next_available_token_before ~next_available_token_after
               ~pending_coinbase_stack_state:
-                { Transaction_snark.Pending_coinbase_stack_state.source=
+                { Transaction_snark.Pending_coinbase_stack_state.source =
                     Pending_coinbase.Stack.empty
-                ; target= coinbase_stack_target }
+                ; target = coinbase_stack_target
+                }
               ~snapp_account1:None ~snapp_account2:None
-              { Transaction_protocol_state.Poly.transaction= t
-              ; block_data= Lazy.force state_body }
+              { Transaction_protocol_state.Poly.transaction = t
+              ; block_data = Lazy.force state_body
+              }
               (unstage (Sparse_ledger.handler sparse_ledger))
           in
           sparse_ledger' )
@@ -307,7 +310,7 @@ let run profiler num_transactions repeats preeval =
            ~f:(fun (participants, next_available_token) t ->
              ( List.rev_append
                  (Transaction.accounts_accessed ~next_available_token
-                    (Transaction.forget t))
+                    (Transaction.forget t) )
                  participants
              , Transaction.next_available_token (Transaction.forget t)
                  next_available_token ) ) )
@@ -346,19 +349,19 @@ let command =
             the mocked ones"
          (optional int)
      and repeats =
-       flag "--repeat" ~aliases:["repeat"]
+       flag "--repeat" ~aliases:[ "repeat" ]
          ~doc:"count number of times to repeat the profile" (optional int)
      and preeval =
-       flag "--preeval" ~aliases:["preeval"]
+       flag "--preeval" ~aliases:[ "preeval" ]
          ~doc:
            "true/false whether to pre-evaluate the checked computation to \
             cache interpreter and computation state"
          (optional bool)
      and check_only =
-       flag "--check-only" ~aliases:["check-only"]
+       flag "--check-only" ~aliases:[ "check-only" ]
          ~doc:"Just check base snarks, don't keys or time anything" no_arg
      and witness_only =
-       flag "--witness-only" ~aliases:["witness-only"]
+       flag "--witness-only" ~aliases:[ "witness-only" ]
          ~doc:"Just generate the witnesses for the base snarks" no_arg
      in
      let num_transactions =
@@ -368,4 +371,4 @@ let command =
      let repeats = Option.value repeats ~default:1 in
      if witness_only then witness num_transactions repeats preeval
      else if check_only then dry num_transactions repeats preeval
-     else main num_transactions repeats preeval)
+     else main num_transactions repeats preeval )

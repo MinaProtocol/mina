@@ -8,7 +8,7 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
   let directory = Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
   let log_filename = "mina.log" in
   let exists name =
-    Result.is_ok (Unix.access (Filename.concat directory name) [`Exists])
+    Result.is_ok (Unix.access (Filename.concat directory name) [ `Exists ])
   in
   let get_size name =
     Int64.to_int_exn (Unix.stat (Filename.concat directory name)).st_size
@@ -33,7 +33,7 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
       ~processor:(Logger.Processor.raw ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory ~log_filename
-           ~max_size ~num_rotate) ;
+           ~max_size ~num_rotate ) ;
     run_test ~last_size:0 ~rotations:0 ~rotation_expected:false
   with exn ->
     ignore (Unix.system ("rm -rf " ^ directory) : Unix.Exit_or_signal.t) ;

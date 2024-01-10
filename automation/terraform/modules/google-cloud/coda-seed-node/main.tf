@@ -37,7 +37,7 @@ resource "google_compute_instance" "vm" {
     spec:
       containers:
         - name: ${var.instance_name}
-          image: ${var.coda_image}
+          image: ${var.mina_image}
           command:
             - /bin/bash
           args:

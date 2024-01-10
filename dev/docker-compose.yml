@@ -9,6 +9,7 @@ services:
     volumes:
       - "..:/mina" # mount the mina folder so that changes are reflected in the container
       - "_opam:/mina/_opam" # exclude any existing local switch
+      - "_build:/mina/_build" # exclude any existing local build
       - "opam:/home/opam/.opam" # cache opam stuff
     stdin_open: true # docker run -i
     tty: true # docker run -t
@@ -17,3 +18,4 @@ services:
 volumes:
   opam:
   _opam:
+  _build:

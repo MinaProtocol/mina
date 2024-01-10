@@ -1,21 +1,10 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-module Mina_numbers = Mina_numbers
-module Hash_prefix_states = Hash_prefix_states
-
-[%%else]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states
 
 [%%endif]
 
@@ -25,14 +14,15 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('app_state, 'vk) t = {app_state: 'app_state; verification_key: 'vk}
+      type ('app_state, 'vk) t =
+        { app_state : 'app_state; verification_key : 'vk }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 end
 
 type ('app_state, 'vk) t_ = ('app_state, 'vk) Poly.t =
-  {app_state: 'app_state; verification_key: 'vk}
+  { app_state : 'app_state; verification_key : 'vk }
 
 [%%versioned
 module Stable = struct
@@ -57,8 +47,7 @@ let digest_vk (t : Side_loaded_verification_key.t) =
     hash ~init:Hash_prefix_states.side_loaded_vk
       (pack_input (Side_loaded_verification_key.to_input t)))
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module Checked = struct
   type t =
@@ -77,7 +66,7 @@ module Checked = struct
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
-    to_input' {t with verification_key= Lazy.force t.verification_key.hash}
+    to_input' { t with verification_key = Lazy.force t.verification_key.hash }
 
   let digest_vk t =
     Random_oracle.Checked.(
@@ -124,13 +113,14 @@ let to_input (t : t) =
     ~verification_key:
       (f
          (Fn.compose field
-            (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash)))
+            (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
   |> List.reduce_exn ~f:append
 
 let default : _ Poly.t =
   (* These are the permissions of a "user"/"non snapp" account. *)
-  { app_state= Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
-  ; verification_key= None }
+  { app_state = Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
+  ; verification_key = None
+  }
 
 let digest (t : t) =
   Random_oracle.(

@@ -21,10 +21,10 @@ module Rpc = struct
 
     include
       Versioned_rpc.Both_convert.Plain.S
-      with type callee_query := Callee.query
-       and type callee_response := Callee.response
-       and type caller_query := Caller.query
-       and type caller_response := Caller.response
+        with type callee_query := Callee.query
+         and type callee_response := Callee.response
+         and type caller_query := Caller.query
+         and type caller_response := Caller.response
   end
 end
 

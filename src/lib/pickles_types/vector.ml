@@ -18,8 +18,7 @@ include T
 let rec iter : type a n. (a, n) t -> f:(a -> unit) -> unit =
  fun t ~f -> match t with [] -> () | x :: xs -> f x ; iter xs ~f
 
-let rec iter2 : type a b n. (a, n) t -> (b, n) t -> f:(a -> b -> unit) -> unit
-    =
+let rec iter2 : type a b n. (a, n) t -> (b, n) t -> f:(a -> b -> unit) -> unit =
  fun t1 t2 ~f ->
   match (t1, t2) with
   | [], [] ->
@@ -27,8 +26,8 @@ let rec iter2 : type a b n. (a, n) t -> (b, n) t -> f:(a -> b -> unit) -> unit
   | x :: xs, y :: ys ->
       f x y ; iter2 xs ys ~f
 
-let rec map2 : type a b c n.
-    (a, n) t -> (b, n) t -> f:(a -> b -> c) -> (c, n) t =
+let rec map2 : type a b c n. (a, n) t -> (b, n) t -> f:(a -> b -> c) -> (c, n) t
+    =
  fun t1 t2 ~f ->
   match (t1, t2) with
   | [], [] ->
@@ -36,9 +35,10 @@ let rec map2 : type a b c n.
   | x :: xs, y :: ys ->
       f x y :: map2 xs ys ~f
 
-let rec hhead_off : type xs n.
-       (xs, n s) Hlist0.H1_1(T).t
-    -> xs Hlist0.HlistId.t * (xs, n) Hlist0.H1_1(T).t =
+let rec hhead_off :
+    type xs n.
+    (xs, n s) Hlist0.H1_1(T).t -> xs Hlist0.HlistId.t * (xs, n) Hlist0.H1_1(T).t
+    =
  fun xss ->
   match xss with
   | [] ->
@@ -47,7 +47,8 @@ let rec hhead_off : type xs n.
       let hds, tls = hhead_off xss in
       (x :: hds, xs :: tls)
 
-let rec mapn : type xs y n.
+let rec mapn :
+    type xs y n.
     (xs, n) Hlist0.H1_1(T).t -> f:(xs Hlist0.HlistId.t -> y) -> (y, n) t =
  fun xss ~f ->
   match xss with
@@ -81,7 +82,8 @@ let rec init : type a n. int -> n nat -> f:(int -> a) -> (a, n) t =
 
 let init n ~f = init 0 n ~f
 
-let rec fold_map : type acc a b n.
+let rec fold_map :
+    type acc a b n.
     (a, n) t -> f:(acc -> a -> acc * b) -> init:acc -> acc * (b, n) t =
  fun t ~f ~init ->
   match t with
@@ -162,7 +164,7 @@ let rec fold : type acc a n. (a, n) t -> f:(acc -> a -> acc) -> init:acc -> acc
 
 let for_all : type a n. (a, n) t -> f:(a -> bool) -> bool =
  fun v ~f ->
-  with_return (fun {return} ->
+  with_return (fun { return } ->
       iter v ~f:(fun x -> if not (f x) then return false) ;
       true )
 
@@ -347,7 +349,8 @@ module With_length (N : Nat.Intf) = struct
   let to_list : 'a t -> 'a list = to_list
 end
 
-let rec typ' : type f var value n.
+let rec typ' :
+    type f var value n.
        ((var, value, f) Snarky_backendless.Typ.t, n) t
     -> ((var, n) t, (value, n) t, f) Snarky_backendless.Typ.t =
   let open Snarky_backendless.Typ in
@@ -365,8 +368,9 @@ let rec typ' : type f var value n.
 
 let typ elt n = typ' (init n ~f:(fun _ -> elt))
 
-let rec append : type n m n_m a.
-    (a, n) t -> (a, m) t -> (n, m, n_m) Nat.Adds.t -> (a, n_m) t =
+let rec append :
+    type n m n_m a. (a, n) t -> (a, m) t -> (n, m, n_m) Nat.Adds.t -> (a, n_m) t
+    =
  fun t1 t2 adds ->
   match (t1, adds) with
   | [], Z ->
@@ -401,8 +405,8 @@ let rec extend_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
       let extended = extend_exn xs m default in
       x :: extended
 
-let rec extend : type a n m.
-    (a, n) t -> (n, m) Nat.Lte.t -> m Nat.t -> a -> (a, m) t =
+let rec extend :
+    type a n m. (a, n) t -> (n, m) Nat.Lte.t -> m Nat.t -> a -> (a, m) t =
  fun v p m default ->
   match (v, p, m) with
   | _, Z, Z ->

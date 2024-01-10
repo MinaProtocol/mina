@@ -62,7 +62,7 @@ let mk xss ~f =
   let open E in
   pexp_array
     (List.map xss ~f:(fun xs ->
-         pexp_array (List.map xs ~f:(fun g -> pexp_array (List.map g ~f))) ))
+         pexp_array (List.map xs ~f:(fun g -> pexp_array (List.map g ~f))) ) )
 
 let structure =
   let loc = Ppxlib.Location.none in
@@ -86,11 +86,11 @@ let structure =
 
       let vesta =
         let f s = Fq.of_bigint (Bigint256.of_hex_string s) in
-        [%e mk vesta ~f:(fun (x, y) -> pexp_tuple [fq x; fq y])]
+        [%e mk vesta ~f:(fun (x, y) -> pexp_tuple [ fq x; fq y ])]
 
       let pallas =
         let f s = Fp.of_bigint (Bigint256.of_hex_string s) in
-        [%e mk pallas ~f:(fun (x, y) -> pexp_tuple [fp x; fp y])]
+        [%e mk pallas ~f:(fun (x, y) -> pexp_tuple [ fp x; fp y ])]
     end]
 
 let () =

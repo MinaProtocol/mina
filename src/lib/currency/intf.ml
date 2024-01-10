@@ -1,19 +1,11 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef
-consensus_mechanism]
-
 open Snark_bits
+
+[%%ifdef consensus_mechanism]
+
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_bits_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Sgn = Sgn_nonconsensus.Sgn
 
 [%%endif]
 
@@ -117,6 +109,12 @@ module type Signed_intf = sig
 
   val zero : t
 
+  val is_zero : t -> bool
+
+  val is_positive : t -> bool
+
+  val is_negative : t -> bool
+
   val to_input : t -> (_, bool) Random_oracle.Input.t
 
   val add : t -> t -> t option
@@ -168,8 +166,7 @@ module type Signed_intf = sig
   [%%endif]
 end
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module type Checked_arithmetic_intf = sig
   type value
@@ -189,10 +186,10 @@ module type Checked_arithmetic_intf = sig
   val sub : var -> var -> (var, _) Checked.t
 
   val sub_flagged :
-    var -> var -> (var * [`Underflow of Boolean.var], _) Checked.t
+    var -> var -> (var * [ `Underflow of Boolean.var ], _) Checked.t
 
   val add_flagged :
-    var -> var -> (var * [`Overflow of Boolean.var], _) Checked.t
+    var -> var -> (var * [ `Overflow of Boolean.var ], _) Checked.t
 
   val ( + ) : var -> var -> (var, _) Checked.t
 
@@ -201,7 +198,7 @@ module type Checked_arithmetic_intf = sig
   val add_signed : var -> signed_var -> (var, _) Checked.t
 
   val add_signed_flagged :
-    var -> signed_var -> (var * [`Overflow of Boolean.var], _) Checked.t
+    var -> signed_var -> (var * [ `Overflow of Boolean.var ], _) Checked.t
 
   val assert_equal : var -> var -> (unit, _) Checked.t
 
@@ -234,9 +231,9 @@ module type S = sig
 
   module Checked :
     Checked_arithmetic_intf
-    with type var := var
-     and type signed_var := Signed.var
-     and type value := t
+      with type var := var
+       and type signed_var := Signed.var
+       and type value := t
 
   [%%else]
 

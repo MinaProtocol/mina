@@ -7,8 +7,10 @@
  *)
 
 type t =
-  {transaction: Transaction.t; metadata: Yojson.Safe.t option [@default None]}
-[@@deriving yojson {strict= false}, show]
+  { transaction : Transaction.t
+  ; metadata : Yojson.Safe.t option [@default None]
+  }
+[@@deriving yojson { strict = false }, show, eq]
 
 (** A MempoolTransactionResponse contains an estimate of a mempool transaction. It may not be possible to know the full impact of a transaction in the mempool (ex: fee paid). *)
-let create (transaction : Transaction.t) : t = {transaction; metadata= None}
+let create (transaction : Transaction.t) : t = { transaction; metadata = None }

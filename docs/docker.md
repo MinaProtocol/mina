@@ -43,7 +43,7 @@ services:
     command: 
       daemon -peer <testnet>.o1test.net:8303 -rest-port 8304 -external-port 10101 -metrics-port 10000 -block-producer-key /root/wallet-keys/my_wallet -unsafe-track-block-producer-key
     environment: 
-      CODA_PRIVKEY_PASS: <key-password>
+      MINA_PRIVKEY_PASS: <key-password>
     volumes:
       - ~/wallet-keys:/root/wallet-keys
 ```

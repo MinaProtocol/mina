@@ -17,7 +17,7 @@ let main ~archive_uri ~state_hash ~sequence_no () =
   match Caqti_async.connect_pool archive_uri with
   | Error e ->
       [%log fatal]
-        ~metadata:[("error", `String (Caqti_error.show e))]
+        ~metadata:[ ("error", `String (Caqti_error.show e)) ]
         "Failed to create a Caqti connection to Postgresql" ;
       exit 1
   | Ok pool ->
@@ -36,7 +36,7 @@ let main ~archive_uri ~state_hash ~sequence_no () =
         Core_kernel.exit 1 ) ;
       let balance_1_id, balance_2_id =
         match receiver_balance_ids with
-        | [id1; id2] ->
+        | [ id1; id2 ] ->
             (id1, id2)
         | _ ->
             failwith "Wrong number of balance ids"
@@ -56,12 +56,13 @@ let main ~archive_uri ~state_hash ~sequence_no () =
           Unsigned.UInt64.of_int64 bal_int64
           |> Currency.Balance.of_uint64 |> Currency.Balance.to_yojson
         in
-        `Assoc [("public_key_id", `Int pk_id); ("balance", bal_json)]
+        `Assoc [ ("public_key_id", `Int pk_id); ("balance", bal_json) ]
       in
       [%log info] "Found balances to be swapped"
         ~metadata:
           [ ("balance_1", balance_to_yojson balance_1)
-          ; ("balance_2", balance_to_yojson balance_2) ] ;
+          ; ("balance_2", balance_to_yojson balance_2)
+          ] ;
       let balance_1_swapped, balance_2_swapped =
         match (balance_1, balance_2) with
         | (pk1, bal1), (pk2, bal2) ->
@@ -105,20 +106,20 @@ let () =
       (let open Let_syntax in
       async ~summary:"Swap bad balances for combined fee transfers"
         (let%map archive_uri =
-           Param.flag "--archive-uri" ~aliases:["archive-uri"]
+           Param.flag "--archive-uri" ~aliases:[ "archive-uri" ]
              ~doc:
                "URI URI for connecting to the archive database (e.g., \
                 postgres://$USER@localhost:5432/archiver)"
              Param.(required string)
          and state_hash =
-           Param.(flag "--state-hash" ~aliases:["state-hash"])
+           Param.(flag "--state-hash" ~aliases:[ "state-hash" ])
              ~doc:
-               "STATE-HASH State hash of the block containing the combined \
-                fee transfer"
+               "STATE-HASH State hash of the block containing the combined fee \
+                transfer"
              Param.(required string)
          and sequence_no =
-           Param.(flag "--sequence-no" ~aliases:["sequence-no"])
+           Param.(flag "--sequence-no" ~aliases:[ "sequence-no" ])
              ~doc:"NN Sequence number of the two fee transfers"
              Param.(required int)
          in
-         main ~archive_uri ~state_hash ~sequence_no)))
+         main ~archive_uri ~state_hash ~sequence_no )))

@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 (** [Visualization] is a set of tools that lets a client visualize complex data
     structures like the transition_frontier *)
@@ -62,17 +62,17 @@ module Make_ocamlgraph (Node : Node_intf) = struct
   include Graph.Graphviz.Dot (struct
     include G
 
-    let graph_attributes _ = [`Rankdir `LeftToRight]
+    let graph_attributes _ = [ `Rankdir `LeftToRight ]
 
     let get_subgraph _ = None
 
-    let default_vertex_attributes _ = [`Shape `Record]
+    let default_vertex_attributes _ = [ `Shape `Record ]
 
     let vertex_name = Node.name
 
     let vertex_attributes node =
       let dot_format = to_dot @@ Node.display_to_yojson (Node.display node) in
-      [`Label dot_format]
+      [ `Label dot_format ]
 
     let default_edge_attributes _ = []
 

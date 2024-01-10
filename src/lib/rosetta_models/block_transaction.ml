@@ -6,10 +6,10 @@
  * Schema Block_transaction.t : BlockTransaction contains a populated Transaction and the BlockIdentifier that contains it.
  *)
 
-type t = {block_identifier: Block_identifier.t; transaction: Transaction.t}
-[@@deriving yojson {strict= false}, show]
+type t = { block_identifier : Block_identifier.t; transaction : Transaction.t }
+[@@deriving yojson { strict = false }, show, eq]
 
 (** BlockTransaction contains a populated Transaction and the BlockIdentifier that contains it. *)
-let create (block_identifier : Block_identifier.t)
-    (transaction : Transaction.t) : t =
-  {block_identifier; transaction}
+let create (block_identifier : Block_identifier.t) (transaction : Transaction.t)
+    : t =
+  { block_identifier; transaction }

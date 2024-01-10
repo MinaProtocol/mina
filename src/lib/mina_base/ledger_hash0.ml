@@ -1,18 +1,5 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef
-consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
 
 include Data_hash.Make_full_size (struct
   let description = "Ledger hash"
@@ -28,15 +15,14 @@ module Stable = struct
 
   module V1 = struct
     module T = struct
-      type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+      type t = Field.t [@@deriving sexp, compare, hash, version { asserted }]
     end
 
     include T
 
     let to_latest = Fn.id
 
-    [%%define_from_scope
-    to_yojson, of_yojson]
+    [%%define_from_scope to_yojson, of_yojson]
 
     include Comparable.Make (T)
     include Hashable.Make_binable (T)

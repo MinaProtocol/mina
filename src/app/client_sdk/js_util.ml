@@ -1,29 +1,27 @@
 (* js_util.ml -- types and transformers for Javascript *)
 
 open Js_of_ocaml
-open Snark_params_nonconsensus
-open Mina_base_nonconsensus
-module Currency = Currency_nonconsensus.Currency
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Global_slot = Mina_numbers_nonconsensus.Global_slot
+open Snark_params.Tick
+open Mina_base
+module Global_slot = Mina_numbers.Global_slot
 module Memo = Signed_command_memo
-module Signature_lib = Signature_lib_nonconsensus
 
-let raise_js_error s = Js.raise_js_error (new%js Js.error_constr (Js.string s))
+let raise_js_error s =
+  Js_error.(raise_ @@ of_error (new%js Js.error_constr (Js.string s)))
 
 type string_js = Js.js_string Js.t
 
 type keypair_js =
-  < privateKey: string_js Js.readonly_prop
-  ; publicKey: string_js Js.readonly_prop >
+  < privateKey : string_js Js.readonly_prop
+  ; publicKey : string_js Js.readonly_prop >
   Js.t
 
 type payload_common_js =
-  < fee: string_js Js.prop
-  ; feePayer: string_js Js.prop
-  ; nonce: string_js Js.prop
-  ; validUntil: string_js Js.prop
-  ; memo: string_js Js.prop >
+  < fee : string_js Js.prop
+  ; feePayer : string_js Js.prop
+  ; nonce : string_js Js.prop
+  ; validUntil : string_js Js.prop
+  ; memo : string_js Js.prop >
   Js.t
 
 let payload_common_of_js (payload_common_js : payload_common_js) =
@@ -41,17 +39,17 @@ let payload_common_of_js (payload_common_js : payload_common_js) =
   let memo_js = payload_common_js##.memo in
   let memo = Js.to_string memo_js |> Memo.create_from_string_exn in
   Signed_command_payload.Common.Poly.
-    {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}
+    { fee; fee_token; fee_payer_pk; nonce; valid_until; memo }
 
 type payment_payload_js =
-  < source: string_js Js.prop
-  ; receiver: string_js Js.prop
-  ; amount: string_js Js.prop >
+  < source : string_js Js.prop
+  ; receiver : string_js Js.prop
+  ; amount : string_js Js.prop >
   Js.t
 
 type payment_js =
-  < common: payload_common_js Js.prop
-  ; paymentPayload: payment_payload_js Js.prop >
+  < common : payload_common_js Js.prop
+  ; paymentPayload : payment_payload_js Js.prop >
   Js.t
 
 let payment_body_of_js payment_payload =
@@ -68,19 +66,19 @@ let payment_body_of_js payment_payload =
     payment_payload##.amount |> Js.to_string |> Currency.Amount.of_string
   in
   Signed_command_payload.Body.Payment
-    Payment_payload.Poly.{source_pk; receiver_pk; token_id; amount}
+    Payment_payload.Poly.{ source_pk; receiver_pk; token_id; amount }
 
 let payload_of_payment_js payment_js : Signed_command_payload.t =
   let common = payload_common_of_js payment_js##.common in
   let body = payment_body_of_js payment_js##.paymentPayload in
-  Signed_command_payload.Poly.{common; body}
+  Signed_command_payload.Poly.{ common; body }
 
 type stake_delegation_payload_js =
-  < delegator: string_js Js.prop ; newDelegate: string_js Js.prop > Js.t
+  < delegator : string_js Js.prop ; newDelegate : string_js Js.prop > Js.t
 
 type stake_delegation_js =
-  < common: payload_common_js Js.prop
-  ; delegationPayload: stake_delegation_payload_js Js.prop >
+  < common : payload_common_js Js.prop
+  ; delegationPayload : stake_delegation_payload_js Js.prop >
   Js.t
 
 let stake_delegation_body_of_js delegation_payload =
@@ -93,15 +91,15 @@ let stake_delegation_body_of_js delegation_payload =
     |> Signature_lib.Public_key.of_base58_check_decompress_exn
   in
   Signed_command_payload.Body.Stake_delegation
-    (Set_delegate {delegator; new_delegate})
+    (Set_delegate { delegator; new_delegate })
 
 let payload_of_stake_delegation_js payment_js : Signed_command_payload.t =
   let common = payload_common_of_js payment_js##.common in
   let body = stake_delegation_body_of_js payment_js##.delegationPayload in
-  Signed_command_payload.Poly.{common; body}
+  Signed_command_payload.Poly.{ common; body }
 
 type signature_js =
-  < field: string_js Js.readonly_prop ; scalar: string_js Js.readonly_prop >
+  < field : string_js Js.readonly_prop ; scalar : string_js Js.readonly_prop >
   Js.t
 
 let signature_to_js_object ((field, scalar) : Signature.t) =
@@ -118,14 +116,31 @@ let signature_of_js_object (signature_js : signature_js) : Signature.t =
   in
   (field, scalar)
 
+type signed_string =
+  < string : string_js Js.readonly_prop
+  ; signer : string_js Js.readonly_prop
+  ; signature : signature_js Js.readonly_prop >
+  Js.t
+
 type signed_payment =
-  < payment: payment_js Js.readonly_prop
-  ; sender: string_js Js.readonly_prop
-  ; signature: signature_js Js.readonly_prop >
+  < payment : payment_js Js.readonly_prop
+  ; sender : string_js Js.readonly_prop
+  ; signature : signature_js Js.readonly_prop >
   Js.t
 
 type signed_stake_delegation =
-  < stakeDelegation: stake_delegation_js Js.readonly_prop
-  ; sender: string_js Js.readonly_prop
-  ; signature: signature_js Js.readonly_prop >
+  < stakeDelegation : stake_delegation_js Js.readonly_prop
+  ; sender : string_js Js.readonly_prop
+  ; signature : signature_js Js.readonly_prop >
   Js.t
+
+let signature_kind_of_string_js network_js fname : Mina_signature_kind.t =
+  match Js.to_string network_js |> Base.String.lowercase with
+  | "mainnet" ->
+      Mainnet
+  | "testnet" ->
+      Testnet
+  | s ->
+      raise_js_error
+        (Core_kernel.sprintf
+           "%s: expected network to be mainnet or testnet, got: %s" fname s )

@@ -2,19 +2,22 @@
  (name runtime_genesis_ledger)
  (public_name runtime_genesis_ledger)
  (libraries
-   ;; opam deps
+   ;;opam libraries
+   base
+   core_kernel
+   async_kernel
    async
    core
-   ;; libraries
-   blockchain_snark
-   mina_base
-   coda_genesis_proof
-   mina_state
-   genesis_ledger_helper
+   result
+   async.async_command
+   ;;local libraries
+   genesis_constants
    coda_runtime_config
-   snark_params
-   snarky.backendless
-   staged_ledger)
+   genesis_ledger_helper
+   logger
+   cache_dir
+   mina_base
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_optcomp ppx_deriving_yojson)))

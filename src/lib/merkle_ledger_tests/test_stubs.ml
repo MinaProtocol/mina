@@ -22,13 +22,13 @@ module Account = struct
 
   let create = Mina_base.Account.create
 
-  let balance Mina_base.Account.Poly.{balance; _} = balance
+  let balance Mina_base.Account.Poly.{ balance; _ } = balance
 
-  let update_balance t bal = {t with Mina_base.Account.Poly.balance= bal}
+  let update_balance t bal = { t with Mina_base.Account.Poly.balance = bal }
 
-  let token Mina_base.Account.Poly.{token_id; _} = token_id
+  let token Mina_base.Account.Poly.{ token_id; _ } = token_id
 
-  let token_owner Mina_base.Account.Poly.{token_permissions; _} =
+  let token_owner Mina_base.Account.Poly.{ token_permissions; _ } =
     match token_permissions with
     | Mina_base.Token_permissions.Token_owned _ ->
         true
@@ -41,19 +41,18 @@ module Receipt = Mina_base.Receipt
 module Hash = struct
   module T = struct
     type t = Md5.t [@@deriving sexp, hash, compare, bin_io_unversioned, equal]
-
-    let to_string = Md5.to_hex
-
-    let to_yojson t = `String (Md5.to_hex t)
-
-    let of_yojson = function
-      | `String s ->
-          Ok (Md5.of_hex_exn s)
-      | _ ->
-          Error "expected string"
   end
 
   include T
+
+  include Codable.Make_base58_check (struct
+    type t = T.t [@@deriving bin_io_unversioned]
+
+    let description = "Ledger test hash"
+
+    let version_byte = Base58_check.Version_bytes.ledger_test_hash
+  end)
+
   include Hashable.Make_binable (T)
 
   (* to prevent pre-image attack,
@@ -81,8 +80,8 @@ struct
       include Bigstring.Stable.V1
 
       (* we're not mutating Bigstrings, which would invalidate hashes
-       OK to use these hash functions
-       *)
+         OK to use these hash functions
+      *)
       let hash = hash_t_frozen
 
       let hash_fold_t = hash_fold_t_frozen
@@ -93,7 +92,9 @@ struct
   end
 
   type t =
-    {uuid: Uuid.Stable.V1.t; table: Bigstring_frozen.t Bigstring_frozen.Table.t}
+    { uuid : Uuid.Stable.V1.t
+    ; table : Bigstring_frozen.t Bigstring_frozen.Table.t
+    }
   [@@deriving sexp]
 
   let to_alist t =
@@ -106,17 +107,20 @@ struct
   let get_uuid t = t.uuid
 
   let create _ =
-    {uuid= Uuid_unix.create (); table= Bigstring_frozen.Table.create ()}
+    { uuid = Uuid_unix.create (); table = Bigstring_frozen.Table.create () }
 
   let create_checkpoint t _ =
-    { uuid= Uuid_unix.create ()
-    ; table=
+    { uuid = Uuid_unix.create ()
+    ; table =
         Bigstring_frozen.Table.of_alist_exn
-        @@ Bigstring_frozen.Table.to_alist t.table }
+        @@ Bigstring_frozen.Table.to_alist t.table
+    }
 
   let close _ = ()
 
   let get t ~key = Bigstring_frozen.Table.find t.table key
+
+  let get_batch t ~keys = List.map keys ~f:(Bigstring_frozen.Table.find t.table)
 
   let set t ~key ~data = Bigstring_frozen.Table.set t.table ~key ~data
 
@@ -126,6 +130,8 @@ struct
         Bigstring_frozen.Table.remove t.table key )
 
   let remove t ~key = Bigstring_frozen.Table.remove t.table key
+
+  let make_checkpoint _ _ = ()
 end
 
 module Storage_locations : Intf.Storage_locations = struct
@@ -151,8 +157,7 @@ module Key = struct
   let empty : t = Account.empty.public_key
 
   let gen_keys num_keys =
-    Quickcheck.random_value
-      (Quickcheck.Generator.list_with_length num_keys gen)
+    Quickcheck.random_value (Quickcheck.Generator.list_with_length num_keys gen)
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)

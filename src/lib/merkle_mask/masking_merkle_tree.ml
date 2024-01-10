@@ -4,7 +4,8 @@
 open Core
 
 (* builds a Merkle tree mask; it's a Merkle tree, with some additional
-   operations *)
+   operations
+*)
 module Make (Inputs : Inputs_intf.S) = struct
   open Inputs
 
@@ -38,33 +39,35 @@ module Make (Inputs : Inputs_intf.S) = struct
   end
 
   type t =
-    { uuid: Uuid.Stable.V1.t
-    ; account_tbl: Account.t Location_binable.Table.t
-    ; token_owners: Key.Stable.Latest.t Token_id.Table.t
-    ; mutable next_available_token: Token_id.t option
-    ; mutable parent: Parent.t
-    ; detached_parent_signal: Detached_parent_signal.t
-    ; hash_tbl: Hash.t Addr.Table.t
-    ; location_tbl: Location.t Account_id.Table.t
-    ; mutable current_location: Location.t option
-    ; depth: int }
+    { uuid : Uuid.Stable.V1.t
+    ; account_tbl : Account.t Location_binable.Table.t
+    ; token_owners : Key.Stable.Latest.t Token_id.Table.t
+    ; mutable next_available_token : Token_id.t option
+    ; mutable parent : Parent.t
+    ; detached_parent_signal : Detached_parent_signal.t
+    ; hash_tbl : Hash.t Addr.Table.t
+    ; location_tbl : Location.t Account_id.Table.t
+    ; mutable current_location : Location.t option
+    ; depth : int
+    }
   [@@deriving sexp]
 
   type unattached = t [@@deriving sexp]
 
   let create ~depth () =
-    { uuid= Uuid_unix.create ()
-    ; parent= Error __LOC__
-    ; detached_parent_signal= Async.Ivar.create ()
-    ; account_tbl= Location_binable.Table.create ()
-    ; token_owners= Token_id.Table.create ()
-    ; next_available_token= None
-    ; hash_tbl= Addr.Table.create ()
-    ; location_tbl= Account_id.Table.create ()
-    ; current_location= None
-    ; depth }
+    { uuid = Uuid_unix.create ()
+    ; parent = Error __LOC__
+    ; detached_parent_signal = Async.Ivar.create ()
+    ; account_tbl = Location_binable.Table.create ()
+    ; token_owners = Token_id.Table.create ()
+    ; next_available_token = None
+    ; hash_tbl = Addr.Table.create ()
+    ; location_tbl = Account_id.Table.create ()
+    ; current_location = None
+    ; depth
+    }
 
-  let get_uuid {uuid; _} = uuid
+  let get_uuid { uuid; _ } = uuid
 
   let depth t = t.depth
 
@@ -95,8 +98,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let create () =
       failwith
-        "Mask.Attached.create: cannot create an attached mask; use \
-         Mask.create and Mask.set_parent"
+        "Mask.Attached.create: cannot create an attached mask; use Mask.create \
+         and Mask.set_parent"
 
     let with_ledger ~f:_ =
       failwith
@@ -119,7 +122,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let detached_signal t = Async.Ivar.read t.detached_parent_signal
 
-    let get_parent ({parent= opt; _} as t) =
+    let get_parent ({ parent = opt; _ } as t) =
       assert_is_attached t ; Result.ok_or_failwith opt
 
     let get_uuid t = assert_is_attached t ; t.uuid
@@ -151,7 +154,16 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let self_set_location t account_id location =
       assert_is_attached t ;
-      Account_id.Table.set t.location_tbl ~key:account_id ~data:location
+      Account_id.Table.set t.location_tbl ~key:account_id ~data:location ;
+      (* if account is at a hitherto-unused location, that
+         becomes the current location
+      *)
+      match t.current_location with
+      | None ->
+          t.current_location <- Some location
+      | Some loc ->
+          if Location.( > ) location loc then
+            t.current_location <- Some location
 
     (* don't rely on a particular implementation *)
     let self_find_account t location =
@@ -177,6 +189,18 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.get (get_parent t) location
 
+    let get_batch t locations =
+      assert_is_attached t ;
+      let found_accounts, leftover_locations =
+        List.partition_map locations ~f:(fun location ->
+            match self_find_account t location with
+            | Some account ->
+                Either.first (location, Some account)
+            | None ->
+                Either.second location )
+      in
+      found_accounts @ Base.get_batch (get_parent t) leftover_locations
+
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
 
@@ -188,9 +212,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           let curr_element = List.hd_exn path in
           let merkle_node_address = Addr.sibling address in
           let mask_hash = self_find_hash t merkle_node_address in
-          let parent_hash =
-            match curr_element with `Left h | `Right h -> h
-          in
+          let parent_hash = match curr_element with `Left h | `Right h -> h in
           let new_hash = Option.value mask_hash ~default:parent_hash in
           let new_element =
             match curr_element with
@@ -246,7 +268,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         (next_address, next_hash) :: accum
       in
       List.foldi merkle_path
-        ~init:[(starting_address, starting_hash)]
+        ~init:[ (starting_address, starting_hash) ]
         ~f:get_addresses_hashes
 
     (* use mask Merkle root, if it exists, else get from parent *)
@@ -333,12 +355,12 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           ()
       | Some location -> (
-        match self_find_account t location with
-        | Some existing_account ->
-            if Account.equal account existing_account then
-              remove_account_and_update_hashes t location
-        | None ->
-            () )
+          match self_find_account t location with
+          | Some existing_account ->
+              if Account.equal account existing_account then
+                remove_account_and_update_hashes t location
+          | None ->
+              () )
 
     (* as for accounts, we see if we have it in the mask, else delegate to
        parent *)
@@ -348,10 +370,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       | Some hash ->
           Some hash
       | None -> (
-        try
-          let hash = Base.get_inner_hash_at_addr_exn (get_parent t) addr in
-          Some hash
-        with _ -> None )
+          try
+            let hash = Base.get_inner_hash_at_addr_exn (get_parent t) addr in
+            Some hash
+          with _ -> None )
 
     (* batch operations TODO: rely on availability of batch operations in Base
        for speed *)
@@ -368,8 +390,8 @@ module Make (Inputs : Inputs_intf.S) = struct
           | Some account ->
               Some account
           | None -> (
-            try Some (Base.get_inner_hash_at_addr_exn (get_parent t) addr)
-            with _ -> None ) )
+              try Some (Base.get_inner_hash_at_addr_exn (get_parent t) addr)
+              with _ -> None ) )
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
@@ -391,23 +413,23 @@ module Make (Inputs : Inputs_intf.S) = struct
             ~expect:old_root_hash
             (Base.merkle_root (get_parent t)) ;
           [%test_result: Hash.t]
-            ~message:
-              "Merkle root of the mask should delegate to the parent now"
+            ~message:"Merkle root of the mask should delegate to the parent now"
             ~expect:(merkle_root t)
             (Base.merkle_root (get_parent t)) )
 
     (* copy tables in t; use same parent *)
     let copy t =
-      { uuid= Uuid_unix.create ()
-      ; parent= Ok (get_parent t)
-      ; detached_parent_signal= Async.Ivar.create ()
-      ; account_tbl= Location_binable.Table.copy t.account_tbl
-      ; token_owners= Token_id.Table.copy t.token_owners
-      ; next_available_token= t.next_available_token
-      ; location_tbl= Account_id.Table.copy t.location_tbl
-      ; hash_tbl= Addr.Table.copy t.hash_tbl
-      ; current_location= t.current_location
-      ; depth= t.depth }
+      { uuid = Uuid_unix.create ()
+      ; parent = Ok (get_parent t)
+      ; detached_parent_signal = Async.Ivar.create ()
+      ; account_tbl = Location_binable.Table.copy t.account_tbl
+      ; token_owners = Token_id.Table.copy t.token_owners
+      ; next_available_token = t.next_available_token
+      ; location_tbl = Account_id.Table.copy t.location_tbl
+      ; hash_tbl = Addr.Table.copy t.hash_tbl
+      ; current_location = t.current_location
+      ; depth = t.depth
+      }
 
     let last_filled t =
       assert_is_attached t ;
@@ -419,18 +441,18 @@ module Make (Inputs : Inputs_intf.S) = struct
           | None ->
               Some parent_loc
           | Some our_loc -> (
-            match (parent_loc, our_loc) with
-            | Account parent_addr, Account our_addr ->
-                (* Addr.compare is Bitstring.compare, essentially String.compare *)
-                let loc =
-                  if Addr.compare parent_addr our_addr >= 0 then parent_loc
-                  else our_loc
-                in
-                Some loc
-            | _ ->
-                failwith
-                  "last_filled: expected account locations for the parent and \
-                   mask" ) )
+              match (parent_loc, our_loc) with
+              | Account parent_addr, Account our_addr ->
+                  (* Addr.compare is Bitstring.compare, essentially String.compare *)
+                  let loc =
+                    if Addr.compare parent_addr our_addr >= 0 then parent_loc
+                    else our_loc
+                  in
+                  Some loc
+              | _ ->
+                  failwith
+                    "last_filled: expected account locations for the parent \
+                     and mask" ) )
 
     include Merkle_ledger.Util.Make (struct
       module Location = Location
@@ -478,8 +500,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                 Token_id.Table.set t.token_owners ~key:account_token
                   ~data:(Account_id.public_key (Account.identifier account)) ;
               self_set_account t location account ;
-              Token_id.max next_available_token (Token_id.next account_token)
-          )
+              Token_id.max next_available_token (Token_id.next account_token) )
         in
         if Token_id.(next_available_token < new_next_available_token) then
           set_next_available_token t new_next_available_token
@@ -493,17 +514,6 @@ module Make (Inputs : Inputs_intf.S) = struct
     let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
       assert_is_attached t ;
       set_all_accounts_rooted_at_exn t address accounts
-
-    (* keys from this mask and all ancestors *)
-    let accounts t =
-      assert_is_attached t ;
-      let mask_keys =
-        Location_binable.Table.data t.account_tbl
-        |> List.map ~f:Account.identifier
-        |> Account_id.Set.of_list
-      in
-      let parent_keys = Base.accounts (get_parent t) in
-      Account_id.Set.union parent_keys mask_keys
 
     let token_owner t tid =
       assert_is_attached t ;
@@ -536,7 +546,16 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let num_accounts t =
       assert_is_attached t ;
-      accounts t |> Account_id.Set.length
+      match t.current_location with
+      | None ->
+          0
+      | Some location -> (
+          match location with
+          | Account addr ->
+              Addr.to_int addr + 1
+          | _ ->
+              failwith "Expected mask current location to represent an account"
+          )
 
     let location_of_account t account_id =
       assert_is_attached t ;
@@ -546,6 +565,19 @@ module Make (Inputs : Inputs_intf.S) = struct
           mask_result
       | None ->
           Base.location_of_account (get_parent t) account_id
+
+    let location_of_account_batch t account_ids =
+      assert_is_attached t ;
+      let found_locations, leftover_account_ids =
+        List.partition_map account_ids ~f:(fun account_id ->
+            match self_find_location t account_id with
+            | Some location ->
+                Either.first (account_id, Some location)
+            | None ->
+                Either.second account_id )
+      in
+      found_locations
+      @ Base.location_of_account_batch (get_parent t) leftover_account_ids
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for t =
@@ -564,11 +596,11 @@ module Make (Inputs : Inputs_intf.S) = struct
         | [] ->
             (parent_keys, mask_locations)
         | key :: rest -> (
-          match self_find_location t key with
-          | None ->
-              loop rest (key :: parent_keys) mask_locations
-          | Some loc ->
-              loop rest parent_keys (loc :: mask_locations) )
+            match self_find_location t key with
+            | None ->
+                loop rest (key :: parent_keys) mask_locations
+            | Some loc ->
+                loop rest parent_keys (loc :: mask_locations) )
       in
       (* parent_keys not in mask, may be in parent mask_locations definitely in
          mask *)
@@ -617,56 +649,26 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let to_list t =
       assert_is_attached t ;
-      accounts t |> Set.to_list
-      |> List.map ~f:(fun key ->
-             let location = location_of_account t key |> Option.value_exn in
-             match location with
-             | Account addr ->
-                 (Addr.to_int addr, get t location |> Option.value_exn)
-             | location ->
-                 raise (Location_is_not_account location) )
-      |> List.sort ~compare:(fun (addr1, _) (addr2, _) ->
-             Int.compare addr1 addr2 )
-      |> List.map ~f:(fun (_, account) -> account)
+      let num_accounts = num_accounts t in
+      Async.Deferred.List.init ~how:`Parallel num_accounts ~f:(fun i ->
+          Async.Deferred.return @@ get_at_index_exn t i )
+
+    let to_list_sequential t =
+      assert_is_attached t ;
+      let num_accounts = num_accounts t in
+      List.init num_accounts ~f:(fun i -> get_at_index_exn t i)
+
+    (* keys from this mask and all ancestors *)
+    let accounts t =
+      assert_is_attached t ;
+      let%map.Async.Deferred accts = to_list t in
+      List.map accts ~f:Account.identifier |> Account_id.Set.of_list
 
     let iteri t ~f =
-      let account_ids = accounts t |> Account_id.Set.to_list in
-      let idx_account_pairs_unsorted =
-        List.map account_ids ~f:(fun acct_id ->
-            let idx =
-              try index_of_account_exn t acct_id
-              with exn ->
-                failwith
-                  (sprintf
-                     !"iter: index_of_account_exn failed, mask uuid: %{sexp: \
-                       Uuid.t} account id: %{sexp: Account_id.t}, exception: \
-                       %s"
-                     (get_uuid t) acct_id (Exn.to_string exn))
-            in
-            match location_of_account t acct_id with
-            | None ->
-                failwith
-                  (sprintf
-                     !"iter: location_of_account returned None, mask uuid: \
-                       %{sexp: Uuid.t} account id: %{sexp: Account_id.t}"
-                     (get_uuid t) acct_id)
-            | Some loc -> (
-              match get t loc with
-              | None ->
-                  failwith
-                    (sprintf
-                       !"iter: get returned None, mask uuid: %{sexp: Uuid.t} \
-                         account id: %{sexp: Account_id.t}"
-                       (get_uuid t) acct_id)
-              | Some acct ->
-                  (idx, acct) ) )
-      in
-      (* in case iteration order matters *)
-      let idx_account_pairs =
-        List.sort idx_account_pairs_unsorted
-          ~compare:(fun (idx1, _) (idx2, _) -> Int.compare idx1 idx2)
-      in
-      List.iter idx_account_pairs ~f:(fun (idx, acct) -> f idx acct)
+      assert_is_attached t ;
+      let num_accounts = num_accounts t in
+      Sequence.range ~stop:`exclusive 0 num_accounts
+      |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
 
     let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
       assert_is_attached t ;
@@ -689,8 +691,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       let f' accum (location, account) =
         (* for mask, ignore just passed-in ignored accounts *)
-        if Account_id.Set.mem ignored_accounts (Account.identifier account)
-        then accum
+        if Account_id.Set.mem ignored_accounts (Account.identifier account) then
+          accum
         else
           let address = Location.to_path_exn location in
           f address accum account
@@ -739,27 +741,32 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       match self_find_location t account_id with
       | None -> (
-        (* not in mask, maybe in parent *)
-        match Base.location_of_account (get_parent t) account_id with
-        | Some location ->
-            Ok (`Existed, location)
-        | None -> (
-            (* not in parent, create new location *)
-            let maybe_location =
-              match last_filled t with
+          (* not in mask, maybe in parent *)
+          match Base.location_of_account (get_parent t) account_id with
+          | Some location ->
+              Ok (`Existed, location)
+          | None -> (
+              (* not in parent, create new location *)
+              let maybe_location =
+                match last_filled t with
+                | None ->
+                    Some (first_location ~ledger_depth:t.depth)
+                | Some loc ->
+                    Location.next loc
+              in
+              match maybe_location with
               | None ->
-                  Some (first_location ~ledger_depth:t.depth)
-              | Some loc ->
-                  Location.next loc
-            in
-            match maybe_location with
-            | None ->
-                Or_error.error_string "Db_error.Out_of_leaves"
-            | Some location ->
-                set t location account ;
-                self_set_location t account_id location ;
-                t.current_location <- Some location ;
-                Ok (`Added, location) ) )
+                  Or_error.error_string "Db_error.Out_of_leaves"
+              | Some location ->
+                  (* `set` calls `self_set_location`, which updates
+                     the current location
+                  *)
+                  set t location account ;
+                  (* apparently redundant, but the non-default token transaction
+                     SNARK tests fail without it
+                  *)
+                  self_set_location t account_id location ;
+                  Ok (`Added, location) ) )
       | Some location ->
           Ok (`Existed, location)
 

@@ -25,7 +25,7 @@ module type Timer_intf = sig
 
   type tok [@@deriving equal]
 
-  val wait : t -> Time.Span.t -> tok * [`Cancelled | `Finished] Deferred.t
+  val wait : t -> Time.Span.t -> tok * [ `Cancelled | `Finished ] Deferred.t
 
   (* No-ops if already cancelled *)
 
@@ -113,45 +113,42 @@ module type S = sig
 end
 
 module type F = functor
-  (State :sig
-          
-          type t [@@deriving equal, sexp, yojson]
-        end)
-  (Message :sig
-            
-            type t
-          end)
+  (State : sig
+     type t [@@deriving equal, sexp, yojson]
+   end)
+  (Message : sig
+     type t
+   end)
   (Peer : Peer_intf)
   (Timer : Timer_intf)
-  (Message_label :sig
-                  
-                  type label [@@deriving enum, sexp]
+  (Message_label : sig
+     type label [@@deriving enum, sexp]
 
-                  include Hashable.S with type t = label
-                end)
-  (Timer_label :sig
-                
-                type label [@@deriving enum, sexp]
+     include Hashable.S with type t = label
+   end)
+  (Timer_label : sig
+     type label [@@deriving enum, sexp]
 
-                include Hashable.S with type t = label
-              end)
-  (Condition_label :sig
-                    
-                    type label [@@deriving enum, sexp, yojson]
+     include Hashable.S with type t = label
+   end)
+  (Condition_label : sig
+     type label [@@deriving enum, sexp, yojson]
 
-                    include Hashable.S with type t = label
-                  end)
-  (Transport :
-     Transport_intf with type message := Message.t and type peer := Peer.t)
-  -> S
-     with type message := Message.t
-      and type state := State.t
-      and type transport := Transport.t
-      and type peer := Peer.t
-      and module Message_label := Message_label
-      and module Timer_label := Timer_label
-      and module Condition_label := Condition_label
-      and module Timer := Timer
+     include Hashable.S with type t = label
+   end)
+  (Transport : Transport_intf
+                 with type message := Message.t
+                  and type peer := Peer.t)
+  ->
+  S
+    with type message := Message.t
+     and type state := State.t
+     and type transport := Transport.t
+     and type peer := Peer.t
+     and module Message_label := Message_label
+     and module Timer_label := Timer_label
+     and module Condition_label := Condition_label
+     and module Timer := Timer
 
 module Make (State : sig
   type t [@@deriving equal, sexp, to_yojson]
@@ -160,9 +157,9 @@ end) (Message : sig
 end)
 (Peer : Peer_intf)
 (Timer : Timer_intf) (Message_label : sig
-    type label [@@deriving sexp]
+  type label [@@deriving sexp]
 
-    include Hashable.S with type t = label
+  include Hashable.S with type t = label
 end) (Timer_label : sig
   type label [@@deriving sexp]
 
@@ -173,8 +170,8 @@ end) (Condition_label : sig
   include Hashable.S with type t = label
 end)
 (Transport : Transport_intf
-             with type message := Message.t
-              and type peer := Peer.t) =
+               with type message := Message.t
+                and type peer := Peer.t) =
 struct
   module Identifier = Peer
 
@@ -187,19 +184,20 @@ struct
   and message_transition = t -> Message.t -> State.t -> State.t Deferred.t
 
   and t =
-    { state: State.t
-    ; last_state: State.t option
-    ; conditions: (condition * transition) Condition_label.Table.t
-    ; message_pipe: Message.t Linear_pipe.Reader.t
-    ; message_handlers:
+    { state : State.t
+    ; last_state : State.t option
+    ; conditions : (condition * transition) Condition_label.Table.t
+    ; message_pipe : Message.t Linear_pipe.Reader.t
+    ; message_handlers :
         (message_condition * message_transition) Message_label.Table.t
-    ; triggered_timers_r: transition Linear_pipe.Reader.t
-    ; triggered_timers_w: transition Linear_pipe.Writer.t
-    ; timer: Timer.t
-    ; timers: Timer.tok list Timer_label.Table.t
-    ; ident: Identifier.t
-    ; transport: Transport.t
-    ; logger: Logger.t }
+    ; triggered_timers_r : transition Linear_pipe.Reader.t
+    ; triggered_timers_w : transition Linear_pipe.Writer.t
+    ; timer : Timer.t
+    ; timers : Timer.tok list Timer_label.Table.t
+    ; ident : Identifier.t
+    ; transport : Transport.t
+    ; logger : Logger.t
+    }
 
   type handle_command = Condition_label.t * condition * transition
 
@@ -222,9 +220,10 @@ struct
       List.partition_map l ~f:(fun tok' ->
           match tok with
           | None ->
-              `Fst tok'
+              Either.first tok'
           | Some tok ->
-              if Timer.equal_tok tok tok' then `Fst tok' else `Snd tok' )
+              if Timer.equal_tok tok tok' then Either.first tok'
+              else Either.second tok' )
     in
     List.iter to_cancel ~f:(fun tok' -> Timer.cancel t.timer tok') ;
     add_back_timers t ~key:label ~data:to_put_back
@@ -257,7 +256,8 @@ struct
     Deferred.any
       [ ready t.message_pipe
       ; ready t.triggered_timers_r
-      ; (if state_changed t then return () else Deferred.never ()) ]
+      ; (if state_changed t then return () else Deferred.never ())
+      ]
 
   let is_ready t : bool =
     let b =
@@ -267,9 +267,9 @@ struct
     in
     b
 
-  let make_node ~transport ~logger ~me ~messages ?parent:_ ~initial_state
-      ~timer message_conditions handle_conditions =
-    let logger = Logger.extend logger [("dsl_node", Peer.to_yojson me)] in
+  let make_node ~transport ~logger ~me ~messages ?parent:_ ~initial_state ~timer
+      message_conditions handle_conditions =
+    let logger = Logger.extend logger [ ("dsl_node", Peer.to_yojson me) ] in
     let conditions = Condition_label.Table.create () in
     List.iter handle_conditions ~f:(fun (l, c, h) ->
         match Condition_label.Table.add conditions ~key:l ~data:(c, h) with
@@ -291,22 +291,23 @@ struct
     let timers = Timer_label.Table.create () in
     let triggered_timers_r, triggered_timers_w = Linear_pipe.create () in
     let t =
-      { state= initial_state
-      ; last_state= None
+      { state = initial_state
+      ; last_state = None
       ; conditions
-      ; message_pipe= messages
+      ; message_pipe = messages
       ; message_handlers
       ; triggered_timers_r
       ; triggered_timers_w
       ; timer
       ; timers
-      ; ident= me
+      ; ident = me
       ; transport
-      ; logger }
+      ; logger
+      }
     in
     t
 
-  let with_new_state t state : t = {t with last_state= Some t.state; state}
+  let with_new_state t state : t = { t with last_state = Some t.state; state }
 
   let step t : t Deferred.t =
     match
@@ -322,14 +323,15 @@ struct
         match matches with
         | [] ->
             return (with_new_state t t.state)
-        | [(label, (_, transition))] ->
+        | [ (label, (_, transition)) ] ->
             let%map t' = transition t t.state >>| with_new_state t in
             [%log' debug t.logger]
               ~metadata:
                 [ ("source", State.to_yojson t.state)
                 ; ("destination", State.to_yojson t'.state)
                 ; ("peer", Peer.to_yojson t.ident)
-                ; ("label", Condition_label.label_to_yojson label) ]
+                ; ("label", Condition_label.label_to_yojson label)
+                ]
               "Making transition from $source to $destination at $peer label: \
                $label" ;
             t'
@@ -342,19 +344,20 @@ struct
     | false, Some transition, _ ->
         ignore
           ( Linear_pipe.read_now t.triggered_timers_r
-            : [`Eof | `Nothing_available | `Ok of transition] ) ;
+            : [ `Eof | `Nothing_available | `Ok of transition ] ) ;
         let%map t' = transition t t.state >>| with_new_state t in
         [%log' debug t.logger]
           ~metadata:
             [ ("source", State.to_yojson t.state)
             ; ("destination", State.to_yojson t'.state)
-            ; ("peer", Peer.to_yojson t.ident) ]
+            ; ("peer", Peer.to_yojson t.ident)
+            ]
           "Making transition from $source to $destination at $peer via timer" ;
         t'
     | false, None, Some msg -> (
         ignore
           ( Linear_pipe.read_now t.message_pipe
-            : [`Eof | `Nothing_available | `Ok of Message.t] ) ;
+            : [ `Eof | `Nothing_available | `Ok of Message.t ] ) ;
         let checks = Message_label.Table.to_alist t.message_handlers in
         let matches =
           List.filter checks ~f:(fun (_, (cond, _)) -> cond msg t.state)
@@ -362,7 +365,7 @@ struct
         match matches with
         | [] ->
             return (with_new_state t t.state)
-        | [(label, (_, transition))] ->
+        | [ (label, (_, transition)) ] ->
             let%map t' = transition t msg t.state >>| with_new_state t in
             [%log' debug t.logger]
               !"Making transition from %{sexp:State.t} to %{sexp:State.t} at \
@@ -379,11 +382,11 @@ struct
     | false, None, None ->
         return (with_new_state t t.state)
 
-  let ident {ident; _} = ident
+  let ident { ident; _ } = ident
 
-  let state {state; _} = state
+  let state { state; _ } = state
 
-  let send {transport; _} = Transport.send transport
+  let send { transport; _ } = Transport.send transport
 
   let send_exn t ~recipient msg =
     match%map send t ~recipient msg with
@@ -393,8 +396,7 @@ struct
         Error.tag e ~tag:"Send failed" |> Error.raise
 
   let send_multi t ~recipients msg =
-    Deferred.List.all
-      (List.map recipients ~f:(fun r -> send t ~recipient:r msg))
+    Deferred.List.all (List.map recipients ~f:(fun r -> send t ~recipient:r msg))
 
   let send_multi_exn t ~recipients msg =
     Deferred.List.all

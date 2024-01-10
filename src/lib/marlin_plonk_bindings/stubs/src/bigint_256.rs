@@ -30,10 +30,10 @@ pub fn of_biguint(x: &BigUint) -> BigInteger256 {
 #[ocaml::func]
 pub fn caml_bigint_256_of_numeral(
     s: &[u8],
-    _len: u32,
-    base: u32,
+    _len: ocaml::Int,
+    base: ocaml::Int,
 ) -> Result<BigInteger256, ocaml::Error> {
-    match BigUint::parse_bytes(s, base) {
+    match BigUint::parse_bytes(s, base.try_into().unwrap()) {
         Some(data) => Ok(of_biguint(&data)),
         None => Err(ocaml::Error::invalid_argument("caml_bigint_256_of_numeral")
             .err()
@@ -116,8 +116,8 @@ pub fn caml_bigint_256_to_bytes(x: ocaml::Pointer<BigInteger256>) -> ocaml::Valu
         let mut input_bytes = vec![];
         (*x_ptr).serialize(&mut input_bytes).expect("serialize failed");
         core::ptr::copy_nonoverlapping(input_bytes.as_ptr(), ocaml::sys::string_val(str), input_bytes.len());
+        ocaml::Value::new(str)
     }
-    ocaml::Value(str)
 }
 
 #[ocaml::func]

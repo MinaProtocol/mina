@@ -1,0 +1,157 @@
+# kubectl apply -f helm/cron_jobs/gossipqa-txn-burst-cronjob.yaml
+# the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
+# make sure you're in the gossipqa namespace
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gossipqa-txn-burst-cronjob
+spec:
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - command:
+            - /bin/bash
+            - -c
+            - '
+ORIGIN_ACCT_KEY=/keys/whale-1-key/whale-1-key;
+RETURNER_ACCT_KEY=/keys/whale-2-key/whale-2-key;
+
+echo "origin acct: $ORIGIN_ACCT_KEY";
+echo "returner acct: $RETURNER_ACCT_KEY";
+
+printf "/ip4/34.152.17.2/tcp/10000/p2p/12D3KooWLsKcaX7TYaurdkYB8WmoUXNKqNUo94w6H4LhzqEYAGc5\n/ip4/34.95.14.84/tcp/10001/p2p/12D3KooW9rebvJT88ZX8mUjCJpKNqyMVTvknri4xqv2d2FwU5DDj\n/ip4/34.95.27.69/tcp/10002/p2p/12D3KooWNsBZvge1nGMxrdGRKgnXctdHAQ4SJDFhNEkHELhJzCSf\n" > /gossipqa_seed_list.txt;
+
+curl https://raw.githubusercontent.com/MinaProtocol/mina/135a81a3c7836bd101afa23ddc846c55ea5919ed/automation/terraform/testnets/gossipqa/genesis_ledger.json > /gossipqa-genesis_ledger.json;
+
+echo "booting mina daemon";
+
+mina daemon --config-file /gossipqa-genesis_ledger.json --peer-list-file /gossipqa_seed_list.txt &
+
+echo "sleeping";
+sleep 480;
+echo "done sleeping";
+while true; do
+  DAEMON_STATUS=$(mina client status);
+  echo "Daemon Status: $DAEMON_STATUS";
+  STATUS=$(mina client status | grep "Sync status");
+  echo "$STATUS" | grep "Synced";
+  RESULT=$?;
+  if [ $RESULT -eq 0 ]; then
+    echo "daemon is synced";
+    break;
+  else
+    echo "waiting for daemon to sync";
+    sleep 60;
+  fi;
+done;
+
+
+mkdir /tmpkeys;
+chmod 700 /tmpkeys;
+
+cp $ORIGIN_ACCT_KEY /tmpkeys;
+chmod 600 /tmpkeys/$(basename $ORIGIN_ACCT_KEY);
+cp $RETURNER_ACCT_KEY /tmpkeys;
+chmod 600 /tmpkeys/$(basename $RETURNER_ACCT_KEY);
+
+./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe gen-there-and-back-txns --num-txn-per-acct 100 --rate-limit-level 1 --rate-limit-interval 5000 --origin-sender-sk-path "/tmpkeys/$(basename $ORIGIN_ACCT_KEY)" --origin-sender-sk-pw "naughty blue worm" --returner-sk-path "/tmpkeys/$(basename $RETURNER_ACCT_KEY)" --returner-sk-pw "naughty blue worm";
+
+echo "ran batch txns";
+
+            '
+            
+            env:
+            - name: MINA_PRIVKEY_PASS
+              value: ""
+            - name: GCLOUD_KEYFILE
+              value: /gcloud/keyfile.json
+            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:815a5dafc70fb994dfe8e5af46dd6a9287a2e6634e50bc9229576d76fb7a2ce7
+            imagePullPolicy: IfNotPresent
+            name: gossipqa-txn-burst-cronjob
+            resources:
+              limits:
+              requests:
+                memory: 14.0Gi
+                cpu: 12.0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /keys/whale-1-key/
+              name: whale-1-key
+            - mountPath: /keys/whale-2-key/
+              name: whale-2-key
+            # - mountPath: /config
+            #   name: daemon-config
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes: [
+            # {
+            #   "name":"daemon-config",
+            #   "configMap": {
+            #     "name": "seed-daemon-config"
+            #   }
+            # },
+            {
+              "name": "whale-1-key",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "whale-1-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "whale-1-key.pub"
+                  }
+                ],
+                "secretName": "whale-1-key"
+              }
+            },
+            {
+              "name": "whale-2-key",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "whale-2-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "whale-2-key.pub"
+                  }
+                ],
+                "secretName": "whale-2-key"
+              }
+            },
+            {
+              "name": "whale-3-key",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "whale-3-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "whale-3-key.pub"
+                  }
+                ],
+                "secretName": "whale-3-key"
+              }
+            }
+
+          ]
+  schedule: 0 13 * * * 
+  # every day at 1pm GMT, which is 6am PST
+  successfulJobsHistoryLimit: 3
+  suspend: false

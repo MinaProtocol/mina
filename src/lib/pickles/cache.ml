@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module Step = struct
   module Key = struct
@@ -11,8 +11,8 @@ module Step = struct
 
       let to_string : t -> _ = function
         | _id, header, n, h ->
-            sprintf !"step-%s-%s-%d-%s" header.kind.type_
-              header.kind.identifier n header.identifying_hash
+            sprintf !"step-%s-%s-%d-%s" header.kind.type_ header.kind.identifier
+              n header.identifying_hash
     end
 
     module Verification = struct
@@ -44,14 +44,14 @@ module Step = struct
               header.constraint_constants header_read.constraint_constants ;
             [%test_eq: string] header.constraint_system_hash
               header_read.constraint_system_hash ;
-            {Backend.Tick.Keypair.index; cs} ) )
+            { Backend.Tick.Keypair.index; cs } ) )
       (fun (_, header, _, _) t path ->
         Or_error.try_with (fun () ->
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
                 (Marlin_plonk_bindings.Pasta_fp_index.write ~append:true
-                   t.Backend.Tick.Keypair.index)
+                   t.Backend.Tick.Keypair.index )
               header path ) )
 
   let vk_storable =
@@ -80,7 +80,7 @@ module Step = struct
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
                 (Marlin_plonk_bindings.Pasta_fp_verifier_index.write
-                   ~append:true x)
+                   ~append:true x )
               header path ) )
 
   let read_or_generate cache k_p k_v typ main =
@@ -99,7 +99,7 @@ module Step = struct
         | Error _e ->
             let r =
               Common.time "stepkeygen" (fun () ->
-                  generate_keypair ~exposing:[typ] main )
+                  generate_keypair ~exposing:[ typ ] main )
             in
             Timer.clock __LOC__ ;
             ignore
@@ -120,7 +120,7 @@ module Step = struct
              let pk, c = Lazy.force pk in
              let vk = Keypair.vk pk in
              ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
-             (vk, c))
+             (vk, c) )
     in
     (pk, vk)
 end
@@ -136,8 +136,8 @@ module Wrap = struct
 
       let to_string : t -> _ = function
         | _id, header, h ->
-            sprintf !"vk-wrap-%s-%s-%s" header.kind.type_
-              header.kind.identifier header.identifying_hash
+            sprintf !"vk-wrap-%s-%s-%s" header.kind.type_ header.kind.identifier
+              header.identifying_hash
     end
 
     module Proving = struct
@@ -171,14 +171,13 @@ module Wrap = struct
               header.constraint_constants header_read.constraint_constants ;
             [%test_eq: string] header.constraint_system_hash
               header_read.constraint_system_hash ;
-            {Backend.Tock.Keypair.index; cs} ) )
+            { Backend.Tock.Keypair.index; cs } ) )
       (fun (_, header, _) t path ->
         Or_error.try_with (fun () ->
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
-                (Marlin_plonk_bindings.Pasta_fq_index.write ~append:true
-                   t.index)
+                (Marlin_plonk_bindings.Pasta_fq_index.write ~append:true t.index)
               header path ) )
 
   let read_or_generate step_domains cache k_p k_v typ main =
@@ -197,12 +196,12 @@ module Wrap = struct
          | Error _e ->
              let r =
                Common.time "wrapkeygen" (fun () ->
-                   generate_keypair ~exposing:[typ] main )
+                   generate_keypair ~exposing:[ typ ] main )
              in
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)
                  : unit Or_error.t ) ;
-             (r, `Generated_something))
+             (r, `Generated_something) )
     in
     let vk =
       lazy
@@ -249,8 +248,8 @@ module Wrap = struct
              let vk = Keypair.vk kp in
              let pk = Keypair.pk kp in
              let vk : Vk.t =
-               { index= vk
-               ; commitments=
+               { index = vk
+               ; commitments =
                    Pickles_types.Plonk_verification_key_evals.map vk.evals
                      ~f:(fun x ->
                        Array.map x.unshifted ~f:(function
@@ -259,13 +258,14 @@ module Wrap = struct
                          | Finite x ->
                              x ) )
                ; step_domains
-               ; data=
+               ; data =
                    (let open Marlin_plonk_bindings.Pasta_fq_index in
-                   {constraints= domain_d1_size pk.index}) }
+                   { constraints = domain_d1_size pk.index })
+               }
              in
              ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
              let _vk = Key_cache.Sync.read cache s_v k_v in
-             (vk, `Generated_something))
+             (vk, `Generated_something) )
     in
     (pk, vk)
 end

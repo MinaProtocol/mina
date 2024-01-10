@@ -38,8 +38,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
 
   let nth_bit x ~n = (x lsr n) land 1 = 1
 
-  let apply_mask mask bs =
-    Checked.all (List.map2_exn mask bs ~f:Boolean.( && ))
+  let apply_mask mask bs = Checked.all (List.map2_exn mask bs ~f:Boolean.( && ))
 
   let pack_unsafe (bs0 : Boolean.var list) =
     let n = List.length bs0 in
@@ -68,8 +67,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
             map (read_var n) ~f:(fun n ->
                 List.init total_length ~f:(fun i ->
                     Bigint.(
-                      compare (of_field (Field.of_int i)) (of_field n) < 0) )
-            ))
+                      compare (of_field (Field.of_int i)) (of_field n) < 0) ) ))
     in
     let%map () =
       Field.Checked.Assert.equal
@@ -147,14 +145,14 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
           let y = random () in
           let (), (less, less_or_equal) =
             run_and_check
-              (let%map {less; less_or_equal} =
+              (let%map { less; less_or_equal } =
                  Field.Checked.compare ~bit_length (Field.Var.constant x)
                    (Field.Var.constant y)
                in
                As_prover.(
                  map2 (read Boolean.typ less)
                    (read Boolean.typ less_or_equal)
-                   ~f:Tuple2.create))
+                   ~f:Tuple2.create) )
               ()
             |> Or_error.ok_exn
           in
@@ -172,8 +170,9 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
              (Checked.all_unit
                 [ boolean_assert_lte Boolean.false_ Boolean.false_
                 ; boolean_assert_lte Boolean.false_ Boolean.true_
-                ; boolean_assert_lte Boolean.true_ Boolean.true_ ])
-             ()) ;
+                ; boolean_assert_lte Boolean.true_ Boolean.true_
+                ] )
+             () ) ;
         assert (
           Or_error.is_error
             (check (boolean_assert_lte Boolean.true_ Boolean.false_) ()) )
@@ -182,16 +181,16 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
         let decreasing bs =
           check (assert_decreasing (List.map ~f:Boolean.var_of_value bs)) ()
         in
-        Or_error.ok_exn (decreasing [true; true; true; false]) ;
-        Or_error.ok_exn (decreasing [true; true; false; false]) ;
-        assert (Or_error.is_error (decreasing [true; true; false; true]))
+        Or_error.ok_exn (decreasing [ true; true; true; false ]) ;
+        Or_error.ok_exn (decreasing [ true; true; false; false ]) ;
+        assert (Or_error.is_error (decreasing [ true; true; false; true ]))
 
       let%test_unit "n_ones" =
         let total_length = 6 in
         let test n =
           let t = n_ones ~total_length (Field.Var.constant (Field.of_int n)) in
           let handle_with (resp : bool list) =
-            handle t (fun (With {request; respond}) ->
+            handle t (fun (With { request; respond }) ->
                 match request with
                 | N_ones ->
                     respond (Provide resp)
@@ -221,34 +220,34 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
         let f k bs =
           assert (num_bits_upper_bound_unchecked (Field.project bs) = k)
         in
-        f 3 [true; true; true; false; false] ;
-        f 4 [true; true; true; true; false] ;
-        f 3 [true; false; true; false; false] ;
-        f 5 [true; false; true; false; true]
+        f 3 [ true; true; true; false; false ] ;
+        f 4 [ true; true; true; true; false ] ;
+        f 3 [ true; false; true; false; false ] ;
+        f 5 [ true; false; true; false; true ]
 
       (*let%test_unit "num_bits_upper_bound" =
-      let max_length = Field.size_in_bits - 1 in
-      let test x =
-        let handle_with resp =
-          handle
-            (num_bits_upper_bound ~max_length (Field.Var.constant x))
-            (fun (With {request; respond}) ->
-              match request with
-              | Num_bits_upper_bound -> respond (Field.of_int resp)
-              | _ -> unhandled)
+        let max_length = Field.size_in_bits - 1 in
+        let test x =
+          let handle_with resp =
+            handle
+              (num_bits_upper_bound ~max_length (Field.Var.constant x))
+              (fun (With {request; respond}) ->
+                match request with
+                | Num_bits_upper_bound -> respond (Field.of_int resp)
+                | _ -> unhandled)
+          in
+          let true_answer = num_bits_upper_bound_unchecked x in
+          for i = 0 to true_answer - 1 do
+            if check (handle_with i) ()
+            then begin
+              let n = Bigint.of_field x in
+              failwithf !"Shouldn't have passed: x=%s, i=%d"
+                (String.init max_length ~f:(fun j -> if Bigint.test_bit n j then '1' else '0'))
+                i ();
+            end;
+          done;
+          assert (check (handle_with true_answer) ())
         in
-        let true_answer = num_bits_upper_bound_unchecked x in
-        for i = 0 to true_answer - 1 do
-          if check (handle_with i) ()
-          then begin
-            let n = Bigint.of_field x in
-            failwithf !"Shouldn't have passed: x=%s, i=%d"
-              (String.init max_length ~f:(fun j -> if Bigint.test_bit n j then '1' else '0'))
-              i ();
-          end;
-        done;
-        assert (check (handle_with true_answer) ())
-      in
-      test (random_n_bit_field_elt max_length)*)
+        test (random_n_bit_field_elt max_length)*)
     end )
 end

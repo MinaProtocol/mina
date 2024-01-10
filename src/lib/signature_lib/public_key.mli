@@ -1,18 +1,8 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 type t = Field.t * Field.t [@@deriving sexp, hash]
 
@@ -20,8 +10,7 @@ include Codable.S with type t := t
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t
-    [@@deriving bin_io, sexp, compare, equal, hash, yojson, version]
+    type nonrec t = t [@@deriving bin_io, sexp, compare, hash, yojson, version]
   end
 
   module Latest = V1
@@ -45,17 +34,16 @@ val of_private_key_exn : Private_key.t -> t
 
 module Compressed : sig
   module Poly : sig
-    type ('field, 'boolean) t = {x: 'field; is_odd: 'boolean}
+    type ('field, 'boolean) t = { x : 'field; is_odd : 'boolean }
 
-    module Stable :
-      sig
-        module V1 : sig
-          type ('field, 'boolean) t
-        end
-
-        module Latest = V1
+    module Stable : sig
+      module V1 : sig
+        type ('field, 'boolean) t
       end
-      with type ('field, 'boolean) V1.t = ('field, 'boolean) t
+
+      module Latest = V1
+    end
+    with type ('field, 'boolean) V1.t = ('field, 'boolean) t
   end
 
   type t = (Field.t, bool) Poly.t [@@deriving sexp, hash]
@@ -64,10 +52,11 @@ module Compressed : sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t
-      [@@deriving sexp, bin_io, equal, compare, hash, version]
+      type nonrec t = t [@@deriving sexp, bin_io, equal, compare, hash, version]
 
       include Codable.S with type t := t
+
+      include Hashable.S_binable with type t := t
     end
 
     module Latest = V1

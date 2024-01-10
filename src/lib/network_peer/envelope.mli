@@ -7,7 +7,7 @@ module Sender : sig
 end
 
 module Incoming : sig
-  type 'a t = {data: 'a; sender: Sender.t; received_at: Time.t}
+  type 'a t = { data : 'a; sender : Sender.t; received_at : Time.t }
   [@@deriving equal, sexp, yojson, compare]
 
   val sender : 'a t -> Sender.t

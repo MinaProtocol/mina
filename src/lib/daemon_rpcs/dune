@@ -3,8 +3,43 @@
  (public_name daemon_rpcs)
  (library_flags -linkall)
  (inline_tests)
- (libraries core async mina_base user_command_input mina_networking ppx_deriving_yojson.runtime yojson
-            perf_histograms consensus sync_status transaction_inclusion_status node_addrs_and_ports cli_lib)
+ (libraries
+   ;; opam libraries
+   base.caml
+   sexplib0
+   bin_prot.shape
+   yojson
+   core
+   async
+   ppx_deriving_yojson.runtime
+   core_kernel
+   async_unix
+   async.async_rpc
+   async_rpc_kernel
+   async_kernel
+   ;; local libraries
+   network_peer
+   genesis_constants
+   currency
+   mina_net2
+   transition_frontier
+   block_time
+   mina_numbers
+   cli_lib
+   transaction_inclusion_status
+   consensus
+   mina_networking
+   mina_base
+   user_command_input
+   perf_histograms
+   sync_status
+   node_addrs_and_ports
+   mina_compile_config
+   logger
+   network_pool
+   data_hash_lib
+   trust_system
+ )
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_compare ppx_deriving.make
  ))

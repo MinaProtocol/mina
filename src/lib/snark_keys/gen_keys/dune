@@ -1,8 +1,32 @@
 (executable
  (name gen_keys)
  (flags -g)
- (libraries ppxlib cache_dir mina_base
-            transaction_snark blockchain_snark async core genesis_ledger_helper_lib)
+ (libraries
+   ;; opam libraries
+   ppxlib
+   async
+   core
+   ppxlib.ast
+   ocaml-migrate-parsetree
+   core_kernel
+   base
+   ocaml-compiler-libs.common
+   yojson
+   compiler-libs
+   async_kernel
+   async_unix
+   ;; local libraries
+   mina_base
+   cache_dir
+   transaction_snark
+   blockchain_snark
+   genesis_ledger_helper.lib
+   genesis_constants
+   key_cache
+   pickles
+   runtime_config
+ )
+
  (preprocess
   (pps ppx_version ppx_let ppxlib.metaquot))
  (instrumentation (backend bisect_ppx))

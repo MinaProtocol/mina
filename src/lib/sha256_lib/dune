@@ -3,7 +3,11 @@
  (public_name sha256_lib)
  (library_flags -linkall)
  (inline_tests)
- (libraries core digestif snark_params)
+ (libraries
+   ;; opam libraries
+   core
+   digestif
+)
  (preprocess
   (pps ppx_version ppx_jane ppx_compare))
  (instrumentation (backend bisect_ppx))

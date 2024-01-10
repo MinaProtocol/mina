@@ -20,13 +20,13 @@ open Asttypes
      module T = struct
        [%%define_from_scope x,y]
      end
- *)
+*)
 
 let name = "define_from_scope"
 
 let expr_to_id loc expr =
   match expr.pexp_desc with
-  | Pexp_ident {txt= Lident s; _} ->
+  | Pexp_ident { txt = Lident s; _ } ->
       s
   | _ ->
       Location.raise_errorf ~loc "Expected identifier"
@@ -45,4 +45,4 @@ let ext =
     expand
 
 let () =
-  Driver.register_transformation name ~rules:[Context_free.Rule.extension ext]
+  Driver.register_transformation name ~rules:[ Context_free.Rule.extension ext ]

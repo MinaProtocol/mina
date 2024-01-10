@@ -6,7 +6,7 @@ open Pickles.Impls.Step.Internal_Basic
 
 [%%else]
 
-open Snark_params_nonconsensus
+open Snark_params.Tick
 
 [%%endif]
 
@@ -22,10 +22,10 @@ end
 
 include
   Intf.S
-  with type field := Field.t
-   and type field_constant := Field.t
-   and type bool := bool
-   and module State := State
+    with type field := Field.t
+     and type field_constant := Field.t
+     and type bool := bool
+     and module State := State
 
 val salt : string -> Field.t State.t
 
@@ -33,9 +33,9 @@ val salt : string -> Field.t State.t
 
 module Checked :
   Intf.S
-  with type field := Field.Var.t
-   and type field_constant := Field.t
-   and type bool := Boolean.var
-   and module State := State
+    with type field := Field.Var.t
+     and type field_constant := Field.t
+     and type bool := Boolean.var
+     and module State := State
 
 [%%endif]

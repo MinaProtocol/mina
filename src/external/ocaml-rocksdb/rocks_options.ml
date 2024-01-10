@@ -116,11 +116,6 @@ module BlockBasedTableOptions =
     let set_index_type =
       create_setter "set_index_type" int
 
-    (* extern void rocksdb_block_based_options_set_hash_index_allow_collision( *)
-    (*     rocksdb_block_based_table_options_t*, unsigned char); *)
-    let set_hash_index_allow_collision =
-      create_setter "set_hash_index_allow_collision" Views.bool_to_uchar
-
     (* extern void rocksdb_block_based_options_set_cache_index_and_filter_blocks( *)
     (*     rocksdb_block_based_table_options_t*, unsigned char); *)
     let set_cache_index_and_filter_blocks =
@@ -128,6 +123,22 @@ module BlockBasedTableOptions =
   end
 
 module Options = struct
+  module SliceTransform = struct
+    type t = Rocks_common.t
+
+    let t = Rocks_common.t
+
+    module Noop = struct
+      include CreateConstructors(struct
+        let super_name = "slicetransform"
+        let name = "noop"
+        let constructor = "rocksdb_" ^ super_name ^ "_create_" ^ name
+        let destructor  = "rocksdb_" ^ super_name ^ "_destroy"
+        let setter_prefix = "rocksdb_" ^ super_name ^ "_" ^ name ^ "_"
+      end)
+    end
+  end
+
   (* extern rocksdb_options_t* rocksdb_options_create(); *)
   (* extern void rocksdb_options_destroy(rocksdb_options_t*\); *)
   module C = CreateConstructors_(struct let name = "options" end)
@@ -210,8 +221,11 @@ module Options = struct
 
   (* extern void rocksdb_options_set_compression_options( *)
   (*     rocksdb_options_t*, int, int, int); *)
-  (* extern void rocksdb_options_set_prefix_extractor( *)
-  (*     rocksdb_options_t*, rocksdb_slicetransform_t*\); *)
+
+  (* extern void rocksdb_options_set_prefix_extractor(rocksdb_options_t* opt, rocksdb_slicetransform_t* trans); *)
+  let set_prefix_extractor =
+    create_setter "set_prefix_extractor" SliceTransform.t
+
   (* extern void rocksdb_options_set_num_levels(rocksdb_options_t*, int); *)
   (* extern void rocksdb_options_set_level0_file_num_compaction_trigger( *)
   (*     rocksdb_options_t*, int); *)
@@ -278,19 +292,6 @@ module Options = struct
   let set_recycle_log_file_num =
     create_setter "set_recycle_log_file_num" Views.int_to_size_t
 
-  (* extern void rocksdb_options_set_soft_rate_limit(rocksdb_options_t*, double); *)
-  let set_soft_rate_limit =
-    create_setter "set_soft_rate_limit" float
-
-  (* extern void rocksdb_options_set_hard_rate_limit(rocksdb_options_t*, double); *)
-  let set_hard_rate_limit =
-    create_setter "set_hard_rate_limit" float
-
-  (* extern void rocksdb_options_set_rate_limit_delay_max_milliseconds( *)
-  (*     rocksdb_options_t*, unsigned int); *)
-  let set_rate_limit_delay_max_milliseconds =
-    create_setter "set_rate_limit_delay_max_milliseconds" Views.int_to_uint_t
-
   (* extern void rocksdb_options_set_max_manifest_file_size( *)
   (*     rocksdb_options_t*, size_t); *)
   let set_max_manifest_file_size =
@@ -300,11 +301,6 @@ module Options = struct
   (*     rocksdb_options_t*, int); *)
   let set_table_cache_numshardbits =
     create_setter "set_table_cache_numshardbits" int
-
-  (* extern void rocksdb_options_set_table_cache_remove_scan_count_limit( *)
-  (*     rocksdb_options_t*, int); *)
-  let set_table_cache_remove_scan_count_limit =
-    create_setter "set_table_cache_remove_scan_count_limit" int
 
   (* extern void rocksdb_options_set_arena_block_size( *)
   (*     rocksdb_options_t*, size_t); *)
@@ -336,11 +332,6 @@ module Options = struct
   let set_manifest_preallocation_size =
     create_setter "set_manifest_preallocation_size" Views.int_to_size_t
 
-  (* extern void rocksdb_options_set_purge_redundant_kvs_while_flush( *)
-  (*     rocksdb_options_t*, unsigned char); *)
-  let set_purge_redundant_kvs_while_flush =
-    create_setter "set_purge_redundant_kvs_while_flush" Views.bool_to_uchar
-
   (* extern void rocksdb_options_set_use_direct_reads( *)
   (*     rocksdb_options_t*, unsigned char); *)
   let set_use_direct_reads =
@@ -360,11 +351,6 @@ module Options = struct
   (*     rocksdb_options_t*, unsigned char); *)
   let set_is_fd_close_on_exec =
     create_setter "set_is_fd_close_on_exec" Views.bool_to_uchar
-
-  (* extern void rocksdb_options_set_skip_log_error_on_recovery( *)
-  (*     rocksdb_options_t*, unsigned char); *)
-  let set_skip_log_error_on_recovery =
-    create_setter "set_skip_log_error_on_recovery" Views.bool_to_uchar
 
   (* extern void rocksdb_options_set_stats_dump_period_sec( *)
   (*     rocksdb_options_t*, unsigned int); *)

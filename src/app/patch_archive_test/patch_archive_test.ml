@@ -35,12 +35,12 @@ let complete_prog_path prog_path =
   else Sys.getcwd () ^/ prog_path
 
 let extract_blocks ~uri ~working_dir ~extract_blocks_path =
-  let args = ["--archive-uri"; Uri.to_string uri; "--all-blocks"] in
+  let args = [ "--archive-uri"; Uri.to_string uri; "--all-blocks" ] in
   let prog = complete_prog_path extract_blocks_path in
   Process.run_lines_exn ~working_dir ~prog ~args ()
 
 let archive_blocks ~uri ~archive_blocks_path ~block_kind files =
-  let args = ["--archive-uri"; Uri.to_string uri; block_kind] @ files in
+  let args = [ "--archive-uri"; Uri.to_string uri; block_kind ] @ files in
   Process.run_lines_exn ~prog:archive_blocks_path ~args ()
 
 let compare_blocks ~logger ~original_blocks_dir ~copy_blocks_dir =
@@ -67,10 +67,11 @@ let compare_blocks ~logger ~original_blocks_dir ~copy_blocks_dir =
     let original_diff = diff_list original_blocks copy_blocks in
     [%log error] "Original database contains these blocks not in the copy"
       ~metadata:
-        [("blocks", `List (List.map original_diff ~f:(fun s -> `String s)))] ;
+        [ ("blocks", `List (List.map original_diff ~f:(fun s -> `String s))) ] ;
     let copy_diff = diff_list copy_blocks original_blocks in
     [%log error] "Copied database contains these blocks not in the original"
-      ~metadata:[("blocks", `List (List.map copy_diff ~f:(fun s -> `String s)))] ;
+      ~metadata:
+        [ ("blocks", `List (List.map copy_diff ~f:(fun s -> `String s))) ] ;
     Core_kernel.exit 1 ) ;
   [%log info]
     "After patching, original and copied databases contain the same set of \
@@ -81,8 +82,7 @@ let compare_blocks ~logger ~original_blocks_dir ~copy_blocks_dir =
     String.Set.fold original_blocks ~init:false ~f:(fun acc block_file ->
         let original_block = get_block (original_blocks_dir ^/ block_file) in
         let copied_block = get_block (copy_blocks_dir ^/ block_file) in
-        if
-          not (Archive_lib.Extensional.Block.equal original_block copied_block)
+        if not (Archive_lib.Extensional.Block.equal original_block copied_block)
         then (
           [%log error] "Original, copied blocks differ in file %s" block_file ;
           true )
@@ -127,7 +127,7 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
     match Caqti_async.connect_pool ~max_size:128 archive_uri with
     | Error e ->
         [%log fatal]
-          ~metadata:[("error", `String (Caqti_error.show e))]
+          ~metadata:[ ("error", `String (Caqti_error.show e)) ]
           "Failed to create a Caqti pool for Postgresql" ;
         exit 1
     | Ok pool ->
@@ -162,7 +162,7 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
   match Caqti_async.connect_pool ~max_size:128 copy_uri with
   | Error e ->
       [%log fatal]
-        ~metadata:[("error", `String (Caqti_error.show e))]
+        ~metadata:[ ("error", `String (Caqti_error.show e)) ]
         "Failed to create a Caqti pool for Postgresql" ;
       exit 1
   | Ok pool ->
@@ -177,7 +177,7 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
       let indexes_to_delete =
         Quickcheck.random_value
           (Quickcheck.Generator.list_with_length num_blocks_to_patch
-             (Int.gen_uniform_incl 0 (Array.length state_hash_array - 1)))
+             (Int.gen_uniform_incl 0 (Array.length state_hash_array - 1)) )
       in
       let%bind () =
         Deferred.List.iter indexes_to_delete ~f:(fun ndx ->
@@ -186,9 +186,9 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
                otherwise, we get a foreign key constraint violation
             *)
             [%log info]
-              "Removing parent references to block with state hash \
-               $state_hash in copied database"
-              ~metadata:[("state_hash", `String state_hash)] ;
+              "Removing parent references to block with state hash $state_hash \
+               in copied database"
+              ~metadata:[ ("state_hash", `String state_hash) ] ;
             let%bind id =
               query_db pool
                 ~f:(fun db -> Sql.Block.run db ~state_hash)
@@ -201,16 +201,14 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
             in
             [%log info]
               "Deleting block with state hash $state_hash from copied database"
-              ~metadata:[("state_hash", `String state_hash)] ;
+              ~metadata:[ ("state_hash", `String state_hash) ] ;
             query_db pool
               ~f:(fun db -> Sql.Block.run_delete db ~state_hash)
               ~item:"state hash of block to delete" )
       in
       (* patch the copy with precomputed or extensional blocks, using the archive_blocks tool *)
       [%log info] "Patching the copy with supplied blocks" ;
-      let block_kind =
-        if precomputed then "-precomputed" else "-extensional"
-      in
+      let block_kind = if precomputed then "-precomputed" else "-extensional" in
       let%bind _lines =
         archive_blocks ~uri:copy_uri ~archive_blocks_path ~block_kind files
       in
@@ -262,25 +260,25 @@ let () =
              Param.(required string)
          and num_blocks_to_patch =
            Param.(
-             flag "--num-blocks-to-patch" ~aliases:["num-blocks-to-patch"]
+             flag "--num-blocks-to-patch" ~aliases:[ "num-blocks-to-patch" ]
                Param.(required int))
              ~doc:"NN Number of blocks to remove and patch"
          and archive_blocks_path =
            Param.(
-             flag "--archive-blocks-path" ~aliases:["archive-blocks-path"]
+             flag "--archive-blocks-path" ~aliases:[ "archive-blocks-path" ]
                Param.(required string))
              ~doc:"PATH Path to archive_blocks executable"
          and extract_blocks_path =
            Param.(
-             flag "--extract-blocks-path" ~aliases:["extract-blocks-path"]
+             flag "--extract-blocks-path" ~aliases:[ "extract-blocks-path" ]
                Param.(required string))
              ~doc:"PATH Path to extract_blocks executable"
          and precomputed =
-           Param.(flag "--precomputed" ~aliases:["precomputed"] no_arg)
+           Param.(flag "--precomputed" ~aliases:[ "precomputed" ] no_arg)
              ~doc:"Blocks are in precomputed format"
          and extensional =
-           Param.(flag "--extensional" ~aliases:["extensional"] no_arg)
+           Param.(flag "--extensional" ~aliases:[ "extensional" ] no_arg)
              ~doc:"Blocks are in extensional format"
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
          main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
-           ~extract_blocks_path ~precomputed ~extensional ~files)))
+           ~extract_blocks_path ~precomputed ~extensional ~files )))

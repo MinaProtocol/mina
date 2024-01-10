@@ -1,3 +1,4 @@
+open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Pipe_lib
@@ -19,9 +20,10 @@ end
 
 module Time_queue = struct
   type 'action t =
-    { mutable curr_time: Time.Span.t
-    ; pending_actions: ('action * Time.Span.t) Pairing_heap.t
-    ; mutable on_new_action: unit Ivar.t option }
+    { mutable curr_time : Time.Span.t
+    ; pending_actions : ('action * Time.Span.t) Pairing_heap.t
+    ; mutable on_new_action : unit Ivar.t option
+    }
 
   let handle_in_future t ~after action =
     Option.iter t.on_new_action ~f:(fun ivar ->
@@ -30,12 +32,13 @@ module Time_queue = struct
     Pairing_heap.add t.pending_actions (action, Time.Span.(after + t.curr_time))
 
   let create ~now =
-    { curr_time= now
-    ; pending_actions=
+    { curr_time = now
+    ; pending_actions =
         Pairing_heap.create
           ~cmp:(fun (_, ts) (_, ts') -> Time.Span.compare ts ts')
           ()
-    ; on_new_action= None }
+    ; on_new_action = None
+    }
 
   let actions_ready t =
     match (Pairing_heap.top t.pending_actions, t.on_new_action) with
@@ -102,11 +105,11 @@ module Time_queue = struct
         let t : char t = create ~now:Time.Span.zero in
         handle_in_future t ~after:(Time.Span.of_int_sec 100) 'a' ;
         handle_in_future t ~after:(Time.Span.of_int_sec 10) 'b' ;
-        let%bind () = tick_assert_sees t ['b'] in
+        let%bind () = tick_assert_sees t [ 'b' ] in
         handle_in_future t ~after:(Time.Span.of_int_sec 10) 'c' ;
         handle_in_future t ~after:(Time.Span.of_int_sec 10) 'd' ;
-        let%bind () = tick_assert_sees t ['c'; 'd'] in
-        tick_assert_sees t ['a'] )
+        let%bind () = tick_assert_sees t [ 'c'; 'd' ] in
+        tick_assert_sees t [ 'a' ] )
 end
 
 module type Temporal_intf = sig
@@ -128,15 +131,15 @@ module type Fake_timer_transport_intf = sig
 end
 
 module type Fake_timer_transport_s = functor
-  (Message :sig
-
-            type t
-          end)
+  (Message : sig
+     type t
+   end)
   (Message_delay : Message_delay_intf with type message := Message.t)
   (Peer : Node.Peer_intf)
-  -> Fake_timer_transport_intf
-     with type message := Message.t
-      and type peer := Peer.t
+  ->
+  Fake_timer_transport_intf
+    with type message := Message.t
+     and type peer := Peer.t
 [@@warning "-67"]
 
 module Fake_timer_transport (Message : sig
@@ -154,20 +157,22 @@ struct
   type peer = Peer.t
 
   type action =
-    | Timeout of [`Cancelled | `Finished] Ivar.t
+    | Timeout of [ `Cancelled | `Finished ] Ivar.t
     | Msg of message * peer
 
   type t =
-    { network:
+    { network :
         (message Linear_pipe.Reader.t * message Linear_pipe.Writer.t)
         Peer.Table.t
-    ; q: action Time_queue.t
-    ; timer_stoppers: [`Cancelled | `Finished] Ivar.t Token.Table.t }
+    ; q : action Time_queue.t
+    ; timer_stoppers : [ `Cancelled | `Finished ] Ivar.t Token.Table.t
+    }
 
   let create ~now =
-    { network= Peer.Table.create ()
-    ; q= Time_queue.create ~now
-    ; timer_stoppers= Token.Table.create () }
+    { network = Peer.Table.create ()
+    ; q = Time_queue.create ~now
+    ; timer_stoppers = Token.Table.create ()
+    }
 
   let actions_ready t = Time_queue.actions_ready t.q
 
@@ -177,14 +182,14 @@ struct
           Ivar.fill_if_empty ivar `Finished ;
           Ivar.read ivar >>| Fn.const ()
       | Msg (m, p) -> (
-        match Peer.Table.find t.network p with
-        | None ->
-            failwithf "Unknown recipient %s"
-              (Peer.sexp_of_t p |> Sexp.to_string_hum)
-              ()
-        | Some (r, w) ->
-            Linear_pipe.write_or_exn ~capacity:1024 w r m ;
-            Linear_pipe.values_available r >>| Fn.const () ) )
+          match Peer.Table.find t.network p with
+          | None ->
+              failwithf "Unknown recipient %s"
+                (Peer.sexp_of_t p |> Sexp.to_string_hum)
+                ()
+          | Some (r, w) ->
+              Linear_pipe.write_or_exn ~capacity:1024 w r m ;
+              Linear_pipe.values_available r >>| Fn.const () ) )
 
   let wait t ts =
     let tok = Ident.next () in
@@ -208,7 +213,7 @@ struct
         return
           (Or_error.error_string
              (Printf.sprintf "Unknown recipient %s"
-                (Peer.sexp_of_t recipient |> Sexp.to_string_hum)))
+                (Peer.sexp_of_t recipient |> Sexp.to_string_hum) ) )
     | Some (_r, _w) ->
         Time_queue.handle_in_future t.q
           ~after:(Message_delay.delay message)
@@ -239,52 +244,48 @@ module Trivial_peer : Trivial_peer_intf = struct
 end
 
 [@@@warning "-67"]
+
 module type S = functor
-  (State :sig
-
-          type t [@@deriving equal, sexp, yojson]
-        end)
-  (Message :sig
-
-            type t
-          end)
+  (State : sig
+     type t [@@deriving equal, sexp, yojson]
+   end)
+  (Message : sig
+     type t
+   end)
   (Message_delay : Message_delay_intf with type message := Message.t)
-  (Message_label :sig
+  (Message_label : sig
+     type label [@@deriving enum, sexp]
 
-                  type label [@@deriving enum, sexp]
+     include Hashable.S with type t = label
+   end)
+  (Timer_label : sig
+     type label [@@deriving enum, sexp]
 
-                  include Hashable.S with type t = label
-                end)
-  (Timer_label :sig
+     include Hashable.S with type t = label
+   end)
+  (Condition_label : sig
+     type label [@@deriving enum, sexp, yojson]
 
-                type label [@@deriving enum, sexp]
-
-                include Hashable.S with type t = label
-              end)
-  (Condition_label :sig
-
-                    type label [@@deriving enum, sexp, yojson]
-
-                    include Hashable.S with type t = label
-                  end)
+     include Hashable.S with type t = label
+   end)
   -> sig
   type t
 
   module Timer_transport :
     Fake_timer_transport_intf
-    with type message := Message.t
-     and type peer := Trivial_peer.t
+      with type message := Message.t
+       and type peer := Trivial_peer.t
 
   module MyNode :
     Node.S
-    with type message := Message.t
-     and type state := State.t
-     and type transport := Timer_transport.t
-     and type peer := Trivial_peer.t
-     and module Message_label := Message_label
-     and module Timer_label := Timer_label
-     and module Condition_label := Condition_label
-     and module Timer := Timer_transport
+      with type message := Message.t
+       and type state := State.t
+       and type transport := Timer_transport.t
+       and type peer := Trivial_peer.t
+       and module Message_label := Message_label
+       and module Timer_label := Timer_label
+       and module Condition_label := Condition_label
+       and module Timer := Timer_transport
 
   module Identifier : sig
     type t = Trivial_peer.t
@@ -304,6 +305,7 @@ module type S = functor
     -> stop:unit Deferred.t
     -> t
 end
+
 [@@@warning "+67"]
 
 module Make (State : sig
@@ -312,10 +314,10 @@ end) (Message : sig
   type t
 end)
 (Message_delay : Message_delay_intf with type message := Message.t)
-                                                                  (Message_label : sig
-    type label [@@deriving enum, sexp]
+(Message_label : sig
+  type label [@@deriving enum, sexp]
 
-    include Hashable.S with type t = label
+  include Hashable.S with type t = label
 end) (Timer_label : sig
   type label [@@deriving enum, sexp]
 
@@ -329,8 +331,7 @@ struct
   module Timer_transport =
     Fake_timer_transport (Message) (Message_delay) (Trivial_peer)
   module MyNode =
-    Node.Make (State) (Message) (Trivial_peer) (Timer_transport)
-      (Message_label)
+    Node.Make (State) (Message) (Trivial_peer) (Timer_transport) (Message_label)
       (Timer_label)
       (Condition_label)
       (Timer_transport)
@@ -341,7 +342,7 @@ struct
     include MyNode.Identifier
   end
 
-  type t = {nodes: MyNode.t Identifier.Table.t; timer: Timer_transport.t}
+  type t = { nodes : MyNode.t Identifier.Table.t; timer : Timer_transport.t }
 
   type change = Delete of Identifier.t | Add of MyNode.t
 
@@ -387,13 +388,14 @@ struct
               >>| fun () ->
               ( merge (Deferred.peek a) a_imm
               , merge (Deferred.peek b) b_imm
-              , Some () ) ) ]
+              , Some () ) )
+            ]
         in
         let node_ready : MyNode.t Deferred.t =
           let any_ready : MyNode.t Deferred.t =
             Deferred.any
               (List.map (Identifier.Table.data t.nodes) ~f:(fun n ->
-                   MyNode.next_ready n >>| Fn.const n ))
+                   MyNode.next_ready n >>| Fn.const n ) )
           in
           any_ready
           >>| fun n ->
@@ -449,11 +451,11 @@ struct
     don't_wait_for
       (let%map () = stop in
        List.iter nodes ~f:(fun n ->
-           Timer_transport.stop_listening timer ~me:(MyNode.ident n) )) ;
+           Timer_transport.stop_listening timer ~me:(MyNode.ident n) ) ) ;
     (* Fill table *)
     List.iter nodes ~f:(fun n ->
         Identifier.Table.add_exn table ~key:(MyNode.ident n) ~data:n ) ;
-    {nodes= table; timer}
+    { nodes = table; timer }
 end
 
 let%test_module "Distributed_dsl" =
@@ -541,14 +543,20 @@ let%test_module "Distributed_dsl" =
                             (Msg 10)
                         in
                         Sent_msg ) ;
-                    return Wait_msg ) ] )
+                    return Wait_msg )
+              ] )
           in
           let specRest =
             let open Machine.MyNode in
             ( [ msg Send_msg
                   (Fn.const (Fn.const true))
-                  ~f:(fun _t (Msg i) -> function Wait_msg -> return (Got_msg i)
-                    | m -> return m ) ]
+                  ~f:
+                    (fun _t (Msg i) -> function
+                      | Wait_msg ->
+                          return (Got_msg i)
+                      | m ->
+                          return m )
+              ]
             , [ on Init
                   (function Start -> true | _ -> false)
                   ~f:(fun _ _ -> return Wait_msg)
@@ -576,12 +584,12 @@ let%test_module "Distributed_dsl" =
                   ~f:(fun t state ->
                     cancel t Timeout_message ;
                     Ivar.fill_if_empty finish_ivar `Success ;
-                    return state ) ] )
+                    return state )
+              ] )
           in
           let machine =
-            Machine.create ~count ~initial_state:Start
-              ~stop:(Deferred.never ()) (fun i ->
-                if i = 0 then spec0 else specRest )
+            Machine.create ~count ~initial_state:Start ~stop:(Deferred.never ())
+              (fun i -> if i = 0 then spec0 else specRest)
           in
           don't_wait_for
             (let%map () =
@@ -589,6 +597,5 @@ let%test_module "Distributed_dsl" =
                  ~max_iters:(Some 10000)
              in
              Ivar.fill_if_empty finish_ivar
-               (`Failure "Stopped looping without getting to success state"))
-      )
+               (`Failure "Stopped looping without getting to success state") ) )
   end )

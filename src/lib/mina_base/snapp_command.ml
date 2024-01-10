@@ -1,24 +1,14 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
-module Mina_numbers = Mina_numbers
-
-[%%else]
-
-open Signature_lib_nonconsensus
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
+open Signature_lib
 module Impl = Pickles.Impls.Step
 open Mina_numbers
 open Currency
@@ -34,7 +24,7 @@ let typ_optional typ ~default =
 (* TODO: One invariant that needs to be checked is
 
    If the fee payer is `Other { pk; _ }, this account should in fact
-   be distinct from the other accounts.  *)
+   be distinct from the other accounts. *)
 
 module Party = struct
   module Update = struct
@@ -43,10 +33,11 @@ module Party = struct
       module Stable = struct
         module V1 = struct
           type ('state_element, 'pk, 'vk, 'perms) t =
-            { app_state: 'state_element Snapp_state.V.Stable.V1.t
-            ; delegate: 'pk
-            ; verification_key: 'vk
-            ; permissions: 'perms }
+            { app_state : 'state_element Snapp_state.V.Stable.V1.t
+            ; delegate : 'pk
+            ; verification_key : 'vk
+            ; permissions : 'perms
+            }
           [@@deriving compare, equal, sexp, hash, yojson, hlist]
         end
       end]
@@ -82,7 +73,8 @@ module Party = struct
         , Permissions.Checked.t Set_or_keep.Checked.t )
         Poly.t
 
-      let to_input ({app_state; delegate; verification_key; permissions} : t) =
+      let to_input ({ app_state; delegate; verification_key; permissions } : t)
+          =
         let open Random_oracle_input in
         List.reduce_exn ~f:append
           [ Snapp_state.to_input app_state
@@ -91,18 +83,20 @@ module Party = struct
               ~f:Public_key.Compressed.Checked.to_input
           ; Set_or_keep.Checked.to_input verification_key ~f:field
           ; Set_or_keep.Checked.to_input permissions
-              ~f:Permissions.Checked.to_input ]
+              ~f:Permissions.Checked.to_input
+          ]
     end
 
     let dummy : t =
-      { app_state=
+      { app_state =
           Vector.init Snapp_state.Max_state_size.n ~f:(fun _ ->
               Set_or_keep.Keep )
-      ; delegate= Keep
-      ; verification_key= Keep
-      ; permissions= Keep }
+      ; delegate = Keep
+      ; verification_key = Keep
+      ; permissions = Keep
+      }
 
-    let to_input ({app_state; delegate; verification_key; permissions} : t) =
+    let to_input ({ app_state; delegate; verification_key; permissions } : t) =
       let open Random_oracle_input in
       List.reduce_exn ~f:append
         [ Snapp_state.to_input app_state
@@ -114,7 +108,8 @@ module Party = struct
             (Set_or_keep.map verification_key ~f:With_hash.hash)
             ~dummy:Field.zero ~f:field
         ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
-            ~f:Permissions.to_input ]
+            ~f:Permissions.to_input
+        ]
 
     let typ () : (Checked.t, t) Typ.t =
       let open Poly in
@@ -127,7 +122,8 @@ module Party = struct
           |> Typ.transport
                ~there:(Set_or_keep.map ~f:With_hash.hash)
                ~back:(Set_or_keep.map ~f:(fun _ -> failwith "vk typ"))
-        ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ ]
+        ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
+        ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
@@ -138,7 +134,7 @@ module Party = struct
       module Stable = struct
         module V1 = struct
           type ('pk, 'update, 'signed_amount) t =
-            {pk: 'pk; update: 'update; delta: 'signed_amount}
+            { pk : 'pk; update : 'update; delta : 'signed_amount }
           [@@deriving hlist, sexp, equal, yojson, hash, compare]
         end
       end]
@@ -162,11 +158,12 @@ module Party = struct
       type t =
         (Public_key.Compressed.var, Update.Checked.t, Amount.Signed.var) Poly.t
 
-      let to_input ({pk; update; delta} : t) =
+      let to_input ({ pk; update; delta } : t) =
         List.reduce_exn ~f:Random_oracle_input.append
           [ Public_key.Compressed.Checked.to_input pk
           ; Update.Checked.to_input update
-          ; Amount.Signed.Checked.to_input delta ]
+          ; Amount.Signed.Checked.to_input delta
+          ]
 
       let digest (t : t) =
         Random_oracle.Checked.(
@@ -176,20 +173,22 @@ module Party = struct
     let typ () : (Checked.t, t) Typ.t =
       let open Poly in
       Typ.of_hlistable
-        [Public_key.Compressed.typ; Update.typ (); Amount.Signed.typ]
+        [ Public_key.Compressed.typ; Update.typ (); Amount.Signed.typ ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
     let dummy : t =
-      { pk= Public_key.Compressed.empty
-      ; update= Update.dummy
-      ; delta= Amount.Signed.zero }
+      { pk = Public_key.Compressed.empty
+      ; update = Update.dummy
+      ; delta = Amount.Signed.zero
+      }
 
-    let to_input ({pk; update; delta} : t) =
+    let to_input ({ pk; update; delta } : t) =
       List.reduce_exn ~f:Random_oracle_input.append
         [ Public_key.Compressed.to_input pk
         ; Update.to_input update
-        ; Amount.Signed.to_input delta ]
+        ; Amount.Signed.to_input delta
+        ]
 
     let digest (t : t) =
       Random_oracle.(
@@ -209,7 +208,7 @@ module Party = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
-          type ('body, 'predicate) t = {body: 'body; predicate: 'predicate}
+          type ('body, 'predicate) t = { body : 'body; predicate : 'predicate }
           [@@deriving hlist, sexp, equal, yojson, hash, compare]
         end
       end]
@@ -247,7 +246,7 @@ module Party = struct
           type t =
             ( Body.Stable.V1.t
               (* It's really more natural for this to be a predicate. Consider doing this
-   if predicates are not too expensive. *)
+                 if predicates are not too expensive. *)
             , Account_nonce.Stable.V1.t )
             Poly.Stable.V1.t
           [@@deriving sexp, equal, yojson, hash, compare]
@@ -268,9 +267,10 @@ module Party = struct
         type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
       end
 
-      let typ : (Checked.t, t) Typ.t = Poly.typ [Body.typ (); Account_nonce.typ]
+      let typ : (Checked.t, t) Typ.t =
+        Poly.typ [ Body.typ (); Account_nonce.typ ]
 
-      let dummy : t = {body= Body.dummy; predicate= Account_nonce.zero}
+      let dummy : t = { body = Body.dummy; predicate = Account_nonce.zero }
     end
 
     module Empty = struct
@@ -284,9 +284,9 @@ module Party = struct
         end
       end]
 
-      let dummy : t = {body= Body.dummy; predicate= ()}
+      let dummy : t = { body = Body.dummy; predicate = () }
 
-      let create body : t = {body; predicate= ()}
+      let create body : t = { body; predicate = () }
     end
   end
 
@@ -295,7 +295,7 @@ module Party = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
-          type ('data, 'auth) t = {data: 'data; authorization: 'auth}
+          type ('data, 'auth) t = { data : 'data; authorization : 'auth }
           [@@deriving hlist, sexp, equal, yojson, hash, compare]
         end
       end]
@@ -350,10 +350,11 @@ module Inner = struct
   module Stable = struct
     module V1 = struct
       type ('one, 'two) t =
-        { token_id: Token_id.Stable.V1.t
-        ; fee_payment: Other_fee_payer.Stable.V1.t option
-        ; one: 'one
-        ; two: 'two }
+        { token_id : Token_id.Stable.V1.t
+        ; fee_payment : Other_fee_payer.Stable.V1.t option
+        ; one : 'one
+        ; two : 'two
+        }
       [@@deriving sexp, equal, yojson, hash, compare, fields, hlist]
     end
   end]
@@ -395,13 +396,6 @@ module Binable_arg = struct
   end]
 end
 
-[%%if
-feature_snapps]
-
-include Binable_arg
-
-[%%else]
-
 [%%versioned_binable
 module Stable = struct
   module V1 = struct
@@ -428,15 +422,16 @@ module Stable = struct
           Inner.Stable.V1.t
     [@@deriving sexp, equal, yojson, hash, compare]
 
-    include Binable.Of_binable
-              (Binable_arg.Stable.V1)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable_without_uuid
+        (Binable_arg.Stable.V1)
+        (struct
+          type nonrec t = t
 
-                let to_binable _ = failwith "Snapps disabled"
+          let to_binable _ = failwith "Snapps disabled"
 
-                let of_binable _ = failwith "Snapps disabled"
-              end)
+          let of_binable _ = failwith "Snapps disabled"
+        end)
 
     let to_latest = Fn.id
 
@@ -446,20 +441,19 @@ module Stable = struct
   end
 end]
 
-[%%endif]
-
 type transfer =
-  { source: Public_key.Compressed.t
-  ; receiver: Public_key.Compressed.t
-  ; amount: Amount.t }
+  { source : Public_key.Compressed.t
+  ; receiver : Public_key.Compressed.t
+  ; amount : Amount.t
+  }
 
 let token_id (t : t) : Token_id.t =
   match t with
-  | Proved_empty {token_id; _}
-  | Proved_signed {token_id; _}
-  | Proved_proved {token_id; _}
-  | Signed_signed {token_id; _}
-  | Signed_empty {token_id; _} ->
+  | Proved_empty { token_id; _ }
+  | Proved_signed { token_id; _ }
+  | Proved_proved { token_id; _ }
+  | Signed_signed { token_id; _ }
+  | Signed_empty { token_id; _ } ->
       token_id
 
 let assert_ b lab = if b then Ok () else Or_error.error_string lab
@@ -481,11 +475,7 @@ let signed_to_non_positive (t : Amount.Signed.t) =
 
 let fee_token (t : t) : Token_id.t =
   let f (x : _ Inner.t) =
-    match x.fee_payment with
-    | Some x ->
-        x.payload.token_id
-    | None ->
-        x.token_id
+    match x.fee_payment with Some x -> x.payload.token_id | None -> x.token_id
   in
   match t with
   | Proved_empty r ->
@@ -523,10 +513,11 @@ let check_tokens (t : t) =
 let native_excess_exn (t : t) =
   let open Party in
   let f1
-      { Inner.one: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
-      ; two: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option
+      { Inner.one : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
+      ; two : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option
       ; token_id
-      ; _ } =
+      ; _
+      } =
     match two with
     | None ->
         assert (is_non_pos one.data.body.delta) ;
@@ -544,7 +535,7 @@ let native_excess_exn (t : t) =
         in
         (Account_id.create pk token_id, x.magnitude)
   in
-  let f2 r = f1 {r with two= Some r.Inner.two} in
+  let f2 r = f1 { r with two = Some r.Inner.two } in
   match t with
   | Proved_empty r ->
       f1 r
@@ -595,11 +586,7 @@ let fee_payment t =
 let fee_exn (t : t) =
   let f (r : _ Inner.t) =
     let _, e = native_excess_exn t in
-    match r.fee_payment with
-    | Some p ->
-        p.payload.fee
-    | None ->
-        Amount.to_fee e
+    match r.fee_payment with Some p -> p.payload.fee | None -> Amount.to_fee e
   in
   match t with
   | Proved_empty r ->
@@ -618,24 +605,27 @@ let fee_exn (t : t) =
 let as_transfer (t : t) : transfer =
   let open Party in
   let f1
-      { Inner.one: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
-      ; two: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option
-      ; _ } : transfer =
+      { Inner.one : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
+      ; two : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option
+      ; _
+      } : transfer =
     match two with
     | None ->
-        { source= one.data.body.pk
-        ; receiver= one.data.body.pk
-        ; amount= Amount.zero }
+        { source = one.data.body.pk
+        ; receiver = one.data.body.pk
+        ; amount = Amount.zero
+        }
     | Some two ->
         let sender, receiver =
           if is_non_pos one.data.body.delta then (one.data.body, two.data.body)
           else (two.data.body, one.data.body)
         in
-        { source= sender.pk
-        ; receiver= receiver.pk
-        ; amount= receiver.delta.magnitude }
+        { source = sender.pk
+        ; receiver = receiver.pk
+        ; amount = receiver.delta.magnitude
+        }
   in
-  let f2 r = f1 {r with two= Some r.Inner.two} in
+  let f2 r = f1 { r with two = Some r.Inner.two } in
   match t with
   | Proved_empty r ->
       f1 r
@@ -666,17 +656,18 @@ let accounts_accessed (t : t) : Account_id.t list =
   let f
       { Inner.token_id
       ; fee_payment
-      ; one: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
-      ; two: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option } =
+      ; one : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
+      ; two : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option
+      } =
     let a k = Account_id.create k token_id in
     a one.data.body.pk
     :: Option.(to_list (map two ~f:(fun x -> a x.data.body.pk)))
     @ Option.(
         to_list
           (map fee_payment ~f:(fun x ->
-               Account_id.create x.payload.pk x.payload.token_id )))
+               Account_id.create x.payload.pk x.payload.token_id ) ))
   in
-  let f2 r = f {r with two= Some r.Inner.two} in
+  let f2 r = f { r with two = Some r.Inner.two } in
   match t with
   | Proved_empty r ->
       f r
@@ -710,19 +701,20 @@ module Payload = struct
     module Stable = struct
       module V1 = struct
         type ('bool, 'token_id, 'fee_payer_opt, 'one, 'two) t =
-          { second_starts_empty: 'bool
-          ; second_ends_empty: 'bool
-          ; token_id: 'token_id
-          ; other_fee_payer_opt: 'fee_payer_opt
+          { second_starts_empty : 'bool
+          ; second_ends_empty : 'bool
+          ; token_id : 'token_id
+          ; other_fee_payer_opt : 'fee_payer_opt
                 (* It would be more optimal if it was
-   - one: Body-minus-update
-   - two: Body-minus-update
-   - updates: { one: Update.t; two: Update.t }
+                   - one: Body-minus-update
+                   - two: Body-minus-update
+                   - updates: { one: Update.t; two: Update.t }
 
-   since both statements contain both updates.
-*)
-          ; one: 'one
-          ; two: 'two }
+                   since both statements contain both updates.
+                *)
+          ; one : 'one
+          ; two : 'two
+          }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
     end]
@@ -782,9 +774,9 @@ module Payload = struct
 
       let digested (r : t) : Digested.Checked.t =
         let b (x : _ Party.Predicated.Poly.t) =
-          {x with body= Party.Body.Checked.digest x.body}
+          { x with body = Party.Body.Checked.digest x.body }
         in
-        {r with one= b r.one; two= b r.two}
+        { r with one = b r.one; two = b r.two }
     end
 
     let typ : (Checked.t, t) Typ.t =
@@ -796,10 +788,11 @@ module Payload = struct
           |> Typ.transport
                ~there:
                  (Flagged_option.of_option
-                    ~default:Other_fee_payer.Payload.dummy)
+                    ~default:Other_fee_payer.Payload.dummy )
                ~back:Flagged_option.to_option
         ; Party.Predicated.Signed.typ
-        ; Party.Predicated.Signed.typ ]
+        ; Party.Predicated.Signed.typ
+        ]
   end
 
   module One_proved = struct
@@ -932,19 +925,21 @@ module Payload = struct
              ; token_id
              ; other_fee_payer_opt
              ; one
-             ; two } :
-              _ Inner.t) ~f1 ~f2 =
-          let p f {Party.Predicated.Poly.body; predicate} =
-            List.reduce_exn ~f:append [b body; f predicate]
+             ; two
+             } :
+              _ Inner.t ) ~f1 ~f2 =
+          let p f { Party.Predicated.Poly.body; predicate } =
+            List.reduce_exn ~f:append [ b body; f predicate ]
           in
           List.reduce_exn ~f:append
-            [ bitstring [second_starts_empty; second_ends_empty]
+            [ bitstring [ second_starts_empty; second_ends_empty ]
             ; !(Token_id.Checked.to_input token_id)
             ; Snapp_basic.Flagged_option.(
                 to_input' ~f:Other_fee_payer.Payload.Checked.to_input
                   other_fee_payer_opt)
             ; p f1 one
-            ; p f2 two ]
+            ; p f2 two
+            ]
         in
         let nonce x = !(Account_nonce.Checked.to_input x) in
         match t with
@@ -969,20 +964,22 @@ module Payload = struct
            ; token_id
            ; other_fee_payer_opt
            ; one
-           ; two } :
-            _ Inner.t) ~f1 ~f2 =
-        let p f {Party.Predicated.Poly.body; predicate} =
-          List.reduce_exn ~f:append [b body; f predicate]
+           ; two
+           } :
+            _ Inner.t ) ~f1 ~f2 =
+        let p f { Party.Predicated.Poly.body; predicate } =
+          List.reduce_exn ~f:append [ b body; f predicate ]
         in
         List.reduce_exn ~f:append
-          [ bitstring [second_starts_empty; second_ends_empty]
+          [ bitstring [ second_starts_empty; second_ends_empty ]
           ; Token_id.to_input token_id
           ; Snapp_basic.Flagged_option.(
               to_input' ~f:Other_fee_payer.Payload.to_input
                 (of_option ~default:Other_fee_payer.Payload.dummy
-                   other_fee_payer_opt))
+                   other_fee_payer_opt ))
           ; p f1 one
-          ; p f2 two ]
+          ; p f2 two
+          ]
       in
       match t with
       | Zero_proved r ->
@@ -999,19 +996,19 @@ module Payload = struct
 
   let digested (t : t) : Digested.t =
     let b (x : _ Party.Predicated.Poly.t) =
-      {x with body= Party.Body.digest x.body}
+      { x with body = Party.Body.digest x.body }
     in
     let s x =
       let t = b x in
-      {t with predicate= Snapp_predicate.digest t.predicate}
+      { t with predicate = Snapp_predicate.digest t.predicate }
     in
     match t with
     | Zero_proved r ->
-        Zero_proved {r with one= b r.one; two= b r.two}
+        Zero_proved { r with one = b r.one; two = b r.two }
     | One_proved r ->
-        One_proved {r with one= s r.one; two= b r.two}
+        One_proved { r with one = s r.one; two = b r.two }
     | Two_proved r ->
-        Two_proved {r with one= s r.one; two= s r.two}
+        Two_proved { r with one = s r.one; two = s r.two }
 end
 
 (* In order to be compatible with the transaction pool (where transactions are stored in
@@ -1039,7 +1036,7 @@ let nonce (t : t) =
     match p.self_predicate.nonce with
     | Ignore ->
         None
-    | Check {lower; upper} ->
+    | Check { lower; upper } ->
         if Account_nonce.equal lower upper then Some lower else None
   in
   let p x = T (x, pred) in
@@ -1053,15 +1050,15 @@ let nonce (t : t) =
   in
   match t with
   | Proved_proved r ->
-      nonce r [p r.one; p r.two]
+      nonce r [ p r.one; p r.two ]
   | Proved_signed r ->
-      nonce r [p r.one; n r.two]
+      nonce r [ p r.one; n r.two ]
   | Proved_empty r ->
-      nonce r [p r.one]
+      nonce r [ p r.one ]
   | Signed_signed r ->
-      nonce r [n r.one; n r.two]
+      nonce r [ n r.one; n r.two ]
   | Signed_empty r ->
-      nonce r [n r.one]
+      nonce r [ n r.one ]
 
 let nonce_invariant t =
   match nonce t with
@@ -1074,12 +1071,7 @@ let nonce_invariant t =
 (* TODO: Check that predicates are consistent. *)
 (* TODO: Check the predicates that can be checked (e.g., on fee_payment) *)
 let check (t : t) : unit Or_error.t =
-  let opt lab = function
-    | None ->
-        Or_error.error_string lab
-    | Some x ->
-        Ok x
-  in
+  let opt lab = function None -> Or_error.error_string lab | Some x -> Ok x in
   let open Or_error.Let_syntax in
   let open Party in
   let%bind _ = Or_error.try_with (fun () -> fee_exn t) in
@@ -1112,13 +1104,12 @@ let check (t : t) : unit Or_error.t =
         return ()
   in
   let check_both
-      ({token_id; fee_payment; one; two} :
+      ({ token_id; fee_payment; one; two } :
         ( ((_ Body.Poly.t, _) Predicated.Poly.t, _) Authorized.Poly.t
         , ((_ Body.Poly.t, _) Predicated.Poly.t, _) Authorized.Poly.t )
-        Inner.t) =
+        Inner.t ) =
     let%bind excess =
-      opt "overflow"
-        (Amount.Signed.add one.data.body.delta two.data.body.delta)
+      opt "overflow" (Amount.Signed.add one.data.body.delta two.data.body.delta)
     in
     let%bind () =
       assert_
@@ -1128,11 +1119,10 @@ let check (t : t) : unit Or_error.t =
     fee_checks ~excess ~token_id ~fee_payment
   in
   let check_opt
-      ({token_id; fee_payment; one; two} :
+      ({ token_id; fee_payment; one; two } :
         ( ((_ Body.Poly.t, _) Predicated.Poly.t, _) Authorized.Poly.t
-        , ((_ Body.Poly.t, _) Predicated.Poly.t, _) Authorized.Poly.t option
-        )
-        Inner.t) =
+        , ((_ Body.Poly.t, _) Predicated.Poly.t, _) Authorized.Poly.t option )
+        Inner.t ) =
     let%bind excess =
       opt "overflow"
         ( match two with
@@ -1153,7 +1143,7 @@ let check (t : t) : unit Or_error.t =
       assert_
         (List.for_all (accounts_accessed t) ~f:(fun aid ->
              Account_id.public_key aid |> Public_key.decompress
-             |> Option.is_some ))
+             |> Option.is_some ) )
         "public keys for all accounts involved in the transaction must be valid"
     in
     fee_checks ~excess ~token_id ~fee_payment
@@ -1174,84 +1164,94 @@ let check (t : t) : unit Or_error.t =
 let to_payload (t : t) : Payload.t =
   let opt x =
     Option.value_map x ~default:Party.Predicated.Signed.dummy
-      ~f:(fun {Party.Authorized.Poly.data; authorization= _} ->
-        {data with predicate= Party.Predicated.Signed.dummy.predicate} )
+      ~f:(fun { Party.Authorized.Poly.data; authorization = _ } ->
+        { data with predicate = Party.Predicated.Signed.dummy.predicate } )
   in
   match t with
   | Proved_empty
-      {one= {data= one; authorization= _}; two; token_id; fee_payment} ->
+      { one = { data = one; authorization = _ }; two; token_id; fee_payment } ->
       One_proved
-        { second_starts_empty= true
-        ; second_ends_empty= Option.is_none two
+        { second_starts_empty = true
+        ; second_ends_empty = Option.is_none two
         ; one
-        ; two= opt two
+        ; two = opt two
         ; token_id
-        ; other_fee_payer_opt=
-            Option.map fee_payment ~f:(fun {payload; signature= _} -> payload)
+        ; other_fee_payer_opt =
+            Option.map fee_payment ~f:(fun { payload; signature = _ } ->
+                payload )
         }
   | Signed_empty
-      {one= {data= one; authorization= _}; two; token_id; fee_payment} ->
+      { one = { data = one; authorization = _ }; two; token_id; fee_payment } ->
       Zero_proved
-        { second_starts_empty= true
-        ; second_ends_empty= Option.is_none two
+        { second_starts_empty = true
+        ; second_ends_empty = Option.is_none two
         ; one
-        ; two= opt two
+        ; two = opt two
         ; token_id
-        ; other_fee_payer_opt=
-            Option.map fee_payment ~f:(fun {payload; signature= _} -> payload)
+        ; other_fee_payer_opt =
+            Option.map fee_payment ~f:(fun { payload; signature = _ } ->
+                payload )
         }
   | Signed_signed
-      { one= {data= one; authorization= _}
-      ; two= {data= two; authorization= _}
+      { one = { data = one; authorization = _ }
+      ; two = { data = two; authorization = _ }
       ; token_id
-      ; fee_payment } ->
+      ; fee_payment
+      } ->
       Zero_proved
-        { second_starts_empty= false
-        ; second_ends_empty= false
+        { second_starts_empty = false
+        ; second_ends_empty = false
         ; one
         ; two
         ; token_id
-        ; other_fee_payer_opt=
-            Option.map fee_payment ~f:(fun {payload; signature= _} -> payload)
+        ; other_fee_payer_opt =
+            Option.map fee_payment ~f:(fun { payload; signature = _ } ->
+                payload )
         }
   | Proved_signed
-      { one= {data= one; authorization= _}
-      ; two= {data= two; authorization= _}
+      { one = { data = one; authorization = _ }
+      ; two = { data = two; authorization = _ }
       ; token_id
-      ; fee_payment } ->
+      ; fee_payment
+      } ->
       One_proved
-        { second_starts_empty= false
-        ; second_ends_empty= false
+        { second_starts_empty = false
+        ; second_ends_empty = false
         ; one
         ; two
         ; token_id
-        ; other_fee_payer_opt=
-            Option.map fee_payment ~f:(fun {payload; signature= _} -> payload)
+        ; other_fee_payer_opt =
+            Option.map fee_payment ~f:(fun { payload; signature = _ } ->
+                payload )
         }
   | Proved_proved
-      { one= {data= one; authorization= _}
-      ; two= {data= two; authorization= _}
+      { one = { data = one; authorization = _ }
+      ; two = { data = two; authorization = _ }
       ; token_id
-      ; fee_payment } ->
+      ; fee_payment
+      } ->
       Two_proved
-        { second_starts_empty= false
-        ; second_ends_empty= false
+        { second_starts_empty = false
+        ; second_ends_empty = false
         ; one
         ; two
         ; token_id
-        ; other_fee_payer_opt=
-            Option.map fee_payment ~f:(fun {payload; signature= _} -> payload)
+        ; other_fee_payer_opt =
+            Option.map fee_payment ~f:(fun { payload; signature = _ } ->
+                payload )
         }
 
-let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t
-    =
+let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t =
   let r : _ Inner.t =
-    { one= {Party.Authorized.Poly.data= data1; authorization= Signature.dummy}
-    ; two= {Party.Authorized.Poly.data= data2; authorization= Signature.dummy}
+    { one =
+        { Party.Authorized.Poly.data = data1; authorization = Signature.dummy }
+    ; two =
+        { Party.Authorized.Poly.data = data2; authorization = Signature.dummy }
     ; token_id
-    ; fee_payment=
+    ; fee_payment =
         Option.map fee_payment ~f:(fun (_priv_key, payload) ->
-            {Other_fee_payer.payload; signature= Signature.dummy} ) }
+            { Other_fee_payer.payload; signature = Signature.dummy } )
+    }
   in
   let sign =
     let msg =
@@ -1263,22 +1263,25 @@ let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t
   in
   Signed_signed
     { r with
-      one= {r.one with authorization= sign signer1}
-    ; two= {r.two with authorization= sign signer2}
-    ; fee_payment=
+      one = { r.one with authorization = sign signer1 }
+    ; two = { r.two with authorization = sign signer2 }
+    ; fee_payment =
         Option.map2 fee_payment r.fee_payment ~f:(fun (sk, _) x ->
-            {x with signature= sign sk} ) }
+            { x with signature = sign sk } )
+    }
 
 let signed_empty ?fee_payment ?data2 ~token_id (signer1, data1) : t =
   let r : _ Inner.t =
-    { one= {Party.Authorized.Poly.data= data1; authorization= Signature.dummy}
-    ; two=
+    { one =
+        { Party.Authorized.Poly.data = data1; authorization = Signature.dummy }
+    ; two =
         Option.map data2 ~f:(fun data ->
-            {Party.Authorized.Poly.data; authorization= ()} )
+            { Party.Authorized.Poly.data; authorization = () } )
     ; token_id
-    ; fee_payment=
+    ; fee_payment =
         Option.map fee_payment ~f:(fun (_priv_key, payload) ->
-            {Other_fee_payer.payload; signature= Signature.dummy} ) }
+            { Other_fee_payer.payload; signature = Signature.dummy } )
+    }
   in
   let sign =
     let msg =
@@ -1290,10 +1293,11 @@ let signed_empty ?fee_payment ?data2 ~token_id (signer1, data1) : t =
   in
   Signed_empty
     { r with
-      one= {r.one with authorization= sign signer1}
-    ; fee_payment=
+      one = { r.one with authorization = sign signer1 }
+    ; fee_payment =
         Option.map2 fee_payment r.fee_payment ~f:(fun (sk, _) x ->
-            {x with signature= sign sk} ) }
+            { x with signature = sign sk } )
+    }
 
 module Base58_check = Codable.Make_base58_check (Stable.Latest)
 

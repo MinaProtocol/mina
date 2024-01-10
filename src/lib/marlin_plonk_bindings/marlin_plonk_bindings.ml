@@ -41,3 +41,7 @@ module Pasta_fq_proof = Marlin_plonk_bindings_pasta_fq_proof
 (* Oracles *)
 module Pasta_fp_oracles = Marlin_plonk_bindings_pasta_fp_oracles
 module Pasta_fq_oracles = Marlin_plonk_bindings_pasta_fq_oracles
+
+(* Poseidon *)
+module Pasta_fp_poseidon = Marlin_plonk_bindings_pasta_fp_poseidon
+module Pasta_fq_poseidon = Marlin_plonk_bindings_pasta_fq_poseidon

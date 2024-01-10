@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Import
 open Pickles_types
 open Types
@@ -14,17 +14,18 @@ module Pairing_based = struct
   module Stable = struct
     module V1 = struct
       type ('s, 'sgs, 'bpcs) t =
-        {app_state: 's; sg: 'sgs; old_bulletproof_challenges: 'bpcs}
+        { app_state : 's; sg : 'sgs; old_bulletproof_challenges : 'bpcs }
       [@@deriving sexp, yojson, sexp, compare, hash, equal]
     end
   end]
 
-  let prepare ~dlog_plonk_index {app_state; sg; old_bulletproof_challenges} =
+  let prepare ~dlog_plonk_index { app_state; sg; old_bulletproof_challenges } =
     { Pairing_based.Proof_state.Me_only.app_state
     ; sg
     ; dlog_plonk_index
-    ; old_bulletproof_challenges=
-        Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges }
+    ; old_bulletproof_challenges =
+        Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges
+    }
 end
 
 module Dlog_based = struct
@@ -73,8 +74,9 @@ module Dlog_based = struct
       Dlog_based.Proof_state.Me_only.t
   end
 
-  let prepare ({sg; old_bulletproof_challenges} : _ t) =
+  let prepare ({ sg; old_bulletproof_challenges } : _ t) =
     { Dlog_based.Proof_state.Me_only.sg
-    ; old_bulletproof_challenges=
-        Vector.map ~f:Ipa.Wrap.compute_challenges old_bulletproof_challenges }
+    ; old_bulletproof_challenges =
+        Vector.map ~f:Ipa.Wrap.compute_challenges old_bulletproof_challenges
+    }
 end

@@ -1,22 +1,23 @@
 open Core_kernel
 
 type ('field, 'bool) t =
-  {field_elements: 'field array; bitstrings: 'bool list array}
+  { field_elements : 'field array; bitstrings : 'bool list array }
 [@@deriving sexp, compare]
 
 let append t1 t2 =
-  { field_elements= Array.append t1.field_elements t2.field_elements
-  ; bitstrings= Array.append t1.bitstrings t2.bitstrings }
+  { field_elements = Array.append t1.field_elements t2.field_elements
+  ; bitstrings = Array.append t1.bitstrings t2.bitstrings
+  }
 
-let field_elements x = {field_elements= x; bitstrings= [||]}
+let field_elements x = { field_elements = x; bitstrings = [||] }
 
-let field x = {field_elements= [|x|]; bitstrings= [||]}
+let field x = { field_elements = [| x |]; bitstrings = [||] }
 
-let bitstring x = {field_elements= [||]; bitstrings= [|x|]}
+let bitstring x = { field_elements = [||]; bitstrings = [| x |] }
 
-let bitstrings x = {field_elements= [||]; bitstrings= x}
+let bitstrings x = { field_elements = [||]; bitstrings = x }
 
-let pack_bits ~max_size ~pack {field_elements= _; bitstrings} =
+let pack_bits ~max_size ~pack { field_elements = _; bitstrings } =
   let rec pack_full_fields rev_fields bits length =
     if length >= max_size then
       let field_bits, bits = List.split_n bits max_size in
@@ -33,12 +34,12 @@ let pack_bits ~max_size ~pack {field_elements= _; bitstrings} =
   if remaining_length = 0 then packed_field_elements
   else pack remaining_bits :: packed_field_elements
 
-let pack_to_fields ~size_in_bits ~pack {field_elements; bitstrings} =
+let pack_to_fields ~size_in_bits ~pack { field_elements; bitstrings } =
   let max_size = size_in_bits - 1 in
-  let packed_bits = pack_bits ~max_size ~pack {field_elements; bitstrings} in
+  let packed_bits = pack_bits ~max_size ~pack { field_elements; bitstrings } in
   Array.append field_elements (Array.of_list_rev packed_bits)
 
-let to_bits ~unpack {field_elements; bitstrings} =
+let to_bits ~unpack { field_elements; bitstrings } =
   let field_bits = Array.map ~f:unpack field_elements in
   List.concat @@ Array.to_list @@ Array.append field_bits bitstrings
 
@@ -53,17 +54,16 @@ module Coding = struct
           [ of_int_exn @@ ((x lsr 24) land 0xff)
           ; of_int_exn @@ ((x lsr 16) land 0xff)
           ; of_int_exn @@ ((x lsr 8) land 0xff)
-          ; of_int_exn @@ (x land 0xff) ]
+          ; of_int_exn @@ (x land 0xff)
+          ]
     in
     let len1 = len_to_string @@ Array.length t.field_elements in
     let fields =
       (* We only support 32byte fields *)
       let () =
-        match t.field_elements with
-        | [|x; _|] ->
-            assert (String.length (string_of_field x) = 32)
-        | _ ->
-            ()
+        if Array.length t.field_elements > 0 then
+          assert (String.length (string_of_field t.field_elements.(0)) = 32)
+        else ()
       in
       Array.map t.field_elements ~f:string_of_field |> String.concat_array
     in
@@ -149,19 +149,15 @@ module Coding = struct
     let many p =
       (fun cs ->
         let rec go xs acc =
-          match p xs with
-          | Ok (a, xs) ->
-              go xs (a :: acc)
-          | Error _ ->
-              (acc, xs)
+          match p xs with Ok (a, xs) -> go xs (a :: acc) | Error _ -> (acc, xs)
         in
         M.return @@ go cs [] )
       |> map ~f:List.rev
 
     let%test_unit "many" =
-      [%test_eq: (char list, [`Expected_eof]) Result.t]
-        (run (many u8) ['a'; 'b'; 'c'])
-        (Result.return ['a'; 'b'; 'c'])
+      [%test_eq: (char list, [ `Expected_eof ]) Result.t]
+        (run (many u8) [ 'a'; 'b'; 'c' ])
+        (Result.return [ 'a'; 'b'; 'c' ])
 
     (** p exactly n times *)
     let exactly n p =
@@ -179,9 +175,9 @@ module Coding = struct
 
     let%test_unit "exactly" =
       [%test_eq:
-        (char list * char list, [`Expected_eof | `Unexpected_eof]) Result.t]
-        ((exactly 3 u8) ['a'; 'b'; 'c'; 'd'])
-        (Result.return (['a'; 'b'; 'c'], ['d']))
+        (char list * char list, [ `Expected_eof | `Unexpected_eof ]) Result.t]
+        ((exactly 3 u8) [ 'a'; 'b'; 'c'; 'd' ])
+        (Result.return ([ 'a'; 'b'; 'c' ], [ 'd' ]))
 
     let return_res r cs = r |> Result.map ~f:(fun x -> (x, cs))
   end
@@ -205,7 +201,8 @@ module Coding = struct
     ; (b land (0x1 lsl 3)) lsr 3
     ; (b land (0x1 lsl 2)) lsr 2
     ; (b land (0x1 lsl 1)) lsr 1
-    ; b land 0x1 ]
+    ; b land 0x1
+    ]
     |> List.map ~f
 
   (** Deserialize bytes into a random oracle input with 32byte fields according to the RFC0038 specification *)
@@ -224,7 +221,7 @@ module Coding = struct
       let%map bytes = Parser.(many u8) in
       let bits = List.concat_map ~f:(bits_of_byte ~of_bool) bytes in
       let bitstring = List.take bits len2 in
-      {field_elements= Array.of_list fields; bitstrings= [|bitstring|]}
+      { field_elements = Array.of_list fields; bitstrings = [| bitstring |] }
     in
     Parser.run parser s
 
@@ -252,8 +249,50 @@ module Coding = struct
     |> Result.return
 end
 
+(** Coding2 is an alternate binary coding setup where we pass two arrays of
+ *  field elements instead of a single structure to simplify manipulation
+ *  outside of the Mina construction API
+ *
+ * This is described as the second mechanism for coding Random_oracle_input in
+ * RFC0038
+ *
+*)
+module Coding2 = struct
+  module Rendered = struct
+    (* as bytes, you must hex this later *)
+    type 'field t_ = { prefix : 'field array; suffix : 'field array }
+    [@@deriving yojson]
+
+    type t = string t_ [@@deriving yojson]
+
+    let map ~f { prefix; suffix } =
+      { prefix = Array.map ~f prefix; suffix = Array.map ~f suffix }
+  end
+
+  let string_of_field : bool list -> string = Coding.string_of_field
+
+  let field_of_string = Coding.field_of_string
+
+  let serialize' t ~pack =
+    { Rendered.prefix = t.field_elements
+    ; suffix = pack_bits ~max_size:254 ~pack t |> Array.of_list_rev
+    }
+
+  let serialize t ~string_of_field ~pack =
+    let () =
+      if Array.length t.field_elements > 0 then
+        assert (String.length (string_of_field t.field_elements.(0)) = 32)
+      else ()
+    in
+    serialize' t ~pack |> Rendered.map ~f:string_of_field
+end
+
 let%test_module "random_oracle input" =
   ( module struct
+    let gen_field ~size_in_bits =
+      let open Quickcheck.Generator in
+      list_with_length size_in_bits bool
+
     let gen_input ?size_in_bits () =
       let open Quickcheck.Generator in
       let open Let_syntax in
@@ -263,12 +302,31 @@ let%test_module "random_oracle input" =
       in
       let%bind field_elements =
         (* Treat a field as a list of bools of length [size_in_bits]. *)
-        list (list_with_length size_in_bits bool)
+        list (gen_field ~size_in_bits)
       in
       let%map bitstrings = list (list bool) in
       ( size_in_bits
-      , { field_elements= Array.of_list field_elements
-        ; bitstrings= Array.of_list bitstrings } )
+      , { field_elements = Array.of_list field_elements
+        ; bitstrings = Array.of_list bitstrings
+        } )
+
+    let%test_unit "coding2 equiv to hash directly" =
+      let size_in_bits = 255 in
+      let field = gen_field ~size_in_bits in
+      Quickcheck.test ~trials:300
+        Quickcheck.Generator.(
+          tuple2 (gen_input ~size_in_bits ()) (tuple2 field field))
+        ~f:(fun ((_, input), (x, y)) ->
+          let middle = [| x; y |] in
+          let expected =
+            append input (field_elements middle)
+            |> pack_to_fields ~size_in_bits ~pack:Fn.id
+          in
+          let { Coding2.Rendered.prefix; suffix } =
+            Coding2.serialize' input ~pack:Fn.id
+          in
+          let actual = Array.(concat [ prefix; middle; suffix ]) in
+          [%test_eq: bool list array] expected actual )
 
     let%test_unit "field/string partial isomorphism bitstrings" =
       Quickcheck.test ~trials:300
@@ -298,9 +356,10 @@ let%test_module "random_oracle input" =
           in
           let normalized t =
             { t with
-              bitstrings=
+              bitstrings =
                 ( t.bitstrings |> Array.to_list |> List.concat
-                |> fun xs -> [|xs|] ) }
+                |> fun xs -> [| xs |] )
+            }
           in
           assert (
             Array.for_all input.field_elements ~f:(fun el ->
@@ -310,7 +369,7 @@ let%test_module "random_oracle input" =
                 Array.for_all x.field_elements ~f:(fun el ->
                     List.length el = size_in_bits ) ) ) ;
           [%test_eq:
-            ((bool list, bool) t, [`Expected_eof | `Unexpected_eof]) Result.t]
+            ((bool list, bool) t, [ `Expected_eof | `Unexpected_eof ]) Result.t]
             (normalized input |> Result.return)
             (deserialized |> Result.map ~f:normalized) )
 
@@ -324,7 +383,7 @@ let%test_module "random_oracle input" =
             Array.fold ~init:bits input.field_elements ~f:(fun bits field ->
                 (* The next chunk of [size_in_bits] bits is for the field
                          element.
-                  *)
+                *)
                 let field_bits, rest = List.split_n bits size_in_bits in
                 assert (bools_equal field_bits field) ;
                 rest )
@@ -354,7 +413,7 @@ let%test_module "random_oracle input" =
               ~f:(fun fields input_field ->
                 (* The next field element should be the literal field element
                                    passed in.
-                    *)
+                *)
                 match fields with
                 | [] ->
                     failwith "Too few field elements"
@@ -370,12 +429,12 @@ let%test_module "random_oracle input" =
                        fewer bits than the maximum field element to ensure that it
                        doesn't overflow, so we expect [size_in_bits - 1] bits for
                        maximum safe density.
-                  *)
+                *)
                 assert (List.length field_bits = size_in_bits - 1)
               else (
                 (* This field will be comprised of the remaining bits, up to a
                        maximum of [size_in_bits - 1]. It should not be empty.
-                  *)
+                *)
                 assert (not (List.is_empty field_bits)) ;
                 assert (List.length field_bits < size_in_bits) ) ) ;
           let rec go input_bitstrings packed_fields =
@@ -409,6 +468,6 @@ let%test_module "random_oracle input" =
           in
           (* Check that the bits match between the input bitstring and the
                  remaining fields.
-            *)
+          *)
           go (Array.to_list input.bitstrings) bitstring_fields )
   end )

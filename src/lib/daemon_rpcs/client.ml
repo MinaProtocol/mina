@@ -19,20 +19,20 @@ let dispatch rpc query (host_and_port : Host_and_port.t) =
                 (Rpc.Connection.Heartbeat_config.create
                    ~timeout:
                      (Time_ns.Span.of_sec
-                        Mina_compile_config.rpc_heartbeat_timeout_sec)
+                        Mina_compile_config.rpc_heartbeat_timeout_sec )
                    ~send_every:
                      (Time_ns.Span.of_sec
-                        Mina_compile_config.rpc_heartbeat_send_every_sec)
-                   ())
+                        Mina_compile_config.rpc_heartbeat_send_every_sec )
+                   () )
               r w
               ~connection_state:(fun _ -> ())
           with
           | Error exn ->
               return
                 (Or_error.errorf
-                   !"Error connecting to the daemon on \
-                     %{sexp:Host_and_port.t} using the RPC call, %s,: %s"
-                   host_and_port (Rpc.Rpc.name rpc) (Exn.to_string exn))
+                   !"Error connecting to the daemon on %{sexp:Host_and_port.t} \
+                     using the RPC call, %s,: %s"
+                   host_and_port (Rpc.Rpc.name rpc) (Exn.to_string exn) )
           | Ok conn ->
               Rpc.Rpc.dispatch rpc conn query ) )
 

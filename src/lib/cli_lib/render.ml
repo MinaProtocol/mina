@@ -46,14 +46,15 @@ module Public_key_with_details = struct
     let to_yojson (public_key, balance, nonce) =
       `Assoc
         [ ( public_key
-          , `Assoc [("balance", `Int balance); ("nonce", `Int nonce)] ) ]
+          , `Assoc [ ("balance", `Int balance); ("nonce", `Int nonce) ] )
+        ]
   end
 
   type t = Pretty_account.t list [@@deriving to_yojson]
 
-  type format = {accounts: t} [@@deriving to_yojson, fields]
+  type format = { accounts : t } [@@deriving to_yojson, fields]
 
-  let to_yojson t = format_to_yojson {accounts= t}
+  let to_yojson t = format_to_yojson { accounts = t }
 
   let to_text account =
     List.map account ~f:(fun (public_key, balance, nonce) ->

@@ -102,8 +102,7 @@ module P2 = struct
   end
 
   module T (M : T2) :
-    S with type ('a1, 'a2) p = ('a1, 'a2) M.t and type witness = W(M).t =
-  struct
+    S with type ('a1, 'a2) p = ('a1, 'a2) M.t and type witness = W(M).t = struct
     type ('a1, 'a2) p = ('a1, 'a2) M.t
 
     type witness = W(M).t
@@ -151,8 +150,8 @@ module P3 = struct
 
   module T (M : T3) :
     S
-    with type ('a1, 'a2, 'a3) p = ('a1, 'a2, 'a3) M.t
-     and type witness = W(M).t = struct
+      with type ('a1, 'a2, 'a3) p = ('a1, 'a2, 'a3) M.t
+       and type witness = W(M).t = struct
     type ('a1, 'a2, 'a3) p = ('a1, 'a2, 'a3) M.t
 
     type witness = W(M).t
@@ -201,8 +200,8 @@ module P4 = struct
 
   module T (M : T4) :
     S
-    with type ('a1, 'a2, 'a3, 'a4) p = ('a1, 'a2, 'a3, 'a4) M.t
-     and type witness = W(M).t = struct
+      with type ('a1, 'a2, 'a3, 'a4) p = ('a1, 'a2, 'a3, 'a4) M.t
+       and type witness = W(M).t = struct
     type ('a1, 'a2, 'a3, 'a4) p = ('a1, 'a2, 'a3, 'a4) M.t
 
     type witness = W(M).t
@@ -254,8 +253,8 @@ module P5 = struct
 
   module T (M : T5) :
     S
-    with type ('a1, 'a2, 'a3, 'a4, 'a5) p = ('a1, 'a2, 'a3, 'a4, 'a5) M.t
-     and type witness = W(M).t = struct
+      with type ('a1, 'a2, 'a3, 'a4, 'a5) p = ('a1, 'a2, 'a3, 'a4, 'a5) M.t
+       and type witness = W(M).t = struct
     type ('a1, 'a2, 'a3, 'a4, 'a5) p = ('a1, 'a2, 'a3, 'a4, 'a5) M.t
 
     type witness = W(M).t
@@ -306,7 +305,7 @@ let%test_module "Higher_kinded_poly" =
 
     module Poly_int_5 = P5.T (Int_5)
 
-    let ints = [1; 2; 3; 4; 5]
+    let ints = [ 1; 2; 3; 4; 5 ]
 
     let poly_ints_1 = List.map ~f:Poly_int_1.to_poly ints
 
@@ -337,7 +336,7 @@ let%test_module "Higher_kinded_poly" =
 
     module Poly_option = P1.T (Option)
 
-    let options = [Some 1; None; None; Some 4; Some 5]
+    let options = [ Some 1; None; None; Some 4; Some 5 ]
 
     let poly_options = List.map ~f:Poly_option.to_poly options
 
@@ -357,7 +356,7 @@ let%test_module "Higher_kinded_poly" =
 
     module Poly_ignore_2 = P2.T (Ignore_2)
 
-    let num_unit_tuples = [(1, ()); (2, ()); (3, ()); (4, ())]
+    let num_unit_tuples = [ (1, ()); (2, ()); (3, ()); (4, ()) ]
 
     let ignore_1s : (int, _, _) P2.t list =
       List.map ~f:Poly_ignore_1.to_poly num_unit_tuples

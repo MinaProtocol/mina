@@ -13,10 +13,10 @@ val privkey_read_path : string Command.Param.t
 val conf_dir : string option Command.Param.t
 
 module Types : sig
-  type 'a with_name = {name: string; value: 'a}
+  type 'a with_name = { name : string; value : 'a }
 
   type 'a with_name_and_displayed_default =
-    {name: string; value: 'a option; default: 'a}
+    { name : string; value : 'a option; default : 'a }
 end
 
 module Host_and_port : sig
@@ -49,13 +49,11 @@ end
 
 module Port : sig
   module Daemon : sig
-    val external_ :
-      int Types.with_name_and_displayed_default Command.Param.t
+    val external_ : int Types.with_name_and_displayed_default Command.Param.t
 
     val client : int Types.with_name_and_displayed_default Command.Param.t
 
-    val rest_server :
-      int Types.with_name_and_displayed_default Command.Param.t
+    val rest_server : int Types.with_name_and_displayed_default Command.Param.t
 
     val limited_graphql_server : int option Types.with_name Command.Param.t
   end
@@ -74,10 +72,11 @@ module Log : sig
 end
 
 type signed_command_common =
-  { sender: Signature_lib.Public_key.Compressed.t
-  ; fee: Currency.Fee.t
-  ; nonce: Mina_base.Account.Nonce.t option
-  ; memo: string option }
+  { sender : Signature_lib.Public_key.Compressed.t
+  ; fee : Currency.Fee.t
+  ; nonce : Mina_base.Account.Nonce.t option
+  ; memo : string option
+  }
 
 val signed_command_common : signed_command_common Command.Param.t
 

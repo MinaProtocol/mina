@@ -3,7 +3,26 @@
  (public_name parallel_scan)
  (inline_tests)
  (library_flags -linkall)
- (libraries async digestif mina_metrics core lens non_empty_list pipe_lib sgn state_or_error)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   base
+   core_kernel
+   sexplib0
+   async
+   digestif
+   core
+   lens
+   async_kernel
+   bin_prot.shape
+   base.caml
+   async_unix
+   ;; local libraries
+   mina_metrics
+   non_empty_list
+   pipe_lib
+   state_or_error
+ )
  (preprocess
   (pps ppx_jane ppx_coda ppx_version ppx_compare lens.ppx_deriving))
  (instrumentation (backend bisect_ppx))

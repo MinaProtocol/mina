@@ -3,7 +3,18 @@
  (public_name time_simulator)
  (library_flags -linkall)
  (inline_tests)
- (libraries mina_intf)
+ (libraries
+   ;;opam libraries
+   async_unix
+   ppx_inline_test.config
+   async_kernel
+   core_kernel
+   core_kernel.pairing_heap
+   async
+   core
+   ;;local libraries
+   mina_intf
+ )
  (preprocess
   (pps ppx_version ppx_jane ppx_compare))
  (instrumentation (backend bisect_ppx))

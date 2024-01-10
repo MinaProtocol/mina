@@ -1,7 +1,4 @@
 open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
 open Core
 open Async
 open Pickles_types

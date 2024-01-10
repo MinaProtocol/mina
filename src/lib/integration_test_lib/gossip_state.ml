@@ -1,7 +1,7 @@
 open Core_kernel
 
 module By_direction = struct
-  type 'a t = {sent: 'a; received: 'a} [@@deriving to_yojson, fields]
+  type 'a t = { sent : 'a; received : 'a } [@@deriving to_yojson, fields]
 end
 
 module type Set = sig
@@ -53,20 +53,22 @@ end
 open Event_type.Gossip
 
 type t =
-  { node_id: string
-  ; blocks: Block.r Set.t By_direction.t
-  ; transactions: Transactions.r Set.t By_direction.t
-  ; snark_work: Snark_work.r Set.t By_direction.t }
+  { node_id : string
+  ; blocks : Block.r Set.t By_direction.t
+  ; transactions : Transactions.r Set.t By_direction.t
+  ; snark_work : Snark_work.r Set.t By_direction.t
+  }
 [@@deriving to_yojson, fields]
 
 let create node_id : t =
   let f create =
-    {By_direction.sent= create (); By_direction.received= create ()}
+    { By_direction.sent = create (); By_direction.received = create () }
   in
   { node_id
-  ; blocks= f Set.create
-  ; transactions= f Set.create
-  ; snark_work= f Set.create }
+  ; blocks = f Set.create
+  ; transactions = f Set.create
+  ; snark_work = f Set.create
+  }
 
 let add (gossip_state : t) (type a)
     (event_type : a Event_type.Gossip.With_direction.t Event_type.t)
@@ -120,7 +122,8 @@ let stats (type a)
             let event_type_gossip_state_by_direction = getter_func gos_state in
             Set.union
               [ event_type_gossip_state_by_direction.sent
-              ; event_type_gossip_state_by_direction.received ] )
+              ; event_type_gossip_state_by_direction.received
+              ] )
       in
       ( `Seen_by_all (Set.size (Set.inter event_type_gossip_states))
       , `Seen_by_some (Set.size (Set.union event_type_gossip_states)) )

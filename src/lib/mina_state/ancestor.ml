@@ -5,7 +5,7 @@ module Input = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = {descendant: State_hash.Stable.V1.t; generations: int}
+      type t = { descendant : State_hash.Stable.V1.t; generations : int }
       [@@deriving sexp]
 
       let to_latest = Fn.id
@@ -32,12 +32,12 @@ let verify =
         acc
     | h :: hs ->
         let acc =
-          Protocol_state.hash_abstract ~hash_body:Fn.id
-            {previous_state_hash= acc; body= h}
+          Protocol_state.hashes_abstract ~hash_body:Fn.id
+            { previous_state_hash = acc; body = h }
         in
-        go acc hs
+        go acc.state_hash hs
   in
-  fun ({descendant; generations} : Input.t) (ancestor : Output.t)
+  fun ({ descendant; generations } : Input.t) (ancestor : Output.t)
       (proof : Proof.t) ->
     List.length proof = generations
     && State_hash.equal descendant (go ancestor proof)
@@ -82,15 +82,15 @@ end = struct
           (acc, List.rev hs)
       | body :: bs ->
           let length = Mina_numbers.Length.succ length in
-          let full_state_hash =
-            Protocol_state.hash_abstract ~hash_body:Fn.id
-              {previous_state_hash= acc; body}
+          let full_state_hashes =
+            Protocol_state.hashes_abstract ~hash_body:Fn.id
+              { previous_state_hash = acc; body }
           in
           go
-            ((acc, full_state_hash, length, body) :: hs)
-            full_state_hash length bs
+            ((acc, full_state_hashes.state_hash, length, body) :: hs)
+            full_state_hashes.state_hash length bs
     in
-    fun (t : t) ({descendant; generations} : Input.t) (ancestor : Output.t)
+    fun (t : t) ({ descendant; generations } : Input.t) (ancestor : Output.t)
         ~ancestor_length (proof : Proof.t) ->
       let open Or_error.Let_syntax in
       let%bind () =
@@ -101,7 +101,7 @@ end = struct
       List.iter to_add ~f:(fun (prev, h, length, body) ->
           add t ~prev_hash:prev ~hash:h ~length ~body_hash:body )
 
-  let prove (t : t) {Input.descendant; generations} :
+  let prove (t : t) { Input.descendant; generations } :
       (Output.t * Proof.t) option =
     T.ancestor_of_depth t ~depth:generations ~source:descendant
 end
@@ -119,17 +119,18 @@ let%test_unit "completeness" =
         List.folding_map bs ~init:(ancestor, Length.zero)
           ~f:(fun (prev, length) body ->
             let length = Length.succ length in
-            let h =
-              Protocol_state.hash_abstract ~hash_body:Fn.id
-                {previous_state_hash= prev; body}
+            let hs =
+              Protocol_state.hashes_abstract ~hash_body:Fn.id
+                { previous_state_hash = prev; body }
             in
-            Prover.add prover ~prev_hash:prev ~hash:h ~length ~body_hash:body ;
-            ((h, length), h) )
+            Prover.add prover ~prev_hash:prev ~hash:hs.state_hash ~length
+              ~body_hash:body ;
+            ((hs.state_hash, length), hs.state_hash) )
       in
       List.iteri hashes ~f:(fun i h ->
-          let input = {Input.generations= i + 1; descendant= h} in
+          let input = { Input.generations = i + 1; descendant = h } in
           let a, proof =
-            Prover.prove prover {generations= i + 1; descendant= h}
+            Prover.prove prover { generations = i + 1; descendant = h }
             |> Option.value_exn ?here:None ?error:None ?message:None
           in
           [%test_eq: State_hash.t] a ancestor ;

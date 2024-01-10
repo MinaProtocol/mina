@@ -2,12 +2,17 @@
 set -o pipefail -x
 
 TEST_NAME="$1"
-MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_VERSION-devnet-$MINA_GIT_HASH"
-ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_VERSION-$MINA_GIT_HASH"
+MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-devnet"
+ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG"
+
+if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
+  echo "Skipping $TEST_NAME"
+  exit 0
+fi
 
 ./test_executive.exe cloud "$TEST_NAME" \
-  --coda-image "$MINA_IMAGE" \
+  --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
-  --coda-automation-location ./automation \
+  --mina-automation-location ./automation \
   | tee "$TEST_NAME.test.log" \
-  | coda-logproc -i inline -f '!(.level in ["Debug", "Spam"])'
+  | ./logproc.exe -i inline -f '!(.level in ["Debug", "Spam"])'

@@ -10,7 +10,7 @@
         server: Text
     },
     default = {
-        username = "o1bot",
+        username = "o1botdockerhub",
         `password-env` = "DOCKER_PASSWORD",
         server = ""
     }

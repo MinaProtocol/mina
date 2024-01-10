@@ -24,7 +24,7 @@ module Payload = struct
     end]
 
     let create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo : t =
-      {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}
+      { fee; fee_token; fee_payer_pk; nonce; valid_until; memo }
 
     let to_user_command_common (t : t) ~minimum_nonce ~inferred_nonce :
         (Signed_command_payload.Common.t, string) Result.t =
@@ -38,26 +38,28 @@ module Payload = struct
             (* NB: A lower, explicitly given nonce can be used to cancel
                transactions or to re-issue them with a higher fee.
             *)
-            if
-              Account_nonce.(minimum_nonce <= nonce && nonce <= inferred_nonce)
+            if Account_nonce.(minimum_nonce <= nonce && nonce <= inferred_nonce)
             then Ok nonce
             else
+              (* IMPORTANT! Do not change the content of this error without
+               * updating Rosetta's construction API to handle the changes *)
               Error
                 (sprintf
-                   !"Input nonce %s either different from inferred nonce %s \
-                     or below minimum_nonce %s"
+                   !"Input nonce %s either different from inferred nonce %s or \
+                     below minimum_nonce %s"
                    (Account_nonce.to_string nonce)
                    (Account_nonce.to_string inferred_nonce)
-                   (Account_nonce.to_string minimum_nonce))
+                   (Account_nonce.to_string minimum_nonce) )
       in
-      { Signed_command_payload.Common.Poly.fee= t.fee
-      ; fee_token= t.fee_token
-      ; fee_payer_pk= t.fee_payer_pk
+      { Signed_command_payload.Common.Poly.fee = t.fee
+      ; fee_token = t.fee_token
+      ; fee_payer_pk = t.fee_payer_pk
       ; nonce
-      ; valid_until= t.valid_until
-      ; memo= t.memo }
+      ; valid_until = t.valid_until
+      ; memo = t.memo
+      }
 
-    let fee_payer ({fee_token; fee_payer_pk; _} : t) =
+    let fee_payer ({ fee_token; fee_payer_pk; _ } : t) =
       Account_id.create fee_payer_pk fee_token
   end
 
@@ -74,11 +76,11 @@ module Payload = struct
     end
   end]
 
-  let create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo ~body : t
-      =
-    { common=
+  let create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo ~body : t =
+    { common =
         Common.create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo
-    ; body }
+    ; body
+    }
 
   let to_user_command_payload (t : t) ~minimum_nonce ~inferred_nonce :
       (Signed_command_payload.t, string) Result.t =
@@ -86,9 +88,9 @@ module Payload = struct
     let%map common =
       Common.to_user_command_common t.common ~minimum_nonce ~inferred_nonce
     in
-    {Signed_command_payload.Poly.common; body= t.body}
+    { Signed_command_payload.Poly.common; body = t.body }
 
-  let fee_payer ({common; _} : t) = Common.fee_payer common
+  let fee_payer ({ common; _ } : t) = Common.fee_payer common
 end
 
 module Sign_choice = struct
@@ -120,26 +122,24 @@ module Stable = struct
   end
 end]
 
-[%%define_locally
-Stable.Latest.(to_yojson)]
+[%%define_locally Stable.Latest.(to_yojson)]
 
-let fee_payer ({payload; _} : t) = Payload.fee_payer payload
+let fee_payer ({ payload; _ } : t) = Payload.fee_payer payload
 
-let create ?nonce ~fee ~fee_token ~fee_payer_pk ~valid_until ~memo ~body
-    ~signer ~sign_choice () : t =
+let create ?nonce ~fee ~fee_token ~fee_payer_pk ~valid_until ~memo ~body ~signer
+    ~sign_choice () : t =
   let valid_until = Option.value valid_until ~default:Global_slot.max_value in
   let payload =
-    Payload.create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo
-      ~body
+    Payload.create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo ~body
   in
-  {payload; signer; signature= sign_choice}
+  { payload; signer; signature = sign_choice }
 
 let sign ~signer ~(user_command_payload : Signed_command_payload.t) = function
   | Sign_choice.Signature signature ->
       Option.value_map
         ~default:(Deferred.return (Error "Invalid_signature"))
         (Signed_command.create_with_signature_checked signature signer
-           user_command_payload)
+           user_command_payload )
         ~f:Deferred.Result.return
   | Keypair signer_kp ->
       Deferred.Result.return
@@ -203,7 +203,7 @@ let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
       (Result.map_error ~f:(fun str ->
            Error.createf "Error creating user command: %s Error: %s"
              (Yojson.Safe.to_string (to_yojson client_input))
-             str ))
+             str ) )
   @@
   let open Deferred.Result.Let_syntax in
   let fee_payer = fee_payer client_input in

@@ -1,22 +1,10 @@
 (* receipt.ml *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 module B58_lib = Base58_check
-
-[%%ifdef
-consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 module Elt = struct
   type t =
@@ -39,15 +27,14 @@ module Chain_hash = struct
 
     module V1 = struct
       module T = struct
-        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+        type t = Field.t [@@deriving sexp, compare, hash, version { asserted }]
       end
 
       include T
 
       let to_latest = Fn.id
 
-      [%%define_from_scope
-      to_yojson, of_yojson]
+      [%%define_from_scope to_yojson, of_yojson]
 
       include Comparable.Make (T)
       include Hashable.Make_binable (T)
@@ -73,8 +60,7 @@ module Chain_hash = struct
     Input.(append x (field (t :> Field.t)))
     |> pack_input |> hash ~init |> of_hash
 
-  [%%if
-  defined consensus_mechanism]
+  [%%if defined consensus_mechanism]
 
   module Checked = struct
     module Elt = struct
@@ -133,8 +119,7 @@ module Chain_hash = struct
 
   let%test_unit "json" =
     Quickcheck.test ~trials:20 gen ~sexp_of:sexp_of_t ~f:(fun t ->
-        assert (Codable.For_tests.check_encoding (module Stable.V1) ~equal t)
-    )
+        assert (Codable.For_tests.check_encoding (module Stable.V1) ~equal t) )
 
   [%%endif]
 end

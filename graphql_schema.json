@@ -1,15 +1,9 @@
 {
   "data": {
     "__schema": {
-      "queryType": {
-        "name": "query"
-      },
-      "mutationType": {
-        "name": "mutation"
-      },
-      "subscriptionType": {
-        "name": "subscription"
-      },
+      "queryType": { "name": "query" },
+      "mutationType": { "name": "mutation" },
+      "subscriptionType": { "name": "subscription" },
       "types": [
         {
           "kind": "ENUM",
@@ -35,7 +29,8 @@
           "fields": [
             {
               "name": "newSyncUpdate",
-              "description": "Event that triggers when the network sync status changes",
+              "description":
+                "Event that triggers when the network sync status changes",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -51,7 +46,8 @@
             },
             {
               "name": "newBlock",
-              "description": "Event that triggers when a new block is created that either contains a transaction with the specified public key, or was produced by it. If no public key is provided, then the event will trigger for every new block received",
+              "description":
+                "Event that triggers when a new block is created that either contains a transaction with the specified public key, or was produced by it. If no public key is provided, then the event will trigger for every new block received",
               "args": [
                 {
                   "name": "publicKey",
@@ -78,7 +74,8 @@
             },
             {
               "name": "chainReorganization",
-              "description": "Event that triggers when the best tip changes in a way that is not a trivial extension of the existing one",
+              "description":
+                "Event that triggers when the best tip changes in a way that is not a trivial extension of the existing one",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -185,7 +182,8 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "NetworkPeer",
-          "description": "Network identifiers for another protocol participant",
+          "description":
+            "Network identifiers for another protocol participant",
           "fields": [
             {
               "name": "libp2p_port",
@@ -194,11 +192,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -243,11 +237,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "defaultValue": null
             },
@@ -291,7 +281,8 @@
           "fields": [
             {
               "name": "isolate",
-              "description": "If true, no connections will be allowed unless they are from a trusted peer",
+              "description":
+                "If true, no connections will be allowed unless they are from a trusted peer",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -307,7 +298,8 @@
             },
             {
               "name": "bannedPeers",
-              "description": "Peers we will never allow connections from (unless they are also trusted!)",
+              "description":
+                "Peers we will never allow connections from (unless they are also trusted!)",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -357,7 +349,8 @@
           "inputFields": [
             {
               "name": "isolate",
-              "description": "If true, no connections will be allowed unless they are from a trusted peer",
+              "description":
+                "If true, no connections will be allowed unless they are from a trusted peer",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -371,7 +364,8 @@
             },
             {
               "name": "bannedPeers",
-              "description": "Peers we will never allow connections from (unless they are also trusted!)",
+              "description":
+                "Peers we will never allow connections from (unless they are also trusted!)",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -494,7 +488,8 @@
           "fields": [
             {
               "name": "publicKey",
-              "description": "Public key you wish to start snark-working on; null to stop doing any snark work",
+              "description":
+                "Public key you wish to start snark-working on; null to stop doing any snark work",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -508,7 +503,8 @@
           "inputFields": [
             {
               "name": "publicKey",
-              "description": "Public key you wish to start snark-working on; null to stop doing any snark work",
+              "description":
+                "Public key you wish to start snark-working on; null to stop doing any snark work",
               "type": {
                 "kind": "SCALAR",
                 "name": "PublicKey",
@@ -528,7 +524,8 @@
           "fields": [
             {
               "name": "lastSnarkWorker",
-              "description": "Returns the last public key that was designated for snark work",
+              "description":
+                "Returns the last public key that was designated for snark work",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -551,7 +548,8 @@
           "fields": [
             {
               "name": "publicKey",
-              "description": "Public key of the account to receive coinbases. Block production keys will receive the coinbases if none is given",
+              "description":
+                "Public key of the account to receive coinbases. Block production keys will receive the coinbases if none is given",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -565,7 +563,8 @@
           "inputFields": [
             {
               "name": "publicKey",
-              "description": "Public key of the account to receive coinbases. Block production keys will receive the coinbases if none is given",
+              "description":
+                "Public key of the account to receive coinbases. Block production keys will receive the coinbases if none is given",
               "type": {
                 "kind": "SCALAR",
                 "name": "PublicKey",
@@ -585,7 +584,8 @@
           "fields": [
             {
               "name": "lastCoinbaseReceiver",
-              "description": "Returns the public key that was receiving coinbases previously, or none if it was the block producer",
+              "description":
+                "Returns the public key that was receiving coinbases previously, or none if it was the block producer",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -597,153 +597,13 @@
             },
             {
               "name": "currentCoinbaseReceiver",
-              "description": "Returns the public key that will receive coinbase, or none if it will be the block producer",
+              "description":
+                "Returns the public key that will receive coinbase, or none if it will be the block producer",
               "args": [],
               "type": {
                 "kind": "SCALAR",
                 "name": "PublicKey",
                 "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "SetStakingInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "publicKeys",
-              "description": "Public keys of accounts you wish to stake with - these must be accounts that are in trackedAccounts",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "publicKeys",
-              "description": "Public keys of accounts you wish to stake with - these must be accounts that are in trackedAccounts",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "SetStakingPayload",
-          "description": null,
-          "fields": [
-            {
-              "name": "lastStaking",
-              "description": "Returns the public keys that were staking funds previously",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "lockedPublicKeys",
-              "description": "List of public keys that could not be used to stake because they were locked",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "currentStakingKeys",
-              "description": "Returns the public keys that are now staking their funds",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
-                  }
-                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -815,13 +675,10 @@
           "fields": [
             {
               "name": "nonce",
-              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
+              "description":
+                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -829,23 +686,16 @@
               "name": "memo",
               "description": "Short arbitrary message provided by the sender",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description":
+                "The global slot number after which this transaction cannot be applied",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -867,7 +717,8 @@
             },
             {
               "name": "amount",
-              "description": "Amount of token to create in the receiver's account",
+              "description":
+                "Amount of token to create in the receiver's account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -883,7 +734,8 @@
             },
             {
               "name": "receiver",
-              "description": "Public key to mint the new tokens for (defaults to token owner's account)",
+              "description":
+                "Public key to mint the new tokens for (defaults to token owner's account)",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -929,32 +781,22 @@
           "inputFields": [
             {
               "name": "nonce",
-              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "description":
+                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "memo",
               "description": "Short arbitrary message provided by the sender",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "description":
+                "The global slot number after which this transaction cannot be applied",
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "defaultValue": null
             },
             {
@@ -973,7 +815,8 @@
             },
             {
               "name": "amount",
-              "description": "Amount of token to create in the receiver's account",
+              "description":
+                "Amount of token to create in the receiver's account",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -987,7 +830,8 @@
             },
             {
               "name": "receiver",
-              "description": "Public key to mint the new tokens for (defaults to token owner's account)",
+              "description":
+                "Public key to mint the new tokens for (defaults to token owner's account)",
               "type": {
                 "kind": "SCALAR",
                 "name": "PublicKey",
@@ -1062,13 +906,10 @@
           "fields": [
             {
               "name": "nonce",
-              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
+              "description":
+                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -1076,29 +917,23 @@
               "name": "memo",
               "description": "Short arbitrary message provided by the sender",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description":
+                "The global slot number after which this transaction cannot be applied",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "feePayer",
-              "description": "Public key to pay the fees from and sign the transaction with (defaults to the receiver)",
+              "description":
+                "Public key to pay the fees from and sign the transaction with (defaults to the receiver)",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -1176,37 +1011,28 @@
           "inputFields": [
             {
               "name": "nonce",
-              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "description":
+                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "memo",
               "description": "Short arbitrary message provided by the sender",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "description":
+                "The global slot number after which this transaction cannot be applied",
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "feePayer",
-              "description": "Public key to pay the fees from and sign the transaction with (defaults to the receiver)",
+              "description":
+                "Public key to pay the fees from and sign the transaction with (defaults to the receiver)",
               "type": {
                 "kind": "SCALAR",
                 "name": "PublicKey",
@@ -1309,13 +1135,10 @@
           "fields": [
             {
               "name": "nonce",
-              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
+              "description":
+                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -1323,23 +1146,16 @@
               "name": "memo",
               "description": "Short arbitrary message provided by the sender",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description":
+                "The global slot number after which this transaction cannot be applied",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -1377,7 +1193,8 @@
             },
             {
               "name": "feePayer",
-              "description": "Public key to pay the fee from (defaults to the tokenOwner)",
+              "description":
+                "Public key to pay the fee from (defaults to the tokenOwner)",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -1391,32 +1208,22 @@
           "inputFields": [
             {
               "name": "nonce",
-              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "description":
+                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "memo",
               "description": "Short arbitrary message provided by the sender",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "description":
+                "The global slot number after which this transaction cannot be applied",
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "defaultValue": null
             },
             {
@@ -1449,7 +1256,8 @@
             },
             {
               "name": "feePayer",
-              "description": "Public key to pay the fee from (defaults to the tokenOwner)",
+              "description":
+                "Public key to pay the fee from (defaults to the tokenOwner)",
               "type": {
                 "kind": "SCALAR",
                 "name": "PublicKey",
@@ -1496,13 +1304,10 @@
           "fields": [
             {
               "name": "nonce",
-              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
+              "description":
+                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -1510,23 +1315,16 @@
               "name": "memo",
               "description": "Short arbitrary message provided by the sender",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description":
+                "The global slot number after which this transaction cannot be applied",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -1582,32 +1380,22 @@
           "inputFields": [
             {
               "name": "nonce",
-              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "description":
+                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "memo",
               "description": "Short arbitrary message provided by the sender",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "description":
+                "The global slot number after which this transaction cannot be applied",
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "defaultValue": null
             },
             {
@@ -1681,6 +1469,16 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "PrivateKey",
+          "description": "Base58Check-encoded private key",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -2200,7 +1998,8 @@
           "fields": [
             {
               "name": "addWallet",
-              "description": "Add a wallet - this will create a new keypair and store it in the daemon",
+              "description":
+                "Add a wallet - this will create a new keypair and store it in the daemon",
               "args": [
                 {
                   "name": "input",
@@ -2230,8 +2029,49 @@
               "deprecationReason": "use createAccount instead"
             },
             {
+              "name": "startFilteredLog",
+              "description":
+                "TESTING ONLY: Start filtering and recording all structured events in memory",
+              "args": [
+                {
+                  "name": "filter",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "createAccount",
-              "description": "Create a new account - this will create a new keypair and store it in the daemon",
+              "description":
+                "Create a new account - this will create a new keypair and store it in the daemon",
               "args": [
                 {
                   "name": "input",
@@ -2262,7 +2102,8 @@
             },
             {
               "name": "createHDAccount",
-              "description": "Create an account with hardware wallet - this will let the hardware wallet generate a keypair corresponds to the HD-index you give and store this HD-index and the generated public key in the daemon. Calling this command with the same HD-index and the same hardware wallet will always generate the same keypair.",
+              "description":
+                "Create an account with hardware wallet - this will let the hardware wallet generate a keypair corresponds to the HD-index you give and store this HD-index and the generated public key in the daemon. Calling this command with the same HD-index and the same hardware wallet will always generate the same keypair.",
               "args": [
                 {
                   "name": "input",
@@ -2293,7 +2134,8 @@
             },
             {
               "name": "unlockAccount",
-              "description": "Allow transactions to be sent from the unlocked account",
+              "description":
+                "Allow transactions to be sent from the unlocked account",
               "args": [
                 {
                   "name": "input",
@@ -2324,7 +2166,8 @@
             },
             {
               "name": "unlockWallet",
-              "description": "Allow transactions to be sent from the unlocked account",
+              "description":
+                "Allow transactions to be sent from the unlocked account",
               "args": [
                 {
                   "name": "input",
@@ -2355,7 +2198,8 @@
             },
             {
               "name": "lockAccount",
-              "description": "Lock an unlocked account to prevent transaction being sent from it",
+              "description":
+                "Lock an unlocked account to prevent transaction being sent from it",
               "args": [
                 {
                   "name": "input",
@@ -2386,7 +2230,8 @@
             },
             {
               "name": "lockWallet",
-              "description": "Lock an unlocked account to prevent transaction being sent from it",
+              "description":
+                "Lock an unlocked account to prevent transaction being sent from it",
               "args": [
                 {
                   "name": "input",
@@ -2417,7 +2262,8 @@
             },
             {
               "name": "deleteAccount",
-              "description": "Delete the private key for an account that you track",
+              "description":
+                "Delete the private key for an account that you track",
               "args": [
                 {
                   "name": "input",
@@ -2448,7 +2294,8 @@
             },
             {
               "name": "deleteWallet",
-              "description": "Delete the private key for an account that you track",
+              "description":
+                "Delete the private key for an account that you track",
               "args": [
                 {
                   "name": "input",
@@ -2513,7 +2360,8 @@
                 },
                 {
                   "name": "path",
-                  "description": "Path to the wallet file, relative to the daemon's current working directory.",
+                  "description":
+                    "Path to the wallet file, relative to the daemon's current working directory.",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -2560,7 +2408,8 @@
               "args": [
                 {
                   "name": "signature",
-                  "description": "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
+                  "description":
+                    "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
                   "type": {
                     "kind": "INPUT_OBJECT",
                     "name": "SignatureInput",
@@ -2596,12 +2445,121 @@
               "deprecationReason": null
             },
             {
+              "name": "sendTestPayments",
+              "description": "Send a series of test payments",
+              "args": [
+                {
+                  "name": "repeat_delay_ms",
+                  "description":
+                    "Delay with which a transaction shall be repeated",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt32",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "repeat_count",
+                  "description":
+                    "How many times shall transaction be repeated",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt32",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "fee",
+                  "description": "The fee of each payment",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt64",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "amount",
+                  "description": "The amount of each payment",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt64",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "receiver",
+                  "description": "The receiver of the payments",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "PublicKey",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "senders",
+                  "description":
+                    "The private keys from which to sign the payments",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "PrivateKey",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "sendDelegation",
               "description": "Change your delegate by sending a transaction",
               "args": [
                 {
                   "name": "signature",
-                  "description": "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
+                  "description":
+                    "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
                   "type": {
                     "kind": "INPUT_OBJECT",
                     "name": "SignatureInput",
@@ -2642,7 +2600,8 @@
               "args": [
                 {
                   "name": "signature",
-                  "description": "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
+                  "description":
+                    "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
                   "type": {
                     "kind": "INPUT_OBJECT",
                     "name": "SignatureInput",
@@ -2683,7 +2642,8 @@
               "args": [
                 {
                   "name": "signature",
-                  "description": "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
+                  "description":
+                    "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
                   "type": {
                     "kind": "INPUT_OBJECT",
                     "name": "SignatureInput",
@@ -2724,7 +2684,8 @@
               "args": [
                 {
                   "name": "signature",
-                  "description": "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
+                  "description":
+                    "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
                   "type": {
                     "kind": "INPUT_OBJECT",
                     "name": "SignatureInput",
@@ -2787,37 +2748,6 @@
               "deprecationReason": null
             },
             {
-              "name": "setStaking",
-              "description": "Set keys you wish to stake with",
-              "args": [
-                {
-                  "name": "input",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "SetStakingInput",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": null
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SetStakingPayload",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "setCoinbaseReceiver",
               "description": "Set the key to receive coinbases",
               "args": [
@@ -2850,7 +2780,8 @@
             },
             {
               "name": "setSnarkWorker",
-              "description": "Set key you wish to snark work with or disable snark working",
+              "description":
+                "Set key you wish to snark work with or disable snark working",
               "args": [
                 {
                   "name": "input",
@@ -2881,7 +2812,8 @@
             },
             {
               "name": "setSnarkWorkFee",
-              "description": "Set fee that you will like to receive for doing snark work",
+              "description":
+                "Set fee that you will like to receive for doing snark work",
               "args": [
                 {
                   "name": "input",
@@ -2912,7 +2844,8 @@
             },
             {
               "name": "setConnectionGatingConfig",
-              "description": "Set the connection gating config, returning the current config after the application (which may have failed)",
+              "description":
+                "Set the connection gating config, returning the current config after the application (which may have failed)",
               "args": [
                 {
                   "name": "input",
@@ -3314,16 +3247,13 @@
           "fields": [
             {
               "name": "delegatorIndex",
-              "description": "Position in the ledger of the delegator's account",
+              "description":
+                "Position in the ledger of the delegator's account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -3364,15 +3294,12 @@
           "inputFields": [
             {
               "name": "delegatorIndex",
-              "description": "Position in the ledger of the delegator's account",
+              "description":
+                "Position in the ledger of the delegator's account",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "defaultValue": null
             },
@@ -3412,11 +3339,13 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "VrfThresholdInput",
-          "description": "The amount of stake delegated, used to determine the threshold for a vrf evaluation producing a block",
+          "description":
+            "The amount of stake delegated, used to determine the threshold for a vrf evaluation producing a block",
           "fields": [
             {
               "name": "totalStake",
-              "description": "The total amount of stake across all accounts in the epoch's staking ledger.",
+              "description":
+                "The total amount of stake across all accounts in the epoch's staking ledger.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3432,7 +3361,8 @@
             },
             {
               "name": "delegatedStake",
-              "description": "The amount of stake delegated to the vrf evaluator by the delegating account. This should match the amount in the epoch's staking ledger, which may be different to the amount in the current ledger.",
+              "description":
+                "The amount of stake delegated to the vrf evaluator by the delegating account. This should match the amount in the epoch's staking ledger, which may be different to the amount in the current ledger.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3450,7 +3380,8 @@
           "inputFields": [
             {
               "name": "totalStake",
-              "description": "The total amount of stake across all accounts in the epoch's staking ledger.",
+              "description":
+                "The total amount of stake across all accounts in the epoch's staking ledger.",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3464,7 +3395,8 @@
             },
             {
               "name": "delegatedStake",
-              "description": "The amount of stake delegated to the vrf evaluator by the delegating account. This should match the amount in the epoch's staking ledger, which may be different to the amount in the current ledger.",
+              "description":
+                "The amount of stake delegated to the vrf evaluator by the delegating account. This should match the amount in the epoch's staking ledger, which may be different to the amount in the current ledger.",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3484,11 +3416,13 @@
         {
           "kind": "OBJECT",
           "name": "VrfThreshold",
-          "description": "The amount of stake delegated, used to determine the threshold for a vrf evaluation winning a slot",
+          "description":
+            "The amount of stake delegated, used to determine the threshold for a vrf evaluation winning a slot",
           "fields": [
             {
               "name": "delegatedStake",
-              "description": "The amount of stake delegated to the vrf evaluator by the delegating account. This should match the amount in the epoch's staking ledger, which may be different to the amount in the current ledger.",
+              "description":
+                "The amount of stake delegated to the vrf evaluator by the delegating account. This should match the amount in the epoch's staking ledger, which may be different to the amount in the current ledger.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3504,7 +3438,8 @@
             },
             {
               "name": "totalStake",
-              "description": "The total amount of stake across all accounts in the epoch's staking ledger.",
+              "description":
+                "The total amount of stake across all accounts in the epoch's staking ledger.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3573,16 +3508,13 @@
             },
             {
               "name": "delegatorIndex",
-              "description": "Position in the ledger of the delegator's account",
+              "description":
+                "Position in the ledger of the delegator's account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -3596,7 +3528,8 @@
         {
           "kind": "OBJECT",
           "name": "VrfEvaluation",
-          "description": "A witness to a vrf evaluation, which may be externally verified",
+          "description":
+            "A witness to a vrf evaluation, which may be externally verified",
           "fields": [
             {
               "name": "message",
@@ -3664,7 +3597,8 @@
             },
             {
               "name": "scaledMessageHash",
-              "description": "A group element represented as 2 field elements",
+              "description":
+                "A group element represented as 2 field elements",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3700,31 +3634,26 @@
             },
             {
               "name": "vrfOutput",
-              "description": "The vrf output derived from the evaluation witness. If null, the vrf witness was invalid.",
+              "description":
+                "The vrf output derived from the evaluation witness. If null, the vrf witness was invalid.",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "vrfOutputFractional",
-              "description": "The vrf output derived from the evaluation witness, as a fraction. This represents a won slot if vrfOutputFractional <= (1 - (1 / 4)^(delegated_balance / total_stake)). If null, the vrf witness was invalid.",
+              "description":
+                "The vrf output derived from the evaluation witness, as a fraction. This represents a won slot if vrfOutputFractional <= (1 - (1 / 4)^(delegated_balance / total_stake)). If null, the vrf witness was invalid.",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "Float",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "Float", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "thresholdMet",
-              "description": "Whether the threshold to produce a block was met, if specified",
+              "description":
+                "Whether the threshold to produce a block was met, if specified",
               "args": [
                 {
                   "name": "input",
@@ -3737,11 +3666,7 @@
                   "defaultValue": null
                 }
               ],
-              "type": {
-                "kind": "SCALAR",
-                "name": "Boolean",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -3754,17 +3679,14 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "SignatureInput",
-          "description": "A cryptographic signature -- you must provide either field+scalar or rawSignature",
+          "description":
+            "A cryptographic signature -- you must provide either field+scalar or rawSignature",
           "fields": [
             {
               "name": "rawSignature",
               "description": "Raw encoded signature",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -3772,11 +3694,7 @@
               "name": "scalar",
               "description": "Scalar component of signature",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -3784,11 +3702,7 @@
               "name": "field",
               "description": "Field component of signature",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -3797,31 +3711,19 @@
             {
               "name": "rawSignature",
               "description": "Raw encoded signature",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "scalar",
               "description": "Scalar component of signature",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "field",
               "description": "Field component of signature",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "defaultValue": null
             }
           ],
@@ -3836,13 +3738,10 @@
           "fields": [
             {
               "name": "nonce",
-              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
+              "description":
+                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -3850,23 +3749,16 @@
               "name": "memo",
               "description": "Short arbitrary message provided by the sender",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description":
+                "The global slot number after which this transaction cannot be applied",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -3906,11 +3798,7 @@
               "name": "token",
               "description": "Token to send",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "TokenId",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "TokenId", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -3950,32 +3838,22 @@
           "inputFields": [
             {
               "name": "nonce",
-              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "description":
+                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "memo",
               "description": "Short arbitrary message provided by the sender",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "description":
+                "The global slot number after which this transaction cannot be applied",
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "defaultValue": null
             },
             {
@@ -4009,11 +3887,7 @@
             {
               "name": "token",
               "description": "Token to send",
-              "type": {
-                "kind": "SCALAR",
-                "name": "TokenId",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "TokenId", "ofType": null },
               "defaultValue": null
             },
             {
@@ -4072,7 +3946,8 @@
             },
             {
               "name": "coinbase",
-              "description": "The amount received as a coinbase reward for producing a block",
+              "description":
+                "The amount received as a coinbase reward for producing a block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4127,11 +4002,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "sign",
-                  "ofType": null
-                }
+                "ofType": { "kind": "ENUM", "name": "sign", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -4161,7 +4032,8 @@
         {
           "kind": "OBJECT",
           "name": "WorkDescription",
-          "description": "Transition from a source ledger to a target ledger with some fee excess and increase in supply ",
+          "description":
+            "Transition from a source ledger to a target ledger with some fee excess and increase in supply ",
           "fields": [
             {
               "name": "sourceLedgerHash",
@@ -4197,7 +4069,8 @@
             },
             {
               "name": "feeExcess",
-              "description": "Total transaction fee that is not accounted for in the transition from source ledger to target ledger",
+              "description":
+                "Total transaction fee that is not accounted for in the transition from source ledger to target ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4234,11 +4107,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -4252,7 +4121,8 @@
         {
           "kind": "OBJECT",
           "name": "PendingSnarkWork",
-          "description": "Snark work bundles that are not available in the pool yet",
+          "description":
+            "Snark work bundles that are not available in the pool yet",
           "fields": [
             {
               "name": "workBundle",
@@ -4351,11 +4221,7 @@
               "name": "banned_status",
               "description": "Banned status",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -4381,13 +4247,15 @@
             },
             {
               "name": "PENDING",
-              "description": "A transaction either in the transition frontier or in transaction pool but is not on the longest chain",
+              "description":
+                "A transaction either in the transition frontier or in transaction pool but is not on the longest chain",
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "UNKNOWN",
-              "description": "The transaction has either been snarked, reached finality through consensus or has been dropped",
+              "description":
+                "The transaction has either been snarked, reached finality through consensus or has been dropped",
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -4484,7 +4352,8 @@
             },
             {
               "name": "fee",
-              "description": "Amount that the recipient is paid in this fee transfer",
+              "description":
+                "Amount that the recipient is paid in this fee transfer",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4500,7 +4369,8 @@
             },
             {
               "name": "type",
-              "description": "Fee_transfer|Fee_transfer_via_coinbase Snark worker fees deducted from the coinbase amount are of type 'Fee_transfer_via_coinbase', rest are deducted from transaction fees",
+              "description":
+                "Fee_transfer|Fee_transfer_via_coinbase Snark worker fees deducted from the coinbase amount are of type 'Fee_transfer_via_coinbase', rest are deducted from transaction fees",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4532,11 +4402,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "ID",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -4575,16 +4441,13 @@
             },
             {
               "name": "nonce",
-              "description": "Sequence number of command for the fee-payer's account",
+              "description":
+                "Sequence number of command for the fee-payer's account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -4638,6 +4501,23 @@
               "deprecationReason": null
             },
             {
+              "name": "validUntil",
+              "description":
+                "The global slot number after which this transaction cannot be applied",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "token",
               "description": "Token used for the transaction",
               "args": [],
@@ -4655,7 +4535,8 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
+              "description":
+                "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4687,7 +4568,8 @@
             },
             {
               "name": "fee",
-              "description": "Fee that the fee-payer is willing to pay for making the transaction",
+              "description":
+                "Fee that the fee-payer is willing to pay for making the transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4703,7 +4585,8 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description":
+                "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4719,7 +4602,8 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this command represents a delegation of stake",
+              "description":
+                "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4799,24 +4683,17 @@
             },
             {
               "name": "failureReason",
-              "description": "null is no failure or status unknown, reason for failure otherwise.",
+              "description":
+                "null is no failure or status unknown, reason for failure otherwise.",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
           ],
           "inputFields": null,
           "interfaces": [
-            {
-              "kind": "INTERFACE",
-              "name": "UserCommand",
-              "ofType": null
-            }
+            { "kind": "INTERFACE", "name": "UserCommand", "ofType": null }
           ],
           "enumValues": null,
           "possibleTypes": null
@@ -4865,11 +4742,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "ID",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -4908,16 +4781,13 @@
             },
             {
               "name": "nonce",
-              "description": "Sequence number of command for the fee-payer's account",
+              "description":
+                "Sequence number of command for the fee-payer's account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -4971,6 +4841,23 @@
               "deprecationReason": null
             },
             {
+              "name": "validUntil",
+              "description":
+                "The global slot number after which this transaction cannot be applied",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "token",
               "description": "Token used for the transaction",
               "args": [],
@@ -4988,7 +4875,8 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
+              "description":
+                "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5020,7 +4908,8 @@
             },
             {
               "name": "fee",
-              "description": "Fee that the fee-payer is willing to pay for making the transaction",
+              "description":
+                "Fee that the fee-payer is willing to pay for making the transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5036,7 +4925,8 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description":
+                "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5052,7 +4942,8 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this command represents a delegation of stake",
+              "description":
+                "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5132,24 +5023,17 @@
             },
             {
               "name": "failureReason",
-              "description": "null is no failure or status unknown, reason for failure otherwise.",
+              "description":
+                "null is no failure or status unknown, reason for failure otherwise.",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
           ],
           "inputFields": null,
           "interfaces": [
-            {
-              "kind": "INTERFACE",
-              "name": "UserCommand",
-              "ofType": null
-            }
+            { "kind": "INTERFACE", "name": "UserCommand", "ofType": null }
           ],
           "enumValues": null,
           "possibleTypes": null
@@ -5161,7 +5045,8 @@
           "fields": [
             {
               "name": "tokenOwner",
-              "description": "Public key to set as the owner of the new token",
+              "description":
+                "Public key to set as the owner of the new token",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5177,7 +5062,8 @@
             },
             {
               "name": "newAccountsDisabled",
-              "description": "Whether new accounts created in this token are disabled",
+              "description":
+                "Whether new accounts created in this token are disabled",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5198,11 +5084,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "ID",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -5241,16 +5123,13 @@
             },
             {
               "name": "nonce",
-              "description": "Sequence number of command for the fee-payer's account",
+              "description":
+                "Sequence number of command for the fee-payer's account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -5304,6 +5183,23 @@
               "deprecationReason": null
             },
             {
+              "name": "validUntil",
+              "description":
+                "The global slot number after which this transaction cannot be applied",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "token",
               "description": "Token used for the transaction",
               "args": [],
@@ -5321,7 +5217,8 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
+              "description":
+                "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5353,7 +5250,8 @@
             },
             {
               "name": "fee",
-              "description": "Fee that the fee-payer is willing to pay for making the transaction",
+              "description":
+                "Fee that the fee-payer is willing to pay for making the transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5369,7 +5267,8 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description":
+                "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5385,7 +5284,8 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this command represents a delegation of stake",
+              "description":
+                "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5465,24 +5365,17 @@
             },
             {
               "name": "failureReason",
-              "description": "null is no failure or status unknown, reason for failure otherwise.",
+              "description":
+                "null is no failure or status unknown, reason for failure otherwise.",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
           ],
           "inputFields": null,
           "interfaces": [
-            {
-              "kind": "INTERFACE",
-              "name": "UserCommand",
-              "ofType": null
-            }
+            { "kind": "INTERFACE", "name": "UserCommand", "ofType": null }
           ],
           "enumValues": null,
           "possibleTypes": null
@@ -5494,7 +5387,8 @@
           "fields": [
             {
               "name": "tokenOwner",
-              "description": "The account that owns the token for the new account",
+              "description":
+                "The account that owns the token for the new account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5510,7 +5404,8 @@
             },
             {
               "name": "disabled",
-              "description": "Whether this account should be disabled upon creation. If this command was not issued by the token owner, it should match the 'newAccountsDisabled' property set in the token owner's account.",
+              "description":
+                "Whether this account should be disabled upon creation. If this command was not issued by the token owner, it should match the 'newAccountsDisabled' property set in the token owner's account.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5531,11 +5426,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "ID",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -5574,16 +5465,13 @@
             },
             {
               "name": "nonce",
-              "description": "Sequence number of command for the fee-payer's account",
+              "description":
+                "Sequence number of command for the fee-payer's account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -5637,6 +5525,23 @@
               "deprecationReason": null
             },
             {
+              "name": "validUntil",
+              "description":
+                "The global slot number after which this transaction cannot be applied",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "token",
               "description": "Token used for the transaction",
               "args": [],
@@ -5654,7 +5559,8 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
+              "description":
+                "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5686,7 +5592,8 @@
             },
             {
               "name": "fee",
-              "description": "Fee that the fee-payer is willing to pay for making the transaction",
+              "description":
+                "Fee that the fee-payer is willing to pay for making the transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5702,7 +5609,8 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description":
+                "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5718,7 +5626,8 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this command represents a delegation of stake",
+              "description":
+                "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5798,24 +5707,17 @@
             },
             {
               "name": "failureReason",
-              "description": "null is no failure or status unknown, reason for failure otherwise.",
+              "description":
+                "null is no failure or status unknown, reason for failure otherwise.",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
           ],
           "inputFields": null,
           "interfaces": [
-            {
-              "kind": "INTERFACE",
-              "name": "UserCommand",
-              "ofType": null
-            }
+            { "kind": "INTERFACE", "name": "UserCommand", "ofType": null }
           ],
           "enumValues": null,
           "possibleTypes": null
@@ -5868,11 +5770,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "ID",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -5911,16 +5809,13 @@
             },
             {
               "name": "nonce",
-              "description": "Sequence number of command for the fee-payer's account",
+              "description":
+                "Sequence number of command for the fee-payer's account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -5974,6 +5869,23 @@
               "deprecationReason": null
             },
             {
+              "name": "validUntil",
+              "description":
+                "The global slot number after which this transaction cannot be applied",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "token",
               "description": "Token used for the transaction",
               "args": [],
@@ -5991,7 +5903,8 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
+              "description":
+                "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6023,7 +5936,8 @@
             },
             {
               "name": "fee",
-              "description": "Fee that the fee-payer is willing to pay for making the transaction",
+              "description":
+                "Fee that the fee-payer is willing to pay for making the transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6039,7 +5953,8 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description":
+                "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6055,7 +5970,8 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this command represents a delegation of stake",
+              "description":
+                "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6135,24 +6051,17 @@
             },
             {
               "name": "failureReason",
-              "description": "null is no failure or status unknown, reason for failure otherwise.",
+              "description":
+                "null is no failure or status unknown, reason for failure otherwise.",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
           ],
           "inputFields": null,
           "interfaces": [
-            {
-              "kind": "INTERFACE",
-              "name": "UserCommand",
-              "ofType": null
-            }
+            { "kind": "INTERFACE", "name": "UserCommand", "ofType": null }
           ],
           "enumValues": null,
           "possibleTypes": null
@@ -6169,11 +6078,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "ID",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -6212,16 +6117,13 @@
             },
             {
               "name": "nonce",
-              "description": "Sequence number of command for the fee-payer's account",
+              "description":
+                "Sequence number of command for the fee-payer's account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -6275,6 +6177,23 @@
               "deprecationReason": null
             },
             {
+              "name": "validUntil",
+              "description":
+                "The global slot number after which this transaction cannot be applied",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "token",
               "description": "Token used by the command",
               "args": [],
@@ -6292,7 +6211,8 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - 0 for commands that are not associated with an amount",
+              "description":
+                "Amount that the source is sending to receiver - 0 for commands that are not associated with an amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6324,7 +6244,8 @@
             },
             {
               "name": "fee",
-              "description": "Fee that the fee-payer is willing to pay for making the transaction",
+              "description":
+                "Fee that the fee-payer is willing to pay for making the transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6356,7 +6277,8 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this represents a delegation of stake, otherwise it is a payment",
+              "description":
+                "If true, this represents a delegation of stake, otherwise it is a payment",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6436,13 +6358,10 @@
             },
             {
               "name": "failureReason",
-              "description": "null is no failure, reason for failure otherwise.",
+              "description":
+                "null is no failure, reason for failure otherwise.",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -6485,7 +6404,8 @@
           "fields": [
             {
               "name": "userCommands",
-              "description": "List of user commands (payments and stake delegations) included in this block",
+              "description":
+                "List of user commands (payments and stake delegations) included in this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6533,7 +6453,8 @@
             },
             {
               "name": "coinbase",
-              "description": "Amount of mina granted to the producer of this block",
+              "description":
+                "Amount of mina granted to the producer of this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6549,13 +6470,10 @@
             },
             {
               "name": "coinbaseReceiverAccount",
-              "description": "Account to which the coinbase for this block was granted",
+              "description":
+                "Account to which the coinbase for this block was granted",
               "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "Account",
-                "ofType": null
-              },
+              "type": { "kind": "OBJECT", "name": "Account", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -6574,11 +6492,7 @@
               "name": "base64",
               "description": "Base-64 encoded proof",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -7023,7 +6937,8 @@
           "fields": [
             {
               "name": "date",
-              "description": "date (stringified Unix time - number of milliseconds since January 1, 1970)",
+              "description":
+                "date (stringified Unix time - number of milliseconds since January 1, 1970)",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7039,7 +6954,8 @@
             },
             {
               "name": "utcDate",
-              "description": "utcDate (stringified Unix time - number of milliseconds since January 1, 1970). Time offsets are adjusted to reflect true wall-clock time instead of genesis time.",
+              "description":
+                "utcDate (stringified Unix time - number of milliseconds since January 1, 1970). Time offsets are adjusted to reflect true wall-clock time instead of genesis time.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7087,13 +7003,10 @@
             },
             {
               "name": "stagedLedgerProofEmitted",
-              "description": "Block finished a staged ledger, and a proof was emitted from it and included into this block's proof. If there is no transition frontier available or no block found, this will return null.",
+              "description":
+                "Block finished a staged ledger, and a proof was emitted from it and included into this block's proof. If there is no transition frontier available or no block found, this will return null.",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "Boolean",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -7126,7 +7039,8 @@
             },
             {
               "name": "blockchainState",
-              "description": "State which is agnostic of a particular consensus algorithm",
+              "description":
+                "State which is agnostic of a particular consensus algorithm",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7142,7 +7056,8 @@
             },
             {
               "name": "consensusState",
-              "description": "State specific to the Codaboros Proof of Stake consensus algorithm",
+              "description":
+                "State specific to the Codaboros Proof of Stake consensus algorithm",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7217,7 +7132,8 @@
             },
             {
               "name": "stateHash",
-              "description": "Base58Check-encoded hash of the state after this block",
+              "description":
+                "Base58Check-encoded hash of the state after this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7233,7 +7149,8 @@
             },
             {
               "name": "stateHashField",
-              "description": "Experimental: Bigint field-element representation of stateHash",
+              "description":
+                "Experimental: Bigint field-element representation of stateHash",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7291,6 +7208,19 @@
                   "name": "Transactions",
                   "ofType": null
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "commandTransactionCount",
+              "description":
+                "Count of user command transactions in the block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -7364,7 +7294,8 @@
             },
             {
               "name": "fee",
-              "description": "Fee that snark worker is charging to generate a snark proof",
+              "description":
+                "Fee that snark worker is charging to generate a snark proof",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7428,11 +7359,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -7474,7 +7401,8 @@
             },
             {
               "name": "bannedPeers",
-              "description": "Peers we will never allow connections from (unless they are also trusted!)",
+              "description":
+                "Peers we will never allow connections from (unless they are also trusted!)",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7498,7 +7426,8 @@
             },
             {
               "name": "isolate",
-              "description": "If true, no connections will be allowed unless they are from a trusted peer",
+              "description":
+                "If true, no connections will be allowed unless they are from a trusted peer",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7519,19 +7448,10 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "Boolean",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "AnnotatedBalance",
-          "description": "A total balance annotated with the amount that is currently unknown with the invariant unknown <= total, as well as the currently liquid and locked balances.",
+          "description":
+            "A total balance annotated with the amount that is currently unknown with the invariant unknown <= total, as well as the currently liquid and locked balances.",
           "fields": [
             {
               "name": "total",
@@ -7551,7 +7471,8 @@
             },
             {
               "name": "unknown",
-              "description": "The amount of mina owned by the account whose origin is currently unknown",
+              "description":
+                "The amount of mina owned by the account whose origin is currently unknown",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7567,25 +7488,19 @@
             },
             {
               "name": "liquid",
-              "description": "The amount of mina owned by the account which is currently available. Can be null if bootstrapping.",
+              "description":
+                "The amount of mina owned by the account which is currently available. Can be null if bootstrapping.",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt64",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
               "isDeprecated": true,
               "deprecationReason": null
             },
             {
               "name": "locked",
-              "description": "The amount of mina owned by the account which is currently locked. Can be null if bootstrapping.",
+              "description":
+                "The amount of mina owned by the account which is currently locked. Can be null if bootstrapping.",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt64",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
               "isDeprecated": true,
               "deprecationReason": null
             },
@@ -7607,13 +7522,10 @@
             },
             {
               "name": "stateHash",
-              "description": "Hash of block at which balance was measured. Can be null if bootstrapping. Guaranteed to be non-null for direct account lookup queries when not bootstrapping. Can also be null when accessed as nested properties (eg. via delegators). ",
+              "description":
+                "Hash of block at which balance was measured. Can be null if bootstrapping. Guaranteed to be non-null for direct account lookup queries when not bootstrapping. Can also be null when accessed as nested properties (eg. via delegators). ",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -7640,13 +7552,10 @@
           "fields": [
             {
               "name": "initial_mininum_balance",
-              "description": "The initial minimum balance for a time-locked account",
+              "description":
+                "The initial minimum balance for a time-locked account",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt64",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -7654,11 +7563,7 @@
               "name": "cliff_time",
               "description": "The cliff time for a time-locked account",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -7666,11 +7571,7 @@
               "name": "cliff_amount",
               "description": "The cliff amount for a time-locked account",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt64",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -7678,23 +7579,16 @@
               "name": "vesting_period",
               "description": "The vesting period for a time-locked account",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt32",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "vesting_increment",
-              "description": "The vesting increment for a time-locked account",
+              "description":
+                "The vesting increment for a time-locked account",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt64",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -7707,7 +7601,8 @@
         {
           "kind": "SCALAR",
           "name": "TokenId",
-          "description": "String representation of a token's UInt64 identifier",
+          "description":
+            "String representation of a token's UInt64 identifier",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -7795,37 +7690,28 @@
             },
             {
               "name": "nonce",
-              "description": "A natural number that increases with each transaction (stringified uint32)",
+              "description":
+                "A natural number that increases with each transaction (stringified uint32)",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "inferredNonce",
-              "description": "Like the `nonce` field, except it includes the scheduled transactions (transactions not yet included in a block) (stringified uint32)",
+              "description":
+                "Like the `nonce` field, except it includes the scheduled transactions (transactions not yet included in a block) (stringified uint32)",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "epochDelegateAccount",
-              "description": "The account that you delegated on the staking ledger of the current block's epoch",
+              "description":
+                "The account that you delegated on the staking ledger of the current block's epoch",
               "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "Account",
-                "ofType": null
-              },
+              "type": { "kind": "OBJECT", "name": "Account", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -7833,17 +7719,14 @@
               "name": "receiptChainHash",
               "description": "Top hash of the receipt chain merkle-list",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "delegate",
-              "description": "The public key to which you are delegating - if you are not delegating to anybody, this would return your public key",
+              "description":
+                "The public key to which you are delegating - if you are not delegating to anybody, this would return your public key",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -7855,19 +7738,17 @@
             },
             {
               "name": "delegateAccount",
-              "description": "The account to which you are delegating - if you are not delegating to anybody, this would return your public key",
+              "description":
+                "The account to which you are delegating - if you are not delegating to anybody, this would return your public key",
               "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "Account",
-                "ofType": null
-              },
+              "type": { "kind": "OBJECT", "name": "Account", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "delegators",
-              "description": "The list of accounts which are delegating to you (note that the info is recorded in the last epoch so it might not be up to date with the current account status)",
+              "description":
+                "The list of accounts which are delegating to you (note that the info is recorded in the last epoch so it might not be up to date with the current account status)",
               "args": [],
               "type": {
                 "kind": "LIST",
@@ -7887,7 +7768,8 @@
             },
             {
               "name": "lastEpochDelegators",
-              "description": "The list of accounts which are delegating to you in the last epoch (note that the info is recorded in the one before last epoch epoch so it might not be up to date with the current account status)",
+              "description":
+                "The list of accounts which are delegating to you in the last epoch (note that the info is recorded in the one before last epoch epoch so it might not be up to date with the current account status)",
               "args": [],
               "type": {
                 "kind": "LIST",
@@ -7907,19 +7789,17 @@
             },
             {
               "name": "votingFor",
-              "description": "The previous epoch lock hash of the chain which you are voting for",
+              "description":
+                "The previous epoch lock hash of the chain which you are voting for",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "stakingActive",
-              "description": "True if you are actively staking with this account on the current daemon - this may not yet have been updated if the staking key was changed recently",
+              "description":
+                "True if you are actively staking with this account on the current daemon - this may not yet have been updated if the staking key was changed recently",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7951,13 +7831,10 @@
             },
             {
               "name": "locked",
-              "description": "True if locked, false if unlocked, null if the account isn't tracked by the queried daemon",
+              "description":
+                "True if locked, false if unlocked, null if the account isn't tracked by the queried daemon",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "Boolean",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -7965,34 +7842,169 @@
               "name": "isTokenOwner",
               "description": "True if this account owns its associated token",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "Boolean",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "isDisabled",
-              "description": "True if this account has been disabled by the owner of the associated token",
+              "description":
+                "True if this account has been disabled by the owner of the associated token",
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "Boolean",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "index",
-              "description": "The index of this account in the ledger, or null if this account does not yet have a known position in the best tip ledger",
+              "description":
+                "The index of this account in the ledger, or null if this account does not yet have a known position in the best tip ledger",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Boolean",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "GetFilteredLogEntries",
+          "description": null,
+          "fields": [
+            {
+              "name": "logMessages",
+              "description": "Structured log messages since the given offset",
               "args": [],
               "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "isCapturing",
+              "description":
+                "Whether we are capturing structured log messages",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "Metrics",
+          "description": null,
+          "fields": [
+            {
+              "name": "blockProductionDelay",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "transactionPoolDiffReceived",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "transactionPoolDiffBroadcasted",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "transactionsAddedToPool",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "transactionPoolSize",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8044,11 +8056,7 @@
               "name": "peer",
               "description": null,
               "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "Peer",
-                "ofType": null
-              },
+              "type": { "kind": "OBJECT", "name": "Peer", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -8059,11 +8067,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8075,11 +8079,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8102,11 +8102,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8118,11 +8114,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8134,11 +8126,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8150,11 +8138,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8166,11 +8150,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8198,11 +8178,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8216,11 +8192,13 @@
         {
           "kind": "OBJECT",
           "name": "ConsensusTimeGlobalSlot",
-          "description": "Consensus time and the corresponding global slot since genesis",
+          "description":
+            "Consensus time and the corresponding global slot since genesis",
           "fields": [
             {
               "name": "consensusTime",
-              "description": "Time in terms of slot number in an epoch, start and end time of the slot since UTC epoch",
+              "description":
+                "Time in terms of slot number in an epoch, start and end time of the slot since UTC epoch",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8287,7 +8265,8 @@
             },
             {
               "name": "globalSlotSinceGenesis",
-              "description": "Next block production global-slot-since-genesis ",
+              "description":
+                "Next block production global-slot-since-genesis ",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8311,7 +8290,8 @@
             },
             {
               "name": "generatedFromConsensusAt",
-              "description": "Consensus time of the block that was used to determine the next block production time",
+              "description":
+                "Consensus time of the block that was used to determine the next block production time",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8535,11 +8515,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8551,11 +8527,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8807,11 +8779,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8867,11 +8835,7 @@
               "name": "numAccounts",
               "description": null,
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -8879,11 +8843,7 @@
               "name": "blockchainLength",
               "description": null,
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -8894,11 +8854,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8910,11 +8866,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8926,11 +8878,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8939,11 +8887,7 @@
               "name": "ledgerMerkleRoot",
               "description": null,
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -8951,11 +8895,7 @@
               "name": "stateHash",
               "description": null,
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -9038,11 +8978,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -9051,11 +8987,7 @@
               "name": "snarkWorker",
               "description": null,
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -9066,11 +8998,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -9139,11 +9067,7 @@
               "name": "coinbaseReceiver",
               "description": null,
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -9175,11 +9099,7 @@
               "name": "globalSlotSinceGenesisBestTip",
               "description": null,
               "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
+              "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -9253,6 +9173,22 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "AddrsAndPorts",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "metrics",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Metrics",
                   "ofType": null
                 }
               },
@@ -9353,17 +9289,46 @@
               "name": "version",
               "description": "The version of the node (git commit hash)",
               "args": [],
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "getFilteredLogEntries",
+              "description":
+                "TESTING ONLY: Retrieve all new structured events in memory",
+              "args": [
+                {
+                  "name": "offset",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
               "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "GetFilteredLogEntries",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "ownedWallets",
-              "description": "Wallets for which the daemon knows the private key",
+              "description":
+                "Wallets for which the daemon knows the private key",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9387,7 +9352,8 @@
             },
             {
               "name": "trackedAccounts",
-              "description": "Accounts for which the daemon tracks the private key",
+              "description":
+                "Accounts for which the daemon tracks the private key",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9428,17 +9394,14 @@
                   "defaultValue": null
                 }
               ],
-              "type": {
-                "kind": "OBJECT",
-                "name": "Account",
-                "ofType": null
-              },
+              "type": { "kind": "OBJECT", "name": "Account", "ofType": null },
               "isDeprecated": true,
               "deprecationReason": "use account instead"
             },
             {
               "name": "connectionGatingConfig",
-              "description": "The rules that the libp2p helper will use to determine which connections to permit",
+              "description":
+                "The rules that the libp2p helper will use to determine which connections to permit",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9458,7 +9421,8 @@
               "args": [
                 {
                   "name": "token",
-                  "description": "Token of account being retrieved (defaults to CODA)",
+                  "description":
+                    "Token of account being retrieved (defaults to CODA)",
                   "type": {
                     "kind": "SCALAR",
                     "name": "TokenId",
@@ -9481,11 +9445,7 @@
                   "defaultValue": null
                 }
               ],
-              "type": {
-                "kind": "OBJECT",
-                "name": "Account",
-                "ofType": null
-              },
+              "type": { "kind": "OBJECT", "name": "Account", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -9569,16 +9529,14 @@
             },
             {
               "name": "bestChain",
-              "description": "Retrieve a list of blocks from transition frontier's root to the current best tip. Returns an error if the system is bootstrapping.",
+              "description":
+                "Retrieve a list of blocks from transition frontier's root to the current best tip. Returns an error if the system is bootstrapping.",
               "args": [
                 {
                   "name": "maxLength",
-                  "description": "The maximum number of blocks to return. If there are more blocks in the transition frontier from root to tip, the n blocks closest to the best tip will be returned",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "Int",
-                    "ofType": null
-                  },
+                  "description":
+                    "The maximum number of blocks to return. If there are more blocks in the transition frontier from root to tip, the n blocks closest to the best tip will be returned",
+                  "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
                   "defaultValue": null
                 }
               ],
@@ -9600,16 +9558,14 @@
             },
             {
               "name": "block",
-              "description": "Retrieve a block with the given state hash or height, if contained in the transition frontier.",
+              "description":
+                "Retrieve a block with the given state hash or height, if contained in the transition frontier.",
               "args": [
                 {
                   "name": "height",
-                  "description": "The height of the desired block in the best chain",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "Int",
-                    "ofType": null
-                  },
+                  "description":
+                    "The height of the desired block in the best chain",
+                  "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
                   "defaultValue": null
                 },
                 {
@@ -9653,7 +9609,8 @@
             },
             {
               "name": "initialPeers",
-              "description": "List of peers that the daemon first used to connect to the network",
+              "description":
+                "List of peers that the daemon first used to connect to the network",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9677,7 +9634,8 @@
             },
             {
               "name": "getPeers",
-              "description": "List of peers that the daemon is currently connected to",
+              "description":
+                "List of peers that the daemon is currently connected to",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9701,7 +9659,8 @@
             },
             {
               "name": "pooledUserCommands",
-              "description": "Retrieve all the scheduled user commands for a specified sender that the current daemon sees in their transaction pool. All scheduled commands are queried if no sender is specified",
+              "description":
+                "Retrieve all the scheduled user commands for a specified sender that the current daemon sees in their transaction pool. All scheduled commands are queried if no sender is specified",
               "args": [
                 {
                   "name": "ids",
@@ -9741,7 +9700,8 @@
                 },
                 {
                   "name": "publicKey",
-                  "description": "Public key of sender of pooled user commands",
+                  "description":
+                    "Public key of sender of pooled user commands",
                   "type": {
                     "kind": "SCALAR",
                     "name": "PublicKey",
@@ -9862,7 +9822,8 @@
             },
             {
               "name": "snarkPool",
-              "description": "List of completed snark works that have the lowest fee so far",
+              "description":
+                "List of completed snark works that have the lowest fee so far",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9910,7 +9871,8 @@
             },
             {
               "name": "genesisConstants",
-              "description": "The constants used to determine the configuration of the genesis block and all of its transitive dependencies",
+              "description":
+                "The constants used to determine the configuration of the genesis block and all of its transitive dependencies",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9926,23 +9888,21 @@
             },
             {
               "name": "timeOffset",
-              "description": "The time offset in seconds used to convert real times into blockchain times",
+              "description":
+                "The time offset in seconds used to convert real times into blockchain times",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "nextAvailableToken",
-              "description": "The next token ID that has not been allocated. Token IDs are allocated sequentially, so all lower token IDs have been allocated",
+              "description":
+                "The next token ID that has not been allocated. Token IDs are allocated sequentially, so all lower token IDs have been allocated",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9962,7 +9922,8 @@
               "args": [
                 {
                   "name": "signature",
-                  "description": "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
+                  "description":
+                    "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
                   "type": {
                     "kind": "INPUT_OBJECT",
                     "name": "SignatureInput",
@@ -9999,7 +9960,8 @@
             },
             {
               "name": "evaluateVrf",
-              "description": "Evaluate a vrf for the given public key. This includes a witness which may be verified without access to the private key for this vrf evaluation.",
+              "description":
+                "Evaluate a vrf for the given public key. This includes a witness which may be verified without access to the private key for this vrf evaluation.",
               "args": [
                 {
                   "name": "vrfThreshold",
@@ -10054,7 +10016,8 @@
             },
             {
               "name": "checkVrf",
-              "description": "Check a vrf evaluation commitment. This can be used to check vrf evaluations without needing to reveal the private key, in the format returned by evaluateVrf",
+              "description":
+                "Check a vrf evaluation commitment. This can be used to check vrf evaluations without needing to reveal the private key, in the format returned by evaluateVrf",
               "args": [
                 {
                   "name": "input",
@@ -10085,7 +10048,8 @@
             },
             {
               "name": "runtimeConfig",
-              "description": "The runtime configuration passed to the daemon at start-up",
+              "description":
+                "The runtime configuration passed to the daemon at start-up",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -10093,6 +10057,40 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "JSON",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "fork_config",
+              "description":
+                "The runtime configuration for a blockchain fork intended to be a continuation of the current one.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "JSON",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "threadGraph",
+              "description":
+                "A graphviz dot format representation of the deamon's internal thread graph",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
                   "ofType": null
                 }
               },

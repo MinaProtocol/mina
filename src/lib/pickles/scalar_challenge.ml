@@ -24,8 +24,8 @@ let to_field_checked (type f)
   let zero = F.Constant.zero in
   for i = (128 / 2) - 1 downto 0 do
     (* s = -1 + 2 * r_2i
-       a_next = 
-        if r_2i1 
+       a_next =
+        if r_2i1
         then 2 a_prev + s
         else 2 a_prev
        =
@@ -58,9 +58,9 @@ let to_field_checked (type f)
        <->
        two_b_prev_minus_b_next = 2 b_prev - b_next
        &&
-       0 
+       0
        = two_b_prev_minus_b_next - 1 + 2 r_2i + r_2i1 - 2 r_2i1 r_2i
-       = 2 r_2i + r_2i1 - 2 r_2i1 r_2i + two_b_prev_minus_b_next + -1 
+       = 2 r_2i + r_2i1 - 2 r_2i1 r_2i + two_b_prev_minus_b_next + -1
     *)
     let open Impl in
     let a_next =
@@ -102,8 +102,10 @@ let to_field_checked (type f)
     in
     let open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint in
     let p l r o m c =
-      [ { Snarky_backendless.Constraint.annotation= None
-        ; basic= T (Basic {l; r; o; m; c}) } ]
+      [ { Snarky_backendless.Constraint.annotation = None
+        ; basic = T (Basic { l; r; o; m; c })
+        }
+      ]
     in
     let two = F.Constant.of_int 2 in
     let r_2i = (bits.(2 * i) :> F.t) in
@@ -122,15 +124,16 @@ let to_field_checked (type f)
         (* 2 r_2i + r_2i1 - 2 r_2i1 r_2i + two_b_prev_minus_b_next + -1  *)
       ; p (two, r_2i) (one, r_2i1)
           (one, two_b_prev_minus_b_next)
-          (F.Constant.negate two) neg_one ] ;
+          (F.Constant.negate two) neg_one
+      ] ;
     a := a_next ;
     b := b_next
   done ;
   F.(scale !a endo + !b)
 
 let to_field_constant (type f) ~endo
-    (module F : Plonk_checks.Field_intf with type t = f)
-    (SC.Scalar_challenge c) =
+    (module F : Plonk_checks.Field_intf with type t = f) (SC.Scalar_challenge c)
+    =
   let bits = Array.of_list (Challenge.Constant.to_bits c) in
   let a = ref (F.of_int 2) in
   let b = ref (F.of_int 2) in
@@ -148,7 +151,7 @@ let to_field_constant (type f) ~endo
 let test (type f)
     (module Impl : Snarky_backendless.Snark_intf.Run
       with type prover_state = unit
-       and type field = f) ~(endo : f) =
+       and type field = f ) ~(endo : f) =
   let open Impl in
   let module T = Internal_Basic in
   let n = 128 in
@@ -171,16 +174,16 @@ let test (type f)
               (Scalar_challenge (Challenge.Constant.of_bits s)) )
           xs
       with e ->
-        Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+        eprintf !"Input %{sexp: bool list}\n%!" xs ;
         raise e )
 
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
     (Challenge : Challenge.S with module Impl := Impl) (Endo : sig
-        val base : Impl.Field.Constant.t
+      val base : Impl.Field.Constant.t
 
-        val scalar : G.Constant.Scalar.t
+      val scalar : G.Constant.Scalar.t
     end) =
 struct
   open Impl
@@ -250,26 +253,29 @@ struct
                   (!yp - ((!b2il + !b2il - one) * !yt)) / (!xp - !xq))
         in
         let row =
-          { Zexe_backend_common.Endoscale_round.b2i1= b2i1l
+          { Zexe_backend_common.Endoscale_round.b2i1 = b2i1l
           ; xt
-          ; b2i= b2il
+          ; b2i = b2il
           ; xq
           ; yt
           ; xp
           ; l1
           ; yp
           ; xs
-          ; ys }
+          ; ys
+          }
         in
         go (row :: rows) s (i - 1)
     in
     let p = G.double (G.( + ) (Field.scale xt endo, yt) (xt, yt)) in
     let state = go [] p Int.(n - 1) in
     assert_
-      [ { basic=
+      [ { basic =
             Zexe_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (EC_endoscale {state})
-        ; annotation= None } ] ;
+              (EC_endoscale { state })
+        ; annotation = None
+        }
+      ] ;
     let finish = state.(Int.(n - 1)) in
     (finish.xs, finish.ys)
 
@@ -302,7 +308,7 @@ struct
               G.Constant.scale g x )
             (random_point, xs)
         with e ->
-          Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+          eprintf !"Input %{sexp: bool list}\n%!" xs ;
           raise e )
 
   let endo_inv ((gx, gy) as g) chal =

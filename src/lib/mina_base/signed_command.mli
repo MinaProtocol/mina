@@ -7,7 +7,7 @@ module Poly : sig
   module Stable : sig
     module V1 : sig
       type ('payload, 'pk, 'signature) t =
-        {payload: 'payload; signer: 'pk; signature: 'signature}
+        { payload : 'payload; signer : 'pk; signature : 'signature }
       [@@deriving sexp, hash, yojson, equal, compare]
     end
   end]

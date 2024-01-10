@@ -15,14 +15,14 @@ let to_group (type t)
         let params = params
       end)
   in
-  let {Group_map.Spec.a; b} = Params.spec params in
+  let { Group_map.Spec.a; b } = Params.spec params in
   let try_decode x =
     let f x = F.((x * x * x) + (a * x) + b) in
     let y = f x in
     if F.is_square y then Some (x, F.sqrt y) else None
   in
   let x1, x2, x3 = M.potential_xs t in
-  List.find_map [x1; x2; x3] ~f:try_decode |> Option.value_exn
+  List.find_map [ x1; x2; x3 ] ~f:try_decode |> Option.value_exn
 
 module Checked = struct
   open Snarky_backendless

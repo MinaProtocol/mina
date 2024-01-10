@@ -3,9 +3,6 @@
  (libraries core_kernel)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
- (public_name mina_version))
-
-(rule
- (targets mina_version.ml)
- (deps (:< gen.sh) (universe))
- (action (run %{<} %{targets})))
+ (public_name mina_version)
+ (virtual_modules mina_version)
+ (default_implementation mina_version.normal))

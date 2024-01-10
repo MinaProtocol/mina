@@ -32,9 +32,9 @@ module Ballot = struct
     let to_bits (nonce, vote) = Nonce.to_bits nonce @ Vote.to_bits vote
 
     (* This is our first explicit example of a checked computation. It simply says that to
-   convert an opened ballot into bits, one converts the nonce and the vote into bits and
-   concatenates them. Behind the scenes, this function would set up all the constraints
-   necessary to certify the correctness of this computation with a snark. *)
+       convert an opened ballot into bits, one converts the nonce and the vote into bits and
+       concatenates them. Behind the scenes, this function would set up all the constraints
+       necessary to certify the correctness of this computation with a snark. *)
     let var_to_bits (nonce, vote) =
       let%map nonce_bits = Nonce.var_to_bits nonce
       and vote_bits = Vote.var_to_bits vote in
@@ -115,7 +115,7 @@ let check_winner commitments claimed_winner =
 (* This specifies the data that will be exposed in the statement we're proving:
    a list of closed ballots (commitments to votes) and the winner. *)
 let exposed () =
-  Data_spec.[Typ.list ~length:number_of_voters Ballot.Closed.typ; Vote.typ]
+  Data_spec.[ Typ.list ~length:number_of_voters Ballot.Closed.typ; Vote.typ ]
 
 let keypair = generate_keypair check_winner ~exposing:(exposed ())
 
@@ -130,12 +130,11 @@ let winner (ballots : Ballot.Opened.t array) =
   if pepperoni_votes > Array.length ballots / 2 then Vote.Pepperoni
   else Mushroom
 
-let handled_check (ballots : Ballot.Opened.t array) commitments claimed_winner
-    =
+let handled_check (ballots : Ballot.Opened.t array) commitments claimed_winner =
   (* As mentioned before, a checked computation can request help from outside.
      Here is where we answer those requests (or at least some of them). *)
   handle (check_winner commitments claimed_winner)
-    (fun (With {request; respond}) ->
+    (fun (With { request; respond }) ->
       match request with
       | Open_ballot i ->
           respond (Provide ballots.(i))

@@ -13,7 +13,7 @@ let%test_module "blake2-equality test" =
         run_and_check
           (let%bind input = exists typ1 ~compute:(As_prover.return input) in
            let%map result = checked input in
-           As_prover.read typ2 result)
+           As_prover.read typ2 result )
           ()
         |> Or_error.ok_exn
       in

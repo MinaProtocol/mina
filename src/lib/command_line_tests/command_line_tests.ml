@@ -18,8 +18,7 @@ let%test_module "Command line tests" =
 
        the mina.exe executable must have been built before running the test
        here, else it will fail
-
-     *)
+    *)
     let coda_exe = "../../app/cli/src/mina.exe"
 
     let start_daemon config_dir genesis_ledger_dir port =
@@ -41,7 +40,10 @@ let%test_module "Command line tests" =
               ; "-genesis-ledger-dir"
               ; genesis_ledger_dir
               ; "-current-protocol-version"
-              ; "0.0.0" ]
+              ; "0.0.0"
+              ; "-external-ip"
+              ; "0.0.0.0"
+              ]
             ()
         with
         | Ok s ->
@@ -53,11 +55,11 @@ let%test_module "Command line tests" =
 
     let stop_daemon port =
       Process.run () ~prog:coda_exe
-        ~args:["client"; "stop-daemon"; "-daemon-port"; sprintf "%d" port]
+        ~args:[ "client"; "stop-daemon"; "-daemon-port"; sprintf "%d" port ]
 
     let start_client port =
       Process.run ~prog:coda_exe
-        ~args:["client"; "status"; "-daemon-port"; sprintf "%d" port]
+        ~args:[ "client"; "status"; "-daemon-port"; sprintf "%d" port ]
         ()
 
     let create_config_directories () =
@@ -67,8 +69,8 @@ let%test_module "Command line tests" =
       (conf, genesis)
 
     let remove_config_directory config_dir genesis_dir =
-      let%bind _ = Process.run_exn ~prog:"rm" ~args:["-rf"; config_dir] () in
-      Process.run_exn ~prog:"rm" ~args:["-rf"; genesis_dir] ()
+      let%bind _ = Process.run_exn ~prog:"rm" ~args:[ "-rf"; config_dir ] () in
+      Process.run_exn ~prog:"rm" ~args:[ "-rf"; genesis_dir ] ()
       |> Deferred.ignore_m
 
     let test_background_daemon () =

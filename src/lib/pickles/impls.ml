@@ -4,10 +4,17 @@ open Import
 open Backend
 module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock) (Unit)
 
+(** returns [true] if the [i]th bit of [x] is set to 1 *)
 let test_bit x i = B.(shift_right x i land one = one)
 
-let forbidden_shifted_values ~modulus:r ~size_in_bits ~f =
+(** returns all the values that can fit in [~size_in_bits] bits and that are
+ * either congruent with -2^[~size_in_bits] mod [~modulus] 
+ * or congruent with -2^[~size_in_bits] - 1 mod [~modulus] 
+ *)
+let forbidden_shifted_values ~modulus:r ~size_in_bits =
   let two_to_n = B.(pow (of_int 2) (of_int size_in_bits)) in
+  (* this function doesn't make sense if the modulus is smaller *)
+  assert (B.(r < two_to_n)) ;
   let neg_two_to_n = B.(neg two_to_n) in
   let representatives x =
     let open Sequence in
@@ -18,9 +25,8 @@ let forbidden_shifted_values ~modulus:r ~size_in_bits ~f =
     |> take_while ~f:fits_in_n_bits
     |> to_list
   in
-  List.concat_map [neg_two_to_n; B.(neg_two_to_n - one)] ~f:representatives
+  List.concat_map [ neg_two_to_n; B.(neg_two_to_n - one) ] ~f:representatives
   |> List.dedup_and_sort ~compare:B.compare
-  |> List.map ~f
 
 module Step = struct
   module Impl = Snarky_backendless.Snark.Run.Make (Tick) (Unit)
@@ -36,11 +42,40 @@ module Step = struct
       Field.t * Boolean.var
 
     let forbidden_shifted_values =
-      forbidden_shifted_values ~size_in_bits:Constant.size_in_bits
-        ~modulus:(Wrap_impl.Bigint.to_bignum_bigint Constant.size) ~f:(fun x ->
-          let hi = test_bit x (Field.size_in_bits - 1) in
-          let lo = B.shift_right x 1 in
-          (Impl.Bigint.(to_field (of_bignum_bigint lo)), hi) )
+      let size_in_bits = Constant.size_in_bits in
+      let other_mod = Wrap_impl.Bigint.to_bignum_bigint Constant.size in
+      let values = forbidden_shifted_values ~size_in_bits ~modulus:other_mod in
+      let f x =
+        let hi = test_bit x (Field.size_in_bits - 1) in
+        let lo = B.shift_right x 1 in
+        let lo =
+          (* IMPORTANT: in practice we should filter such values
+             see: https://github.com/MinaProtocol/mina/pull/9324/commits/82b14cd7f11fb938ab6d88aac19516bd7ea05e94
+             but the circuit needs to remain the same, which is to use 0 when a value is larger than the modulus here (tested by the unit test below)
+          *)
+          let modulus = Impl.Field.size in
+          if B.compare modulus lo <= 0 then Tick.Field.zero
+          else Impl.Bigint.(to_field (of_bignum_bigint lo))
+        in
+        (lo, hi)
+      in
+      values |> List.map ~f
+
+    let%test_unit "preserve circuit behavior for Step" =
+      let expected_list =
+        [ ("45560315531506369815346746415080538112", false)
+        ; ("45560315531506369815346746415080538113", false)
+        ; ( "14474011154664524427946373126085988481727088556502330059655218120611762012161"
+          , true )
+        ; ( "14474011154664524427946373126085988481727088556502330059655218120611762012161"
+          , true )
+        ]
+      in
+      let str_list =
+        List.map forbidden_shifted_values ~f:(fun (a, b) ->
+            (Tick.Field.to_string a, b) )
+      in
+      assert ([%equal: (string * bool) list] str_list expected_list)
 
     let (typ_unchecked : (t, Constant.t) Typ.t), check =
       let t0 =
@@ -51,7 +86,7 @@ module Step = struct
             (Field.Constant.project low, high) )
           ~back:(fun (low, high) ->
             let low, _ = Util.split_last (Field.Constant.unpack low) in
-            Tock.Field.of_bits (low @ [high]) )
+            Tock.Field.of_bits (low @ [ high ]) )
       in
       let check t =
         let open Internal_Basic in
@@ -67,9 +102,9 @@ module Step = struct
       in
       (t0, check)
 
-    let typ = {typ_unchecked with check}
+    let typ = { typ_unchecked with check }
 
-    let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [b]
+    let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [ b ]
   end
 
   module Digest = Digest.Make (Impl)
@@ -85,7 +120,7 @@ module Step = struct
            ( Shifted_value.typ Other_field.typ_unchecked
            , fun (Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
-               t ))
+               t ) )
         spec
     in
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
@@ -107,11 +142,35 @@ module Wrap = struct
     type t = Field.t
 
     let forbidden_shifted_values =
-      forbidden_shifted_values ~size_in_bits:Constant.size_in_bits
-        ~modulus:(Step.Impl.Bigint.to_bignum_bigint Constant.size) ~f:(fun x ->
-          Impl.Bigint.(to_field (of_bignum_bigint x)) )
+      let other_mod = Step.Impl.Bigint.to_bignum_bigint Constant.size in
+      let size_in_bits = Constant.size_in_bits in
+      let values = forbidden_shifted_values ~size_in_bits ~modulus:other_mod in
+      let f x =
+        let modulus = Impl.Field.size in
+        (* IMPORTANT: in practice we should filter such values
+           see: https://github.com/MinaProtocol/mina/pull/9324/commits/82b14cd7f11fb938ab6d88aac19516bd7ea05e94
+           but the circuit needs to remain the same, which is to use 0 when a value is larger than the modulus here (tested by the unit test below)
+        *)
+        if B.compare modulus x <= 0 then Wrap_field.zero
+        else Impl.Bigint.(to_field (of_bignum_bigint x))
+      in
+      values |> List.map ~f
+
+    let%test_unit "preserve circuit behavior for Wrap" =
+      let expected_list =
+        [ "91120631062839412180561524743370440705"
+        ; "91120631062839412180561524743370440706"
+        ; "0"
+        ; "0"
+        ]
+      in
+      let str_list =
+        List.map forbidden_shifted_values ~f:Wrap_field.to_string
+      in
+      assert ([%equal: string list] str_list expected_list)
 
     let typ_unchecked, check =
+      (* Tick -> Tock *)
       let t0 =
         Typ.transport Field.typ
           ~there:(Fn.compose Tock.Field.of_bits Tick.Field.to_bits)
@@ -127,7 +186,7 @@ module Wrap = struct
       in
       (t0, check)
 
-    let typ = {typ_unchecked with check}
+    let typ = { typ_unchecked with check }
 
     let to_bits x = Field.unpack x ~length:Field.size_in_bits
   end
@@ -142,7 +201,7 @@ module Wrap = struct
            ( Shifted_value.typ fp
            , fun (Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
-               t ))
+               t ) )
         In_circuit.spec
     in
     let typ =

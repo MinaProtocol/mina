@@ -7,16 +7,16 @@ module Poly : sig
   module Stable : sig
     module V1 : sig
       type ('state_hash, 'body) t =
-        {previous_state_hash: 'state_hash; body: 'body}
+        { previous_state_hash : 'state_hash; body : 'body }
       [@@deriving equal, ord, hash, sexp, to_yojson]
     end
   end]
 end
 
-val hash_abstract :
+val hashes_abstract :
      hash_body:('body -> State_body_hash.t)
   -> (State_hash.t, 'body) Poly.t
-  -> State_hash.t
+  -> State_hash.State_hashes.t
 
 module Body : sig
   module Poly : sig
@@ -71,8 +71,7 @@ module Value : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t =
-        (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
+      type t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, yojson]
     end
   end]
@@ -131,9 +130,10 @@ val negative_one :
 
 val hash_checked : var -> (State_hash.var * State_body_hash.var, _) Checked.t
 
-val hash : Value.t -> State_hash.t
+val hashes : Value.t -> State_hash.State_hashes.t
 
 (** Same as [hash], but accept the [body_hash] directly to avoid re-computing
     it.
 *)
-val hash_with_body : Value.t -> body_hash:State_body_hash.t -> State_hash.t
+val hashes_with_body :
+  Value.t -> body_hash:State_body_hash.t -> State_hash.State_hashes.t

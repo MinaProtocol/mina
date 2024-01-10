@@ -187,7 +187,7 @@ module type S = sig
       module Stable : sig
         module V1 : sig
           type ('action, 'coinbase_amount) t =
-            {action: 'action; coinbase_amount: 'coinbase_amount}
+            { action : 'action; coinbase_amount : 'coinbase_amount }
           [@@deriving sexp]
         end
       end]

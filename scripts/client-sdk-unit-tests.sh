@@ -8,7 +8,7 @@ echo "Building client SDK..."
 source ~/.profile
 make client_sdk
 echo "Running unit tests in Javascript"
-nodejs src/app/client_sdk/tests/run_unit_tests.js
+node src/app/client_sdk/tests/run_unit_tests.js
 
 # the Rosetta encodings are not part of the client SDK as such,
 # but the SDK relies on them, so it's reasonable to compare
@@ -24,7 +24,7 @@ echo "Running"
 echo "Building nonconsensus Javascript code for encodings..."
 make client_sdk
 echo "Running"
-nodejs src/app/client_sdk/tests/test_encodings.js > encodings.js.nonconsensus
+node src/app/client_sdk/tests/test_encodings.js > encodings.js.nonconsensus
 
 diff encodings.consensus encodings.js.nonconsensus
 

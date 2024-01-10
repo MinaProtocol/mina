@@ -6,9 +6,10 @@ module Single = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { receiver_pk: Public_key.Compressed.Stable.V1.t
-        ; fee: Currency.Fee.Stable.V1.t
-        ; fee_token: Token_id.Stable.V1.t }
+        { receiver_pk : Public_key.Compressed.Stable.V1.t
+        ; fee : Currency.Fee.Stable.V1.t
+        ; fee_token : Token_id.Stable.V1.t
+        }
       [@@deriving sexp, compare, equal, yojson, hash]
 
       let to_latest = Fn.id
@@ -25,19 +26,16 @@ module Single = struct
   [%%define_locally
   Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 
-  [%%define_locally
-  Base58_check.String_ops.(to_string, of_string)]
+  let create ~receiver_pk ~fee ~fee_token = { receiver_pk; fee; fee_token }
 
-  let create ~receiver_pk ~fee ~fee_token = {receiver_pk; fee; fee_token}
+  let receiver_pk { receiver_pk; _ } = receiver_pk
 
-  let receiver_pk {receiver_pk; _} = receiver_pk
-
-  let receiver {receiver_pk; fee_token; _} =
+  let receiver { receiver_pk; fee_token; _ } =
     Account_id.create receiver_pk fee_token
 
-  let fee {fee; _} = fee
+  let fee { fee; _ } = fee
 
-  let fee_token {fee_token; _} = fee_token
+  let fee_token { fee_token; _ } = fee_token
 
   module Gen = struct
     let with_random_receivers ?(min_fee = 0) ~keys ~max_fee ~token :
@@ -49,7 +47,7 @@ module Single = struct
         >>| fun keypair -> Public_key.compress keypair.Keypair.public_key
       and fee = Int.gen_incl min_fee max_fee >>| Currency.Fee.of_int
       and fee_token = token in
-      {receiver_pk; fee; fee_token}
+      { receiver_pk; fee; fee_token }
   end
 end
 
@@ -64,9 +62,10 @@ module Stable = struct
 end]
 
 type single = Single.t =
-  { receiver_pk: Public_key.Compressed.t
-  ; fee: Currency.Fee.t
-  ; fee_token: Token_id.t }
+  { receiver_pk : Public_key.Compressed.t
+  ; fee : Currency.Fee.t
+  ; fee_token : Token_id.t
+  }
 [@@deriving sexp, compare, yojson, hash]
 
 let to_singles = Fn.id
@@ -98,12 +97,11 @@ include Comparable.Make (Stable.Latest)
 
 let fee_excess ft =
   ft
-  |> One_or_two.map ~f:(fun {fee_token; fee; _} ->
+  |> One_or_two.map ~f:(fun { fee_token; fee; _ } ->
          (fee_token, Currency.Fee.Signed.(negate (of_unsigned fee))) )
   |> Fee_excess.of_one_or_two
 
-let receiver_pks t =
-  One_or_two.to_list (One_or_two.map ~f:Single.receiver_pk t)
+let receiver_pks t = One_or_two.to_list (One_or_two.map ~f:Single.receiver_pk t)
 
 let receivers t = One_or_two.to_list (One_or_two.map ~f:Single.receiver t)
 

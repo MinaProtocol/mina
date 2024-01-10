@@ -3,15 +3,14 @@ open Core
 module type Key = sig
   type t [@@deriving sexp]
 
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving sexp, bin_io]
-      end
-
-      module Latest = V1
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp, bin_io]
     end
-    with type V1.t = t
+
+    module Latest = V1
+  end
+  with type V1.t = t
 
   val empty : t
 
@@ -25,13 +24,12 @@ end
 module type Token_id = sig
   type t [@@deriving sexp]
 
-  module Stable :
-    sig
-      module Latest : sig
-        type t [@@deriving bin_io]
-      end
+  module Stable : sig
+    module Latest : sig
+      type t [@@deriving bin_io]
     end
-    with type Latest.t = t
+  end
+  with type Latest.t = t
 
   val default : t
 
@@ -96,7 +94,7 @@ end
 module type Hash = sig
   type t [@@deriving bin_io, compare, equal, sexp, yojson]
 
-  val to_string : t -> string
+  val to_base58_check : t -> string
 
   include Hashable.S_binable with type t := t
 
@@ -120,12 +118,14 @@ module type Key_value_database = sig
 
   include
     Key_value_database.Intf.Ident
-    with type t := t
-     and type key := Bigstring.t
-     and type value := Bigstring.t
-     and type config := config
+      with type t := t
+       and type key := Bigstring.t
+       and type value := Bigstring.t
+       and type config := config
 
   val create_checkpoint : t -> string -> t
+
+  val make_checkpoint : t -> string -> unit
 
   val get_uuid : t -> Uuid.t
 

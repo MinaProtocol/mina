@@ -9,8 +9,8 @@ RUN yarn install && yarn cache clean
 
 COPY lib.js .
 
-ENV CODA_GRAPHQL_HOST=localhost
-ENV CODA_GRAPHQL_PORT=3085
+ENV MINA_GRAPHQL_HOST=localhost
+ENV MINA_GRAPHQL_PORT=3085
 
 ENV GOOGLE_CLOUD_STORAGE_API_KEY=
 
@@ -20,5 +20,5 @@ RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSI
     && rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
 
 ENTRYPOINT ["bash", "-c"]
-CMD ["dockerize -wait tcp://$CODA_GRAPHQL_HOST:$CODA_GRAPHQL_PORT -timeout 90s && node lib.js" ]
+CMD ["dockerize -wait tcp://$MINA_GRAPHQL_HOST:$MINA_GRAPHQL_PORT -timeout 90s && node lib.js" ]
 

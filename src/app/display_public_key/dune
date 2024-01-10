@@ -3,7 +3,18 @@
  (name display_public_key)
  (public_name display_public_key)
  (modes native)
- (libraries cli_lib core)
+ (libraries
+   ;; opam libraries
+   base
+   async_kernel
+   async
+   core
+   base.caml
+   ;; local libraries
+   cli_lib
+   signature_lib
+   secrets
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_sexp_conv ppx_optcomp))
  (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60))

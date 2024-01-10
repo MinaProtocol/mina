@@ -6,8 +6,8 @@
  * Schema Peer.t : A Peer is a representation of a node's peer.
  *)
 
-type t = {peer_id: string; metadata: Yojson.Safe.t option [@default None]}
-[@@deriving yojson {strict= false}, show]
+type t = { peer_id : string; metadata : Yojson.Safe.t option [@default None] }
+[@@deriving yojson { strict = false }, show, eq]
 
 (** A Peer is a representation of a node's peer. *)
-let create (peer_id : string) : t = {peer_id; metadata= None}
+let create (peer_id : string) : t = { peer_id; metadata = None }

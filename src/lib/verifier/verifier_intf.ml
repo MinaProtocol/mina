@@ -11,7 +11,7 @@ module Base = struct
          t
       -> Mina_base.User_command.Verifiable.t list
          (* The first level of error represents failure to verify, the second a failure in
-   communicating with the verifier. *)
+            communicating with the verifier. *)
       -> [ `Valid of Mina_base.User_command.Valid.t
          | `Invalid
          | `Valid_assuming of

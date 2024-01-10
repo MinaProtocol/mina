@@ -5,7 +5,9 @@ open Signature_lib
 module Stable = struct
   module V1 = struct
     type t =
-      {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
+      { fee : Currency.Fee.Stable.V1.t
+      ; prover : Public_key.Compressed.Stable.V1.t
+      }
     [@@deriving sexp, yojson, hash]
 
     let to_latest = Fn.id
@@ -30,4 +32,4 @@ include Comparable.Make (Stable.V1.T)
 
 let gen =
   Quickcheck.Generator.map2 Currency.Fee.gen Public_key.Compressed.gen
-    ~f:(fun fee prover -> {fee; prover})
+    ~f:(fun fee prover -> { fee; prover })

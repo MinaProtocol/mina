@@ -6,9 +6,10 @@ module Fee_transfer = Coinbase_fee_transfer
 module Stable = struct
   module V1 = struct
     type t =
-      { receiver: Public_key.Compressed.Stable.V1.t
-      ; amount: Currency.Amount.Stable.V1.t
-      ; fee_transfer: Fee_transfer.Stable.V1.t option }
+      { receiver : Public_key.Compressed.Stable.V1.t
+      ; amount : Currency.Amount.Stable.V1.t
+      ; fee_transfer : Fee_transfer.Stable.V1.t option
+      }
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
@@ -23,9 +24,6 @@ module Base58_check = Codable.Make_base58_check (Stable.Latest)
 
 [%%define_locally
 Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
-
-[%%define_locally
-Base58_check.String_ops.(to_string, of_string)]
 
 let receiver_pk t = t.receiver
 
@@ -45,32 +43,32 @@ let accounts_accessed t =
   receiver t
   :: List.map ~f:Fee_transfer.receiver (Option.to_list t.fee_transfer)
 
-let is_valid {amount; fee_transfer; _} =
+let is_valid { amount; fee_transfer; _ } =
   match fee_transfer with
   | None ->
       true
-  | Some {fee; _} ->
+  | Some { fee; _ } ->
       Currency.Amount.(of_fee fee <= amount)
 
 let create ~amount ~receiver ~fee_transfer =
-  let t = {receiver; amount; fee_transfer} in
+  let t = { receiver; amount; fee_transfer } in
   if is_valid t then
     let adjusted_fee_transfer =
       Option.bind fee_transfer ~f:(fun fee_transfer ->
           Option.some_if
             (not
                (Public_key.Compressed.equal receiver
-                  (Fee_transfer.receiver_pk fee_transfer)))
+                  (Fee_transfer.receiver_pk fee_transfer) ) )
             fee_transfer )
     in
-    Ok {t with fee_transfer= adjusted_fee_transfer}
+    Ok { t with fee_transfer = adjusted_fee_transfer }
   else Or_error.error_string "Coinbase.create: invalid coinbase"
 
-let supply_increase {receiver= _; amount; fee_transfer} =
+let supply_increase { receiver = _; amount; fee_transfer } =
   match fee_transfer with
   | None ->
       Ok amount
-  | Some {fee; _} ->
+  | Some { fee; _ } ->
       Currency.Amount.sub amount (Currency.Amount.of_fee fee)
       |> Option.value_map
            ~f:(fun _ -> Ok amount)
@@ -96,7 +94,7 @@ module Gen = struct
       if supercharged_coinbase then
         Option.value_exn
           (Currency.Amount.scale amount
-             constraint_constants.supercharged_coinbase_factor)
+             constraint_constants.supercharged_coinbase_factor )
       else amount
     in
     (* keep account-creation fee for the coinbase-receiver *)
@@ -104,7 +102,7 @@ module Gen = struct
       Option.value_exn
         (Currency.Fee.sub
            (Currency.Amount.to_fee amount)
-           constraint_constants.account_creation_fee)
+           constraint_constants.account_creation_fee )
     in
     let min_fee = constraint_constants.account_creation_fee in
     let%map fee_transfer =
@@ -112,14 +110,14 @@ module Gen = struct
     in
     let fee_transfer =
       match fee_transfer with
-      | Some {Fee_transfer.receiver_pk; _}
+      | Some { Fee_transfer.receiver_pk; _ }
         when Public_key.Compressed.equal receiver receiver_pk ->
           (* Erase fee transfer, to mirror [create]. *)
           None
       | _ ->
           fee_transfer
     in
-    ( {receiver; amount; fee_transfer}
+    ( { receiver; amount; fee_transfer }
     , `Supercharged_coinbase supercharged_coinbase )
 
   let with_random_receivers ~keys ~min_amount ~max_amount ~fee_transfer =
@@ -136,12 +134,12 @@ module Gen = struct
     in
     let fee_transfer =
       match fee_transfer with
-      | Some {Fee_transfer.receiver_pk; _}
+      | Some { Fee_transfer.receiver_pk; _ }
         when Public_key.Compressed.equal receiver receiver_pk ->
           (* Erase fee transfer, to mirror [create]. *)
           None
       | _ ->
           fee_transfer
     in
-    {receiver; amount; fee_transfer}
+    { receiver; amount; fee_transfer }
 end

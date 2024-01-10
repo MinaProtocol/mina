@@ -1,11 +1,11 @@
 include Core_kernel
 
 module True = struct
-  type t = unit
+  type t = True
 end
 
 module False = struct
-  type t = unit
+  type t = False
 end
 
 type true_ = True.t

@@ -4,33 +4,31 @@ open Mina_base
 
 type Structured_log_events.t +=
   | Merge_snark_generated of
-      { time:
-          (Time.Span.t[@to_yojson
-                        fun total -> `String (Time.Span.to_string_hum total)]
-                      [@of_yojson
-                        function
-                        | `String time ->
-                            Ok (Time.Span.of_string time)
-                        | _ ->
-                            Error
-                              "Snark_worker.Functor: Could not parse timespan"])
+      { time :
+          (Time.Span.t
+          [@to_yojson fun total -> `String (Time.Span.to_string_hum total)]
+          [@of_yojson
+            function
+            | `String time ->
+                Ok (Time.Span.of_string time)
+            | _ ->
+                Error "Snark_worker.Functor: Could not parse timespan"] )
       }
-  [@@deriving register_event {msg= "Merge SNARK generated in $time"}]
+  [@@deriving register_event { msg = "Merge SNARK generated in $time" }]
 
 type Structured_log_events.t +=
   | Base_snark_generated of
-      { time:
-          (Time.Span.t[@to_yojson
-                        fun total -> `String (Time.Span.to_string_hum total)]
-                      [@of_yojson
-                        function
-                        | `String time ->
-                            Ok (Time.Span.of_string time)
-                        | _ ->
-                            Error
-                              "Snark_worker.Functor: Could not parse timespan"])
+      { time :
+          (Time.Span.t
+          [@to_yojson fun total -> `String (Time.Span.to_string_hum total)]
+          [@of_yojson
+            function
+            | `String time ->
+                Ok (Time.Span.of_string time)
+            | _ ->
+                Error "Snark_worker.Functor: Could not parse timespan"] )
       }
-  [@@deriving register_event {msg= "Base SNARK generated in $time"}]
+  [@@deriving register_event { msg = "Base SNARK generated in $time" }]
 
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
@@ -65,7 +63,7 @@ module Make (Inputs : Intf.Inputs_intf) :
   end
 
   let perform (s : Worker_state.t) public_key
-      ({instances; fee} as spec : Work.Spec.t) =
+      ({ instances; fee } as spec : Work.Spec.t) =
     One_or_two.Deferred_result.map instances ~f:(fun w ->
         let open Deferred.Or_error.Let_syntax in
         let%map proof, time =
@@ -78,15 +76,17 @@ module Make (Inputs : Intf.Inputs_intf) :
         ) )
     |> Deferred.Or_error.map ~f:(function
          | `One (proof1, metrics1) ->
-             { Snark_work_lib.Work.Result.proofs= `One proof1
-             ; metrics= `One metrics1
+             { Snark_work_lib.Work.Result.proofs = `One proof1
+             ; metrics = `One metrics1
              ; spec
-             ; prover= public_key }
+             ; prover = public_key
+             }
          | `Two ((proof1, metrics1), (proof2, metrics2)) ->
-             { Snark_work_lib.Work.Result.proofs= `Two (proof1, proof2)
-             ; metrics= `Two (metrics1, metrics2)
+             { Snark_work_lib.Work.Result.proofs = `Two (proof1, proof2)
+             ; metrics = `Two (metrics1, metrics2)
              ; spec
-             ; prover= public_key } )
+             ; prover = public_key
+             } )
 
   let dispatch rpc shutdown_on_disconnect query address =
     let%map res =
@@ -97,10 +97,11 @@ module Make (Inputs : Intf.Inputs_intf) :
           (Rpc.Connection.Heartbeat_config.create
              ~timeout:
                (Time_ns.Span.of_sec
-                  Mina_compile_config.rpc_heartbeat_timeout_sec)
+                  Mina_compile_config.rpc_heartbeat_timeout_sec )
              ~send_every:
                (Time_ns.Span.of_sec
-                  Mina_compile_config.rpc_heartbeat_send_every_sec) ())
+                  Mina_compile_config.rpc_heartbeat_send_every_sec )
+             () )
         (Tcp.Where_to_connect.of_host_and_port address)
         (fun conn -> Rpc.Rpc.dispatch rpc conn query)
     in
@@ -126,16 +127,16 @@ module Make (Inputs : Intf.Inputs_intf) :
             Mina_metrics.(
               Cryptography.Snark_work_histogram.observe
                 Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
-            [%str_log info] (Merge_snark_generated {time})
+            [%str_log info] (Merge_snark_generated { time })
         | `Transition ->
             Mina_metrics.(
               Cryptography.Snark_work_histogram.observe
                 Cryptography.snark_work_base_time_sec (Time.Span.to_sec time)) ;
-            [%str_log info] (Base_snark_generated {time}) )
+            [%str_log info] (Base_snark_generated { time }) )
 
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Inputs.Ledger_proof.t) ~logger
+        with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger
       ~proof_level daemon_address shutdown_on_disconnect =
     let constraint_constants =
       (* TODO: Make this configurable. *)
@@ -168,7 +169,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         let%bind cwd = Sys.getcwd () in
         [%log debug]
           !"Snark worker working directory $dir"
-          ~metadata:[("dir", `String cwd)] ;
+          ~metadata:[ ("dir", `String cwd) ] ;
         let path = "snark_coordinator" in
         match%bind Sys.file_exists path with
         | `Yes -> (
@@ -180,7 +181,7 @@ module Make (Inputs : Intf.Inputs_intf) :
       in
       [%log debug]
         !"Snark worker using daemon $addr"
-        ~metadata:[("addr", `String (Host_and_port.to_string daemon_address))] ;
+        ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
       match%bind
         dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
           daemon_address
@@ -194,7 +195,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           in
           (* No work to be done -- quietly take a brief nap *)
           [%log info] "No jobs available. Napping for $time seconds"
-            ~metadata:[("time", `Float random_delay)] ;
+            ~metadata:[ ("time", `Float random_delay) ] ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some (work, public_key)) -> (
@@ -206,7 +207,8 @@ module Make (Inputs : Intf.Inputs_intf) :
               ; ( "work_ids"
                 , Transaction_snark_work.Statement.compact_json
                     (One_or_two.map (Work.Spec.instances work)
-                       ~f:Work.Single.Spec.statement) ) ] ;
+                       ~f:Work.Single.Spec.statement ) )
+              ] ;
           let%bind () = wait () in
           (* Pause to wait for stdout to flush *)
           match%bind perform state public_key work with
@@ -214,15 +216,14 @@ module Make (Inputs : Intf.Inputs_intf) :
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
               emit_proof_metrics result.metrics logger ;
-              [%log info]
-                "Submitted completed SNARK work $work_ids to $address"
+              [%log info] "Submitted completed SNARK work $work_ids to $address"
                 ~metadata:
-                  [ ( "address"
-                    , `String (Host_and_port.to_string daemon_address) )
+                  [ ("address", `String (Host_and_port.to_string daemon_address))
                   ; ( "work_ids"
                     , Transaction_snark_work.Statement.compact_json
                         (One_or_two.map (Work.Spec.instances work)
-                           ~f:Work.Single.Spec.statement) ) ] ;
+                           ~f:Work.Single.Spec.statement ) )
+                  ] ;
               let rec submit_work () =
                 match%bind
                   dispatch Rpcs_versioned.Submit_work.Latest.rpc
@@ -240,28 +241,29 @@ module Make (Inputs : Intf.Inputs_intf) :
 
   let command_from_rpcs
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Inputs.Ledger_proof.t) =
+        with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =
-        flag "--daemon-address" ~aliases:["daemon-address"]
+        flag "--daemon-address" ~aliases:[ "daemon-address" ]
           (required (Arg_type.create Host_and_port.of_string))
           ~doc:"HOST-AND-PORT address daemon is listening on"
       and proof_level =
-        flag "--proof-level" ~aliases:["proof-level"]
+        flag "--proof-level" ~aliases:[ "proof-level" ]
           (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
           ~doc:"full|check|none"
       and shutdown_on_disconnect =
-        flag "--shutdown-on-disconnect" ~aliases:["shutdown-on-disconnect"]
+        flag "--shutdown-on-disconnect"
+          ~aliases:[ "shutdown-on-disconnect" ]
           (optional bool)
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
       in
       fun () ->
         let logger =
-          Logger.create () ~metadata:[("process", `String "Snark Worker")]
+          Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
-        Signal.handle [Signal.term] ~f:(fun _signal ->
+        Signal.handle [ Signal.term ] ~f:(fun _signal ->
             [%log info]
               !"Received signal to terminate. Aborting snark worker process" ;
             Core.exit 0 ) ;
@@ -280,5 +282,6 @@ module Make (Inputs : Intf.Inputs_intf) :
     ; "-proof-level"
     ; Genesis_constants.Proof_level.to_string proof_level
     ; "-shutdown-on-disconnect"
-    ; Bool.to_string shutdown_on_disconnect ]
+    ; Bool.to_string shutdown_on_disconnect
+    ]
 end

@@ -1,6 +1,5 @@
 open Core_kernel
 open Ppxlib
-open Asttypes
 
 (** This is a ppx to flag code that will expire after a certain date
 
@@ -16,12 +15,12 @@ open Asttypes
 
 let name = "expires_after"
 
-let expand ~loc ~path:_ str _delimiter =
+let expand ~loc ~path:_ str =
   let date =
     try
       (* the of_string function below allows too-long strings, as long as it starts
          with a valid date, so we do our own length check
-        *)
+      *)
       if String.length str.txt > 8 then
         Location.raise_errorf ~loc:str.loc
           "Not a valid date, string too long; must be in form YYYYMMDD" ;
@@ -37,8 +36,9 @@ let expand ~loc ~path:_ str _delimiter =
 
 let ext =
   Extension.declare name Extension.Context.structure_item
-    Ast_pattern.(single_expr_payload (pexp_constant (pconst_string __' __)))
+    Ast_pattern.(
+      single_expr_payload (pexp_constant (pconst_string __' drop drop)))
     expand
 
 let () =
-  Driver.register_transformation name ~rules:[Context_free.Rule.extension ext]
+  Driver.register_transformation name ~rules:[ Context_free.Rule.extension ext ]

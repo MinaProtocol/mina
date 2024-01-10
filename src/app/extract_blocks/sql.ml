@@ -1,4 +1,4 @@
-(* sql.ml -- (Postgresql) SQL queries for missing subchain app *)
+(* sql.ml -- (Postgresql) SQL queries for extract blocks app *)
 
 module Subchain = struct
   let make_sql ~join_condition =
@@ -6,13 +6,13 @@ module Subchain = struct
       {sql| WITH RECURSIVE chain AS (
 
               SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                     next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp
+                     next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp, chain_status
               FROM blocks b WHERE b.state_hash = $1
 
               UNION ALL
 
               SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,b.snarked_ledger_hash_id,b.staking_epoch_data_id,
-                     b.next_epoch_data_id,b.ledger_hash,b.height,b.global_slot,b.global_slot_since_genesis,b.timestamp
+                     b.next_epoch_data_id,b.ledger_hash,b.height,b.global_slot,b.global_slot_since_genesis,b.timestamp,b.chain_status
               FROM blocks b
 
               INNER JOIN chain
@@ -21,7 +21,7 @@ module Subchain = struct
            )
 
            SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                  next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp
+                  next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp,chain_status
            FROM chain
       |sql}
       join_condition
@@ -36,8 +36,8 @@ module Subchain = struct
       Archive_lib.Processor.Block.typ
       (make_sql
          ~join_condition:
-           "b.id = chain.parent_id AND (chain.state_hash <> $2 OR \
-            b.state_hash = $2)")
+           "b.id = chain.parent_id AND (chain.state_hash <> $2 OR b.state_hash \
+            = $2)" )
 
   let start_from_unparented (module Conn : Caqti_async.CONNECTION)
       ~end_state_hash =
@@ -50,7 +50,7 @@ module Subchain = struct
   let query_all =
     Caqti_request.collect Caqti_type.unit Archive_lib.Processor.Block.typ
       {sql| SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                   next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp
+                   next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp, chain_status
             FROM blocks
       |sql}
 
@@ -100,22 +100,24 @@ end
 
 module Blocks_and_internal_commands = struct
   type t =
-    { internal_command_id: int
-    ; sequence_no: int
-    ; secondary_sequence_no: int
-    ; receiver_balance_id: int }
+    { internal_command_id : int
+    ; sequence_no : int
+    ; secondary_sequence_no : int
+    ; receiver_account_creation_fee_paid : int64 option
+    ; receiver_balance_id : int
+    }
   [@@deriving hlist]
 
   let typ =
     let open Archive_lib.Processor.Caqti_type_spec in
-    let spec = Caqti_type.[int; int; int; int] in
+    let spec = Caqti_type.[ int; int; int; option int64; int ] in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT internal_command_id, sequence_no, secondary_sequence_no, receiver_balance
+      {sql| SELECT internal_command_id, sequence_no, secondary_sequence_no, receiver_account_creation_fee_paid, receiver_balance
             FROM (blocks_internal_commands
               INNER JOIN blocks
               ON blocks.id = blocks_internal_commands.block_id)

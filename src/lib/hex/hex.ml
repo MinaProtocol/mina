@@ -190,7 +190,7 @@ module Safe = struct
            in
            let high = charify @@ ((Char.to_int c land 0xF0) lsr 4) in
            let lo = charify (Char.to_int c land 0x0F) in
-           String.of_char_list [high; lo] )
+           String.of_char_list [ high; lo ] )
     |> String.concat
 
   let%test_unit "to_hex sane" =
@@ -218,7 +218,7 @@ module Safe = struct
     String.to_list hex |> List.chunks_of ~length:2
     |> List.fold_result ~init:[] ~f:(fun acc chunk ->
            match chunk with
-           | [a; b] when Char.is_alphanum a && Char.is_alphanum b ->
+           | [ a; b ] when Char.is_alphanum a && Char.is_alphanum b ->
                Or_error.return
                @@ (Char.((to_u4 a lsl 4) lor to_u4 b |> of_int_exn) :: acc)
            | _ ->
@@ -227,7 +227,7 @@ module Safe = struct
     |> Option.map ~f:(Fn.compose String.of_char_list List.rev)
 
   let%test_unit "partial isomorphism" =
-    Quickcheck.test ~sexp_of:[%sexp_of: string] ~examples:["\243"; "abc"]
+    Quickcheck.test ~sexp_of:[%sexp_of: string] ~examples:[ "\243"; "abc" ]
       Quickcheck.Generator.(map (list char) ~f:String.of_char_list)
       ~f:(fun s ->
         let hexified = to_hex s in

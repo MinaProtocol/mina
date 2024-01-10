@@ -4,8 +4,14 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane h_list.ppx ppx_compare))
  (libraries
-   sgn_type
+   ;; opam libraries
+   core_kernel
+   sexplib0
+   core
+   base.caml
+   ;; local libraries
    snarky_curves
+   sgn_type
    snarky.backendless
-   snarkette
-   core_kernel))
+   bitstring_lib
+))
