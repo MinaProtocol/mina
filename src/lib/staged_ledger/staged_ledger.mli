@@ -143,6 +143,7 @@ module Staged_ledger_error : sig
     | Insufficient_work of string
     | Mismatched_statuses of Transaction.t With_status.t * Transaction_status.t
     | Invalid_public_key of Public_key.Compressed.t
+    | ZkApps_exceed_limit of int * int
     | Unexpected of Error.t
   [@@deriving sexp]
 

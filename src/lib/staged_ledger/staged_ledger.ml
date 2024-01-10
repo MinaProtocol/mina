@@ -988,10 +988,10 @@ module T = struct
             |> List.filter ~f:(fun txn -> zkAppCountGetter txn)
             |> List.length
           in
-          if zkAppCount > t.constraint_constants.zkapps_per_block then
+          if zkAppCount > Genesis_constants.zkapps_per_block then
             Deferred.Result.fail
               (Staged_ledger_error.ZkApps_exceed_limit
-                 (zkAppCount, t.constraint_constants.zkapps_per_block) )
+                 (zkAppCount, Genesis_constants.zkapps_per_block) )
           else Deferred.Result.return () )
     in
     [%log internal] "Update_coinbase_stack"
