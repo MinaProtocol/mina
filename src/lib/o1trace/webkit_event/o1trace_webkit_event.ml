@@ -5,9 +5,12 @@ module Scheduler = Async_kernel_scheduler
 
 let current_wr = ref None
 
+let emitted_since_cycle_ended = ref false
+
 let emit_event' =
   let buf = Bigstring.create 512 in
   fun wr event ->
+    emitted_since_cycle_ended := true ;
     try Webkit_trace_event_binary_output.emit_event ~buf wr event
     with exn ->
       Writer.writef wr "failed to write o1trace event: %s\n" (Exn.to_string exn)
@@ -100,7 +103,9 @@ module T = struct
     emit_event
       (new_thread_event ~include_name:true fiber.key fiber.id New_thread)
 
-  let on_cycle_end () = emit_event (new_event Cycle_end)
+  let on_cycle_end () =
+    if !emitted_since_cycle_ended then emit_event (new_event Cycle_end) ;
+    emitted_since_cycle_ended := false
 end
 
 let start_tracing wr =
