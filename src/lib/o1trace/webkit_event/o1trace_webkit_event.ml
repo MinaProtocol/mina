@@ -5,11 +5,12 @@ module Scheduler = Async_kernel_scheduler
 
 let current_wr = ref None
 
-let emit_event' wr event =
+let emit_event' =
   let buf = Bigstring.create 512 in
-  try Webkit_trace_event_binary_output.emit_event ~buf wr event
-  with exn ->
-    Writer.writef wr "failed to write o1trace event: %s\n" (Exn.to_string exn)
+  fun wr event ->
+    try Webkit_trace_event_binary_output.emit_event ~buf wr event
+    with exn ->
+      Writer.writef wr "failed to write o1trace event: %s\n" (Exn.to_string exn)
 
 let emit_event event =
   Option.iter !current_wr ~f:(fun wr -> emit_event' wr event)
