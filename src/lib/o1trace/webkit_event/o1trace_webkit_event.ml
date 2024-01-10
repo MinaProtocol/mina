@@ -99,16 +99,15 @@ module T = struct
   let on_new_fiber (fiber : O1trace.Thread.Fiber.t) =
     emit_event
       (new_thread_event ~include_name:true fiber.key fiber.id New_thread)
-end
 
-let cancel = ref (ref false)
+  let on_cycle_end () = emit_event (new_event Cycle_end)
+end
 
 let start_tracing wr =
   if Option.is_some !current_wr then (* log an error, do nothing *)
     ()
   else (
     current_wr := Some wr ;
-    let cancel = !cancel in
     (* FIXME: these handlers cannot be removed without further
        changes to async_kernel. Instead, we will leak a ref and
        accumulate a bunch of NOOPs every time we call [stop_tracing] *)
@@ -123,7 +122,5 @@ let stop_tracing () =
     ()
   else (
     emit_event (new_event Trace_end) ;
-    !cancel := true ;
-    cancel := ref false ;
     current_wr := None ;
     O1trace.Plugins.disable_plugin (module T) )

@@ -109,7 +109,7 @@ let sync_thread name f =
       let ctx = with_o1trace ~name ctx in
       match
         Scheduler.Private.with_execution_context (Scheduler.Private.t ()) ctx
-          ~f:(fun () -> Result.try_with f)
+          ~f:(fun () -> Result.try_with f )
       with
       | Error exn ->
           Exn.reraise exn "exception caught by O1trace.sync_thread"
@@ -118,7 +118,11 @@ let sync_thread name f =
           on_job_exit' fiber elapsed_time ;
           result )
 
-let () = Stdlib.(Async_kernel.Tracing.fns := { on_job_enter; on_job_exit })
+let () =
+  Stdlib.(Async_kernel.Tracing.fns := { on_job_enter; on_job_exit }) ;
+  Scheduler.Expert.run_every_cycle_end (fun () ->
+      Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
+          Plugin.on_cycle_end () ) )
 
 (*
 let () =
