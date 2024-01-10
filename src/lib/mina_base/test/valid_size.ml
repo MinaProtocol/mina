@@ -35,6 +35,7 @@ let genesis_constant_error limit events actions : Genesis_constants.t =
       ; slots_per_sub_window = 5
       ; delta = 5
       ; genesis_state_timestamp = Genesis_constants.of_time (Time.now ())
+      ; zkapps_per_block = 128
       }
   ; txpool_max_size = 5
   ; num_accounts = Some 1

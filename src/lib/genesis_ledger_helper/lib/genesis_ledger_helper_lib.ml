@@ -467,7 +467,6 @@ let make_constraint_constants
                 Mina_numbers.Global_slot_since_genesis.of_int
                   previous_global_slot
             } )
-  ; zkapps_per_block = default.zkapps_per_block
   }
 
 let runtime_config_of_constraint_constants
@@ -503,7 +502,6 @@ let runtime_config_of_constraint_constants
           ; previous_global_slot =
               Mina_numbers.Global_slot_since_genesis.to_int previous_global_slot
           } )
-  ; zkapps_per_block = Some constraint_constants.zkapps_per_block
   }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
@@ -546,6 +544,9 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
       ; genesis_state_timestamp =
           Option.value ~default:default.protocol.genesis_state_timestamp
             genesis_state_timestamp
+      ; zkapps_per_block =
+          Option.value ~default:default.protocol.zkapps_per_block
+            (config.genesis >>= fun cfg -> cfg.zkapps_per_block)
       }
   ; txpool_max_size =
       Option.value ~default:default.txpool_max_size
@@ -584,6 +585,7 @@ let runtime_config_of_genesis_constants (genesis_constants : Genesis_constants.t
       Some
         (Genesis_constants.genesis_timestamp_to_string
            genesis_constants.protocol.genesis_state_timestamp )
+  ; zkapps_per_block = Some genesis_constants.protocol.zkapps_per_block
   }
 
 let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)

@@ -381,7 +381,6 @@ module Json_layout = struct
       ; supercharged_coinbase_factor : int option [@default None]
       ; account_creation_fee : Currency.Fee.t option [@default None]
       ; fork : Fork_config.t option [@default None]
-      ; zkapps_per_block : int option [@default None]
       }
     [@@deriving yojson, fields, dhall_type]
 
@@ -397,6 +396,7 @@ module Json_layout = struct
       ; slots_per_epoch : int option [@default None]
       ; slots_per_sub_window : int option [@default None]
       ; genesis_state_timestamp : string option [@default None]
+      ; zkapps_per_block : int option [@default None]
       }
     [@@deriving yojson, fields, dhall_type]
 
@@ -745,14 +745,12 @@ module Proof_keys = struct
     ; supercharged_coinbase_factor : int option
     ; account_creation_fee : Currency.Fee.Stable.Latest.t option
     ; fork : Fork_config.t option
-    ; zkapps_per_block : int option
     }
   [@@deriving bin_io_unversioned]
 
   let make ?level ?sub_windows_per_window ?ledger_depth ?work_delay
       ?block_window_duration_ms ?transaction_capacity ?coinbase_amount
-      ?supercharged_coinbase_factor ?account_creation_fee ?zkapps_per_block
-      ?fork () =
+      ?supercharged_coinbase_factor ?account_creation_fee ?fork () =
     { level
     ; sub_windows_per_window
     ; ledger_depth
@@ -763,7 +761,6 @@ module Proof_keys = struct
     ; supercharged_coinbase_factor
     ; account_creation_fee
     ; fork
-    ; zkapps_per_block
     }
 
   let to_json_layout
@@ -777,7 +774,6 @@ module Proof_keys = struct
       ; supercharged_coinbase_factor
       ; account_creation_fee
       ; fork
-      ; zkapps_per_block
       } =
     { Json_layout.Proof_keys.level = Option.map ~f:Level.to_json_layout level
     ; sub_windows_per_window
@@ -790,7 +786,6 @@ module Proof_keys = struct
     ; supercharged_coinbase_factor
     ; account_creation_fee
     ; fork
-    ; zkapps_per_block
     }
 
   let of_json_layout
@@ -804,7 +799,6 @@ module Proof_keys = struct
       ; supercharged_coinbase_factor
       ; account_creation_fee
       ; fork
-      ; zkapps_per_block
       } =
     let open Result.Let_syntax in
     let%map level = result_opt ~f:Level.of_json_layout level
@@ -821,7 +815,6 @@ module Proof_keys = struct
     ; supercharged_coinbase_factor
     ; account_creation_fee
     ; fork
-    ; zkapps_per_block
     }
 
   let to_yojson x = Json_layout.Proof_keys.to_yojson (to_json_layout x)
@@ -849,8 +842,6 @@ module Proof_keys = struct
     ; account_creation_fee =
         opt_fallthrough ~default:t1.account_creation_fee t2.account_creation_fee
     ; fork = opt_fallthrough ~default:t1.fork t2.fork
-    ; zkapps_per_block =
-        opt_fallthrough ~default:t1.zkapps_per_block t2.zkapps_per_block
     }
 end
 
@@ -861,6 +852,7 @@ module Genesis = struct
     ; slots_per_epoch : int option
     ; slots_per_sub_window : int option
     ; genesis_state_timestamp : string option
+    ; zkapps_per_block : int option
     }
   [@@deriving bin_io_unversioned]
 
@@ -884,6 +876,8 @@ module Genesis = struct
     ; genesis_state_timestamp =
         opt_fallthrough ~default:t1.genesis_state_timestamp
           t2.genesis_state_timestamp
+    ; zkapps_per_block =
+        opt_fallthrough ~default:t1.zkapps_per_block t2.zkapps_per_block
     }
 end
 

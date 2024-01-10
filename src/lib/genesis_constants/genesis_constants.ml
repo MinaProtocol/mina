@@ -53,7 +53,6 @@ module Constraint_constants = struct
     ; supercharged_coinbase_factor : int
     ; account_creation_fee : Currency.Fee.Stable.Latest.t
     ; fork : Fork_constants.t option
-    ; zkapps_per_block : int
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 
@@ -81,7 +80,6 @@ module Constraint_constants = struct
               }
         | None ->
             None )
-    ; zkapps_per_block = t.zkapps_per_block
     }
 
   (* Generate the compile-time constraint constants, using a signature to hide
@@ -182,8 +180,6 @@ module Constraint_constants = struct
 
       [%%endif]
 
-      let zkapps_per_block = 1
-
       let compiled =
         { sub_windows_per_window
         ; ledger_depth
@@ -197,7 +193,6 @@ module Constraint_constants = struct
         ; account_creation_fee =
             Currency.Fee.of_mina_string_exn account_creation_fee_string
         ; fork
-        ; zkapps_per_block
         }
     end :
       sig
@@ -254,6 +249,7 @@ module Protocol = struct
           ; slots_per_sub_window : 'length
           ; delta : 'delta
           ; genesis_state_timestamp : 'genesis_state_timestamp
+          ; zkapps_per_block : 'length
           }
         [@@deriving equal, ord, hash, sexp, yojson, hlist, fields]
       end
@@ -281,6 +277,7 @@ module Protocol = struct
                       (Time.Span.of_ms
                          (Int64.to_float t.genesis_state_timestamp) ) )
                    ~zone:Time.Zone.utc ) )
+          ; ("zkapps_per_block", `Int t.zkapps_per_block)
           ]
 
       let of_yojson = function
@@ -290,6 +287,7 @@ module Protocol = struct
             ; ("slots_per_sub_window", `Int slots_per_sub_window)
             ; ("delta", `Int delta)
             ; ("genesis_state_timestamp", `String time_str)
+            ; ("zkapps_per_block", `Int zkapps_per_block)
             ] -> (
             match validate_time time_str with
             | Ok genesis_state_timestamp ->
@@ -299,6 +297,7 @@ module Protocol = struct
                   ; slots_per_sub_window
                   ; delta
                   ; genesis_state_timestamp
+                  ; zkapps_per_block
                   }
             | Error e ->
                 Error (sprintf !"Genesis_constants.Protocol.of_yojson: %s" e) )
@@ -321,6 +320,7 @@ module Protocol = struct
                 (Time.of_span_since_epoch
                    (Time.Span.of_ms (Int64.to_float t.genesis_state_timestamp)) )
                 ~zone:Time.Zone.utc
+          ; zkapps_per_block = t.zkapps_per_block
           }
         in
         T.sexp_of_t t'
@@ -354,6 +354,7 @@ module T = struct
           ; t.protocol.slots_per_sub_window
           ; t.protocol.delta
           ; t.txpool_max_size
+          ; t.protocol.zkapps_per_block
           ]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
@@ -379,6 +380,8 @@ include T
 
 [%%inject "pool_max_size", pool_max_size]
 
+[%%inject "zkapps_per_block", zkapps_per_block]
+
 let compiled : t =
   { protocol =
       { k
@@ -387,6 +390,7 @@ let compiled : t =
       ; delta
       ; genesis_state_timestamp =
           genesis_timestamp_of_string genesis_state_timestamp_string |> of_time
+      ; zkapps_per_block
       }
   ; txpool_max_size = pool_max_size
   ; num_accounts = None

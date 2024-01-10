@@ -61,6 +61,7 @@ type t =
   ; slots_per_epoch : int
   ; slots_per_sub_window : int
   ; txpool_max_size : int
+  ; zkapps_per_block : int
   }
 
 let proof_config_default : Runtime_config.Proof_keys.t =
@@ -93,6 +94,7 @@ let default =
   ; slots_per_sub_window = 2
   ; delta = 0
   ; txpool_max_size = 3000
+  ; zkapps_per_block = 128
   }
 
 let transaction_capacity_log_2 (config : t) =

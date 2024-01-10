@@ -1298,7 +1298,6 @@ struct
     ; supercharged_coinbase_factor = 0
     ; account_creation_fee = Unsigned.UInt64.of_int 0
     ; fork = None
-    ; zkapps_per_block = 128
     }
 
   let rule self : _ Inductive_rule.t =
@@ -1349,7 +1348,6 @@ struct
         ; supercharged_coinbase_factor = 0
         ; account_creation_fee = Unsigned.UInt64.of_int 0
         ; fork = None
-        ; zkapps_per_block = 128
         }
       ~choices:(fun ~self -> [ rule self ])
 
