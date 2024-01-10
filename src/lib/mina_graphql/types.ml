@@ -1416,8 +1416,8 @@ module AccountObj = struct
                ~doc:
                  "The list of accounts which are delegating to you in the last \
                   epoch (note that the info is recorded in the one before last \
-                  epoch epoch so it might not be up to date with the current \
-                  account status)"
+                  epoch so it might not be up to date with the current account \
+                  status)"
                ~args:Arg.[]
                ~resolve:(fun { ctx = mina; _ } { account; _ } ->
                  let open Option.Let_syntax in
