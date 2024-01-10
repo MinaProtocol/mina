@@ -1,2 +1,2 @@
 from .event import WebHookEvent
-from .info import GithubPayloadInfo,CommitInfo
+from .info import GithubPayloadInfo, CommitInfo

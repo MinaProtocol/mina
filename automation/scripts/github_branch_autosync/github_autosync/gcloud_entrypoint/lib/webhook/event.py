@@ -1,7 +1,7 @@
 import hashlib
 import hmac
 from http.client import HTTPException
-from . import GithubPayloadInfo
+from .info import GithubPayloadInfo
 
 
 class WebHookEvent:
