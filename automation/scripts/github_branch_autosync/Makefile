@@ -24,7 +24,7 @@ deploy: zip_package check-env
 	--timeout=300 \
 	--trigger-http \
 	--allow-unauthenticated \
-	--entry-point=handle_incoming_commit_push \
+	--entry-point=handle_request \
 	--set-env-vars=WEBHOOK_APP_USER=$(WEBHOOK_APP_USER),WEBHOOK_APP_REPO=$(WEBHOOK_APP_REPO),WEBHOOK_APP_TOKEN=$(WEBHOOK_APP_TOKEN),WEBHOOK_APP_GITHUB_SECRET=$(WEBHOOK_APP_GITHUB_SECRET)
 
 	@echo --- reverts import fixing ---

@@ -3,7 +3,7 @@
 from .lib import *
 from typing import Optional
 
-config = config.load('../tests/config.json')
+config = config.load('config.json')
 
 
 def handle_request(request):
@@ -39,27 +39,13 @@ def handle_incoming_commit_push_json(payload_info, config):
         else:
             handle_incoming_commit_push_in_personal_branches(source_branch)
     elif config.is_submodule_repository(repository):
-        handle_incoming_commit_from_submodule(payload_info, config)
+        print(f"change in submodules not supported {payload_info.repository}. skipping...")
+        #handle_incoming_commit_from_submodule(payload_info, config)
     else:
         print(f"unknown source repository {payload_info.repository}. skipping...")
         return
 
     print("done")
-
-
-def handle_incoming_commit_from_submodule(info, config):
-    new_commit_hash = info.new_commit_hash
-    parent_commit = info.old_commit_hash
-    github_api = GithubApi(config.github)
-    submodule = config.get_submodule_repository(info.repository).first()
-    mainline_branch = submodule,info.incoming_branch)
-    #update_branch = f"update_{info.repository}_for_{mainline_branch}"
-    #github_api.create_new_branch(update_branch)
-
-    print(github_api.update_module_hash(parent_commit,new_commit_hash,))
-    #github_api.submodules(info.incoming_branch())
-
-    return
 
 
 def handle_incoming_commit_push_in_stable_branches(source_branch):

@@ -11,19 +11,16 @@
         }
     ],
     "github": {
+        "branches":{
+            "o1js-main" : "develop"
+        },
         "dryrun": false,
         "token":"${WEBHOOK_APP_TOKEN}",
         "username":"${WEBHOOK_APP_USER}",
         "repo":"${WEBHOOK_APP_REPO}",
         "secret":"${WEBHOOK_APP_GITHUB_SECRET}"
     },
-
-    "branches":{
-        "compatible" : "rampup",
-        "rampup" : "berkeley",
-        "berkeley" : "develop"
-    },
-    "pr": {
+   "pr": {
         "title_prefix": "[Branches auto sync failure] ",
         "assignees": ["dkijania"],
         "body_prefix": "This is auto-generated PR in order to solve merge conflicts between two branches.",
