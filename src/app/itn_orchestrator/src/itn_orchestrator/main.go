@@ -43,7 +43,7 @@ func init() {
 	addAction(actions, lib.StopDaemonAction{})
 	addAction(actions, lib.RotateAction{})
 	addAction(actions, lib.SetZkappSoftLimitAction{})
-	addAction(actions, lib.MajorityStakeCheckAction{})
+	addAction(actions, lib.SlotsCoveredCheckAction{})
 }
 
 type AppConfig struct {

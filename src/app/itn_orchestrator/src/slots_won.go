@@ -47,12 +47,12 @@ func (SlotsWonAction) Name() string { return "slots-won" }
 
 var _ Action = SlotsWonAction{}
 
-type MajorityStakeCheckParams struct {
+type SlotsCoveredCheckParams struct {
 	Threshold float64          `json:"threshold"`
 	SlotsWon  []SlotsWonOutput `json:"slotsWon"`
 }
 
-func MajorityStakeCheck(config Config, params MajorityStakeCheckParams) error {
+func SlotsCoveredCheck(config Config, params SlotsCoveredCheckParams) error {
 	threshold := params.Threshold
 	allSlots := map[int]struct{}{}
 	minSlot := math.MaxInt
@@ -73,19 +73,20 @@ func MajorityStakeCheck(config Config, params MajorityStakeCheckParams) error {
 	if proportion < threshold {
 		return fmt.Errorf("proportion %f of slots covered by queried nodes is lower than threshold %f", proportion, threshold)
 	}
+	config.Log.Infof("Total %.2f%% of slots are covered", proportion*100)
 	return nil
 }
 
-type MajorityStakeCheckAction struct{}
+type SlotsCoveredCheckAction struct{}
 
-func (MajorityStakeCheckAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
-	var params MajorityStakeCheckParams
+func (SlotsCoveredCheckAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
+	var params SlotsCoveredCheckParams
 	if err := json.Unmarshal(rawParams, &params); err != nil {
 		return err
 	}
-	return MajorityStakeCheck(config, params)
+	return SlotsCoveredCheck(config, params)
 }
 
-func (MajorityStakeCheckAction) Name() string { return "majority-stake-check" }
+func (SlotsCoveredCheckAction) Name() string { return "slots-covered-check" }
 
-var _ Action = MajorityStakeCheckAction{}
+var _ Action = SlotsCoveredCheckAction{}
