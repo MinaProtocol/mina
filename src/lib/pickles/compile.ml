@@ -440,7 +440,7 @@ struct
             , r.custom_gate_type )
         | r :: rules ->
             let feature_flags, custom_gate_type = go rules in
-            (* Note: For now we only support one choice when custom gates are defined *)
+            (* Note: For now we only support one choice when configurable gates are defined *)
             if
               Option.is_some custom_gate_type
               || Option.is_some r.custom_gate_type

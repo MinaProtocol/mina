@@ -1,8 +1,7 @@
 use kimchi::{
     circuits::{
-        gate::GateType,
         constraints::FeatureFlags,
-        expr::{Linearization, PolishToken},
+        expr::Linearization,
         lookup::lookups::{LookupFeatures, LookupPatterns},
     },
     linearization::{constraints_expr, linearization_columns},
@@ -10,8 +9,7 @@ use kimchi::{
 
 /// Converts the linearization of the kimchi circuit polynomial into a printable string.
 pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
-    // omit_custom_gate: bool,
-    custom_gate_type: Option<&Vec<PolishToken<F>>>,
+    omit_custom_gate: bool,
     uses_custom_gates: bool,
 ) -> (String, Vec<(String, String)>) {
     let features = if uses_custom_gates {
@@ -38,7 +36,7 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
     };
     let evaluated_cols = linearization_columns::<F>(features.as_ref());
     let (linearization, _powers_of_alpha) =
-        constraints_expr::<F>(/* omit_custom_gate */ false, custom_gate_type, features.as_ref(), true);
+        constraints_expr::<F>(omit_custom_gate, None, features.as_ref(), true);
 
     let Linearization {
         constant_term,
@@ -59,89 +57,21 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
 }
 
 #[ocaml::func]
-pub fn fp_linearization_strings_plus() -> (String, Vec<(String, String)>) {
-    // Define conditional gate in RPN
-    //     w(0) = w(1) * w(3) + (1 - w(3)) * w(2)
-    use kimchi::circuits::expr::{PolishToken::*, *};
-    use kimchi::circuits::gate::CurrOrNext::Curr;
-    let conditional_gate = Some(vec![
-        Cell(Variable {
-            col: Column::Index(GateType::ForeignFieldAdd),
-            row: Curr,
-        }),
-        Cell(Variable {
-            col: Column::Witness(3),
-            row: Curr,
-        }),
-        Dup,
-        Mul,
-        Cell(Variable {
-            col: Column::Witness(3),
-            row: Curr,
-        }),
-        Sub,
-        Alpha,
-        Pow(1),
-        Cell(Variable {
-            col: Column::Witness(0),
-            row: Curr,
-        }),
-        Cell(Variable {
-            col: Column::Witness(3),
-            row: Curr,
-        }),
-        Cell(Variable {
-            col: Column::Witness(1),
-            row: Curr,
-        }),
-        Mul,
-        Literal(mina_curves::pasta::Fp::from(1u32)),
-        Cell(Variable {
-            col: Column::Witness(3),
-            row: Curr,
-        }),
-        Sub,
-        Cell(Variable {
-            col: Column::Witness(2),
-            row: Curr,
-        }),
-        Mul,
-        Add,
-        Sub,
-        Mul,
-        Add,
-        Mul,
-    ]);
-
-    linearization_strings::<mina_curves::pasta::Fp>(conditional_gate.as_ref(), true)
-}
-
-#[ocaml::func]
-pub fn fq_linearization_strings_plus() -> (String, Vec<(String, String)>) {
-    linearization_strings::<mina_curves::pasta::Fq>(None, false)
-}
-
-
-#[ocaml::func]
 pub fn fp_linearization_strings_minus() -> (String, Vec<(String, String)>) {
-    // linearization_strings::<mina_curves::pasta::Fp>(true, true)
-    linearization_strings::<mina_curves::pasta::Fp>(None, true)
+    linearization_strings::<mina_curves::pasta::Fp>(true, true)
 }
 
 #[ocaml::func]
 pub fn fq_linearization_strings_minus() -> (String, Vec<(String, String)>) {
-    // linearization_strings::<mina_curves::pasta::Fq>(true, false)
-    linearization_strings::<mina_curves::pasta::Fq>(None, false)
+    linearization_strings::<mina_curves::pasta::Fq>(true, false)
 }
 
 #[ocaml::func]
 pub fn fp_linearization_strings() -> (String, Vec<(String, String)>) {
-    // linearization_strings::<mina_curves::pasta::Fp>(false, true)
-    linearization_strings::<mina_curves::pasta::Fp>(None, true)
+    linearization_strings::<mina_curves::pasta::Fp>(false, true)
 }
 
 #[ocaml::func]
 pub fn fq_linearization_strings() -> (String, Vec<(String, String)>) {
-    // linearization_strings::<mina_curves::pasta::Fq>(false, false)
-    linearization_strings::<mina_curves::pasta::Fq>(None, false)
+    linearization_strings::<mina_curves::pasta::Fq>(false, false)
 }

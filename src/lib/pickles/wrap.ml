@@ -21,13 +21,13 @@ module Type1 =
       let index_terms = Plonk_checks.Scalars.Tick.index_terms
     end)
 
-module Type1Plus =
+module Type1Minus =
   Plonk_checks.Make
     (Shifted_value.Type1)
     (struct
-      let constant_term = Plonk_checks.Scalars.TickPlus.constant_term
+      let constant_term = Plonk_checks.Scalars.TickMinus.constant_term
 
-      let index_terms = Plonk_checks.Scalars.TickPlus.index_terms
+      let index_terms = Plonk_checks.Scalars.TickMinus.index_terms
     end)
 
 let _vector_of_list (type a t)
@@ -52,7 +52,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
   in
   let ft_eval0 : Tick.Field.t =
     if Option.is_some custom_gate_type then
-      Type1Plus.ft_eval0
+      Type1Minus.ft_eval0
         (module Tick.Field)
         plonk ~env ~domain
         (Plonk_types.Evals.to_in_circuit combined_evals)

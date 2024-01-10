@@ -817,8 +817,8 @@ struct
           let index_terms = Plonk_checks.Scalars.Tick.index_terms
         end)
 
-    module Type1Plus =
-      Plonk_checks.Make (Shifted_value.Type1) (Scalars.TickPlus)
+    module Type1Minus =
+      Plonk_checks.Make (Shifted_value.Type1) (Scalars.TickMinus)
   end
 
   let domain_for_compiled (type branches)
@@ -1035,7 +1035,7 @@ struct
       let ft_eval0 : Field.t =
         with_label "ft_eval0" (fun () ->
             if Option.is_some custom_gate_type then
-              Plonk_checks.Type1Plus.ft_eval0
+              Plonk_checks.Type1Minus.ft_eval0
                 (module Field)
                 ~env ~domain plonk_minimal combined_evals evals1.public_input
             else
@@ -1106,7 +1106,7 @@ struct
     let plonk_checks_passed =
       with_label "plonk_checks_passed" (fun () ->
           if Option.is_some custom_gate_type then
-            Plonk_checks.Type1Plus.checked
+            Plonk_checks.Type1Minus.checked
               (module Impl)
               ~env ~shift:shift1 plonk combined_evals
           else
