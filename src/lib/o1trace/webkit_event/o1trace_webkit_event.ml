@@ -32,11 +32,8 @@ let new_event (k : event_kind) : event =
   ; tid = 0
   }
 
-let new_thread_event ?(include_name = false) thread_key tid event_kind =
-  { (new_event event_kind) with
-    tid
-  ; name = (if include_name then String.concat ~sep:"/" thread_key else "")
-  }
+let new_thread_event ?(include_name = "") tid event_kind =
+  { (new_event event_kind) with tid; name = include_name }
 
 (*
 
@@ -95,13 +92,13 @@ module T = struct
   let on_job_enter (fiber : O1trace.Thread.Fiber.t) =
     if fiber.id <> !most_recent_id then (
       most_recent_id := fiber.id ;
-      emit_event (new_thread_event fiber.key fiber.id Thread_switch) )
+      emit_event (new_thread_event fiber.id Thread_switch) )
 
   let on_job_exit _fiber _time_elapsed = ()
 
   let on_new_fiber (fiber : O1trace.Thread.Fiber.t) =
-    emit_event
-      (new_thread_event ~include_name:true fiber.key fiber.id New_thread)
+    let fullname = String.concat ~sep:"/" (O1trace.Thread.Fiber.key fiber) in
+    emit_event (new_thread_event ~include_name:fullname fiber.id New_thread)
 
   let on_cycle_end () =
     if !emitted_since_cycle_ended then emit_event (new_event Cycle_end) ;
@@ -114,9 +111,7 @@ let start_tracing wr =
   else (
     current_wr := Some wr ;
     emit_event (new_event Pid_is) ;
-    O1trace.Thread.iter_fibers ~f:(fun fiber ->
-        emit_event
-          (new_thread_event ~include_name:true fiber.key fiber.id New_thread) ) ;
+    O1trace.Thread.iter_fibers ~f:T.on_new_fiber ;
     O1trace.Plugins.enable_plugin (module T) )
 
 let stop_tracing () =

@@ -99,6 +99,8 @@ module Fiber = struct
     Execution_context.with_local ctx ctx_id (Some t)
 
   let of_context ctx = Execution_context.find_local ctx ctx_id
+
+  let key { thread = { name; _ }; parent; _ } = fiber_key name parent
 end
 
 let of_context ctx =
