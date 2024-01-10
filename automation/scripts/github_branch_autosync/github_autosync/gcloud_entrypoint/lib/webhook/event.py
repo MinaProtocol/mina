@@ -1,7 +1,7 @@
 import hashlib
 import hmac
 from http.client import HTTPException
-from github_autosync.gcloud_entrypoint import GithubPayloadInfo
+from . import GithubPayloadInfo
 
 
 class WebHookEvent:

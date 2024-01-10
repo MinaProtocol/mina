@@ -1,7 +1,6 @@
 """ Main module for handling incoming GitHub webhook event"""
 
-from .lib import *
-from typing import Optional
+from lib import *
 
 config = config.load('config.json')
 
