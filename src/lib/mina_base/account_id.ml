@@ -161,6 +161,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let public_key (key, _tid) = key
 
+  let of_public_key (pk : Public_key.t) =
+    create (Public_key.compress pk) Digest.default
+
   let token_id (_key, id) = id
 
   let to_input ((key, tid) : t) =

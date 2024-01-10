@@ -14,11 +14,6 @@ type t =
   ( Field.t
   , Field.t Scalar_challenge.t
   , Other_field.t Shifted_value.t
-  , ( ( Field.t Scalar_challenge.t
-      , Other_field.t Shifted_value.t )
-      Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
-    , Boolean.var )
-    Plonk_types.Opt.t
   , ( Field.t Scalar_challenge.t Bulletproof_challenge.t
     , Tock.Rounds.n )
     Pickles_types.Vector.t
@@ -36,10 +31,6 @@ module Constant = struct
     ( Challenge.Constant.t
     , Challenge.Constant.t Scalar_challenge.t
     , Tock.Field.t Shifted_value.t
-    , ( Challenge.Constant.t Scalar_challenge.t
-      , Tock.Field.t Shifted_value.t )
-      Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
-      option
     , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
       , Tock.Rounds.n )
       Vector.t
@@ -65,19 +56,42 @@ module Constant = struct
          ; gamma = Challenge.Constant.to_tock_field gamma
          ; zeta = Common.Ipa.Wrap.endo_to_field zeta
          ; joint_combiner = None
+         ; feature_flags = Plonk_types.Features.none_bool
          }
        in
        let evals =
-         Plonk_types.Evals.to_in_circuit Dummy.evals_combined.evals.evals
+         Plonk_types.Evals.to_in_circuit
+           (Lazy.force Dummy.evals_combined).evals.evals
        in
        let env =
+         let module Env_bool = struct
+           type t = bool
+
+           let true_ = true
+
+           let false_ = false
+
+           let ( &&& ) = ( && )
+
+           let ( ||| ) = ( || )
+
+           let any = List.exists ~f:Fn.id
+         end in
+         let module Env_field = struct
+           include Tock.Field
+
+           type bool = Env_bool.t
+
+           let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
+         end in
          Plonk_checks.scalars_env
-           (module Tock.Field)
-           ~srs_length_log2:Common.Max_degree.wrap_log2
+           (module Env_bool)
+           (module Env_field)
+           ~srs_length_log2:Common.Max_degree.wrap_log2 ~zk_rows:3
            ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
            ~field_of_hex:
-             (Core_kernel.Fn.compose Tock.Field.of_bigint
-                Kimchi_pasta.Pasta.Bigint256.of_hex_string )
+             (Core_kernel.Fn.compose Tock.Field.of_bigint (fun x ->
+                  Kimchi_pasta.Pasta.Bigint256.of_hex_string x ) )
            ~domain:
              (Plonk_checks.domain
                 (module Tock.Field)
@@ -86,10 +100,17 @@ module Constant = struct
            chals evals
        in
        let plonk =
-         Plonk_checks.derive_plonk (module Tock.Field) ~env ~shift chals evals
+         let module Field = struct
+           include Tock.Field
+         end in
+         Plonk_checks.derive_plonk (module Field) ~env ~shift chals evals
+         |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+            .of_wrap
+              ~assert_none:(fun x -> assert (Option.is_none (Opt.to_option x)))
+              ~assert_false:(fun x -> assert (not x))
        in
        { deferred_values =
-           { plonk = { plonk with alpha; beta; gamma; zeta; lookup = None }
+           { plonk = { plonk with alpha; beta; gamma; zeta }
            ; combined_inner_product = Shifted_value (tock ())
            ; xi = Scalar_challenge.create one_chal
            ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
@@ -100,9 +121,16 @@ module Constant = struct
        } )
 end
 
-let typ ~wrap_rounds ~uses_lookup : (t, Constant.t) Typ.t =
+let typ ~wrap_rounds:_ : (t, Constant.t) Typ.t =
   Types.Step.Proof_state.Per_proof.typ
     (module Impl)
     (Shifted_value.typ Other_field.typ)
     ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
-    ~zero:Common.Lookup_parameters.tick_zero ~uses_lookup
+
+let dummy : unit -> t =
+  Memo.unit (fun () ->
+      let (Typ { var_of_fields; value_to_fields; _ }) =
+        typ ~wrap_rounds:Backend.Tock.Rounds.n
+      in
+      let xs, aux = value_to_fields (Lazy.force Constant.dummy) in
+      var_of_fields (Array.map ~f:Field.constant xs, aux) )

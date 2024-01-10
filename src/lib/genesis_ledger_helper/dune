@@ -1,7 +1,7 @@
 (library
  (public_name genesis_ledger_helper)
  (name genesis_ledger_helper)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    ppx_inline_test.config
@@ -26,7 +26,7 @@
    genesis_ledger_helper.lib
    precomputed_values
    coda_genesis_ledger
-   coda_runtime_config
+   mina_runtime_config
    signature_lib
    mina_base
    genesis_constants

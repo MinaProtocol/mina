@@ -21,3 +21,5 @@ let receiver_key_warning =
 (* let pubsub_v1 = Gossip_net.Libp2p.RW *)
 
 let pubsub_v0 = Gossip_net.Libp2p.RW
+
+let file_log_rotations = 50

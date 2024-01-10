@@ -105,17 +105,16 @@ module Make (Inputs : Inputs_intf) :
     match validation with
     | Ok block ->
         Ok block
-    | Error err ->
-        Or_error.error_string
-          ( match err with
-          | `Invalid_genesis_protocol_state ->
-              "invalid genesis state"
-          | `Invalid_protocol_version | `Mismatched_protocol_version ->
-              "invalid protocol version"
-          | `Invalid_proof ->
-              "invalid proof"
-          | `Verifier_error e ->
-              Printf.sprintf "verifier error: %s" (Error.to_string_hum e) )
+    | Error err -> (
+        match err with
+        | `Invalid_genesis_protocol_state ->
+            Or_error.error_string "invalid genesis state"
+        | `Invalid_protocol_version | `Mismatched_protocol_version ->
+            Or_error.error_string "invalid protocol version"
+        | `Invalid_proof e ->
+            Error (Error.tag ~tag:"invalid proof" e)
+        | `Verifier_error e ->
+            Error (Error.tag ~tag:"verifier proof" e) )
 
   let verify ~verifier ~genesis_constants ~precomputed_values
       { Proof_carrying_data.data = best_tip; proof = merkle_list, root } =
@@ -149,7 +148,7 @@ module Make (Inputs : Inputs_intf) :
     let root_transition_with_hash =
       With_hash.of_data root ~hash_data:state_hashes
     in
-    let%bind (_ : State_hash.t Non_empty_list.t) =
+    let%bind (_ : State_hash.t Mina_stdlib.Nonempty_list.t) =
       Deferred.return
         (Result.of_option
            (Merkle_list_verifier.verify

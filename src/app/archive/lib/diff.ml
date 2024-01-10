@@ -76,14 +76,18 @@ module Builder = struct
     let start = Time.now () in
     let account_ids_accessed = Mina_block.account_ids_accessed block in
     let accounts_accessed =
-      List.filter_map account_ids_accessed ~f:(fun acct_id ->
-          (* an accessed account may not be the ledger *)
-          let%bind.Option index =
-            Option.try_with (fun () ->
-                Mina_ledger.Ledger.index_of_account_exn ledger acct_id )
-          in
-          let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
-          Some (index, account) )
+      List.filter_map account_ids_accessed ~f:(fun (acct_id, status) ->
+          match status with
+          | `Not_accessed ->
+              None
+          | `Accessed ->
+              (* an accessed account may not be in the ledger *)
+              let%bind.Option index =
+                Option.try_with (fun () ->
+                    Mina_ledger.Ledger.index_of_account_exn ledger acct_id )
+              in
+              let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
+              Some (index, account) )
     in
     let accounts_accessed_time = Time.now () in
     [%log debug]
@@ -108,7 +112,9 @@ module Builder = struct
     in
     let tokens_used =
       let unique_tokens =
-        List.map account_ids_accessed ~f:Account_id.token_id
+        (* a token is used regardless of txn status *)
+        List.map account_ids_accessed ~f:(fun (acct_id, _status) ->
+            Account_id.token_id acct_id )
         |> List.dedup_and_sort ~compare:Token_id.compare
       in
       List.map unique_tokens ~f:(fun token_id ->

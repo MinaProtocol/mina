@@ -90,6 +90,8 @@ module Transaction_pool : sig
 
   val transactions_added_to_pool : Counter.t
 
+  val vk_refcount_table_size : Gauge.t
+
   val zkapp_transactions_added_to_pool : Counter.t
 
   val zkapp_transaction_size : Counter.t

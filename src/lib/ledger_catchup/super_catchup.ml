@@ -161,6 +161,11 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
   let open Deferred.Let_syntax in
   match cached_initially_validated_transition_result with
   | Ok x ->
+      Internal_tracing.with_state_hash
+        ( Validation.block_with_hash transition_with_hash
+        |> State_hash.With_state_hashes.state_hash )
+      @@ fun () ->
+      [%log internal] "Validate_transition_done" ;
       [%log trace]
         ~metadata:[ ("state_hash", state_hash) ]
         "initial_validate: validation is successful" ;
@@ -268,7 +273,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
                           (Mina_block.header transition)
                       |> Protocol_version.to_string ) )
                 ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(get_current () |> to_string) )
+                  , `String Protocol_version.(to_string current) )
                 ] ) )
       in
       Error (Error.of_string "mismatched protocol version")
@@ -325,7 +330,7 @@ let try_to_connect_hash_chain t hashes ~frontier
     |> Consensus.Data.Consensus_state.blockchain_length
   in
   List.fold_until
-    (Non_empty_list.to_list hashes)
+    (Mina_stdlib.Nonempty_list.to_list hashes)
     ~init:(blockchain_length_of_target_hash, [])
     ~f:(fun (blockchain_length, acc) hash ->
       let f x = Continue_or_stop.Stop (Ok (x, acc)) in
@@ -401,7 +406,7 @@ module Downloader = struct
 end
 
 let with_lengths hs ~target_length =
-  List.filter_mapi (Non_empty_list.to_list hs) ~f:(fun i x ->
+  List.filter_mapi (Mina_stdlib.Nonempty_list.to_list hs) ~f:(fun i x ->
       let open Option.Let_syntax in
       let%map x_len = Length.sub target_length (Length.of_int i) in
       (x, x_len) )
@@ -508,8 +513,8 @@ module Initial_validate_batcher = struct
         >>| function
         | Ok tvs ->
             Ok (List.map tvs ~f:(fun x -> `Valid x))
-        | Error `Invalid_proof ->
-            Ok (List.map xs ~f:(fun x -> `Potentially_invalid (input x)))
+        | Error (`Invalid_proof err) ->
+            Ok (List.map xs ~f:(fun x -> `Potentially_invalid (input x, err)))
         | Error (`Verifier_error e) ->
             Error e )
 
@@ -558,10 +563,10 @@ module Verify_work_batcher = struct
                      (One_or_two.map proofs ~f:(fun p -> (p, msg))) ) )
         |> Verifier.verify_transaction_snarks verifier
         >>| function
-        | Ok true ->
+        | Ok (Ok ()) ->
             Ok (List.map xs ~f:(fun x -> `Valid (input x)))
-        | Ok false ->
-            Ok (List.map xs ~f:(fun x -> `Potentially_invalid (input x)))
+        | Ok (Error err) ->
+            Ok (List.map xs ~f:(fun x -> `Potentially_invalid (input x, err)))
         | Error e ->
             Error e )
 
@@ -586,11 +591,13 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
     | Ok (Ok tv) ->
         return (Ok { transition with data = tv })
     | Ok (Error invalid) ->
-        let s = "initial_validate: block failed to verify, invalid proof" in
+        let err = Verifier.invalid_to_error invalid in
         [%log warn]
-          ~metadata:[ ("state_hash", state_hash) ]
-          "%s, %s" s
-          (Verifier.invalid_to_string invalid) ;
+          ~metadata:
+            [ ("state_hash", state_hash)
+            ; ("err", Error_json.error_to_yojson err)
+            ]
+          "initial_validate: block failed to verify due to $err." ;
         let%map () =
           match transition.sender with
           | Local ->
@@ -600,7 +607,11 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
                 record trust_system logger peer
                   Actions.(Sent_invalid_proof, None))
         in
-        Error (`Error (Error.of_string s))
+        let err =
+          Error.tag err
+            ~tag:"initial_validate: block failed to verify, invalid proof"
+        in
+        Error (`Error err)
     | Error e ->
         [%log warn]
           ~metadata:
@@ -643,11 +654,22 @@ let download s d ~key ~attempts =
     "Download download $key" ;
   Downloader.download d ~key ~attempts
 
-let create_node ~downloader t x =
+let create_node ~logger ~downloader t x =
   let attempts = Attempt_history.empty in
   let state, h, blockchain_length, parent, result =
     match x with
     | `Root root ->
+        let blockchain_length =
+          Breadcrumb.block root |> Mina_block.blockchain_length
+        in
+        Internal_tracing.with_state_hash (Breadcrumb.state_hash root)
+        @@ fun () ->
+        [%log internal] "@block_metadata"
+          ~metadata:
+            [ ( "blockchain_length"
+              , Mina_numbers.Length.to_yojson blockchain_length )
+            ] ;
+        [%log internal] "Catchup_job_finished" ;
         ( Node.State.Finished
         , Breadcrumb.state_hash root
         , Breadcrumb.consensus_state root
@@ -655,6 +677,11 @@ let create_node ~downloader t x =
         , Breadcrumb.parent_hash root
         , Ivar.create_full (Ok `Added_to_frontier) )
     | `Hash (h, l, parent) ->
+        Internal_tracing.with_state_hash h
+        @@ fun () ->
+        [%log internal] "@block_metadata"
+          ~metadata:[ ("blockchain_length", Mina_numbers.Length.to_yojson l) ] ;
+        [%log internal] "To_download" ;
         ( Node.State.To_download
             (download "create_node" downloader ~key:(h, l) ~attempts)
         , h
@@ -663,9 +690,23 @@ let create_node ~downloader t x =
         , Ivar.create () )
     | `Initial_validated (b, valid_cb) ->
         let t = (Cached.peek b).Envelope.Incoming.data in
-        ( Node.State.To_verify (b, valid_cb)
-        , Validation.block_with_hash t
+        let state_hash =
+          Validation.block_with_hash t
           |> State_hash.With_state_hashes.state_hash
+        in
+        let blockchain_length =
+          Validation.block t |> Mina_block.blockchain_length
+        in
+        Internal_tracing.with_state_hash state_hash
+        @@ fun () ->
+        [%log internal] "@block_metadata"
+          ~metadata:
+            [ ( "blockchain_length"
+              , Mina_numbers.Length.to_yojson blockchain_length )
+            ] ;
+        [%log internal] "To_verify" ;
+        ( Node.State.To_verify (b, valid_cb)
+        , state_hash
         , Validation.block t |> Mina_block.blockchain_length
         , Validation.block t |> Mina_block.header
           |> Mina_block.Header.protocol_state
@@ -871,7 +912,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                 [%log' warn t.logger] "verification failed! redownloading"
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson node.state_hash)
-                    ; ("error", `String (Verifier.invalid_to_string err))
+                    ; ( "error"
+                      , Error_json.error_to_yojson
+                          (Verifier.invalid_to_error err) )
                     ] ;
                 ( match iv.sender with
                 | Local ->
@@ -983,7 +1026,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
             Strict_pipe.Writer.write catchup_breadcrumbs_writer
               ( [ Rose_tree.of_non_empty_list
-                    (Non_empty_list.singleton (c, valid_cb))
+                    (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
                 ]
               , `Ledger_catchup finished ) ;
             let%bind () =
@@ -1285,7 +1328,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                         (* If we hit this case we should probably remove the parent from the
                             table and prune, although in theory that should be handled by
                            the frontier calling [Full_catchup_tree.apply_diffs]. *)
-                        create_node ~downloader t (`Root root)
+                        create_node ~logger ~downloader t (`Root root)
                     | `Node node ->
                         (* TODO: Log what is going on with transition frontier. *)
                         node
@@ -1298,7 +1341,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                     ~f:
                       (Rose_tree.iter ~f:(fun b_and_c ->
                            let node =
-                             create_node ~downloader t
+                             create_node ~logger ~downloader t
                                (`Initial_validated b_and_c)
                            in
                            ignore
@@ -1311,7 +1354,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                           let l = Length.succ l in
                           ( if not (Hashtbl.mem t.nodes h) then
                             let node =
-                              create_node t ~downloader (`Hash (h, l, parent))
+                              create_node ~logger t ~downloader
+                                (`Hash (h, l, parent))
                             in
                             don't_wait_for (run_state_machine node >>| ignore)
                           ) ;
@@ -1326,7 +1370,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~context:(module Context)
         ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
         ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
-        ~build_func:Transition_frontier.Breadcrumb.build )
+        ~build_func:
+          (Transition_frontier.Breadcrumb.build
+             ~get_completed_work:(Fn.const None) ) )
 
 (* Unit tests *)
 
@@ -1364,7 +1410,8 @@ let%test_module "Ledger_catchup tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            () )
 
     module Context = struct
       let logger = logger

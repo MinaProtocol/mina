@@ -10,7 +10,7 @@ exception No_initial_peers
 type Structured_log_events.t +=
   | Gossip_new_state of { state_hash : State_hash.t }
   | Gossip_transaction_pool_diff of
-      { txns : Transaction_pool.Resource_pool.Diff.t }
+      { fee_payer_summaries : User_command.fee_payer_summary_t list }
   | Gossip_snark_pool_diff of { work : Snark_pool.Resource_pool.Diff.compact }
   [@@deriving register_event]
 
@@ -142,7 +142,6 @@ module Rpcs : sig
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   include Rpc_intf.Rpc_interface_intf with type ('q, 'r) rpc := ('q, 'r) rpc
 end
@@ -243,10 +242,10 @@ val broadcast_state :
   t -> Mina_block.t State_hash.With_state_hashes.t -> unit Deferred.t
 
 val broadcast_snark_pool_diff :
-  t -> Snark_pool.Resource_pool.Diff.t -> unit Deferred.t
+  ?nonce:int -> t -> Snark_pool.Resource_pool.Diff.t -> unit Deferred.t
 
 val broadcast_transaction_pool_diff :
-  t -> Transaction_pool.Resource_pool.Diff.t -> unit Deferred.t
+  ?nonce:int -> t -> Transaction_pool.Resource_pool.Diff.t -> unit Deferred.t
 
 val glue_sync_ledger :
      t
@@ -274,7 +273,10 @@ val initial_peers : t -> Mina_net2.Multiaddr.t list
 val connection_gating_config : t -> Mina_net2.connection_gating Deferred.t
 
 val set_connection_gating_config :
-  t -> Mina_net2.connection_gating -> Mina_net2.connection_gating Deferred.t
+     t
+  -> ?clean_added_peers:bool
+  -> Mina_net2.connection_gating
+  -> Mina_net2.connection_gating Deferred.t
 
 val ban_notification_reader :
   t -> Gossip_net.ban_notification Linear_pipe.Reader.t

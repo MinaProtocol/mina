@@ -5,20 +5,13 @@ let cons (type a) (key : string) (body : a) (to_yojson : a -> Yojson.Safe.t) =
   `Assoc [ (key, to_yojson body) ]
 
 module Backend = struct
-  module S3 = struct
-    type t =
-      { key : string
-      ; encrypt : bool
-      ; region : string
-      ; bucket : string
-      ; acl : string
-      }
-    [@@deriving to_yojson]
+  module Local = struct
+    type t = { path : string } [@@deriving to_yojson]
   end
 
-  type t = S3 of S3.t
+  type t = Local of Local.t
 
-  let to_yojson = function S3 x -> cons "s3" x S3.to_yojson
+  let to_yojson = function Local x -> cons "local" x Local.to_yojson
 end
 
 module Block = struct

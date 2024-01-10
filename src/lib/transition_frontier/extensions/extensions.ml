@@ -68,10 +68,15 @@ let close t : unit =
     ~identity:(close_extension (module Identity.Broadcasted))
     ~new_breadcrumbs:(close_extension (module New_breadcrumbs.Broadcasted))
 
-let notify (t : t) ~frontier ~diffs_with_mutants =
+let notify (t : t) ~logger ~frontier ~diffs_with_mutants =
   let update (type t)
       (module B : Intf.Broadcasted_extension_intf with type t = t) field =
-    B.update (Field.get field t) frontier diffs_with_mutants
+    [%log internal] "Update_frontier_extension"
+      ~metadata:[ ("extension_name", `String B.name) ] ;
+    let%map () = B.update (Field.get field t) frontier diffs_with_mutants in
+    [%log internal] "Update_frontier_extension_done"
+      ~metadata:[ ("extension_name", `String B.name) ] ;
+    ()
   in
   Deferred.List.all_unit
     (Fields.to_list

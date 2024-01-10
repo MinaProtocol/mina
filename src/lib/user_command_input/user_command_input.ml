@@ -13,7 +13,7 @@ module Payload = struct
           ( Currency.Fee.Stable.V1.t
           , Public_key.Compressed.Stable.V1.t
           , Account_nonce.Stable.V1.t option
-          , Global_slot.Stable.V1.t
+          , Global_slot_since_genesis.Stable.V1.t
           , Signed_command_memo.Stable.V1.t )
           Signed_command_payload.Common.Poly.Stable.V2.t
         [@@deriving sexp, to_yojson]
@@ -125,7 +125,9 @@ let fee_payer ({ payload; _ } : t) = Payload.fee_payer payload
 
 let create ?nonce ~fee ~fee_payer_pk ~valid_until ~memo ~body ~signer
     ~sign_choice () : t =
-  let valid_until = Option.value valid_until ~default:Global_slot.max_value in
+  let valid_until =
+    Option.value valid_until ~default:Global_slot_since_genesis.max_value
+  in
   let payload =
     Payload.create ~fee ~fee_payer_pk ?nonce ~valid_until ~memo ~body
   in
@@ -190,8 +192,8 @@ let warn_if_unable_to_pay_account_creation_fee ~get_account
            receiver account doesn't appear to have been created already and \
            the transaction amount of %s is smaller than the account creation \
            fee of %s."
-          (to_formatted_string amount)
-          (to_formatted_string account_creation_fee) ;
+          (to_mina_string amount)
+          (to_mina_string account_creation_fee) ;
       ()
 
 let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce

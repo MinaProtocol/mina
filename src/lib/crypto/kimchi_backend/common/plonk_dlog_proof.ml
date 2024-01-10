@@ -23,7 +23,7 @@ module type Stable_v1 = sig
     module Latest = V1
   end
 
-  type t = Stable.V1.t [@@deriving sexp, compare, yojson]
+  type t = Stable.V1.t [@@deriving sexp, compare, yojson, hash, equal]
 end
 
 module type Inputs_intf = sig
@@ -90,27 +90,31 @@ module type Inputs_intf = sig
   end
 
   module Backend : sig
+    type with_public_evals =
+      (Curve.Affine.Backend.t, Scalar_field.t) Kimchi_types.proof_with_public
+
     type t = (Curve.Affine.Backend.t, Scalar_field.t) Kimchi_types.prover_proof
 
     val create :
          Index.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.t array
-      -> Curve.Affine.Backend.t array
-      -> t
+      -> primary:Scalar_field.Vector.t
+      -> auxiliary:Scalar_field.Vector.t
+      -> prev_chals:Scalar_field.t array
+      -> prev_comms:Curve.Affine.Backend.t array
+      -> with_public_evals
 
     val create_async :
          Index.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.t array
-      -> Curve.Affine.Backend.t array
-      -> t Promise.t
+      -> primary:Scalar_field.Vector.t
+      -> auxiliary:Scalar_field.Vector.t
+      -> prev_chals:Scalar_field.t array
+      -> prev_comms:Curve.Affine.Backend.t array
+      -> with_public_evals Promise.t
 
-    val verify : Verifier_index.t -> t -> bool
+    val verify : Verifier_index.t -> with_public_evals -> bool
 
-    val batch_verify : Verifier_index.t array -> t array -> bool Promise.t
+    val batch_verify :
+      Verifier_index.t array -> with_public_evals array -> bool Promise.t
   end
 end
 
@@ -179,7 +183,7 @@ module Make (Inputs : Inputs_intf) = struct
         let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
 
         let create ~messages ~openings =
-          let open Pickles_types.Plonk_types.Proof in
+          let open Pickles_types.Plonk_types.Proof.Stable.Latest in
           { messages; openings }
       end
 
@@ -196,14 +200,54 @@ module Make (Inputs : Inputs_intf) = struct
     end
   end]
 
-  include (
-    Stable.Latest :
-      sig
-        type t [@@deriving compare, sexp, yojson, hash, equal, bin_io]
-      end
-      with type t := t )
+  module T = struct
+    type t = (G.Affine.t, Fq.t, Fq.t array) Pickles_types.Plonk_types.Proof.t
+    [@@deriving compare, sexp, yojson, hash, equal]
 
-  [%%define_locally Stable.Latest.(create)]
+    let id = "plong_dlog_proof_" ^ Inputs.id
+
+    type 'a creator =
+         messages:G.Affine.t Pickles_types.Plonk_types.Messages.t
+      -> openings:
+           (G.Affine.t, Fq.t, Fq.t array) Pickles_types.Plonk_types.Openings.t
+      -> 'a
+
+    let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
+
+    let create ~messages ~openings =
+      let open Pickles_types.Plonk_types.Proof in
+      { messages; openings }
+  end
+
+  include T
+
+  include (
+    struct
+      include Allocation_functor.Make.Basic (T)
+      include Allocation_functor.Make.Partial.Sexp (T)
+      include Allocation_functor.Make.Partial.Yojson (T)
+    end :
+      sig
+        include
+          Allocation_functor.Intf.Output.Basic_intf
+            with type t := t
+             and type 'a creator := 'a creator
+
+        include
+          Allocation_functor.Intf.Output.Sexp_intf
+            with type t := t
+             and type 'a creator := 'a creator
+
+        include
+          Allocation_functor.Intf.Output.Yojson_intf
+            with type t := t
+             and type 'a creator := 'a creator
+      end )
+
+  type with_public_evals =
+    { proof : t
+    ; public_evals : (Scalar_field.t array * Scalar_field.t array) option
+    }
 
   let g t f = G.Affine.of_backend (f t)
 
@@ -212,7 +256,8 @@ module Make (Inputs : Inputs_intf) = struct
     Array.iter arr ~f:(fun fe -> Fq.Vector.emplace_back vec fe) ;
     vec
 
-  (** Note that this function will panic if any of the points are points at infinity *)
+  (** Note that this function will panic if any of the points are points at
+      infinity *)
   let opening_proof_of_backend_exn (t : Opening_proof_backend.t) =
     let g (x : G.Affine.Backend.t) : G.Affine.t =
       G.Affine.of_backend x |> Pickles_types.Or_infinity.finite_exn
@@ -229,24 +274,70 @@ module Make (Inputs : Inputs_intf) = struct
     ; challenge_polynomial_commitment = g t.sg
     }
 
+  let eval_of_backend
+      ({ w
+       ; coefficients
+       ; z
+       ; s
+       ; generic_selector
+       ; poseidon_selector
+       ; complete_add_selector
+       ; mul_selector
+       ; emul_selector
+       ; endomul_scalar_selector
+       ; range_check0_selector
+       ; range_check1_selector
+       ; foreign_field_add_selector
+       ; foreign_field_mul_selector
+       ; xor_selector
+       ; rot_selector
+       ; lookup_aggregation
+       ; lookup_table
+       ; lookup_sorted
+       ; runtime_lookup_table
+       ; runtime_lookup_table_selector
+       ; xor_lookup_selector
+       ; lookup_gate_lookup_selector
+       ; range_check_lookup_selector
+       ; foreign_field_mul_lookup_selector
+       } :
+        Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
+    { w = tuple15_to_vec w
+    ; coefficients = tuple15_to_vec coefficients
+    ; z
+    ; s = tuple6_to_vec s
+    ; generic_selector
+    ; poseidon_selector
+    ; complete_add_selector
+    ; mul_selector
+    ; emul_selector
+    ; endomul_scalar_selector
+    ; range_check0_selector
+    ; range_check1_selector
+    ; foreign_field_add_selector
+    ; foreign_field_mul_selector
+    ; xor_selector
+    ; rot_selector
+    ; lookup_aggregation
+    ; lookup_table
+    ; lookup_sorted =
+        Vector.init Nat.N5.n ~f:(fun i ->
+            Option.try_with_join (fun () -> lookup_sorted.(i)) )
+    ; runtime_lookup_table
+    ; runtime_lookup_table_selector
+    ; xor_lookup_selector
+    ; lookup_gate_lookup_selector
+    ; range_check_lookup_selector
+    ; foreign_field_mul_lookup_selector
+    }
+
+  let evals_to_tuple ({ zeta; zeta_omega } : _ Kimchi_types.point_evaluations) =
+    (zeta, zeta_omega)
+
   let of_backend (t : Backend.t) : t =
     let proof = opening_proof_of_backend_exn t.proof in
-    let e1, e2 = t.evals in
     let evals =
-      let open Pickles_types.Plonk_types.Evals in
-      { w = Vector.zip (tuple15_to_vec e1.w) (tuple15_to_vec e2.w)
-      ; s = Vector.zip (tuple6_to_vec e1.s) (tuple6_to_vec e2.s)
-      ; z = (e1.z, e2.z)
-      ; generic_selector = (e1.generic_selector, e2.generic_selector)
-      ; poseidon_selector = (e1.poseidon_selector, e2.poseidon_selector)
-      ; lookup =
-          Option.map2 e1.lookup e2.lookup ~f:(fun l1 l2 ->
-              { Lookup.aggreg = (l1.aggreg, l2.aggreg)
-              ; table = (l1.table, l2.table)
-              ; sorted = Array.map2_exn l1.sorted l2.sorted ~f:Tuple2.create
-              ; runtime = Option.map2 l1.runtime l2.runtime ~f:Tuple2.create
-              } )
-      }
+      Plonk_types.Evals.map ~f:evals_to_tuple (eval_of_backend t.evals)
     in
     let wo x : Inputs.Curve.Affine.t array =
       match Poly_comm.of_backend_without_degree_bound x with
@@ -266,38 +357,91 @@ module Make (Inputs : Inputs_intf) = struct
         ; lookup =
             Option.map t.commitments.lookup
               ~f:(fun l : _ Pickles_types.Plonk_types.Messages.Lookup.t ->
-                { sorted = Array.map ~f:wo l.sorted
+                { sorted =
+                    Vector.init
+                      Pickles_types.Plonk_types.Lookup_sorted_minus_1.n
+                      ~f:(fun i -> wo l.sorted.(i))
+                ; sorted_5th_column =
+                    (* TODO: This is ugly and error-prone *)
+                    Option.try_with (fun () ->
+                        wo
+                          l.sorted.(Nat.to_int
+                                      Pickles_types.Plonk_types
+                                      .Lookup_sorted_minus_1
+                                      .n) )
                 ; aggreg = wo l.aggreg
                 ; runtime = Option.map ~f:wo l.runtime
                 } )
         }
       ~openings:{ proof; evals; ft_eval1 = t.ft_eval1 }
 
-  let lookup_eval_to_backend
-      { Pickles_types.Plonk_types.Evals.Lookup.sorted; aggreg; table; runtime }
-      : 'f Kimchi_types.lookup_evaluations =
-    { sorted; aggreg; table; runtime }
+  let of_backend_with_public_evals (t : Backend.with_public_evals) :
+      with_public_evals =
+    { proof = of_backend t.proof
+    ; public_evals = Option.map ~f:evals_to_tuple t.public_evals
+    }
 
   let eval_to_backend
       { Pickles_types.Plonk_types.Evals.w
+      ; coefficients
       ; z
       ; s
       ; generic_selector
       ; poseidon_selector
-      ; lookup
+      ; complete_add_selector
+      ; mul_selector
+      ; emul_selector
+      ; endomul_scalar_selector
+      ; range_check0_selector
+      ; range_check1_selector
+      ; foreign_field_add_selector
+      ; foreign_field_mul_selector
+      ; xor_selector
+      ; rot_selector
+      ; lookup_aggregation
+      ; lookup_table
+      ; lookup_sorted
+      ; runtime_lookup_table
+      ; runtime_lookup_table_selector
+      ; xor_lookup_selector
+      ; lookup_gate_lookup_selector
+      ; range_check_lookup_selector
+      ; foreign_field_mul_lookup_selector
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
+    ; coefficients = tuple15_of_vec coefficients
     ; z
     ; s = tuple6_of_vec s
     ; generic_selector
     ; poseidon_selector
-    ; lookup = Option.map ~f:lookup_eval_to_backend lookup
+    ; complete_add_selector
+    ; mul_selector
+    ; emul_selector
+    ; endomul_scalar_selector
+    ; range_check0_selector
+    ; range_check1_selector
+    ; foreign_field_add_selector
+    ; foreign_field_mul_selector
+    ; xor_selector
+    ; rot_selector
+    ; lookup_aggregation
+    ; lookup_table
+    ; lookup_sorted = Vector.to_array lookup_sorted
+    ; runtime_lookup_table
+    ; runtime_lookup_table_selector
+    ; xor_lookup_selector
+    ; lookup_gate_lookup_selector
+    ; range_check_lookup_selector
+    ; foreign_field_mul_lookup_selector
     }
 
   let vec_to_array (type t elt)
       (module V : Snarky_intf.Vector.S with type t = t and type elt = elt)
       (v : t) =
     Array.init (V.length v) ~f:(V.get v)
+
+  let evals_of_tuple (zeta, zeta_omega) : _ Kimchi_types.point_evaluations =
+    { zeta; zeta_omega }
 
   let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
       ({ messages = { w_comm; z_comm; t_comm; lookup }
@@ -317,7 +461,10 @@ module Make (Inputs : Inputs_intf) = struct
         ; t_comm = pcwo t_comm
         ; lookup =
             Option.map lookup ~f:(fun t : _ Kimchi_types.lookup_commitments ->
-                { sorted = Array.map ~f:pcwo t.sorted
+                { sorted =
+                    Array.map ~f:pcwo
+                      (Array.append (Vector.to_array t.sorted)
+                         (Option.to_array t.sorted_5th_column) )
                 ; aggreg = pcwo t.aggreg
                 ; runtime = Option.map ~f:pcwo t.runtime
                 } )
@@ -329,9 +476,7 @@ module Make (Inputs : Inputs_intf) = struct
         ; z2 = z_2
         ; sg = g challenge_polynomial_commitment
         }
-    ; evals =
-        ( eval_to_backend (Plonk_types.Evals.map ~f:fst evals)
-        , eval_to_backend (Plonk_types.Evals.map ~f:snd evals) )
+    ; evals = eval_to_backend (Plonk_types.Evals.map ~f:evals_of_tuple evals)
     ; ft_eval1
     ; public = primary_input
     ; prev_challenges =
@@ -348,6 +493,16 @@ module Make (Inputs : Inputs_intf) = struct
   let to_backend chal_polys primary_input t =
     to_backend' chal_polys (List.to_array primary_input) t
 
+  let to_backend_with_public_evals' (chal_polys : Challenge_polynomial.t list)
+      primary_input ({ proof; public_evals } : with_public_evals) :
+      Backend.with_public_evals =
+    { proof = to_backend' chal_polys primary_input proof
+    ; public_evals = Option.map ~f:evals_of_tuple public_evals
+    }
+
+  let to_backend_with_public_evals chal_polys primary_input t =
+    to_backend_with_public_evals' chal_polys (List.to_array primary_input) t
+
   let create ?message pk ~primary ~auxiliary =
     let chal_polys =
       match (message : message option) with Some s -> s | None -> []
@@ -362,8 +517,11 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment) )
     in
-    let res = Backend.create pk primary auxiliary challenges commitments in
-    of_backend res
+    let res =
+      Backend.create pk ~primary ~auxiliary ~prev_chals:challenges
+        ~prev_comms:commitments
+    in
+    of_backend_with_public_evals res
 
   let create_async ?message pk ~primary ~auxiliary =
     let chal_polys =
@@ -380,26 +538,39 @@ module Make (Inputs : Inputs_intf) = struct
           G.Affine.to_backend (Finite commitment) )
     in
     let%map.Promise res =
-      Backend.create_async pk primary auxiliary challenges commitments
+      Backend.create_async pk ~primary ~auxiliary ~prev_chals:challenges
+        ~prev_comms:commitments
     in
-    of_backend res
+    of_backend_with_public_evals res
 
   let batch_verify' (conv : 'a -> Fq.t array)
-      (ts : (Verifier_index.t * t * 'a * message option) list) =
+      (ts : (Verifier_index.t * with_public_evals * 'a * message option) list) =
+    let logger = Internal_tracing_context_logger.get () in
+    [%log internal] "Batch_verify_backend_convert_inputs" ;
     let vks_and_v =
       Array.of_list_map ts ~f:(fun (vk, t, xs, m) ->
-          let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
+          let p =
+            to_backend_with_public_evals'
+              (Option.value ~default:[] m)
+              (conv xs) t
+          in
           (vk, p) )
     in
-    Backend.batch_verify
-      (Array.map ~f:fst vks_and_v)
-      (Array.map ~f:snd vks_and_v)
+    [%log internal] "Batch_verify_backend_convert_inputs_done" ;
+    [%log internal] "Batch_verify_backend" ;
+    let%map.Promise result =
+      Backend.batch_verify
+        (Array.map ~f:fst vks_and_v)
+        (Array.map ~f:snd vks_and_v)
+    in
+    [%log internal] "Batch_verify_backend_done" ;
+    result
 
   let batch_verify = batch_verify' (fun xs -> List.to_array xs)
 
   let verify ?message t vk xs : bool =
     Backend.verify vk
-      (to_backend'
+      (to_backend_with_public_evals'
          (Option.value ~default:[] message)
          (vec_to_array (module Scalar_field.Vector) xs)
          t )

@@ -8,8 +8,8 @@ let
   inherit (builtins) filterSource path;
 
   inherit (pkgs.lib)
-    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath
-    optionalString escapeShellArg;
+    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath optionalString
+    escapeShellArg;
 
   external-repo =
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
@@ -19,17 +19,18 @@ let
   external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
     (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
-  difference = a: b:
-    filterAttrs (name: _: !builtins.elem name (builtins.attrNames b)) a;
-
+  # Packages which are `installed` in the export.
+  # These are all the transitive ocaml dependencies of Mina.
   export-installed = opam-nix.opamListToQuery export.installed;
 
+  # Extra packages which are not in opam.export but useful for development, such as an LSP server.
   extra-packages = with implicit-deps; {
     dune-rpc = "3.5.0";
     dyn = "3.5.0";
     fiber = "3.5.0";
     chrome-trace = "3.5.0";
-    ocaml-lsp-server = "1.14.1";
+    ocaml-lsp-server = "1.15.1-4.14";
+    ocamlc-loc = "3.5.0";
     ocaml-system = ocaml;
     ocamlformat-rpc-lib = "0.22.4";
     omd = "1.3.2";
@@ -40,22 +41,27 @@ let
     xdg = dune;
   };
 
+  # Dependencies required by every Mina package
   implicit-deps = export-installed // external-packages;
 
+  # Pins from opam.export
   pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
 
-  scope = opam-nix.applyOverlays opam-nix.__overlays (opam-nix.defsToScope pkgs
-    ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
+  scope = opam-nix.applyOverlays opam-nix.__overlays
+    (opam-nix.defsToScope pkgs { }
+      ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
 
   installedPackageNames =
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
 
   sourceInfo = inputs.self.sourceInfo or { };
 
+  # "System" dependencies required by all Mina packages
   external-libs = with pkgs;
     [ zlib bzip2 gmp openssl libffi ]
     ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
 
+  # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
   filtered-src = with inputs.nix-filter.lib;
     filter {
       root = ../.;
@@ -73,9 +79,11 @@ let
       lld_wrapped = pkgs.writeShellScriptBin "ld.lld"
         ''${pkgs.llvmPackages.bintools}/bin/ld.lld "$@"'';
 
+      # Make a script wrapper around a binary, setting all the necessary environment variables and adding necessary tools to PATH.
+      # Also passes the version information to the executable.
       wrapMina = let
         commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
-        commit_date = inputs.self.sourceInfo.lastModifiedDate or "<unknown>";
+        commit_date = inputs.flockenzeit.lib.RFC-5322 inputs.self.sourceInfo.lastModified or 0;
       in package:
       { deps ? [ pkgs.gnutar pkgs.gzip ], }:
       pkgs.runCommand "${package.name}-release" {
@@ -94,6 +102,8 @@ let
         done
       '') package.outputs);
 
+      # Derivation which has all Mina's dependencies in it, and creates an empty output if the command succeds.
+      # Useful for unit tests.
       runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { } }:
         check:
         self.mina-dev.overrideAttrs (oa:
@@ -109,6 +119,7 @@ let
       lmdb = super.lmdb.overrideAttrs
         (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
 
+      # Can't find sodium-static and ctypes
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
         propagatedBuildInputs = [ pkgs.sodium-static ];
@@ -117,20 +128,26 @@ let
         '';
       });
 
+      # Doesn't have an explicit dependency on ctypes
       rpc_parallel = super.rpc_parallel.overrideAttrs
         (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
 
+      # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({
         pname = "mina";
         version = "dev";
         # Prevent unnecessary rebuilds on non-source changes
         src = filtered-src;
 
+        withFakeOpam = false;
+
         # TODO, get this from somewhere
         MARLIN_REPO_SHA = "<unknown>";
         MINA_COMMIT_SHA1 = "<unknown>";
         MINA_COMMIT_DATE = "<unknown>";
         MINA_BRANCH = "<unknown>";
+
+        DUNE_PROFILE = "devnet";
 
         NIX_LDFLAGS =
           optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
@@ -191,11 +208,20 @@ let
             src/app/swap_bad_balances/swap_bad_balances.exe \
             src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
           dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
+          # Building documentation fails, because not everything in the source tree compiles. Ignore the errors.
           dune build @doc || true
         '';
 
-        outputs =
-          [ "out" "archive" "generate_keypair" "mainnet" "testnet" "genesis" "sample" "batch_txn_tool"];
+        outputs = [
+          "out"
+          "archive"
+          "generate_keypair"
+          "mainnet"
+          "testnet"
+          "genesis"
+          "sample"
+          "batch_txn_tool"
+        ];
 
         installPhase = ''
           mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
@@ -227,8 +253,26 @@ let
         OCAMLPARAM = "_,cclib=-lc++";
       });
 
+      # Same as above, but wrapped with version info.
       mina = wrapMina self.mina-dev { };
 
+      # Mina with additional instrumentation info.
+      with-instrumentation-dev = self.mina-dev.overrideAttrs (oa: {
+        pname = "with-instrumentation";
+        outputs = [ "out" ];
+
+        buildPhase = ''
+          dune build  --display=short --profile=testnet_postake_medium_curves --instrument-with bisect_ppx src/app/cli/src/mina.exe
+        '';
+        installPhase = ''
+          mkdir -p $out/bin
+          mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
+        '';
+      });
+        
+      with-instrumentation = wrapMina self.with-instrumentation-dev { };
+      
+      # Unit tests
       mina_tests = runMinaCheck {
         name = "tests";
         extraArgs = {
@@ -248,49 +292,12 @@ let
         dune runtest src/app/archive src/lib/command_line_tests --display=short
       '';
 
+      # Check if the code is formatted properly
       mina-ocaml-format = runMinaCheck { name = "ocaml-format"; } ''
         dune exec --profile=dev src/app/reformat/reformat.exe -- -path . -check
       '';
 
-      mina_client_sdk = self.mina-dev.overrideAttrs (_: {
-        pname = "mina_client_sdk";
-        version = "dev";
-        src = filtered-src;
-
-        outputs = [ "out" ];
-
-        checkInputs = [ pkgs.nodejs-16_x ];
-
-        MINA_VERSION_IMPLEMENTATION = "mina_version.dummy";
-
-        buildPhase = ''
-          dune build --display=short \
-            src/lib/crypto/kimchi_bindings/js/node_js \
-            src/app/client_sdk/client_sdk.bc.js \
-            src/lib/snarky_js_bindings/snarky_js_node.bc.js \
-            src/lib/snarky_js_bindings/snarky_js_chrome.bc.js
-        '';
-
-        doCheck = true;
-        checkPhase = ''
-          node src/app/client_sdk/tests/run_unit_tests.js
-
-          dune build src/app/client_sdk/tests/test_signatures.exe
-          ./_build/default/src/app/client_sdk/tests/test_signatures.exe > nat.consensus.json
-          node src/app/client_sdk/tests/test_signatures.js > js.nonconsensus.json
-          if ! diff -q nat.consensus.json js.nonconsensus.json; then
-            echo "Consensus and JS code generate different signatures";
-            exit 1
-          fi
-        '';
-
-        installPhase = ''
-          mkdir -p $out/share/client_sdk $out/share/snarkyjs_bindings
-          mv _build/default/src/app/client_sdk/client_sdk.bc.js $out/share/client_sdk
-          mv _build/default/src/lib/snarky_js_bindings/snarky_js_*.js $out/share/snarkyjs_bindings
-        '';
-      });
-
+      # Integration test executive
       test_executive-dev = self.mina-dev.overrideAttrs (oa: {
         pname = "mina-test_executive";
         outputs = [ "out" ];

@@ -37,6 +37,6 @@
    ppx_version.runtime
    consensus
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_let ppx_deriving_yojson)))

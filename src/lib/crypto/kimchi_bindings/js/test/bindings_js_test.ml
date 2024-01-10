@@ -643,7 +643,7 @@ let _ =
                |> Backend.Keypair.create ~prev_challenges:0 )
          in
          let x = Backend.Field.of_int 2 in
-         let (pi : Backend.Proof.t) =
+         let (pi : Backend.Proof.with_public_evals) =
            time "generate witness conv" (fun () ->
                Impl.generate_witness_conv ~input_typ:Typ.field
                  ~return_typ:Typ.unit main
@@ -875,32 +875,7 @@ let _ =
          let vbmul3 =
            mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
          in
-         let endomul1 =
-           mk_wires ChaCha0 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
-         in
-         let endomul2 =
-           mk_wires ChaCha1 7 (7, 0) (7, 1) (7, 2) (rand_fields 31)
-         in
-         let endomul3 =
-           mk_wires ChaCha2 8 (8, 0) (8, 1) (8, 2) (rand_fields 32)
-         in
-         let endomul4 =
-           mk_wires ChaChaFinal 9 (9, 0) (9, 1) (9, 2) (rand_fields 33)
-         in
-         let all =
-           [ zero
-           ; generic
-           ; add1
-           ; add2
-           ; vbmul1
-           ; vbmul2
-           ; vbmul3
-           ; endomul1
-           ; endomul2
-           ; endomul3
-           ; endomul4
-           ]
-         in
+         let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
          let test_vec vec =
            List.iter (add vec) all ;
            List.iteri (fun i x -> assert (eq x (get vec i))) all ;
@@ -945,8 +920,16 @@ let _ =
            vec
          in
          let urs = Pasta_fp_urs.create 16 in
-         let index0 = create gate_vector 0 0 urs in
-         let index2 = create gate_vector 2 0 urs in
+         (* TODO(dw) write tests with lookup tables *)
+         let lookup_tables = [||] in
+         (* TODO(dw) write tests with runtime tables *)
+         let runtime_table_cfg = [||] in
+         let index0 =
+           create gate_vector 0 lookup_tables runtime_table_cfg 0 urs
+         in
+         let index2 =
+           create gate_vector 2 lookup_tables runtime_table_cfg 0 urs
+         in
          assert (max_degree index0 = 16) ;
          assert (max_degree index2 = 16) ;
          assert (public_inputs index0 = 0) ;
@@ -987,38 +970,21 @@ let _ =
            let vbmul3 =
              mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
            in
-           let endomul1 =
-             mk_wires ChaCha0 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
-           in
-           let endomul2 =
-             mk_wires ChaCha1 7 (7, 0) (7, 1) (7, 2) (rand_fields 31)
-           in
-           let endomul3 =
-             mk_wires ChaCha2 8 (8, 0) (8, 1) (8, 2) (rand_fields 32)
-           in
-           let endomul4 =
-             mk_wires ChaChaFinal 9 (9, 0) (9, 1) (9, 2) (rand_fields 33)
-           in
-           let all =
-             [ zero
-             ; generic
-             ; add1
-             ; add2
-             ; vbmul1
-             ; vbmul2
-             ; vbmul3
-             ; endomul1
-             ; endomul2
-             ; endomul3
-             ; endomul4
-             ]
-           in
+           let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
            List.iter (add vec) all ;
            vec
          in
          let urs = Pasta_fq_urs.create 16 in
-         let index0 = create gate_vector 0 0 urs in
-         let index2 = create gate_vector 2 0 urs in
+         (* TODO(dw) write tests with lookup tables *)
+         let lookup_tables = [||] in
+         (* TODO(dw) write tests with runtime tables *)
+         let runtime_table_cfg = [||] in
+         let index0 =
+           create gate_vector 0 lookup_tables runtime_table_cfg 0 urs
+         in
+         let index2 =
+           create gate_vector 2 lookup_tables runtime_table_cfg 0 urs
+         in
          assert (max_degree index0 = 16) ;
          assert (max_degree index2 = 16) ;
          assert (public_inputs index0 = 0) ;
@@ -1042,43 +1008,66 @@ let verification_evals_to_list
     ; mul_comm : 'PolyComm
     ; emul_comm : 'PolyComm
     ; endomul_scalar_comm : 'PolyComm
-    ; chacha_comm : 'PolyComm array option
+    ; xor_comm : 'PolyComm option
+    ; range_check0_comm : 'PolyComm option
+    ; range_check1_comm : 'PolyComm option
+    ; foreign_field_add_comm : 'PolyComm option
+    ; foreign_field_mul_comm : 'PolyComm option
+    ; rot_comm : 'PolyComm option
     } =
-  generic_comm :: psm_comm :: complete_add_comm :: mul_comm :: emul_comm
-  :: endomul_scalar_comm
-  :: ( Array.append sigma_comm coefficients_comm
-     |> Array.append (Option.value ~default:[||] chacha_comm)
-     |> Array.to_list )
+  let non_opt_comms =
+    generic_comm :: psm_comm :: complete_add_comm :: mul_comm :: emul_comm
+    :: endomul_scalar_comm
+    :: (Array.append sigma_comm coefficients_comm |> Array.to_list)
+  in
+  let opt_comms =
+    [ xor_comm
+    ; range_check0_comm
+    ; range_check1_comm
+    ; foreign_field_add_comm
+    ; foreign_field_mul_comm
+    ; rot_comm
+    ]
+  in
+  List.map Option.some non_opt_comms @ opt_comms
 
 let eq_verifier_index ~field_equal ~other_field_equal
     { VerifierIndex.domain = { log_size_of_group = i1_1; group_gen = f1 }
     ; max_poly_size = i1_2
-    ; max_quot_size = i1_3
     ; srs = _
     ; evals = evals1
     ; shifts = shifts1
     ; lookup_index = _
     ; public = public1
     ; prev_challenges = prev_challenges1
+    ; zk_rows = zk_rows1
     }
     { VerifierIndex.domain = { log_size_of_group = i2_1; group_gen = f2 }
     ; max_poly_size = i2_2
-    ; max_quot_size = i2_3
     ; srs = _
     ; evals = evals2
     ; shifts = shifts2
     ; lookup_index = _
     ; public = public2
     ; prev_challenges = prev_challenges2
+    ; zk_rows = zk_rows2
     } =
-  i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2 && i1_3 = i2_3
+  i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2
   && List.for_all2
-       (eq_poly_comm ~field_equal:other_field_equal)
+       (fun x y ->
+         match (x, y) with
+         | Some x, Some y ->
+             eq_poly_comm ~field_equal:other_field_equal x y
+         | None, None ->
+             true
+         | _, _ ->
+             false )
        (verification_evals_to_list evals1)
        (verification_evals_to_list evals2)
   && eq_verification_shifts ~field_equal shifts1 shifts2
   && public1 = public2
   && prev_challenges1 = prev_challenges2
+  && zk_rows1 = zk_rows2
 
 let _ =
   let open Pasta_fp_verifier_index in
@@ -1114,8 +1103,18 @@ let _ =
              ~other_field_equal:Pasta_fq.equal
          in
          let urs = Pasta_fp_urs.create 16 in
-         let index0 = Pasta_fp_index.create gate_vector 0 0 urs in
-         let index2 = Pasta_fp_index.create gate_vector 2 0 urs in
+         (* TODO(dw) write tests with lookup tables *)
+         let lookup_tables = [||] in
+         (* TODO(dw) write tests with runtime tables *)
+         let runtime_table_cfg = [||] in
+         let index0 =
+           Pasta_fp_index.create gate_vector 0 lookup_tables runtime_table_cfg 0
+             urs
+         in
+         let index2 =
+           Pasta_fp_index.create gate_vector 2 lookup_tables runtime_table_cfg 0
+             urs
+         in
          let vindex0_0 = create index0 in
          let vindex0_1 = create index0 in
          assert (eq vindex0_0 vindex0_1) ;
@@ -1164,8 +1163,18 @@ let _ =
              ~other_field_equal:Pasta_fp.equal
          in
          let urs = Pasta_fq_urs.create 16 in
-         let index0 = Pasta_fq_index.create gate_vector 0 0 urs in
-         let index2 = Pasta_fq_index.create gate_vector 2 0 urs in
+         (* TODO(dw) write tests with lookup tables *)
+         let lookup_tables = [||] in
+         (* TODO(dw) write tests with runtime tables *)
+         let runtime_table_cfg = [||] in
+         let index0 =
+           Pasta_fq_index.create gate_vector 0 lookup_tables runtime_table_cfg 0
+             urs
+         in
+         let index2 =
+           Pasta_fq_index.create gate_vector 2 lookup_tables runtime_table_cfg 0
+             urs
+         in
          let vindex0_0 = create index0 in
          let vindex0_1 = create index0 in
          assert (eq vindex0_0 vindex0_1) ;

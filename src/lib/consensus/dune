@@ -1,7 +1,7 @@
 (library
  (name consensus)
  (public_name consensus)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (modules (:standard \ proof_of_stake_fuzzer))
  (library_flags (-linkall))
  (libraries
@@ -41,6 +41,7 @@
    merkle_ledger
    pickles.backend
    random_oracle
+   pipe_lib
    bignum_bigint
    vrf_lib
    snark_params
@@ -75,11 +76,14 @@
    pickles
    snark_bits
    sparse_ledger_lib
+   syncable_ledger
    trust_system
    mina_base.import
    ppx_version.runtime
    graphql_basic_scalars
    signature_lib_unix
+   internal_tracing
+   o1trace
  )
  (preprocessor_deps "../../config.mlh")
  (preprocess

@@ -11,9 +11,6 @@ module type Basic = sig
 
   type magnitude = t [@@deriving sexp, compare]
 
-  (* not automatically derived *)
-  val dhall_type : Ppx_dhall_type.Dhall_type.t
-
   val max_int : t
 
   val length_in_bits : int
@@ -38,17 +35,33 @@ module type Basic = sig
 
   val to_string : t -> string
 
-  val of_formatted_string : string -> t
+  val of_mina_string_exn : string -> t
 
-  val to_formatted_string : t -> string
-
-  val of_int : int -> t
-
-  val to_int : t -> int
+  val to_mina_string : t -> string
 
   val to_uint64 : t -> uint64
 
   val of_uint64 : uint64 -> t
+
+  (* The functions below are unsafe, because they could overflow or
+     underflow. They perform appropriate checks to guard against this
+     and either raise Currency_overflow exception or return None
+     depending on the error-handling strategy.
+
+     It is advisable to use nanomina and mina wherever possible and
+     limit the use of _exn veriants to places where a fixed value is
+     being converted and hence overflow cannot happen. *)
+  val of_mina_int_exn : int -> t
+
+  val of_nanomina_int_exn : int -> t
+
+  val of_mina_int : int -> t option
+
+  val of_nanomina_int : int -> t option
+
+  val to_mina_int : t -> int
+
+  val to_nanomina_int : t -> int
 
   [%%ifdef consensus_mechanism]
 
@@ -107,8 +120,10 @@ module type Signed_intf = sig
 
   val gen : t Quickcheck.Generator.t
 
-  val create :
-    magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed_poly.t
+  val create : magnitude:magnitude -> sgn:Sgn.t -> t
+
+  (* allows creation of negative 0 *)
+  val create_preserve_zero_sign : magnitude:magnitude -> sgn:Sgn.t -> t
 
   val sgn : t -> Sgn.t
 
@@ -292,9 +307,6 @@ module type Full = sig
         [@@@with_all_version_tags]
 
         type t [@@deriving sexp, compare, hash, yojson, equal]
-
-        (* not automatically derived *)
-        val dhall_type : Ppx_dhall_type.Dhall_type.t
       end
     end]
 
@@ -303,6 +315,12 @@ module type Full = sig
     include Arithmetic_intf with type t := t
 
     include Codable.S with type t := t
+
+    val minimum_user_command_fee : t
+
+    val default_transaction_fee : t
+
+    val default_snark_worker_fee : t
 
     (* TODO: Get rid of signed fee, use signed amount *)
     [%%ifdef consensus_mechanism]
@@ -346,9 +364,6 @@ module type Full = sig
         [@@@with_all_version_tags]
 
         type t [@@deriving sexp, compare, hash, equal, yojson]
-
-        (* not automatically derived *)
-        val dhall_type : Ppx_dhall_type.Dhall_type.t
       end
     end]
 
@@ -402,6 +417,8 @@ module type Full = sig
 
       val to_fee : var -> Fee.var
 
+      val to_field : var -> Field.Var.t
+
       module Unsafe : sig
         val of_field : Field.Var.t -> t
       end
@@ -416,9 +433,6 @@ module type Full = sig
     module Stable : sig
       module V1 : sig
         type t [@@deriving sexp, compare, hash, yojson, equal]
-
-        (* not automatically derived *)
-        val dhall_type : Ppx_dhall_type.Dhall_type.t
       end
     end]
 
@@ -467,6 +481,8 @@ module type Full = sig
 
       val sub_or_zero : var -> var -> var Checked.t
 
+      val sub_amount_or_zero : var -> Amount.var -> var Checked.t
+
       val ( + ) : var -> Amount.var -> var Checked.t
 
       val ( - ) : var -> Amount.var -> var Checked.t
@@ -484,6 +500,8 @@ module type Full = sig
       val ( >= ) : var -> var -> Boolean.var Checked.t
 
       val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
+
+      val to_field : var -> Field.Var.t
 
       module Unsafe : sig
         val of_field : Field.Var.t -> var

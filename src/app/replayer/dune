@@ -1,7 +1,6 @@
 (executable
  (package replayer)
  (name replayer)
- (flags -w -32-34)
  (public_name replayer)
  (libraries
    ;; opam libraries
@@ -10,6 +9,8 @@
    result
    async.async_command
    async
+   base.caml
+   bin_prot.shape
    caqti-async
    core_kernel
    archive_lib
@@ -39,9 +40,12 @@
    mina_state
    mina_ledger
    mina_base
+   mina_base.import
+   mina_transaction
+   mina_transaction_logic
    mina_caqti
    genesis_constants
-   coda_runtime_config
+   mina_runtime_config
    logger
    kimchi_backend
    kimchi_backend.pasta
@@ -49,12 +53,12 @@
    kimchi_backend.common
    block_time
    data_hash_lib
-   mina_base.import
    pickles
    sgn
    unsigned_extended
    random_oracle
    codable
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

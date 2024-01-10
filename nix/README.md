@@ -34,6 +34,17 @@ You may also install Nix from your distribution's official repository;
 Note however that it is preferrable you get a relatively recent
 version (⩾ 2.5), and the version from the repository may be rather old.
 
+**warning for macOS users**: macOS updates will often break your nix
+installation. To prevent that, you can add the following to your `~/.bashrc` or
+`~/.zshrc`:
+
+```bash
+# avoid macOS updates to destroy nix
+if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
+  source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+fi
+```
+
 ## 2. Enable Flakes (optional but recommended)
 
 Mina is packaged using [Nix Flakes](https://nixos.wiki/wiki/Flakes),
@@ -84,14 +95,16 @@ If you wish to build Mina yourself, or work on some changes incrementally, run
 otherwise). This will drop you in a shell with all dependencies, including
 OCaml, Rust and Go ones available, so the only thing you have to do is run `dune
 build src/app/cli/src/mina.exe`. You can also just run `eval "$buildPhase"` to
-run the same command as would be run inside the nix sandbox. The produced
-executable can be found in `_build/default/src/app/cli/src/mina.exe`. You most
-likely want to run it from the same shell you've built it in, since the
-executable looks for certain dependencies at runtime via environment variables,
-meaning you either have to set those variables yourself or rely on the ones set
-by the `devShell`. The executable produced by `nix build mina` (see ["Pure"
-build section](#pure-build)) doesn't suffer from this limitation, since it is
-wrapped with all the necessary environment variables.
+run the same command as would be run inside the nix sandbox. Running `make
+build` will **not** work due to it trying to build the already-built go
+dependencies. The produced executable can be found in
+`_build/default/src/app/cli/src/mina.exe`. You most likely want to **run it from
+the same shell you've built it in**, since the executable looks for certain
+dependencies at runtime via environment variables, meaning you either have to
+set those variables yourself or rely on the ones set by the `devShell`. The
+executable produced by `nix build mina` (see ["Pure" build
+section](#pure-build)) doesn't suffer from this limitation, since it is wrapped
+with all the necessary environment variables.
 
 Note that `opam` will **not** be available in that shell, since Nix takes over
 the job of computing and installing dependencies. If you need to modify the opam
@@ -111,8 +124,9 @@ nix develop mina#with-lsp -c $EDITOR .
 if you have your `$EDITOR` variable set correctly. Otherwise, replace it with
 the editor you want to edit Mina with.
 
-This will drop you in your favorite editor within a Nix sanbdbox containing an
-OCaml LSP server.
+This will drop you in your favorite editor within a Nix environment containing an
+OCaml LSP server. You might need to configure your editor appropriately;
+See [Per-editor instructions](#per-editor-instructions).
 
 However, for LSP to work its magic, you will need to have to make type
 informations available. They can for example be obtained by running `dune build
@@ -120,6 +134,46 @@ informations available. They can for example be obtained by running `dune build
 
 Don't forget to exit and re-enter the editor using this command after switching
 branches, or otherwise changing the dependency tree of Mina.
+
+#### Per-editor instructions
+
+##### Visual Studio Code / vscodium
+
+You have to install the "OCaml Platform" extension, either from
+[official marketplace](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
+or [openvsix](https://open-vsx.org/extension/ocamllabs/ocaml-platform).
+
+After installing it, run `code` (or `codium`) from within the `nix develop mina#with-lsp` shell,
+click "Select Sandbox" in the extension menu, and then pick "Global Sandbox". From then on, it should just work.
+
+##### Vim
+
+Install [CoC](https://github.com/neoclide/coc.nvim), and add the following to its configuration (`$HOME/.config/nvim`, or just enter command `:CocConfig`):
+
+```
+{
+  "languageserver": {
+    "ocaml-lsp": {
+      "command": "ocamllsp",
+      "args": [],
+      "filetypes": [
+        "ocaml", "reason"
+      ]
+    }
+  }
+}
+```
+
+Now, whenever you start vim from `nix develop mina#with-lsp`, it should just work.
+
+##### Emacs
+
+You need to install [tuareg](https://github.com/ocaml/tuareg) and  a LSP client, like  [lsp-mode](https://github.com/emacs-lsp/lsp-mode) or [eglot](https://github.com/joaotavora/eglot).
+You do not need to use [merlin](https://github.com/ocaml/merlin) directly (through `merlin-mode`), as `ocaml-lsp-server` that LSP client will use uses `merlin` backend.
+Note that LSP with flycheck and similar tools will not provide the global project compilation functionality, they will focus on individual buffers instead.
+To compile the whole project you can still use `M-x compile` or anything else; compilation results will be then seen by the LSP/flycheck.
+This should just work without any configuration, as long as you start it from `nix develop mina#with-lsp`.
+If you prefer to have just one instance of `emacs` running, consider installing `direnv` as explained in the sections below: emacs packages [envrc](https://github.com/purcell/envrc) and [emacs-direnv](https://github.com/wbolster/emacs-direnv) (just `direnv` in MELPA) provide integration with the tool, allowing emacs to use nix-defined sandbox variables when the open buffer is a repository file.
 
 ### "Pure" build
 
@@ -159,17 +213,36 @@ branches, or otherwise changing the dependency tree of Mina.
 
 TL;DR:
 ```
-nix build mina#mina-docker
+$(nix build mina#mina-image-full) | docker load
+# Also available: mina-image-slim, mina-image-instr, mina-archive-image-full,
 ```
 
 Since a "pure" build can happen entirely inside the Nix sandbox, we can use its
-result to produce other useful artifacts with Nix. For example, you can build a
-slim docker image. Run `nix build mina#mina-docker` if you're using flakes (or
-`nix-build packages.x86_64-linux.mina-docker` otherwise). You will get a
-`result` symlink in the current directory, which links to a tarball containing
-the docker image. You can load the image using `docker load -i result`, then
-note the tag it outputs. You can then run Mina from this docker image with
-`docker run mina:<tag> mina.exe <args>`.
+result to produce other useful artifacts with Nix. For example, we can build
+docker images. Due to /nix/store space usage concerns, instead of building the
+image itself Nix produces a script which, when executed, outputs a tarball of a
+docker image, suitable for consumption with `docker load`. After loading the
+image, it can be used as any other docker image would be (e.g. with `docker
+run`). The images for branches available on github can also be obtained from the
+registry at
+`us-west2-docker.pkg.dev/o1labs-192920/nix-containers/$IMAGE:$BRANCH`, e.g.
+`docker run --rm -it
+us-west2-docker.pkg.dev/o1labs-192920/nix-containers/mina-image-full:develop` .
+
+The `slim` image only has the Mina daemon itself, whereas `full` images also
+contain many useful tools, such as coreutils, fake init, jq, etc.
+
+The `instr` image is a replica of `full` image with additional instrumenation data.
+
+### Debian package
+
+TL;DR:
+```
+nix build mina#mina-deb
+```
+
+The Debian package is for installing on .deb-based systems which don't have Nix
+installed. **Installing it if you have Nix already won't work.**
 
 ### Demo nixos-container
 
@@ -309,6 +382,14 @@ networking inside the Nix sandbox (in order to vendor all the dependencies using
 specified explicitly. This is the hash you're updating by running
 `./nix/update-libp2p-hashes.sh`.
 
+### Notes on instrumenation package
+
+`nix build mina#mina_with_instrumentation` allows to build a special version on mina
+ with instrumentation enabled. This can be helpful if one would like verify 
+what is a code coverage of end-to-end/manual tests performed over mina under development. 
+Additionally there is a docker image available which wraps up above mina build into full mina image. 
+One can prepare it using command: `$(nix build mina#mina-image-instr-full --print-out-paths) | docker load`
+
 ### Discovering all the packages this Flake provides
 
 `nix flake show` doesn't work due to
@@ -355,7 +436,26 @@ nix-repl> :u legacyPackages.x86_64-linux.regular.ocamlPackages_mina.mina-dev.ove
 
 ## Troubleshooting
 
-### `Error: File unavailable:`, missing dependency libraries, or incorrect dependency library versions
+### Evaluation takes too long
+
+Evaluating any output of this flake for the first time can take a substantial
+amount of time. This is because Nix wants to ensure purity, and thus copies all
+submodules to the store and checks them out individually, even if you already
+have them checked out in your work tree.
+
+This is good for reproducibility, but can be inconvenient. Here are some steps
+you can take to circumvent this:
+
+- If you're using `direnv`, make sure to install and use `nix-direnv`. It has a
+  caching mechanism that significantly speeds up subsequent re-entries into the
+  environment. You might have to `direnv reload` manually once in a while as a
+  trade-off.
+- If you are trying to evaluate something from a clean checkout, it will take
+  longer, because Nix will try to ensure purity. You can circumvent this by
+  making the index dirty, e.g. by doing `touch foo; git add foo` . This will
+  make all Nix commands do a quick copy instead of checking everything out.
+
+### `Error: File unavailable:`, `Undefined symbols for architecture ...:`, `Compiler version mismatch`, missing dependency libraries, or incorrect dependency library versions
 
 If you get an error like this:
 
@@ -376,13 +476,45 @@ Error: File unavailable:
 /nix/store/2i0iqm48p20mrn69nbgr0pf76vdzjxj6-marlin_plonk_bindings_stubs-0.1.0/lib/lib/libwires_15_stubs.a
 ```
 
-It is likely that you have switched branches but didn't re-enter the development
+or like this:
+
+```
+Undefined symbols for architecture x86_64:
+  "____chkstk_darwin", referenced from:
+      __GLOBAL__sub_I_clock_cache.cc in librocksdb_stubs.a(clock_cache.o)
+      __GLOBAL__sub_I_lru_cache.cc in librocksdb_stubs.a(lru_cache.o)
+      __GLOBAL__sub_I_sharded_cache.cc in librocksdb_stubs.a(sharded_cache.o)
+      __GLOBAL__sub_I_builder.cc in librocksdb_stubs.a(builder.o)
+      __GLOBAL__sub_I_c.cc in librocksdb_stubs.a(c.o)
+      __GLOBAL__sub_I_column_family.cc in librocksdb_stubs.a(column_family.o)
+      __GLOBAL__sub_I_compacted_db_impl.cc in librocksdb_stubs.a(compacted_db_impl.o)
+      ...
+ld: symbol(s) not found for architecture x86_64
+```
+
+or like this:
+
+```
+Compiler version mismatch: this project seems to be compiled with OCaml
+compiler version 4.11, but the running OCaml LSP supports OCaml version 4.14.
+OCaml language support will not work properly until this problem is fixed.
+Hint: Make sure your editor runs OCaml LSP that supports this version of
+compiler.
+```
+
+This could be caused by having some non-Nix setup polluting the environment
+in your shell init file. Try running `nix develop mina -c bash --norc` or
+`nix develop mina -c zsh --no-rc` and see if that helps. If it does, look through
+the corresponding shell init files for anything suspicious (e.g. `eval $(opam env)`
+or `PATH` modifications).
+
+Alternatively, you might have switched branches but didn't re-enter the development
 shell. Exit the development shell (with `exit`, Ctrl+D, or however else you like
 exiting your shells) and re-enter it again with `nix develop mina`. `direnv` can
 also sometimes not reload the environment automatically, in that case, try
 `direnv reload`.
 
-Alternatively, in some circumstances, `dune` is not smart enough to rebuild
+Finally, in some circumstances, `dune` is not smart enough to rebuild
 things even if the environment changed and they should be rebuilt. Try removing
 the `_build` directory (or running `dune clean`, which does the same thing).
 
@@ -453,7 +585,7 @@ export GIT_LFS_SKIP_SMUDGE=1
 
 Before running any `nix` commands.
 
-### Warning: ignoring untrusted substituter
+### `Warning: ignoring untrusted substituter`
 
 Update your `/etc/nix/nix.conf` with the following content (concatenating new
 values with possibly already existing):
@@ -464,3 +596,23 @@ trusted-public-keys = nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct
 ```
 
 And then reload your `nix-daemon` service.
+
+### `gcc: Argument list too long`
+
+If you have a lot of big environment variables, especially on macOS, this might
+happen when you try to build anything inside the pure shell. It happens because
+the stack size for every process is limited, and it is shared between the
+current environment, the argument list, and some other things. Therefore, if
+your environment takes up too much space, not enough is left for the arguments.
+The way to fix the error is to unset some of the bigger enviornment variables,
+perhaps with
+
+```bash
+export XDG_DATA_DIRS= DIRENV_DIFF= <...>
+```
+
+Before running any `dune` commands.
+
+Alternatively, you can just run your commands inside `nix develop
+--ignore-environment mina`, which unsets all the outside environment variables,
+resulting in a more reproducible but less convenient environment.

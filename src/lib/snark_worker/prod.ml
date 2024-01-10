@@ -75,7 +75,9 @@ module Inputs = struct
           let statement = Work.Single.Spec.statement single in
           let process k =
             let start = Time.now () in
-            match%map.Async.Deferred k () with
+            match%map.Async.Deferred
+              Monitor.try_with_join_or_error ~here:[%here] k
+            with
             | Error e ->
                 [%log error] "SNARK worker failed: $error"
                   ~metadata:
@@ -106,9 +108,9 @@ module Inputs = struct
                             Or_error.try_with (fun () ->
                                 Transaction_snark.zkapp_command_witnesses_exn
                                   ~constraint_constants:M.constraint_constants
+                                  ~global_slot:w.block_global_slot
                                   ~state_body:w.protocol_state_body
                                   ~fee_excess:Currency.Amount.Signed.zero
-                                  (`Sparse_ledger w.ledger)
                                   [ ( `Pending_coinbase_init_stack w.init_stack
                                     , `Pending_coinbase_of_statement
                                         { Transaction_snark
@@ -118,9 +120,13 @@ module Inputs = struct
                                         ; target =
                                             input.target.pending_coinbase_stack
                                         }
+                                    , `Sparse_ledger w.first_pass_ledger
+                                    , `Sparse_ledger w.second_pass_ledger
+                                    , `Connecting_ledger_hash
+                                        input.connecting_ledger_left
                                     , zkapp_command )
                                   ]
-                                |> fst |> List.rev )
+                                |> List.rev )
                             |> Result.map_error ~f:(fun e ->
                                    Error.createf
                                      !"Failed to generate inputs for \
@@ -132,8 +138,8 @@ module Inputs = struct
                           in
                           let log_base_snark f ~statement ~spec ~all_inputs =
                             match%map.Deferred
-                              Deferred.Or_error.try_with (fun () ->
-                                  f ~statement ~spec )
+                              Deferred.Or_error.try_with ~here:[%here]
+                                (fun () -> f ~statement ~spec)
                             with
                             | Ok p ->
                                 Ok p
@@ -259,10 +265,12 @@ module Inputs = struct
                                 { Transaction_protocol_state.Poly.transaction =
                                     t
                                 ; block_data = w.protocol_state_body
+                                ; global_slot = w.block_global_slot
                                 }
                                 ~init_stack:w.init_stack
                                 (unstage
-                                   (Mina_ledger.Sparse_ledger.handler w.ledger) ) ) )
+                                   (Mina_ledger.Sparse_ledger.handler
+                                      w.first_pass_ledger ) ) ) )
               | Merge (_, proof1, proof2) ->
                   process (fun () -> M.merge ~sok_digest proof1 proof2) ) )
       | Check | None ->
@@ -276,6 +284,6 @@ module Inputs = struct
           in
           Deferred.Or_error.return
           @@ ( Transaction_snark.create ~statement:{ stmt with sok_digest }
-                 ~proof:Proof.transaction_dummy
+                 ~proof:(Lazy.force Proof.transaction_dummy)
              , Time.Span.zero )
 end

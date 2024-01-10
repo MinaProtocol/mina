@@ -1,4 +1,12 @@
-use kimchi::proof::caml::CamlRecursionChallenge;
+use kimchi::circuits::{
+    expr::FeatureFlag,
+    lookup::{
+        lookups::{LookupFeatures, LookupPattern, LookupPatterns},
+        runtime_tables::caml::{CamlRuntimeTable, CamlRuntimeTableCfg},
+        tables::caml::CamlLookupTable,
+    },
+};
+use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use std::io::Write;
@@ -15,17 +23,17 @@ use wires_15_stubs::{
     pasta_fq_plonk_proof::*,
     pasta_fq_plonk_verifier_index::*,
     plonk_verifier_index::{
-        CamlLookupSelectors, CamlLookupVerifierIndex, CamlLookupsUsed, CamlPlonkDomain,
-        CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
+        CamlLookupInfo, CamlLookupSelectors, CamlLookupVerifierIndex, CamlLookupsUsed,
+        CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
     },
     projective::{pallas::*, vesta::*},
     srs::{fp::*, fq::*},
     CamlCircuitGate,
     CamlLookupCommitments,
-    CamlLookupEvaluations,
     CamlOpeningProof,
     CamlPolyComm,
     CamlProofEvaluations,
+    CamlProofWithPublic,
     CamlProverCommitments,
     CamlProverProof,
     CamlRandomOracles,
@@ -91,17 +99,26 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlGroupAffine<T1> => "or_infinity");
     decl_type!(w, env, CamlScalarChallenge::<T1> => "scalar_challenge");
     decl_type!(w, env, CamlRandomOracles::<T1> => "random_oracles");
-    decl_type!(w, env, CamlLookupEvaluations<T1> => "lookup_evaluations");
+    decl_type!(w, env, PointEvaluations::<T1> => "point_evaluations");
     decl_type!(w, env, CamlProofEvaluations::<T1> => "proof_evaluations");
     decl_type!(w, env, CamlPolyComm::<T1> => "poly_comm");
     decl_type!(w, env, CamlRecursionChallenge::<T1, T2> => "recursion_challenge");
     decl_type!(w, env, CamlOpeningProof::<T1, T2> => "opening_proof");
     decl_type!(w, env, CamlLookupCommitments::<T1> => "lookup_commitments");
+
+    decl_type!(w, env, CamlRuntimeTableCfg::<T1> => "runtime_table_cfg");
+    decl_type!(w, env, CamlLookupTable::<T1> => "lookup_table");
+    decl_type!(w, env, CamlRuntimeTable::<T1> => "runtime_table");
     decl_type!(w, env, CamlProverCommitments::<T1> => "prover_commitments");
     decl_type!(w, env, CamlProverProof<T1, T2> => "prover_proof");
+    decl_type!(w, env, CamlProofWithPublic<T1, T2> => "proof_with_public");
 
     decl_type!(w, env, CamlWire => "wire");
     decl_type!(w, env, GateType => "gate_type");
+    decl_type!(w, env, LookupPattern => "lookup_pattern");
+    decl_type!(w, env, LookupPatterns => "lookup_patterns");
+    decl_type!(w, env, LookupFeatures => "lookup_features");
+    decl_type!(w, env, FeatureFlag => "feature_flag");
     decl_type!(w, env, CamlCircuitGate<T1> => "circuit_gate");
 
     decl_type!(w, env, CurrOrNext => "curr_or_next");
@@ -110,6 +127,7 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_module!(w, env, "VerifierIndex", {
         decl_module!(w, env, "Lookup", {
             decl_type!(w, env, CamlLookupsUsed => "lookups_used");
+            decl_type!(w, env, CamlLookupInfo => "lookup_info");
             decl_type!(w, env, CamlLookupSelectors<T1> => "lookup_selectors");
             decl_type!(w, env, CamlLookupVerifierIndex<T1> => "t");
         });
@@ -159,6 +177,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_pasta_fp_to_string => "to_string");
         decl_func!(w, env, caml_pasta_fp_of_string => "of_string");
         decl_func!(w, env, caml_pasta_fp_print => "print");
+        decl_func!(w, env, caml_pasta_fp_print_rust => "print_rust");
         decl_func!(w, env, caml_pasta_fp_copy => "copy");
         decl_func!(w, env, caml_pasta_fp_mut_add => "mut_add");
         decl_func!(w, env, caml_pasta_fp_mut_sub => "mut_sub");
@@ -195,6 +214,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_pasta_fq_to_string => "to_string");
         decl_func!(w, env, caml_pasta_fq_of_string => "of_string");
         decl_func!(w, env, caml_pasta_fq_print => "print");
+        decl_func!(w, env, caml_pasta_fq_print_rust => "print_rust");
         decl_func!(w, env, caml_pasta_fq_copy => "copy");
         decl_func!(w, env, caml_pasta_fq_mut_add => "mut_add");
         decl_func!(w, env, caml_pasta_fq_mut_sub => "mut_sub");
@@ -311,8 +331,10 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_create => "create");
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_add => "add");
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_get => "get");
+                    decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_len => "len");
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_wrap => "wrap");
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_digest => "digest");
+                    decl_func!(w, env, caml_pasta_fp_plonk_circuit_serialize => "to_json");
                 });
                 decl_module!(w, env, "Fq", {
                     decl_type!(w, env, CamlPastaFqPlonkGateVector => "t");
@@ -321,8 +343,10 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_create => "create");
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_add => "add");
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_get => "get");
+                    decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_len => "len");
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_wrap => "wrap");
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_digest => "digest");
+                    decl_func!(w, env, caml_pasta_fq_plonk_circuit_serialize => "to_json");
                 });
             });
         });
@@ -419,7 +443,8 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_module!(w, env, "Fp", {
                 decl_type_alias!(w, env, "t" => CamlOracles<CamlFp>);
 
-                decl_func!(w, env, fp_oracles_create => "create");
+                decl_func!(w, env, fp_oracles_create_no_public => "create");
+                decl_func!(w, env, fp_oracles_create => "create_with_public_evals");
                 decl_func!(w, env, fp_oracles_dummy => "dummy");
                 decl_func!(w, env, fp_oracles_deep_copy => "deep_copy");
             });
@@ -427,7 +452,8 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_module!(w, env, "Fq", {
                 decl_type_alias!(w, env, "t" => CamlOracles<CamlFq>);
 
-                decl_func!(w, env, fq_oracles_create => "create");
+                decl_func!(w, env, fq_oracles_create_no_public => "create");
+                decl_func!(w, env, fq_oracles_create => "create_with_public_evals");
                 decl_func!(w, env, fq_oracles_dummy => "dummy");
                 decl_func!(w, env, fq_oracles_deep_copy => "deep_copy");
             });
@@ -436,7 +462,14 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_module!(w, env, "Proof", {
             decl_module!(w, env, "Fp", {
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_create => "create");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_create_and_verify => "create_and_verify");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_lookup => "example_with_lookup");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_ffadd => "example_with_ffadd");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_xor => "example_with_xor");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_rot => "example_with_rot");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_foreign_field_mul => "example_with_foreign_field_mul");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_range_check => "example_with_range_check");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_range_check0 => "example_with_range_check0");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_verify => "verify");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_batch_verify => "batch_verify");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_dummy => "dummy");

@@ -48,6 +48,7 @@ module Op = struct
               |> Option.bind ~f:(fun relate ->
                      List.findi plan ~f:(fun _ a -> a_eq relate a.label) )
               |> Option.map ~f:(fun (i, _) -> [ operation_identifier i ])
+              |> Option.value ~default:[]
             in
             let%map a =
               f ~related_operations
@@ -137,6 +138,14 @@ module Partial = struct
     let%bind fee_payer_pk = pk_to_public_key ~context:"Fee payer" t.fee_payer in
     let%bind source_pk = pk_to_public_key ~context:"Source" t.source in
     let%bind receiver_pk = pk_to_public_key ~context:"Receiver" t.receiver in
+    let%bind () =
+      Result.ok_if_true
+        (Public_key.Compressed.equal fee_payer_pk source_pk)
+        ~error:
+          (Errors.create
+             (`Operations_not_valid
+               [ Errors.Partial_reason.Fee_payer_and_source_mismatch ] ) )
+    in
     let%bind memo =
       match t.memo with
       | Some memo -> (
@@ -156,16 +165,14 @@ module Partial = struct
                      [ Errors.Partial_reason.Amount_not_some ] ) )
           in
           let payload =
-            { Payment_payload.Poly.source_pk
-            ; receiver_pk
+            { Payment_payload.Poly.receiver_pk
             ; amount = Amount_currency.of_uint64 amount
             }
           in
           Signed_command.Payload.Body.Payment payload
       | `Delegation ->
           let payload =
-            Stake_delegation.Set_delegate
-              { delegator = source_pk; new_delegate = receiver_pk }
+            Stake_delegation.Set_delegate { new_delegate = receiver_pk }
           in
           Result.return @@ Signed_command.Payload.Body.Stake_delegation payload
     in
@@ -173,7 +180,8 @@ module Partial = struct
       ~fee:(Fee_currency.of_uint64 t.fee)
       ~fee_payer_pk ~nonce ~body ~memo
       ~valid_until:
-        (Option.map ~f:Mina_numbers.Global_slot.of_uint32 t.valid_until)
+        (Option.map ~f:Mina_numbers.Global_slot_since_genesis.of_uint32
+           t.valid_until )
 end
 
 let forget (t : t) : Partial.t =
@@ -290,8 +298,10 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       let open Result.Let_syntax in
       let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
-      | Some x ->
+      | Some x when Amount_of.compare_to_int64 x 0L < 1 ->
           V.return (Amount_of.negated x)
+      | Some _ ->
+          V.fail Fee_not_negative
       | None ->
           V.fail Amount_not_some
     in

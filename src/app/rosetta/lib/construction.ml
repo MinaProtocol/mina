@@ -23,9 +23,6 @@ module Get_options_metadata =
         }
         nonce
       }
-      daemonStatus {
-        chainId
-      }
       initialPeers
      }
 |}]
@@ -277,6 +274,7 @@ module Metadata = struct
     val ( / ) : t -> t -> t
   end
 
+  (* Invariant: fees is not empty *)
   let suggest_fee (type a) (module F : Field_like with type t = a) fees =
     let len = Array.length fees in
     let med = fees.(len / 2) in
@@ -344,13 +342,16 @@ module Metadata = struct
           | None ->
               M.fail (Errors.create `Chain_info_missing)
         in
-        Amount_of.mina
-          (suggest_fee
-             ( module struct
-               include Unsigned_extended.UInt64
-               include Infix
-             end )
-             fees)
+        if Array.is_empty fees then
+          Amount_of.mina (Mina_currency.Fee.to_uint64 Signed_command.minimum_fee)
+        else
+          Amount_of.mina
+            (suggest_fee
+               ( module struct
+                   include Unsigned_extended.UInt64
+                   include Infix
+                 end )
+               fees)
       in
       (* minimum fee : Pull this from the compile constants *)
       let amount_metadata =
@@ -359,7 +360,7 @@ module Metadata = struct
             , Amount.to_yojson
                 (Amount_of.mina
                    (Mina_currency.Fee.to_uint64
-                      Mina_compile_config.minimum_user_command_fee)) )
+                      Mina_currency.Fee.minimum_user_command_fee)) )
           ]
       in
       let receiver_exists =
@@ -541,7 +542,7 @@ module Payloads = struct
                      partial_user_command.User_command_info.Partial.source
                      partial_user_command.User_command_info.Partial.token)
             ; hex_bytes = Hex.Safe.to_hex unsigned_transaction_string
-            ; signature_type = Some "schnorr_poseidon"
+            ; signature_type = Some `Schnorr_poseidon
             }
           ]
       }
@@ -611,8 +612,7 @@ module Parse = struct
     module T (M : Monad_fail.S) = struct
       type t =
         { verify_payment_signature :
-               network_identifier:Rosetta_models.Network_identifier.t
-            -> payment:Transaction.Unsigned.Rendered.Payment.t
+               payment:Transaction.Unsigned.Rendered.Payment.t
             -> signature:Mina_base.Signature.t
             -> unit
             -> (bool, Errors.t) M.t
@@ -625,7 +625,7 @@ module Parse = struct
 
     let real : Real.t =
       { verify_payment_signature =
-          (fun ~network_identifier ~payment ~signature () ->
+          (fun ~payment ~signature () ->
             let open Deferred.Result in
             let open Deferred.Result.Let_syntax in
             let parse_pk ~which s =
@@ -642,21 +642,19 @@ module Parse = struct
                             which)
                        (`Json_parse (Some (Core_kernel.Error.to_string_hum e))))
             in
-            let%bind source_pk = parse_pk ~which:"source" payment.from in
+            let%bind fee_payer_pk = parse_pk ~which:"source" payment.from in
             let%bind receiver_pk = parse_pk ~which:"receiver" payment.to_ in
             let body =
               Signed_command_payload.Body.Payment
-                { source_pk
-                ; receiver_pk
+                { receiver_pk
                 ; amount = Mina_currency.Amount.of_uint64 payment.amount
                 }
             in
-            let fee_payer_pk = source_pk in
             let fee = Mina_currency.Fee.of_uint64 payment.fee in
             let signer = fee_payer_pk in
             let valid_until =
               Option.map payment.valid_until
-                ~f:Mina_numbers.Global_slot.of_uint32
+                ~f:Mina_numbers.Global_slot_since_genesis.of_uint32
             in
             let nonce = payment.nonce in
             let%map memo =
@@ -673,20 +671,18 @@ module Parse = struct
               Signed_command_payload.create ~fee ~fee_payer_pk ~nonce
                 ~valid_until ~memo ~body
             in
-            (* choose signature verification based on network *)
-            let signature_kind : Mina_signature_kind.t =
-              if String.equal network_identifier.network "mainnet" then
-                Mainnet
-              else Testnet
-            in
             Option.is_some @@
-              Signed_command.create_with_signature_checked ~signature_kind
-                signature signer payload )
+              Signed_command.create_with_signature_checked signature signer payload )
       ; lift = Deferred.return
       }
   end
 
   module Impl (M : Monad_fail.S) = struct
+    let check_sufficient_fee (type a) (payment : a -> Transaction.Unsigned.Rendered.Payment.t option) (transaction : a) : (unit, Errors.t) Result.t =
+      match payment transaction with
+    | Some pay -> if Transaction.Unsigned.Rendered.Payment.is_fee_sufficient pay then Ok () else  Result.fail @@ Errors.create `Transaction_submit_fee_small
+    | None -> Ok ()
+
     let handle ~(env : Env.T(M).t) (req : Construction_parse_request.t) =
       let open M.Let_syntax in
       let%bind json =
@@ -707,6 +703,10 @@ module Parse = struct
                      Errors.create (`Json_parse (Some e)))
               |> env.lift
             in
+            let%bind () =
+              check_sufficient_fee Transaction.Signed.Rendered.(fun a -> a.payment) signed_rendered_transaction
+              |> env.lift
+            in
             let%bind signed_transaction =
               Transaction.Signed.of_rendered signed_rendered_transaction
               |> env.lift
@@ -716,8 +716,7 @@ module Parse = struct
               | Some payment ->
                   (* Only perform signature validation on payments. *)
                   let%bind res =
-                    env.verify_payment_signature
-                      ~network_identifier:req.network_identifier ~payment
+                    env.verify_payment_signature ~payment
                       ~signature:signed_transaction.signature ()
                   in
                   if res then M.return ()
@@ -732,11 +731,18 @@ module Parse = struct
               ]
             , meta_of_command signed_transaction.command)
         | false ->
-            let%map unsigned_transaction =
+            let%bind unsigned_rendered_transaction =
               Transaction.Unsigned.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
-                     Errors.create (`Json_parse (Some e)))
-              |> Result.bind ~f:Transaction.Unsigned.of_rendered
+                    Errors.create (`Json_parse (Some e)))
+              |> env.lift
+            in
+            let%bind () =
+              check_sufficient_fee Transaction.Unsigned.Rendered.(fun a -> a.payment) unsigned_rendered_transaction
+              |> env.lift
+            in
+            let%map unsigned_transaction =
+             Transaction.Unsigned.of_rendered unsigned_rendered_transaction
               |> env.lift
             in
             ( User_command_info.to_operations ~failure_status:None
@@ -824,27 +830,25 @@ end
 module Submit = struct
   module Sql = struct
     module Transaction_exists = struct
-      type t =
-        { nonce: int64
-        ; source: string
-        ; receiver: string
-        ; amount: int64
-        ; fee: int64
+      type params =
+        { nonce : int64
+        ; source : string
+        ; receiver : string
+        ; amount : string
+        ; fee : string
         }
       [@@deriving hlist]
 
-      let typ =
+      let params_typ =
         let open Mina_caqti.Type_spec in
-        let spec =
-          Caqti_type.[int64; string; string; int64; int64]
-        in
-        let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+        let spec = Caqti_type.[ int64; string; string; string; string ] in
+        let encode t = Ok (hlist_to_tuple spec (params_to_hlist t)) in
+        let decode t = Ok (params_of_hlist (tuple_to_hlist spec t)) in
         Caqti_type.custom ~encode ~decode (to_rep spec)
 
       let query =
         Caqti_request.find_opt
-          typ
+          params_typ
           Caqti_type.string
           {sql| SELECT uc.id FROM user_commands uc
                 INNER JOIN public_keys AS pks ON pks.id = uc.source_id
@@ -862,12 +866,12 @@ module Submit = struct
           { nonce = (UInt32.to_int64 nonce)
           ; source
           ; receiver
-          ; amount = (UInt64.to_int64 amount)
-          ; fee = (UInt64.to_int64 fee) }
+          ; amount = UInt64.to_string amount
+          ; fee = UInt64.to_string fee
+          }
         |> Deferred.Result.map ~f:Option.is_some
     end
   end
-
 
   module Env = struct
     module T (M : Monad_fail.S) = struct

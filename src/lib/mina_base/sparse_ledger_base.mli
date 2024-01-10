@@ -9,7 +9,7 @@ module Stable : sig
       , Account_id.Stable.V2.t
       , Account.Stable.V2.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson]
 
     val to_latest : t -> t
   end
@@ -19,10 +19,12 @@ type sparse_ledger = t
 
 module Global_state : sig
   type t =
-    { ledger : sparse_ledger
+    { first_pass_ledger : sparse_ledger
+    ; second_pass_ledger : sparse_ledger
     ; fee_excess : Currency.Amount.Signed.t
     ; supply_increase : Currency.Amount.Signed.t
     ; protocol_state : Zkapp_precondition.Protocol_state.View.t
+    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
   [@@deriving sexp, to_yojson]
 end
@@ -57,9 +59,23 @@ val add_path :
   -> Account.t
   -> t
 
+(** Same as [add_path], but using the hashes provided in the wide merkle path
+    instead of recomputing them.
+    This is unsafe: the hashes are not checked or recomputed.
+*)
+val add_wide_path_unsafe :
+     t
+  -> [ `Left of Field.t * Field.t | `Right of Field.t * Field.t ] list
+  -> Account_id.t
+  -> Account.t
+  -> t
+
 val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 
 val handler : t -> Handler.t Staged.t
 
 val has_locked_tokens_exn :
-  global_slot:Mina_numbers.Global_slot.t -> account_id:Account_id.t -> t -> bool
+     global_slot:Mina_numbers.Global_slot_since_genesis.t
+  -> account_id:Account_id.t
+  -> t
+  -> bool

@@ -332,13 +332,12 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let validate_commands (t : t)
       ~(check :
-            User_command.t list
+            User_command.t With_status.t list
          -> (User_command.Valid.t list, 'e) Result.t Async.Deferred.Or_error.t
          ) : (With_valid_signatures.t, 'e) Result.t Async.Deferred.Or_error.t =
     let map t ~f = Async.Deferred.Or_error.map t ~f:(Result.map ~f) in
     let validate cs =
-      map
-        (check (List.map cs ~f:With_status.data))
+      map (check cs)
         ~f:
           (List.map2_exn cs ~f:(fun c data ->
                { With_status.data; status = c.status } ) )

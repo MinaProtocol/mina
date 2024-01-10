@@ -113,7 +113,7 @@ val validate_proofs :
   -> genesis_state_hash:State_hash.t
   -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_block list
   -> ( ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_block list
-     , [> `Invalid_proof | `Verifier_error of Error.t ] )
+     , [> `Invalid_proof of Error.t | `Verifier_error of Error.t ] )
      Deferred.Result.t
 
 val validate_single_proof :
@@ -121,7 +121,7 @@ val validate_single_proof :
   -> genesis_state_hash:State_hash.t
   -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_block
   -> ( ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_block
-     , [> `Invalid_proof | `Verifier_error of Error.t ] )
+     , [> `Invalid_proof of Error.t | `Verifier_error of Error.t ] )
      Deferred.Result.t
 
 val skip_proof_validation :
@@ -133,18 +133,20 @@ val extract_delta_block_chain_witness :
      ( 'a
      , 'b
      , 'c
-     , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
      , 'd
      , 'e
      , 'f )
      t
-  -> State_hash.t Non_empty_list.t
+  -> State_hash.t Mina_stdlib.Nonempty_list.t
 
 val validate_delta_block_chain :
      ( 'a
      , 'b
      , 'c
-     , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.false_t
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
      , 'd
      , 'e
      , 'f )
@@ -152,7 +154,8 @@ val validate_delta_block_chain :
   -> ( ( 'a
        , 'b
        , 'c
-       , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+       , [ `Delta_block_chain ]
+         * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
        , 'd
        , 'e
        , 'f )
@@ -165,7 +168,8 @@ val skip_delta_block_chain_validation :
   -> ( 'a
      , 'b
      , 'c
-     , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.false_t
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
      , 'd
      , 'e
      , 'f )
@@ -173,7 +177,8 @@ val skip_delta_block_chain_validation :
   -> ( 'a
      , 'b
      , 'c
-     , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
      , 'd
      , 'e
      , 'f )
@@ -245,6 +250,9 @@ val reset_frontier_dependencies_validation :
 val validate_staged_ledger_diff :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
   -> logger:Logger.t
+  -> get_completed_work:
+       (   Transaction_snark_work.Statement.t
+        -> Transaction_snark_work.Checked.t option )
   -> precomputed_values:Genesis_proof.t
   -> verifier:Verifier.t
   -> parent_staged_ledger:Staged_ledger.t

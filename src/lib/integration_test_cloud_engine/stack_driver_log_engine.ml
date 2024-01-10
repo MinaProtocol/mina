@@ -152,7 +152,13 @@ module Subscription = struct
             gcloud_key_file_env
     in
     let create_topic name =
-      run_cmd_or_error "." prog [ "pubsub"; "topics"; "create"; name ]
+      run_cmd_or_error "." prog
+        [ "pubsub"
+        ; "topics"
+        ; "create"
+        ; name
+        ; "--message-retention-duration=3d"
+        ]
     in
     let create_subscription name topic =
       run_cmd_or_error "." prog
@@ -164,6 +170,7 @@ module Subscription = struct
         ; topic
         ; "--topic-project"
         ; project_id
+        ; "--expiration-period=3d"
         ]
     in
     let t = resource_names name in
@@ -226,7 +233,7 @@ module Subscription = struct
         ; subscription_id
         ; "--auto-ack"
         ; "--limit"
-        ; string_of_int 5
+        ; string_of_int 10
         ; "--format"
         ; "table(DATA)"
         ]
@@ -258,7 +265,7 @@ let parse_event_from_log_entry ~logger ~network log_entry =
   let%bind pod_id =
     find string log_entry [ "resource"; "labels"; "pod_name" ]
   in
-  let%bind node =
+  let%bind _, node =
     Kubernetes_network.lookup_node_by_pod_id network pod_id
     |> Option.value_map ~f:Or_error.return
          ~default:
@@ -318,7 +325,7 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
                 ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
           Deferred.unit )
     in
-    let%bind () = after (Time.Span.of_ms 10000.0) in
+    let%bind () = after (Time.Span.of_ms 5000.0) in
     pull_subscription_in_background ~logger ~network ~event_writer ~subscription
     )
   else Deferred.unit
@@ -333,6 +340,7 @@ let create ~logger ~(network : Kubernetes_network.t) =
     in
     String.concat filters ~sep:"\n"
   in
+  [%log debug] "log_filter: %s" log_filter ;
   let%map subscription =
     Subscription.create_with_retry ~logger ~name:network.namespace
       ~filter:log_filter

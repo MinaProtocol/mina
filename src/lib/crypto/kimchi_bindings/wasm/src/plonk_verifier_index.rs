@@ -3,15 +3,19 @@ use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
-use commitment_dlog::srs::SRS;
 use kimchi::circuits::{
-    polynomials::permutation::Shifts,
-    polynomials::permutation::{zk_polynomial, zk_w3},
+    constraints::FeatureFlags,
+    lookup::index::LookupSelectors,
+    lookup::lookups::{LookupFeatures, LookupInfo, LookupPatterns},
+    polynomials::permutation::{permutation_vanishing_polynomial, zk_w, Shifts},
     wires::{COLUMNS, PERMUTS},
 };
 use kimchi::linearization::expr_linearization;
-use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
+use kimchi::poly_commitment::evaluation_proof::OpeningProof;
+use kimchi::verifier_index::{LookupVerifierIndex, VerifierIndex as DlogVerifierIndex};
 use paste::paste;
+use poly_commitment::commitment::PolyComm;
+use poly_commitment::srs::SRS;
 use std::path::Path;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -68,12 +72,25 @@ macro_rules! impl_verification_key {
                 #[wasm_bindgen(skip)]
                 pub endomul_scalar_comm: $WasmPolyComm,
                 #[wasm_bindgen(skip)]
-                pub chacha_comm: WasmVector<$WasmPolyComm>,
+                pub xor_comm: Option<$WasmPolyComm>,
+                #[wasm_bindgen(skip)]
+                pub range_check0_comm: Option<$WasmPolyComm>,
+                #[wasm_bindgen(skip)]
+                pub range_check1_comm: Option<$WasmPolyComm>,
+                #[wasm_bindgen(skip)]
+                pub foreign_field_add_comm: Option<$WasmPolyComm>,
+                #[wasm_bindgen(skip)]
+                pub foreign_field_mul_comm: Option<$WasmPolyComm>,
+                #[wasm_bindgen(skip)]
+                pub rot_comm: Option<$WasmPolyComm>
             }
+
             type WasmPlonkVerificationEvals = [<Wasm $field_name:camel PlonkVerificationEvals>];
+
 
             #[wasm_bindgen]
             impl [<Wasm $field_name:camel PlonkVerificationEvals>] {
+                #[allow(clippy::too_many_arguments)]
                 #[wasm_bindgen(constructor)]
                 pub fn new(
                     sigma_comm: WasmVector<$WasmPolyComm>,
@@ -84,6 +101,12 @@ macro_rules! impl_verification_key {
                     mul_comm: &$WasmPolyComm,
                     emul_comm: &$WasmPolyComm,
                     endomul_scalar_comm: &$WasmPolyComm,
+                    xor_comm: Option<$WasmPolyComm>,
+                    range_check0_comm: Option<$WasmPolyComm>,
+                    range_check1_comm: Option<$WasmPolyComm>,
+                    foreign_field_add_comm: Option<$WasmPolyComm>,
+                    foreign_field_mul_comm: Option<$WasmPolyComm>,
+                    rot_comm: Option<$WasmPolyComm>,
                     ) -> Self {
                     WasmPlonkVerificationEvals {
                         sigma_comm: sigma_comm.clone(),
@@ -94,7 +117,12 @@ macro_rules! impl_verification_key {
                         mul_comm: mul_comm.clone(),
                         emul_comm: emul_comm.clone(),
                         endomul_scalar_comm: endomul_scalar_comm.clone(),
-                        chacha_comm: (vec![]).into(),
+                        xor_comm: xor_comm.clone(),
+                        range_check0_comm: range_check0_comm.clone(),
+                        range_check1_comm: range_check1_comm.clone(),
+                        foreign_field_mul_comm: foreign_field_mul_comm.clone(),
+                        foreign_field_add_comm: foreign_field_add_comm.clone(),
+                        rot_comm: rot_comm.clone(),
                     }
                 }
 
@@ -179,14 +207,65 @@ macro_rules! impl_verification_key {
                 }
 
                 #[wasm_bindgen(getter)]
-                pub fn chacha_comm(&self) -> WasmVector<$WasmPolyComm> {
-                    self.chacha_comm.clone()
+                pub fn xor_comm(&self) -> Option<$WasmPolyComm> {
+                    self.xor_comm.clone()
                 }
 
                 #[wasm_bindgen(setter)]
-                pub fn set_chacha_comm(&mut self, x: WasmVector<$WasmPolyComm>) {
-                    self.chacha_comm = x;
+                pub fn set_xor_comm(&mut self, x: Option<$WasmPolyComm>) {
+                    self.xor_comm = x;
                 }
+
+                #[wasm_bindgen(getter)]
+                pub fn rot_comm(&self) -> Option<$WasmPolyComm> {
+                    self.rot_comm.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_rot_comm(&mut self, x: Option<$WasmPolyComm>) {
+                    self.rot_comm = x;
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn range_check0_comm(&self) -> Option<$WasmPolyComm> {
+                    self.range_check0_comm.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_range_check0_comm(&mut self, x: Option<$WasmPolyComm>) {
+                    self.range_check0_comm = x;
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn range_check1_comm(&self) -> Option<$WasmPolyComm> {
+                    self.range_check1_comm.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_range_check1_comm(&mut self, x: Option<$WasmPolyComm>) {
+                    self.range_check1_comm = x;
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn foreign_field_add_comm(&self) -> Option<$WasmPolyComm> {
+                    self.foreign_field_add_comm.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_foreign_field_add_comm(&mut self, x: Option<$WasmPolyComm>) {
+                    self.foreign_field_add_comm = x;
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn foreign_field_mul_comm(&self) -> Option<$WasmPolyComm> {
+                    self.foreign_field_mul_comm.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_foreign_field_mul_comm(&mut self, x: Option<$WasmPolyComm>) {
+                    self.foreign_field_mul_comm = x;
+                }
+
             }
 
             #[derive(Clone, Copy)]
@@ -220,10 +299,274 @@ macro_rules! impl_verification_key {
 
             #[wasm_bindgen]
             #[derive(Clone)]
+            pub struct [<Wasm $field_name:camel LookupSelectors>] {
+                #[wasm_bindgen(skip)]
+                pub xor: Option<$WasmPolyComm>,
+                #[wasm_bindgen(skip)]
+                pub lookup : Option<$WasmPolyComm>,
+                #[wasm_bindgen(skip)]
+                pub range_check: Option<$WasmPolyComm>,
+                #[wasm_bindgen(skip)]
+                pub ffmul: Option<$WasmPolyComm>,
+            }
+
+            type WasmLookupSelectors = [<Wasm $field_name:camel LookupSelectors>];
+
+            impl From<WasmLookupSelectors> for LookupSelectors<PolyComm<$G>> {
+                fn from(x: WasmLookupSelectors) -> Self {
+                    Self {
+                        xor: x.xor.map(Into::into),
+                        lookup: x.lookup.map(Into::into),
+                        range_check: x.range_check.map(Into::into),
+                        ffmul: x.ffmul.map(Into::into),
+                    }
+                }
+            }
+
+            impl From<&WasmLookupSelectors> for LookupSelectors<PolyComm<$G>> {
+                fn from(x: &WasmLookupSelectors) -> Self {
+                    Self {
+                        xor: x.xor.clone().map(Into::into),
+                        lookup: x.lookup.clone().map(Into::into),
+                        range_check: x.range_check.clone().map(Into::into),
+                        ffmul: x.ffmul.clone().map(Into::into),
+                    }
+                }
+            }
+
+            impl From<&LookupSelectors<PolyComm<$G>>> for WasmLookupSelectors {
+                fn from(x: &LookupSelectors<PolyComm<$G>>) -> Self {
+                    Self {
+                        xor: x.xor.clone().map(Into::into),
+                        lookup: x.lookup.clone().map(Into::into),
+                        range_check: x.range_check.clone().map(Into::into),
+                        ffmul: x.ffmul.clone().map(Into::into),
+                    }
+                }
+            }
+
+            impl From<LookupSelectors<PolyComm<$G>>> for WasmLookupSelectors {
+                fn from(x: LookupSelectors<PolyComm<$G>>) -> Self {
+                    Self {
+                        xor: x.xor.clone().map(Into::into),
+                        lookup: x.lookup.clone().map(Into::into),
+                        range_check: x.range_check.clone().map(Into::into),
+                        ffmul: x.ffmul.clone().map(Into::into),
+                    }
+                }
+            }
+
+            #[wasm_bindgen]
+            impl [<Wasm $field_name:camel LookupSelectors>] {
+                #[wasm_bindgen(constructor)]
+                pub fn new(
+                    xor: Option<$WasmPolyComm>,
+                    lookup: Option<$WasmPolyComm>,
+                    range_check: Option<$WasmPolyComm>,
+                    ffmul: Option<$WasmPolyComm>
+                ) -> Self {
+                    Self {
+                        xor,
+                        lookup,
+                        range_check,
+                        ffmul
+                    }
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn xor(&self) -> Option<$WasmPolyComm> {
+                    self.xor.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_xor(&mut self, x: Option<$WasmPolyComm>) {
+                    self.xor = x
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn lookup(&self) -> Option<$WasmPolyComm> {
+                    self.lookup.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_lookup(&mut self, x: Option<$WasmPolyComm>) {
+                    self.lookup = x
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn ffmul(&self) -> Option<$WasmPolyComm> {
+                    self.ffmul.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_ffmul(&mut self, x: Option<$WasmPolyComm>) {
+                    self.ffmul = x
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn range_check(&self) -> Option<$WasmPolyComm> {
+                    self.range_check.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_range_check(&mut self, x: Option<$WasmPolyComm>) {
+                    self.range_check = x
+                }
+            }
+
+            #[wasm_bindgen]
+            #[derive(Clone)]
+            pub struct [<Wasm $field_name:camel LookupVerifierIndex>] {
+                pub joint_lookup_used: bool,
+
+                #[wasm_bindgen(skip)]
+                pub lookup_table: WasmVector<$WasmPolyComm>,
+
+                #[wasm_bindgen(skip)]
+                pub lookup_selectors: WasmLookupSelectors,
+
+                #[wasm_bindgen(skip)]
+                pub table_ids: Option<$WasmPolyComm>,
+
+                #[wasm_bindgen(skip)]
+                pub lookup_info: LookupInfo,
+
+                #[wasm_bindgen(skip)]
+                pub runtime_tables_selector: Option<$WasmPolyComm>,
+            }
+
+            type WasmLookupVerifierIndex = [<Wasm $field_name:camel LookupVerifierIndex>];
+
+            impl From<&LookupVerifierIndex<$G>> for WasmLookupVerifierIndex {
+                fn from(x: &LookupVerifierIndex<$G>) -> Self {
+                    Self {
+                        joint_lookup_used: x.joint_lookup_used.into(),
+                        lookup_table: x.lookup_table.clone().iter().map(Into::into).collect(),
+                        lookup_selectors: x.lookup_selectors.clone().into(),
+                        table_ids: x.table_ids.clone().map(Into::into),
+                        lookup_info: x.lookup_info.clone(),
+                        runtime_tables_selector: x.runtime_tables_selector.clone().map(Into::into)
+                    }
+                }
+            }
+
+            impl From<LookupVerifierIndex<$G>> for WasmLookupVerifierIndex {
+                fn from(x: LookupVerifierIndex<$G>) -> Self {
+                    Self {
+                        joint_lookup_used: x.joint_lookup_used.into(),
+                        lookup_table: x.lookup_table.iter().map(Into::into).collect(),
+                        lookup_selectors: x.lookup_selectors.into(),
+                        table_ids: x.table_ids.map(Into::into),
+                        lookup_info: x.lookup_info,
+                        runtime_tables_selector: x.runtime_tables_selector.map(Into::into)
+                    }
+                }
+            }
+
+
+            impl From<&WasmLookupVerifierIndex> for LookupVerifierIndex<$G> {
+                fn from(x: &WasmLookupVerifierIndex) -> Self {
+                    Self {
+                        joint_lookup_used: x.joint_lookup_used.into(),
+                        lookup_table: x.lookup_table.clone().iter().map(Into::into).collect(),
+                        lookup_selectors: x.lookup_selectors.clone().into(),
+                        table_ids: x.table_ids.clone().map(Into::into),
+                        lookup_info: x.lookup_info,
+                        runtime_tables_selector: x.runtime_tables_selector.clone().map(Into::into)
+                    }
+                }
+            }
+
+            impl From<WasmLookupVerifierIndex> for LookupVerifierIndex<$G> {
+                fn from(x: WasmLookupVerifierIndex) -> Self {
+                    Self {
+                        joint_lookup_used: x.joint_lookup_used.into(),
+                        lookup_table: x.lookup_table.iter().map(Into::into).collect(),
+                        lookup_selectors: x.lookup_selectors.into(),
+                        table_ids: x.table_ids.map(Into::into),
+                        lookup_info: x.lookup_info,
+                        runtime_tables_selector: x.runtime_tables_selector.map(Into::into)
+                    }
+                }
+            }
+
+            #[wasm_bindgen]
+            impl [<Wasm $field_name:camel LookupVerifierIndex>] {
+                #[wasm_bindgen(constructor)]
+                pub fn new(
+                    joint_lookup_used: bool,
+                    lookup_table: WasmVector<$WasmPolyComm>,
+                    lookup_selectors: WasmLookupSelectors,
+                    table_ids: Option<$WasmPolyComm>,
+                    lookup_info: &LookupInfo,
+                    runtime_tables_selector: Option<$WasmPolyComm>
+                ) -> WasmLookupVerifierIndex {
+                    WasmLookupVerifierIndex {
+                        joint_lookup_used,
+                        lookup_table,
+                        lookup_selectors,
+                        table_ids,
+                        lookup_info: lookup_info.clone(),
+                        runtime_tables_selector
+                    }
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn lookup_table(&self) -> WasmVector<$WasmPolyComm> {
+                    self.lookup_table.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_lookup_table(&mut self, x: WasmVector<$WasmPolyComm>) {
+                    self.lookup_table = x
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn lookup_selectors(&self) -> WasmLookupSelectors {
+                    self.lookup_selectors.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_lookup_selectors(&mut self, x: WasmLookupSelectors) {
+                    self.lookup_selectors = x
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn table_ids(&self) -> Option<$WasmPolyComm>{
+                    self.table_ids.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_table_ids(&mut self, x: Option<$WasmPolyComm>) {
+                    self.table_ids = x
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn lookup_info(&self) -> LookupInfo {
+                    self.lookup_info.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_lookup_info(&mut self, x: LookupInfo) {
+                    self.lookup_info = x
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn runtime_tables_selector(&self) -> Option<$WasmPolyComm> {
+                    self.runtime_tables_selector.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_runtime_tables_selector(&mut self, x: Option<$WasmPolyComm>) {
+                    self.runtime_tables_selector = x
+                }
+            }
+
+            #[wasm_bindgen]
+            #[derive(Clone)]
             pub struct [<Wasm $field_name:camel PlonkVerifierIndex>] {
                 pub domain: WasmDomain,
                 pub max_poly_size: i32,
-                pub max_quot_size: i32,
                 pub public_: i32,
                 pub prev_challenges: i32,
                 #[wasm_bindgen(skip)]
@@ -231,7 +574,9 @@ macro_rules! impl_verification_key {
                 #[wasm_bindgen(skip)]
                 pub evals: WasmPlonkVerificationEvals,
                 pub shifts: WasmShifts,
-                // TODO: add lookup index field
+                #[wasm_bindgen(skip)]
+                pub lookup_index: Option<WasmLookupVerifierIndex>,
+                pub zk_rows: isize,
             }
             type WasmPlonkVerifierIndex = [<Wasm $field_name:camel PlonkVerifierIndex>];
 
@@ -241,22 +586,24 @@ macro_rules! impl_verification_key {
                 pub fn new(
                     domain: &WasmDomain,
                     max_poly_size: i32,
-                    max_quot_size: i32,
                     public_: i32,
                     prev_challenges: i32,
                     srs: &$WasmSrs,
                     evals: &WasmPlonkVerificationEvals,
                     shifts: &WasmShifts,
+                    lookup_index: Option<WasmLookupVerifierIndex>,
+                    zk_rows: isize,
                 ) -> Self {
                     WasmPlonkVerifierIndex {
                         domain: domain.clone(),
                         max_poly_size,
-                        max_quot_size,
                         public_,
                         prev_challenges,
                         srs: srs.clone(),
                         evals: evals.clone(),
                         shifts: shifts.clone(),
+                        lookup_index: lookup_index.clone(),
+                        zk_rows: zk_rows,
                     }
                 }
 
@@ -279,11 +626,21 @@ macro_rules! impl_verification_key {
                 pub fn set_evals(&mut self, x: WasmPlonkVerificationEvals) {
                     self.evals = x
                 }
+
+                #[wasm_bindgen(getter)]
+                pub fn lookup_index(&self) -> Option<WasmLookupVerifierIndex> {
+                    self.lookup_index.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_lookup_index(&mut self, li: Option<WasmLookupVerifierIndex>) {
+                    self.lookup_index = li
+                }
             }
 
             pub fn to_wasm<'a>(
                 srs: &Arc<SRS<$G>>,
-                vi: DlogVerifierIndex<$G>,
+                vi: DlogVerifierIndex<$G, OpeningProof<$G>>,
             ) -> WasmPlonkVerifierIndex {
                 WasmPlonkVerifierIndex {
                     domain: WasmDomain {
@@ -291,7 +648,6 @@ macro_rules! impl_verification_key {
                         group_gen: vi.domain.group_gen.into(),
                     },
                     max_poly_size: vi.max_poly_size as i32,
-                    max_quot_size: vi.max_quot_size as i32,
                     public_: vi.public as i32,
                     prev_challenges: vi.prev_challenges as i32,
                     srs: srs.into(),
@@ -304,11 +660,12 @@ macro_rules! impl_verification_key {
                         mul_comm: vi.mul_comm.into(),
                         emul_comm: vi.emul_comm.into(),
                         endomul_scalar_comm: vi.endomul_scalar_comm.into(),
-                        chacha_comm:
-                            match vi.chacha_comm {
-                                None => vec![].into(),
-                                Some(cs) => vec![(&cs[0]).into(), (&cs[1]).into(), (&cs[2]).into(), (&cs[3]).into()].into()
-                            }
+                        xor_comm: vi.xor_comm.map(|v| v.into()),
+                        range_check0_comm: vi.range_check0_comm.map(|v| v.into()),
+                        range_check1_comm: vi.range_check1_comm.map(|v| v.into()),
+                        foreign_field_add_comm: vi.foreign_field_add_comm.map(|v| v.into()),
+                        foreign_field_mul_comm: vi.foreign_field_mul_comm.map(|v| v.into()),
+                        rot_comm: vi.rot_comm.map(|v| v.into())
                     },
                     shifts:
                         WasmShifts {
@@ -320,6 +677,8 @@ macro_rules! impl_verification_key {
                             s5: vi.shift[5].into(),
                             s6: vi.shift[6].into(),
                         },
+                    lookup_index: vi.lookup_index.map(Into::into),
+                    zk_rows: vi.zk_rows as isize,
                 }
             }
 
@@ -333,7 +692,6 @@ macro_rules! impl_verification_key {
                         group_gen: vi.domain.group_gen.clone().into(),
                     },
                     max_poly_size: vi.max_poly_size as i32,
-                    max_quot_size: vi.max_quot_size as i32,
                     srs: srs.clone().into(),
                     evals: WasmPlonkVerificationEvals {
                         sigma_comm: vi.sigma_comm.iter().map(From::from).collect(),
@@ -344,11 +702,6 @@ macro_rules! impl_verification_key {
                         mul_comm: vi.mul_comm.clone().into(),
                         emul_comm: vi.emul_comm.clone().into(),
                         endomul_scalar_comm: vi.endomul_scalar_comm.clone().into(),
-                        chacha_comm:
-                            match &vi.chacha_comm {
-                                None => vec![].into(),
-                                Some(cs) => vec![cs[0].clone().into(), cs[1].clone().into(), cs[2].clone().into(), cs[3].clone().into()].into()
-                            }
                     },
                     shifts:
                         WasmShifts {
@@ -366,14 +719,15 @@ macro_rules! impl_verification_key {
 
             pub fn of_wasm(
                 max_poly_size: i32,
-                max_quot_size: i32,
                 public_: i32,
                 prev_challenges: i32,
                 log_size_of_group: i32,
                 srs: &$WasmSrs,
                 evals: &WasmPlonkVerificationEvals,
                 shifts: &WasmShifts,
-            ) -> (DlogVerifierIndex<GAffine>, Arc<SRS<GAffine>>) {
+                lookup_index: Option<WasmLookupVerifierIndex>,
+                zk_rows: isize,
+            ) -> (DlogVerifierIndex<GAffine, OpeningProof<GAffine>>, Arc<SRS<GAffine>>) {
                 /*
                 let urs_copy = Rc::clone(&*urs);
                 let urs_copy_outer = Rc::clone(&*urs);
@@ -382,10 +736,30 @@ macro_rules! impl_verification_key {
                     // Rc<_>s into weak pointers.
                     SRSValue::Ref(unsafe { &*Rc::into_raw(urs_copy) })
                 }; */
-                let (endo_q, _endo_r) = commitment_dlog::srs::endos::<$GOther>();
+                let (endo_q, _endo_r) = poly_commitment::srs::endos::<$GOther>();
                 let domain = Domain::<$F>::new(1 << log_size_of_group).unwrap();
 
-                let (linearization, powers_of_alpha) = expr_linearization(false, false, None, false, false);
+                let feature_flags =
+                    FeatureFlags {
+                        range_check0: false,
+                        range_check1: false,
+                        foreign_field_add: false,
+                        foreign_field_mul: false,
+                        rot: false,
+                        xor: false,
+                        lookup_features:
+                        LookupFeatures {
+                            patterns: LookupPatterns {
+                                xor: false,
+                                lookup: false,
+                                range_check: false,
+                                foreign_field_mul: false, },
+                            joint_lookup_used:false,
+                            uses_runtime_tables: false,
+                        },
+                    };
+
+                let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
                 let index =
                     DlogVerifierIndex {
@@ -402,26 +776,25 @@ macro_rules! impl_verification_key {
                         emul_comm: (&evals.emul_comm).into(),
 
                         endomul_scalar_comm: (&evals.endomul_scalar_comm).into(),
-                        // TODO
-                        chacha_comm: None,
-                        range_check_comm: None,
-                        foreign_field_add_comm: None,
-                        xor_comm: None,
+                        xor_comm: (&evals.xor_comm).as_ref().map(Into::into),
+                        range_check0_comm: (&evals.range_check0_comm).as_ref().map(Into::into),
+                        range_check1_comm: (&evals.range_check1_comm).as_ref().map(Into::into),
+                        foreign_field_add_comm: (&evals.foreign_field_add_comm).as_ref().map(Into::into),
+                        foreign_field_mul_comm: (&evals.foreign_field_mul_comm).as_ref().map(Into::into),
+                        rot_comm: (&evals.rot_comm).as_ref().map(Into::into),
 
-                        foreign_field_modulus: None,
                         w: {
                             let res = once_cell::sync::OnceCell::new();
-                            res.set(zk_w3(domain)).unwrap();
+                            res.set(zk_w(domain, 3)).unwrap();
                             res
                         },
                         endo: endo_q,
                         max_poly_size: max_poly_size as usize,
-                        max_quot_size: max_quot_size as usize,
                         public: public_ as usize,
                         prev_challenges: prev_challenges as usize,
-                        zkpm: {
+                        permutation_vanishing_polynomial_m: {
                             let res = once_cell::sync::OnceCell::new();
-                            res.set(zk_polynomial(domain)).unwrap();
+                            res.set(permutation_vanishing_polynomial(domain, 3)).unwrap();
                             res
                         },
                         shift: [
@@ -434,29 +807,30 @@ macro_rules! impl_verification_key {
                             shifts.s6.into()
                         ],
                         srs: {
-                            let res = once_cell::sync::OnceCell::new();
-                            res.set(srs.0.clone()).unwrap();
-                            res
+                          Arc::clone(&srs.0)
                         },
+
+                        zk_rows: zk_rows as u64,
+
                         linearization,
                         powers_of_alpha,
-                        // TODO
-                        lookup_index: None,
+                        lookup_index: lookup_index.map(Into::into),
                     };
                 (index, srs.0.clone())
             }
 
-            impl From<WasmPlonkVerifierIndex> for DlogVerifierIndex<$G> {
+            impl From<WasmPlonkVerifierIndex> for DlogVerifierIndex<$G, OpeningProof<$G>> {
                 fn from(index: WasmPlonkVerifierIndex) -> Self {
                     of_wasm(
                         index.max_poly_size,
-                        index.max_quot_size,
                         index.public_,
                         index.prev_challenges,
                         index.domain.log_size_of_group,
                         &index.srs,
                         &index.evals,
                         &index.shifts,
+                        index.lookup_index,
+                        index.zk_rows
                     )
                     .0
                 }
@@ -466,11 +840,11 @@ macro_rules! impl_verification_key {
                 offset: Option<i32>,
                 srs: &$WasmSrs,
                 path: String,
-            ) -> Result<DlogVerifierIndex<$G>, JsValue> {
+            ) -> Result<DlogVerifierIndex<$G, OpeningProof<$G>>, JsValue> {
                 let path = Path::new(&path);
-                let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-                DlogVerifierIndex::<$G>::from_file(
-                    Some(srs.0.clone()),
+                let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffineOther>();
+                DlogVerifierIndex::<$G, OpeningProof<$G>>::from_file(
+                    srs.0.clone(),
                     path,
                     offset.map(|x| x as u64),
                     endo_q,
@@ -493,7 +867,7 @@ macro_rules! impl_verification_key {
                 index: WasmPlonkVerifierIndex,
                 path: String,
             ) -> Result<(), JsValue> {
-                let index: DlogVerifierIndex<$G> = index.into();
+                let index: DlogVerifierIndex<$G, OpeningProof<$G>> = index.into();
                 let path = Path::new(&path);
                 index.to_file(path, append).map_err(|e| {
                     println!("{}", e);
@@ -525,7 +899,7 @@ macro_rules! impl_verification_key {
             pub fn [<$name:snake _serialize>](
                 index: WasmPlonkVerifierIndex,
             ) -> String {
-                let index: DlogVerifierIndex<$G> = index.into();
+                let index: DlogVerifierIndex<$G, OpeningProof<$G>> = index.into();
                 serde_json::to_string(&index).unwrap()
             }
 
@@ -534,7 +908,7 @@ macro_rules! impl_verification_key {
                 srs: &$WasmSrs,
                 index: String,
             ) -> WasmPlonkVerifierIndex {
-                let vi: DlogVerifierIndex<$G> = serde_json::from_str(&index).unwrap();
+                let vi: DlogVerifierIndex<$G, OpeningProof<$G>> = serde_json::from_str(&index).unwrap();
                 return to_wasm(srs, vi.into())
             }
 
@@ -543,7 +917,7 @@ macro_rules! impl_verification_key {
                 index: &$WasmIndex,
             ) -> WasmPlonkVerifierIndex {
                 {
-                    let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+                    let ptr: &mut poly_commitment::srs::SRS<GAffine> =
                         unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
                     ptr.add_lagrange_basis(index.0.as_ref().cs.domain.d1);
                 }
@@ -586,7 +960,6 @@ macro_rules! impl_verification_key {
                         group_gen: $F::one().into(),
                     },
                     max_poly_size: 0,
-                    max_quot_size: 0,
                     public_: 0,
                     prev_challenges: 0,
                     srs: $WasmSrs(Arc::new(SRS::create(0))),
@@ -599,7 +972,12 @@ macro_rules! impl_verification_key {
                         mul_comm: comm(),
                         emul_comm: comm(),
                         endomul_scalar_comm: comm(),
-                        chacha_comm: vec![].into(),
+                        xor_comm: None,
+                        range_check0_comm: None,
+                        range_check1_comm: None,
+                        foreign_field_add_comm: None,
+                        foreign_field_mul_comm: None,
+                        rot_comm: None,
                     },
                     shifts:
                         WasmShifts {
@@ -611,6 +989,8 @@ macro_rules! impl_verification_key {
                             s5: $F::one().into(),
                             s6: $F::one().into(),
                         },
+                    lookup_index: None,
+                    zk_rows: 3,
                 }
             }
 
@@ -642,8 +1022,8 @@ pub mod fp {
         WasmPolyComm,
         WasmFpSrs,
         GAffineOther,
-        oracle::pasta::fp_kimchi,
-        oracle::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
         WasmPastaFpPlonkIndex,
         Fp
     );
@@ -666,8 +1046,8 @@ pub mod fq {
         WasmPolyComm,
         WasmFqSrs,
         GAffineOther,
-        oracle::pasta::fq_kimchi,
-        oracle::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
         WasmPastaFqPlonkIndex,
         Fq
     );

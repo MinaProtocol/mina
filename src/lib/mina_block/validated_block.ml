@@ -6,7 +6,7 @@ module Stable = struct
   module V2 = struct
     type t =
       Block.Stable.V2.t State_hash.With_state_hashes.Stable.V1.t
-      * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
+      * State_hash.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
     [@@deriving sexp, equal]
 
     let to_yojson (block_with_hashes, _) =

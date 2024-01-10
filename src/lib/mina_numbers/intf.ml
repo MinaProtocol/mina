@@ -14,9 +14,6 @@ module type S_unchecked = sig
 
   include Hashable.S with type t := t
 
-  (* not automatically derived *)
-  val dhall_type : Ppx_dhall_type.Dhall_type.t
-
   val max_value : t
 
   val length_in_bits : int
@@ -26,6 +23,8 @@ module type S_unchecked = sig
   val gen_incl : t -> t -> t Quickcheck.Generator.t
 
   val zero : t
+
+  val one : t
 
   val succ : t -> t
 
@@ -52,6 +51,8 @@ module type S_unchecked = sig
 
   val of_bits : bool list -> t
 
+  val to_field : t -> Field.t
+
   val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
   val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
@@ -63,8 +64,6 @@ end
 
 module type S_checked = sig
   type unchecked
-
-  open Snark_params.Tick
 
   type var
 

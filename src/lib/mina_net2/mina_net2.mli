@@ -75,6 +75,8 @@ module Multiaddr : sig
 
   val to_peer : t -> Network_peer.Peer.t option
 
+  val of_peer : Network_peer.Peer.t -> t
+
   (** can a multiaddr plausibly be used as a Peer.t?
       a syntactic check only; a return value of
        true does not guarantee that the multiaddress can
@@ -122,17 +124,22 @@ end
 
 (** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
   *
+  * The optional [allow_multiple_instances] defaults to `false`. A `true` value
+  * allows spawning multiple subprocesses, which can be useful for tests.
+  *
   * The new [net] isn't connected to any network until [configure] is called.
   *
   * This can fail for a variety of reasons related to spawning the subprocess.
 *)
 val create :
-     all_peers_seen_metric:bool
+     ?allow_multiple_instances:bool
+  -> all_peers_seen_metric:bool
   -> logger:Logger.t
   -> pids:Child_processes.Termination.t
   -> conf_dir:string
   -> on_peer_connected:(Peer.Id.t -> unit)
   -> on_peer_disconnected:(Peer.Id.t -> unit)
+  -> unit
   -> t Deferred.Or_error.t
 
 (** State for the connection gateway. It will disallow connections from IPs
@@ -283,6 +290,8 @@ module Libp2p_stream : sig
   val pipes : t -> string Pipe.Reader.t * string Pipe.Writer.t
 
   val remote_peer : t -> Peer.t
+
+  val max_chunk_size : int
 end
 
 (** Opens a stream with a peer on a particular protocol.
@@ -364,7 +373,10 @@ val shutdown : t -> unit Deferred.t
 
     This will fail if any of the trusted or banned peers are on IPv6. *)
 val set_connection_gating_config :
-  t -> connection_gating -> connection_gating Deferred.t
+     t
+  -> ?clean_added_peers:bool
+  -> connection_gating
+  -> connection_gating Deferred.t
 
 val connection_gating_config : t -> connection_gating
 

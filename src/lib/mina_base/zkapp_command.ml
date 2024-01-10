@@ -1,44 +1,6 @@
 open Core_kernel
 open Signature_lib
 
-let add_caller (p : Account_update.Wire.t) caller : Account_update.t =
-  let add_caller_body (p : Account_update.Body.Wire.t) caller :
-      Account_update.Body.t =
-    { public_key = p.public_key
-    ; token_id = p.token_id
-    ; update = p.update
-    ; balance_change = p.balance_change
-    ; increment_nonce = p.increment_nonce
-    ; events = p.events
-    ; sequence_events = p.sequence_events
-    ; call_data = p.call_data
-    ; preconditions = p.preconditions
-    ; use_full_commitment = p.use_full_commitment
-    ; caller
-    ; authorization_kind = p.authorization_kind
-    }
-  in
-  { body = add_caller_body p.body caller; authorization = p.authorization }
-
-let add_caller_simple (p : Account_update.Simple.t) caller : Account_update.t =
-  let add_caller_body (p : Account_update.Body.Simple.t) caller :
-      Account_update.Body.t =
-    { public_key = p.public_key
-    ; token_id = p.token_id
-    ; update = p.update
-    ; balance_change = p.balance_change
-    ; increment_nonce = p.increment_nonce
-    ; events = p.events
-    ; sequence_events = p.sequence_events
-    ; call_data = p.call_data
-    ; preconditions = p.preconditions
-    ; use_full_commitment = p.use_full_commitment
-    ; caller
-    ; authorization_kind = p.authorization_kind
-    }
-  in
-  { body = add_caller_body p.body caller; authorization = p.authorization }
-
 module Call_forest = struct
   let empty = Outside_hash_image.t
 
@@ -100,10 +62,11 @@ module Call_forest = struct
       fold2_exn ts1 ts2 ~init:() ~f:(fun () p1 p2 -> f p1 p2)
 
     let rec mapi_with_trees' ~i (t : _ t) ~f =
+      let account_update = f i t.account_update t in
       let l, calls = mapi_forest_with_trees' ~i:(i + 1) t.calls ~f in
       ( l
       , { calls
-        ; account_update = f i t.account_update t
+        ; account_update
         ; account_update_digest = t.account_update_digest
         } )
 
@@ -182,12 +145,19 @@ module Call_forest = struct
       module Checked : sig
         include Digest_intf.S_checked
 
-        val create : Account_update.Checked.t -> t
+        val create :
+          ?chain:Mina_signature_kind.t -> Account_update.Checked.t -> t
+
+        val create_body :
+          ?chain:Mina_signature_kind.t -> Account_update.Body.Checked.t -> t
       end
 
       include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
-      val create : Account_update.t -> t
+      val create : ?chain:Mina_signature_kind.t -> Account_update.t -> t
+
+      val create_body :
+        ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
     end
 
     module rec Forest : sig
@@ -195,6 +165,8 @@ module Call_forest = struct
 
       module Checked : sig
         include Digest_intf.S_checked
+
+        val empty : t
 
         val cons : Tree.Checked.t -> t -> t
       end
@@ -262,9 +234,16 @@ module Call_forest = struct
         include Checked
 
         let create = Account_update.Checked.digest
+
+        let create_body = Account_update.Body.Checked.digest
       end
 
-      let create : Account_update.t -> t = Account_update.digest
+      let create : ?chain:Mina_signature_kind.t -> Account_update.t -> t =
+        Account_update.digest
+
+      let create_body :
+          ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t =
+        Account_update.Body.digest
     end
 
     module Forest = struct
@@ -282,6 +261,8 @@ module Call_forest = struct
 
       module Checked = struct
         include Checked
+
+        let empty = constant empty
 
         let cons hash h_tl =
           Random_oracle.Checked.hash
@@ -454,93 +435,6 @@ module Call_forest = struct
 
   let deferred_mapi = Tree.deferred_mapi_forest
 
-  let%test_unit "Account_update_or_stack.of_zkapp_command_list" =
-    let zkapp_command_list_1 = [ 0; 0; 0; 0 ] in
-    let node i calls =
-      { With_stack_hash.elt =
-          { Tree.calls; account_update = i; account_update_digest = () }
-      ; stack_hash = ()
-      }
-    in
-    let zkapp_command_list_1_res : (int, unit, unit) t =
-      let n0 = node 0 [] in
-      [ n0; n0; n0; n0 ]
-    in
-    let f_index = mapi ~f:(fun i _p -> i) in
-    [%test_eq: (int, unit, unit) t]
-      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_1)
-      zkapp_command_list_1_res ;
-    let zkapp_command_list1_index : (int, unit, unit) t =
-      let n i = node i [] in
-      [ n 0; n 1; n 2; n 3 ]
-    in
-    [%test_eq: (int, unit, unit) t]
-      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_1
-      |> f_index )
-      zkapp_command_list1_index ;
-    [%test_eq: int list]
-      (to_account_updates
-         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_1) )
-      zkapp_command_list_1 ;
-    let zkapp_command_list_2 = [ 0; 0; 1; 1 ] in
-    let zkapp_command_list_2_res =
-      [ node 0 []; node 0 [ node 1 []; node 1 [] ] ]
-    in
-    let zkapp_command_list_2_index =
-      [ node 0 []; node 1 [ node 2 []; node 3 [] ] ]
-    in
-    [%test_eq: (int, unit, unit) t]
-      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_2)
-      zkapp_command_list_2_res ;
-    [%test_eq: (int, unit, unit) t]
-      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_2
-      |> f_index )
-      zkapp_command_list_2_index ;
-    [%test_eq: int list]
-      (to_account_updates
-         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_2) )
-      zkapp_command_list_2 ;
-    let zkapp_command_list_3 = [ 0; 0; 1; 0 ] in
-    let zkapp_command_list_3_res =
-      [ node 0 []; node 0 [ node 1 [] ]; node 0 [] ]
-    in
-    let zkapp_command_list_3_index =
-      [ node 0 []; node 1 [ node 2 [] ]; node 3 [] ]
-    in
-    [%test_eq: (int, unit, unit) t]
-      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_3)
-      zkapp_command_list_3_res ;
-    [%test_eq: (int, unit, unit) t]
-      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_3
-      |> f_index )
-      zkapp_command_list_3_index ;
-    [%test_eq: int list]
-      (to_account_updates
-         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_3) )
-      zkapp_command_list_3 ;
-    let zkapp_command_list_4 = [ 0; 1; 2; 3; 2; 1; 0 ] in
-    let zkapp_command_list_4_res =
-      [ node 0 [ node 1 [ node 2 [ node 3 [] ]; node 2 [] ]; node 1 [] ]
-      ; node 0 []
-      ]
-    in
-    let zkapp_command_list_4_index =
-      [ node 0 [ node 1 [ node 2 [ node 3 [] ]; node 4 [] ]; node 5 [] ]
-      ; node 6 []
-      ]
-    in
-    [%test_eq: (int, unit, unit) t]
-      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4)
-      zkapp_command_list_4_res ;
-    [%test_eq: (int, unit, unit) t]
-      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4
-      |> f_index )
-      zkapp_command_list_4_index ;
-    [%test_eq: int list]
-      (to_account_updates
-         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4) )
-      zkapp_command_list_4
-
   let to_zkapp_command_with_hashes_list (xs : _ t) =
     let rec collect (xs : _ t) acc =
       match xs with
@@ -611,178 +505,6 @@ module Call_forest = struct
   let accumulate_hashes_predicated xs =
     accumulate_hashes ~hash_account_update:Digest.Account_update.create xs
 
-  (* Delegate_call means, preserve the current caller.
-  *)
-  let add_callers
-      (type account_update account_update_with_caller account_update_digest
-      digest id ) (ps : (account_update, account_update_digest, digest) t)
-      ~(call_type : account_update -> Account_update.Call_type.t)
-      ~(add_caller : account_update -> id -> account_update_with_caller)
-      ~(null_id : id) ~(account_update_id : account_update -> id) :
-      (account_update_with_caller, account_update_digest, digest) t =
-    let module Context = struct
-      type t = { caller : id; self : id }
-    end in
-    let open Context in
-    let rec go curr_context ps =
-      match ps with
-      | { With_stack_hash.elt =
-            { Tree.account_update = p; account_update_digest; calls }
-        ; stack_hash
-        }
-        :: ps ->
-          let elt =
-            let child_context =
-              match call_type p with
-              | Delegate_call ->
-                  curr_context
-              | Call ->
-                  { caller = curr_context.self; self = account_update_id p }
-            in
-            let account_update_caller = child_context.caller in
-            { Tree.account_update = add_caller p account_update_caller
-            ; account_update_digest
-            ; calls = go child_context calls
-            }
-          in
-          { With_stack_hash.elt; stack_hash } :: go curr_context ps
-      | [] ->
-          []
-    in
-    go { self = null_id; caller = null_id } ps
-
-  let add_callers' (type h1 h2) (ps : (Account_update.Wire.t, h1, h2) t) :
-      (Account_update.t, h1, h2) t =
-    add_callers ps
-      ~call_type:(fun p -> p.body.caller)
-      ~add_caller ~null_id:Token_id.default
-      ~account_update_id:(fun p ->
-        Account_id.(
-          derive_token_id ~owner:(create p.body.public_key p.body.token_id)) )
-
-  let add_callers_simple (type h1 h2) (ps : (Account_update.Simple.t, h1, h2) t)
-      : (Account_update.t, h1, h2) t =
-    add_callers ps
-      ~call_type:(fun p -> p.body.caller)
-      ~add_caller:add_caller_simple ~null_id:Token_id.default
-      ~account_update_id:(fun p ->
-        Account_id.(
-          derive_token_id ~owner:(create p.body.public_key p.body.token_id)) )
-
-  let remove_callers
-      (type account_update_with_caller account_update_without_sender h1 h2 h1'
-      h2' id ) ~(map_account_update_digest : h1 -> h1')
-      ~(map_stack_hash : h2 -> h2')
-      (ps : (account_update_with_caller, h1, h2) t)
-      ~(equal_id : id -> id -> bool)
-      ~(add_call_type :
-            account_update_with_caller
-         -> Account_update.Call_type.t
-         -> account_update_without_sender ) ~(null_id : id)
-      ~(account_update_caller : account_update_with_caller -> id) :
-      (account_update_without_sender, h1', h2') t =
-    let rec go ~top_level_account_update parent_caller ps =
-      let call_type_for_account_update p : Account_update.Call_type.t =
-        if top_level_account_update then Call
-        else if equal_id parent_caller (account_update_caller p) then
-          Delegate_call
-        else Call
-      in
-      match ps with
-      | { With_stack_hash.elt =
-            { Tree.account_update = p; account_update_digest; calls }
-        ; stack_hash
-        }
-        :: ps ->
-          let ty = call_type_for_account_update p in
-          { With_stack_hash.elt =
-              { Tree.account_update = add_call_type p ty
-              ; account_update_digest =
-                  map_account_update_digest account_update_digest
-              ; calls =
-                  go ~top_level_account_update:false (account_update_caller p)
-                    calls
-              }
-          ; stack_hash = map_stack_hash stack_hash
-          }
-          :: go ~top_level_account_update parent_caller ps
-      | [] ->
-          []
-    in
-    go ~top_level_account_update:true null_id ps
-
-  let%test_unit "add_callers and remove_callers" =
-    let module P = struct
-      type 'a t = { id : int; caller : 'a } [@@deriving compare, sexp]
-    end in
-    let module With_call_type = struct
-      type tmp = (Account_update.Call_type.t P.t, unit, unit) t
-      [@@deriving compare, sexp]
-
-      type t = tmp [@@deriving compare, sexp]
-    end in
-    let null_id = -1 in
-    let module With_id = struct
-      type tmp = (int P.t, unit, unit) t [@@deriving compare, sexp]
-
-      type t = tmp [@@deriving compare, sexp]
-    end in
-    let of_tree tree : _ t =
-      [ { With_stack_hash.elt = tree; stack_hash = () } ]
-    in
-    let node id caller calls =
-      { Tree.account_update = { P.id; caller }
-      ; account_update_digest = ()
-      ; calls =
-          List.map calls ~f:(fun elt ->
-              { With_stack_hash.elt; stack_hash = () } )
-      }
-    in
-    let t : With_call_type.t =
-      let open Account_update.Call_type in
-      node 0 Call
-        [ node 1 Call
-            [ node 11 Call [ node 111 Call []; node 112 Delegate_call [] ]
-            ; node 12 Delegate_call
-                [ node 121 Call []; node 122 Delegate_call [] ]
-            ]
-        ; node 2 Delegate_call
-            [ node 21 Delegate_call
-                [ node 211 Call []; node 212 Delegate_call [] ]
-            ; node 22 Call [ node 221 Call []; node 222 Delegate_call [] ]
-            ]
-        ]
-      |> of_tree
-    in
-    let expected_output : With_id.t =
-      node 0 null_id
-        [ node 1 0
-            [ node 11 1 [ node 111 11 []; node 112 1 [] ]
-            ; node 12 0 [ node 121 1 []; node 122 0 [] ]
-            ]
-        ; node 2 null_id
-            [ node 21 null_id [ node 211 0 []; node 212 null_id [] ]
-            ; node 22 0 [ node 221 22 []; node 222 0 [] ]
-            ]
-        ]
-      |> of_tree
-    in
-    let open P in
-    [%test_eq: With_id.t]
-      (add_callers t
-         ~call_type:(fun p -> p.caller)
-         ~add_caller:(fun p caller : int P.t -> { p with caller })
-         ~null_id
-         ~account_update_id:(fun p -> p.id) )
-      expected_output ;
-    [%test_eq: With_call_type.t]
-      (remove_callers expected_output ~equal_id:Int.equal
-         ~map_account_update_digest:Fn.id ~map_stack_hash:Fn.id
-         ~add_call_type:(fun p call_type -> { p with caller = call_type })
-         ~null_id
-         ~account_update_caller:(fun p -> p.caller) )
-      t
-
   module With_hashes_and_data = struct
     [%%versioned
     module Stable = struct
@@ -810,14 +532,7 @@ module Call_forest = struct
       of_account_updates xs
         ~account_update_depth:(fun ((p : Account_update.Simple.t), _) ->
           p.body.call_depth )
-      |> add_callers
-           ~call_type:(fun ((p : Account_update.Simple.t), _) -> p.body.caller)
-           ~add_caller:(fun (p, x) id -> (add_caller_simple p id, x))
-           ~null_id:Token_id.default
-           ~account_update_id:(fun ((p : Account_update.Simple.t), _) ->
-             Account_id.(
-               derive_token_id ~owner:(create p.body.public_key p.body.token_id))
-             )
+      |> map ~f:(fun (p, x) -> (Account_update.of_simple p, x))
       |> accumulate_hashes
 
     let of_account_updates (xs : (Account_update.Graphql_repr.t * 'a) list) :
@@ -866,14 +581,7 @@ module Call_forest = struct
       of_account_updates xs
         ~account_update_depth:(fun (p : Account_update.Simple.t) ->
           p.body.call_depth )
-      |> add_callers
-           ~call_type:(fun (p : Account_update.Simple.t) -> p.body.caller)
-           ~add_caller:(fun p id -> add_caller_simple p id)
-           ~null_id:Token_id.default
-           ~account_update_id:(fun (p : Account_update.Simple.t) ->
-             Account_id.(
-               derive_token_id ~owner:(create p.body.public_key p.body.token_id))
-             )
+      |> map ~f:Account_update.of_simple
       |> accumulate_hashes
 
     let of_account_updates (xs : Account_update.Graphql_repr.t list) : t =
@@ -976,7 +684,7 @@ module T = struct
             type t =
               { fee_payer : Account_update.Fee_payer.Stable.V1.t
               ; account_updates :
-                  ( Account_update.Wire.Stable.V1.t
+                  ( Account_update.Stable.V1.t
                   , unit
                   , unit )
                   Call_forest.Stable.V1.t
@@ -991,8 +699,8 @@ module T = struct
         let check (t : t) : unit =
           List.iter t.account_updates ~f:(fun p ->
               assert (
-                Account_update.Call_type.equal p.elt.account_update.body.caller
-                  Call ) )
+                Account_update.May_use_token.equal
+                  p.elt.account_update.body.may_use_token No ) )
 
         let of_graphql_repr (t : Graphql_repr.t) : t =
           { fee_payer = t.fee_payer
@@ -1002,11 +710,6 @@ module T = struct
                 ~f:Account_update.of_graphql_repr
                 ~account_update_depth:(fun (p : Account_update.Graphql_repr.t)
                                       -> p.body.call_depth )
-              |> Call_forest.remove_callers ~equal_id:Token_id.equal
-                   ~map_account_update_digest:ignore ~map_stack_hash:ignore
-                   ~add_call_type:Account_update.to_wire
-                   ~null_id:Token_id.default ~account_update_caller:(fun p ->
-                     p.body.caller )
           }
 
         let to_graphql_repr (t : t) : Graphql_repr.t =
@@ -1014,13 +717,6 @@ module T = struct
           ; memo = t.memo
           ; account_updates =
               t.account_updates
-              |> Call_forest.add_callers
-                   ~call_type:(fun (p : Account_update.Wire.t) -> p.body.caller)
-                   ~add_caller ~null_id:Token_id.default
-                   ~account_update_id:(fun (p : Account_update.Wire.t) ->
-                     Account_id.(
-                       derive_token_id
-                         ~owner:(create p.body.public_key p.body.token_id)) )
               |> Call_forest.to_account_updates_map
                    ~f:(fun ~depth account_update ->
                      Account_update.to_graphql_repr account_update
@@ -1031,32 +727,18 @@ module T = struct
           let open Quickcheck.Generator in
           let open Let_syntax in
           let gen_call_forest =
-            let%map xs =
-              fixed_point (fun self ->
-                  let%bind calls_length = small_non_negative_int in
-                  list_with_length calls_length
-                    (let%map account_update = Account_update.Wire.gen
-                     and calls = self in
-                     { With_stack_hash.stack_hash = ()
-                     ; elt =
-                         { Call_forest.Tree.account_update
-                         ; account_update_digest = ()
-                         ; calls
-                         }
-                     } ) )
-            in
-            (* All top level zkapp_command should be "Call" not "Delegate_call" *)
-            List.map xs
-              ~f:
-                (With_stack_hash.map
-                   ~f:(fun (t : (Account_update.Wire.t, _, _) Call_forest.Tree.t)
-                      ->
-                     { t with
-                       account_update =
-                         { t.account_update with
-                           body = { t.account_update.body with caller = Call }
-                         }
-                     } ) )
+            fixed_point (fun self ->
+                let%bind calls_length = small_non_negative_int in
+                list_with_length calls_length
+                  (let%map account_update = Account_update.gen
+                   and calls = self in
+                   { With_stack_hash.stack_hash = ()
+                   ; elt =
+                       { Call_forest.Tree.account_update
+                       ; account_update_digest = ()
+                       ; calls
+                       }
+                   } ) )
           in
           let open Quickcheck.Let_syntax in
           let%map fee_payer = Account_update.Fee_payer.gen
@@ -1081,27 +763,32 @@ module T = struct
         ; memo = w.memo
         ; account_updates =
             w.account_updates
-            |> Call_forest.add_callers
-                 ~call_type:(fun (p : Account_update.Wire.t) -> p.body.caller)
-                 ~add_caller ~null_id:Token_id.default
-                 ~account_update_id:(fun (p : Account_update.Wire.t) ->
-                   Account_id.(
-                     derive_token_id
-                       ~owner:(create p.body.public_key p.body.token_id)) )
             |> Call_forest.accumulate_hashes
                  ~hash_account_update:(fun (p : Account_update.t) ->
                    Digest.Account_update.create p )
         }
 
       let to_wire (t : t) : Wire.t =
+        let rec forget_hashes = List.map ~f:forget_hash
+        and forget_hash = function
+          | { With_stack_hash.stack_hash = _
+            ; elt =
+                { Call_forest.Tree.account_update
+                ; account_update_digest = _
+                ; calls
+                }
+            } ->
+              { With_stack_hash.stack_hash = ()
+              ; elt =
+                  { Call_forest.Tree.account_update
+                  ; account_update_digest = ()
+                  ; calls = forget_hashes calls
+                  }
+              }
+        in
         { fee_payer = t.fee_payer
         ; memo = t.memo
-        ; account_updates =
-            Call_forest.remove_callers ~equal_id:Token_id.equal
-              ~map_account_update_digest:ignore ~map_stack_hash:ignore
-              ~add_call_type:Account_update.to_wire ~null_id:Token_id.default
-              ~account_update_caller:(fun p -> p.body.caller)
-              t.account_updates
+        ; account_updates = forget_hashes t.account_updates
         }
 
       include
@@ -1122,6 +809,8 @@ include T
 
 [%%define_locally Stable.Latest.(of_wire, to_wire)]
 
+[%%define_locally Stable.Latest.Wire.(gen)]
+
 let of_simple (w : Simple.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
@@ -1129,13 +818,7 @@ let of_simple (w : Simple.t) : t =
       Call_forest.of_account_updates w.account_updates
         ~account_update_depth:(fun (p : Account_update.Simple.t) ->
           p.body.call_depth )
-      |> Call_forest.add_callers
-           ~call_type:(fun (p : Account_update.Simple.t) -> p.body.caller)
-           ~add_caller:add_caller_simple ~null_id:Token_id.default
-           ~account_update_id:(fun (p : Account_update.Simple.t) ->
-             Account_id.(
-               derive_token_id ~owner:(create p.body.public_key p.body.token_id))
-             )
+      |> Call_forest.map ~f:Account_update.of_simple
       |> Call_forest.accumulate_hashes
            ~hash_account_update:(fun (p : Account_update.t) ->
              Digest.Account_update.create p )
@@ -1145,45 +828,31 @@ let to_simple (t : t) : Simple.t =
   { fee_payer = t.fee_payer
   ; memo = t.memo
   ; account_updates =
-      Call_forest.remove_callers ~equal_id:Token_id.equal
-        ~map_account_update_digest:ignore ~map_stack_hash:ignore
-        ~add_call_type:(fun { body = b; authorization } call_type ->
-          { Account_update.Simple.authorization
-          ; body =
-              { public_key = b.public_key
-              ; token_id = b.token_id
-              ; update = b.update
-              ; balance_change = b.balance_change
-              ; increment_nonce = b.increment_nonce
-              ; events = b.events
-              ; sequence_events = b.sequence_events
-              ; call_data = b.call_data
-              ; preconditions = b.preconditions
-              ; use_full_commitment = b.use_full_commitment
-              ; caller = call_type
-              ; call_depth = 0
-              ; authorization_kind = b.authorization_kind
-              }
-          } )
-        ~null_id:Token_id.default
-        ~account_update_caller:(fun (p : Account_update.t) -> p.body.caller)
-        t.account_updates
+      t.account_updates
       |> Call_forest.to_account_updates_map
-           ~f:(fun ~depth (p : Account_update.Simple.t) ->
-             { p with body = { p.body with call_depth = depth } } )
+           ~f:(fun ~depth { Account_update.body = b; authorization } ->
+             { Account_update.Simple.authorization
+             ; body =
+                 { public_key = b.public_key
+                 ; token_id = b.token_id
+                 ; update = b.update
+                 ; balance_change = b.balance_change
+                 ; increment_nonce = b.increment_nonce
+                 ; events = b.events
+                 ; actions = b.actions
+                 ; call_data = b.call_data
+                 ; preconditions = b.preconditions
+                 ; use_full_commitment = b.use_full_commitment
+                 ; implicit_account_creation_fee =
+                     b.implicit_account_creation_fee
+                 ; may_use_token = b.may_use_token
+                 ; call_depth = depth
+                 ; authorization_kind = b.authorization_kind
+                 }
+             } )
   }
 
-let%test_unit "wire embedded in t" =
-  let module Wire = Stable.Latest.Wire in
-  Quickcheck.test ~trials:10 ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
-      [%test_eq: Wire.t] (to_wire (of_wire w)) w )
-
-let%test_unit "wire embedded in graphql" =
-  let module Wire = Stable.Latest.Wire in
-  Quickcheck.test ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
-      [%test_eq: Wire.t] (Wire.of_graphql_repr (Wire.to_graphql_repr w)) w )
-
-let zkapp_command (t : t) : _ Call_forest.t =
+let all_account_updates (t : t) : _ Call_forest.t =
   let p = t.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
   let fee_payer : Account_update.t =
@@ -1226,10 +895,19 @@ let fee_token (_t : t) = Token_id.default
 let fee_payer (t : t) =
   Account_id.create t.fee_payer.body.public_key (fee_token t)
 
+let extract_vks (t : t) : Verification_key_wire.t List.t =
+  account_updates t
+  |> Call_forest.fold ~init:[] ~f:(fun acc (p : Account_update.t) ->
+         match Account_update.verification_key_update_to_option p with
+         | Zkapp_basic.Set_or_keep.Set (Some vk) ->
+             vk :: acc
+         | _ ->
+             acc )
+
 let account_updates_list (t : t) : Account_update.t list =
   Call_forest.fold t.account_updates ~init:[] ~f:(Fn.flip List.cons) |> List.rev
 
-let zkapp_command_list (t : t) : Account_update.t list =
+let all_account_updates_list (t : t) : Account_update.t list =
   Call_forest.fold t.account_updates
     ~init:[ Account_update.of_fee_payer (fee_payer_account_update t) ]
     ~f:(Fn.flip List.cons)
@@ -1238,17 +916,19 @@ let zkapp_command_list (t : t) : Account_update.t list =
 let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
-let accounts_accessed (t : t) (status : Transaction_status.t) =
-  match status with
-  | Applied ->
-      Call_forest.fold t.account_updates
-        ~init:[ fee_payer t ]
-        ~f:(fun acc p -> Account_update.account_id p :: acc)
-      |> List.rev |> List.stable_dedup
-  | Failed _ ->
-      [ fee_payer t ]
+(* always `Accessed` for fee payer *)
+let account_access_statuses (t : t) (status : Transaction_status.t) =
+  let init = [ (fee_payer t, `Accessed) ] in
+  let status_sym =
+    match status with Applied -> `Accessed | Failed _ -> `Not_accessed
+  in
+  Call_forest.fold t.account_updates ~init ~f:(fun acc p ->
+      (Account_update.account_id p, status_sym) :: acc )
+  |> List.rev |> List.stable_dedup
 
-let accounts_referenced (t : t) = accounts_accessed t Applied
+let accounts_referenced (t : t) =
+  List.map (account_access_statuses t Applied) ~f:(fun (acct_id, _status) ->
+      acct_id )
 
 let fee_payer_pk (t : t) = t.fee_payer.body.public_key
 
@@ -1322,7 +1002,85 @@ module Virtual = struct
   end
 end
 
-module Verifiable = struct
+let check_authorization (p : Account_update.t) : unit Or_error.t =
+  match (p.authorization, p.body.authorization_kind) with
+  | None_given, None_given | Proof _, Proof _ | Signature _, Signature ->
+      Ok ()
+  | _ ->
+      let err =
+        let expected =
+          Account_update.Authorization_kind.to_control_tag
+            p.body.authorization_kind
+        in
+        let got = Control.tag p.authorization in
+        Error.create "Authorization kind does not match the authorization"
+          [ ("expected", expected); ("got", got) ]
+          [%sexp_of: (string * Control.Tag.t) list]
+      in
+      Error err
+
+module Verifiable : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = private
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates :
+            ( Side_loaded_verification_key.Stable.V2.t
+            , Zkapp_basic.F.Stable.V1.t )
+            With_hash.Stable.V1.t
+            option
+            Call_forest.With_hashes_and_data.Stable.V1.t
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      val to_latest : t -> t
+    end
+  end]
+
+  val find_vk_via_ledger :
+       ledger:'a
+    -> get:('a -> 'b -> Account.t option)
+    -> location_of_account:('a -> Account_id.t -> 'b option)
+    -> Zkapp_basic.F.t
+    -> Account_id.t
+    -> (Verification_key_wire.t, Error.t) Result.t
+
+  val create :
+       T.t
+    -> status:Transaction_status.t
+    -> find_vk:
+         (   Zkapp_basic.F.t
+          -> Account_id.t
+          -> (Verification_key_wire.t, Error.t) Result.t )
+    -> t Or_error.t
+
+  module Any : sig
+    (** creates verifiables from a list of commands that caches verification
+        keys and permits _any_ vks that have been seen earlier in the list. *)
+    val create_all :
+         T.t With_status.t list
+      -> find_vk:
+           (   Zkapp_basic.F.t
+            -> Account_id.t
+            -> (Verification_key_wire.t, Error.t) Result.t )
+      -> t With_status.t list Or_error.t
+  end
+
+  module Last : sig
+    (** creates verifiables from a list of commands that caches verification
+        keys and permits only the _last_ vk that has been seen earlier in the
+        list. *)
+    val create_all :
+         T.t With_status.t list
+      -> find_vk:
+           (   Zkapp_basic.F.t
+            -> Account_id.t
+            -> (Verification_key_wire.t, Error.t) Result.t )
+      -> t With_status.t list Or_error.t
+  end
+end = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -1341,6 +1099,200 @@ module Verifiable = struct
       let to_latest = Fn.id
     end
   end]
+
+  let ok_if_vk_hash_expected ~got ~expected =
+    if not @@ Zkapp_basic.F.equal (With_hash.hash got) expected then
+      Error
+        (Error.create "Expected vk hash doesn't match hash in vk we received"
+           [ ("expected_vk_hash", expected)
+           ; ("got_vk_hash", With_hash.hash got)
+           ]
+           [%sexp_of: (string * Zkapp_basic.F.t) list] )
+    else Ok got
+
+  let find_vk_via_ledger ~ledger ~get ~location_of_account expected_vk_hash
+      account_id =
+    match
+      let open Option.Let_syntax in
+      let%bind location = location_of_account ledger account_id in
+      let%bind (account : Account.t) = get ledger location in
+      let%bind zkapp = account.zkapp in
+      zkapp.verification_key
+    with
+    | Some vk ->
+        ok_if_vk_hash_expected ~got:vk ~expected:expected_vk_hash
+    | None ->
+        let err =
+          Error.create "No verification key found for proved account update"
+            ("account_id", account_id) [%sexp_of: string * Account_id.t]
+        in
+        Error err
+
+  (* Ensures that there's a verification_key available for all account_updates
+   * and creates a valid command associating the correct keys with each
+   * account_id.
+   *
+   * If an account_update replaces the verification_key (or deletes it),
+   * subsequent account_updates use the replaced key instead of looking in the
+   * ledger for the key (ie set by a previous transaction).
+   *)
+  let create ({ fee_payer; account_updates; memo } : T.t)
+      ~(status : Transaction_status.t) ~find_vk : t Or_error.t =
+    With_return.with_return (fun { return } ->
+        let tbl = Account_id.Table.create () in
+        let vks_overridden =
+          (* Keep track of the verification keys that have been set so far
+             during this transaction.
+          *)
+          ref Account_id.Map.empty
+        in
+        let account_updates =
+          Call_forest.map account_updates ~f:(fun p ->
+              let account_id = Account_update.account_id p in
+              let vks_overriden' =
+                match Account_update.verification_key_update_to_option p with
+                | Zkapp_basic.Set_or_keep.Set vk_next ->
+                    Account_id.Map.set !vks_overridden ~key:account_id
+                      ~data:vk_next
+                | Zkapp_basic.Set_or_keep.Keep ->
+                    !vks_overridden
+              in
+              let () =
+                match check_authorization p with
+                | Ok () ->
+                    ()
+                | Error _ as err ->
+                    return err
+              in
+              match
+                ( p.body.authorization_kind
+                , phys_equal status Transaction_status.Applied )
+              with
+              | Proof vk_hash, true -> (
+                  let prioritized_vk =
+                    (* only lookup _past_ vk setting, ie exclude the new one we
+                     * potentially set in this account_update (use the non-'
+                     * vks_overrided) . *)
+                    match Account_id.Map.find !vks_overridden account_id with
+                    | Some (Some vk) -> (
+                        match
+                          ok_if_vk_hash_expected ~got:vk ~expected:vk_hash
+                        with
+                        | Ok vk ->
+                            Some vk
+                        | Error err ->
+                            return (Error err) )
+                    | Some None ->
+                        (* we explicitly have erased the key *)
+                        let err =
+                          Error.create
+                            "No verification key found for proved account \
+                             update: the verification key was removed by a \
+                             previous account update"
+                            ("account_id", account_id)
+                            [%sexp_of: string * Account_id.t]
+                        in
+                        return (Error err)
+                    | None -> (
+                        (* we haven't set anything; lookup the vk in the fallback *)
+                        match find_vk vk_hash account_id with
+                        | Error e ->
+                            return (Error e)
+                        | Ok vk ->
+                            Some vk )
+                  in
+                  match prioritized_vk with
+                  | Some prioritized_vk ->
+                      Account_id.Table.update tbl account_id ~f:(fun _ ->
+                          With_hash.hash prioritized_vk ) ;
+                      (* return the updated overrides *)
+                      vks_overridden := vks_overriden' ;
+                      (p, Some prioritized_vk)
+                  | None ->
+                      (* The transaction failed, so we allow the vk to be missing. *)
+                      (p, None) )
+              | _ ->
+                  vks_overridden := vks_overriden' ;
+                  (p, None) )
+        in
+        Ok { fee_payer; account_updates; memo } )
+
+  module Map_cache = struct
+    type 'a t = 'a Zkapp_basic.F_map.Map.t
+
+    let empty = Zkapp_basic.F_map.Map.empty
+
+    let find = Zkapp_basic.F_map.Map.find
+
+    let set = Zkapp_basic.F_map.Map.set
+  end
+
+  module Singleton_cache = struct
+    type 'a t = (Zkapp_basic.F.t * 'a) option
+
+    let empty = None
+
+    let find t key =
+      match t with
+      | None ->
+          None
+      | Some (k, v) ->
+          if Zkapp_basic.F.equal key k then Some v else None
+
+    let set _ ~key ~data = Some (key, data)
+  end
+
+  module Make_create_all (Cache : sig
+    type 'a t
+
+    val empty : 'a t
+
+    val find : 'a t -> Zkapp_basic.F.t -> 'a option
+
+    val set : 'a t -> key:Zkapp_basic.F.t -> data:'a -> 'a t
+  end) =
+  struct
+    let create_all (cmds : T.t With_status.t list)
+        ~(find_vk :
+              Zkapp_basic.F.t
+           -> Account_id.t
+           -> (Verification_key_wire.t, Error.t) Result.t ) :
+        t With_status.t list Or_error.t =
+      Or_error.try_with (fun () ->
+          snd (* remove the helper cache we folded with *)
+            (List.fold_map cmds ~init:Cache.empty
+               ~f:(fun
+                    (running_cache : Verification_key_wire.t Cache.t)
+                    { data = cmd; status }
+                  ->
+                 let verified_cmd : t =
+                   create cmd ~status ~find_vk:(fun vk_hash account_id ->
+                       (* first we check if there's anything in the running
+                          cache within this chunk so far *)
+                       match Cache.find running_cache vk_hash with
+                       | None ->
+                           (* before falling back to the find_vk *)
+                           find_vk vk_hash account_id
+                       | Some vk ->
+                           Ok vk )
+                   |> Or_error.ok_exn
+                 in
+                 let running_cache' =
+                   List.fold (extract_vks cmd) ~init:running_cache
+                     ~f:(fun acc vk ->
+                       Cache.set acc ~key:(With_hash.hash vk) ~data:vk )
+                 in
+                 (running_cache', { With_status.data = verified_cmd; status }) )
+            ) )
+  end
+
+  module Any = struct
+    include Make_create_all (Map_cache)
+  end
+
+  module Last = struct
+    include Make_create_all (Singleton_cache)
+  end
 end
 
 let of_verifiable (t : Verifiable.t) : t =
@@ -1411,24 +1363,10 @@ let weight (zkapp_command : t) : int =
     ]
 
 module type Valid_intf = sig
-  module Verification_key_hash : sig
-    [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type t = Zkapp_basic.F.Stable.V1.t
-        [@@deriving sexp, compare, equal, hash, yojson]
-      end
-    end]
-  end
-
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = private
-        { zkapp_command : T.Stable.V1.t
-        ; verification_keys :
-            (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
-        }
+      type t = private { zkapp_command : T.Stable.V1.t }
       [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
@@ -1438,12 +1376,14 @@ module type Valid_intf = sig
 
   val to_valid :
        T.t
-    -> ledger:'a
-    -> get:('a -> 'b -> Account.t option)
-    -> location_of_account:('a -> Account_id.t -> 'b option)
-    -> t option
+    -> status:Transaction_status.t
+    -> find_vk:
+         (   Zkapp_basic.F.t
+          -> Account_id.t
+          -> (Verification_key_wire.t, Error.t) Result.t )
+    -> t Or_error.t
 
-  val of_verifiable : Verifiable.t -> t option
+  val of_verifiable : Verifiable.t -> t
 
   val forget : t -> T.t
 end
@@ -1470,71 +1410,25 @@ struct
   module Stable = struct
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
-        { zkapp_command : S.V1.t
-        ; verification_keys :
-            (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
-        }
+        { zkapp_command : S.V1.t }
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  let create ~verification_keys zkapp_command : t =
-    { zkapp_command; verification_keys }
+  let create zkapp_command : t = { zkapp_command }
 
-  let of_verifiable (t : Verifiable.t) : t option =
-    let open Option.Let_syntax in
-    let tbl = Account_id.Table.create () in
-    let%map () =
-      Call_forest.fold t.account_updates ~init:(Some ())
-        ~f:(fun acc (p, vk_opt) ->
-          let%bind _ok = acc in
-          let account_id = Account_update.account_id p in
-          let%bind () =
-            match (p.authorization, p.body.authorization_kind) with
-            | None_given, None_given | Proof _, Proof | Signature _, Signature
-              ->
-                Some ()
-            | _ ->
-                None
-          in
-          if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
-            let%map { With_hash.hash; _ } = vk_opt in
-            Account_id.Table.update tbl account_id ~f:(fun _ -> hash)
-          else acc )
-    in
-    { zkapp_command = of_verifiable t
-    ; verification_keys = Account_id.Table.to_alist tbl
-    }
+  let of_verifiable (t : Verifiable.t) : t = { zkapp_command = of_verifiable t }
 
   let to_valid_unsafe (t : T.t) :
       [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ] =
-    `If_this_is_used_it_should_have_a_comment_justifying_it
-      (create t ~verification_keys:[])
+    `If_this_is_used_it_should_have_a_comment_justifying_it (create t)
 
   let forget (t : t) : T.t = t.zkapp_command
 
-  let to_valid (t : T.t) ~ledger ~get ~location_of_account : t option =
-    let open Option.Let_syntax in
-    let find_vk account_id =
-      let%bind location = location_of_account ledger account_id in
-      let%bind (account : Account.t) = get ledger location in
-      let%bind zkapp = account.zkapp in
-      zkapp.verification_key
-    in
-    let tbl = Account_id.Table.create () in
-    let%map () =
-      Call_forest.fold t.account_updates ~init:(Some ()) ~f:(fun acc p ->
-          let%bind _ok = acc in
-          let account_id = Account_update.account_id p in
-          if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
-            Option.map (find_vk account_id) ~f:(fun vk ->
-                Account_id.Table.update tbl account_id ~f:(fun _ ->
-                    With_hash.hash vk ) )
-          else acc )
-    in
-    create ~verification_keys:(Account_id.Table.to_alist tbl) t
+  let to_valid (t : T.t) ~status ~find_vk : t Or_error.t =
+    Verifiable.create t ~status ~find_vk |> Or_error.map ~f:of_verifiable
 end
 
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
@@ -1594,20 +1488,21 @@ let arg_query_string x =
   Fields_derivers_zkapps.Test.Loop.json_to_string_gql @@ to_json x
 
 let dummy =
-  let account_update : Account_update.t =
-    { body = Account_update.Body.dummy
-    ; authorization = Control.dummy_of_tag Signature
-    }
-  in
-  let fee_payer : Account_update.Fee_payer.t =
-    { body = Account_update.Body.Fee_payer.dummy
-    ; authorization = Signature.dummy
-    }
-  in
-  { fee_payer
-  ; account_updates = Call_forest.cons account_update []
-  ; memo = Signed_command_memo.empty
-  }
+  lazy
+    (let account_update : Account_update.t =
+       { body = Account_update.Body.dummy
+       ; authorization = Control.dummy_of_tag Signature
+       }
+     in
+     let fee_payer : Account_update.Fee_payer.t =
+       { body = Account_update.Body.Fee_payer.dummy
+       ; authorization = Signature.dummy
+       }
+     in
+     { fee_payer
+     ; account_updates = Call_forest.cons account_update []
+     ; memo = Signed_command_memo.empty
+     } )
 
 module Make_update_group (Input : sig
   type global_state
@@ -1615,6 +1510,8 @@ module Make_update_group (Input : sig
   type local_state
 
   type spec
+
+  type connecting_ledger_hash
 
   val zkapp_segment_of_controls : Control.t list -> spec
 end) : sig
@@ -1626,12 +1523,15 @@ end) : sig
       ; spec : Input.spec
       ; state_before : state
       ; state_after : state
+      ; connecting_ledger : Input.connecting_ledger_hash
       }
   end
 
   val group_by_zkapp_command_rev :
-       Account_update.t list list
-    -> (Input.global_state * Input.local_state) list list
+       t list
+    -> (Input.global_state * Input.local_state * Input.connecting_ledger_hash)
+       list
+       list
     -> Zkapp_command_intermediate_state.t list
 end = struct
   open Input
@@ -1644,39 +1544,48 @@ end = struct
       ; spec : spec
       ; state_before : state
       ; state_after : state
+      ; connecting_ledger : connecting_ledger_hash
       }
   end
 
   (** [group_by_zkapp_command_rev zkapp_commands stmtss] identifies before/after pairs of
-    statements, corresponding to zkapp_command in [zkapp_commands] which minimize the
-    number of snark proofs needed to prove all of the zkapp_command.
+      statements, corresponding to account updates for each zkapp_command in [zkapp_commands] which minimize the
+      number of snark proofs needed to prove all of the zkapp_command.
 
-    This function is intended to take the zkapp_command from multiple transactions as
-    its input, which may be converted from a [Zkapp_command.t list] using
-    [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should be a list of
-    the same length, with 1 more state than the number of zkapp_command for each
-    transaction.
+      This function is intended to take multiple zkapp transactions as
+      its input, which is then converted to a [Account_update.t list list] using
+      [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should
+      be a list of the same length, with 1 more state than the number of
+      zkapp_command for each transaction.
 
-    For example, two transactions made up of zkapp_command [[p1; p2; p3]] and
-    [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
-    where each [s_n] is the state after applying [p_n] on top of [s_{n-1}], and
-    where [s0] is the initial state before any of the transactions have been
-    applied.
+      For example, two transactions made up of zkapp_command [[p1; p2; p3]] and
+      [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
+      where each [s_n] is the state after applying [p_n] on top of [s_{n-1}], and
+      where [s0] is the initial state before any of the transactions have been
+      applied.
 
-    Each pair is also identified with one of [`Same], [`New], or [`Two_new],
-    indicating that the next one ([`New]) or next two ([`Two_new]) [Zkapp_command.t]s
-    will need to be passed as part of the snark witness while applying that
-    pair.
-*)
-  let group_by_zkapp_command_rev (zkapp_commands : Account_update.t list list)
-      (stmtss : (global_state * local_state) list list) :
-      Zkapp_command_intermediate_state.t list =
+      Each pair is also identified with one of [`Same], [`New], or [`Two_new],
+      indicating that the next one ([`New]) or next two ([`Two_new]) [Zkapp_command.t]s
+      will need to be passed as part of the snark witness while applying that
+      pair.
+  *)
+  let group_by_zkapp_command_rev (zkapp_commands : t list)
+      (stmtss : (global_state * local_state * connecting_ledger_hash) list list)
+      : Zkapp_command_intermediate_state.t list =
     let intermediate_state ~kind ~spec ~before ~after =
+      let global_before, local_before, _ = before in
+      let global_after, local_after, connecting_ledger = after in
       { Zkapp_command_intermediate_state.kind
       ; spec
-      ; state_before = { global = fst before; local = snd before }
-      ; state_after = { global = fst after; local = snd after }
+      ; state_before = { global = global_before; local = local_before }
+      ; state_after = { global = global_after; local = local_after }
+      ; connecting_ledger
       }
+    in
+    let zkapp_account_updatess =
+      []
+      :: List.map zkapp_commands ~f:(fun (zkapp_command : t) ->
+             all_account_updates_list zkapp_command )
     in
     let rec group_by_zkapp_command_rev
         (zkapp_commands : Account_update.t list list) stmtss acc =
@@ -1703,7 +1612,7 @@ end = struct
       | ( ({ authorization = Proof _ as a1; _ } :: zkapp_command)
           :: zkapp_commands
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
-          (* This account_update contains a proof, don't pair it with other zkapp_command. *)
+          (* This account_update contains a proof, don't pair it with other account updates. *)
           group_by_zkapp_command_rev
             (zkapp_command :: zkapp_commands)
             (stmts :: stmtss)
@@ -1716,7 +1625,7 @@ end = struct
              :: zkapp_commands
         , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* This account_update is part of a new transaction, and contains a proof, don't
-             pair it with other zkapp_command.
+             pair it with other account updates.
           *)
           group_by_zkapp_command_rev
             (zkapp_command :: zkapp_commands)
@@ -1918,7 +1827,7 @@ end = struct
             "group_by_zkapp_command_rev: No statements given for transaction \
              after next"
     in
-    group_by_zkapp_command_rev zkapp_commands stmtss []
+    group_by_zkapp_command_rev zkapp_account_updatess stmtss []
 end
 
 (*Transaction_snark.Zkapp_command_segment.Basic.t*)
@@ -1928,6 +1837,8 @@ module Update_group = Make_update_group (struct
   type local_state = unit
 
   type global_state = unit
+
+  type connecting_ledger_hash = unit
 
   type spec = possible_segments
 
@@ -1944,6 +1855,17 @@ module Update_group = Make_update_group (struct
         failwith "zkapp_segment_of_controls: Unsupported combination"
 end)
 
+let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
+    ~(genesis_constants : Genesis_constants.t) () =
+  (*10.26*np + 10.08*n2 + 9.14*n1 < 69.45*)
+  let proof_cost = genesis_constants.zkapp_proof_update_cost in
+  let signed_pair_cost = genesis_constants.zkapp_signed_pair_update_cost in
+  let signed_single_cost = genesis_constants.zkapp_signed_single_update_cost in
+  Float.(
+    (proof_cost * of_int proof_segments)
+    + (signed_pair_cost * of_int signed_pair_segments)
+    + (signed_single_cost * of_int signed_single_segments))
+
 (* Zkapp_command transactions are filtered using this predicate
    - when adding to the transaction pool
    - in incoming blocks
@@ -1953,28 +1875,28 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
   let events_elements events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
-  let all_updates, num_event_elements, num_sequence_event_elements =
+  let all_updates, num_event_elements, num_action_elements =
     Call_forest.fold t.account_updates
       ~init:([ Account_update.of_fee_payer (fee_payer_account_update t) ], 0, 0)
-      ~f:(fun (acc, num_event_elements, num_sequence_event_elements)
+      ~f:(fun (acc, num_event_elements, num_action_elements)
               (account_update : Account_update.t) ->
         let account_update_evs_elements =
           events_elements account_update.body.events
         in
         let account_update_seq_evs_elements =
-          events_elements account_update.body.sequence_events
+          events_elements account_update.body.actions
         in
         ( account_update :: acc
         , num_event_elements + account_update_evs_elements
-        , num_sequence_event_elements + account_update_seq_evs_elements ) )
+        , num_action_elements + account_update_seq_evs_elements ) )
     |> fun (updates, ev, sev) -> (List.rev updates, ev, sev)
   in
   let groups =
-    Update_group.group_by_zkapp_command_rev ([] :: [ all_updates ])
-      ( [ ((), ()) ]
-      :: [ ((), ()) :: List.map all_updates ~f:(fun _ -> ((), ())) ] )
+    Update_group.group_by_zkapp_command_rev [ t ]
+      ( [ ((), (), ()) ]
+      :: [ ((), (), ()) :: List.map all_updates ~f:(fun _ -> ((), (), ())) ] )
   in
-  let proof_segments, signed_singles, signed_pairs =
+  let proof_segments, signed_single_segments, signed_pair_segments =
     List.fold ~init:(0, 0, 0) groups
       ~f:(fun (proof_segments, signed_singles, signed_pairs) { spec; _ } ->
         match spec with
@@ -1985,29 +1907,18 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
         | Signed_pair ->
             (proof_segments, signed_singles, signed_pairs + 1) )
   in
-  let proof_cost = genesis_constants.zkapp_proof_update_cost in
-  let signed_pair_cost = genesis_constants.zkapp_signed_pair_update_cost in
-  let signed_single_cost = genesis_constants.zkapp_signed_single_update_cost in
   let cost_limit = genesis_constants.zkapp_transaction_cost_limit in
   let max_event_elements = genesis_constants.max_event_elements in
-  let max_sequence_event_elements =
-    genesis_constants.max_sequence_event_elements
-  in
-  (*10.26*np + 10.08*n2 + 9.14*n1 < 69.45*)
+  let max_action_elements = genesis_constants.max_action_elements in
   let zkapp_cost_within_limit =
     Float.(
-      (proof_cost * of_int proof_segments)
-      + (signed_pair_cost * of_int signed_pairs)
-      + (signed_single_cost * of_int signed_singles)
+      zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
+        ~genesis_constants ()
       < cost_limit)
   in
   let valid_event_elements = num_event_elements <= max_event_elements in
-  let valid_sequence_event_elements =
-    num_sequence_event_elements <= max_sequence_event_elements
-  in
-  if
-    zkapp_cost_within_limit && valid_event_elements
-    && valid_sequence_event_elements
+  let valid_action_elements = num_action_elements <= max_action_elements in
+  if zkapp_cost_within_limit && valid_event_elements && valid_action_elements
   then Ok ()
   else
     let proof_zkapp_command_err =
@@ -2021,43 +1932,81 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
           (sprintf "too many event elements (%d, max allowed is %d)"
              num_event_elements max_event_elements )
     in
-    let sequence_events_err =
-      if valid_sequence_event_elements then None
+    let actions_err =
+      if valid_action_elements then None
       else
         Some
           (sprintf "too many sequence event elements (%d, max allowed is %d)"
-             num_sequence_event_elements max_sequence_event_elements )
+             num_action_elements max_action_elements )
     in
     let err_msg =
       List.filter
-        [ proof_zkapp_command_err; events_err; sequence_events_err ]
+        [ proof_zkapp_command_err; events_err; actions_err ]
         ~f:Option.is_some
       |> List.map ~f:(fun opt -> Option.value_exn opt)
       |> String.concat ~sep:"; "
     in
     Error (Error.of_string err_msg)
 
+let has_zero_vesting_period t =
+  Call_forest.exists t.account_updates ~f:(fun p ->
+      match p.body.update.timing with
+      | Keep ->
+          false
+      | Set { vesting_period; _ } ->
+          Mina_numbers.Global_slot_span.(equal zero) vesting_period )
+
+let get_transaction_commitments (zkapp_command : t) =
+  let memo_hash = Signed_command_memo.hash zkapp_command.memo in
+  let fee_payer_hash =
+    Account_update.of_fee_payer zkapp_command.fee_payer
+    |> Digest.Account_update.create
+  in
+  let account_updates_hash = account_updates_hash zkapp_command in
+  let txn_commitment = Transaction_commitment.create ~account_updates_hash in
+  let full_txn_commitment =
+    Transaction_commitment.create_complete txn_commitment ~memo_hash
+      ~fee_payer_hash
+  in
+  (txn_commitment, full_txn_commitment)
+
 let inner_query =
   lazy
     (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
        Fields_derivers_zkapps.(inner_query (deriver @@ Derivers.o ())) )
 
-let%test_module "Test" =
-  ( module struct
-    module Fd = Fields_derivers_zkapps.Derivers
+module For_tests = struct
+  let replace_vks t vk =
+    { t with
+      account_updates =
+        Call_forest.map t.account_updates ~f:(fun (p : Account_update.t) ->
+            { p with
+              body =
+                { p.body with
+                  update =
+                    { p.body.update with
+                      verification_key =
+                        (* replace dummy vks in vk Setting *)
+                        ( match p.body.update.verification_key with
+                        | Set _vk ->
+                            Set vk
+                        | Keep ->
+                            Keep )
+                    }
+                ; authorization_kind =
+                    (* replace dummy vk hashes in authorization kind *)
+                    ( match p.body.authorization_kind with
+                    | Proof _vk_hash ->
+                        Proof (With_hash.hash vk)
+                    | ak ->
+                        ak )
+                }
+            } )
+    }
+end
 
-    let full = deriver @@ Fd.o ()
-
-    let%test_unit "json roundtrip dummy" =
-      [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
-
-    let%test_unit "full circuit" =
-      Run_in_thread.block_on_async_exn
-      @@ fun () -> Fields_derivers_zkapps.Test.Loop.run full dummy
-
-    let%test "latest zkApp version" =
-      (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
-         for latest version, then update this test
-      *)
-      Stable.Latest.version = 1
-  end )
+let%test "latest zkApp version" =
+  (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
+     for latest version, then update this test
+  *)
+  Stable.Latest.version = 1

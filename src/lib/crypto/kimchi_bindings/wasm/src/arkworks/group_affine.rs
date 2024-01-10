@@ -167,13 +167,13 @@ pub fn caml_pasta_pallas_rng(i: u32) -> WasmPallasGProjective {
 
 #[wasm_bindgen]
 pub fn caml_pasta_pallas_endo_base() -> WasmPastaFp {
-    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffine>();
+    let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffine>();
     WasmPastaFp(endo_q)
 }
 
 #[wasm_bindgen]
 pub fn caml_pasta_pallas_endo_scalar() -> WasmPastaFq {
-    let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
+    let (_endo_q, endo_r) = poly_commitment::srs::endos::<GAffine>();
     WasmPastaFq(endo_r)
 }
 

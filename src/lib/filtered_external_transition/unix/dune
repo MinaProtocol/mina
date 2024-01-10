@@ -1,7 +1,7 @@
 (library
  (name filtered_external_transition_unix)
  (public_name filtered_external_transition.unix)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    graphql-async

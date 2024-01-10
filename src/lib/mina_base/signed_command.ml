@@ -68,10 +68,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
       include Comparable.Make (T)
       include Hashable.Make (T)
 
-      let accounts_accessed ({ payload; _ } : t) status =
-        Payload.accounts_accessed payload status
+      let account_access_statuses ({ payload; _ } : t) status =
+        Payload.account_access_statuses payload status
 
-      let accounts_referenced (t : t) = accounts_accessed t Applied
+      let accounts_referenced (t : t) =
+        List.map (account_access_statuses t Applied)
+          ~f:(fun (acct_id, _status) -> acct_id)
     end
 
     module V1 = struct
@@ -84,18 +86,48 @@ module Make_str (_ : Wire_types.Concrete) = struct
         Poly.Stable.V1.t
       [@@deriving compare, sexp, hash, yojson]
 
-      (* don't need to coerce old commands to new ones *)
-      let to_latest _ = failwith "Not implemented"
+      let to_latest ({ payload; signer; signature } : t) : Latest.t =
+        let payload : Signed_command_payload.t =
+          let valid_until =
+            Global_slot_legacy.to_uint32 payload.common.valid_until
+            |> Global_slot_since_genesis.of_uint32
+          in
+          let common : Signed_command_payload.Common.t =
+            { fee = payload.common.fee
+            ; fee_payer_pk = payload.common.fee_payer_pk
+            ; nonce = payload.common.nonce
+            ; valid_until
+            ; memo = payload.common.memo
+            }
+          in
+          let body : Signed_command_payload.Body.t =
+            match payload.body with
+            | Payment payment_payload ->
+                let payload' : Payment_payload.t =
+                  { receiver_pk = payment_payload.receiver_pk
+                  ; amount = payment_payload.amount
+                  }
+                in
+                Payment payload'
+            | Stake_delegation stake_delegation_payload ->
+                Stake_delegation
+                  (Stake_delegation.Stable.V1.to_latest stake_delegation_payload)
+          in
+          { common; body }
+        in
+        { payload; signer; signature }
     end
   end]
 
   (* type of signed commands, pre-Berkeley hard fork *)
   type t_v1 = Stable.V1.t
 
-  type _unused = unit
-    constraint (Payload.t, Public_key.t, Signature.t) Poly.t = t
+  let (_ : (t, (Payload.t, Public_key.t, Signature.t) Poly.t) Type_equal.t) =
+    Type_equal.T
 
   include (Stable.Latest : module type of Stable.Latest with type t := t)
+
+  let signature Poly.{ signature; _ } = signature
 
   let payload Poly.{ payload; _ } = payload
 
@@ -104,7 +136,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let nonce = Fn.compose Payload.nonce payload
 
   (* for filtering *)
-  let minimum_fee = Mina_compile_config.minimum_user_command_fee
+  let minimum_fee = Currency.Fee.minimum_user_command_fee
 
   let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
@@ -119,10 +151,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let fee_excess ({ payload; _ } : t) = Payload.fee_excess payload
 
   let token ({ payload; _ } : t) = Payload.token payload
-
-  let source_pk ({ payload; _ } : t) = Payload.source_pk payload
-
-  let source ({ payload; _ } : t) = Payload.source payload
 
   let receiver_pk ({ payload; _ } : t) = Payload.receiver_pk payload
 
@@ -170,12 +198,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
         ?(nonce = Account_nonce.zero) ~fee_range create_body =
       let open Quickcheck.Generator.Let_syntax in
-      let min_fee = Fee.to_int Mina_compile_config.minimum_user_command_fee in
+      let min_fee = Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee in
       let max_fee = min_fee + fee_range in
       let%bind (signer : Signature_keypair.t), (receiver : Signature_keypair.t)
           =
         key_gen
-      and fee = Int.gen_incl min_fee max_fee >>| Currency.Fee.of_int
+      and fee =
+        Int.gen_incl min_fee max_fee >>| Currency.Fee.of_nanomina_int_exn
       and memo = String.quickcheck_generator in
       let%map body = create_body signer receiver in
       let payload : Payload.t =
@@ -198,13 +227,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
         @@ fun { public_key = signer; _ } { public_key = receiver; _ } ->
         let open Quickcheck.Generator.Let_syntax in
         let%map amount =
-          Int.gen_incl min_amount max_amount >>| Currency.Amount.of_int
+          Int.gen_incl min_amount max_amount
+          >>| Currency.Amount.of_nanomina_int_exn
         in
         Signed_command_payload.Body.Payment
-          { receiver_pk = Public_key.compress receiver
-          ; source_pk = Public_key.compress signer
-          ; amount
-          }
+          { receiver_pk = Public_key.compress receiver; amount }
 
       let gen ?(sign_type = `Fake) =
         match sign_type with
@@ -226,9 +253,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Quickcheck.Generator.return
             @@ Signed_command_payload.Body.Stake_delegation
                  (Set_delegate
-                    { delegator = Public_key.compress signer
-                    ; new_delegate = Public_key.compress new_delegate
-                    } ) )
+                    { new_delegate = Public_key.compress new_delegate } ) )
 
       let gen_with_random_participants ~keys ?nonce ~fee_range =
         with_random_participants ~keys ~gen:(gen ?nonce ~fee_range)
@@ -283,7 +308,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  let amount_to_spend =
                    if spend_all then balance
                    else
-                     Currency.Amount.of_int (Currency.Amount.to_int balance / 2)
+                     Currency.Amount.of_nanomina_int_exn
+                       (Currency.Amount.to_nanomina_int balance / 2)
                  in
                  Quickcheck_lib.gen_division_currency amount_to_spend
                    command_splits'.(i) )
@@ -299,7 +325,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Quickcheck.Generator.filter ~f:(fun (_, splits) ->
               Array.for_all splits ~f:(fun split ->
                   List.for_all split ~f:(fun amt ->
-                      Currency.Amount.(amt >= of_int 2_000_000_000) ) ) )
+                      Currency.Amount.(amt >= of_mina_int_exn 2) ) ) )
         in
         let account_nonces =
           Array.map ~f:(fun (_, _, nonce, _) -> nonce) account_info
@@ -339,10 +365,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let sender_pk = Public_key.compress sender_pk.public_key in
               Payload.create ~fee ~fee_payer_pk:sender_pk ~valid_until:None
                 ~nonce ~memo
-                ~body:
-                  (Payment
-                     { source_pk = sender_pk; receiver_pk = receiver; amount }
-                  )
+                ~body:(Payment { receiver_pk = receiver; amount })
             in
             let sign' =
               match sign_type with
@@ -386,9 +409,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let version_byte = Base58_check.Version_bytes.signed_command_v1
   end
 
-  module Base58_check_v1 = Codable.Make_base58_check (V1_all_tagged)
-
-  let of_base58_check_exn_v1 = Base58_check_v1.of_base58_check
+  let of_base58_check_exn_v1, to_base58_check_v1 =
+    let module Base58_check_v1 = Codable.Make_base58_check (V1_all_tagged) in
+    Base58_check_v1.(of_base58_check, to_base58_check)
 
   (* give transaction ids have version tag *)
   include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
@@ -400,9 +423,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let public_keys t =
     let fee_payer = fee_payer_pk t in
-    let source = source_pk t in
     let receiver = receiver_pk t in
-    [ fee_payer; source; receiver ]
+    [ fee_payer; receiver ]
 
   let check_valid_keys t =
     List.for_all (public_keys t) ~f:(fun pk ->

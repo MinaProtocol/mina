@@ -3,205 +3,16 @@ module type Full = sig
   open Mina_base
   open Mina_transaction
   open Snark_params
-  open Mina_state
   open Currency
   module Transaction_validator = Transaction_validator
 
   (** For debugging. Logs to stderr the inputs to the top hash. *)
   val with_top_hash_logging : (unit -> 'a) -> 'a
 
-  module Pending_coinbase_stack_state : sig
-    module Init_stack : sig
-      [%%versioned:
-      module Stable : sig
-        module V1 : sig
-          type t =
-            | Base of Pending_coinbase.Stack_versioned.Stable.V1.t
-            | Merge
-          [@@deriving sexp, hash, compare, equal, yojson]
-        end
-      end]
-    end
+  module Pending_coinbase_stack_state =
+    Mina_state.Snarked_ledger_state.Pending_coinbase_stack_state
 
-    module Poly : sig
-      [%%versioned:
-      module Stable : sig
-        module V1 : sig
-          type 'pending_coinbase t =
-            { source : 'pending_coinbase; target : 'pending_coinbase }
-          [@@deriving compare, equal, fields, hash, sexp, yojson]
-
-          val to_latest :
-               ('pending_coinbase -> 'pending_coinbase')
-            -> 'pending_coinbase t
-            -> 'pending_coinbase' t
-        end
-      end]
-
-      val typ :
-           ('pending_coinbase_var, 'pending_coinbase) Tick.Typ.t
-        -> ('pending_coinbase_var t, 'pending_coinbase t) Tick.Typ.t
-    end
-
-    type 'pending_coinbase poly = 'pending_coinbase Poly.t =
-      { source : 'pending_coinbase; target : 'pending_coinbase }
-    [@@deriving sexp, hash, compare, equal, fields, yojson]
-
-    [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, yojson]
-      end
-    end]
-
-    type var = Pending_coinbase.Stack.var Poly.t
-
-    open Tick
-
-    val typ : (var, t) Typ.t
-
-    val to_input : t -> Field.t Random_oracle.Input.Chunked.t
-
-    val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
-  end
-
-  module Statement : sig
-    module Poly : sig
-      [%%versioned:
-      module Stable : sig
-        module V2 : sig
-          type ( 'ledger_hash
-               , 'amount
-               , 'pending_coinbase
-               , 'fee_excess
-               , 'sok_digest
-               , 'local_state )
-               t =
-            { source :
-                ( 'ledger_hash
-                , 'pending_coinbase
-                , 'local_state )
-                Registers.Stable.V1.t
-            ; target :
-                ( 'ledger_hash
-                , 'pending_coinbase
-                , 'local_state )
-                Registers.Stable.V1.t
-            ; supply_increase : 'amount
-            ; fee_excess : 'fee_excess
-            ; sok_digest : 'sok_digest
-            }
-          [@@deriving compare, equal, hash, sexp, yojson, hlist]
-        end
-      end]
-
-      val with_empty_local_state :
-           supply_increase:'amount
-        -> fee_excess:'fee_excess
-        -> sok_digest:'sok_digest
-        -> source:'ledger_hash
-        -> target:'ledger_hash
-        -> pending_coinbase_stack_state:
-             'pending_coinbase Pending_coinbase_stack_state.poly
-        -> ( 'ledger_hash
-           , 'amount
-           , 'pending_coinbase
-           , 'fee_excess
-           , 'sok_digest
-           , Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.t )
-           t
-    end
-
-    type ( 'ledger_hash
-         , 'amount
-         , 'pending_coinbase
-         , 'fee_excess
-         , 'sok_digest
-         , 'local_state )
-         poly =
-          ( 'ledger_hash
-          , 'amount
-          , 'pending_coinbase
-          , 'fee_excess
-          , 'sok_digest
-          , 'local_state )
-          Poly.t =
-      { source : ('ledger_hash, 'pending_coinbase, 'local_state) Registers.t
-      ; target : ('ledger_hash, 'pending_coinbase, 'local_state) Registers.t
-      ; supply_increase : 'amount
-      ; fee_excess : 'fee_excess
-      ; sok_digest : 'sok_digest
-      }
-    [@@deriving compare, equal, hash, sexp, yojson]
-
-    [%%versioned:
-    module Stable : sig
-      module V2 : sig
-        type t =
-          ( Frozen_ledger_hash.Stable.V1.t
-          , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
-          , Pending_coinbase.Stack_versioned.Stable.V1.t
-          , Fee_excess.Stable.V1.t
-          , unit
-          , Local_state.Stable.V1.t )
-          Poly.Stable.V2.t
-        [@@deriving compare, equal, hash, sexp, yojson]
-      end
-    end]
-
-    module With_sok : sig
-      [%%versioned:
-      module Stable : sig
-        module V2 : sig
-          type t =
-            ( Frozen_ledger_hash.Stable.V1.t
-            , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
-            , Pending_coinbase.Stack_versioned.Stable.V1.t
-            , Fee_excess.Stable.V1.t
-            , Sok_message.Digest.Stable.V1.t
-            , Local_state.Stable.V1.t )
-            Poly.Stable.V2.t
-          [@@deriving compare, equal, hash, sexp, yojson]
-        end
-      end]
-
-      type var =
-        ( Frozen_ledger_hash.var
-        , Amount.Signed.var
-        , Pending_coinbase.Stack.var
-        , Fee_excess.var
-        , Sok_message.Digest.Checked.t
-        , Local_state.Checked.t )
-        Poly.t
-
-      open Tick
-
-      val typ : (var, t) Typ.t
-
-      val to_input : t -> Field.t Random_oracle.Input.Chunked.t
-
-      val to_field_elements : t -> Field.t array
-
-      module Checked : sig
-        type t = var
-
-        val to_input :
-          var -> Field.Var.t Random_oracle.Input.Chunked.t Checked.t
-
-        (* This is actually a checked function. *)
-        val to_field_elements : var -> Field.Var.t array
-      end
-    end
-
-    val gen : t Quickcheck.Generator.t
-
-    val merge : t -> t -> t Or_error.t
-
-    include Hashable.S_binable with type t := t
-
-    include Comparable.S with type t := t
-  end
+  module Statement = Mina_state.Snarked_ledger_state
 
   [%%versioned:
   module Stable : sig
@@ -215,6 +26,8 @@ module type Full = sig
   val proof : t -> Mina_base.Proof.t
 
   val statement : t -> Statement.t
+
+  val statement_with_sok : t -> Statement.With_sok.t
 
   val sok_digest : t -> Sok_message.Digest.t
 
@@ -230,19 +43,19 @@ module type Full = sig
   val verify :
        (t * Sok_message.t) list
     -> key:Pickles.Verification_key.t
-    -> bool Async.Deferred.t
+    -> unit Or_error.t Async.Deferred.t
 
   module Verification : sig
     module type S = sig
       val tag : tag
 
-      val verify : (t * Sok_message.t) list -> bool Async.Deferred.t
+      val verify : (t * Sok_message.t) list -> unit Or_error.t Async.Deferred.t
 
       val id : Pickles.Verification_key.Id.t Lazy.t
 
       val verification_key : Pickles.Verification_key.t Lazy.t
 
-      val verify_against_digest : t -> bool Async.Deferred.t
+      val verify_against_digest : t -> unit Or_error.t Async.Deferred.t
 
       val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
     end
@@ -252,12 +65,10 @@ module type Full = sig
        ?preeval:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
-    -> source:Frozen_ledger_hash.t
-    -> target:Frozen_ledger_hash.t
+    -> source_first_pass_ledger:Frozen_ledger_hash.t
+    -> target_first_pass_ledger:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> zkapp_account1:Zkapp_account.t option
-    -> zkapp_account2:Zkapp_account.t option
     -> supply_increase:Amount.Signed.t
     -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
@@ -266,8 +77,8 @@ module type Full = sig
   val check_user_command :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
-    -> source:Frozen_ledger_hash.t
-    -> target:Frozen_ledger_hash.t
+    -> source_first_pass_ledger:Frozen_ledger_hash.t
+    -> target_first_pass_ledger:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> supply_increase:Amount.Signed.t
@@ -279,12 +90,10 @@ module type Full = sig
        ?preeval:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
-    -> source:Frozen_ledger_hash.t
-    -> target:Frozen_ledger_hash.t
+    -> source_first_pass_ledger:Frozen_ledger_hash.t
+    -> target_first_pass_ledger:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> zkapp_account1:Zkapp_account.t option
-    -> zkapp_account2:Zkapp_account.t option
     -> supply_increase:Amount.Signed.t
     -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
@@ -376,19 +185,22 @@ module type Full = sig
    *)
   val zkapp_command_witnesses_exn :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_body:Transaction_protocol_state.Block_data.t
     -> fee_excess:Currency.Amount.Signed.t
-    -> [ `Ledger of Mina_ledger.Ledger.t
-       | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
     -> ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
        * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
+       * [ `Ledger of Mina_ledger.Ledger.t
+         | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
+       * [ `Ledger of Mina_ledger.Ledger.t
+         | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
+       * [ `Connecting_ledger_hash of Ledger_hash.t ]
        * Zkapp_command.t )
        list
     -> ( Zkapp_command_segment.Witness.t
        * Zkapp_command_segment.Basic.t
        * Statement.With_sok.t )
        list
-       * Mina_ledger.Sparse_ledger.t
 
   module Make (Inputs : sig
     val constraint_constants : Genesis_constants.Constraint_constants.t
@@ -412,7 +224,6 @@ module type Full = sig
       -> timed_balance_check:(Tick.Boolean.var -> unit Tick.Checked.t)
       -> account:
            ( 'b
-           , 'c
            , 'd
            , 'e
            , Currency.Balance.var
@@ -421,7 +232,8 @@ module type Full = sig
            , 'h
            , 'i
            , ( Tick.Boolean.var
-             , Mina_numbers.Global_slot.Checked.var
+             , Mina_numbers.Global_slot_since_genesis.Checked.var
+             , Mina_numbers.Global_slot_span.Checked.var
              , Currency.Balance.var
              , Currency.Amount.var )
              Account_timing.As_record.t
@@ -429,10 +241,11 @@ module type Full = sig
            , 'k )
            Account.Poly.t
       -> txn_amount:Currency.Amount.var option
-      -> txn_global_slot:Mina_numbers.Global_slot.Checked.var
+      -> txn_global_slot:Mina_numbers.Global_slot_since_genesis.Checked.var
       -> ( [> `Min_balance of Currency.Balance.var ]
          * ( Tick.Boolean.var
-           , Mina_numbers.Global_slot.Checked.var
+           , Mina_numbers.Global_slot_since_genesis.Checked.var
+           , Mina_numbers.Global_slot_span.Checked.var
            , Currency.Balance.var
            , Currency.Amount.var )
            Account_timing.As_record.t )
@@ -445,6 +258,7 @@ module type Full = sig
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Statement.With_sok.var
         -> Zkapp_statement.Checked.t option
+           * [> `Must_verify of Tick.Boolean.var ]
     end
   end
 
@@ -469,9 +283,40 @@ module type Full = sig
 
     val deploy_snapp :
          ?no_auth:bool
+      -> ?permissions:Permissions.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Deploy_snapp_spec.t
       -> Zkapp_command.t
+
+    module Single_account_update_spec : sig
+      type t =
+        { fee : Currency.Fee.t
+        ; fee_payer : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+        ; zkapp_account_keypair : Signature_lib.Keypair.t
+        ; memo : Signed_command_memo.t
+        ; update : Account_update.Update.t
+        ; actions : Tick.Field.t array list
+        ; events : Tick.Field.t array list
+        ; call_data : Tick.Field.t
+        }
+    end
+
+    val single_account_update :
+         ?zkapp_prover_and_vk:
+           ( unit
+           , unit
+           , unit
+           , Zkapp_statement.t
+           , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+             Async.Deferred.t )
+           Pickles.Prover.t
+           * ( Pickles.Side_loaded.Verification_key.t
+             , Snark_params.Tick.Field.t )
+             With_hash.t
+      -> chain:Mina_signature_kind.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> Single_account_update_spec.t
+      -> Zkapp_command.t Async.Deferred.t
 
     module Update_states_spec : sig
       type t =
@@ -479,8 +324,7 @@ module type Full = sig
         ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
         ; fee_payer :
             (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
-        ; receivers :
-            (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+        ; receivers : (Signature_lib.Keypair.t * Currency.Amount.t) list
         ; amount : Currency.Amount.t
         ; zkapp_account_keypairs : Signature_lib.Keypair.t list
         ; memo : Signed_command_memo.t
@@ -488,7 +332,7 @@ module type Full = sig
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
         ; current_auth : Permissions.Auth_required.t
-        ; sequence_events : Tick.Field.t array list
+        ; actions : Tick.Field.t array list
         ; events : Tick.Field.t array list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
@@ -497,7 +341,8 @@ module type Full = sig
     end
 
     val update_states :
-         ?zkapp_prover:
+         ?receiver_auth:Control.Tag.t
+      -> ?zkapp_prover_and_vk:
            ( unit
            , unit
            , unit
@@ -505,6 +350,10 @@ module type Full = sig
            , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
              Async.Deferred.t )
            Pickles.Prover.t
+           * ( Pickles.Side_loaded.Verification_key.t
+             , Snark_params.Tick.Field.t )
+             With_hash.t
+      -> ?empty_sender:bool
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Update_states_spec.t
       -> Zkapp_command.t Async.Deferred.t
@@ -557,7 +406,7 @@ module type Full = sig
         ; new_zkapp_account : bool
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
-        ; sequence_events : Tick.Field.t array list
+        ; actions : Tick.Field.t array list
         ; events : Tick.Field.t array list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
@@ -566,5 +415,7 @@ module type Full = sig
     end
 
     val multiple_transfers : Multiple_transfers_spec.t -> Zkapp_command.t
+
+    val set_proof_cache : Pickles.Proof_cache.t -> unit
   end
 end

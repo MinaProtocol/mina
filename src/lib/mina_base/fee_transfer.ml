@@ -49,14 +49,15 @@ module Make_str (A : Wire_types.Concrete) = struct
     let fee_token { fee_token; _ } = fee_token
 
     module Gen = struct
-      let with_random_receivers ?(min_fee = 0) ~keys ~max_fee ~token :
+      let with_random_receivers ?(min_fee = 0) ~max_fee ~token keys :
           t Quickcheck.Generator.t =
         let open Quickcheck.Generator.Let_syntax in
         let%map receiver_pk =
           let open Signature_lib in
           Quickcheck_lib.of_array keys
           >>| fun keypair -> Public_key.compress keypair.Keypair.public_key
-        and fee = Int.gen_incl min_fee max_fee >>| Currency.Fee.of_int
+        and fee =
+          Int.gen_incl min_fee max_fee >>| Currency.Fee.of_nanomina_int_exn
         and fee_token = token in
         { receiver_pk; fee; fee_token }
     end

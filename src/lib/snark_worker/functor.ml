@@ -68,7 +68,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     module Single = struct
       module Spec = struct
         type t = (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
-        [@@deriving sexp, to_yojson]
+        [@@deriving sexp, yojson]
 
         let transaction t =
           Option.map (Work.Single.Spec.witness t) ~f:(fun w ->
@@ -79,7 +79,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     end
 
     module Spec = struct
-      type t = Single.Spec.t Work.Spec.t [@@deriving sexp, to_yojson]
+      type t = Single.Spec.t Work.Spec.t [@@deriving sexp, yojson]
 
       let instances = Work.Spec.instances
     end
@@ -305,7 +305,7 @@ module Make (Inputs : Intf.Inputs_intf) :
               let%bind () =
                 match%map
                   dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
-                    shutdown_on_disconnect (work, public_key) daemon_address
+                    shutdown_on_disconnect (e, work, public_key) daemon_address
                 with
                 | Error e ->
                     [%log error]

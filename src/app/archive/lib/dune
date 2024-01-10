@@ -8,6 +8,7 @@
    base64
    async_rpc_kernel
    base.caml
+   base.base_internalhash_types
    bin_prot.shape
    async_kernel
    caqti-driver-postgresql
@@ -26,7 +27,8 @@
    child_processes
    precomputed_values
    coda_genesis_ledger
-   coda_runtime_config
+   consensus.vrf
+   mina_runtime_config
    sgn
    mina_base.util
    kimchi_backend.pasta
@@ -69,9 +71,11 @@
    protocol_version
    mina_version
    staged_ledger_diff
+   error_json
+   ppx_deriving_yojson.runtime
    ppx_version.runtime
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (modes native)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_custom_printf ppx_deriving_yojson h_list.ppx)))

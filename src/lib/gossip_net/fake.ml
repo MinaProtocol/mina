@@ -270,15 +270,17 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
           M.Block_sink.push sink_block
             (`Transition env, `Time_received time, `Valid_cb vc) )
 
-    let broadcast_snark_pool_diff ?origin_topic t diff =
+    let broadcast_snark_pool_diff ?origin_topic ?nonce t diff =
       ignore origin_topic ;
+      ignore nonce ;
       Network.broadcast t.network ~sender:t.me diff
         (fun (Any_sinks (sinksM, (_, _, sink_snark_work))) ->
           let module M = (val sinksM) in
           M.Snark_sink.push sink_snark_work )
 
-    let broadcast_transaction_pool_diff ?origin_topic t diff =
+    let broadcast_transaction_pool_diff ?origin_topic ?nonce t diff =
       ignore origin_topic ;
+      ignore nonce ;
       Network.broadcast t.network ~sender:t.me diff
         (fun (Any_sinks (sinksM, (_, sink_tx, _))) ->
           let module M = (val sinksM) in
@@ -286,7 +288,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     let connection_gating t = Deferred.return !(t.connection_gating)
 
-    let set_connection_gating t config =
+    let set_connection_gating ?clean_added_peers:_ t config =
       t.connection_gating := config ;
       Deferred.return config
   end

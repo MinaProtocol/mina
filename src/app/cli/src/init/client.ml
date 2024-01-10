@@ -76,10 +76,10 @@ let get_balance_graphql =
          | Some account ->
              if Token_id.(equal default) token then
                printf "Balance: %s mina\n"
-                 (Currency.Balance.to_formatted_string account.balance.total)
+                 (Currency.Balance.to_mina_string account.balance.total)
              else
                printf "Balance: %s tokens\n"
-                 (Currency.Balance.to_formatted_string account.balance.total)
+                 (Currency.Balance.to_mina_string account.balance.total)
          | None ->
              printf "There are no funds in this account\n" ) )
 
@@ -101,7 +101,7 @@ let get_tokens_graphql =
          in
          printf "Accounts are held for token IDs:\n" ;
          Array.iter response.accounts ~f:(fun account ->
-             printf "%s " (Token_id.to_string account.token) ) ) )
+             printf "%s " (Token_id.to_string account.tokenId) ) ) )
 
 let get_time_offset_graphql =
   Command.async
@@ -436,7 +436,8 @@ let batch_send_payments =
       { receiver : string
       ; amount : Currency.Amount.t
       ; fee : Currency.Fee.t
-      ; valid_until : Mina_numbers.Global_slot.t option [@sexp.option]
+      ; valid_until : Mina_numbers.Global_slot_since_genesis.t option
+            [@sexp.option]
       }
     [@@deriving sexp]
   end in
@@ -453,9 +454,10 @@ let batch_send_payments =
           { Payment_info.receiver =
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
-          ; valid_until = Some (Mina_numbers.Global_slot.random ())
-          ; amount = Currency.Amount.of_int (Random.int 100)
-          ; fee = Currency.Fee.of_int (Random.int 100)
+          ; valid_until =
+              Some (Mina_numbers.Global_slot_since_genesis.random ())
+          ; amount = Currency.Amount.of_nanomina_int_exn (Random.int 100)
+          ; fee = Currency.Fee.of_nanomina_int_exn (Random.int 100)
           }
         in
         eprintf "Could not read payments from %s.\n" payments_path ;
@@ -481,7 +483,7 @@ let batch_send_payments =
           in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty ~valid_until
-            ~body:(Payment { source_pk = signer_pk; receiver_pk; amount })
+            ~body:(Payment { receiver_pk; amount })
             ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
     in
     Daemon_rpcs.Client.dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
@@ -584,7 +586,7 @@ let cancel_transaction_graphql =
            Currency.Fee.of_uint64 (fee + replace_fee)
          in
          printf "Fee to cancel transaction is %s coda.\n"
-           (Currency.Fee.to_formatted_string cancel_fee) ;
+           (Currency.Fee.to_mina_string cancel_fee) ;
          let cancel_query =
            let input =
              Mina_graphql.Types.Input.SendPaymentInput.make_input
@@ -877,8 +879,7 @@ let currency_in_ledger =
          List.iter tokens ~f:(fun token ->
              let total =
                Token_id.Table.find_exn currency_tbl token
-               |> Currency.Balance.of_uint64
-               |> Currency.Balance.to_formatted_string
+               |> Currency.Balance.of_uint64 |> Currency.Balance.to_mina_string
              in
              if Token_id.equal token Token_id.default then
                Format.printf "MINA: %s@." total
@@ -1033,14 +1034,22 @@ let pending_snark_work =
                  (Array.map
                     ~f:(fun bundle ->
                       Array.map bundle.workBundle ~f:(fun w ->
-                          let f = w.fee_excess in
+                          let fee_excess_left = w.fee_excess.feeExcessLeft in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w.work_id
                           ; fee_excess =
-                              to_signed_fee_exn f.sign f.fee_magnitude
+                              Currency.Amount.Signed.of_fee
+                                (to_signed_fee_exn fee_excess_left.sign
+                                   fee_excess_left.feeMagnitude )
                           ; supply_increase = w.supply_increase
-                          ; source_ledger_hash = w.source_ledger_hash
-                          ; target_ledger_hash = w.target_ledger_hash
+                          ; source_first_pass_ledger_hash =
+                              w.source_first_pass_ledger_hash
+                          ; target_first_pass_ledger_hash =
+                              w.target_first_pass_ledger_hash
+                          ; source_second_pass_ledger_hash =
+                              w.source_second_pass_ledger_hash
+                          ; target_second_pass_ledger_hash =
+                              w.target_second_pass_ledger_hash
                           } ) )
                     response.pendingSnarkWork )
              in
@@ -1056,7 +1065,7 @@ let start_tracing =
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Start_tracing.rpc () port
          with
          | Ok () ->
-             printf "Daemon started tracing!"
+             print_endline "Daemon started tracing!"
          | Error e ->
              Daemon_rpcs.Client.print_rpc_error e ) )
 
@@ -1069,7 +1078,38 @@ let stop_tracing =
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Stop_tracing.rpc () port
          with
          | Ok () ->
-             printf "Daemon stopped printing!"
+             print_endline "Daemon stopped printing!"
+         | Error e ->
+             Daemon_rpcs.Client.print_rpc_error e ) )
+
+let start_internal_tracing =
+  let open Deferred.Let_syntax in
+  let open Command.Param in
+  Command.async
+    ~summary:
+      "Start internal tracing to \
+       $config-directory/internal-tracing/internal-trace.jsonl"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Start_internal_tracing.rpc ()
+             port
+         with
+         | Ok () ->
+             print_endline "Daemon internal started tracing!"
+         | Error e ->
+             Daemon_rpcs.Client.print_rpc_error e ) )
+
+let stop_internal_tracing =
+  let open Deferred.Let_syntax in
+  let open Command.Param in
+  Command.async ~summary:"Stop internal tracing"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Stop_internal_tracing.rpc ()
+             port
+         with
+         | Ok () ->
+             print_endline "Daemon internal tracing stopped!"
          | Error e ->
              Daemon_rpcs.Client.print_rpc_error e ) )
 
@@ -1153,8 +1193,9 @@ let set_snark_work_fee =
            ~f:(fun response ->
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
-               (Currency.Fee.to_int fee)
-               (Currency.Fee.to_int response.setSnarkWorkFee.lastFee) ) )
+               (Currency.Fee.to_nanomina_int fee)
+               (Currency.Fee.to_nanomina_int response.setSnarkWorkFee.lastFee) )
+         )
 
 let import_key =
   Command.async
@@ -1405,7 +1446,7 @@ let list_accounts =
                        \  Locked: %b\n"
                        (i + 1)
                        (Public_key.Compressed.to_base58_check w.public_key)
-                       (Currency.Balance.to_formatted_string w.balance.total)
+                       (Currency.Balance.to_mina_string w.balance.total)
                        (Option.value ~default:true w.locked) ) ;
                  Ok () )
          | Error (`Failed_request _ as err) ->
@@ -1471,7 +1512,7 @@ let create_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createAccount.public_key
+             response.createAccount.account.public_key
          in
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ) )
 
@@ -1488,7 +1529,7 @@ let create_hd_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createHDAccount.public_key
+             response.createHDAccount.account.public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
            (Mina_numbers.Hd_index.to_string hd_index)
@@ -1522,7 +1563,7 @@ let unlock_account =
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
-                 response.unlockAccount.public_key
+                 response.unlockAccount.account.public_key
              in
              printf "\n🔓 Unlocked account!\nPublic key: %s\n" pk_string
          | Error e ->
@@ -1563,7 +1604,7 @@ let generate_libp2p_keypair_do privkey_path =
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
         with
         | Ok net ->
             let%bind me = Mina_net2.generate_random_keypair net in
@@ -1583,6 +1624,34 @@ let generate_libp2p_keypair =
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
     generate_libp2p_keypair_do privkey_path)
+
+let dump_libp2p_keypair_do privkey_path =
+  Cli_lib.Exceptions.handle_nicely
+  @@ fun () ->
+  Deferred.ignore_m
+    (let open Deferred.Let_syntax in
+    let logger = Logger.null () in
+    (* Using the helper only for keypair generation requires no state. *)
+    File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
+        match%bind
+          Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
+        with
+        | Ok net ->
+            let%bind () = Mina_net2.shutdown net in
+            let%map me = Secrets.Libp2p_keypair.read_exn' privkey_path in
+            printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
+        | Error e ->
+            [%log fatal] "failed to dump libp2p keypair: $error"
+              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+            exit 20 ))
+
+let dump_libp2p_keypair =
+  Command.async ~summary:"Print an existing libp2p keypair"
+    (let open Command.Let_syntax in
+    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
+    dump_libp2p_keypair_do privkey_path)
 
 let trustlist_ip_flag =
   Command.Param.(
@@ -1746,7 +1815,7 @@ let compile_time_constants =
              ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
              ; ( "coinbase"
                , `String
-                   (Currency.Amount.to_formatted_string
+                   (Currency.Amount.to_mina_string
                       precomputed_values.constraint_constants.coinbase_amount )
                )
              ; ( "block_window_duration_ms"
@@ -2013,28 +2082,43 @@ let receipt_chain_hash =
        transaction ID"
     (let%map_open previous_hash =
        flag "--previous-hash"
-         ~doc:"Previous receipt chain hash, base58check encoded"
+         ~doc:"HASH Previous receipt chain hash, Base58Check-encoded"
          (required string)
      and transaction_id =
-       flag "--transaction-id" ~doc:"Transaction ID, base64-encoded"
-         (required string)
+       flag "--transaction-id"
+         ~doc:"TRANSACTION_ID Transaction ID, Base64-encoded" (required string)
+     and index =
+       flag "--index"
+         ~doc:
+           "NN For a zkApp, 0 for fee payer or 1-based index of account update"
+         (optional string)
      in
      fun () ->
        let previous_hash =
          Receipt.Chain_hash.of_base58_check_exn previous_hash
        in
-       (* What we call transaction IDs in GraphQL are just base64-encoded
-          transactions. It's easy to handle, and we return it from the
-          transaction commands above, so lets use this format.
-
-          TODO: handle zkApps, issue #11431
-       *)
-       let transaction =
-         Signed_command.of_base64 transaction_id |> Or_error.ok_exn
-       in
        let hash =
-         Receipt.Chain_hash.cons_signed_command_payload
-           (Signed_command_payload transaction.payload) previous_hash
+         match index with
+         | None ->
+             let signed_cmd =
+               Signed_command.of_base64 transaction_id |> Or_error.ok_exn
+             in
+             Receipt.Chain_hash.cons_signed_command_payload
+               (Signed_command_payload signed_cmd.payload) previous_hash
+         | Some n ->
+             let zkapp_cmd =
+               Zkapp_command.of_base64 transaction_id |> Or_error.ok_exn
+             in
+             let receipt_elt =
+               let _txn_commitment, full_txn_commitment =
+                 Zkapp_command.get_transaction_commitments zkapp_cmd
+               in
+               Receipt.Zkapp_command_elt.Zkapp_command_commitment
+                 full_txn_commitment
+             in
+             let account_update_index = Mina_numbers.Index.of_string n in
+             Receipt.Chain_hash.cons_zkapp_command_commitment
+               account_update_index receipt_elt previous_hash
        in
        printf "%s\n" (Receipt.Chain_hash.to_base58_check hash) )
 
@@ -2049,7 +2133,8 @@ let chain_id_inputs =
              ( genesis_state_hash
              , genesis_constants
              , snark_keys
-             , protocol_major_version ) ->
+             , protocol_transaction_version
+             , protocol_network_version ) ->
              let open Format in
              printf
                "@[<v>Genesis state hash: %s@,\
@@ -2060,7 +2145,8 @@ let chain_id_inputs =
                 @]@,\
                 @[<v 2>Snark keys:@,\
                 %a@]@,\
-                Protocol major version: %d@]@."
+                Protocol transaction version: %u@,\
+                Protocol network version: %u@]@."
                (State_hash.to_base58_check genesis_state_hash)
                Yojson.Safe.pp
                (Genesis_constants.Protocol.to_yojson genesis_constants.protocol)
@@ -2070,7 +2156,7 @@ let chain_id_inputs =
                   pp_print_int )
                genesis_constants.num_accounts
                (pp_print_list ~pp_sep:pp_print_cut pp_print_string)
-               snark_keys protocol_major_version
+               snark_keys protocol_transaction_version protocol_network_version
          | Error err ->
              Format.eprintf "Could not get chain id inputs: %s@."
                (Error.to_string_hum err) ) )
@@ -2145,6 +2231,31 @@ let thread_graph =
                (Error.to_string_hum
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
              exit 1 ) )
+
+let itn_create_accounts =
+  Command.async ~summary:"Fund new accounts for incentivized testnet"
+    (let open Command.Param in
+    let privkey_path = Cli_lib.Flag.privkey_read_path in
+    let key_prefix =
+      flag "--key-prefix" ~doc:"STRING prefix of keyfiles" (required string)
+    in
+    let num_accounts =
+      flag "--num-accounts" ~doc:"NN Number of new accounts" (required int)
+    in
+    let fee =
+      flag "--fee"
+        ~doc:
+          (sprintf "NN Fee in nanomina paid to create an account (minimum: %s)"
+             Mina_compile_config.minimum_user_command_fee_string )
+        (required int)
+    in
+    let amount =
+      flag "--amount"
+        ~doc:"NN Amount in nanomina to be divided among new accounts"
+        (required int)
+    in
+    let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
+    Cli_lib.Background_daemon.rpc_init args ~f:Itn.create_accounts)
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -2227,7 +2338,7 @@ let client_trustlist_group =
     ]
 
 let advanced =
-  Command.group ~summary:"Advanced client commands"
+  let cmds0 =
     [ ("get-nonce", get_nonce_cmd)
     ; ("client-trustlist", client_trustlist_group)
     ; ("get-trust-status", get_trust_status)
@@ -2241,6 +2352,8 @@ let advanced =
     ; ("constraint-system-digests", constraint_system_digests)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
+    ; ("start-internal-tracing", start_internal_tracing)
+    ; ("stop-internal-tracing", stop_internal_tracing)
     ; ("snark-job-list", snark_job_list)
     ; ("pooled-user-commands", pooled_user_commands)
     ; ("pooled-zkapp-commands", pooled_zkapp_commands)
@@ -2267,6 +2380,13 @@ let advanced =
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
     ]
+  in
+  let cmds =
+    if Mina_compile_config.itn_features then
+      ("itn-create-accounts", itn_create_accounts) :: cmds0
+    else cmds0
+  in
+  Command.group ~summary:"Advanced client commands" cmds
 
 let ledger =
   Command.group ~summary:"Ledger commands"
@@ -2277,4 +2397,6 @@ let ledger =
 
 let libp2p =
   Command.group ~summary:"Libp2p commands"
-    [ ("generate-keypair", generate_libp2p_keypair) ]
+    [ ("generate-keypair", generate_libp2p_keypair)
+    ; ("dump-keypair", dump_libp2p_keypair)
+    ]

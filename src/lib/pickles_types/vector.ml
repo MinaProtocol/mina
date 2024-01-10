@@ -12,10 +12,49 @@ end
 
 include T
 
+let singleton a = [ a ]
+
 let unsingleton (type a) ([ x ] : (a, z s) t) : a = x
 
 let rec iter : type a n. (a, n) t -> f:(a -> unit) -> unit =
  fun t ~f -> match t with [] -> () | x :: xs -> f x ; iter xs ~f
+
+let iteri (type a n) (t : (a, n) t) ~(f : int -> a -> unit) : unit =
+  let rec go : type n. int -> (a, n) t -> unit =
+   fun acc t ->
+    match t with
+    | [] ->
+        ()
+    | x :: xs ->
+        f acc x ;
+        go (acc + 1) xs
+  in
+  go 0 t
+
+let rec length : type a n. (a, n) t -> n Nat.t = function
+  | [] ->
+      Z
+  | _ :: xs ->
+      S (length xs)
+
+let nth v i =
+  let rec loop : type a n. int -> (a, n) t -> a option =
+   fun j -> function
+    | [] ->
+        None
+    | x :: xs ->
+        if Int.equal i j then Some x else loop (j + 1) xs
+  in
+  loop 0 v
+
+let nth_exn v i =
+  match nth v i with
+  | None ->
+      invalid_argf "Vector.nth_exn %d called on a vector of length %d" i
+        (length v |> Nat.to_int)
+        ()
+  | Some e ->
+      e
 
 let rec iter2 : type a b n. (a, n) t -> (b, n) t -> f:(a -> b -> unit) -> unit =
  fun t1 t2 ~f ->
@@ -61,6 +100,16 @@ let rec mapn :
   | [] ->
       failwith "mapn: Empty args"
 
+let rec nth : type a n. (a, n) t -> int -> a option =
+ fun t idx ->
+  match t with
+  | [] ->
+      None
+  | x :: _ when idx = 0 ->
+      Some x
+  | _ :: t ->
+      nth t (idx - 1)
+
 let zip xs ys = map2 xs ys ~f:(fun x y -> (x, y))
 
 let rec to_list : type a n. (a, n) t -> a list =
@@ -69,12 +118,6 @@ let rec to_list : type a n. (a, n) t -> a list =
 let sexp_of_t a _ v = List.sexp_of_t a (to_list v)
 
 let to_array t = Array.of_list (to_list t)
-
-let rec length : type a n. (a, n) t -> n Nat.t = function
-  | [] ->
-      Z
-  | _ :: xs ->
-      S (length xs)
 
 let rec init : type a n. int -> n Nat.t -> f:(int -> a) -> (a, n) t =
  fun i n ~f -> match n with Z -> [] | S n -> f i :: init (i + 1) n ~f
@@ -392,6 +435,18 @@ let rec transpose : type a n m. ((a, n) t, m) t -> ((a, m) t, n) t =
 let rec trim : type a n m. (a, m) t -> (n, m) Nat.Lte.t -> (a, n) t =
  fun v p -> match (v, p) with _, Z -> [] | x :: xs, S p -> x :: trim xs p
 
+let trim_front (type a n m) (v : (a, m) t) (p : (n, m) Nat.Lte.t) : (a, n) t =
+  rev (trim (rev v) p)
+
+let extend_front_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
+ fun v m dummy ->
+  let v = to_array v in
+  let n = Array.length v in
+  let m' = Nat.to_int m in
+  assert (n <= m') ;
+  let padding = m' - n in
+  init m ~f:(fun i -> if i < padding then dummy else v.(i - padding))
+
 let rec extend_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
  fun v m default ->
   match (v, m) with
@@ -415,6 +470,10 @@ let rec extend :
       default :: extend [] Z m default
   | x :: xs, S p, S m ->
       x :: extend xs p m default
+
+let extend_front :
+    type a n m. (a, n) t -> (n, m) Nat.Lte.t -> m Nat.t -> a -> (a, m) t =
+ fun v _p m default -> extend_front_exn v m default
 
 module type S = sig
   type 'a t [@@deriving compare, yojson, sexp, hash, equal]
@@ -478,11 +537,7 @@ module Vector_2 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_4 = struct
@@ -503,11 +558,7 @@ module Vector_4 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_5 = struct
@@ -528,11 +579,7 @@ module Vector_5 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_6 = struct
@@ -553,11 +600,7 @@ module Vector_6 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_7 = struct
@@ -578,11 +621,7 @@ module Vector_7 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_8 = struct
@@ -603,11 +642,7 @@ module Vector_8 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_15 = struct
@@ -628,11 +663,7 @@ module Vector_15 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_16 = struct
@@ -653,9 +684,5 @@ module Vector_16 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end

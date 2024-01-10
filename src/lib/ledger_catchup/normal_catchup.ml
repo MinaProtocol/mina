@@ -161,7 +161,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
                           (Mina_block.header transition)
                       |> Protocol_version.to_string ) )
                 ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(get_current () |> to_string) )
+                  , `String Protocol_version.(to_string current) )
                 ] ) )
       in
       Error (Error.of_string "mismatched protocol version")
@@ -276,7 +276,7 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
       in
       Deferred.return
       @@ List.fold_until
-           (Non_empty_list.to_list hashes)
+           (Mina_stdlib.Nonempty_list.to_list hashes)
            ~init:(blockchain_length_of_target_hash, [])
            ~f:(fun (blockchain_length, acc) hash ->
              match Transition_frontier.find frontier hash with
@@ -505,12 +505,12 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
              ledger catchup: $error" ;
           Deferred.Or_error.fail
             (Error.tag ~tag:"verifier threw an error" error)
-      | Error `Invalid_proof ->
+      | Error (`Invalid_proof err) ->
           let%map () =
             (* TODO: Isolate and punish all the evil sender *)
             Deferred.unit
           in
-          Error (Error.of_string "invalid proof")
+          Error (Error.tag ~tag:"invalid proof" err)
     in
     let verification_end_time = Core.Time.now () in
     [%log debug]
@@ -575,7 +575,8 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
   in
   let build_start_time = Core.Time.now () in
   let trees_of_transitions =
-    Option.fold (Non_empty_list.of_list_opt transitions_with_initial_validation)
+    Option.fold
+      (Mina_stdlib.Nonempty_list.of_list_opt transitions_with_initial_validation)
       ~init:subtrees ~f:(fun _ transitions ->
         [ Rose_tree.of_non_empty_list ~subtrees transitions ] )
   in
@@ -877,7 +878,8 @@ let%test_module "Ledger_catchup tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            () )
 
     module Context = struct
       let logger = logger

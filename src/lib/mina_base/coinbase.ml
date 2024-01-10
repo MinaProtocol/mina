@@ -48,9 +48,19 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let fee_transfer t = t.fee_transfer
 
-  let accounts_accessed t =
-    receiver t
-    :: List.map ~f:Fee_transfer.receiver (Option.to_list t.fee_transfer)
+  let account_access_statuses t (status : Transaction_status.t) =
+    let access_status =
+      match status with Applied -> `Accessed | Failed _ -> `Not_accessed
+    in
+    let account_ids =
+      receiver t
+      :: List.map ~f:Fee_transfer.receiver (Option.to_list t.fee_transfer)
+    in
+    List.map account_ids ~f:(fun acct_id -> (acct_id, access_status))
+
+  let accounts_referenced t =
+    List.map (account_access_statuses t Transaction_status.Applied)
+      ~f:(fun (acct_id, _status) -> acct_id)
 
   let is_valid { amount; fee_transfer; _ } =
     match fee_transfer with
@@ -137,7 +147,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         Quickcheck_lib.of_array keys
         >>| fun keypair -> Public_key.compress keypair.Keypair.public_key
       and amount =
-        Int.gen_incl min_amount max_amount >>| Currency.Amount.of_int
+        Int.gen_incl min_amount max_amount
+        >>| Currency.Amount.of_nanomina_int_exn
       in
       let%map fee_transfer =
         Option.quickcheck_generator (fee_transfer ~coinbase_amount:amount)

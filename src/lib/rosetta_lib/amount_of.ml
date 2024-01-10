@@ -37,6 +37,9 @@ end
 let negated (t : Amount.t) =
   { t with value = (Int64.to_string @@ Int64.(neg @@ of_string t.value)) }
 
+let compare_to_int64 (t : Amount.t) (i : int64) =
+  Int64.(compare (of_string t.value) i)
+
 let mina total =
   { Amount.value = Unsigned.UInt64.to_string total
   ; currency = { Currency.symbol = "MINA"; decimals = 9l; metadata = None }

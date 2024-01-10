@@ -82,7 +82,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           type t =
             ( State_hash.Stable.V1.t
             , Blockchain_state.Value.Stable.V2.t
-            , Consensus.Data.Consensus_state.Value.Stable.V1.t
+            , Consensus.Data.Consensus_state.Value.Stable.V2.t
             , Protocol_constants_checked.Value.Stable.V1.t )
             Poly.Stable.V1.t
           [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
@@ -135,7 +135,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; consensus_state
         ; constants
         } =
-      let blockchain_state = Blockchain_state.var_to_input blockchain_state in
+      let%map blockchain_state =
+        Blockchain_state.var_to_input blockchain_state
+      in
       let constants = Protocol_constants_checked.var_to_input constants in
       let consensus_state =
         Consensus.Data.Consensus_state.var_to_input consensus_state
@@ -146,7 +148,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         |> append constants)
 
     let hash_checked (t : var) =
-      let input = var_to_input t in
+      let%bind input = var_to_input t in
       make_checked (fun () ->
           Random_oracle.Checked.(
             hash ~init:Hash_prefix.protocol_state_body (pack_input input)
@@ -158,13 +160,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         Zkapp_precondition.Protocol_state.View.Checked.t =
       let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
       let cs : Consensus.Data.Consensus_state.var = t.consensus_state in
-      { snarked_ledger_hash = t.blockchain_state.registers.ledger
-      ; timestamp = t.blockchain_state.timestamp
+      { snarked_ledger_hash =
+          Blockchain_state.snarked_ledger_hash t.blockchain_state
       ; blockchain_length = C.blockchain_length_var cs
       ; min_window_density = C.min_window_density_var cs
-      ; last_vrf_output = ()
       ; total_currency = C.total_currency_var cs
-      ; global_slot_since_hard_fork = C.curr_global_slot_var cs
       ; global_slot_since_genesis = C.global_slot_since_genesis_var cs
       ; staking_epoch_data = C.staking_epoch_data_var cs
       ; next_epoch_data = C.next_epoch_data_var cs
@@ -180,13 +180,11 @@ module Make_str (A : Wire_types.Concrete) = struct
     let view (t : Value.t) : Zkapp_precondition.Protocol_state.View.t =
       let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
       let cs = t.consensus_state in
-      { snarked_ledger_hash = t.blockchain_state.registers.ledger
-      ; timestamp = t.blockchain_state.timestamp
+      { snarked_ledger_hash =
+          Blockchain_state.snarked_ledger_hash t.blockchain_state
       ; blockchain_length = C.blockchain_length cs
       ; min_window_density = C.min_window_density cs
-      ; last_vrf_output = ()
       ; total_currency = C.total_currency cs
-      ; global_slot_since_hard_fork = C.curr_global_slot cs
       ; global_slot_since_genesis = C.global_slot_since_genesis cs
       ; staking_epoch_data = C.staking_epoch_data cs
       ; next_epoch_data = C.next_epoch_data cs

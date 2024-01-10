@@ -8,35 +8,33 @@ import (
 	"math"
 	"os"
 	"strconv"
-	"sync"
 	"time"
 
 	ipc "libp2p_ipc"
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
-	net "github.com/libp2p/go-libp2p-core/network"
-	peer "github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	net "github.com/libp2p/go-libp2p/core/network"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 func newApp() *app {
-	outChan := make(chan *capnp.Message, 64)
+	outChan := make(chan *capnp.Message, 1<<12) // 4096 messages stacked
 	ctx := context.Background()
 	return &app{
 		P2p:                      nil,
 		Ctx:                      ctx,
-		Subs:                     make(map[uint64]subscription),
-		Topics:                   make(map[string]*pubsub.Topic),
-		ValidatorMutex:           &sync.Mutex{},
-		Validators:               make(map[uint64]*validationStatus),
-		Streams:                  make(map[uint64]net.Stream),
+		_subs:                    make(map[uint64]subscription),
+		_topics:                  make(map[string]*pubsub.Topic),
+		_validators:              make(map[uint64]*validationStatus),
+		_streams:                 make(map[uint64]*stream),
 		OutChan:                  outChan,
 		Out:                      bufio.NewWriter(os.Stdout),
-		AddedPeers:               []peer.AddrInfo{},
+		_addedPeers:              []peer.AddrInfo{},
 		MetricsRefreshTime:       time.Minute,
 		metricsCollectionStarted: false,
 		metricsServer:            nil,
@@ -48,11 +46,11 @@ func (app *app) SetConnectionHandlers() {
 	app.setConnectionHandlersOnce.Do(func() {
 		app.P2p.ConnectionManager.AddOnConnectHandler(func(net net.Network, c net.Conn) {
 			app.updateConnectionMetrics()
-			app.writeMsg(mkPeerConnectedUpcall(peer.Encode(c.RemotePeer())))
+			app.writeMsg(mkPeerConnectedUpcall(c.RemotePeer().String()))
 		})
 		app.P2p.ConnectionManager.AddOnDisconnectHandler(func(net net.Network, c net.Conn) {
 			app.updateConnectionMetrics()
-			app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(c.RemotePeer())))
+			app.writeMsg(mkPeerDisconnectedUpcall(c.RemotePeer().String()))
 		})
 	})
 }
@@ -62,6 +60,125 @@ func (app *app) NextId() uint64 {
 	defer app.counterMutex.Unlock()
 	app.counter = app.counter + 1
 	return app.counter
+}
+
+func (app *app) AddPeers(infos ...peer.AddrInfo) {
+	app.addedPeersMutex.Lock()
+	defer app.addedPeersMutex.Unlock()
+	app._addedPeers = append(app._addedPeers, infos...)
+}
+
+// GetAddedPeers returns list of peers
+//
+// Elements of returned slice should never be modified!
+func (app *app) GetAddedPeers() []peer.AddrInfo {
+	app.addedPeersMutex.RLock()
+	defer app.addedPeersMutex.RUnlock()
+	return app._addedPeers
+}
+
+func (app *app) ResetAddedPeers() {
+	app.addedPeersMutex.Lock()
+	defer app.addedPeersMutex.Unlock()
+	app._addedPeers = nil
+}
+
+func (app *app) AddStream(stream_ net.Stream) uint64 {
+	streamIdx := app.NextId()
+	app.streamsMutex.Lock()
+	defer app.streamsMutex.Unlock()
+	app._streams[streamIdx] = &stream{stream: stream_}
+	return streamIdx
+}
+
+func (app *app) RemoveStream(streamId uint64) (*stream, bool) {
+	app.streamsMutex.Lock()
+	defer app.streamsMutex.Unlock()
+	stream, ok := app._streams[streamId]
+	delete(app._streams, streamId)
+	return stream, ok
+}
+
+func (app *app) getStream(streamId uint64) (*stream, bool) {
+	app.streamsMutex.RLock()
+	defer app.streamsMutex.RUnlock()
+	s, has := app._streams[streamId]
+	return s, has
+}
+
+func (app *app) WriteStream(streamId uint64, data []byte) error {
+	if stream, ok := app.getStream(streamId); ok {
+		stream.mutex.Lock()
+		defer stream.mutex.Unlock()
+
+		if n, err := stream.stream.Write(data); err != nil {
+			// TODO check that it's correct to error out, not repeat writing
+			_, has := app.RemoveStream(streamId)
+			if has {
+				// If stream is no longer in the *app, it means it is closed or soon to be closed by
+				// another goroutine
+				close_err := stream.stream.Close()
+				if close_err != nil {
+					app.P2p.Logger.Debugf("failed to close stream %d after encountering write failure (%s): %s", streamId, err.Error(), close_err.Error())
+				}
+			}
+			return wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data)))
+		}
+		return nil
+	}
+	return badRPC(errors.New("unknown stream_idx"))
+}
+
+func (app *app) AddValidator() (uint64, chan pubsub.ValidationResult) {
+	seqno := app.NextId()
+	ch := make(chan pubsub.ValidationResult)
+	app.validatorMutex.Lock()
+	defer app.validatorMutex.Unlock()
+	app._validators[seqno] = new(validationStatus)
+	app._validators[seqno].Completion = ch
+	return seqno, ch
+}
+
+func (app *app) TimeoutValidator(seqno uint64) {
+	now := time.Now()
+	app.validatorMutex.Lock()
+	defer app.validatorMutex.Unlock()
+	app._validators[seqno].TimedOutAt = &now
+}
+
+func (app *app) RemoveValidator(seqno uint64) (*validationStatus, bool) {
+	app.validatorMutex.Lock()
+	defer app.validatorMutex.Unlock()
+	st, ok := app._validators[seqno]
+	delete(app._validators, seqno)
+	return st, ok
+}
+
+func (app *app) AddTopic(topicName string, topic *pubsub.Topic) {
+	app.topicsMutex.Lock()
+	defer app.topicsMutex.Unlock()
+	app._topics[topicName] = topic
+}
+
+func (app *app) GetTopic(topicName string) (*pubsub.Topic, bool) {
+	app.topicsMutex.RLock()
+	defer app.topicsMutex.RUnlock()
+	topic, has := app._topics[topicName]
+	return topic, has
+}
+
+func (app *app) AddSubscription(subId uint64, sub subscription) {
+	app.subsMutex.Lock()
+	defer app.subsMutex.Unlock()
+	app._subs[subId] = sub
+}
+
+func (app *app) RemoveSubscription(subId uint64) (subscription, bool) {
+	app.subsMutex.Lock()
+	defer app.subsMutex.Unlock()
+	sub, ok := app._subs[subId]
+	delete(app._subs, subId)
+	return sub, ok
 }
 
 func parseMultiaddrWithID(ma multiaddr.Multiaddr, id peer.ID) (*codaPeerInfo, error) {
@@ -96,6 +213,7 @@ func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
 	return info, nil
 }
 
+// Writes a message back to the OCaml node
 func (app *app) writeMsg(msg *capnp.Message) {
 	if app.NoUpcalls {
 		return
@@ -190,13 +308,13 @@ func (app *app) checkPeerCount() {
 
 	err = prometheus.Register(peerCount)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register peer_count; perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register peer_count; perhaps we've already done so: %s", err)
 		return
 	}
 
 	err = prometheus.Register(connectedPeerCount)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register connected_peer_count; perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register connected_peer_count; perhaps we've already done so: %s", err)
 		return
 	}
 
@@ -329,7 +447,7 @@ func setMultiaddrList(m ipc.Multiaddr_List, addrs []multiaddr.Multiaddr) {
 
 func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 	go func() {
-		buf := make([]byte, 4096)
+		buf := make([]byte, 1<<17) // 128kb
 		tot := uint64(0)
 		for {
 			n, err := stream.Read(buf)

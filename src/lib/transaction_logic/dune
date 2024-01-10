@@ -17,6 +17,7 @@
    integers
    base_quickcheck
    ;; local libraries
+   mina_stdlib
    mina_wire_types
    block_time
    currency

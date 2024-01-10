@@ -15,7 +15,7 @@
    currency
    pickles
    consensus
-   coda_runtime_config
+   mina_runtime_config
    blockchain_snark
    mina_base
    mina_state

@@ -1,10 +1,11 @@
 (* extract_blocks.ml -- dump extensional blocks from archive db *)
 
+[@@@coverage exclude_file]
+
 open Core_kernel
 open Async
 open Mina_base
 open Mina_transaction
-open Signature_lib
 open Archive_lib
 
 let epoch_data_of_raw_epoch_data ~pool (raw_epoch_data : Processor.Epoch_data.t)
@@ -44,17 +45,12 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let query_db = Mina_caqti.query pool in
   let state_hash = State_hash.of_base58_check_exn block.state_hash in
   let parent_hash = State_hash.of_base58_check_exn block.parent_hash in
+  let pk_of_id = Load_data.pk_of_id pool in
   let open Deferred.Let_syntax in
-  let%bind creator_str =
-    query_db ~f:(fun db -> Processor.Public_key.find_by_id db block.creator_id)
-  in
-  let creator = Public_key.Compressed.of_base58_check_exn creator_str in
-  let%bind block_winner_str =
-    query_db ~f:(fun db ->
-        Processor.Public_key.find_by_id db block.block_winner_id )
-  in
-  let block_winner =
-    Public_key.Compressed.of_base58_check_exn block_winner_str
+  let%bind creator = pk_of_id block.creator_id in
+  let%bind block_winner = pk_of_id block.block_winner_id in
+  let last_vrf_output =
+    Base64.decode_exn ~alphabet:Base64.uri_safe_alphabet block.last_vrf_output
   in
   let%bind snarked_ledger_hash_str =
     query_db ~f:(fun db ->
@@ -81,27 +77,55 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     block.min_window_density |> Unsigned.UInt32.of_int64
     |> Mina_numbers.Length.of_uint32
   in
+  let sub_window_densities =
+    block.sub_window_densities
+    |> Array.map ~f:(fun length ->
+           Unsigned.UInt32.of_int64 length |> Mina_numbers.Length.of_uint32 )
+    |> Array.to_list
+  in
   let total_currency = Currency.Amount.of_string block.total_currency in
   let ledger_hash = Ledger_hash.of_base58_check_exn block.ledger_hash in
   let height = Unsigned.UInt32.of_int64 block.height in
   let global_slot_since_hard_fork =
     Unsigned.UInt32.of_int64 block.global_slot_since_hard_fork
+    |> Mina_numbers.Global_slot_since_hard_fork.of_uint32
   in
   let global_slot_since_genesis =
     Unsigned.UInt32.of_int64 block.global_slot_since_genesis
+    |> Mina_numbers.Global_slot_since_genesis.of_uint32
   in
   let timestamp = Block_time.of_string_exn block.timestamp in
   let chain_status = Chain_status.of_string block.chain_status in
+  let%bind protocol_version =
+    let%map { transaction; network; patch } =
+      query_db ~f:(fun db ->
+          Processor.Protocol_versions.load db block.protocol_version_id )
+    in
+    Protocol_version.create ~transaction ~network ~patch
+  in
+  let%bind proposed_protocol_version =
+    Option.value_map block.proposed_protocol_version_id ~default:(return None)
+      ~f:(fun id ->
+        let%map { transaction; network; patch } =
+          query_db ~f:(fun db -> Processor.Protocol_versions.load db id)
+        in
+        let protocol_version =
+          Protocol_version.create ~transaction ~network ~patch
+        in
+        Some protocol_version )
+  in
   (* commands, accounts_accessed, accounts_created, tokens_used to be filled in later *)
   return
     { Extensional.Block.state_hash
     ; parent_hash
     ; creator
     ; block_winner
+    ; last_vrf_output
     ; snarked_ledger_hash
     ; staking_epoch_data
     ; next_epoch_data
     ; min_window_density
+    ; sub_window_densities
     ; total_currency
     ; ledger_hash
     ; height
@@ -111,6 +135,8 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; user_cmds = []
     ; internal_cmds = []
     ; zkapp_cmds = []
+    ; proposed_protocol_version
+    ; protocol_version
     ; chain_status
     ; accounts_accessed = []
     ; accounts_created = []
@@ -131,6 +157,7 @@ let fill_in_accounts_accessed pool block_state_hash =
 
 let fill_in_accounts_created pool block_state_hash =
   let query_db = Mina_caqti.query pool in
+  let pk_of_id = Load_data.pk_of_id pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
     query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
@@ -149,13 +176,7 @@ let fill_in_accounts_created pool block_state_hash =
         query_db ~f:(fun db ->
             Processor.Account_identifiers.load db account_identifier_id )
       in
-      let%bind pk =
-        let%map pk_str =
-          query_db ~f:(fun db ->
-              Processor.Public_key.find_by_id db public_key_id )
-        in
-        Public_key.Compressed.of_base58_check_exn pk_str
-      in
+      let%bind pk = pk_of_id public_key_id in
       let%bind token_id =
         let%map { value; _ } =
           query_db ~f:(fun db -> Processor.Token.find_by_id db token_id)
@@ -168,6 +189,7 @@ let fill_in_accounts_created pool block_state_hash =
 
 let fill_in_tokens_used pool block_state_hash =
   let query_db = Mina_caqti.query pool in
+  let pk_of_id = Load_data.pk_of_id pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
     query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
@@ -179,13 +201,7 @@ let fill_in_tokens_used pool block_state_hash =
     | None, None ->
         return (token_id, None)
     | Some owner_pk_id, Some owner_tok_id ->
-        let%bind owner_pk =
-          let%map pk_str =
-            query_db ~f:(fun db ->
-                Processor.Public_key.find_by_id db owner_pk_id )
-          in
-          Public_key.Compressed.of_base58_check_exn pk_str
-        in
+        let%bind owner_pk = pk_of_id owner_pk_id in
         let%bind owner_token_id =
           let%map owner_token =
             query_db ~f:(fun db -> Processor.Token.find_by_id db owner_tok_id)
@@ -257,7 +273,7 @@ let fill_in_tokens_used pool block_state_hash =
 
 let fill_in_user_commands pool block_state_hash =
   let query_db = Mina_caqti.query pool in
-  let account_identifier_of_id = Load_data.account_identifier_of_id pool in
+  let pk_of_id = Load_data.pk_of_id pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
     query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
@@ -273,9 +289,9 @@ let fill_in_user_commands pool block_state_hash =
             Processor.User_command.Signed_command.load db ~id:user_command_id )
       in
       let command_type = user_cmd.command_type in
-      let%bind fee_payer = account_identifier_of_id user_cmd.fee_payer_id in
-      let%bind source = account_identifier_of_id user_cmd.source_id in
-      let%bind receiver = account_identifier_of_id user_cmd.receiver_id in
+      let%bind fee_payer = pk_of_id user_cmd.fee_payer_id in
+      let%bind source = pk_of_id user_cmd.source_id in
+      let%bind receiver = pk_of_id user_cmd.receiver_id in
       let nonce =
         user_cmd.nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32
       in
@@ -283,7 +299,8 @@ let fill_in_user_commands pool block_state_hash =
       let fee = Currency.Fee.of_string user_cmd.fee in
       let valid_until =
         Option.map user_cmd.valid_until ~f:(fun valid ->
-            Unsigned.UInt32.of_int64 valid |> Mina_numbers.Global_slot.of_uint32 )
+            Unsigned.UInt32.of_int64 valid
+            |> Mina_numbers.Global_slot_since_genesis.of_uint32 )
       in
       let memo = user_cmd.memo |> Signed_command_memo.of_base58_check_exn in
       let hash = user_cmd.hash |> Transaction_hash.of_base58_check_exn in
@@ -320,7 +337,7 @@ let fill_in_user_commands pool block_state_hash =
 
 let fill_in_internal_commands pool block_state_hash =
   let query_db = Mina_caqti.query pool in
-  let account_identifier_of_id = Load_data.account_identifier_of_id pool in
+  let pk_of_id = Load_data.pk_of_id pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
     query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
@@ -336,7 +353,7 @@ let fill_in_internal_commands pool block_state_hash =
             Processor.Internal_command.load db ~id:internal_command_id )
       in
       let command_type = internal_cmd.command_type in
-      let%bind receiver = account_identifier_of_id internal_cmd.receiver_id in
+      let%bind receiver = pk_of_id internal_cmd.receiver_id in
       let fee = Currency.Fee.of_string internal_cmd.fee in
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let%bind block_internal_cmd =

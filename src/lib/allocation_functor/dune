@@ -1,7 +1,7 @@
 (library
   (name allocation_functor)
   (public_name allocation_functor)
-  (inline_tests)
+  (inline_tests (flags -verbose -show-counts))
   (libraries
    ;; opam libraries
    core_kernel

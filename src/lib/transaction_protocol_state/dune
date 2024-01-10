@@ -2,7 +2,7 @@
  (name transaction_protocol_state)
  (public_name transaction_protocol_state)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    sexplib0
@@ -16,6 +16,7 @@
    snark_params
    snarky.backendless
    mina_state
+   mina_numbers
    sgn
    ppx_version.runtime
  )

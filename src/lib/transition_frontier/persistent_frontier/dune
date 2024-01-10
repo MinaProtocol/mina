@@ -13,6 +13,7 @@
    base.caml
    sexplib0
    extlib
+   async_unix
    ;;local libraries
    o1trace
    mina_metrics
@@ -40,7 +41,7 @@
    verifier
    with_hash
    debug_assert
-   non_empty_list
+   mina_stdlib
    ppx_version.runtime
    pickles.backend
    snark_params
@@ -53,6 +54,7 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    mina_wire_types
+   internal_tracing
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_bin_prot ppx_deriving_yojson)))

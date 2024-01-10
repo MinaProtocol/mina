@@ -15,7 +15,6 @@
    bin_prot
    bin_prot.shape
    init
-   tests
    async
    core.daemon
    base.caml
@@ -45,7 +44,6 @@
    mina_base.import
    error_json
    genesis_ledger_helper
-   memory_stats
    consensus
    child_processes
    node_addrs_and_ports
@@ -65,7 +63,7 @@
    mina_version
    mina_net2
    block_time
-   coda_runtime_config
+   mina_runtime_config
    trust_system
    protocol_version
    coda_genesis_proof
@@ -76,6 +74,8 @@
    snarky.backendless
    o1trace
    ppx_version.runtime
+   internal_tracing
+   itn_logger
  )
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))

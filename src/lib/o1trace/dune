@@ -14,7 +14,7 @@
    sexplib0
    ;;local libraries
    logger)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (synopsis "Basic event tracing")
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_mina)))

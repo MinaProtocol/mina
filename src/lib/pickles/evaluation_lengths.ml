@@ -1,14 +1,32 @@
-open Core_kernel
-open Pickles_types
-open Import
-open Plonk_types
-
-let create (type a) ~(of_int : int -> a) : a Plonk_types.Evals.t =
-  let one = of_int 1 in
-  { w = Vector.init Columns.n ~f:(fun _ -> one)
-  ; z = one
-  ; s = Vector.init Permuts_minus_1.n ~f:(fun _ -> one)
-  ; generic_selector = one
-  ; poseidon_selector = one
-  ; lookup = None
-  }
+let default =
+  let one = 1 in
+  let open Pickles_types in
+  let open Plonk_types in
+  Evals.
+    { w = Vector.init Columns.n ~f:(fun _ -> one)
+    ; coefficients = Vector.init Columns.n ~f:(fun _ -> one)
+    ; z = one
+    ; s = Vector.init Permuts_minus_1.n ~f:(fun _ -> one)
+    ; generic_selector = one
+    ; poseidon_selector = one
+    ; complete_add_selector = one
+    ; mul_selector = one
+    ; emul_selector = one
+    ; endomul_scalar_selector = one
+    ; (* FIXME *)
+      range_check0_selector = None
+    ; range_check1_selector = None
+    ; foreign_field_add_selector = None
+    ; foreign_field_mul_selector = None
+    ; xor_selector = None
+    ; rot_selector = None
+    ; lookup_aggregation = None
+    ; lookup_table = None
+    ; lookup_sorted = Vector.init Nat.N5.n ~f:(fun _ -> None)
+    ; runtime_lookup_table = None
+    ; runtime_lookup_table_selector = None
+    ; xor_lookup_selector = None
+    ; lookup_gate_lookup_selector = None
+    ; range_check_lookup_selector = None
+    ; foreign_field_mul_lookup_selector = None
+    }

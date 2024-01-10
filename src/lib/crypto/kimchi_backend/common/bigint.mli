@@ -69,6 +69,8 @@ module type Intf = sig
 
   val length_in_bytes : int
 
+  val to_hex : t -> string
+
   val to_hex_string : t -> string
 
   val of_hex_string : ?reverse:bool -> string -> t
@@ -125,6 +127,8 @@ module Make : functor
   val bytes_per_limb : int
 
   val length_in_bytes : int
+
+  val to_hex : t -> string
 
   val to_hex_string : t -> string
 

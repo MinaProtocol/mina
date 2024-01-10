@@ -24,7 +24,8 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
   let block_with_hash =
     let body = Staged_ledger_diff.Body.create Staged_ledger_diff.empty_diff in
     let header =
-      Header.create ~protocol_state ~protocol_state_proof:Proof.blockchain_dummy
+      Header.create ~protocol_state
+        ~protocol_state_proof:(Lazy.force Proof.blockchain_dummy)
         ~delta_block_chain_proof:
           (Protocol_state.previous_state_hash protocol_state, [])
         ()
@@ -38,7 +39,7 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
     , (`Proof, Truth.True ())
     , ( `Delta_block_chain
       , Truth.True
-          ( Non_empty_list.singleton
+          ( Mina_stdlib.Nonempty_list.singleton
           @@ Protocol_state.previous_state_hash protocol_state ) )
     , (`Frontier_dependencies, Truth.True ())
     , (`Staged_ledger_diff, Truth.True ())

@@ -13,8 +13,8 @@ module type Gen_intf = sig
   module Gen : sig
     (** Generate a single transaction between
      * Generate random keys for sender and receiver
-     * for fee $\in [Mina_compile_config.minimum_user_command_fee,
-     * Mina_compile_config.minimum_user_command_fee+fee_range]$
+     * for fee $\in [Currency.Fee.minimum_user_command_fee,
+     * Currency.Fee.minimum_user_command_fee+fee_range]$
      * and an amount $\in [1,max_amount]$
     *)
     val payment :
@@ -30,8 +30,8 @@ module type Gen_intf = sig
 
     (** Generate a single transaction between
      * $a, b \in keys$
-     * for fee $\in [Mina_compile_config.minimum_user_command_fee,
-     * Mina_compile_config.minimum_user_command_fee+fee_range]$
+     * for fee $\in [Currency.Fee.minimum_user_command_fee,
+     * Currency.Fee.minimum_user_command_fee+fee_range]$
      * and an amount $\in [1,max_amount]$
     *)
     val payment_with_random_participants :
@@ -84,6 +84,8 @@ module type S = sig
 
   include Hashable.S with type t := t
 
+  val signature : t -> Signature.t
+
   val payload : t -> Signed_command_payload.t
 
   val fee : t -> Currency.Fee.t
@@ -102,10 +104,6 @@ module type S = sig
 
   val token : t -> Token_id.t
 
-  val source_pk : t -> Public_key.Compressed.t
-
-  val source : t -> Account_id.t
-
   val receiver_pk : t -> Public_key.Compressed.t
 
   val receiver : t -> Account_id.t
@@ -116,7 +114,7 @@ module type S = sig
 
   val memo : t -> Signed_command_memo.t
 
-  val valid_until : t -> Global_slot.t
+  val valid_until : t -> Global_slot_since_genesis.t
 
   (* for filtering *)
   val minimum_fee : Currency.Fee.t
@@ -174,8 +172,6 @@ module type S = sig
 
   val check_valid_keys : t -> bool
 
-  module Base58_check_v1 : Codable.Base58_check_intf with type t := t_v1
-
   module For_tests : sig
     (** the signature kind is an argument, to match `sign`, but ignored *)
     val fake_sign :
@@ -198,8 +194,11 @@ module type S = sig
   (** Forget the signature check. *)
   val forget_check : With_valid_signature.t -> t
 
-  (** account ids accessed, given a transaction status *)
-  val accounts_accessed : t -> Transaction_status.t -> Account_id.t list
+  (** returned status always `Accessed for fee payer *)
+  val account_access_statuses :
+       t
+    -> Transaction_status.t
+    -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
 
   (** all account ids mentioned in a command *)
   val accounts_referenced : t -> Account_id.t list
@@ -207,6 +206,8 @@ module type S = sig
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 
   val of_base58_check_exn_v1 : string -> t_v1 Or_error.t
+
+  val to_base58_check_v1 : t_v1 -> string
 
   include Codable.Base64_intf with type t := t
 end
@@ -231,7 +232,7 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
+    [@@@with_top_version_tag]
 
     module V2 : sig
       type t =
@@ -245,7 +246,10 @@ module type Full = sig
 
       include Hashable.S with type t := t
 
-      val accounts_accessed : t -> Transaction_status.t -> Account_id.t list
+      val account_access_statuses :
+           t
+        -> Transaction_status.t
+        -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
 
       val accounts_referenced : t -> Account_id.t list
     end
@@ -257,6 +261,8 @@ module type Full = sig
         , Signature.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, sexp, hash, yojson]
+
+      val to_latest : t -> Latest.t
     end
   end]
 

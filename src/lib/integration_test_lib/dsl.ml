@@ -36,7 +36,6 @@ module Make (Engine : Intf.Engine.S) () :
   module Wait_condition =
     Wait_condition.Make (Engine) (Event_router) (Network_state)
   module Node = Engine.Network.Node
-  module Util = Util.Make (Engine)
 
   (* TODO: monadify as Malleable_error w/ global value threading *)
   type t =
@@ -166,7 +165,7 @@ module Make (Engine : Intf.Engine.S) () :
             condition.description
           |> Malleable_error.soft_error ~value:()
 
-  (**************************************************************************************************)
+  (*************************************************************************************************)
   (* TODO: move into executive module *)
 
   type log_error = Node.t * Event_type.Log_error.t

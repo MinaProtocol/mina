@@ -28,8 +28,6 @@ module SC = Scalar_challenge
    We use corresponding type variable names throughout this file.
 *)
 
-include Wrap_verifier.Make (Wrap_main_inputs)
-
 module Old_bulletproof_chals = struct
   type t =
     | T :
@@ -38,21 +36,19 @@ module Old_bulletproof_chals = struct
         -> t
 end
 
-let pack_statement max_proofs_verified ~lookup t =
+let pack_statement max_proofs_verified t =
   let open Types.Step in
   Spec.pack
     (module Impl)
-    (Statement.spec
-       (module Impl)
-       max_proofs_verified Backend.Tock.Rounds.n lookup )
-    (Statement.to_data t ~option_map:Plonk_types.Opt.map)
+    (Statement.spec max_proofs_verified Backend.Tock.Rounds.n)
+    (Statement.to_data t)
 
 let shifts ~log2_size = Common.tock_shifts ~log2_size
 
 let domain_generator ~log2_size =
   Backend.Tock.Field.domain_generator ~log2_size |> Impl.Field.constant
 
-let split_field_typ : (Field.t * Boolean.var, Field.Constant.t) Typ.t =
+let _split_field_typ : (Field.t * Boolean.var, Field.Constant.t) Typ.t =
   Typ.transport
     Typ.(field * Boolean.typ)
     ~there:(fun (x : Field.Constant.t) ->
@@ -84,35 +80,31 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
   Field.(Assert.equal ((of_int 2 * y) + (is_odd :> t)) x) ;
   res
 
-let lookup_config = { Plonk_types.Lookup_config.lookup = No; runtime = No }
-
-let commitment_lookup_config =
-  { Plonk_types.Lookup_config.lookup = No; runtime = No }
-
-let lookup_config_for_pack =
-  { Types.Wrap.Lookup_parameters.zero = Common.Lookup_parameters.tock_zero
-  ; use = No
-  }
-
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
-    (type max_proofs_verified branches prev_varss prev_valuess env
-    max_local_max_proofs_verifieds )
+    (type max_proofs_verified branches prev_varss max_local_max_proofs_verifieds)
+    ~num_chunks ~feature_flags
     (full_signature :
       ( max_proofs_verified
       , branches
       , max_local_max_proofs_verifieds )
       Full_signature.t ) (pi_branches : (prev_varss, branches) Hlist.Length.t)
     (step_keys :
-      (Wrap_main_inputs.Inner_curve.Constant.t index, branches) Vector.t Lazy.t
-      ) (step_widths : (int, branches) Vector.t)
-    (step_domains : (Domains.t, branches) Vector.t)
+      ( ( Wrap_main_inputs.Inner_curve.Constant.t array
+        , Wrap_main_inputs.Inner_curve.Constant.t array option )
+        Wrap_verifier.index'
+      , branches )
+      Vector.t
+      Lazy.t ) (step_widths : (int, branches) Vector.t)
+    (step_domains : (Domains.t, branches) Vector.t) ~srs
     (max_proofs_verified :
       (module Nat.Add.Intf with type n = max_proofs_verified) ) :
     (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t
     * (   ( _
           , _
           , _ Shifted_value.Type1.t
+          , _
+          , _
           , _
           , _
           , _
@@ -133,7 +125,7 @@ let wrap_main
       (create () : (max_proofs_verified, max_local_max_proofs_verifieds) t))
   in
   Timer.clock __LOC__ ;
-  let { Full_signature.padded; maxes = (module Max_widths_by_slot) } =
+  let { Full_signature.padded = _; maxes = (module Max_widths_by_slot) } =
     full_signature
   in
   Timer.clock __LOC__ ;
@@ -150,7 +142,7 @@ let wrap_main
            ; sponge_digest_before_evaluations
            ; messages_for_next_wrap_proof = messages_for_next_wrap_proof_digest
            }
-       ; messages_for_next_step_proof
+       ; messages_for_next_step_proof = _
        } :
         ( _
         , _
@@ -160,8 +152,11 @@ let wrap_main
         , _
         , _
         , _
+        , _
+        , _
         , Field.t )
         Types.Wrap.Statement.In_circuit.t ) =
+    let logger = Internal_tracing_context_logger.get () in
     with_label __LOC__ (fun () ->
         let which_branch' =
           exists
@@ -170,31 +165,35 @@ let wrap_main
             ~request:(fun () -> Req.Which_branch)
         in
         let which_branch =
-          One_hot_vector.of_index which_branch' ~length:branches
+          Wrap_verifier.One_hot_vector.of_index which_branch' ~length:branches
         in
         let actual_proofs_verified_mask =
           Util.ones_vector
             (module Impl)
             ~first_zero:
-              (Pseudo.choose (which_branch, step_widths) ~f:Field.of_int)
+              (Wrap_verifier.Pseudo.choose
+                 (which_branch, step_widths)
+                 ~f:Field.of_int )
             Max_proofs_verified.n
+          |> Vector.rev
         in
         let domain_log2 =
-          Pseudo.choose
+          Wrap_verifier.Pseudo.choose
             ( which_branch
             , Vector.map ~f:(fun ds -> Domain.log2_size ds.h) step_domains )
             ~f:Field.of_int
         in
         let () =
-          (* Check that the branch_data public-input is correct *)
-          Branch_data.Checked.pack
-            (module Impl)
-            { proofs_verified_mask =
-                Vector.extend_exn actual_proofs_verified_mask Nat.N2.n
-                  Boolean.false_
-            ; domain_log2
-            }
-          |> Field.Assert.equal branch_data
+          with_label __LOC__ (fun () ->
+              (* Check that the branch_data public-input is correct *)
+              Branch_data.Checked.pack
+                (module Impl)
+                { proofs_verified_mask =
+                    Vector.extend_front_exn actual_proofs_verified_mask Nat.N2.n
+                      Boolean.false_
+                ; domain_log2
+                }
+              |> Field.Assert.equal branch_data )
         in
         let prev_proof_state =
           with_label __LOC__ (fun () ->
@@ -202,19 +201,24 @@ let wrap_main
               let typ =
                 typ
                   (module Impl)
-                  Common.Lookup_parameters.tock_zero
-                  ~assert_16_bits:(assert_n_bits ~n:16)
+                  ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
                   (Vector.init Max_proofs_verified.n ~f:(fun _ ->
-                       Plonk_types.Opt.Flag.No ) )
+                       Plonk_types.Features.none ) )
                   (Shifted_value.Type2.typ Field.typ)
               in
               exists typ ~request:(fun () -> Req.Proof_state) )
         in
         let step_plonk_index =
           with_label __LOC__ (fun () ->
-              choose_key which_branch
+              Wrap_verifier.choose_key which_branch
                 (Vector.map (Lazy.force step_keys)
-                   ~f:(Plonk_verification_key_evals.map ~f:Inner_curve.constant) ) )
+                   ~f:
+                     (Plonk_verification_key_evals.Step.map
+                        ~f:(Array.map ~f:Inner_curve.constant) ~f_opt:(function
+                       | None ->
+                           Opt.nothing
+                       | Some x ->
+                           Opt.just (Array.map ~f:Inner_curve.constant x) ) ) ) )
         in
         let prev_step_accs =
           with_label __LOC__ (fun () ->
@@ -258,7 +262,9 @@ let wrap_main
               let evals =
                 let ty =
                   let ty =
-                    Plonk_types.All_evals.typ (module Impl) lookup_config
+                    Plonk_types.All_evals.typ
+                      (module Impl)
+                      ~num_chunks:1 feature_flags
                   in
                   Vector.typ ty Max_proofs_verified.n
                 in
@@ -275,10 +281,11 @@ let wrap_main
                   in
                   Vector.map wrap_domain_indices ~f:(fun index ->
                       let which_branch =
-                        One_hot_vector.of_index index
+                        Wrap_verifier.One_hot_vector.of_index index
                           ~length:Wrap_verifier.num_possible_domains
                       in
-                      Pseudo.Domain.to_domain ~shifts ~domain_generator
+                      Wrap_verifier.Pseudo.Domain.to_domain ~shifts
+                        ~domain_generator
                         (which_branch, all_possible_domains) )
                 in
                 Vector.mapn
@@ -313,7 +320,7 @@ let wrap_main
                        Need to compute this value from the which_branch.
                     *)
                     let (T
-                          ( max_local_max_proofs_verified
+                          ( _max_local_max_proofs_verified
                           , old_bulletproof_challenges ) ) =
                       old_bulletproof_challenges
                     in
@@ -323,7 +330,7 @@ let wrap_main
                     in
                     let finalized, chals =
                       with_label __LOC__ (fun () ->
-                          finalize_other_proof
+                          Wrap_verifier.finalize_other_proof
                             (module Wrap_hack.Padded_length)
                             ~domain:(wrap_domain :> _ Plonk_checks.plonk_domain)
                             ~sponge ~old_bulletproof_challenges deferred_values
@@ -353,7 +360,7 @@ let wrap_main
           let shift = Shifts.tick1 in
           exists
             (Plonk_types.Openings.Bulletproof.typ
-               ( Typ.transport Other_field.Packed.typ
+               ( Typ.transport Wrap_verifier.Other_field.Packed.typ
                    ~there:(fun x ->
                      (* When storing, make it a shifted value *)
                      match
@@ -383,29 +390,33 @@ let wrap_main
                 exists
                   (Plonk_types.Messages.typ
                      (module Impl)
-                     Inner_curve.typ ~bool:Boolean.typ commitment_lookup_config
+                     Inner_curve.typ ~bool:Boolean.typ feature_flags
                      ~dummy:Inner_curve.Params.one
                      ~commitment_lengths:
-                       (Commitment_lengths.create ~of_int:Fn.id) )
+                       (Commitment_lengths.default ~num_chunks) )
                   ~request:(fun () -> Req.Messages) )
           in
-          let sponge = Opt.create sponge_params in
+          let sponge = Wrap_verifier.Opt.create sponge_params in
           with_label __LOC__ (fun () ->
-              incrementally_verify_proof max_proofs_verified
-                ~actual_proofs_verified_mask ~step_domains
-                ~verification_key:step_plonk_index ~xi ~sponge
-                ~public_input:
-                  (Array.map
-                     (pack_statement Max_proofs_verified.n
-                        ~lookup:lookup_config_for_pack prev_statement )
-                     ~f:(function
-                    | `Field (Shifted_value x) ->
-                        `Field (split_field x)
-                    | `Packed_bits (x, n) ->
-                        `Packed_bits (x, n) ) )
-                ~sg_old:prev_step_accs
-                ~advice:{ b; combined_inner_product }
-                ~messages ~which_branch ~openings_proof ~plonk )
+              [%log internal] "Wrap_verifier_incrementally_verify_proof" ;
+              let res =
+                Wrap_verifier.incrementally_verify_proof max_proofs_verified
+                  ~actual_proofs_verified_mask ~step_domains
+                  ~verification_key:step_plonk_index ~srs ~xi ~sponge
+                  ~public_input:
+                    (Array.map
+                       (pack_statement Max_proofs_verified.n prev_statement)
+                       ~f:(function
+                      | `Field (Shifted_value x) ->
+                          `Field (split_field x)
+                      | `Packed_bits (x, n) ->
+                          `Packed_bits (x, n) ) )
+                  ~sg_old:prev_step_accs
+                  ~advice:{ b; combined_inner_product }
+                  ~messages ~which_branch ~openings_proof ~plonk
+              in
+              [%log internal] "Wrap_verifier_incrementally_verify_proof_done" ;
+              res )
         in
         with_label __LOC__ (fun () ->
             Boolean.Assert.is_true bulletproof_success ) ;

@@ -37,7 +37,12 @@ module type Full = sig
 
   val fee_transfer : t -> Fee_transfer.t option
 
-  val accounts_accessed : t -> Account_id.t list
+  val account_access_statuses :
+       t
+    -> Transaction_status.t
+    -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
+
+  val accounts_referenced : t -> Account_id.t list
 
   val create :
        amount:Currency.Amount.t

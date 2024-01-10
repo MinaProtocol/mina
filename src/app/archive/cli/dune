@@ -13,7 +13,7 @@
    async.async_command
    ;;local libraries
    genesis_constants
-   coda_runtime_config
+   mina_runtime_config
    cli_lib
    logger
    block_time

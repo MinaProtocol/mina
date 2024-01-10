@@ -14,6 +14,12 @@ open Let_syntax
 
 open Intf
 
+(** [Currency_oveflow] is being thrown to signal an overflow
+    or underflow during conversions from [int] to currency.
+    The exception contains the [int] value that caused the
+    misbehaviour. *)
+exception Currency_overflow of int
+
 type uint64 = Unsigned.uint64
 
 (** See documentation of the {!Mina_wire_types} library *)
@@ -89,9 +95,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     type t = Unsigned.t [@@deriving sexp, compare, hash]
 
-    (* can't be automatically derived *)
-    let dhall_type = Ppx_dhall_type.Dhall_type.Text
-
     [%%define_locally
     Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
 
@@ -99,7 +102,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let precision_exp = Unsigned.of_int @@ Int.pow 10 precision
 
-    let to_formatted_string amount =
+    let to_mina_string amount =
       let rec go num_stripped_zeros num =
         let open Int in
         if num mod 10 = 0 && num <> 0 then go (num_stripped_zeros + 1) (num / 10)
@@ -115,7 +118,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Int.(precision - num_stripped_zeros)
           num
 
-    let of_formatted_string input =
+    let of_mina_string_exn input =
       let parts = String.split ~on:'.' input in
       match parts with
       | [ whole ] ->
@@ -129,16 +132,16 @@ module Make_str (A : Wire_types.Concrete) = struct
               ( whole ^ decimal
               ^ String.make Int.(precision - decimal_length) '0' )
       | _ ->
-          failwith "Currency.of_formatted_string: Invalid currency input"
+          failwith "Currency.of_mina_string_exn: Invalid currency input"
 
     module Arg = struct
       type typ = t [@@deriving sexp, hash, compare]
 
       type t = typ [@@deriving sexp, hash, compare]
 
-      let to_string = to_formatted_string
+      let to_string = to_mina_string
 
-      let of_string = of_formatted_string
+      let of_string = of_mina_string_exn
     end
 
     include Codable.Make_of_string (Arg)
@@ -344,7 +347,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let typ : (var, t) Typ.t =
       let (Typ typ) = Field.typ in
       Typ.transport
-        (Typ { typ with check = (fun x -> make_checked_ast @@ range_check x) })
+        (Typ { typ with check = range_check })
         ~there:to_field ~back:of_field
 
     [%%endif]
@@ -352,6 +355,13 @@ module Make_str (A : Wire_types.Concrete) = struct
     let zero = Unsigned.zero
 
     let one = Unsigned.one
+
+    (* The number of nanounits in a unit. User for unit transformations. *)
+    let unit_to_nano = 1_000_000_000
+
+    let to_nanomina_int = to_int
+
+    let to_mina_int m = to_int m / unit_to_nano
 
     let sub x y = if x < y then None else Some (Unsigned.sub x y)
 
@@ -377,13 +387,42 @@ module Make_str (A : Wire_types.Concrete) = struct
           (z, `Overflow b)
 
     let scale u64 i =
-      let i = Unsigned.of_int i in
-      let max_val = Unsigned.(div max_int i) in
-      if max_val >= u64 then Some (Unsigned.mul u64 i) else None
+      if Int.(i = 0) then Some zero
+      else
+        let i = Unsigned.of_int i in
+        let max_val = Unsigned.(div max_int i) in
+        if max_val >= u64 then Some (Unsigned.mul u64 i) else None
 
     let ( + ) = add
 
     let ( - ) = sub
+
+    (* The functions below are unsafe, because they could overflow or
+       underflow. They perform appropriate checks to guard against this
+       and either raise Currency_overflow exception or return None
+       depending on the error-handling strategy.
+
+       It is advisable to use nanomina and mina wherever possible and
+       limit the use of _exn veriants to places where a fixed value is
+       being converted and hence overflow cannot happen. *)
+    let of_nanomina_int i = if Int.(i >= 0) then Some (of_int i) else None
+
+    let of_mina_int i =
+      Option.(of_nanomina_int i >>= Fn.flip scale unit_to_nano)
+
+    let of_nanomina_int_exn i =
+      match of_nanomina_int i with
+      | None ->
+          raise (Currency_overflow i)
+      | Some m ->
+          m
+
+    let of_mina_int_exn i =
+      match of_mina_int i with
+      | None ->
+          raise (Currency_overflow i)
+      | Some m ->
+          m
 
     type magnitude = t [@@deriving sexp, hash, compare, yojson]
 
@@ -432,18 +471,22 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type magnitude = Unsigned.t [@@deriving sexp, compare]
 
-      let create ~magnitude ~sgn = { magnitude; sgn }
+      let create ~magnitude ~sgn =
+        { magnitude
+        ; sgn = (if Unsigned.(equal magnitude zero) then Sgn.Pos else sgn)
+        }
+
+      let create_preserve_zero_sign ~magnitude ~sgn = { magnitude; sgn }
 
       let sgn { sgn; _ } = sgn
 
       let magnitude { magnitude; _ } = magnitude
 
-      let zero : t = create ~magnitude:zero ~sgn:Sgn.Pos
+      let zero : t = { magnitude = zero; sgn = Sgn.Pos }
 
       let gen =
         Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
-            if Unsigned.(equal zero magnitude) then zero
-            else create ~magnitude ~sgn )
+            create ~magnitude ~sgn )
 
       let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
@@ -841,7 +884,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%test_unit "formatting_roundtrip" =
             let generator = gen_incl Unsigned.zero Unsigned.max_int in
             qc_test_fast generator ~shrinker ~f:(fun num ->
-                match of_formatted_string (to_formatted_string num) with
+                match of_mina_string_exn (to_mina_string num) with
                 | after_format ->
                     if Unsigned.equal after_format num then ()
                     else
@@ -851,7 +894,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                              (sprintf
                                 !"formatting: num=%{Unsigned} middle=%{String} \
                                   after=%{Unsigned}"
-                                num (to_formatted_string num) after_format ) ))
+                                num (to_mina_string num) after_format ) ))
                 | exception e ->
                     let err = Error.of_exn e in
                     Error.(
@@ -863,7 +906,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%test_unit "formatting_trailing_zeros" =
             let generator = gen_incl Unsigned.zero Unsigned.max_int in
             qc_test_fast generator ~shrinker ~f:(fun num ->
-                let formatted = to_formatted_string num in
+                let formatted = to_mina_string num in
                 let has_decimal = String.contains formatted '.' in
                 let trailing_zero = String.is_suffix formatted ~suffix:"0" in
                 if has_decimal && trailing_zero then
@@ -872,7 +915,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       (of_string
                          (sprintf
                             !"formatting: num=%{Unsigned} formatted=%{String}"
-                            num (to_formatted_string num) ) )) )
+                            num (to_mina_string num) ) )) )
         end )
     end
 
@@ -901,13 +944,22 @@ module Make_str (A : Wire_types.Concrete) = struct
         type t = Unsigned_extended.UInt64.Stable.V1.t
         [@@deriving sexp, compare, hash, equal]
 
-        [%%define_from_scope to_yojson, of_yojson, dhall_type]
+        [%%define_from_scope to_yojson, of_yojson]
 
         let to_latest = Fn.id
       end
     end]
 
-    type _unused = unit constraint Signed.t = (t, Sgn.t) Signed_poly.t
+    let (_ : (Signed.t, (t, Sgn.t) Signed_poly.t) Type_equal.t) = Type_equal.T
+
+    let minimum_user_command_fee =
+      of_mina_string_exn Mina_compile_config.minimum_user_command_fee_string
+
+    let default_transaction_fee =
+      of_mina_string_exn Mina_compile_config.default_transaction_fee_string
+
+    let default_snark_worker_fee =
+      of_mina_string_exn Mina_compile_config.default_snark_worker_fee_string
   end
 
   module Amount = struct
@@ -923,9 +975,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             [@@@with_all_version_tags]
 
             type t = A.t [@@deriving sexp, compare, hash, equal, yojson]
-
-            (* not automatically derived *)
-            val dhall_type : Ppx_dhall_type.Dhall_type.t
           end
         end]
 
@@ -990,6 +1039,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           val to_fee : var -> Fee.var
 
+          val to_field : var -> Field.Var.t
+
           module Unsafe : sig
             val of_field : Field.Var.t -> t
           end
@@ -1037,7 +1088,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           type t = Unsigned_extended.UInt64.Stable.V1.t
           [@@deriving sexp, compare, hash, equal, yojson]
 
-          [%%define_from_scope to_yojson, of_yojson, dhall_type]
+          [%%define_from_scope to_yojson, of_yojson]
 
           let to_latest = Fn.id
         end
@@ -1057,6 +1108,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let of_fee (fee : Fee.var) : var = fee
 
         let to_fee (t : var) : Fee.var = t
+
+        let to_field = Fn.id
 
         module Unsafe = struct
           let of_field : Field.Var.t -> var = Fn.id
@@ -1080,9 +1133,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving sexp, compare, equal, hash, yojson]
 
         let to_latest = Fn.id
-
-        (* can't be automatically derived *)
-        let dhall_type = Ppx_dhall_type.Dhall_type.Text
       end
     end]
 
@@ -1117,6 +1167,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Checked = struct
       include Amount.Checked
 
+      let to_field = Fn.id
+
       module Unsafe = struct
         let of_field (x : Field.Var.t) : var = x
       end
@@ -1128,6 +1180,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let add_amount = add
 
       let sub_amount = sub
+
+      let sub_amount_or_zero = sub_or_zero
 
       let add_amount_flagged = add_flagged
 

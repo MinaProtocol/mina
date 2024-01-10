@@ -138,7 +138,7 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
     ~external_multiaddr ~network_id ~unsafe_no_trust_ip ~flood ~direct_peers
     ~seed_peers ~known_private_ip_nets ~peer_exchange ~peer_protection_ratio
     ~min_connections ~max_connections ~validation_queue_size ~gating_config
-    ~topic_config =
+    ~topic_config () =
   build
     (module Builder.Libp2pConfig)
     Builder.Libp2pConfig.(
@@ -163,7 +163,7 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
            (List.map ~f:create_topic_level topic_config))
 
 let create_gating_config ~banned_ips ~banned_peers ~trusted_ips ~trusted_peers
-    ~isolate =
+    ~isolate ~clean_added_peers =
   build
     (module Builder.GatingConfig)
     Builder.GatingConfig.(
@@ -171,7 +171,8 @@ let create_gating_config ~banned_ips ~banned_peers ~trusted_ips ~trusted_peers
       *> list_op banned_peer_ids_set_list banned_peers
       *> list_op trusted_ips_set_list trusted_ips
       *> list_op trusted_peer_ids_set_list trusted_peers
-      *> op isolate_set isolate)
+      *> op isolate_set isolate
+      *> op clean_added_peers_set clean_added_peers)
 
 let create_rpc_header ~sequence_number =
   build'
@@ -339,4 +340,7 @@ let read_incoming_messages reader =
 
 let write_outgoing_message writer msg =
   msg |> Builder.Libp2pHelperInterface.Message.to_message
-  |> Capnp.Codecs.serialize_iter ~compression ~f:(Writer.write writer)
+  |> Capnp.Codecs.serialize_fold_copyless ~compression ~init:0
+       ~f:(fun total str len ->
+         Writer.write ~len writer str ;
+         total + len )

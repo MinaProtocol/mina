@@ -21,7 +21,6 @@ module Body = struct
     ; receiver_pk : 'public_key
     ; token_id : 'token_id
     ; amount : 'amount
-    ; token_locked : 'bool
     }
   [@@deriving sexp, hlist]
 
@@ -29,22 +28,20 @@ module Body = struct
     (Tag.t, Public_key.Compressed.t, Token_id.t, Currency.Amount.t, bool) t_
   [@@deriving sexp]
 
-  let of_user_command_payload_body = function
-    | Signed_command_payload.Body.Payment { source_pk; receiver_pk; amount } ->
+  let of_user_command_payload_body ~fee_payer_pk = function
+    | Signed_command_payload.Body.Payment { receiver_pk; amount } ->
         { tag = Tag.Payment
-        ; source_pk
+        ; source_pk = fee_payer_pk
         ; receiver_pk
         ; token_id = Token_id.default
         ; amount
-        ; token_locked = false
         }
-    | Stake_delegation (Set_delegate { delegator; new_delegate }) ->
+    | Stake_delegation (Set_delegate { new_delegate }) ->
         { tag = Tag.Stake_delegation
-        ; source_pk = delegator
+        ; source_pk = fee_payer_pk
         ; receiver_pk = new_delegate
         ; token_id = Token_id.default
         ; amount = Currency.Amount.zero
-        ; token_locked = false
         }
 
   let gen ~fee =
@@ -61,8 +58,6 @@ module Body = struct
             (Amount.zero, max_amount_without_overflow)
         | Stake_delegation ->
             (Amount.zero, Amount.zero)
-        | Create_account ->
-            (Amount.zero, Amount.zero)
         | Fee_transfer ->
             (Amount.zero, max_amount_without_overflow)
         | Coinbase ->
@@ -70,24 +65,8 @@ module Body = struct
                amount - fee should be defined. In other words,
                amount >= fee *)
             (Amount.of_fee fee, Amount.max_int)
-        | Mint_tokens ->
-            (Amount.zero, Amount.max_int)
       in
       Amount.gen_incl min max
-    and token_locked =
-      match tag with
-      | Payment ->
-          return false
-      | Stake_delegation ->
-          return false
-      | Create_account ->
-          Quickcheck.Generator.bool
-      | Fee_transfer ->
-          return false
-      | Coinbase ->
-          return false
-      | Mint_tokens ->
-          return false
     and source_pk = Public_key.Compressed.gen
     and receiver_pk = Public_key.Compressed.gen
     and token_id =
@@ -96,16 +75,12 @@ module Body = struct
           Token_id.gen
       | Stake_delegation ->
           return Token_id.default
-      | Create_account ->
-          Token_id.gen
-      | Mint_tokens ->
-          Token_id.gen
       | Fee_transfer ->
           return Token_id.default
       | Coinbase ->
           return Token_id.default
     in
-    { tag; source_pk; receiver_pk; token_id; amount; token_locked }
+    { tag; source_pk; receiver_pk; token_id; amount }
 
   [%%ifdef consensus_mechanism]
 
@@ -124,25 +99,20 @@ module Body = struct
       ; Public_key.Compressed.typ
       ; Token_id.typ
       ; Currency.Amount.typ
-      ; Boolean.typ
       ]
       ~var_to_hlist:t__to_hlist ~value_to_hlist:t__to_hlist
       ~var_of_hlist:t__of_hlist ~value_of_hlist:t__of_hlist
 
   module Checked = struct
-    let constant
-        ({ tag; source_pk; receiver_pk; token_id; amount; token_locked } : t) :
-        var =
+    let constant ({ tag; source_pk; receiver_pk; token_id; amount } : t) : var =
       { tag = Tag.unpacked_of_t tag
       ; source_pk = Public_key.Compressed.var_of_t source_pk
       ; receiver_pk = Public_key.Compressed.var_of_t receiver_pk
       ; token_id = Token_id.Checked.constant token_id
       ; amount = Currency.Amount.var_of_t amount
-      ; token_locked = Boolean.var_of_value token_locked
       }
 
-    let to_input_legacy
-        { tag; source_pk; receiver_pk; token_id; amount; token_locked } =
+    let to_input_legacy { tag; source_pk; receiver_pk; token_id; amount } =
       let%map amount = Currency.Amount.var_to_input_legacy amount
       and () =
         make_checked (fun () ->
@@ -156,14 +126,13 @@ module Body = struct
          ; Public_key.Compressed.Checked.to_input_legacy receiver_pk
          ; token_id
          ; amount
-         ; Random_oracle.Input.Legacy.bitstring [ token_locked ]
+         ; Random_oracle.Input.Legacy.bitstring [ Boolean.false_ ]
         |]
   end
 
   [%%endif]
 
-  let to_input_legacy
-      { tag; source_pk; receiver_pk; token_id; amount; token_locked } =
+  let to_input_legacy { tag; source_pk; receiver_pk; token_id; amount } =
     assert (Token_id.equal token_id Token_id.default) ;
     Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
       [| Tag.to_input_legacy tag
@@ -171,7 +140,7 @@ module Body = struct
        ; Public_key.Compressed.to_input_legacy receiver_pk
        ; Signed_command_payload.Legacy_token_id.default
        ; Currency.Amount.to_input_legacy amount
-       ; Random_oracle.Input.Legacy.bitstring [ token_locked ]
+       ; Random_oracle.Input.Legacy.bitstring [ false ]
       |]
 end
 
@@ -202,7 +171,7 @@ module Payload_common = struct
     , Public_key.Compressed.t
     , Token_id.t
     , Mina_numbers.Account_nonce.t
-    , Mina_numbers.Global_slot.t
+    , Mina_numbers.Global_slot_since_genesis.t
     , Signed_command_memo.t )
     Poly.t
   [@@deriving sexp]
@@ -217,7 +186,7 @@ module Payload_common = struct
       , Public_key.Compressed.var
       , Token_id.Checked.t
       , Mina_numbers.Account_nonce.Checked.t
-      , Mina_numbers.Global_slot.Checked.t
+      , Mina_numbers.Global_slot_since_genesis.Checked.t
       , Signed_command_memo.Checked.t )
       Poly.t
 
@@ -229,7 +198,8 @@ module Payload_common = struct
       ; fee_token = Token_id.Checked.constant fee_token
       ; nonce = Mina_numbers.Account_nonce.Checked.constant nonce
       ; memo = Signed_command_memo.Checked.constant memo
-      ; valid_until = Mina_numbers.Global_slot.Checked.constant valid_until
+      ; valid_until =
+          Mina_numbers.Global_slot_since_genesis.Checked.constant valid_until
       }
   end
 
@@ -240,7 +210,7 @@ module Payload_common = struct
       ; Token_id.typ
       ; Public_key.Compressed.typ
       ; Mina_numbers.Account_nonce.typ
-      ; Mina_numbers.Global_slot.typ
+      ; Mina_numbers.Global_slot_since_genesis.typ
       ; Signed_command_memo.typ
       ]
       ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -265,7 +235,7 @@ let of_user_command_payload
       ; valid_until
       ; memo
       }
-  ; body = Body.of_user_command_payload_body body
+  ; body = Body.of_user_command_payload_body ~fee_payer_pk body
   }
 
 let gen =
@@ -317,7 +287,7 @@ let excess (payload : t) : Amount.Signed.t =
   let fee = payload.common.fee in
   let amount = payload.body.amount in
   match tag with
-  | Payment | Stake_delegation | Create_account | Mint_tokens ->
+  | Payment | Stake_delegation ->
       (* For all user commands, the fee excess is just the fee. *)
       Amount.Signed.of_unsigned (Amount.of_fee fee)
   | Fee_transfer ->
@@ -328,7 +298,7 @@ let excess (payload : t) : Amount.Signed.t =
 
 let fee_excess ({ body = { tag; amount; _ }; common = { fee; _ } } : t) =
   match tag with
-  | Payment | Stake_delegation | Create_account | Mint_tokens ->
+  | Payment | Stake_delegation ->
       (* For all user commands, the fee excess is just the fee. *)
       Fee_excess.of_single (Token_id.default, Fee.Signed.of_unsigned fee)
   | Fee_transfer ->
@@ -345,5 +315,5 @@ let expected_supply_increase (payload : payload) =
   match tag with
   | Coinbase ->
       payload.body.amount
-  | Payment | Stake_delegation | Create_account | Mint_tokens | Fee_transfer ->
+  | Payment | Stake_delegation | Fee_transfer ->
       Amount.zero

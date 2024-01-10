@@ -2,7 +2,7 @@
  (name mina_lib)
  (public_name mina_lib)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    integers
@@ -25,7 +25,7 @@
    best_tip_prover
    proof_carrying_data
    mina_compile_config
-   coda_runtime_config
+   mina_runtime_config
    ledger_proof
    mina_net2
    network_peer
@@ -83,7 +83,6 @@
    timeout_lib
    prover
    verifier
-   non_empty_list
    snark_work_lib
    truth
    ledger_catchup
@@ -102,7 +101,8 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    mina_wire_types
+   internal_tracing
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_inline_test ppx_deriving.std))
- (synopsis "Coda gut layer"))
+ (synopsis "Mina gut layer"))

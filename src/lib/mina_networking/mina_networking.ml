@@ -17,10 +17,13 @@ type Structured_log_events.t +=
 
 type Structured_log_events.t +=
   | Gossip_transaction_pool_diff of
-      { txns : Transaction_pool.Resource_pool.Diff.t }
+      { fee_payer_summaries : User_command.fee_payer_summary_t list }
   [@@deriving
     register_event
-      { msg = "Broadcasting transaction pool diff over gossip net" }]
+      { msg =
+          "Broadcasting transaction pool diff $fee_payer_summaries over gossip \
+           net"
+      }]
 
 type Structured_log_events.t +=
   | Gossip_snark_pool_diff of { work : Snark_pool.Resource_pool.Diff.compact }
@@ -494,7 +497,7 @@ module Rpcs = struct
     module V2 = struct
       module T = struct
         type query =
-          ( Consensus.Data.Consensus_state.Value.Stable.V1.t
+          ( Consensus.Data.Consensus_state.Value.Stable.V2.t
           , State_hash.Stable.V1.t )
           With_hash.Stable.V1.t
         [@@deriving sexp]
@@ -891,7 +894,6 @@ module Rpcs = struct
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   type rpc_handler =
     | Rpc_handler :
@@ -924,8 +926,6 @@ module Rpcs = struct
         (module Ban_notify)
     | Get_best_tip ->
         (module Get_best_tip)
-    | Consensus_rpc rpc ->
-        Consensus.Hooks.Rpcs.implementation_of_rpc rpc
 
   let match_handler :
       type q r.
@@ -933,7 +933,7 @@ module Rpcs = struct
       -> (q, r) rpc
       -> do_:((q, r) Rpc_intf.rpc_fn -> 'a)
       -> 'a option =
-   fun (Rpc_handler { rpc = impl_rpc; f; cost; budget }) rpc ~do_ ->
+   fun (Rpc_handler { rpc = impl_rpc; f; cost = _; budget = _ }) rpc ~do_ ->
     match (rpc, impl_rpc) with
     | Get_some_initial_peers, Get_some_initial_peers ->
         Some (do_ f)
@@ -975,12 +975,6 @@ module Rpcs = struct
     | Get_best_tip, Get_best_tip ->
         Some (do_ f)
     | Get_best_tip, _ ->
-        None
-    | Consensus_rpc rpc_a, Consensus_rpc rpc_b ->
-        Consensus.Hooks.Rpcs.match_handler
-          (Rpc_handler { rpc = rpc_b; f; cost; budget })
-          rpc_a ~do_
-    | Consensus_rpc _, _ ->
         None
 end
 
@@ -1069,10 +1063,6 @@ let create (config : Config.t) ~sinks
        -> Rpcs.Get_transition_knowledge.response Deferred.t ) =
   let module Context = struct
     let logger = config.logger
-
-    let consensus_constants = config.precomputed_values.consensus_constants
-
-    let constraint_constants = config.constraint_constants
   end in
   let open Context in
   let run_for_rpc_result conn data ~f action_msg msg_args =
@@ -1158,7 +1148,7 @@ let create (config : Config.t) ~sinks
                          (Header.current_protocol_version
                             (Mina_block.header external_transition) ) ) )
                 ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(to_string @@ get_current ()) )
+                  , `String Protocol_version.(to_string current) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -1390,15 +1380,6 @@ let create (config : Config.t) ~sinks
         ; cost = unit
         }
     ]
-    @ Consensus.Hooks.Rpcs.(
-        List.map
-          (rpc_handlers
-             ~context:(module Context)
-             ~local_state:config.consensus_local_state
-             ~genesis_ledger_hash:
-               (Frozen_ledger_hash.of_ledger_hash config.genesis_ledger_hash) )
-          ~f:(fun (Rpc_handler { rpc; f; cost; budget }) ->
-            Rpcs.(Rpc_handler { rpc = Consensus_rpc rpc; f; cost; budget }) ))
   in
   let%map gossip_net =
     O1trace.thread "gossip_net" (fun () ->
@@ -1485,43 +1466,35 @@ include struct
 
   let connection_gating_config t = lift connection_gating t
 
-  let set_connection_gating_config t config =
-    lift set_connection_gating t config
+  let set_connection_gating_config t ?clean_added_peers config =
+    lift (set_connection_gating ?clean_added_peers) t config
 end
 
 (* TODO: Have better pushback behavior *)
-let log_gossip logger ~log_msg msg =
-  [%str_log' trace logger]
-    ~metadata:[ ("message", Gossip_net.Message.msg_to_yojson msg) ]
-    log_msg
-
 let broadcast_state t state =
-  let msg = With_hash.data state in
-  log_gossip t.logger (Gossip_net.Message.New_state msg)
-    ~log_msg:
-      (Gossip_new_state
-         { state_hash = State_hash.With_state_hashes.state_hash state } ) ;
+  [%str_log' trace t.logger]
+    (Gossip_new_state
+       { state_hash = State_hash.With_state_hashes.state_hash state } ) ;
   Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
-  Gossip_net.Any.broadcast_state t.gossip_net msg
+  Gossip_net.Any.broadcast_state t.gossip_net (With_hash.data state)
 
-let broadcast_transaction_pool_diff t diff =
-  log_gossip t.logger (Gossip_net.Message.Transaction_pool_diff diff)
-    ~log_msg:(Gossip_transaction_pool_diff { txns = diff }) ;
+let broadcast_transaction_pool_diff ?nonce t diff =
+  [%str_log' trace t.logger]
+    (Gossip_transaction_pool_diff
+       { fee_payer_summaries = List.map ~f:User_command.fee_payer_summary diff }
+    ) ;
   Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
-  Gossip_net.Any.broadcast_transaction_pool_diff t.gossip_net diff
+  Gossip_net.Any.broadcast_transaction_pool_diff ?nonce t.gossip_net diff
 
-let broadcast_snark_pool_diff t diff =
+let broadcast_snark_pool_diff ?nonce t diff =
   Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_broadcasted) ;
-  log_gossip t.logger (Gossip_net.Message.Snark_pool_diff diff)
-    ~log_msg:
-      (Gossip_snark_pool_diff
-         { work =
-             Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
-         } ) ;
-  Gossip_net.Any.broadcast_snark_pool_diff t.gossip_net diff
+  [%str_log' trace t.logger]
+    (Gossip_snark_pool_diff
+       { work = Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
+       } ) ;
+  Gossip_net.Any.broadcast_snark_pool_diff ?nonce t.gossip_net diff
 
-(* TODO: Don't copy and paste *)
-let find_map' xs ~f =
+let find_map xs ~f =
   let open Async in
   let ds = List.map xs ~f in
   let filter ~f =
@@ -1578,7 +1551,7 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
            "None of randomly-chosen peers can handle the request" )
     else
       let current_peers, remaining_peers = List.split_n peers num_peers in
-      find_map' current_peers ~f:(fun peer ->
+      find_map current_peers ~f:(fun peer ->
           let%bind response_or_error =
             query_peer t peer.Peer.peer_id rpc input
           in

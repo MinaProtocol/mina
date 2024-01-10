@@ -5,7 +5,7 @@ mina:
   logLevel: "Info"
   logSnarkWorkGossip: false
   logTxnPoolGossip: false
-  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
+  image: "gcr.io/o1labs-192920/mina-daemon:1.3.2beta2-release-2.0.0-0b63498-bullseye-berkeley"
   useCustomEntrypoint: false
   customEntrypoint: ""
   privkeyPass: "naughty blue worm"
@@ -18,17 +18,22 @@ mina:
     metrics: "10001"
     p2p: "10909"
   exposeGraphql: false
+  exposeItnGraphql: false
+  itn:
+    port: "3086"
+    keys: ""
   cpuRequest: 6
   memRequest: "12.0Gi"
 
 archive:
+  replicas: 1
   hostPort: "10909"
-  image: gcr.io/o1labs-192920/mina-archive:1.1.8-b10c0e3
+  image: "gcr.io/o1labs-192920/mina-archive:1.3.2beta2-release-2.0.0-0b63498-bullseye"
   # remoteSchemaFile needs to be just the script name, not a url.  remoteSchemaAuxFiles needs to be a list of urls of scripts, one of these urls needs to be the url of the main sql script that invokes the other ones.  sorry it's confusing
   remoteSchemaFile: "create_schema.sql"
   remoteSchemaAuxFiles:
     - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/zkapp_tables.sql"
-    - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+    - "https://raw.githubusercontent.com/MinaProtocol/mina/compatible/src/app/archive/create_schema.sql"
   postgresHost:  '{{ .Release.Name }}-postgresql'
   postgresUri: postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.ports.postgres }}/{{ .Values.postgresql.auth.database }}
   ports:
@@ -37,12 +42,16 @@ archive:
     metrics: "10002"
   enableLocalDaemon: true
   enablePostgresDB: true
+  enableDumpCronjob: true
+  initFromDump: false
 
 postgresql:
   primary:
     name: "archive"
     persistence:
       enabled: false
+      size: 8Gi
+      storageClass: ssd-delete
     initdb:
       user: "mina"
       password: "zo3moong7moog4Iep7eNgo3iecaesahH"
@@ -50,6 +59,7 @@ postgresql:
     username: "mina"
     password: "zo3moong7moog4Iep7eNgo3iecaesahH"
     database: "archive"
+    enablePostgresUser: false
 
 nodeSelector:
   preemptible: true
@@ -59,3 +69,8 @@ healthcheck:
   failureThreshold: 60
   periodSeconds: 5
   initialDelaySeconds: 30
+
+storage:
+  accessMode: "ReadWriteOnce"
+  size: "4Gi"
+  storageClass: "standard"

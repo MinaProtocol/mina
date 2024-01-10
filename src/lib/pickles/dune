@@ -1,8 +1,25 @@
 (library
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (name pickles)
  (public_name pickles)
- (flags -warn-error -22+34+33+27)
+ (modules_without_implementation
+  full_signature
+  type
+  intf
+  pickles_intf)
+ ; Deactivated warnings
+ ; 40: name-out-scope (activate later)
+ ;
+ ; 41: ambiguous name (too many of them for now, activate later)
+ ;
+ ; 42: disambiguated-name (rely on type disambiguation ,not too bad but closer
+ ; module openings may both solve the warning *and* help the reader)
+ ;
+ ; 44: open-shadow-identifier (operation overloading is common in the codebase)
+ (flags
+  (:standard -w +a-40..42-44
+             -warn-error +a-27)
+   -open Core_kernel)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -44,7 +61,6 @@
    snarky_group_map
    sponge
    pickles.pseudo
-   pickles.precomputed
    pickles.limb_vector
    pickles_base
    kimchi_backend
@@ -63,5 +79,8 @@
    tuple_lib
    promise
    kimchi_backend.common
+   logger
+   internal_tracing.context_logger
    ppx_version.runtime
+   error_json
 ))

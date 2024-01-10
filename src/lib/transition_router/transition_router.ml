@@ -22,7 +22,7 @@ type Structured_log_events.t += Starting_transition_frontier_controller
 type Structured_log_events.t += Starting_bootstrap_controller
   [@@deriving register_event { msg = "Starting bootstrap controller phase" }]
 
-let create_bufferred_pipe ?name ~f () =
+let create_buffered_pipe ?name ~f () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow (Drop_head f)))
 
 let is_transition_for_bootstrap ~context:(module Context : CONTEXT) frontier
@@ -70,7 +70,7 @@ let is_transition_for_bootstrap ~context:(module Context : CONTEXT) frontier
           ~existing:root_consensus_state ~candidate:new_consensus_state
 
 let start_transition_frontier_controller ~context:(module Context : CONTEXT)
-    ~trust_system ~verifier ~network ~time_controller
+    ~trust_system ~verifier ~network ~time_controller ~get_completed_work
     ~producer_transition_reader_ref ~producer_transition_writer_ref
     ~verified_transition_writer ~clear_reader ~collected_transitions
     ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
@@ -79,7 +79,7 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
   let ( transition_frontier_controller_reader
       , transition_frontier_controller_writer ) =
     let name = "transition frontier controller pipe" in
-    create_bufferred_pipe ~name
+    create_buffered_pipe ~name
       ~f:(fun (`Block block, `Valid_cb valid_cb) ->
         Mina_metrics.(
           Counter.inc_one
@@ -103,7 +103,8 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
     Transition_frontier_controller.run
       ~context:(module Context)
       ~trust_system ~verifier ~network ~time_controller ~collected_transitions
-      ~frontier ~network_transition_reader:!transition_reader_ref
+      ~frontier ~get_completed_work
+      ~network_transition_reader:!transition_reader_ref
       ~producer_transition_reader ~clear_reader
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
@@ -113,17 +114,18 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
   |> don't_wait_for
 
 let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
-    ~verifier ~network ~time_controller ~producer_transition_reader_ref
-    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
-    ~transition_reader_ref ~transition_writer_ref ~consensus_local_state
-    ~frontier_w ~initial_root_transition ~persistent_root ~persistent_frontier
+    ~verifier ~network ~time_controller ~get_completed_work
+    ~producer_transition_reader_ref ~producer_transition_writer_ref
+    ~verified_transition_writer ~clear_reader ~transition_reader_ref
+    ~transition_writer_ref ~consensus_local_state ~frontier_w
+    ~initial_root_transition ~persistent_root ~persistent_frontier
     ~best_seen_transition ~catchup_mode =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
     let name = "bootstrap controller pipe" in
-    create_bufferred_pipe ~name
+    create_buffered_pipe ~name
       ~f:(fun (`Block head, `Valid_cb valid_cb) ->
         Mina_metrics.(
           Counter.inc_one Pipe.Drop_on_overflow.router_bootstrap_controller) ;
@@ -156,7 +158,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
       Strict_pipe.Writer.kill !transition_writer_ref ;
       start_transition_frontier_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller
+        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_reader_ref ~producer_transition_writer_ref
         ~verified_transition_writer ~clear_reader ~collected_transitions
         ~transition_reader_ref ~transition_writer_ref ~frontier_w new_frontier
@@ -305,7 +307,7 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
       Mina_networking.peers network
       >>| fun peers ->
       if not @@ Deferred.is_determined high_connectivity then
-        if List.length peers = 0 then
+        if List.is_empty peers then
           if is_seed then
             [%log info]
               ~metadata:
@@ -328,13 +330,15 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
             "Will start initialization without connecting to too many peers" )
     ]
 
-let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
-    ~is_demo_mode ~verifier ~trust_system ~time_controller ~frontier_w
-    ~producer_transition_reader_ref ~producer_transition_writer_ref
-    ~clear_reader ~verified_transition_writer ~transition_reader_ref
-    ~transition_writer_ref ~most_recent_valid_block_writer ~persistent_root
-    ~persistent_frontier ~consensus_local_state ~catchup_mode ~notify_online =
+let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
+    ~is_seed ~is_demo_mode ~verifier ~trust_system ~time_controller
+    ~get_completed_work ~frontier_w ~producer_transition_reader_ref
+    ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
+    ~transition_reader_ref ~transition_writer_ref
+    ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
+    ~consensus_local_state ~catchup_mode ~notify_online =
   let open Context in
+  [%log info] "Initializing transition router" ;
   let%bind () =
     if is_demo_mode then return ()
     else wait_for_high_connectivity ~logger ~network ~is_seed
@@ -362,7 +366,7 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
       in
       start_bootstrap_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller
+        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_reader_ref ~producer_transition_writer_ref
         ~verified_transition_writer ~clear_reader ~transition_reader_ref
         ~consensus_local_state ~transition_writer_ref ~frontier_w
@@ -393,11 +397,12 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
           start_bootstrap_controller
             ~context:(module Context)
             ~trust_system ~verifier ~network ~time_controller
-            ~producer_transition_reader_ref ~producer_transition_writer_ref
-            ~verified_transition_writer ~clear_reader ~transition_reader_ref
-            ~consensus_local_state ~transition_writer_ref ~frontier_w
-            ~persistent_root ~persistent_frontier ~initial_root_transition
-            ~catchup_mode ~best_seen_transition:(Some best_tip)
+            ~get_completed_work ~producer_transition_reader_ref
+            ~producer_transition_writer_ref ~verified_transition_writer
+            ~clear_reader ~transition_reader_ref ~consensus_local_state
+            ~transition_writer_ref ~frontier_w ~persistent_root
+            ~persistent_frontier ~initial_root_transition ~catchup_mode
+            ~best_seen_transition:(Some best_tip)
       | _ ->
           if Option.is_some best_tip then
             [%log info]
@@ -417,45 +422,45 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
                from network" ;
           let curr_best_tip = Transition_frontier.best_tip frontier in
           let%map () =
-            match
-              Consensus.Hooks.required_local_state_sync
-                ~constants:precomputed_values.consensus_constants
-                ~consensus_state:
-                  (Transition_frontier.Breadcrumb.consensus_state curr_best_tip)
-                ~local_state:consensus_local_state
-            with
-            | None ->
-                [%log info] "Local state already in sync" ;
-                Deferred.unit
-            | Some sync_jobs -> (
-                [%log info] "Local state is out of sync; " ;
-                match%map
-                  Consensus.Hooks.sync_local_state
-                    ~local_state:consensus_local_state
-                    ~context:(module Context)
-                    ~trust_system
-                    ~random_peers:(Mina_networking.random_peers network)
-                    ~query_peer:
-                      { Consensus.Hooks.Rpcs.query =
-                          (fun peer rpc query ->
-                            Mina_networking.(
-                              query_peer network peer.peer_id
-                                (Rpcs.Consensus_rpc rpc) query) )
-                      }
-                    sync_jobs
-                with
-                | Error e ->
-                    Error.tag e ~tag:"Local state sync failed" |> Error.raise
-                | Ok () ->
-                    () )
+            if not sync_local_state then (
+              [%log info] "Not syncing local state, should only occur in tests" ;
+              (* make frontier available for tests *)
+              Broadcast_pipe.Writer.write frontier_w (Some frontier) )
+            else
+              match
+                Consensus.Hooks.required_local_state_sync
+                  ~constants:precomputed_values.consensus_constants
+                  ~consensus_state:
+                    (Transition_frontier.Breadcrumb.consensus_state
+                       curr_best_tip )
+                  ~local_state:consensus_local_state
+              with
+              | None ->
+                  [%log info] "Local state already in sync" ;
+                  Deferred.unit
+              | Some sync_jobs -> (
+                  [%log info] "Local state is out of sync; " ;
+                  match%map
+                    Consensus.Hooks.sync_local_state
+                      ~local_state:consensus_local_state
+                      ~glue_sync_ledger:
+                        (Mina_networking.glue_sync_ledger network)
+                      ~context:(module Context)
+                      ~trust_system sync_jobs
+                  with
+                  | Error e ->
+                      Error.tag e ~tag:"Local state sync failed" |> Error.raise
+                  | Ok () ->
+                      () )
           in
           let collected_transitions = Option.to_list best_tip in
           start_transition_frontier_controller
             ~context:(module Context)
             ~trust_system ~verifier ~network ~time_controller
-            ~producer_transition_reader_ref ~producer_transition_writer_ref
-            ~verified_transition_writer ~clear_reader ~collected_transitions
-            ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier )
+            ~get_completed_work ~producer_transition_reader_ref
+            ~producer_transition_writer_ref ~verified_transition_writer
+            ~clear_reader ~collected_transitions ~transition_reader_ref
+            ~transition_writer_ref ~frontier_w frontier )
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -496,22 +501,27 @@ let wait_till_genesis ~logger ~time_controller
       (logger_loop ())
     |> Deferred.ignore_m
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~is_seed ~is_demo_mode ~time_controller ~consensus_local_state
-    ~persistent_root_location ~persistent_frontier_location
+(* [sync_local_state] may be `false` for tests, where we want
+   to set local state in the test
+*)
+let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
+    ~trust_system ~verifier ~network ~is_seed ~is_demo_mode ~time_controller
+    ~consensus_local_state ~persistent_root_location
+    ~persistent_frontier_location
     ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~network_transition_reader
     ~producer_transition_reader
     ~most_recent_valid_block:
       (most_recent_valid_block_reader, most_recent_valid_block_writer)
-    ~catchup_mode ~notify_online =
+    ~get_completed_work ~catchup_mode ~notify_online () =
   let open Context in
+  [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
     Strict_pipe.create ~name:"clear" Synchronous
   in
   let verified_transition_reader, verified_transition_writer =
     let name = "verified transitions" in
-    create_bufferred_pipe ~name
+    create_buffered_pipe ~name
       ~f:(fun ( `Transition (head : Mina_block.Validated.t)
               , _
               , `Valid_cb valid_cb ) ->
@@ -524,7 +534,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   in
   let transition_reader, transition_writer =
     let name = "transition pipe" in
-    create_bufferred_pipe ~name
+    create_buffered_pipe ~name
       ~f:(fun (`Block block, `Valid_cb valid_cb) ->
         Mina_metrics.(Counter.inc_one Pipe.Drop_on_overflow.router_transitions) ;
         Mina_block.handle_dropped_transition
@@ -550,7 +560,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       in
       let valid_transition_reader, valid_transition_writer =
         let name = "valid transitions" in
-        create_bufferred_pipe ~name
+        create_buffered_pipe ~name
           ~f:(fun head ->
             let `Block block, `Valid_cb valid_cb = head in
             Mina_metrics.(
@@ -574,12 +584,12 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
       let%map () =
-        initialize
+        initialize ~sync_local_state
           ~context:(module Context)
           ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
-          ~persistent_frontier ~persistent_root ~time_controller ~frontier_w
-          ~producer_transition_reader_ref ~catchup_mode
-          ~producer_transition_writer_ref ~clear_reader
+          ~persistent_frontier ~persistent_root ~time_controller
+          ~get_completed_work ~frontier_w ~producer_transition_reader_ref
+          ~catchup_mode ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~transition_reader_ref
           ~transition_writer_ref ~most_recent_valid_block_writer
           ~consensus_local_state ~notify_online
@@ -642,7 +652,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                         start_bootstrap_controller
                           ~context:(module Context)
                           ~trust_system ~verifier ~network ~time_controller
-                          ~producer_transition_reader_ref
+                          ~get_completed_work ~producer_transition_reader_ref
                           ~producer_transition_writer_ref
                           ~verified_transition_writer ~clear_reader
                           ~transition_reader_ref ~transition_writer_ref

@@ -18,13 +18,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Wallet in
     { default with
       requires_graphql = true
+    ; genesis_ledger =
+        [ { account_name = "node-a-key"; balance = "700000"; timing = Untimed }
+        ; { account_name = "node-b-key"; balance = "700000"; timing = Untimed }
+        ; { account_name = "node-c-key"; balance = "800000"; timing = Untimed }
+        ]
     ; block_producers =
-        [ { balance = "700000"; timing = Untimed }
-        ; { balance = "700000"; timing = Untimed }
-        ; { balance = "800000"; timing = Untimed }
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ; { node_name = "node-c"; account_name = "node-c-key" }
         ]
     }
 
@@ -32,43 +36,66 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     [%log info] "peers_list"
       ~metadata:
-        [ ("peers", `List (List.map all_nodes ~f:(fun n -> `String (Node.id n))))
+        [ ( "peers"
+          , `List
+              (List.map (Core.String.Map.data all_mina_nodes) ~f:(fun n ->
+                   `String (Node.infra_id n) ) ) )
         ] ;
-    let[@warning "-8"] [ node_a; node_b; node_c ] =
-      Network.block_producers network
+    let node_a =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
+    in
+    let node_b =
+      Core.String.Map.find_exn (Network.block_producers network) "node-b"
+    in
+    let node_c =
+      Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
     (* witness the node_c frontier load on initialization *)
     let%bind () =
-      wait_for t @@ Wait_condition.persisted_frontier_loaded node_c
+      wait_for t
+      @@ ( Wait_condition.persisted_frontier_loaded node_c
+         |> Wait_condition.with_timeouts
+              ~soft_timeout:
+                (Network_time_span.Literal
+                   (Time.Span.of_ms (20. *. 60. *. 1000.)) )
+              ~hard_timeout:
+                (Network_time_span.Literal
+                   (Time.Span.of_ms (20. *. 60. *. 1000.)) ) )
     in
-    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
+    (* let%bind () = wait_for t (Wait_condition.nodes_to_initialize [ node_c ]) in *)
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
+    in
     let%bind initial_connectivity_data =
-      Util.fetch_connectivity_data ~logger all_nodes
+      fetch_connectivity_data ~logger (Core.String.Map.data all_mina_nodes)
     in
     let%bind () =
       section "network is fully connected upon initialization"
-        (Util.assert_peers_completely_connected initial_connectivity_data)
+        (assert_peers_completely_connected initial_connectivity_data)
     in
     let%bind () =
       section
         "network can't be partitioned if 2 nodes are hypothetically taken \
          offline"
-        (Util.assert_peers_cant_be_partitioned ~max_disconnections:2
+        (assert_peers_cant_be_partitioned ~max_disconnections:2
            initial_connectivity_data )
     in
     (* a couple of transactions, so the persisted transition frontier is not trivial *)
     let%bind () =
       section_hard "send a payment"
-        (let%bind sender_pub_key = Util.pub_key_of_node node_c in
-         let%bind receiver_pub_key = Util.pub_key_of_node node_b in
+        (let%bind sender_pub_key = pub_key_of_node node_c in
+         let%bind receiver_pub_key = pub_key_of_node node_b in
          let%bind { hash = txn_hash; _ } =
-           Node.must_send_payment ~logger node_c ~sender_pub_key
-             ~receiver_pub_key
-             ~amount:(Currency.Amount.of_int 1_000_000)
-             ~fee:(Currency.Fee.of_int 10_000_000)
+           Graphql_requests.must_send_online_payment ~logger
+             (Network.Node.get_ingress_uri node_c)
+             ~sender_pub_key ~receiver_pub_key
+             ~amount:(Currency.Amount.of_nanomina_int_exn 1_000_000)
+             ~fee:(Currency.Fee.of_nanomina_int_exn 10_000_000)
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier ~txn_hash
@@ -86,13 +113,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       section_hard "send a zkApp to create an account"
         (let%bind parties_create_accounts =
-           let amount = Currency.Amount.of_int 10_000_000_000 in
+           let amount = Currency.Amount.of_mina_int_exn 10 in
            let nonce = Mina_base.Account.Nonce.(succ zero) in
            let memo =
              Mina_base.Signed_command_memo.create_from_string_exn
                "Zkapp create account"
            in
-           let fee = Currency.Fee.of_int 20_000_000 in
+           let fee = Currency.Fee.of_nanomina_int_exn 20_000_000 in
            let sender_kp =
              (Option.value_exn (Node.network_keypair node_c)).keypair
            in
@@ -115,7 +142,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ~constraint_constants:(Network.constraint_constants network)
                 parties_spec
          in
-         let%bind () = send_zkapp ~logger node_c parties_create_accounts in
+         let%bind () =
+           send_zkapp ~logger
+             (Network.Node.get_ingress_uri node_c)
+             parties_create_accounts
+         in
          wait_for_zkapp parties_create_accounts )
     in
     let%bind () =
@@ -127,7 +158,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Mina_base.Account_id.create pk Mina_base.Token_id.default
          in
          let%map _account_data =
-           Node.must_get_account_data ~logger node_c ~account_id
+           Graphql_requests.must_get_account_data ~logger
+             (Network.Node.get_ingress_uri node_c)
+             ~account_id
          in
          () )
     in
@@ -140,7 +173,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "short bootstrap"
         (let%bind () = Node.stop node_c in
          [%log info] "%s stopped, will now wait for blocks to be produced"
-           (Node.id node_c) ;
+           (Node.infra_id node_c) ;
          let%bind () =
            wait_for t
              ( Wait_condition.blocks_to_be_produced 1
@@ -152,7 +185,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind () = Node.start ~fresh_state:true node_c in
          [%log info]
            "%s started again, will now wait for this node to initialize"
-           (Node.id node_c) ;
+           (Node.infra_id node_c) ;
          (* we've witnessed the loading of the node_c frontier on initialization
             so the event here must be the frontier loading on the node_c restart
          *)
@@ -170,7 +203,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
        let%bind final_connectivity_data =
-         Util.fetch_connectivity_data ~logger all_nodes
+         fetch_connectivity_data ~logger (Core.String.Map.data all_mina_nodes)
        in
-       Util.assert_peers_completely_connected final_connectivity_data )
+       assert_peers_completely_connected final_connectivity_data )
 end

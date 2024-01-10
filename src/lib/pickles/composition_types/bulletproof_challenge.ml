@@ -1,5 +1,3 @@
-open Core_kernel
-
 [%%versioned
 module Stable = struct
   module V1 = struct
@@ -12,11 +10,13 @@ end]
 
 let pack { prechallenge } = prechallenge
 
-let unpack = function prechallenge -> { prechallenge }
+let unpack prechallenge = { prechallenge }
+
+let map { prechallenge } ~f = { prechallenge = f prechallenge }
 
 let typ chal =
-  let there { prechallenge } = prechallenge in
-  let back prechallenge = { prechallenge } in
+  let there = pack in
+  let back = unpack in
   let open Snarky_backendless in
   Typ.transport ~there ~back (Kimchi_backend_common.Scalar_challenge.typ chal)
   |> Typ.transport_var ~there ~back

@@ -1,9 +1,9 @@
 {
  "network": {
   "blockchain": "mina",
-  "network": "debug"
+  "network": "PLACEHOLDER_NETWORK_NAME"
  },
- "online_url": "http://localhost:3087",
+ "online_url": "http://localhost:PLACEHOLDER_ROSETTA_ONLINE_PORT",
  "data_directory": "",
  "http_timeout": 10,
  "max_retries": 5,
@@ -19,7 +19,18 @@
  "error_stack_trace_disabled": false,
  "coin_supported": false,
  "construction": {
-   "offline_url":                "http://localhost:3087",
+ "prefunded_accounts":[
+   {
+     "privkey": "PLACEHOLDER_PREFUNDED_PRIVKEY",
+     "account_identifier":{
+     "address": "PLACEHOLDER_PREFUNDED_ADDRESS",
+     "metadata": {"token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"}
+     },
+     "curve_type":"pallas",
+     "currency":{"symbol":"MINA", "decimals":9}
+   }
+   ],
+   "offline_url":                "http://localhost:PLACEHOLDER_ROSETTA_OFFLINE_PORT",
    "max_offline_connections":    4,
    "force_retry":                false,
    "stale_depth":                3,
@@ -35,8 +46,9 @@
    "quiet":                      false,
    "initial_balance_fetch_disabled": false,
    "end_conditions": {
-     "create_account":         10,
-     "transfer":               20
+     "create_account":      10,
+     "transfer_payment":    20,
+     "transfer_delegation": 5
    }
  },
  "data": {
@@ -60,7 +72,12 @@
   "results_output_file": "",
   "pruning_block_disabled": false,
   "pruning_balance_disabled": false,
-  "initial_balance_fetch_disabled": false
+  "initial_balance_fetch_disabled": false,
+  "end_conditions": {
+    "reconciliation_coverage": {
+      "tip": true
+    }
+  }
  },
  "perf": null
 }

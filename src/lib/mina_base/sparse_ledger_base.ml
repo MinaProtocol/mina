@@ -32,10 +32,12 @@ end
 
 module Global_state = struct
   type t =
-    { ledger : sparse_ledger
+    { first_pass_ledger : sparse_ledger
+    ; second_pass_ledger : sparse_ledger
     ; fee_excess : Currency.Amount.Signed.t
     ; supply_increase : Currency.Amount.Signed.t
     ; protocol_state : Zkapp_precondition.Protocol_state.View.t
+    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
   [@@deriving sexp, to_yojson]
 end
@@ -109,9 +111,6 @@ module L = struct
   let create_new_account t id to_set =
     get_or_create_account t id to_set |> Or_error.map ~f:ignore
 
-  let remove_accounts_exn : t -> Account_id.t list -> unit =
-   fun _t _xs -> failwith "remove_accounts_exn: not implemented"
-
   let merkle_root : t -> Ledger_hash.t = fun t -> M.merkle_root !t
 
   let with_ledger : depth:int -> f:(t -> 'a) -> 'a =
@@ -151,6 +150,7 @@ M.
   , set_exn
   , find_index_exn
   , add_path
+  , add_wide_path_unsafe
   , merkle_root
   , iteri )]
 

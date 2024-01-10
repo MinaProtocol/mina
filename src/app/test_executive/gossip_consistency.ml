@@ -1,11 +1,12 @@
 open Core
 open Integration_test_lib
-open Mina_transaction
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
   open Engine
   open Dsl
+
+  open Test_common.Make (Inputs)
 
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
@@ -14,61 +15,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let block_producer_balance = "1000" (* 1_000_000_000_000 *)
-
   let config =
-    let n = 3 in
     let open Test_config in
     { default with
       requires_graphql = true
+    ; genesis_ledger =
+        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
+        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
+        ]
     ; block_producers =
-        List.init n ~f:(fun _ ->
-            { Wallet.balance = block_producer_balance; timing = Untimed } )
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ]
     }
-
-  let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee ~node
-      n =
-    let open Malleable_error.Let_syntax in
-    let rec go n hashlist =
-      if n = 0 then return hashlist
-      else
-        let%bind hash =
-          let%map { hash; _ } =
-            Network.Node.must_send_payment ~logger ~sender_pub_key
-              ~receiver_pub_key ~amount ~fee node
-          in
-          [%log info] "gossip_consistency test: payment #%d sent with hash %s."
-            n
-            (Transaction_hash.to_base58_check hash) ;
-          hash
-        in
-        go (n - 1) (List.append hashlist [ hash ])
-    in
-    go n []
-
-  let wait_for_payments ~logger ~dsl ~hashlist n =
-    let open Malleable_error.Let_syntax in
-    let rec go n hashlist =
-      if n = 0 then return ()
-      else
-        (* confirm payment *)
-        let%bind () =
-          let hash = List.hd_exn hashlist in
-          let%map () =
-            wait_for dsl
-              (Wait_condition.signed_command_to_be_included_in_frontier
-                 ~txn_hash:hash ~node_included_in:`Any_node )
-          in
-          [%log info]
-            "gossip_consistency test: payment #%d with hash %s successfully \
-             included in frontier."
-            n
-            (Transaction_hash.to_base58_check hash) ;
-          ()
-        in
-        go (n - 1) (List.tl_exn hashlist)
-    in
-    go n hashlist
 
   let run network t =
     let open Malleable_error.Let_syntax in
@@ -76,18 +35,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "gossip_consistency test: starting..." ;
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Network.all_nodes network))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data (Network.all_mina_nodes network)) )
     in
     [%log info] "gossip_consistency test: done waiting for initializations" ;
-    let receiver_bp = Caml.List.nth (Network.block_producers network) 0 in
-    let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
-    let sender_bp =
-      Core_kernel.List.nth_exn (Network.block_producers network) 1
+    let receiver_bp =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
-    let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
+    let%bind receiver_pub_key = pub_key_of_node receiver_bp in
+    let sender_bp =
+      Core.String.Map.find_exn (Network.block_producers network) "node-b"
+    in
+    let%bind sender_pub_key = pub_key_of_node sender_bp in
     let num_payments = 3 in
-    let fee = Currency.Fee.of_int 10_000_000 in
-    let amount = Currency.Amount.of_int 10_000_000 in
+    let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
+    let amount = Currency.Amount.of_nanomina_int_exn 10_000_000 in
     [%log info] "gossip_consistency test: will now send %d payments"
       num_payments ;
     let%bind hashlist =

@@ -58,6 +58,19 @@ type 'command t_ = 'command Poly.t =
   | Fee_transfer of Fee_transfer.t
   | Coinbase of Coinbase.t
 
+let to_valid_unsafe :
+    t -> [ `If_this_is_used_it_should_have_a_comment_justifying_it of Valid.t ]
+    = function
+  | Command t ->
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it t') =
+        User_command.to_valid_unsafe t
+      in
+      `If_this_is_used_it_should_have_a_comment_justifying_it (Command t')
+  | Fee_transfer t ->
+      `If_this_is_used_it_should_have_a_comment_justifying_it (Fee_transfer t)
+  | Coinbase t ->
+      `If_this_is_used_it_should_have_a_comment_justifying_it (Coinbase t)
+
 let forget : Valid.t -> t = function
   | Command t ->
       Command (User_command.forget_check t)
@@ -82,32 +95,36 @@ let expected_supply_increase = function
   | Coinbase t ->
       Coinbase.expected_supply_increase t
 
-let public_keys : t -> _ = function
-  | Command (Signed_command cmd) ->
-      [ Signed_command.fee_payer_pk cmd
-      ; Signed_command.source_pk cmd
-      ; Signed_command.receiver_pk cmd
-      ]
-  | Command (Zkapp_command t) ->
-      Zkapp_command.accounts_referenced t |> List.map ~f:Account_id.public_key
-  | Fee_transfer ft ->
-      Fee_transfer.receiver_pks ft
-  | Coinbase cb ->
-      Coinbase.accounts_accessed cb |> List.map ~f:Account_id.public_key
+let public_keys (t : t) =
+  let account_ids =
+    match t with
+    | Command (Signed_command cmd) ->
+        Signed_command.accounts_referenced cmd
+    | Command (Zkapp_command t) ->
+        Zkapp_command.accounts_referenced t
+    | Fee_transfer ft ->
+        Fee_transfer.receivers ft
+    | Coinbase cb ->
+        Coinbase.accounts_referenced cb
+  in
+  List.map account_ids ~f:Account_id.public_key
 
-let accounts_accessed (t : t) (status : Transaction_status.t) =
+let account_access_statuses (t : t) (status : Transaction_status.t) =
   match t with
   | Command (Signed_command cmd) ->
-      Signed_command.accounts_accessed cmd status
+      Signed_command.account_access_statuses cmd status
   | Command (Zkapp_command t) ->
-      Zkapp_command.accounts_accessed t status
+      Zkapp_command.account_access_statuses t status
   | Fee_transfer ft ->
       assert (Transaction_status.equal Applied status) ;
-      Fee_transfer.receivers ft
+      List.map (Fee_transfer.receivers ft) ~f:(fun acct_id ->
+          (acct_id, `Accessed) )
   | Coinbase cb ->
-      Coinbase.accounts_accessed cb
+      Coinbase.account_access_statuses cb status
 
-let accounts_referenced (t : t) = accounts_accessed t Applied
+let accounts_referenced (t : t) =
+  List.map (account_access_statuses t Applied) ~f:(fun (acct_id, _status) ->
+      acct_id )
 
 let fee_payer_pk (t : t) =
   match t with
@@ -126,3 +143,52 @@ let valid_size ~genesis_constants (t : t) =
       User_command.valid_size ~genesis_constants cmd
   | Fee_transfer _ | Coinbase _ ->
       Ok ()
+
+let check_well_formedness ~genesis_constants (t : t) =
+  match t with
+  | Command cmd ->
+      User_command.check_well_formedness ~genesis_constants cmd
+  | Fee_transfer _ | Coinbase _ ->
+      Ok ()
+
+let yojson_summary_of_command =
+  let is_proof upd =
+    match Account_update.authorization upd with Proof _ -> true | _ -> false
+  in
+  let zkapp_type cmd =
+    let updates = Zkapp_command.account_updates_list cmd in
+    Printf.sprintf "zkapp:%d:%d" (List.length updates)
+      (List.count updates ~f:is_proof)
+  in
+  let mk_record type_ memo signature =
+    `List
+      [ `String type_
+      ; `String (Signature.to_base58_check signature)
+      ; `String (Signed_command_memo.to_string_hum memo)
+      ]
+  in
+  function
+  | User_command.Zkapp_command cmd ->
+      mk_record (zkapp_type cmd) (Zkapp_command.memo cmd)
+        ( Zkapp_command.fee_payer_account_update cmd
+        |> Account_update.Fee_payer.authorization )
+  | Signed_command cmd ->
+      mk_record "payment" (Signed_command.memo cmd)
+        (Signed_command.signature cmd)
+
+let yojson_summary = function
+  | Command cmd ->
+      yojson_summary_of_command cmd
+  | Fee_transfer _ ->
+      `List [ `String "fee_transfer" ]
+  | Coinbase cb ->
+      let amount = Currency.Amount.to_yojson @@ Coinbase.amount cb in
+      `List [ `String "coinbase"; amount ]
+
+let yojson_summary_with_status cmd_with_status =
+  let status =
+    Transaction_status.to_yojson (With_status.status cmd_with_status)
+  in
+  match yojson_summary (With_status.data cmd_with_status) with
+  | `List lst ->
+      `List (lst @ [ status ])

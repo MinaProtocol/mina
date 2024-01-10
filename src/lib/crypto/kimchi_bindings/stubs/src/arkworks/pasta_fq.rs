@@ -36,7 +36,7 @@ impl CamlFq {
     unsafe extern "C" fn ocaml_compare(x: ocaml::Raw, y: ocaml::Raw) -> i32 {
         let x = x.as_pointer::<Self>();
         let y = y.as_pointer::<Self>();
-        match x.as_ref().0.cmp(&y.as_ref().0) {
+        match x.as_ref().0.into_repr().cmp(&y.as_ref().0.into_repr()) {
             core::cmp::Ordering::Less => -1,
             core::cmp::Ordering::Equal => 0,
             core::cmp::Ordering::Greater => 1,
@@ -210,6 +210,12 @@ pub fn caml_pasta_fq_print(x: ocaml::Pointer<CamlFq>) {
 
 #[ocaml_gen::func]
 #[ocaml::func]
+pub fn caml_pasta_fq_print_rust(x: ocaml::Pointer<CamlFq>) {
+    println!("{}", x.as_ref().0);
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
 pub fn caml_pasta_fq_copy(mut x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) {
     *x.as_mut() = *y.as_ref()
 }
@@ -241,7 +247,7 @@ pub fn caml_pasta_fq_mut_square(mut x: ocaml::Pointer<CamlFq>) {
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_compare(x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) -> ocaml::Int {
-    match x.as_ref().0.cmp(&y.as_ref().0) {
+    match x.as_ref().0.into_repr().cmp(&y.as_ref().0.into_repr()) {
         Less => -1,
         Equal => 0,
         Greater => 1,

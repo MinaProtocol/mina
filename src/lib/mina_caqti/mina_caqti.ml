@@ -5,8 +5,12 @@ open Core_kernel
 open Caqti_async
 open Mina_base
 
+(* custom Caqti types for generating type annotations on queries *)
 type _ Caqti_type.field +=
   | Array_nullable_int : int option array Caqti_type.field
+
+type _ Caqti_type.field +=
+  | Array_nullable_int64 : int64 option array Caqti_type.field
 
 type _ Caqti_type.field +=
   | Array_nullable_string : string option array Caqti_type.field
@@ -106,6 +110,22 @@ let () =
   in
   define_coding Array_nullable_int { get_coding }
 
+(* register coding for nullable int64 arrays *)
+let () =
+  let open Caqti_type.Field in
+  let rep = Caqti_type.String in
+  let encode, decode =
+    make_coding ~elem_to_string:Int64.to_string ~elem_of_string:Int64.of_string
+  in
+  let get_coding : type a. _ -> a t -> a coding =
+   fun _ -> function
+    | Array_nullable_int64 ->
+        Coding { rep; encode; decode }
+    | _ ->
+        assert false
+  in
+  define_coding Array_nullable_int64 { get_coding }
+
 (* register coding for nullable string arrays *)
 let () =
   let open Caqti_type.Field in
@@ -138,6 +158,23 @@ let array_int_typ : int array Caqti_type.t =
     >>| Array.of_list
   in
   Caqti_type.custom array_nullable_int_typ ~encode ~decode
+
+(* this type may require type annotations in queries, eg.
+   `SELECT id FROM zkapp_states WHERE element_ids = ?::bigint[]`
+*)
+let array_nullable_int64_typ : int64 option array Caqti_type.t =
+  Caqti_type.field Array_nullable_int64
+
+let array_int64_typ : int64 array Caqti_type.t =
+  let open Result.Let_syntax in
+  let encode xs = return @@ Array.map ~f:Option.some xs in
+  let decode xs =
+    Option.all (Array.to_list xs)
+    |> Result.of_option
+         ~error:"Failed to decode int64 array, encountered NULL value"
+    >>| Array.of_list
+  in
+  Caqti_type.custom array_nullable_int64_typ ~encode ~decode
 
 (* this type may require type annotations in queries, e.g.
    `SELECT id FROM zkapp_states WHERE element_ids = ?::string[]`
@@ -189,10 +226,12 @@ let add_if_some (f : 'arg -> ('res, 'err) Deferred.Result.t) :
     'arg option -> ('res option, 'err) Deferred.Result.t =
   Fn.compose deferred_result_lift_opt @@ Option.map ~f
 
+(* if zkApp-related item is Set, run `f` *)
 let add_if_zkapp_set (f : 'arg -> ('res, 'err) Deferred.Result.t) :
     'arg Zkapp_basic.Set_or_keep.t -> ('res option, 'err) Deferred.Result.t =
   Fn.compose (add_if_some f) Zkapp_basic.Set_or_keep.to_option
 
+(* if zkApp-related item is Check, run `f` *)
 let add_if_zkapp_check (f : 'arg -> ('res, 'err) Deferred.Result.t) :
     'arg Zkapp_basic.Or_ignore.t -> ('res option, 'err) Deferred.Result.t =
   Fn.compose (add_if_some f) Zkapp_basic.Or_ignore.to_option
@@ -242,6 +281,9 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
     (String.concat ~sep:", " cols)
     values returning
 
+(* run `select_cols` and return the result, if found
+   if not found, run `insert_into_cols` and return the result
+*)
 let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
@@ -282,11 +324,13 @@ let make_get_opt ~of_option ~f item_opt =
   in
   of_option res_opt
 
+(** convert options to Set or Keep for zkApps-related results *)
 let get_zkapp_set_or_keep (item_opt : 'arg option)
     ~(f : 'arg -> ('res, _) Deferred.Result.t) :
     'res Zkapp_basic.Set_or_keep.t Deferred.t =
   make_get_opt ~of_option:Zkapp_basic.Set_or_keep.of_option ~f item_opt
 
+(** convert options to Check or Ignore for zkApps-related results *)
 let get_zkapp_or_ignore (item_opt : 'arg option)
     ~(f : 'arg -> ('res, _) Deferred.Result.t) :
     'res Zkapp_basic.Or_ignore.t Deferred.t =

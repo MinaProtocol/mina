@@ -2,10 +2,14 @@
 
 set -eo pipefail
 
-if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "compatible" ]; then
-  echo "Not pulling against compatible, not running the connect test"
-  exit 0
-fi
+case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
+    compatible|release/*)
+      ;;
+    *) 
+      echo "Not pulling against compatible or not in release branch. Therefore, not running the connect test"
+      exit 0
+      ;;
+esac
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
@@ -20,7 +24,7 @@ git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
 
 echo "Installing mina daemon package: mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
-echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
+echo "deb [trusted=yes] http://packages.o1test.net bullseye $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
 apt-get update
 apt-get install --allow-downgrades -y "mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
 
@@ -32,10 +36,11 @@ mina daemon \
   --peer-list-url "https://storage.googleapis.com/seed-lists/${TESTNET_NAME}_seeds.txt" \
 & # -background
 
-# Attempt to connect to the GraphQL client every 10s for up to 4 minutes
+
+# Attempt to connect to the GraphQL client every 30s for up to 12 minutes
 num_status_retries=24
 for ((i=1;i<=$num_status_retries;i++)); do
-  sleep 10s
+  sleep 30s
   set +e
   mina client status
   status_exit_code=$?

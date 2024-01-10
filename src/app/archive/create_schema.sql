@@ -69,9 +69,9 @@ CREATE TYPE transaction_status AS ENUM ('applied', 'failed');
 CREATE TABLE user_commands
 ( id             serial              PRIMARY KEY
 , command_type   user_command_type   NOT NULL
-, fee_payer_id   int                 NOT NULL REFERENCES account_identifiers(id)
-, source_id      int                 NOT NULL REFERENCES account_identifiers(id)
-, receiver_id    int                 NOT NULL REFERENCES account_identifiers(id)
+, fee_payer_id   int                 NOT NULL REFERENCES public_keys(id)
+, source_id      int                 NOT NULL REFERENCES public_keys(id)
+, receiver_id    int                 NOT NULL REFERENCES public_keys(id)
 , nonce          bigint              NOT NULL
 , amount         text
 , fee            text                NOT NULL
@@ -85,7 +85,7 @@ CREATE TYPE internal_command_type AS ENUM ('fee_transfer_via_coinbase', 'fee_tra
 CREATE TABLE internal_commands
 ( id            serial                PRIMARY KEY
 , command_type  internal_command_type NOT NULL
-, receiver_id   int                   NOT NULL REFERENCES account_identifiers(id)
+, receiver_id   int                   NOT NULL REFERENCES public_keys(id)
 , fee           text                  NOT NULL
 , hash          text                  NOT NULL
 , UNIQUE (hash,command_type)
@@ -127,27 +127,41 @@ CREATE TABLE epoch_data
 , start_checkpoint text   NOT NULL
 , lock_checkpoint  text   NOT NULL
 , epoch_length     bigint NOT NULL
+, UNIQUE (seed, ledger_hash_id, total_currency, start_checkpoint, lock_checkpoint, epoch_length)
+);
+
+CREATE TABLE protocol_versions
+( id               serial PRIMARY KEY
+, transaction      int    NOT NULL
+, network          int    NOT NULL
+, patch            int    NOT NULL
+, UNIQUE (transaction,network,patch)
 );
 
 CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');
 
+/* last_vrf_output is a sequence of hex-digit pairs derived from a bitstring */
 CREATE TABLE blocks
-( id                           serial PRIMARY KEY
-, state_hash                   text   NOT NULL UNIQUE
-, parent_id                    int                    REFERENCES blocks(id)
-, parent_hash                  text   NOT NULL
-, creator_id                   int    NOT NULL        REFERENCES public_keys(id)
-, block_winner_id              int    NOT NULL        REFERENCES public_keys(id)
-, snarked_ledger_hash_id       int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
-, staking_epoch_data_id        int    NOT NULL        REFERENCES epoch_data(id)
-, next_epoch_data_id           int    NOT NULL        REFERENCES epoch_data(id)
-, min_window_density           bigint NOT NULL
-, total_currency               text   NOT NULL
-, ledger_hash                  text   NOT NULL
-, height                       bigint NOT NULL
-, global_slot_since_hard_fork  bigint NOT NULL
-, global_slot_since_genesis    bigint NOT NULL
-, timestamp                    text   NOT NULL
+( id                           serial   PRIMARY KEY
+, state_hash                   text     NOT NULL UNIQUE
+, parent_id                    int                      REFERENCES blocks(id)
+, parent_hash                  text     NOT NULL
+, creator_id                   int      NOT NULL        REFERENCES public_keys(id)
+, block_winner_id              int      NOT NULL        REFERENCES public_keys(id)
+, last_vrf_output              text     NOT NULL
+, snarked_ledger_hash_id       int      NOT NULL        REFERENCES snarked_ledger_hashes(id)
+, staking_epoch_data_id        int      NOT NULL        REFERENCES epoch_data(id)
+, next_epoch_data_id           int      NOT NULL        REFERENCES epoch_data(id)
+, min_window_density           bigint   NOT NULL
+, sub_window_densities         bigint[] NOT NULL
+, total_currency               text     NOT NULL
+, ledger_hash                  text     NOT NULL
+, height                       bigint   NOT NULL
+, global_slot_since_hard_fork  bigint   NOT NULL
+, global_slot_since_genesis    bigint   NOT NULL
+, protocol_version_id          int      NOT NULL        REFERENCES protocol_versions(id)
+, proposed_protocol_version_id int                      REFERENCES protocol_versions(id)
+, timestamp                    text     NOT NULL
 , chain_status                 chain_status_type NOT NULL
 );
 

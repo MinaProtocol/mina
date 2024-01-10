@@ -8,6 +8,7 @@
    async_unix
    core
    base
+   base.caml
    core_kernel
    sexplib0
    yojson
@@ -46,7 +47,7 @@
    mina_wire_types
    )
   (library_flags -linkall)
-  (inline_tests)
+  (inline_tests (flags -verbose -show-counts))
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane))
   (instrumentation (backend bisect_ppx)))

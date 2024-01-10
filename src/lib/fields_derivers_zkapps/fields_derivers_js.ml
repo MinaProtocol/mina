@@ -75,6 +75,7 @@ module Js_layout = struct
     | UInt32
     | UInt64
     | PublicKey
+    | Sign
     | Custom of string
 
   let leaf_type_to_string = function
@@ -94,11 +95,22 @@ module Js_layout = struct
         "UInt64"
     | PublicKey ->
         "PublicKey"
+    | Sign ->
+        "Sign"
     | Custom s ->
         s
 
+  type option_type =
+    | Flagged_option
+    | Closed_interval of (string * string)
+    | Or_undefined
+
   let leaf_type (s : leaf_type) =
     `Assoc [ ("type", `String (leaf_type_to_string s)) ]
+
+  let of_layout layout obj =
+    obj#js_layout := layout ;
+    obj
 
   let skip obj =
     obj#skip := true ;
@@ -130,29 +142,53 @@ module Js_layout = struct
         ] ;
     obj
 
-  let option x obj ~(js_type : [ `Flagged_option | `Or_undefined ]) : _ Input.t
-      =
-    let inner = !(x#js_layout) in
-    let js_type =
-      match js_type with
-      | `Flagged_option ->
-          "flaggedOption"
-      | `Or_undefined ->
-          "orUndefined"
-    in
+  let record (entries : (string * 'a) list) (obj : _ Input.t) : _ Input.t =
     obj#js_layout :=
       `Assoc
-        [ ("type", `String "option")
-        ; ("optionType", `String js_type)
-        ; ("inner", inner)
+        [ ("type", `String "object")
+        ; ("name", `String "Anonymous")
+        ; ("docs", `Null)
+        ; ("keys", `List (List.map ~f:(fun (key, _) -> `String key) entries))
+        ; ( "entries"
+          , `Assoc (List.map ~f:(fun (key, inner) -> (key, inner)) entries) )
+        ; ( "docEntries"
+          , `Assoc (List.map ~f:(fun (key, _) -> (key, `String "")) entries) )
         ] ;
+    obj
+
+  let option x obj ~(js_type : option_type) : _ Input.t =
+    let inner = !(x#js_layout) in
+    let layout =
+      match js_type with
+      | Flagged_option ->
+          `Assoc
+            [ ("type", `String "option")
+            ; ("optionType", `String "flaggedOption")
+            ; ("inner", inner)
+            ]
+      | Closed_interval (min, max) ->
+          `Assoc
+            [ ("type", `String "option")
+            ; ("optionType", `String "closedInterval")
+            ; ("rangeMin", `String min)
+            ; ("rangeMax", `String max)
+            ; ("inner", inner)
+            ]
+      | Or_undefined ->
+          `Assoc
+            [ ("type", `String "option")
+            ; ("optionType", `String "orUndefined")
+            ; ("inner", inner)
+            ]
+    in
+    obj#js_layout := layout ;
     obj
 
   let wrapped x obj =
     obj#js_layout := !(x#js_layout) ;
     obj
 
-  let with_checked ~name (x : _ Input.t) (obj : _ Input.t) =
+  let needs_custom_js ~name (x : _ Input.t) (obj : _ Input.t) =
     match !(obj#js_layout) with
     | `Assoc layout ->
         obj#js_layout :=

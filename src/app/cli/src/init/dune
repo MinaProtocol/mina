@@ -20,7 +20,9 @@
    async_unix
    uri
    core_kernel
+   core_kernel.uuid
    core
+   core.uuid
    base
    async
    cohttp
@@ -28,10 +30,13 @@
    async.async_command
    async_rpc_kernel
    base.caml
+   base.base_internalhash_types
    graphql-cohttp
    cohttp-async
    graphql-async
+   mirage-crypto-ec
    ;;local libraries
+   snark_profiler_lib
    archive_lib
    mina_wire_types
    perf_histograms
@@ -49,6 +54,7 @@
    user_command_input
    network_peer
    logger
+   itn_logger
    coda_genesis_proof
    data_hash_lib
    currency
@@ -58,6 +64,7 @@
    node_status
    o1trace_webkit_event
    generated_graphql_queries
+   itn_crypto
    mina_transaction
    mina_generators
    mina_user_error
@@ -90,7 +97,7 @@
    participating_state
    staged_ledger
    mina_commands
-   coda_runtime_config
+   mina_runtime_config
    coda_genesis_ledger
    mina_networking
    sgn
@@ -110,7 +117,10 @@
    pickles
    pickles.backend
    snark_params
+   mina_signature_kind
+   string_sign
    zkapp_command_builder
+   internal_tracing
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh

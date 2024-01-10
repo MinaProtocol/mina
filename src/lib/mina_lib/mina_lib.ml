@@ -117,8 +117,13 @@ type t =
       ([ `Path of string ] option * [ `Log ] option) ref
   ; block_production_status :
       [ `Producing | `Producing_in_ms of float | `Free ] ref
+  ; in_memory_reverse_structured_log_messages_for_integration_test :
+      (int * string list * bool) ref
+  ; vrf_evaluation_state : Block_producer.Vrf_evaluation_state.t
   }
 [@@deriving fields]
+
+let vrf_evaluation_state t = t.vrf_evaluation_state
 
 let time_controller t = t.config.time_controller
 
@@ -248,6 +253,8 @@ module Snark_worker = struct
     snark_worker_process
 
   let start t =
+    O1trace.thread "snark_worker"
+    @@ fun () ->
     match t.processes.snark_worker with
     | `On ({ process = process_ivar; kill_ivar; _ }, _) ->
         [%log' debug t.config.logger] !"Starting snark worker process" ;
@@ -437,7 +444,8 @@ let get_node_state t =
   }
 
 (* This is a hack put in place to deal with nodes getting stuck
-   in Offline states, that is, not receiving blocks for an extended period.
+   in Offline states, that is, not receiving blocks for an extended period,
+   or stuck in Bootstrap for too long
 
    To address this, we restart the libp2p helper when we become offline. *)
 let next_helper_restart = ref None
@@ -446,12 +454,21 @@ let offline_shutdown = ref None
 
 exception Offline_shutdown
 
+exception Bootstrap_stuck_shutdown
+
 let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
   let restart_delay = Time.Span.of_min 5. in
   let offline_shutdown_delay = Time.Span.of_min 25. in
+  let after_genesis =
+    let genesis_timestamp =
+      Genesis_constants.(
+        genesis_timestamp_of_string genesis_state_timestamp_string)
+    in
+    fun () -> Time.(( >= ) (now ())) genesis_timestamp
+  in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -461,29 +478,31 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
         else
           match online_status with
           | `Offline ->
-              ( match !next_helper_restart with
-              | None ->
-                  next_helper_restart :=
-                    Some
-                      (Async.Clock.Event.run_after restart_delay
-                         (fun () ->
-                           [%log info]
-                             "Offline for too long; restarting libp2p_helper" ;
-                           Mina_networking.restart_helper net ;
-                           next_helper_restart := None ;
-                           match !offline_shutdown with
-                           | None ->
-                               offline_shutdown :=
-                                 Some
-                                   (Async.Clock.Event.run_after
-                                      offline_shutdown_delay
-                                      (fun () -> raise Offline_shutdown)
-                                      () )
-                           | Some _ ->
-                               () )
-                         () )
-              | Some _ ->
-                  () ) ;
+              (* nothing to do if offline before genesis *)
+              ( if after_genesis () then
+                match !next_helper_restart with
+                | None ->
+                    next_helper_restart :=
+                      Some
+                        (Async.Clock.Event.run_after restart_delay
+                           (fun () ->
+                             [%log info]
+                               "Offline for too long; restarting libp2p_helper" ;
+                             Mina_networking.restart_helper net ;
+                             next_helper_restart := None ;
+                             match !offline_shutdown with
+                             | None ->
+                                 offline_shutdown :=
+                                   Some
+                                     (Async.Clock.Event.run_after
+                                        offline_shutdown_delay
+                                        (fun () -> raise Offline_shutdown)
+                                        () )
+                             | Some _ ->
+                                 () )
+                           () )
+                | Some _ ->
+                    () ) ;
               let is_empty = function `Empty -> true | _ -> false in
               if is_empty first_connection then (
                 [%str_log info] Connecting ;
@@ -520,6 +539,9 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     let offline_timeout_duration = Time.Span.of_min offline_timeout_min in
     let offline_timeout = ref None in
     let offline_warned = ref false in
+    let bootstrap_timeout_min = 120.0 in
+    let bootstrap_timeout_duration = Time.Span.of_min bootstrap_timeout_min in
+    let bootstrap_timeout = ref None in
     let log_offline_warning _tm =
       [%log error]
         "Daemon has not received any gossip messages for %0.0f minutes; check \
@@ -549,16 +571,48 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
       | None ->
           ()
     in
-    let handle_status_change status =
-      if match status with `Offline -> true | _ -> false then
-        start_offline_timeout ()
-      else stop_offline_timeout ()
+    let log_bootstrap_error_and_restart _tm =
+      [%log error] "Daemon has been in bootstrap for %0.0f minutes"
+        bootstrap_timeout_min ;
+      raise Bootstrap_stuck_shutdown
+    in
+    let start_bootstrap_timeout () =
+      match !bootstrap_timeout with
+      | Some _ ->
+          ()
+      | None ->
+          (* don't check bootstrap timeout before genesis *)
+          if after_genesis () then
+            bootstrap_timeout :=
+              Some
+                (Timeout.create () bootstrap_timeout_duration
+                   ~f:log_bootstrap_error_and_restart )
+    in
+    let stop_bootstrap_timeout () =
+      match !bootstrap_timeout with
+      | Some timeout ->
+          Timeout.cancel () timeout () ;
+          bootstrap_timeout := None
+      | None ->
+          ()
+    in
+    let handle_status_change (sync_status : Sync_status.t) =
+      ( match sync_status with
+      | `Offline ->
+          start_offline_timeout ()
+      | _ ->
+          stop_offline_timeout () ) ;
+      match sync_status with
+      | `Bootstrap ->
+          start_bootstrap_timeout ()
+      | _ ->
+          stop_bootstrap_timeout ()
     in
     Observer.on_update_exn observer ~f:(function
-      | Initialized value ->
-          handle_status_change value
-      | Changed (_, value) ->
-          handle_status_change value
+      | Initialized sync_status ->
+          handle_status_change sync_status
+      | Changed (_old_sync_status, new_sync_status) ->
+          handle_status_change new_sync_status
       | Invalidated ->
           () ) ) ;
   (* recompute Mina status on an interval *)
@@ -585,40 +639,49 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 let best_ledger = compose_of_option best_ledger_opt
 
 let get_ledger t state_hash_opt =
-  let open Or_error.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   let%bind state_hash =
-    Option.value_map state_hash_opt ~f:Or_error.return
-      ~default:
-        ( match best_tip t with
-        | `Active bc ->
-            Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
-        | `Bootstrapping ->
-            Or_error.error_string
-              "get_ledger: can't get staged ledger hash while bootstrapping" )
+    Deferred.return
+    @@ Option.value_map state_hash_opt ~f:Or_error.return
+         ~default:
+           ( match best_tip t with
+           | `Active bc ->
+               Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
+           | `Bootstrapping ->
+               Or_error.error_string
+                 "get_ledger: can't get staged ledger hash while bootstrapping"
+           )
   in
-  let%bind frontier = t.components.transition_frontier |> peek_frontier in
+  let%bind frontier =
+    t.components.transition_frontier |> peek_frontier |> Deferred.return
+  in
   match Transition_frontier.find frontier state_hash with
   | Some b ->
       let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
-      Ok (Ledger.to_list (Staged_ledger.ledger staged_ledger))
+      let%map.Deferred accounts =
+        Ledger.to_list (Staged_ledger.ledger staged_ledger)
+      in
+      Ok accounts
   | None ->
-      Or_error.error_string
-        "get_ledger: state hash not found in transition frontier"
+      Deferred.return
+      @@ Or_error.error_string "state hash not found in transition frontier"
 
 let get_snarked_ledger t state_hash_opt =
-  let open Or_error.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   let%bind state_hash =
-    Option.value_map state_hash_opt ~f:Or_error.return
+    Option.value_map state_hash_opt ~f:Deferred.Or_error.return
       ~default:
         ( match best_tip t with
         | `Active bc ->
-            Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
+            Deferred.Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
         | `Bootstrapping ->
-            Or_error.error_string
+            Deferred.Or_error.error_string
               "get_snarked_ledger: can't get snarked ledger hash while \
                bootstrapping" )
   in
-  let%bind frontier = t.components.transition_frontier |> peek_frontier in
+  let%bind frontier =
+    t.components.transition_frontier |> peek_frontier |> Deferred.return
+  in
   match Transition_frontier.find frontier state_hash with
   | Some b ->
       let root_snarked_ledger =
@@ -626,61 +689,50 @@ let get_snarked_ledger t state_hash_opt =
       in
       let ledger = Ledger.of_database root_snarked_ledger in
       let path = Transition_frontier.path_map frontier b ~f:Fn.id in
-      let%bind _ =
-        List.fold_until ~init:(Ok ()) path
-          ~f:(fun _acc b ->
+      let%bind () =
+        Mina_stdlib.Deferred.Result.List.iter path ~f:(fun b ->
             if Transition_frontier.Breadcrumb.just_emitted_a_proof b then
-              match
-                Staged_ledger.proof_txns_with_state_hashes
-                  (Transition_frontier.Breadcrumb.staged_ledger b)
-              with
-              | None ->
-                  Stop
-                    (Or_error.error_string
-                       (sprintf
-                          "No transactions corresponding to the emitted proof \
-                           for state_hash:%s"
-                          (State_hash.to_base58_check
-                             (Transition_frontier.Breadcrumb.state_hash b) ) ) )
-              | Some txns -> (
-                  match
-                    List.fold_until ~init:(Ok ())
-                      (Non_empty_list.to_list txns)
-                      ~f:(fun _acc (txn, state_hash) ->
-                        (*Validate transactions against the protocol state associated with the transaction*)
-                        match
-                          Transition_frontier.find_protocol_state frontier
-                            state_hash
-                        with
-                        | Some state -> (
-                            let txn_state_view =
-                              Mina_state.Protocol_state.body state
-                              |> Mina_state.Protocol_state.Body.view
-                            in
-                            match
-                              Ledger.apply_transaction
-                                ~constraint_constants:
-                                  t.config.precomputed_values
-                                    .constraint_constants ~txn_state_view ledger
-                                txn.data
-                            with
-                            | Ok _ ->
-                                Continue (Ok ())
-                            | e ->
-                                Stop (Or_error.map e ~f:ignore) )
-                        | None ->
-                            Stop
-                              (Or_error.errorf
-                                 !"Coudln't find protocol state with hash %s"
-                                 (State_hash.to_base58_check state_hash) ) )
-                      ~finish:Fn.id
-                  with
-                  | Ok _ ->
-                      Continue (Ok ())
-                  | e ->
-                      Stop e )
-            else Continue (Ok ()) )
-          ~finish:Fn.id
+              (*Validate transactions against the protocol state associated with the transaction*)
+              let get_protocol_state state_hash =
+                match
+                  Transition_frontier.find_protocol_state frontier state_hash
+                with
+                | Some s ->
+                    Ok s
+                | None ->
+                    Or_error.errorf "Failed to find protocol state for hash %s"
+                      (State_hash.to_base58_check state_hash)
+              in
+              let apply_first_pass =
+                Ledger.apply_transaction_first_pass
+                  ~constraint_constants:
+                    t.config.precomputed_values.constraint_constants
+              in
+              let apply_second_pass = Ledger.apply_transaction_second_pass in
+              let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
+                  sparse_ledger txn =
+                let open Or_error.Let_syntax in
+                let%map _ledger, partial_txn =
+                  Mina_ledger.Sparse_ledger.apply_transaction_first_pass
+                    ~constraint_constants:
+                      t.config.precomputed_values.constraint_constants
+                    ~global_slot ~txn_state_view sparse_ledger txn
+                in
+                partial_txn
+              in
+              Staged_ledger.Scan_state.get_snarked_ledger_async ~ledger
+                ~get_protocol_state ~apply_first_pass ~apply_second_pass
+                ~apply_first_pass_sparse_ledger
+                (Staged_ledger.scan_state
+                   (Transition_frontier.Breadcrumb.staged_ledger b) )
+              |> Deferred.Result.map_error ~f:(fun e ->
+                     Error.createf
+                       "Failed to apply proof transactions for state_hash:%s : \
+                        %s"
+                       (State_hash.to_base58_check
+                          (Transition_frontier.Breadcrumb.state_hash b) )
+                       (Error.to_string_hum e) )
+            else return () )
       in
       let snarked_ledger_hash =
         Transition_frontier.Breadcrumb.block b
@@ -690,17 +742,17 @@ let get_snarked_ledger t state_hash_opt =
       in
       let merkle_root = Ledger.merkle_root ledger in
       if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then (
-        let res = Ledger.to_list ledger in
+        let%map.Deferred res = Ledger.to_list ledger in
         ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
         Ok res )
       else
-        Or_error.errorf
+        Deferred.Or_error.errorf
           "Expected snarked ledger hash %s but got %s for state hash %s"
           (Frozen_ledger_hash.to_base58_check snarked_ledger_hash)
           (Frozen_ledger_hash.to_base58_check merkle_root)
           (State_hash.to_base58_check state_hash)
   | None ->
-      Or_error.error_string
+      Deferred.Or_error.error_string
         "get_snarked_ledger: state hash not found in transition frontier"
 
 let get_account t aid =
@@ -875,7 +927,7 @@ let best_chain ?max_length t =
   let best_tip_path = Transition_frontier.best_tip_path ?max_length frontier in
   match max_length with
   | Some max_length
-    when Mina_stdlib.List.Length.Compare.(best_tip_path > max_length) ->
+    when Mina_stdlib.List.Length.Compare.(best_tip_path >= max_length) ->
       (* The [best_tip_path] has already been truncated to the correct length,
          we skip adding the root to stay below the maximum.
       *)
@@ -960,19 +1012,27 @@ let add_full_transactions t user_commands =
     |> Deferred.don't_wait_for ;
     Ivar.read result_ivar
   in
-  let too_big_err =
+  let well_formed_errors =
     List.find_map user_commands ~f:(fun cmd ->
-        let size_validity =
-          User_command.valid_size
+        match
+          User_command.check_well_formedness
             ~genesis_constants:t.config.precomputed_values.genesis_constants cmd
-        in
-        match size_validity with Ok () -> None | Error err -> Some err )
+        with
+        | Ok () ->
+            None
+        | Error errs ->
+            Some errs )
   in
-  match too_big_err with
+  match well_formed_errors with
   | None ->
       add_all_txns ()
-  | Some err ->
-      Deferred.Result.fail err
+  | Some errs ->
+      let error =
+        Error.of_string
+          ( List.map errs ~f:User_command.Well_formedness_error.to_string
+          |> String.concat ~sep:"," )
+      in
+      Deferred.Result.fail error
 
 let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
   let add_all_txns () =
@@ -983,20 +1043,28 @@ let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
     |> Deferred.don't_wait_for ;
     Ivar.read result_ivar
   in
-  let too_big_err =
-    List.find_map zkapp_commands ~f:(fun zkapp_command ->
-        let size_validity =
-          Zkapp_command.valid_size
+  let well_formed_errors =
+    List.find_map zkapp_commands ~f:(fun cmd ->
+        match
+          User_command.check_well_formedness
             ~genesis_constants:t.config.precomputed_values.genesis_constants
-            zkapp_command
-        in
-        match size_validity with Ok () -> None | Error err -> Some err )
+            (Zkapp_command cmd)
+        with
+        | Ok () ->
+            None
+        | Error errs ->
+            Some errs )
   in
-  match too_big_err with
+  match well_formed_errors with
   | None ->
       add_all_txns ()
-  | Some err ->
-      Deferred.Result.fail err
+  | Some errs ->
+      let error =
+        Error.of_string
+          ( List.map errs ~f:User_command.Well_formedness_error.to_string
+          |> String.concat ~sep:"," )
+      in
+      Deferred.Result.fail error
 
 let next_producer_timing t = t.next_producer_timing
 
@@ -1322,7 +1390,8 @@ let start t =
       ~transition_writer:t.pipes.producer_transition_writer
       ~log_block_creation:t.config.log_block_creation
       ~block_reward_threshold:t.config.block_reward_threshold
-      ~block_produced_bvar:t.components.block_produced_bvar ;
+      ~block_produced_bvar:t.components.block_produced_bvar
+      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -1330,7 +1399,7 @@ let start t =
         Node_status_service.start ~logger:t.config.logger ~node_status_url
           ~network:t.components.net
           ~transition_frontier:t.components.transition_frontier
-          ~sync_status:t.sync_status
+          ~sync_status:t.sync_status ~chain_id:t.config.chain_id
           ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
           ~start_time:t.config.start_time
           ~slot_duration:
@@ -1339,12 +1408,17 @@ let start t =
     | None ->
         ()
   in
+  let built_with_commit_sha =
+    if t.config.uptime_send_node_commit then Some Mina_version.commit_id_short
+    else None
+  in
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
     ~transition_frontier:t.components.transition_frontier
     ~time_controller:t.config.time_controller
     ~block_produced_bvar:t.components.block_produced_bvar
     ~uptime_submitter_keypair:t.config.uptime_submitter_keypair
+    ~graphql_control_port:t.config.graphql_control_port ~built_with_commit_sha
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)
     ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;
@@ -1399,6 +1473,12 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
   in
   able_to_send_or_wait ()
 
+module type Itn_settable = sig
+  type t
+
+  val set_itn_logger_data : t -> daemon_port:int -> unit Deferred.Or_error.t
+end
+
 let create ?wallets (config : Config.t) =
   let module Context = (val context config) in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
@@ -1406,6 +1486,21 @@ let create ?wallets (config : Config.t) =
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
+      let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
+          =
+        if Mina_compile_config.itn_features then
+          let ({ client_port; _ } : Node_addrs_and_ports.t) =
+            config.gossip_net_params.addrs_and_ports
+          in
+          match%map M.set_itn_logger_data t ~daemon_port:client_port with
+          | Ok () ->
+              ()
+          | Error err ->
+              [%log' warn config.logger]
+                "Error when setting ITN logger data: %s"
+                (Error.to_string_hum err)
+        else Deferred.unit
+      in
       O1trace.thread "mina_lib" (fun () ->
           let%bind prover =
             Monitor.try_with ~here:[%here]
@@ -1418,10 +1513,17 @@ let create ?wallets (config : Config.t) =
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
               (fun () ->
                 O1trace.thread "manage_prover_subprocess" (fun () ->
-                    Prover.create ~logger:config.logger
-                      ~proof_level:config.precomputed_values.proof_level
-                      ~constraint_constants ~pids:config.pids
-                      ~conf_dir:config.conf_dir ) )
+                    let%bind prover =
+                      Prover.create ~logger:config.logger
+                        ~enable_internal_tracing:
+                          (Internal_tracing.is_enabled ())
+                        ~internal_trace_filename:"prover-internal-trace.jsonl"
+                        ~proof_level:config.precomputed_values.proof_level
+                        ~constraint_constants ~pids:config.pids
+                        ~conf_dir:config.conf_dir ()
+                    in
+                    let%map () = set_itn_data (module Prover) prover in
+                    prover ) )
             >>| Result.ok_exn
           in
           let%bind verifier =
@@ -1436,13 +1538,36 @@ let create ?wallets (config : Config.t) =
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
               (fun () ->
                 O1trace.thread "manage_verifier_subprocess" (fun () ->
-                    Verifier.create ~logger:config.logger
-                      ~proof_level:config.precomputed_values.proof_level
-                      ~constraint_constants:
-                        config.precomputed_values.constraint_constants
-                      ~pids:config.pids ~conf_dir:(Some config.conf_dir) ) )
+                    let%bind verifier =
+                      Verifier.create ~logger:config.logger
+                        ~enable_internal_tracing:
+                          (Internal_tracing.is_enabled ())
+                        ~internal_trace_filename:"verifier-internal-trace.jsonl"
+                        ~proof_level:config.precomputed_values.proof_level
+                        ~constraint_constants:
+                          config.precomputed_values.constraint_constants
+                        ~pids:config.pids ~conf_dir:(Some config.conf_dir) ()
+                    in
+                    let%map () = set_itn_data (module Verifier) verifier in
+                    verifier ) )
             >>| Result.ok_exn
           in
+          (* This setup is required for the dynamic enabling/disabling of internal
+             tracing to also work with the verifier and prover sub-processes. *)
+          Internal_tracing.register_toggle_callback (fun enabled ->
+              let%map result =
+                Verifier.toggle_internal_tracing verifier enabled
+              in
+              Or_error.iter_error result ~f:(fun error ->
+                  [%log' warn config.logger]
+                    "Failed to toggle verifier internal tracing: $error"
+                    ~metadata:[ ("error", `String (Error.to_string_hum error)) ] ) ) ;
+          Internal_tracing.register_toggle_callback (fun enabled ->
+              let%map result = Prover.toggle_internal_tracing prover enabled in
+              Or_error.iter_error result ~f:(fun error ->
+                  [%log' warn config.logger]
+                    "Failed to toggle prover internal tracing: $error"
+                    ~metadata:[ ("error", `String (Error.to_string_hum error)) ] ) ) ;
           let%bind vrf_evaluator =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -1481,20 +1606,19 @@ let create ?wallets (config : Config.t) =
                       (fun exn ->
                         let err = Error.of_exn ~backtrace:`Get exn in
                         [%log' fatal config.logger]
-                          "unhandled exception from uptime service SNARK \
-                           worker: $exn, terminating daemon"
+                          "unhandled exception when creating uptime service \
+                           SNARK worker: $exn, terminating daemon"
                           ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ;
                         (* make sure Async shutdown handlers are called *)
                         don't_wait_for (Async.exit 1) ) )
                   (fun () ->
-                    O1trace.thread "manage_uptimer_snark_worker_subprocess"
+                    O1trace.thread "manage_uptime_snark_worker_subprocess"
                       (fun () ->
                         Uptime_service.Uptime_snark_worker.create
                           ~logger:config.logger ~pids:config.pids ) )
                 >>| Result.ok )
           in
           log_snark_coordinator_warning config snark_worker ;
-          Protocol_version.set_current config.initial_protocol_version ;
           Protocol_version.set_proposed_opt config.proposed_protocol_version_opt ;
           let log_rate_limiter_occasionally rl ~label =
             let t = Time.Span.of_min 1. in
@@ -1703,11 +1827,6 @@ let create ?wallets (config : Config.t) =
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-              ~expiry_ns:
-                (Time_ns.Span.of_hr
-                   (Float.of_int
-                      config.precomputed_values.genesis_constants
-                        .transaction_expiry_hr ) )
               ~on_remote_push:notify_online
               ~log_gossip_heard:
                 config.net_config.log_gossip_heard.transaction_pool_diff
@@ -1717,16 +1836,11 @@ let create ?wallets (config : Config.t) =
               ~trust_system:config.trust_system
               ~disk_location:config.snark_pool_disk_location
           in
-          let%bind snark_pool, snark_remote_sink, snark_local_sink =
-            Network_pool.Snark_pool.load ~config:snark_pool_config
+          let snark_pool, snark_remote_sink, snark_local_sink =
+            Network_pool.Snark_pool.create ~config:snark_pool_config
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-              ~expiry_ns:
-                (Time_ns.Span.of_hr
-                   (Float.of_int
-                      config.precomputed_values.genesis_constants
-                        .transaction_expiry_hr ) )
               ~on_remote_push:notify_online
               ~log_gossip_heard:
                 config.net_config.log_gossip_heard.snark_pool_diff
@@ -1739,8 +1853,9 @@ let create ?wallets (config : Config.t) =
               ; on_push = notify_online
               ; log_gossip_heard = config.net_config.log_gossip_heard.new_state
               ; time_controller = config.net_config.time_controller
-              ; consensus_constants = config.net_config.consensus_constants
+              ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
+              ; constraint_constants
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
@@ -1915,7 +2030,9 @@ let create ?wallets (config : Config.t) =
                 (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
               ~catchup_mode ~network_transition_reader:block_reader
               ~producer_transition_reader ~most_recent_valid_block
-              ~notify_online
+              ~get_completed_work:
+                (Network_pool.Snark_pool.get_completed_work snark_pool)
+              ~notify_online ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -1936,7 +2053,7 @@ let create ?wallets (config : Config.t) =
               log_rate_limiter_occasionally rl ~label:"broadcast_transactions" ;
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
-                ~f:(fun cmds ->
+                ~f:(fun Network_pool.With_nonce.{ message; nonce } ->
                   (* the commands had valid sizes when added to the transaction pool
                      don't need to check sizes again for broadcast
                   *)
@@ -1946,9 +2063,10 @@ let create ?wallets (config : Config.t) =
                         Network_pool.Transaction_pool.Resource_pool.Diff.score
                       ~max_per_15_seconds:
                         Network_pool.Transaction_pool.Resource_pool.Diff
-                        .max_per_15_seconds cmds
+                        .max_per_15_seconds message
                   in
-                  Mina_networking.broadcast_transaction_pool_diff net cmds ) ) ;
+                  Mina_networking.broadcast_transaction_pool_diff ~nonce net
+                    message ) ) ;
           O1trace.background_thread "broadcast_blocks" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
@@ -1992,9 +2110,6 @@ let create ?wallets (config : Config.t) =
                             valid_cb
                       | `Internal ->
                           (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
-                          don't_wait_for
-                            (Mina_networking.broadcast_state net
-                               (Mina_block.Validated.forget transition) ) ;
                           Option.iter
                             ~f:
                               (Fn.flip
@@ -2075,16 +2190,16 @@ let create ?wallets (config : Config.t) =
               let rl = Network_pool.Snark_pool.create_rate_limiter () in
               log_rate_limiter_occasionally rl ~label:"broadcast_snark_work" ;
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
-                ~f:(fun x ->
+                ~f:(fun Network_pool.With_nonce.{ message; nonce } ->
                   let%bind () =
                     send_resource_pool_diff_or_wait ~rl
                       ~diff_score:
                         Network_pool.Snark_pool.Resource_pool.Diff.score
                       ~max_per_15_seconds:
                         Network_pool.Snark_pool.Resource_pool.Diff
-                        .max_per_15_seconds x
+                        .max_per_15_seconds message
                   in
-                  Mina_networking.broadcast_snark_pool_diff net x ) ) ;
+                  Mina_networking.broadcast_snark_pool_diff ~nonce net message ) ) ;
           Option.iter config.archive_process_location
             ~f:(fun archive_process_port ->
               [%log' info config.logger]
@@ -2174,6 +2289,10 @@ let create ?wallets (config : Config.t) =
             ; sync_status
             ; precomputed_block_writer
             ; block_production_status = ref `Free
+            ; in_memory_reverse_structured_log_messages_for_integration_test =
+                ref (0, [], false)
+            ; vrf_evaluation_state =
+                Block_producer.Vrf_evaluation_state.create ()
             } ) )
 
 let net { components = { net; _ }; _ } = net
@@ -2181,4 +2300,51 @@ let net { components = { net; _ }; _ } = net
 let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
 
+let start_filtered_log
+    ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
+    (structured_log_ids : string list) =
+  let handle str =
+    let idx, old_messages, started =
+      !in_memory_reverse_structured_log_messages_for_integration_test
+    in
+    in_memory_reverse_structured_log_messages_for_integration_test :=
+      (idx + 1, str :: old_messages, started)
+  in
+  let _, _, started =
+    !in_memory_reverse_structured_log_messages_for_integration_test
+  in
+  if started then Or_error.error_string "Already initialized"
+  else (
+    in_memory_reverse_structured_log_messages_for_integration_test :=
+      (0, [], true) ;
+    let event_set =
+      Structured_log_events.Set.of_list
+      @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
+    in
+    Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+      ~processor:(Logger.Processor.raw_structured_log_events event_set)
+      ~transport:(Logger.Transport.raw handle) ;
+    Ok () )
+
+let get_filtered_log_entries
+    ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
+    (idx : int) =
+  let rec get_from_idx curr_idx rev_messages output =
+    if idx < curr_idx then
+      match rev_messages with
+      | [] ->
+          output
+      | msg :: rev_messages ->
+          get_from_idx (curr_idx - 1) rev_messages (msg :: output)
+    else output
+  in
+  let curr_idx, messages, is_started =
+    !in_memory_reverse_structured_log_messages_for_integration_test
+  in
+  (get_from_idx curr_idx messages [], is_started)
+
 let verifier { processes = { verifier; _ }; _ } = verifier
+
+let vrf_evaluator { processes = { vrf_evaluator; _ }; _ } = vrf_evaluator
+
+let genesis_ledger t = Genesis_proof.genesis_ledger t.config.precomputed_values

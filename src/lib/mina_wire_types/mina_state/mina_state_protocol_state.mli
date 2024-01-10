@@ -14,7 +14,7 @@ module Types : sig
           type t =
             ( Mina_base_state_hash.V1.t
             , Mina_state_blockchain_state.Value.V2.t
-            , Consensus.Data.Consensus_state.Value.V1.t
+            , Consensus.Data.Consensus_state.Value.V2.t
             , Mina_base_protocol_constants_checked.Value.V1.t )
             Poly.V1.t
         end
@@ -54,7 +54,7 @@ module type Concrete = sig
         type t =
           ( Mina_base_state_hash.V1.t
           , Mina_state_blockchain_state.Value.V2.t
-          , Consensus.Data.Consensus_state.Value.V1.t
+          , Consensus.Data.Consensus_state.Value.V2.t
           , Mina_base_protocol_constants_checked.Value.V1.t )
           Poly.V1.t
       end

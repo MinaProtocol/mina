@@ -25,22 +25,23 @@ module Statement = struct
 
       let to_latest = Fn.id
 
-      type _unused = unit constraint t = Arg.Stable.V2.t
+      let (_ : (t, Arg.Stable.V2.t) Type_equal.t) = Type_equal.T
 
+      include Comparable.Make_binable (Arg.Stable.V2)
       include Hashable.Make_binable (Arg.Stable.V2)
     end
   end]
 
   type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson, equal]
 
+  include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make (Stable.Latest)
 
   let gen = One_or_two.gen Transaction_snark.Statement.gen
 
   let compact_json t =
-    `List
-      ( One_or_two.map ~f:(fun s -> `Int (Transaction_snark.Statement.hash s)) t
-      |> One_or_two.to_list )
+    let f s = `Int (Transaction_snark.Statement.hash s) in
+    `List (One_or_two.map ~f t |> One_or_two.to_list)
 
   let work_ids t : int One_or_two.t =
     One_or_two.map t ~f:Transaction_snark.Statement.hash

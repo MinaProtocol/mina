@@ -338,107 +338,114 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
               , pending_coinbases
               , protocol_states ) -> (
               let%map staged_ledger_construction_result =
-                let open Deferred.Or_error.Let_syntax in
-                let received_staged_ledger_hash =
-                  Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-                    (Staged_ledger.Scan_state.hash scan_state)
-                    expected_merkle_root pending_coinbases
-                in
-                [%log debug]
-                  ~metadata:
-                    [ ( "expected_staged_ledger_hash"
-                      , Staged_ledger_hash.to_yojson expected_staged_ledger_hash
-                      )
-                    ; ( "received_staged_ledger_hash"
-                      , Staged_ledger_hash.to_yojson received_staged_ledger_hash
-                      )
-                    ]
-                  "Comparing $expected_staged_ledger_hash to \
-                   $received_staged_ledger_hash" ;
-                let%bind new_root =
-                  t.current_root
-                  |> Mina_block.Validation.skip_frontier_dependencies_validation
-                       `This_block_belongs_to_a_detached_subtree
-                  |> Mina_block.Validation.validate_staged_ledger_hash
-                       (`Staged_ledger_already_materialized
-                         received_staged_ledger_hash )
-                  |> Result.map_error ~f:(fun _ ->
-                         Error.of_string "received faulty scan state from peer" )
-                  |> Deferred.return
-                in
-                let protocol_states =
-                  List.map protocol_states
-                    ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
-                in
-                let%bind protocol_states =
-                  Staged_ledger.Scan_state.check_required_protocol_states
-                    scan_state ~protocol_states
-                  |> Deferred.return
-                in
-                let protocol_states_map =
-                  protocol_states
-                  |> List.map ~f:(fun ps ->
-                         (State_hash.With_state_hashes.state_hash ps, ps) )
-                  |> State_hash.Map.of_alist_exn
-                in
-                let get_state hash =
-                  match Map.find protocol_states_map hash with
-                  | None ->
-                      let new_state_hash =
-                        State_hash.With_state_hashes.state_hash (fst new_root)
-                      in
-                      [%log error]
-                        ~metadata:
-                          [ ("new_root", State_hash.to_yojson new_state_hash)
-                          ; ("state_hash", State_hash.to_yojson hash)
-                          ]
-                        "Protocol state (for scan state transactions) for \
-                         $state_hash not found when bootstrapping to the new \
-                         root $new_root" ;
-                      Or_error.errorf
-                        !"Protocol state (for scan state transactions) for \
-                          %{sexp:State_hash.t} not found when bootstrapping to \
-                          the new root %{sexp:State_hash.t}"
-                        hash new_state_hash
-                  | Some protocol_state ->
-                      Ok (With_hash.data protocol_state)
-                in
-                (* Construct the staged ledger before constructing the transition
-                 * frontier in order to verify the scan state we received.
-                 * TODO: reorganize the code to avoid doing this twice (#3480) *)
-                let open Deferred.Let_syntax in
-                let%map staged_ledger_construction_time, construction_result =
-                  time_deferred
-                    (let open Deferred.Let_syntax in
-                    let temp_mask = Ledger.of_database temp_snarked_ledger in
-                    let%map result =
-                      Staged_ledger
-                      .of_scan_state_pending_coinbases_and_snarked_ledger
-                        ~logger
-                        ~snarked_local_state:
-                          Mina_block.(
-                            t.current_root |> Validation.block |> header
-                            |> Header.protocol_state
-                            |> Protocol_state.blockchain_state
-                            |> Blockchain_state.registers
-                            |> Registers.local_state)
-                        ~verifier ~constraint_constants ~scan_state
-                        ~snarked_ledger:temp_mask ~expected_merkle_root
-                        ~pending_coinbases ~get_state
+                O1trace.thread "construct_root_staged_ledger" (fun () ->
+                    let open Deferred.Or_error.Let_syntax in
+                    let received_staged_ledger_hash =
+                      Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+                        (Staged_ledger.Scan_state.hash scan_state)
+                        expected_merkle_root pending_coinbases
                     in
-                    ignore
-                      ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__
-                          temp_mask
-                        : Ledger.unattached_mask ) ;
-                    Result.map result
-                      ~f:
-                        (const
-                           ( scan_state
-                           , pending_coinbases
-                           , new_root
-                           , protocol_states ) ))
-                in
-                Ok (staged_ledger_construction_time, construction_result)
+                    [%log debug]
+                      ~metadata:
+                        [ ( "expected_staged_ledger_hash"
+                          , Staged_ledger_hash.to_yojson
+                              expected_staged_ledger_hash )
+                        ; ( "received_staged_ledger_hash"
+                          , Staged_ledger_hash.to_yojson
+                              received_staged_ledger_hash )
+                        ]
+                      "Comparing $expected_staged_ledger_hash to \
+                       $received_staged_ledger_hash" ;
+                    let%bind new_root =
+                      t.current_root
+                      |> Mina_block.Validation
+                         .skip_frontier_dependencies_validation
+                           `This_block_belongs_to_a_detached_subtree
+                      |> Mina_block.Validation.validate_staged_ledger_hash
+                           (`Staged_ledger_already_materialized
+                             received_staged_ledger_hash )
+                      |> Result.map_error ~f:(fun _ ->
+                             Error.of_string
+                               "received faulty scan state from peer" )
+                      |> Deferred.return
+                    in
+                    let protocol_states =
+                      List.map protocol_states
+                        ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
+                    in
+                    let%bind protocol_states =
+                      Staged_ledger.Scan_state.check_required_protocol_states
+                        scan_state ~protocol_states
+                      |> Deferred.return
+                    in
+                    let protocol_states_map =
+                      protocol_states
+                      |> List.map ~f:(fun ps ->
+                             (State_hash.With_state_hashes.state_hash ps, ps) )
+                      |> State_hash.Map.of_alist_exn
+                    in
+                    let get_state hash =
+                      match Map.find protocol_states_map hash with
+                      | None ->
+                          let new_state_hash =
+                            State_hash.With_state_hashes.state_hash
+                              (fst new_root)
+                          in
+                          [%log error]
+                            ~metadata:
+                              [ ("new_root", State_hash.to_yojson new_state_hash)
+                              ; ("state_hash", State_hash.to_yojson hash)
+                              ]
+                            "Protocol state (for scan state transactions) for \
+                             $state_hash not found when bootstrapping to the \
+                             new root $new_root" ;
+                          Or_error.errorf
+                            !"Protocol state (for scan state transactions) for \
+                              %{sexp:State_hash.t} not found when \
+                              bootstrapping to the new root \
+                              %{sexp:State_hash.t}"
+                            hash new_state_hash
+                      | Some protocol_state ->
+                          Ok (With_hash.data protocol_state)
+                    in
+                    (* Construct the staged ledger before constructing the transition
+                     * frontier in order to verify the scan state we received.
+                     * TODO: reorganize the code to avoid doing this twice (#3480) *)
+                    let open Deferred.Let_syntax in
+                    let%map staged_ledger_construction_time, construction_result
+                        =
+                      time_deferred
+                        (let open Deferred.Let_syntax in
+                        let temp_mask =
+                          Ledger.of_database temp_snarked_ledger
+                        in
+                        let%map result =
+                          Staged_ledger
+                          .of_scan_state_pending_coinbases_and_snarked_ledger
+                            ~logger
+                            ~snarked_local_state:
+                              Mina_block.(
+                                t.current_root |> Validation.block |> header
+                                |> Header.protocol_state
+                                |> Protocol_state.blockchain_state
+                                |> Blockchain_state.snarked_local_state)
+                            ~verifier ~constraint_constants ~scan_state
+                            ~snarked_ledger:temp_mask ~expected_merkle_root
+                            ~pending_coinbases ~get_state
+                        in
+                        ignore
+                          ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__
+                              temp_mask
+                            : Ledger.unattached_mask ) ;
+                        Result.map result
+                          ~f:
+                            (const
+                               ( scan_state
+                               , pending_coinbases
+                               , new_root
+                               , protocol_states ) ))
+                    in
+                    Ok (staged_ledger_construction_time, construction_result) )
               in
               match staged_ledger_construction_result with
               | Error err ->
@@ -524,19 +531,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                       Consensus.Hooks.sync_local_state
                         ~context:(module Context)
                         ~local_state:consensus_local_state ~trust_system
-                        ~random_peers:(fun n ->
-                          (* This port is completely made up but we only use the peer_id when doing a query, so it shouldn't matter. *)
-                          let%map peers =
-                            Mina_networking.random_peers t.network n
-                          in
-                          sender :: peers )
-                        ~query_peer:
-                          { Consensus.Hooks.Rpcs.query =
-                              (fun peer rpc query ->
-                                Mina_networking.(
-                                  query_peer t.network peer.peer_id
-                                    (Rpcs.Consensus_rpc rpc) query) )
-                          }
+                        ~glue_sync_ledger:
+                          (Mina_networking.glue_sync_ledger t.network)
                         sync_jobs
                     in
                     (true, result) )
@@ -635,13 +631,15 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                 [%log debug] "Sorting filtered transitions by consensus state"
                   ~metadata:[] ;
                 let sorted_filtered_collected_transitions =
-                  List.sort filtered_collected_transitions
-                    ~compare:
-                      (Comparable.lift
-                         ~f:
-                           (Fn.compose Mina_block.Validation.block_with_hash
-                              Envelope.Incoming.data )
-                         (external_transition_compare ~context:(module Context)) )
+                  O1trace.sync_thread "sorting_collected_transitions" (fun () ->
+                      List.sort filtered_collected_transitions
+                        ~compare:
+                          (Comparable.lift
+                             ~f:
+                               (Fn.compose Mina_block.Validation.block_with_hash
+                                  Envelope.Incoming.data )
+                             (external_transition_compare
+                                ~context:(module Context) ) ) )
                 in
                 let this_cycle =
                   { cycle_result = "success"
@@ -705,7 +703,8 @@ let%test_module "Bootstrap_controller tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            () )
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
@@ -939,8 +938,8 @@ let%test_module "Bootstrap_controller tests" =
               let snarked_local_state =
                 Transition_frontier.root frontier
                 |> Transition_frontier.Breadcrumb.protocol_state
-                |> Protocol_state.blockchain_state |> Blockchain_state.registers
-                |> Registers.local_state
+                |> Protocol_state.blockchain_state
+                |> Blockchain_state.snarked_local_state
               in
               let scan_state = Staged_ledger.scan_state staged_ledger in
               let get_state hash =

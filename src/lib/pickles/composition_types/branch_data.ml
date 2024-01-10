@@ -1,6 +1,3 @@
-open Core_kernel
-open Pickles_types
-
 (** See documentation of the {!Mina_wire_types} library *)
 module Wire_types = Mina_wire_types.Pickles_composition_types.Branch_data
 
@@ -124,7 +121,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~there:(fun (x : char) -> Field.Constant.of_int (Char.to_int x))
           ~back:(Domain_log2.of_field_exn (module Impl))
       in
-      let check (x : Field.t) = make_checked_ast (fun () -> assert_16_bits x) in
+      let check (x : Field.t) = make_checked (fun () -> assert_16_bits x) in
       Typ { t with check }
     in
     Typ.of_hlistable

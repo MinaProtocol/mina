@@ -9,6 +9,7 @@ module Side_loaded_verification_key = struct
     module V2 = struct
       type ('g, 'proofs_verified, 'vk) t =
         { max_proofs_verified : 'proofs_verified
+        ; actual_wrap_domain_size : 'proofs_verified
         ; wrap_index : 'g Pickles_types.Plonk_verification_key_evals.Stable.V2.t
         ; wrap_vk : 'vk option
         }

@@ -13,7 +13,7 @@ macro_rules! impl_poly_comm {
      ) => {
         paste! {
             use wasm_bindgen::prelude::*;
-            use commitment_dlog::commitment::PolyComm;
+            use poly_commitment::commitment::PolyComm;
 
             #[wasm_bindgen]
             #[derive(Clone)]

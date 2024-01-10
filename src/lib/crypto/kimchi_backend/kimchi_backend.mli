@@ -11,8 +11,6 @@ module Kimchi_backend_common : sig
 
       val sexp_of_t : t -> Sexplib0.Sexp.t
 
-      val compare : t -> t -> int
-
       val bin_size_t : t Bin_prot.Size.sizer
 
       val bin_write_t : t Bin_prot.Write.writer
@@ -55,6 +53,8 @@ module Kimchi_backend_common : sig
       val square : t -> t
 
       val is_square : t -> bool
+
+      val compare : t -> t -> int
 
       val equal : t -> t -> bool
 
@@ -185,8 +185,6 @@ module Pasta : sig
     (* pickles required *)
     module Pallas = Kimchi_pasta.Pasta.Pallas
   end
-
-  module Precomputed = Kimchi_pasta.Precomputed
 
   (* pickles required *)
   module Vesta_based_plonk : sig

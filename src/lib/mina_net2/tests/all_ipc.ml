@@ -135,6 +135,9 @@ let%test_module "all-ipc test" =
         | Connected, false, true ->
             status := Disconnected ;
             true
+        | Disconnected, true, true ->
+            status := Connected ;
+            true
         | _, _, _ ->
             false
       in
@@ -537,7 +540,7 @@ let%test_module "all-ipc test" =
       let%bind node =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String local_name) ])
-          ~conf_dir ~pids ~on_peer_connected ~on_peer_disconnected
+          ~conf_dir ~pids ~on_peer_connected ~on_peer_disconnected ()
         >>| Or_error.ok_exn
       in
       let%bind kp_a =

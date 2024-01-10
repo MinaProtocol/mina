@@ -210,10 +210,11 @@ let%test_module "multisig_account" =
                         ; public_output = ()
                         ; auxiliary_output = ()
                         } )
-                  ; uses_lookup = false
+                  ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
                   }
                 in
                 Pickles.compile () ~cache:Cache_dir.cache
+                  ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                   ~public_input:(Input Zkapp_statement.typ)
                   ~auxiliary_typ:Typ.unit
                   ~branches:(module Nat.N2)
@@ -258,7 +259,8 @@ let%test_module "multisig_account" =
                             ; public_output = ()
                             ; auxiliary_output = ()
                             } )
-                      ; uses_lookup = false
+                      ; feature_flags =
+                          Pickles_types.Plonk_types.Features.none_bool
                       }
                     ] )
               in
@@ -267,7 +269,6 @@ let%test_module "multisig_account" =
                   ; sender = sender, sender_nonce
                   ; receiver = multisig_account_pk
                   ; amount
-                  ; receiver_is_new = _
                   } =
                 spec
               in
@@ -291,7 +292,7 @@ let%test_module "multisig_account" =
                    Account_id.create multisig_account_pk Token_id.default
                  in
                  Ledger.get_or_create_account ledger id
-                   (Account.create id Currency.Balance.(of_int 0))
+                   (Account.create id Currency.Balance.zero)
                  |> Or_error.ok_exn
                in
                let a = Ledger.get ledger loc |> Option.value_exn in
@@ -331,17 +332,21 @@ let%test_module "multisig_account" =
                     ; balance_change =
                         Currency.Amount.(Signed.(negate (of_unsigned amount)))
                     ; increment_nonce = true
+                    ; implicit_account_creation_fee = true
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Field.zero
                     ; call_depth = 0
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
-                        ; account = Nonce (Account.Nonce.succ sender_nonce)
+                        ; account =
+                            Zkapp_precondition.Account.nonce
+                              (Account.Nonce.succ sender_nonce)
+                        ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
-                    ; caller = Call
+                    ; may_use_token = No
                     ; authorization_kind = Signature
                     }
                 ; authorization = Signature Signature.dummy
@@ -355,20 +360,23 @@ let%test_module "multisig_account" =
                     ; balance_change =
                         Currency.Amount.Signed.(of_unsigned amount)
                     ; increment_nonce = false
+                    ; implicit_account_creation_fee = true
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Field.zero
                     ; call_depth = 0
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
-                        ; account = Full Zkapp_precondition.Account.accept
+                        ; account = Zkapp_precondition.Account.accept
+                        ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
-                    ; caller = Call
-                    ; authorization_kind = Proof
+                    ; may_use_token = No
+                    ; authorization_kind = Proof (With_hash.hash vk)
                     }
-                ; authorization = Proof Mina_base.Proof.transaction_dummy
+                ; authorization =
+                    Proof (Lazy.force Mina_base.Proof.transaction_dummy)
                 }
               in
               let memo = Signed_command_memo.empty in
@@ -377,7 +385,7 @@ let%test_module "multisig_account" =
                   ~account_update_depth:(fun (p : Account_update.Simple.t) ->
                     p.body.call_depth )
                   [ sender_account_update_data; snapp_account_update_data ]
-                |> Zkapp_command.Call_forest.add_callers_simple
+                |> Zkapp_command.Call_forest.map ~f:Account_update.of_simple
                 |> Zkapp_command.Call_forest.accumulate_hashes_predicated
               in
               let account_updates_hash = Zkapp_command.Call_forest.hash ps in
@@ -389,9 +397,7 @@ let%test_module "multisig_account" =
               let tx_statement : Zkapp_statement.t =
                 { account_update =
                     Account_update.Body.digest
-                      (Zkapp_command.add_caller_simple snapp_account_update_data
-                         Token_id.default )
-                        .body
+                      (Account_update.of_simple snapp_account_update_data).body
                 ; calls = (Zkapp_command.Digest.Forest.empty :> field)
                 }
               in
@@ -460,7 +466,6 @@ let%test_module "multisig_account" =
                   }
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              ignore
-                ( U.apply_zkapp_command ledger [ zkapp_command ]
-                  : Sparse_ledger.t ) ) )
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
   end )

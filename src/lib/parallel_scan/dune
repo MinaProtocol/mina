@@ -1,7 +1,7 @@
 (library
  (name parallel_scan)
  (public_name parallel_scan)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (library_flags -linkall)
  (libraries
    ;; opam libraries
@@ -19,7 +19,7 @@
    async_unix
    ;; local libraries
    mina_metrics
-   non_empty_list
+   mina_stdlib
    pipe_lib
    state_or_error
    ppx_version.runtime

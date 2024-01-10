@@ -189,13 +189,20 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _e = Fields_derivers_js.Js_layout.skip obj in
     Fields_derivers_json.Of_yojson.skip obj
 
-  let js_only js_layout obj : _ Unified_input.t =
+  let js_only (js_layout : _ Fields_derivers_js.Js_layout.Input.t -> 'a) obj :
+      _ Unified_input.t =
     let _a = Graphql.Fields.skip obj in
     let _b = Graphql.Args.skip obj in
     let _c = Fields_derivers_json.To_yojson.skip obj in
     let _d = Fields_derivers_graphql.Graphql_query.skip obj in
-    obj#js_layout := js_layout ;
+    let _e = js_layout obj in
     Fields_derivers_json.Of_yojson.skip obj
+
+  let js_leaf leaf obj =
+    js_only Fields_derivers_js.Js_layout.(of_layout @@ leaf_type leaf) obj
+
+  let js_record entries obj =
+    js_only (Fields_derivers_js.Js_layout.record entries) obj
 
   let int obj : _ Unified_input.t =
     let _a = Graphql.Fields.int obj in
@@ -221,10 +228,22 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _e = Fields_derivers_js.Js_layout.bool obj in
     Fields_derivers_json.Of_yojson.bool obj
 
-  let global_slot obj =
-    iso_string obj ~name:"GlobalSlot" ~js_type:UInt32
-      ~to_string:Unsigned.UInt32.to_string
-      ~of_string:(except ~f:Unsigned.UInt32.of_string `Uint)
+  let global_slot_since_genesis obj =
+    iso_string obj ~name:"GlobalSlotSinceGenesis" ~js_type:UInt32
+      ~to_string:Mina_numbers.Global_slot_since_genesis.to_string
+      ~of_string:
+        (except ~f:Mina_numbers.Global_slot_since_genesis.of_string `Uint)
+
+  let global_slot_since_hard_fork obj =
+    iso_string obj ~name:"GlobalSlotSinceHardFork" ~js_type:UInt32
+      ~to_string:Mina_numbers.Global_slot_since_hard_fork.to_string
+      ~of_string:
+        (except ~f:Mina_numbers.Global_slot_since_hard_fork.of_string `Uint)
+
+  let global_slot_span obj =
+    iso_string obj ~name:"GlobalSlotSpan" ~js_type:UInt32
+      ~to_string:Mina_numbers.Global_slot_span.to_string
+      ~of_string:(except ~f:Mina_numbers.Global_slot_span.of_string `Uint)
 
   let amount obj =
     iso_string obj ~name:"CurrencyAmount" ~js_type:UInt64
@@ -311,9 +330,9 @@ module Make (Schema : Graphql_intf.Schema) = struct
     in
     Fields_derivers_json.Of_yojson.finish ((fun x -> f (`Right x)), acc)
 
-  let with_checked ~checked ~name deriver obj =
-    Fields_derivers_js.Js_layout.with_checked ~name
-      (checked @@ o ())
+  let needs_custom_js ~js_type ~name deriver obj =
+    Fields_derivers_js.Js_layout.needs_custom_js ~name
+      (js_type @@ o ())
       (deriver obj)
 
   let balance_change obj =
@@ -332,7 +351,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
           failwith "impossible"
     in
     let sign_deriver =
-      iso_string ~name:"Sign" ~js_type:(Custom "Sign") ~to_string:sign_to_string
+      iso_string ~name:"Sign" ~js_type:Sign ~to_string:sign_to_string
         ~of_string:sign_of_string
     in
     let ( !. ) = ( !. ) ~t_fields_annots:Currency.Signed_poly.t_fields_annots in
@@ -530,7 +549,7 @@ let proof obj : _ Unified_input.t =
     | Error _err ->
         raise_invalid_scalar `Proof s
   in
-  iso_string obj ~name:"SnappProof" ~js_type:String
+  iso_string obj ~name:"ZkappProof" ~js_type:String
     ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
 
 let verification_key_with_hash obj =
@@ -610,7 +629,7 @@ let%test_module "Test" =
 
       let derived inner init =
         iso ~map:of_option ~contramap:to_option
-          ((option ~js_type:`Flagged_option @@ inner @@ o ()) (o ()))
+          ((option ~js_type:Flagged_option @@ inner @@ o ()) (o ()))
           init
     end
 

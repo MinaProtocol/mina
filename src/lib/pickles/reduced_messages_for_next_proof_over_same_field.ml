@@ -1,7 +1,6 @@
 open Core_kernel
 open Import
 open Pickles_types
-open Types
 open Common
 open Backend
 
@@ -45,6 +44,10 @@ end
 
 module Wrap = struct
   module Challenges_vector = struct
+    module Vector = Pickles_types.Vector
+    module Wrap_bp_vec = Import.Types.Wrap_bp_vec
+    open Import
+
     [%%versioned
     module Stable = struct
       [@@@no_toplevel_latest_type]
@@ -66,11 +69,7 @@ module Wrap = struct
       Wrap_bp_vec.t
     [@@deriving sexp, compare, yojson, hash, equal]
 
-    let () =
-      let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
-       fun () -> Type_equal.T
-      in
-      ()
+    let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
     module Prepared = struct
       type t = (Tock.Field.t, Tock.Rounds.n) Vector.t

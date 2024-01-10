@@ -1,6 +1,13 @@
 module Authorization_kind = struct
   module V1 = struct
-    type t = None_given | Signature | Proof
+    (* field for Proof is a verification key hash *)
+    type t = Signature | Proof of Snark_params.Tick.Field.t | None_given
+  end
+end
+
+module May_use_token = struct
+  module V1 = struct
+    type t = No | Parents_own_token | Inherit_from_parent
   end
 end
 
@@ -9,9 +16,9 @@ module Update = struct
     module V1 = struct
       type t =
         { initial_minimum_balance : Currency.Balance.V1.t
-        ; cliff_time : Mina_numbers.Global_slot.V1.t
+        ; cliff_time : Mina_numbers.Global_slot_since_genesis.V1.t
         ; cliff_amount : Currency.Amount.V1.t
-        ; vesting_period : Mina_numbers.Global_slot.V1.t
+        ; vesting_period : Mina_numbers.Global_slot_span.V1.t
         ; vesting_increment : Currency.Amount.V1.t
         }
     end
@@ -42,10 +49,7 @@ end
 
 module Account_precondition = struct
   module V1 = struct
-    type t =
-      | Full of Mina_base_zkapp_precondition.Account.V2.t
-      | Nonce of Mina_numbers.Account_nonce.V1.t
-      | Accept
+    type t = Mina_base_zkapp_precondition.Account.V2.t
   end
 end
 
@@ -54,6 +58,7 @@ module Preconditions = struct
     type t =
       { network : Mina_base_zkapp_precondition.Protocol_state.V1.t
       ; account : Account_precondition.V1.t
+      ; valid_while : Mina_base_zkapp_precondition.Valid_while.V1.t
       }
   end
 end
@@ -64,7 +69,7 @@ module Body = struct
       type t =
         { public_key : Public_key.Compressed.V1.t
         ; fee : Currency.Fee.V1.t
-        ; valid_until : Mina_numbers.Global_slot.V1.t option
+        ; valid_until : Mina_numbers.Global_slot_since_genesis.V1.t option
         ; nonce : Mina_numbers.Account_nonce.V1.t
         }
     end
@@ -85,11 +90,12 @@ module Body = struct
           (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
       ; increment_nonce : bool
       ; events : Events'.V1.t
-      ; sequence_events : Events'.V1.t
+      ; actions : Events'.V1.t
       ; call_data : Pickles.Backend.Tick.Field.V1.t
       ; preconditions : Preconditions.V1.t
       ; use_full_commitment : bool
-      ; caller : Mina_base_token_id.V2.t
+      ; implicit_account_creation_fee : bool
+      ; may_use_token : May_use_token.V1.t
       ; authorization_kind : Authorization_kind.V1.t
       }
   end

@@ -12,6 +12,7 @@
    ;; local libraries
    currency
    transaction_snark
+   mina_state
    one_or_two
    ledger_proof
    signature_lib
