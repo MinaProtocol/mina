@@ -111,10 +111,10 @@ let%test_module "transaction_status" =
       Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~fee_range:10
         ~key_gen ~nonce:(Account_nonce.of_int 1) ()
 
-    let create_pool ~frontier_broadcast_pipe =
+    let create_pool ~frontier_broadcast_pipe ~slot_tx_end =
       let config =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
-          ~verifier
+          ~verifier ~slot_tx_end
       in
       let transaction_pool, _, local_sink =
         Transaction_pool.create ~config
@@ -146,7 +146,7 @@ let%test_module "transaction_status" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               let frontier_broadcast_pipe, _ = Broadcast_pipe.create None in
               let%bind transaction_pool, local_diffs_writer =
-                create_pool ~frontier_broadcast_pipe
+                create_pool ~frontier_broadcast_pipe ~slot_tx_end:None
               in
               let%bind () =
                 Transaction_pool.Local_sink.push local_diffs_writer
@@ -170,7 +170,7 @@ let%test_module "transaction_status" =
                 Broadcast_pipe.create (Some frontier)
               in
               let%bind transaction_pool, local_diffs_writer =
-                create_pool ~frontier_broadcast_pipe
+                create_pool ~frontier_broadcast_pipe ~slot_tx_end:None
               in
               let%bind () =
                 Transaction_pool.Local_sink.push local_diffs_writer
@@ -204,7 +204,7 @@ let%test_module "transaction_status" =
                 Broadcast_pipe.create (Some frontier)
               in
               let%bind transaction_pool, local_diffs_writer =
-                create_pool ~frontier_broadcast_pipe
+                create_pool ~frontier_broadcast_pipe ~slot_tx_end:None
               in
               let unknown_user_command, pool_user_commands =
                 Non_empty_list.uncons user_commands

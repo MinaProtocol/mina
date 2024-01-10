@@ -65,6 +65,26 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
+      module V2 = struct
+        type t =
+          | Insufficient_replace_fee
+          | Invalid_signature
+          | Duplicate
+          | Sender_account_does_not_exist
+          | Invalid_nonce
+          | Insufficient_funds
+          | Insufficient_fee
+          | Overflow
+          | Bad_token
+          | Unwanted_fee_token
+          | Expired
+          | Overloaded
+          | After_slot_tx_end
+        [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           | Insufficient_replace_fee
@@ -81,7 +101,31 @@ module Diff_versioned = struct
           | Overloaded
         [@@deriving sexp, yojson]
 
-        let to_latest = Fn.id
+        let to_latest = function
+          | Insufficient_replace_fee ->
+              V2.Insufficient_replace_fee
+          | Invalid_signature ->
+              V2.Invalid_signature
+          | Duplicate ->
+              V2.Duplicate
+          | Sender_account_does_not_exist ->
+              V2.Sender_account_does_not_exist
+          | Invalid_nonce ->
+              V2.Invalid_nonce
+          | Insufficient_funds ->
+              V2.Insufficient_funds
+          | Insufficient_fee ->
+              V2.Insufficient_fee
+          | Overflow ->
+              V2.Overflow
+          | Bad_token ->
+              V2.Bad_token
+          | Unwanted_fee_token ->
+              V2.Unwanted_fee_token
+          | Expired ->
+              V2.Expired
+          | Overloaded ->
+              V2.Overloaded
       end
     end]
 
@@ -101,6 +145,7 @@ module Diff_versioned = struct
       | Unwanted_fee_token
       | Expired
       | Overloaded
+      | After_slot_tx_end
     [@@deriving sexp, yojson]
 
     let to_string_hum = function
@@ -133,6 +178,9 @@ module Diff_versioned = struct
           "This transaction has expired"
       | Overloaded ->
           "The diff containing this transaction was too large"
+      | After_slot_tx_end ->
+          "This transaction was submitted after the slot defined to stop \
+           accepting transactions"
   end
 
   module Rejected = struct
@@ -141,7 +189,7 @@ module Diff_versioned = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
-        type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
+        type t = (User_command.Stable.V1.t * Diff_error.Stable.V2.t) list
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
@@ -224,8 +272,14 @@ struct
                  themselves banned.
               *)
         ; verifier : (Verifier.t[@sexp.opaque])
+        ; slot_tx_end : Mina_numbers.Global_slot.t option
         }
-      [@@deriving sexp_of, make]
+      [@@deriving sexp_of]
+
+      (* remove next line if there's a way to force [@@deriving make] write a
+         named parameter instead of an optional parameter *)
+      let make ~trust_system ~pool_max_size ~verifier ~slot_tx_end =
+        { trust_system; pool_max_size; verifier; slot_tx_end }
     end
 
     let make_config = Config.make
@@ -393,6 +447,8 @@ struct
             ; ( "current_global_slot"
               , Mina_numbers.Global_slot.to_yojson current_global_slot )
             ] )
+      | After_slot_tx_end ->
+          ("after_slot_tx_end", [])
 
     let balance_of_account ~global_slot (account : Account.t) =
       match account.timing with
@@ -699,7 +755,7 @@ struct
       let t =
         { pool =
             Indexed_pool.empty ~constraint_constants ~consensus_constants
-              ~time_controller
+              ~time_controller ~slot_tx_end:config.Config.slot_tx_end
         ; locally_generated_uncommitted =
             Hashtbl.create
               ( module Transaction_hash.User_command_with_valid_signature.Stable
@@ -850,6 +906,7 @@ struct
           | Unwanted_fee_token
           | Expired
           | Overloaded
+          | After_slot_tx_end
         [@@deriving sexp, yojson]
 
         let to_string_hum = Diff_versioned.Diff_error.to_string_hum
@@ -1123,6 +1180,8 @@ struct
                                     , Mina_numbers.Global_slot.to_yojson
                                         current_global_slot )
                                   ] )
+                            | After_slot_tx_end ->
+                                (After_slot_tx_end, [])
                           in
                           let yojson_fail_reason =
                             Fn.compose
@@ -1144,7 +1203,9 @@ struct
                                 | Unwanted_fee_token _ ->
                                     "unwanted fee token"
                                 | Expired _ ->
-                                    "expired" )
+                                    "expired"
+                                | After_slot_tx_end ->
+                                    "after slot tx end" )
                           in
                           match add_res with
                           | Ok (verified, pool', dropped) ->
@@ -1564,12 +1625,13 @@ let%test_module _ =
             , Time.t * [ `Batch of int ] )
             Hashtbl.t )
 
-    let setup_test () =
+    let setup_test ~slot_tx_end () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
+          ~slot_tx_end
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
@@ -1647,7 +1709,7 @@ let%test_module _ =
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
-            setup_test ()
+            setup_test ~slot_tx_end:None ()
           in
           assert_pool_txs [] ;
           let%bind apply_res =
@@ -1711,7 +1773,7 @@ let%test_module _ =
     let%test_unit "Transactions are removed and added back in fork changes" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
-            setup_test ()
+            setup_test ~slot_tx_end:None ()
           in
           assert_pool_txs [] ;
           let%bind apply_res =
@@ -1741,7 +1803,7 @@ let%test_module _ =
     let%test_unit "invalid transactions are not accepted" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
-            setup_test ()
+            setup_test ~slot_tx_end:None ()
           in
           assert_pool_txs [] ;
           best_tip_ref :=
@@ -1795,7 +1857,7 @@ let%test_module _ =
                    changes" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
-            setup_test ()
+            setup_test ~slot_tx_end:None ()
           in
           assert_pool_txs [] ;
           best_tip_ref :=
@@ -1861,7 +1923,7 @@ let%test_module _ =
     let%test_unit "expired transactions are not accepted" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, _best_tip_diff_w, (_, _best_tip_ref) =
-            setup_test ()
+            setup_test ~slot_tx_end:None ()
           in
           assert_pool_txs [] ;
           let curr_slot = current_global_slot () in
@@ -1903,7 +1965,7 @@ let%test_module _ =
                    removed from the pool when best tip changes" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
-            setup_test ()
+            setup_test ~slot_tx_end:None ()
           in
           assert_pool_txs [] ;
           let curr_slot = current_global_slot () in
@@ -2021,7 +2083,7 @@ let%test_module _ =
           let trust_system = Trust_system.null () in
           let config =
             Test.Resource_pool.make_config ~trust_system ~pool_max_size
-              ~verifier
+              ~verifier ~slot_tx_end:None
           in
           let pool_, _, _ =
             Test.create ~config ~logger ~constraint_constants
@@ -2075,7 +2137,7 @@ let%test_module _ =
       Thread_safe.block_on_async_exn
       @@ fun () ->
       let%bind assert_pool_txs, pool, _best_tip_diff_w, frontier =
-        setup_test ()
+        setup_test ~slot_tx_end:None ()
       in
       let set_sender idx (tx : Signed_command.t) =
         let sender_kp = test_keys.(idx) in
@@ -2166,7 +2228,7 @@ let%test_module _ =
       Thread_safe.block_on_async_exn
       @@ fun () ->
       let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
-        setup_test ()
+        setup_test ~slot_tx_end:None ()
       in
       let txs =
         [ mk_payment 0 5_000_000_000 0 9 20_000_000_000
@@ -2208,7 +2270,7 @@ let%test_module _ =
           Thread_safe.block_on_async_exn (fun () ->
               let%bind _assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref)
                   =
-                setup_test ()
+                setup_test ~slot_tx_end:None ()
               in
               let mock_ledger =
                 Account_id.Map.of_alist_exn
@@ -2276,7 +2338,7 @@ let%test_module _ =
     let%test_unit "rebroadcastable transaction behavior" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
-            setup_test ()
+            setup_test ~slot_tx_end:None ()
           in
           assert_pool_txs [] ;
           let local_cmds = List.take independent_cmds 5 in
@@ -2378,5 +2440,41 @@ let%test_module _ =
               : User_command.t list list ) ;
           assert_pool_txs (List.drop local_cmds' 4 @ remote_cmds') ;
           assert_rebroadcastable pool [] ;
+          Deferred.unit )
+
+    let%test_unit "transactions added before slot_tx_end are accepted" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let curr_slot = current_global_slot () in
+          let%bind assert_pool_txs, pool, _best_tip_diff_w, (_, _best_tip_ref) =
+            setup_test
+              ~slot_tx_end:
+                Mina_numbers.Global_slot.(Option.some @@ succ @@ succ curr_slot)
+              ()
+          in
+          assert_pool_txs [] ;
+          let%bind apply_res =
+            Test.Resource_pool.Diff.unsafe_apply pool
+            @@ Envelope.Incoming.local
+                 (extract_signed_commands independent_cmds)
+          in
+          [%test_eq: pool_apply] (Ok independent_cmds')
+            (accepted_commands apply_res) ;
+          assert_pool_txs independent_cmds' ;
+          Deferred.unit )
+
+    let%test_unit "transactions added after slot_tx_end are rejected" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let curr_slot = current_global_slot () in
+          let%bind assert_pool_txs, pool, _best_tip_diff_w, (_, _best_tip_ref) =
+            setup_test ~slot_tx_end:(Some curr_slot) ()
+          in
+          assert_pool_txs [] ;
+          let%bind apply_res =
+            Test.Resource_pool.Diff.unsafe_apply pool
+            @@ Envelope.Incoming.local
+                 (extract_signed_commands independent_cmds)
+          in
+          [%test_eq: pool_apply] (Ok []) (accepted_commands apply_res) ;
+          assert_pool_txs [] ;
           Deferred.unit )
   end )
