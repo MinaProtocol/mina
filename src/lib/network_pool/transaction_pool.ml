@@ -188,11 +188,20 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V1 = struct
+      module V2 = struct
         type t = (User_command.Stable.V1.t * Diff_error.Stable.V2.t) list
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
+      end
+
+      module V1 = struct
+        type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
+        [@@deriving sexp, yojson]
+
+        let to_latest =
+          List.map ~f:(fun (cmd, error) ->
+              (cmd, Diff_error.Stable.V1.to_latest error) )
       end
     end]
 
