@@ -974,20 +974,24 @@ module T = struct
     [%log internal] "Check #zkApp does not exceed hardcap" ;
     let%bind () =
       O1trace.thread "Check #zkApp does not exceed hardcap" (fun () ->
+          let zkAppCountGetter : Transaction.t With_status.t -> bool = function
+            | { With_status.data =
+                  Transaction.Command (Mina_base.User_command.Zkapp_command _)
+              ; status = _
+              } ->
+                true
+            | _ ->
+                false
+          in
           let zkAppCount =
             transactions
-            |> List.filter ~f:(fun (txn, _) ->
-                   match txn with
-                   | Transaction.Command (User_command.Zkapp_command _) ->
-                       true
-                   | _ ->
-                       false )
+            |> List.filter ~f:(fun txn -> zkAppCountGetter txn)
             |> List.length
           in
-          if zkAppCount > constraint_constants.zkapps_per_block then
+          if zkAppCount > t.constraint_constants.zkapps_per_block then
             Deferred.Result.fail
               (Staged_ledger_error.ZkApps_exceed_limit
-                 (zkAppCount, constraint_constants.zkapps_per_block) )
+                 (zkAppCount, t.constraint_constants.zkapps_per_block) )
           else Deferred.Result.return () )
     in
     [%log internal] "Update_coinbase_stack"
