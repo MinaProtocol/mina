@@ -2,7 +2,24 @@
  (name rocksdb)
  (public_name rocksdb)
  (library_flags -linkall)
- (libraries core rocks key_value_database file_system logger)
+(libraries
+   ;; opam libraries
+   async_kernel
+   async
+   base.caml
+   core.uuid
+   core_kernel
+   rocks
+   core
+   core_kernel.uuid
+   sexplib0
+   ppx_inline_test.config
+   async_unix
+   base.base_internalhash_types
+   ;; local libraries
+   file_system
+   key_value_database
+)
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation (backend bisect_ppx))

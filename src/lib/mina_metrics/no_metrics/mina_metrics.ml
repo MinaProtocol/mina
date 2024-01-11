@@ -9,6 +9,9 @@ module Counter = struct
   let inc_one : t -> unit = fun _ -> ()
 
   let inc : t -> float -> unit = fun _ _ -> ()
+
+  let value : t -> float =
+   fun _ -> failwith "no_metrics doesn't store any value"
 end
 
 module Gauge = struct
@@ -23,18 +26,25 @@ module Gauge = struct
   let dec : t -> float -> unit = fun _ _ -> ()
 
   let set : t -> float -> unit = fun _ _ -> ()
+
+  let value : t -> float =
+   fun _ -> failwith "no_metrics doesn't store any value"
 end
 
 module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
+
+  val buckets : t -> int list
 end
 
 module Histogram = struct
   type t = unit
 
   let observe : t -> float -> unit = fun _ _ -> ()
+
+  let buckets () = []
 end
 
 module Runtime = struct
@@ -58,17 +68,47 @@ module Cryptography = struct
 
   let snark_work_merge_time_sec : Snark_work_histogram.t = ()
 
-  let snark_work_base_time_sec : Snark_work_histogram.t = ()
+  let snark_work_zkapp_base_time_sec : Counter.t = ()
+
+  let snark_work_base_time_sec : Counter.t = ()
+
+  let snark_work_zkapp_base_submissions : Counter.t = ()
+
+  let snark_work_base_submissions : Counter.t = ()
+
+  let zkapp_proof_updates : Counter.t = ()
+
+  let zkapp_transaction_length : Counter.t = ()
 end
 
 module Bootstrap = struct
   let bootstrap_time_ms : Gauge.t = ()
+
+  let staking_epoch_ledger_sync_ms : Counter.t = ()
+
+  let next_epoch_ledger_sync_ms : Counter.t = ()
+
+  let root_snarked_ledger_sync_ms : Counter.t = ()
+
+  let num_of_root_snarked_ledger_retargeted : Gauge.t = ()
 end
 
 module Transaction_pool = struct
   let useful_transactions_received_time_sec : Gauge.t = ()
 
   let pool_size : Gauge.t = ()
+
+  let transactions_added_to_pool : Counter.t = ()
+
+  let vk_refcount_table_size : Gauge.t = ()
+
+  let zkapp_transactions_added_to_pool : Counter.t = ()
+
+  let zkapp_transaction_size : Counter.t = ()
+
+  let zkapp_updates : Counter.t = ()
+
+  let zkapp_proof_updates : Counter.t = ()
 end
 
 module Network = struct
@@ -94,6 +134,14 @@ module Network = struct
     module Validation_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
+
+    module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
   end
 
   module Snark_work = struct
@@ -106,6 +154,14 @@ module Network = struct
     let received : Counter.t = ()
 
     module Validation_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
   end
@@ -122,27 +178,35 @@ module Network = struct
     module Validation_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
+
+    module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
   end
 
   let rpc_requests_received : Counter.t = ()
 
   let rpc_requests_sent : Counter.t = ()
 
-  let get_some_initial_peers_rpcs_sent : Counter.t = ()
+  let get_some_initial_peers_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_some_initial_peers_rpcs_received : Counter.t = ()
+  let get_some_initial_peers_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_some_initial_peers_rpc_requests_failed : Counter.t = ()
 
   let get_some_initial_peers_rpc_responses_failed : Counter.t = ()
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent : Counter.t
-      =
-    ()
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent :
+      Counter.t * Gauge.t =
+    ((), ())
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received :
-      Counter.t =
-    ()
+      Counter.t * Gauge.t =
+    ((), ())
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed :
       Counter.t =
@@ -152,73 +216,85 @@ module Network = struct
       Counter.t =
     ()
 
-  let answer_sync_ledger_query_rpcs_sent : Counter.t = ()
+  let answer_sync_ledger_query_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let answer_sync_ledger_query_rpcs_received : Counter.t = ()
+  let answer_sync_ledger_query_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let answer_sync_ledger_query_rpc_requests_failed : Counter.t = ()
 
   let answer_sync_ledger_query_rpc_responses_failed : Counter.t = ()
 
-  let get_transition_chain_rpcs_sent : Counter.t = ()
+  let get_transition_chain_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_transition_chain_rpcs_received : Counter.t = ()
+  let get_transition_chain_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_transition_chain_rpc_requests_failed : Counter.t = ()
 
   let get_transition_chain_rpc_responses_failed : Counter.t = ()
 
-  let get_transition_knowledge_rpcs_sent : Counter.t = ()
+  let get_transition_knowledge_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_transition_knowledge_rpcs_received : Counter.t = ()
+  let get_transition_knowledge_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_transition_knowledge_rpc_requests_failed : Counter.t = ()
 
   let get_transition_knowledge_rpc_responses_failed : Counter.t = ()
 
-  let get_transition_chain_proof_rpcs_sent : Counter.t = ()
+  let get_transition_chain_proof_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_transition_chain_proof_rpcs_received : Counter.t = ()
+  let get_transition_chain_proof_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_transition_chain_proof_rpc_requests_failed : Counter.t = ()
 
   let get_transition_chain_proof_rpc_responses_failed : Counter.t = ()
 
-  let get_node_status_rpcs_sent : Counter.t = ()
+  let get_node_status_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_node_status_rpcs_received : Counter.t = ()
+  let get_node_status_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_node_status_rpc_requests_failed : Counter.t = ()
 
   let get_node_status_rpc_responses_failed : Counter.t = ()
 
-  let get_ancestry_rpcs_sent : Counter.t = ()
+  let get_ancestry_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_ancestry_rpcs_received : Counter.t = ()
+  let get_ancestry_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_ancestry_rpc_requests_failed : Counter.t = ()
 
   let get_ancestry_rpc_responses_failed : Counter.t = ()
 
-  let ban_notify_rpcs_sent : Counter.t = ()
+  let ban_notify_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let ban_notify_rpcs_received : Counter.t = ()
+  let ban_notify_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let ban_notify_rpc_requests_failed : Counter.t = ()
 
   let ban_notify_rpc_responses_failed : Counter.t = ()
 
-  let get_best_tip_rpcs_sent : Counter.t = ()
+  let get_best_tip_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_best_tip_rpcs_received : Counter.t = ()
+  let get_best_tip_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_best_tip_rpc_requests_failed : Counter.t = ()
 
   let get_best_tip_rpc_responses_failed : Counter.t = ()
 
-  let get_epoch_ledger_rpcs_sent : Counter.t = ()
+  let get_epoch_ledger_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_epoch_ledger_rpcs_received : Counter.t = ()
+  let get_epoch_ledger_rpcs_received : Counter.t * Gauge.t = ((), ())
+
+  let new_state_received : Gauge.t = ()
+
+  let new_state_broadcasted : Gauge.t = ()
+
+  let snark_pool_diff_received : Gauge.t = ()
+
+  let snark_pool_diff_broadcasted : Gauge.t = ()
+
+  let transaction_pool_diff_received : Gauge.t = ()
+
+  let transaction_pool_diff_broadcasted : Gauge.t = ()
 
   let get_epoch_ledger_rpc_requests_failed : Counter.t = ()
 
@@ -241,6 +317,8 @@ module Network = struct
   let rpc_latency_ms_summary : Rpc_latency_histogram.t = ()
 
   let ipc_latency_ns_summary : Ipc_latency_histogram.t = ()
+
+  let ipc_logs_received_total : Counter.t = ()
 end
 
 module Pipe = struct
@@ -273,6 +351,8 @@ module Snark_work = struct
   let snark_work_assigned_rpc : Counter.t = ()
 
   let snark_work_timed_out_rpc : Counter.t = ()
+
+  let snark_work_failed_rpc : Counter.t = ()
 
   let snark_pool_size : Gauge.t = ()
 
@@ -319,6 +399,10 @@ module Block_producer = struct
   let slots_won : Counter.t = ()
 
   let blocks_produced : Counter.t = ()
+
+  module Block_production_delay_histogram = Histogram
+
+  let block_production_delay : Block_production_delay_histogram.t = ()
 end
 
 module Transition_frontier = struct
@@ -358,6 +442,8 @@ module Transition_frontier = struct
 
   let best_tip_user_txns : Gauge.t = ()
 
+  let best_tip_zkapp_txns : Gauge.t = ()
+
   let best_tip_coinbase : Gauge.t = ()
 
   let longest_fork : Gauge.t = ()
@@ -370,7 +456,7 @@ module Transition_frontier = struct
 
   let best_tip_block_height : Gauge.t = ()
 
-  let root_snarked_ledger_accounts : Gauge.t = ()
+  let root_snarked_ledger_accounts : Counter.t = ()
 
   let root_snarked_ledger_total_currency : Gauge.t = ()
 end
@@ -423,6 +509,14 @@ module Block_latency = struct
   end
 
   module Inclusion_time = struct
+    let v : Gauge.t = ()
+
+    let update : Time.Span.t -> unit = fun _ -> ()
+
+    let clear : unit -> unit = fun _ -> ()
+  end
+
+  module Validation_acceptance_time = struct
     let v : Gauge.t = ()
 
     let update : Time.Span.t -> unit = fun _ -> ()

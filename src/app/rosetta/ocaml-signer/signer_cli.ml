@@ -18,7 +18,12 @@ let sign_command =
   in
   let open Deferred.Let_syntax in
   fun () ->
-    let keys = Signer.Keys.of_private_key_bytes private_key in
+    let keys =
+      try
+        Signer.Keys.of_private_key_bytes private_key
+      with
+      | _ -> Signer.Keys.of_private_key_box private_key
+    in
     match
       Signer.sign ~keys ~unsigned_transaction_string:unsigned_transaction
     with
@@ -26,6 +31,31 @@ let sign_command =
         printf "%s\n" signature ; return ()
     | Error e ->
         eprintf "Failed to sign transaction %s" (Errors.show e) ;
+        exit 1
+
+let verify_message_command =
+  let open Command.Let_syntax in
+  let%map_open signature =
+    flag "--signature"
+      ~doc:"Rosetta signature" (required string)
+  and message =
+    flag "--message"
+      ~doc:"Message that was signed" (required string)
+  and public_key =
+    flag "--public-key" ~aliases:["public-key"] ~doc:"Public key hex bytes"
+      (required string)
+  in
+  let open Deferred.Let_syntax in
+  fun () ->
+    let signature = Option.value_exn (Mina_base.Signature.Raw.decode signature) in
+    let pk = Rosetta_coding.Coding.to_public_key public_key in
+    match
+      String_sign.verify signature pk message
+    with
+    | true ->
+        return ()
+    | false ->
+        eprintf "Signature does not verify against this public key" ;
         exit 1
 
 let verify_command =
@@ -60,8 +90,22 @@ let derive_command =
   in
   let open Deferred.Let_syntax in
   fun () ->
+    let keys =
+      try
+        Signer.Keys.of_private_key_bytes private_key
+      with
+      | _ -> Signer.Keys.of_private_key_box private_key
+    in
+    printf "Private Key:\n";
     printf "%s\n"
-      Signer.Keys.(of_private_key_bytes private_key).public_key_hex_bytes ;
+      Signer.Keys.(to_private_key_bytes keys);
+    printf "Public Key:\n";
+    printf "%s\n"
+      keys.public_key_hex_bytes ;
+    printf "%s\n"
+      (keys.keypair.public_key
+        |> Public_key.compress
+        |> Public_key.Compressed.to_base58_check) ;
     return ()
 
 let generate_command =
@@ -70,6 +114,54 @@ let generate_command =
   @@ fun () ->
   let keypair = Keypair.create () in
   printf "%s\n" Signer.Keys.(of_keypair keypair |> to_private_key_bytes) ;
+  return ()
+
+(** Extracts an hexadecimal private key suitable for rosetta from a private-key file.
+    Similarly to the main [mina] binary, the password from the [Secrets.Keypair.env] environment variable will be used if it it set, otherwise it will be read from stdin.*)
+let hex_of_private_key_file =
+  let open Command.Let_syntax in
+  let%map_open privkey_path =
+    flag "--private-key-path" ~doc:"Path to the private key file"
+      (required string)
+  in
+  fun () ->
+    let password =
+      Lazy.return
+        ( match Sys.getenv Secrets.Keypair.env with
+        | Some password ->
+            Deferred.return (Bytes.of_string password)
+        | None ->
+            Secrets.Password.read_hidden_line ~error_help_message:""
+              "Secret key password: " )
+    in
+    let print_key =
+      let open Deferred.Result.Let_syntax in
+      let%bind keypair =
+        Secrets.Keypair.read ~privkey_path ~password
+        |> Deferred.Result.map_error ~f:Secrets.Privkey_error.to_string
+      in
+      return
+        (Format.printf "%s@."
+           (Rosetta_coding.Coding.of_scalar keypair.private_key) )
+    in
+    Deferred.map ~f:Result.ok_or_failwith print_key
+
+let convert_signature_command =
+  let open Command.Let_syntax in
+  let%map_open field_str =
+      flag "--field" ~doc:"Field string in decimal (from mina-signer)"
+        (required string)
+  and scalar_str =
+      flag "--scalar" ~doc:"Scalar string in decimal (from mina-signer)"
+        (required string)
+  in
+  fun () ->
+  let open Deferred.Let_syntax in
+  let open Snark_params.Tick in
+  let field = Field.of_string field_str
+  and scalar = Inner_curve.Scalar.of_string scalar_str
+  in
+  printf "%s\n" (Mina_base.Signature.Raw.encode (field, scalar));
   return ()
 
 let commands =
@@ -84,4 +176,13 @@ let commands =
     , Command.async ~summary:"Import a private key, returns a public-key"
         derive_command )
   ; ( "generate-private-key"
-    , Command.async ~summary:"Generate a new private key" generate_command ) ]
+    , Command.async ~summary:"Generate a new private key" generate_command )
+  ; ( "convert-signature"
+    , Command.async ~summary:"Convert signature from field,scalar decimal strings into Rosetta Signature" convert_signature_command )
+  ; ( "verify-message"
+    , Command.async ~summary:"Verify a string message was signed properly" verify_message_command )
+  ; ( "hex-of-private-key-file"
+    , Command.async
+        ~summary:"Read a private key file and display it as hexadecimal"
+        hex_of_private_key_file )
+  ]

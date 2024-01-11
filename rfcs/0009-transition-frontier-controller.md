@@ -88,7 +88,7 @@ achieved consensus).
    `External_transition.t` and a now light-weight `Staged_ledger.t` it also has a
    notion of the prior breadcrumb. We take advantage of the merkle-mask to put
    these breadcrumbs in each node of the transition-tree. See
-   [RFC-0007](0007-persistent-ledger-builder-controller) for more info on merkle
+   [RFC-0008](0008-persistent-ledger-builder-controller.md) for more info on merkle
    masks, and [Transition frontier](#transition-frontier) for more info about how
    these masks are configured.
 
@@ -96,7 +96,7 @@ Rationale: The frequent operation of answering sync-ledger queries no longer
 require materializing staged-ledgers. We should optimize for operations that
 occur frequently.
 
-3. The `Ktree.t` is mutable and exposes an $O(1)$ `lookup : State_hash.t -> node_entry` where `node_entry` contains (in our case) a `Breadcrumb.t`. We will discuss this further in [Ktree](#ktree).
+3. The `Ktree.t` is mutable and exposes an $O(1)$ `lookup : State_hash.t -> node_entry` where `node_entry` contains (in our case) a `Breadcrumb.t`.
 
 Rationale: We perform `lookup` and `add` frequently on this structure and `add` can be $O(1)$ in the presence of this `lookup` too. `lookup` also lets us traverse the tree forwards and backwards without explicit backedges in our [rose tree](https://en.wikipedia.org/wiki/Rose_tree) -- further simplifying the `Ktree.t` implementation.
 

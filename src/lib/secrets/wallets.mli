@@ -39,7 +39,9 @@ val unlock :
      t
   -> needle:Public_key.Compressed.t
   -> password:Secret_file.password
-  -> (unit, [ `Not_found | `Bad_password ]) Deferred.Result.t
+  -> ( unit
+     , [ `Not_found | `Bad_password | `Key_read_error of Privkey_error.t ] )
+     Deferred.Result.t
 
 val lock : t -> needle:Public_key.Compressed.t -> unit
 

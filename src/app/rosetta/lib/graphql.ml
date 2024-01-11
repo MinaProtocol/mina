@@ -66,9 +66,13 @@ let query query_obj uri =
         (Errors.create ~context:"Empty response from Mina Daemon"
            (`Graphql_mina_query "Empty response"))
   | error, `Null ->
-      Error
-        (Errors.create ~context:"Explicit error response from Mina Daemon"
-           (`Graphql_mina_query (graphql_error_to_string error)))
+      Errors.Transaction_submit.of_request_error (graphql_error_to_string error)
+        |> Option.value
+            ~default:(
+              Errors.create
+                ~context:"Explicit error response from Mina Daemon"
+                (`Graphql_mina_query (graphql_error_to_string error)))
+        |> Result.fail
   | _, raw_json ->
       Result.try_with (fun () -> query_obj#parse raw_json)
       |> Result.map_error ~f:(fun e ->
@@ -79,12 +83,9 @@ let query query_obj uri =
                     (Exn.to_string e))) ) )
   |> Deferred.return
 
-module Decoders = struct
-  let uint64 json =
-    Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
-
-  let int64 json = Yojson.Basic.Util.to_string json |> Int64.of_string
-
-  let uint32 json =
-    Yojson.Basic.Util.to_string json |> Unsigned.UInt32.of_string
-end
+let query_and_catch query_obj uri =
+  let open Deferred.Let_syntax in
+  let%map res = query query_obj uri in
+  match res with
+  | Ok r -> Ok (`Successful r)
+  | Error e -> Ok (`Failed e)

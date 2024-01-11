@@ -1,6 +1,15 @@
 (library
  (public_name webkit_trace_event.binary)
  (name webkit_trace_event_binary_output)
- (libraries core async webkit_trace_event)
+ (libraries
+   ;; opam libraries
+   core
+   async
+   base
+   core_kernel
+   async_unix
+   ;; local libraries
+   webkit_trace_event
+)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))

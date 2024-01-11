@@ -1,134 +1,161 @@
 (* string_sign.ml -- signatures for strings *)
 
-[%%import "/src/config.mlh"]
-
-[%%ifdef consensus_mechanism]
-
-open Snark_params
-open Signature_lib
-open Mina_base
-module Field = Snark_params.Tick.Field
-module Boolean = Snark_params.Tick.Boolean
 module Inner_curve = Snark_params.Tick.Inner_curve
+open Signature_lib
+open Core_kernel
 
-[%%else]
+let nybble_bits = function
+  | 0x0 ->
+      [ false; false; false; false ]
+  | 0x1 ->
+      [ false; false; false; true ]
+  | 0x2 ->
+      [ false; false; true; false ]
+  | 0x3 ->
+      [ false; false; true; true ]
+  | 0x4 ->
+      [ false; true; false; false ]
+  | 0x5 ->
+      [ false; true; false; true ]
+  | 0x6 ->
+      [ false; true; true; false ]
+  | 0x7 ->
+      [ false; true; true; true ]
+  | 0x8 ->
+      [ true; false; false; false ]
+  | 0x9 ->
+      [ true; false; false; true ]
+  | 0xA ->
+      [ true; false; true; false ]
+  | 0xB ->
+      [ true; false; true; true ]
+  | 0xC ->
+      [ true; true; false; false ]
+  | 0xD ->
+      [ true; true; false; true ]
+  | 0xE ->
+      [ true; true; true; false ]
+  | 0xF ->
+      [ true; true; true; true ]
+  | _ ->
+      failwith "nybble_bits: expected value from 0 to 0xF"
 
-open Snark_params_nonconsensus
-open Signature_lib_nonconsensus
-open Mina_base_nonconsensus
-module Snark_params = Snark_params_nonconsensus
-module Tick = Snark_params
-module Signature_lib = Signature_lib_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Inner_curve = Snark_params.Inner_curve
+let char_bits c =
+  let open Core_kernel in
+  let n = Char.to_int c in
+  let hi = Int.(shift_right (bit_and n 0xF0) 4) in
+  let lo = Int.bit_and n 0x0F in
+  List.concat_map [ hi; lo ] ~f:nybble_bits
 
-[%%endif]
+let string_to_input s =
+  Random_oracle.Input.Legacy.
+    { field_elements = [||]
+    ; bitstrings = Stdlib.(Array.of_seq (Seq.map char_bits (String.to_seq s)))
+    }
 
-module Message = struct
-  type t = string
+let verify ?signature_kind signature pk s =
+  let m = string_to_input s in
+  let inner_curve = Inner_curve.of_affine pk in
+  Schnorr.Legacy.verify ?signature_kind signature inner_curve m
 
-  let nybble_bits = function
-    | 0x0 ->
-        [ false; false; false; false ]
-    | 0x1 ->
-        [ false; false; false; true ]
-    | 0x2 ->
-        [ false; false; true; false ]
-    | 0x3 ->
-        [ false; false; true; true ]
-    | 0x4 ->
-        [ false; true; false; false ]
-    | 0x5 ->
-        [ false; true; false; true ]
-    | 0x6 ->
-        [ false; true; true; false ]
-    | 0x7 ->
-        [ false; true; true; true ]
-    | 0x8 ->
-        [ true; false; false; false ]
-    | 0x9 ->
-        [ true; false; false; true ]
-    | 0xA ->
-        [ true; false; true; false ]
-    | 0xB ->
-        [ true; false; true; true ]
-    | 0xC ->
-        [ true; true; false; false ]
-    | 0xD ->
-        [ true; true; false; true ]
-    | 0xE ->
-        [ true; true; true; false ]
-    | 0xF ->
-        [ true; true; true; true ]
-    | _ ->
-        failwith "nybble_bits: expected value from 0 to 0xF"
+let sign ?signature_kind sk s =
+  let m = string_to_input s in
+  Schnorr.Legacy.sign ?signature_kind sk m
 
-  let char_bits c =
-    let open Core_kernel in
-    let n = Char.to_int c in
-    let hi = Int.(shift_right (bit_and n 0xF0) 4) in
-    let lo = Int.bit_and n 0x0F in
-    List.concat_map [ hi; lo ] ~f:nybble_bits
+let%test_module "Sign_string tests" =
+  ( module struct
+    let keypair : Signature_lib.Keypair.t =
+      let public_key =
+        Signature_lib.Public_key.Compressed.of_base58_check_exn
+          "B62qnNkiQn1t1Nhof2fyTtBTbHLbXcUDVX2BWpjGKKK3HsfP8LPhYgE"
+        |> Signature_lib.Public_key.decompress_exn
+      in
+      let private_key =
+        Signature_lib.Private_key.of_base58_check_exn
+          "EKEyDHNLpR42jU8j9p13t6GA3wKBXdHszrV17G6jpfJbK8FZDfYo"
+      in
+      { public_key; private_key }
 
-  let string_bits s =
-    let open Core_kernel in
-    List.(concat_map (String.to_list s) ~f:char_bits)
+    let%test "Sign, verify with default network" =
+      let s =
+        "Now is the time for all good men to come to the aid of their party"
+      in
+      let signature = sign keypair.private_key s in
+      verify signature keypair.public_key s
 
-  let derive t ~private_key ~public_key:pk =
-    let pk_bits { Public_key.Compressed.Poly.x; is_odd } =
-      is_odd :: Field.unpack x
-    in
-    List.concat
-      [ Tock.Field.unpack private_key
-      ; pk_bits (Public_key.compress (Inner_curve.to_affine_exn pk))
-      ; string_bits t
-      ]
-    |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
-    |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
-    |> Base.(Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1)))
-    |> Tock.Field.project
+    let%test "Sign, verify with mainnet" =
+      let s = "Rain and Spain don't rhyme with cheese" in
+      let signature_kind = Mina_signature_kind.Mainnet in
+      let signature = sign ~signature_kind:Mainnet keypair.private_key s in
+      verify ~signature_kind signature keypair.public_key s
 
-  let make_hash ~init t ~public_key ~r =
-    let string_to_input s =
-      Random_oracle.Input.
-        { field_elements = [||]
-        ; bitstrings =
-            Stdlib.(Array.of_seq (Seq.map char_bits (String.to_seq s)))
-        }
-    in
-    let input =
-      let px, py = Inner_curve.to_affine_exn public_key in
-      Random_oracle.Input.append (string_to_input t)
-        { field_elements = [| px; py; r |]; bitstrings = [||] }
-    in
-    let open Random_oracle in
-    hash ~init (pack_input input)
-    |> Digest.to_bits |> Inner_curve.Scalar.of_bits
+    let%test "Sign with legacy mainnet, verify with mainnet" =
+      let open Mina_signature_kind in
+      let s = "Legacy signature for mainnet" in
+      let signature =
+        "\"7mX3ZLNHk9CKtMd7hFLXYwEBXyiosDug9BLWDND1KJEdyfMWX9oWHscxGMT3q4P9DdYiXsXFynsfoLhooy3XJ5dgduPSHw5u\""
+        |> Yojson.Safe.from_string |> Mina_base.Signature.of_yojson
+        |> Core_kernel.Result.ok |> Option.value_exn
+      in
+      verify ~signature_kind:Mainnet signature keypair.public_key s
 
-  let hash = make_hash ~init:Hash_prefix.signature
+    let%test "Sign, verify with testnet" =
+      let s = "In a galaxy far, far away" in
+      let signature_kind = Mina_signature_kind.Testnet in
+      let signature = sign ~signature_kind keypair.private_key s in
+      verify ~signature_kind signature keypair.public_key s
 
-  let hash_for_mainnet = make_hash ~init:Hash_prefix.signature_for_mainnet
+    let%test "Sign with legacy testnet, verify with testnet" =
+      let open Mina_signature_kind in
+      let s = "Legacy signature for testnet" in
+      let signature =
+        "\"7mXR8PX3MuDWa7vTWTy6NWE83nKkRQosU2NzcCohuP56qy5CmugUTEgVD14xRSPMD7DsdCsgD2Y6ehY6Dkh6hRTU28i6CF37\""
+        |> Yojson.Safe.from_string |> Mina_base.Signature.of_yojson
+        |> Core_kernel.Result.ok |> Option.value_exn
+      in
+      verify ~signature_kind:Testnet signature keypair.public_key s
 
-  let hash_for_testnet = make_hash ~init:Hash_prefix.signature_for_testnet
+    let%test "Sign, verify with other networks" =
+      let s = "Sky is blue" in
+      let signature_kind = Mina_signature_kind.Other_network "Foo" in
+      let signature =
+        sign ~signature_kind:(Other_network "Foo") keypair.private_key s
+      in
+      verify ~signature_kind signature keypair.public_key s
 
-  [%%ifdef consensus_mechanism]
+    let%test "Sign with testnet, fail to verify with mainnet or other networks"
+        =
+      let open Mina_signature_kind in
+      let s = "Some pills make you larger" in
+      let signature = sign ~signature_kind:Testnet keypair.private_key s in
+      verify ~signature_kind:Testnet signature keypair.public_key s
+      && (not (verify ~signature_kind:Mainnet signature keypair.public_key s))
+      && not
+           (verify ~signature_kind:(Other_network "Foo") signature
+              keypair.public_key s )
 
-  (* TODO: factor out this common code from Signature_lib.Schnorr.Message *)
-  type var = (Field.Var.t, Boolean.var) Random_oracle.Input.t
+    let%test "Sign with mainnet, fail to verify with testnet or other network" =
+      let open Mina_signature_kind in
+      let s = "Watson, come here, I need you" in
+      let signature = sign ~signature_kind:Mainnet keypair.private_key s in
+      verify ~signature_kind:Mainnet signature keypair.public_key s
+      && (not (verify ~signature_kind:Testnet signature keypair.public_key s))
+      && not
+           (verify ~signature_kind:(Other_network "Foo") signature
+              keypair.public_key s )
 
-  let%snarkydef hash_checked t ~public_key ~r =
-    let input =
-      let px, py = public_key in
-      Random_oracle.Input.append t
-        { field_elements = [| px; py; r |]; bitstrings = [||] }
-    in
-    Tick.make_checked (fun () ->
-        let open Random_oracle.Checked in
-        hash ~init:Hash_prefix_states.signature (pack_input input)
-        |> Digest.to_bits ~length:Field.size_in_bits
-        |> Bitstring_lib.Bitstring.Lsb_first.of_list)
-
-  [%%endif]
-end
-
-module Schnorr = Signature_lib.Schnorr.Make (Tick) (Inner_curve) (Message)
+    let%test "Sign with other networks, fail to verify with mainnet or testnet \
+              or network with a different chain-name" =
+      let open Mina_signature_kind in
+      let s = "Roses are red" in
+      let signature =
+        sign ~signature_kind:(Other_network "Foo") keypair.private_key s
+      in
+      verify ~signature_kind:(Other_network "Foo") signature keypair.public_key
+        s
+      && (not (verify ~signature_kind:Mainnet signature keypair.public_key s))
+      && (not (verify ~signature_kind:Testnet signature keypair.public_key s))
+      && not
+           (verify ~signature_kind:(Other_network "Bar") signature
+              keypair.public_key s )
+  end )

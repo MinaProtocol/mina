@@ -84,7 +84,7 @@ module Reader0 = struct
              let%bind b' = f b a in
              go b'
        in
-       go init)
+       go init )
 
   let fold_until reader ~init ~f =
     enforce_single_reader reader
@@ -100,7 +100,7 @@ module Reader0 = struct
              | `Continue b' ->
                  go b' )
        in
-       go init)
+       go init )
 
   let fold_without_pushback ?consumer reader ~init ~f =
     Pipe.fold_without_pushback ?consumer reader.reader ~init ~f
@@ -147,7 +147,7 @@ module Reader0 = struct
                 Deferred.choose
                   (List.map readers ~f:(fun r ->
                        Deferred.choice (Pipe.values_available r.reader)
-                         (fun _ -> ())))
+                         (fun _ -> ()) ) )
               in
               List.find readers ~f:not_empty
         in
@@ -186,10 +186,10 @@ module Reader0 = struct
         (Pipe.iter reader.reader ~f:(fun x ->
              Deferred.List.iter writers ~f:(fun writer ->
                  if not (Pipe.is_closed writer) then Pipe.write writer x
-                 else return ()))) ;
+                 else return () ) ) ) ;
       don't_wait_for
         (let%map () = Deferred.List.iter readers ~f:Pipe.closed in
-         Pipe.close_read reader.reader) ;
+         Pipe.close_read reader.reader ) ;
       let strict_readers =
         List.map readers ~f:(wrap_reader ?name:reader.name)
       in
@@ -277,7 +277,7 @@ module Writer = struct
                 f head
             | _ ->
                 () ) ;
-            Pipe.write_without_pushback writer.writer data)
+            Pipe.write_without_pushback writer.writer data )
           ~normal_return:()
     | Buffered (`Capacity capacity, `Overflow (Call f)) ->
         handle_buffered_write writer data ~capacity
@@ -339,12 +339,12 @@ module Reader = struct
            | `Snd x ->
                Writer.write writer_b x
            | `Trd x ->
-               Writer.write writer_c x)) ;
+               Writer.write writer_c x ) ) ;
     don't_wait_for
       (let%map () = Pipe.closed reader_a.reader
        and () = Pipe.closed reader_b.reader
        and () = Pipe.closed reader_c.reader in
-       Pipe.close_read reader.reader) ;
+       Pipe.close_read reader.reader ) ;
     reader.downstreams <- [ reader_a; reader_b; reader_c ] ;
     (reader_a, reader_b, reader_c)
 end
@@ -365,7 +365,7 @@ let%test_module "Strict_pipe.Reader.Merge" =
           Writer.write writer2 2 ;
           Writer.close writer1 ;
           let%map () = after (Time_ns.Span.of_ms 5.) in
-          Writer.write writer2 3 ; ())
+          Writer.write writer2 3 ; () )
   end )
 
 let%test_module "Strict_pipe.close" =
