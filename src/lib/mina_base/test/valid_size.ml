@@ -35,7 +35,6 @@ let genesis_constant_error limit events actions : Genesis_constants.t =
       ; slots_per_sub_window = 5
       ; delta = 5
       ; genesis_state_timestamp = Genesis_constants.of_time (Time.now ())
-      ; zkapps_per_block = 128
       }
   ; txpool_max_size = 5
   ; num_accounts = Some 1
@@ -45,6 +44,7 @@ let genesis_constant_error limit events actions : Genesis_constants.t =
   ; zkapp_transaction_cost_limit = limit
   ; max_event_elements = events
   ; max_action_elements = actions
+  ; zkapps_per_block = 1
   }
 
 (* Note that in the following tests the generated zkapp_type will have an account_updates (i.e. a call_forest)

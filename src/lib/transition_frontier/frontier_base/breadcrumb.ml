@@ -404,7 +404,7 @@ module For_tests = struct
             ~constraint_constants:precomputed_values.constraint_constants
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
             ~zkapps_per_block:
-              precomputed_values.genesis_constants.protocol.zkapps_per_block
+              precomputed_values.genesis_constants.zkapps_per_block
         with
         | Ok r ->
             return r

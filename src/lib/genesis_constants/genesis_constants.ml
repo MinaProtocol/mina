@@ -247,7 +247,6 @@ module Protocol = struct
           ; slots_per_sub_window : 'length
           ; delta : 'delta
           ; genesis_state_timestamp : 'genesis_state_timestamp
-          ; zkapps_per_block : 'length
           }
         [@@deriving equal, ord, hash, sexp, yojson, hlist, fields]
       end
@@ -275,7 +274,6 @@ module Protocol = struct
                       (Time.Span.of_ms
                          (Int64.to_float t.genesis_state_timestamp) ) )
                    ~zone:Time.Zone.utc ) )
-          ; ("zkapps_per_block", `Int t.zkapps_per_block)
           ]
 
       let of_yojson = function
@@ -285,7 +283,6 @@ module Protocol = struct
             ; ("slots_per_sub_window", `Int slots_per_sub_window)
             ; ("delta", `Int delta)
             ; ("genesis_state_timestamp", `String time_str)
-            ; ("zkapps_per_block", `Int zkapps_per_block)
             ] -> (
             match validate_time time_str with
             | Ok genesis_state_timestamp ->
@@ -295,7 +292,6 @@ module Protocol = struct
                   ; slots_per_sub_window
                   ; delta
                   ; genesis_state_timestamp
-                  ; zkapps_per_block
                   }
             | Error e ->
                 Error (sprintf !"Genesis_constants.Protocol.of_yojson: %s" e) )
@@ -318,7 +314,6 @@ module Protocol = struct
                 (Time.of_span_since_epoch
                    (Time.Span.of_ms (Int64.to_float t.genesis_state_timestamp)) )
                 ~zone:Time.Zone.utc
-          ; zkapps_per_block = t.zkapps_per_block
           }
         in
         T.sexp_of_t t'
@@ -340,6 +335,7 @@ module T = struct
     ; zkapp_transaction_cost_limit : float
     ; max_event_elements : int
     ; max_action_elements : int
+    ; zkapps_per_block : int
     }
   [@@deriving to_yojson, sexp_of, bin_io_unversioned]
 
@@ -352,7 +348,6 @@ module T = struct
           ; t.protocol.slots_per_sub_window
           ; t.protocol.delta
           ; t.txpool_max_size
-          ; t.protocol.zkapps_per_block
           ]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
@@ -378,8 +373,6 @@ include T
 
 [%%inject "pool_max_size", pool_max_size]
 
-[%%inject "zkapps_per_block", zkapps_per_block]
-
 let compiled : t =
   { protocol =
       { k
@@ -388,7 +381,6 @@ let compiled : t =
       ; delta
       ; genesis_state_timestamp =
           genesis_timestamp_of_string genesis_state_timestamp_string |> of_time
-      ; zkapps_per_block
       }
   ; txpool_max_size = pool_max_size
   ; num_accounts = None
@@ -401,6 +393,7 @@ let compiled : t =
       Mina_compile_config.zkapp_transaction_cost_limit
   ; max_event_elements = Mina_compile_config.max_event_elements
   ; max_action_elements = Mina_compile_config.max_action_elements
+  ; zkapps_per_block = Mina_compile_config.zkapps_per_block
   }
 
 let for_unit_tests = compiled

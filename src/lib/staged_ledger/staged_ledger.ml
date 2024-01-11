@@ -1033,9 +1033,9 @@ module T = struct
       |> Set.to_list
     in
     Ledger.unsafe_preload_accounts_from_parent new_ledger accounts_accessed ;
-    [%log internal] "Check #zkApp does not exceed hardcap" ;
     let%bind () =
-      O1trace.thread "Check #zkApp does not exceed hardcap" (fun () ->
+      O1trace.thread "Check number of zkApps in a block does not exceed hardcap"
+        (fun () ->
           let zkAppCountGetter : Transaction.t With_status.t -> bool = function
             | { With_status.data =
                   Transaction.Command (Mina_base.User_command.Zkapp_command _)
@@ -2376,7 +2376,7 @@ let%test_module "staged ledger tests" =
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
 
-    let zkapps_per_block = 1
+    let zkapps_per_block = 200
 
     let logger = Logger.null ()
 

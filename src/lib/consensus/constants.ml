@@ -23,7 +23,6 @@ module Poly = struct
         ; epoch_duration : 'timespan
         ; delta_duration : 'timespan
         ; genesis_state_timestamp : 'time
-        ; zkapps_per_block : 'length
         }
       [@@deriving equal, compare, hash, sexp, to_yojson, hlist]
     end
@@ -258,7 +257,6 @@ let create' (type a b c)
     ; checkpoint_window_size_in_slots = to_length zero
     ; delta_duration = to_timespan delta_duration
     ; genesis_state_timestamp = protocol_constants.genesis_state_timestamp
-    ; zkapps_per_block = protocol_constants.zkapps_per_block
     }
   in
   res
@@ -302,7 +300,6 @@ let to_protocol_constants
      ; genesis_state_timestamp
      ; slots_per_sub_window
      ; slots_per_epoch
-     ; zkapps_per_block
      ; _
      } :
       _ Poly.t ) =
@@ -311,7 +308,6 @@ let to_protocol_constants
   ; genesis_state_timestamp
   ; slots_per_sub_window
   ; slots_per_epoch
-  ; zkapps_per_block
   }
 
 let typ =
@@ -330,7 +326,6 @@ let typ =
     ; Block_time.Span.Checked.typ
     ; Block_time.Span.Checked.typ
     ; Block_time.Checked.typ
-    ; Length.Checked.typ
     ]
     ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
@@ -387,7 +382,6 @@ module Checked = struct
               ; t.grace_period_end
               ; t.checkpoint_window_slots_per_year
               ; t.checkpoint_window_size_in_slots
-              ; t.zkapps_per_block
              |]
          ; Array.map ~f:Block_time.Span.Checked.to_input
              [| t.block_window_duration_ms

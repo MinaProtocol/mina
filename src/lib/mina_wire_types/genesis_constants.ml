@@ -7,7 +7,6 @@ module Protocol = struct
         ; slots_per_sub_window : 'length
         ; delta : 'delta
         ; genesis_state_timestamp : 'genesis_state_timestamp
-        ; zkapps_per_block : 'length
         }
     end
   end

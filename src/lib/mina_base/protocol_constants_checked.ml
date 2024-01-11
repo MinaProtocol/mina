@@ -31,7 +31,6 @@ module Value = struct
     let open Quickcheck.Let_syntax in
     let%bind k = Int.gen_incl 1 5000 in
     let%bind delta = Int.gen_incl 0 5000 in
-    let%bind zkapps_per_block = Int.gen_incl 1 128 in
     let%bind slots_per_epoch = Int.gen_incl k (8 * k) >>| ( * ) 3 >>| T.of_int
     and slots_per_sub_window = Int.gen_incl 1 ((k + 9) / 9) in
     (*TODO: Bug -> Block_time.(to_time x |> of_time) != x for certain values.
@@ -46,7 +45,6 @@ module Value = struct
     ; slots_per_epoch
     ; slots_per_sub_window = T.of_int slots_per_sub_window
     ; genesis_state_timestamp
-    ; zkapps_per_block = T.of_int zkapps_per_block
     }
 end
 
@@ -58,7 +56,6 @@ let value_of_t (t : Genesis_constants.Protocol.t) : value =
   ; slots_per_epoch = T.of_int t.slots_per_epoch
   ; slots_per_sub_window = T.of_int t.slots_per_sub_window
   ; genesis_state_timestamp = Block_time.of_int64 t.genesis_state_timestamp
-  ; zkapps_per_block = T.of_int t.zkapps_per_block
   }
 
 let t_of_value (v : value) : Genesis_constants.Protocol.t =
@@ -67,7 +64,6 @@ let t_of_value (v : value) : Genesis_constants.Protocol.t =
   ; slots_per_epoch = T.to_int v.slots_per_epoch
   ; slots_per_sub_window = T.to_int v.slots_per_sub_window
   ; genesis_state_timestamp = Block_time.to_int64 v.genesis_state_timestamp
-  ; zkapps_per_block = T.to_int v.zkapps_per_block
   }
 
 let to_input (t : value) =
@@ -90,7 +86,6 @@ let typ =
     ; T.Checked.typ
     ; T.Checked.typ
     ; Block_time.Checked.typ
-    ; T.Checked.typ
     ]
     ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
@@ -99,8 +94,7 @@ let var_to_input (var : var) =
   let k = T.Checked.to_input var.k
   and delta = T.Checked.to_input var.delta
   and slots_per_epoch = T.Checked.to_input var.slots_per_epoch
-  and slots_per_sub_window = T.Checked.to_input var.slots_per_sub_window
-  and zkapps_per_block = T.Checked.to_input var.zkapps_per_block in
+  and slots_per_sub_window = T.Checked.to_input var.slots_per_sub_window in
   let genesis_state_timestamp =
     Block_time.Checked.to_input var.genesis_state_timestamp
   in
@@ -110,7 +104,6 @@ let var_to_input (var : var) =
      ; slots_per_epoch
      ; slots_per_sub_window
      ; genesis_state_timestamp
-     ; zkapps_per_block
     |]
 
 let%test_unit "value = var" =

@@ -1382,7 +1382,7 @@ let start t =
       ~block_produced_bvar:t.components.block_produced_bvar
       ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
       ~zkapps_per_block:
-        t.config.precomputed_values.genesis_constants.protocol.zkapps_per_block ;
+        t.config.precomputed_values.genesis_constants.zkapps_per_block ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with

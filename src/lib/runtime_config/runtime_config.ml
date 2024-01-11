@@ -393,7 +393,6 @@ module Json_layout = struct
       ; slots_per_epoch : int option [@default None]
       ; slots_per_sub_window : int option [@default None]
       ; genesis_state_timestamp : string option [@default None]
-      ; zkapps_per_block : int option [@default None]
       }
     [@@deriving yojson, fields, dhall_type]
 
@@ -412,6 +411,7 @@ module Json_layout = struct
       ; zkapp_transaction_cost_limit : float option [@default None]
       ; max_event_elements : int option [@default None]
       ; max_action_elements : int option [@default None]
+      ; zkapps_per_block : int option [@default None]
       }
     [@@deriving yojson, fields, dhall_type]
 
@@ -849,7 +849,6 @@ module Genesis = struct
     ; slots_per_epoch : int option
     ; slots_per_sub_window : int option
     ; genesis_state_timestamp : string option
-    ; zkapps_per_block : int option
     }
   [@@deriving bin_io_unversioned]
 
@@ -873,8 +872,6 @@ module Genesis = struct
     ; genesis_state_timestamp =
         opt_fallthrough ~default:t1.genesis_state_timestamp
           t2.genesis_state_timestamp
-    ; zkapps_per_block =
-        opt_fallthrough ~default:t1.zkapps_per_block t2.zkapps_per_block
     }
 end
 
@@ -888,6 +885,7 @@ module Daemon = struct
     ; zkapp_transaction_cost_limit : float option [@default None]
     ; max_event_elements : int option [@default None]
     ; max_action_elements : int option [@default None]
+    ; zkapps_per_block : int option [@default None]
     }
   [@@deriving bin_io_unversioned]
 
@@ -921,6 +919,8 @@ module Daemon = struct
         opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
     ; max_action_elements =
         opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
+    ; zkapps_per_block =
+        opt_fallthrough ~default:t1.zkapps_per_block t2.zkapps_per_block
     }
 end
 
