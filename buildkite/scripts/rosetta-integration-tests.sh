@@ -1,5 +1,17 @@
 #!/bin/bash
 
+# Deploy a sandboxed Mina daemon with an archive and a Rosetta instance.
+# Deploy 2 zkApps from https://github.com/MinaProtocol/rosetta-integration-test-zkapps
+# to the network, interact with them and add some regular transactions.
+# Then run full rosetta-cli tests against the Rosetta instance.
+
+# NPM and NodeJS are installed through NVM, versions are stored in environment
+# variables below. Zkapp-cli is installed globally through NPM, however, to
+# ensure compatibility with the daemon, we use o1js pinned in the Mina repo.
+# The repo is mounted into the container at /workdir, so we can build o1js from
+# that source. It is important to make sure that the zkapp-cli version installed
+# is compatible with o1js version used.
+
 # These tests use the mina-dev binary, as rosetta-cli assumes we use a testnet.
 # See https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L222
 
@@ -34,24 +46,43 @@ export MINA_PRIVKEY_PASS=${MINA_PRIVKEY_PASS:=''}
 export MINA_CONFIG_FILE=$HOME/${MINA_NETWORK}.json
 export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=$HOME/.mina-config}"
 export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
-export MINA_SNARKYJS_VERSION=${MINA_SNARKYJS_VERSION:=main}
+
+# Test variables
+export ROSETTA_INT_TEST_ZKAPPS_VERSION=${ROSETTA_INT_TEST_ZKAPPS_VERSION:=rosetta-ci-tests}
+
+# We need a version which is compatible with o1js pinned to the Mina repo.
+# Should be set to 'latest' most of the time, but occasionally we might need
+# an older one.
+export ZKAPP_CLI_VERSION=0.11.0
 
 # Nodejs variables
 export NVM_VERSION=0.39.3
-export NODE_VERSION=16
+export NODE_VERSION=20.6.1
 
 # zkApps variables
 export ZKAPP_PATH=$HOME/zkapps
 
 echo "=========================== INSTALLING NPM ==========================="
-curl -so- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash &> /dev/null
+curl -so- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash &>/dev/null
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"                   # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
+
+nvm install $NODE_VERSION
+nvm use --delete-prefix $NODE_VERSION
+
 mkdir ~/.npm-global
 npm config set prefix '~/.npm-global'
 export PATH=~/.npm-global/bin:$PATH
-npm install --no-progress --global zkapp-cli
+
+# Install zkapp-cli and Typescript compiler.
+npm install --no-progress --global "zkapp-cli@${ZKAPP_CLI_VERSION}" "typescript@latest"
+
+# Build o1js so that we can use it later.
+pushd /workdir/src/lib/snarkyjs
+npm ci
+npm run build
+popd
 
 # Rosetta CLI variables
 # Files from ROSETTA_CLI_CONFIG_FILES will be read from
@@ -65,7 +96,7 @@ ROSETTA_CLI_MAIN_CONFIG_FILE=${ROSETTA_CLI_MAIN_CONFIG_FILE:="config.json"}
 TRANSACTION_FREQUENCY=60
 
 # Fetch zkApps
-curl -Ls https://github.com/MinaProtocol/rosetta-integration-test-zkapps/tarball/$MINA_SNARKYJS_VERSION | tar xz -C /tmp
+curl -Ls https://github.com/MinaProtocol/rosetta-integration-test-zkapps/tarball/$ROSETTA_INT_TEST_ZKAPPS_VERSION | tar xz -C /tmp
 mv /tmp/MinaProtocol-rosetta-integration-test-zkapps-* $ZKAPP_PATH
 
 # Libp2p Keypair
@@ -84,7 +115,7 @@ SNARK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/snark-producer.key.pub)
 mkdir -p $MINA_CONFIG_DIR/wallets/store
 cp $MINA_KEYS_PATH/block-producer.key $MINA_CONFIG_DIR/wallets/store/$BLOCK_PRODUCER_PK
 CURRENT_TIME=$(date +"%Y-%m-%dT%H:%M:%S%z")
-cat <<EOF > "$MINA_CONFIG_FILE"
+cat <<EOF >"$MINA_CONFIG_FILE"
 {
   "genesis": { "genesis_state_timestamp": "$CURRENT_TIME" },
   "proof": { "block_window_duration_ms": 20000 },
@@ -100,10 +131,13 @@ EOF
 for zkapp_path in ${ZKAPP_PATH}/*/; do
   zkapp_path=${zkapp_path%/}
   zkapp=$(basename $zkapp_path)
-  mina-dev advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp}.key
-  zkapp_pk=$(cat $MINA_KEYS_PATH/zkapp-${zkapp}.key.pub)
-  line="[{ \"pk\": \"${zkapp_pk}\", \"balance\": \"10000\", \"delegate\": null, \"sk\": null }]"
-  jq ".ledger.accounts |= . + ${line}" $MINA_CONFIG_FILE > ${MINA_CONFIG_FILE}.tmp
+  # Generate zkApp account keypair
+  mina-dev advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key
+  # Generate zkApp fee payer keypair
+  mina-dev advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key
+  zkapp_fee_payer_pk=$(cat $MINA_KEYS_PATH/zkapp-${zkapp}-fee-payer.key.pub)
+  line="[{ \"pk\": \"${zkapp_fee_payer_pk}\", \"balance\": \"10000\", \"delegate\": null, \"sk\": null }]"
+  jq ".ledger.accounts |= . + ${line}" $MINA_CONFIG_FILE >${MINA_CONFIG_FILE}.tmp
   mv ${MINA_CONFIG_FILE}.tmp $MINA_CONFIG_FILE
 done
 cat $MINA_CONFIG_FILE | jq .
@@ -113,15 +147,14 @@ ROSETTA_CONFIGURATION_OUTPUT_DIR=/tmp/rosetta-cli-config
 mkdir -p "$ROSETTA_CONFIGURATION_OUTPUT_DIR"
 ROSETTA_CONFIGURATION_FILE="${ROSETTA_CONFIGURATION_OUTPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}"
 BLOCK_PRODUCER_PRIVKEY=$(mina-ocaml-signer hex-of-private-key-file --private-key-path "$MINA_KEYS_PATH/block-producer.key")
-for config_file in $ROSETTA_CLI_CONFIG_FILES
-do
-    sed -e "s/PLACEHOLDER_PREFUNDED_PRIVKEY/${BLOCK_PRODUCER_PRIVKEY}/" \
-        -e "s/PLACEHOLDER_PREFUNDED_ADDRESS/${BLOCK_PRODUCER_PK}/" \
-        -e "s/PLACEHOLDER_ROSETTA_OFFLINE_PORT/${MINA_ROSETTA_OFFLINE_PORT}/" \
-        -e "s/PLACEHOLDER_ROSETTA_ONLINE_PORT/${MINA_ROSETTA_ONLINE_PORT}/" \
-        "$ROSETTA_CONFIGURATION_INPUT_DIR/$config_file" > "$ROSETTA_CONFIGURATION_OUTPUT_DIR/$config_file"
+for config_file in $ROSETTA_CLI_CONFIG_FILES; do
+  sed -e "s/PLACEHOLDER_PREFUNDED_PRIVKEY/${BLOCK_PRODUCER_PRIVKEY}/" \
+    -e "s/PLACEHOLDER_PREFUNDED_ADDRESS/${BLOCK_PRODUCER_PK}/" \
+    -e "s/PLACEHOLDER_ROSETTA_OFFLINE_PORT/${MINA_ROSETTA_OFFLINE_PORT}/" \
+    -e "s/PLACEHOLDER_ROSETTA_ONLINE_PORT/${MINA_ROSETTA_ONLINE_PORT}/" \
+    -e "s/PLACEHOLDER_NETWORK_NAME/${MINA_NETWORK}/" \
+    "$ROSETTA_CONFIGURATION_INPUT_DIR/$config_file" >"$ROSETTA_CONFIGURATION_OUTPUT_DIR/$config_file"
 done
-
 
 # Import Genesis Accounts
 echo "==================== IMPORTING GENESIS ACCOUNTS ======================"
@@ -130,7 +163,7 @@ mina-dev accounts import --privkey-path $MINA_KEYS_PATH/snark-producer.key --con
 for zkapp_path in ${ZKAPP_PATH}/*/; do
   zkapp_path=${zkapp_path%/}
   zkapp=$(basename $zkapp_path)
-  mina-dev accounts import --privkey-path $MINA_KEYS_PATH/zkapp-${zkapp}.key --config-directory $MINA_CONFIG_DIR
+  mina-dev accounts import --privkey-path $MINA_KEYS_PATH/zkapp-${zkapp}-fee-payer.key --config-directory $MINA_CONFIG_DIR
 done
 
 # Postgres
@@ -144,15 +177,14 @@ psql -f "${MINA_ARCHIVE_SQL_SCHEMA_PATH}" "${PG_CONN}"
 
 # Mina Rosetta
 echo "=========================== STARTING ROSETTA API ONLINE AND OFFLINE INSTANCES ==========================="
-ports=( $MINA_ROSETTA_ONLINE_PORT $MINA_ROSETTA_OFFLINE_PORT )
-for port in ${ports[*]}
-do
-    mina-rosetta \
+ports=($MINA_ROSETTA_ONLINE_PORT $MINA_ROSETTA_OFFLINE_PORT)
+for port in ${ports[*]}; do
+  mina-rosetta-dev \
     --archive-uri "${PG_CONN}" \
     --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
     --log-level ${LOG_LEVEL} \
     --port ${port} &
-    sleep 5
+  sleep 5
 done
 
 # Mina Archive
@@ -183,11 +215,10 @@ mina-dev daemon \
 echo "========================= WAITING FOR THE DAEMON TO SYNC ==========================="
 daemon_status="Pending"
 retries_left=20
-until [ $daemon_status == "Synced" ]
-do
-  [[ $retries_left -eq 0 ]] && echo "Unable to Sync the Daemon" && exit 1  || ((retries_left--))
+until [ $daemon_status == "Synced" ]; do
+  [[ $retries_left -eq 0 ]] && echo "Unable to Sync the Daemon" && exit 1 || ((retries_left--))
   sleep 15
-  daemon_status=$(mina-dev client status --json | jq -r .sync_status 2> /dev/null || echo "Pending")
+  daemon_status=$(mina-dev client status --json | jq -r .sync_status 2>/dev/null || echo "Pending")
   echo "Daemon Status: ${daemon_status}"
 done
 
@@ -206,37 +237,55 @@ send_payments() {
 }
 send_payments &
 
+# Fee payer cache creation
+echo "==================== PREPARE FEE PAYER CACHE ======================"
+zkapp_fee_payer_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key.pub)
+zkapp_fee_payer_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}-fee-payer.key" | sed -ne "s/Private key: //p")
+
+mkdir -p /root/.cache/zkapp-cli/keys
+echo -e "{\n    \"privateKey\": \"${zkapp_fee_payer_privkey}\",\n    \"publicKey\": \"${zkapp_fee_payer_pk}\"\n}" >/root/.cache/zkapp-cli/keys/sandbox.json
+
 # Deploy zkApps
 echo "==================== DEPLOYING ZKAPPS ======================"
+echo "If this fails, it's likely due to incompatibility between the
+o1js and zkapp-cli versions in use."
+echo "NOTE: At the moment the daemon still has an old version of
+      snarkyjs pinned to it, so we cannot use the latest version of
+      zkapp-cli, which requires o1js. Once the pinned snarkyjs version
+      gets updated, this build will most likely fail and we will then
+      need to update the zkapp-cli version used here. This is
+      unfortunate, but necessary. Please delete this warning once it's
+      done." > /dev/stderr
+
 deploy_txs=()
 for zkapp_path in ${ZKAPP_PATH}/*/; do
   zkapp_path=${zkapp_path%/}
   zkapp=$(basename $zkapp_path)
   echo "Deploying ${zkapp}..."
 
-  zkapp_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}.key.pub)
-  zkapp_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}.key" | sed -ne "s/Private key: //p")
-
-  mina-dev accounts unlock --public-key $zkapp_pk
+  zkapp_account_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key.pub)
+  zkapp_account_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}-account.key" | sed -ne "s/Private key: //p")
 
   mkdir -p ${zkapp_path}/keys
-  echo -e "{\n    \"privateKey\": \"${zkapp_privkey}\",\n    \"publicKey\": \"${zkapp_pk}\"\n}" > "${zkapp_path}/keys/sandbox.json"
+  echo -e "{\n    \"privateKey\": \"${zkapp_account_privkey}\",\n    \"publicKey\": \"${zkapp_account_pk}\"\n}" >"${zkapp_path}/keys/sandbox.json"
 
-  cat <<EOF > "${zkapp_path}/config.json"
+  cat <<EOF >"${zkapp_path}/config.json"
 {
   "version": 1,
   "networks": {
     "sandbox": {
       "url": "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql",
       "keyPath": "keys/sandbox.json",
+      "feepayerKeyPath": "/root/.cache/zkapp-cli/keys/sandbox.json",
+      "feepayerAlias": "sandbox",
       "fee": "1"
     }
   }
 }
 EOF
   cd "$zkapp_path"
-  npm install --no-progress ${OLDPWD}/src/lib/snarky_js_bindings/snarkyjs
-  npm install --no-progress
+  npm ci
+  npm run build
   txn=$(zk deploy sandbox -y | sed -ne "s/https:\/\/berkeley.minaexplorer.com\/transaction\///p")
   deploy_txs+=txn
   cd -
@@ -260,10 +309,9 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
   echo "Interacting with ${zkapp}..."
 
   cd "$zkapp_path"
-  npm run build
   ./interact.sh sandbox
   cd -
-  echo "Done." 
+  echo "Done."
 done
 
 next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"')

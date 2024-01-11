@@ -30,8 +30,10 @@ CREATE TABLE zkapp_field
 */
 CREATE TABLE zkapp_field_array
 ( id                       serial  PRIMARY KEY
-, element_ids              int[]   NOT NULL
+, element_ids              int[]   NOT NULL UNIQUE
 );
+
+CREATE INDEX idx_zkapp_field_array_element_ids ON zkapp_field_array(element_ids);
 
 /* Fixed-width arrays of algebraic fields, given as id's from
    zkapp_field
@@ -78,8 +80,10 @@ CREATE TABLE zkapp_action_states
 */
 CREATE TABLE zkapp_events
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]            NOT NULL
+, element_ids              int[]            NOT NULL UNIQUE
 );
+
+CREATE INDEX idx_zkapp_events_element_ids ON zkapp_events(element_ids);
 
 /* field elements derived from verification keys */
 CREATE TABLE zkapp_verification_key_hashes
@@ -151,40 +155,29 @@ CREATE TABLE zkapp_nonce_bounds
 , nonce_upper_bound        bigint           NOT NULL
 );
 
-CREATE TYPE zkapp_precondition_type AS ENUM ('full', 'nonce', 'accept');
-
 /* NULL convention */
-CREATE TABLE zkapp_account_precondition_values
-( id                       serial                 PRIMARY KEY
-, balance_id               int                    REFERENCES zkapp_balance_bounds(id)
-, nonce_id                 int                    REFERENCES zkapp_nonce_bounds(id)
+CREATE TABLE zkapp_account_precondition
+( id                       serial     PRIMARY KEY
+, balance_id               int                     REFERENCES zkapp_balance_bounds(id)
+, nonce_id                 int                     REFERENCES zkapp_nonce_bounds(id)
 , receipt_chain_hash       text
-, delegate_id              int                    REFERENCES public_keys(id)
-, state_id                 int        NOT NULL    REFERENCES zkapp_states_nullable(id)
-, action_state_id        int                    REFERENCES zkapp_field(id)
+, delegate_id              int                     REFERENCES public_keys(id)
+, state_id                 int        NOT NULL     REFERENCES zkapp_states_nullable(id)
+, action_state_id          int                     REFERENCES zkapp_field(id)
 , proved_state             boolean
 , is_new                   boolean
-);
-
-/* invariants: precondition_account id is not NULL iff kind is 'full'
-               nonce is not NULL iff kind is 'nonce'
-*/
-CREATE TABLE zkapp_account_precondition
-( id                              serial                            PRIMARY KEY
-, kind                            zkapp_precondition_type           NOT NULL
-, account_precondition_values_id  int                               REFERENCES zkapp_account_precondition_values(id)
-, nonce                           bigint
+, UNIQUE(balance_id, receipt_chain_hash, delegate_id, state_id, action_state_id, proved_state, is_new, nonce_id)
 );
 
 CREATE TABLE zkapp_accounts
 ( id                   serial  PRIMARY KEY
-, app_state_id         int     NOT NULL  REFERENCES zkapp_states(id)
-, verification_key_id  int               REFERENCES zkapp_verification_keys(id)
+, app_state_id         int     NOT NULL     REFERENCES zkapp_states(id)
+, verification_key_id  int                  REFERENCES zkapp_verification_keys(id)
 , zkapp_version        bigint  NOT NULL
-, action_state_id    int     NOT NULL  REFERENCES zkapp_action_states(id)
-, last_action_slot   bigint  NOT NULL
+, action_state_id      int     NOT NULL     REFERENCES zkapp_action_states(id)
+, last_action_slot     bigint  NOT NULL
 , proved_state         bool    NOT NULL
-, zkapp_uri_id         int     NOT NULL  REFERENCES zkapp_uris(id)
+, zkapp_uri_id         int     NOT NULL     REFERENCES zkapp_uris(id)
 );
 
 CREATE TABLE zkapp_token_id_bounds

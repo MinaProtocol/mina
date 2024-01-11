@@ -35,7 +35,7 @@
    ppx_inline_test.config
    inline_test_quiet_logs
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_jane ppx_version ppx_inline_test
                   ppx_let ppx_deriving.std ppx_deriving_yojson ppx_custom_printf)))

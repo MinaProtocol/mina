@@ -47,6 +47,9 @@ module Tar = struct
         Ok ()
     | Error err ->
         Error (Error.tag err ~tag:"Error extracting tar file")
+
+  let filename_without_extension =
+    String.chop_suffix_if_exists ~suffix:".tar.gz"
 end
 
 let file_exists ?follow_symlinks filename =
@@ -132,38 +135,36 @@ module Ledger = struct
               ] ;
           return None
     in
-    let%bind hash_filename =
-      match config.hash with
-      | Some hash -> (
-          let hash_filename = hash_filename hash ~ledger_name_prefix in
-          let%bind tar_path =
-            Deferred.List.find_map ~f:(file_exists hash_filename) search_paths
-          in
-          match tar_path with
-          | Some _ ->
-              return tar_path
-          | None ->
-              load_from_s3 hash_filename )
-      | None ->
-          return None
+    let search_local filename =
+      Deferred.List.find_map ~f:(file_exists filename) search_paths
     in
-    let search_local_and_s3 ?other_data name =
-      let named_filename =
-        named_filename ~constraint_constants ~num_accounts:config.num_accounts
-          ~balances:config.balances ~ledger_name_prefix ?other_data name
-      in
-      match%bind
-        Deferred.List.find_map ~f:(file_exists named_filename) search_paths
-      with
+    let search_local_and_s3 filename =
+      match%bind search_local filename with
       | Some path ->
           return (Some path)
       | None ->
-          load_from_s3 named_filename
+          load_from_s3 filename
+    in
+    let%bind hash_filename =
+      match config.hash with
+      | Some hash ->
+          let hash_filename = hash_filename hash ~ledger_name_prefix in
+          search_local_and_s3 hash_filename
+      | None ->
+          return None
     in
     match hash_filename with
     | Some filename ->
         return (Some filename)
     | None -> (
+        let search_local_and_s3 ?other_data name =
+          let named_filename =
+            named_filename ~constraint_constants
+              ~num_accounts:config.num_accounts ~balances:config.balances
+              ~ledger_name_prefix ?other_data name
+          in
+          search_local_and_s3 named_filename
+        in
         match (config.base, config.name) with
         | Named name, _ ->
             let named_filename =
@@ -171,7 +172,7 @@ module Ledger = struct
                 ~num_accounts:config.num_accounts ~balances:config.balances
                 ~ledger_name_prefix name
             in
-            Deferred.List.find_map ~f:(file_exists named_filename) search_paths
+            search_local named_filename
         | Accounts accounts, _ ->
             search_local_and_s3 ~other_data:(accounts_hash accounts) "accounts"
         | Hash hash, None ->
@@ -186,11 +187,33 @@ module Ledger = struct
     [%log trace] "Loading $ledger from $path"
       ~metadata:
         [ ("ledger", `String ledger_name_prefix); ("path", `String filename) ] ;
-    let dirname = Uuid.to_string (Uuid_unix.create ()) in
-    (* Unpack the ledger in the autogen directory, since we know that we have
-       write permissions there.
-    *)
+    let dirname =
+      Tar.filename_without_extension @@ Filename.basename filename
+    in
     let dirname = genesis_dir ^/ dirname in
+    (* remove dir if it exists *)
+    let%bind () =
+      if%bind file_exists ~follow_symlinks:true dirname then (
+        [%log trace] "Genesis ledger dir $path already exists, removing"
+          ~metadata:[ ("path", `String dirname) ] ;
+        let rec remove_dir dir =
+          let%bind files = Sys.ls_dir dir in
+          let%bind () =
+            Deferred.List.iter files ~f:(fun file ->
+                let file = dir ^/ file in
+                remove file )
+          in
+          Unix.rmdir dir
+        and remove file =
+          match%bind Sys.is_directory file with
+          | `Yes ->
+              remove_dir file
+          | _ ->
+              Unix.unlink file
+        in
+        remove dirname )
+      else Deferred.unit
+    in
     let%bind () = Unix.mkdir ~p:() dirname in
     let open Deferred.Or_error.Let_syntax in
     let%map () = Tar.extract ~root:dirname ~file:filename () in
@@ -826,24 +849,25 @@ let load_config_file filename =
       | Error err ->
           Or_error.error_string err )
 
-let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~proof_level (config : Runtime_config.t) =
+let print_config ~logger config =
   let ledger_name_json =
-    match
-      let open Option.Let_syntax in
-      let%bind ledger = config.ledger in
-      ledger.name
-    with
-    | Some name ->
-        `String name
-    | None ->
-        `Null
+    Option.value ~default:`Null
+    @@ let%bind.Option ledger = config.Runtime_config.ledger in
+       let%map.Option name = ledger.name in
+       `String name
   in
+  let json_config, accounts_omitted =
+    Runtime_config.to_yojson_without_accounts config
+  in
+  let f i = List.cons ("accounts_omitted", `Int i) in
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata:
-      [ ("name", ledger_name_json)
-      ; ("config", Runtime_config.to_yojson config)
-      ] ;
+      (Option.value_map ~f ~default:Fn.id accounts_omitted
+         [ ("name", ledger_name_json); ("config", json_config) ] )
+
+let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
+    ~proof_level (config : Runtime_config.t) =
+  print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
   let proof_level =

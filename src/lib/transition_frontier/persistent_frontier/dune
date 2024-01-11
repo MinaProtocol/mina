@@ -13,6 +13,7 @@
    base.caml
    sexplib0
    extlib
+   async_unix
    ;;local libraries
    o1trace
    mina_metrics

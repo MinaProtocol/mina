@@ -1,7 +1,7 @@
 (library
  (public_name integration_test_cloud_engine)
  (name integration_test_cloud_engine)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../graphql-ppx-config.inc ../../../graphql_schema.json)
  (preprocess (pps

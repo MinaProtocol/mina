@@ -1,5 +1,6 @@
 let SelectFiles = ../Lib/SelectFiles.dhall
 let PipelineMode = ./Mode.dhall
+let PipelineStage = ./Stage.dhall
 
 in
 
@@ -10,10 +11,12 @@ in
     path: Text,
     name: Text,
     mode: PipelineMode.Type,
+    stage: PipelineStage.Type,
     dirtyWhen: List SelectFiles.Type
   },
   default = {
     path = ".",
-    mode = PipelineMode.Type.PullRequest
+    mode = PipelineMode.Type.PullRequest,
+    stage = PipelineStage.Type.Test
   }
 }

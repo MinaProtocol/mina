@@ -127,6 +127,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   include (Stable.Latest : module type of Stable.Latest with type t := t)
 
+  let signature Poly.{ signature; _ } = signature
+
   let payload Poly.{ payload; _ } = payload
 
   let fee = Fn.compose Payload.fee payload

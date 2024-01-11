@@ -1,5 +1,5 @@
 (library
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (name kimchi_pasta)
  (public_name kimchi_backend.pasta)
  (flags -warn-error -27)

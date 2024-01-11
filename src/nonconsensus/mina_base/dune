@@ -1,7 +1,7 @@
 (library
  (name mina_base)
  (public_name mina_base_nonconsensus)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (library_flags -linkall)
  (libraries
    ;;opam libraries

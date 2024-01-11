@@ -2,16 +2,14 @@ let S = ../../Lib/SelectFiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
-
+let PipelineMode = ../../Pipeline/Mode.dhall
 let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
-    { name = "TestnetIntegrationTests", key = "build-test-executive" },
     { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
     { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
 ]
 let dependsOnJs = [
-    { name = "TestnetIntegrationTests", key = "build-test-executive" },
     { name = "TestnetIntegrationTests", key = "build-js-tests" },
     { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
     { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
@@ -29,15 +27,14 @@ in Pipeline.build Pipeline.Config::{
         S.strictlyStart (S.contains "automation/terraform/modules/kubernetes/testnet")
     ],
     path = "Test",
-    name = "TestnetIntegrationTests"
+    name = "TestnetIntegrationTests",
+    mode = PipelineMode.Type.Stable
   },
   steps = [
-    TestExecutive.build "integration_tests",
     TestExecutive.buildJs "integration_tests",
     TestExecutive.execute "peers-reliability" dependsOn,
     TestExecutive.execute "chain-reliability" dependsOn,
     TestExecutive.execute "payment" dependsOn,
-    TestExecutive.execute "delegation" dependsOn,
     TestExecutive.execute "gossip-consis" dependsOn,
     TestExecutive.execute "block-prod-prio" dependsOn,
     TestExecutive.execute "medium-bootstrap" dependsOn,

@@ -44,6 +44,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Cache_handle = Cache_handle
   module Step_main_inputs = Step_main_inputs
   module Step_verifier = Step_verifier
+  module Proof_cache = Proof_cache
 
   exception Return_digest = Compile.Return_digest
 
@@ -288,19 +289,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let compile_with_wrap_main_override_promise =
     Compile.compile_with_wrap_main_override_promise
 
-  let compile_promise ?self ?cache ?disk_keys ?return_early_digest_exception
-      ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ~constraint_constants ~choices () =
-    compile_with_wrap_main_override_promise ?self ?cache ?disk_keys
+  let compile_promise ?self ?cache ?proof_cache ?disk_keys
+      ?return_early_digest_exception ?override_wrap_domain ~public_input
+      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
+      ~choices () =
+    compile_with_wrap_main_override_promise ?self ?cache ?proof_cache ?disk_keys
       ?return_early_digest_exception ?override_wrap_domain ~public_input
       ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
       ~choices ()
 
-  let compile ?self ?cache ?disk_keys ?override_wrap_domain ~public_input
-      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
-      ~choices () =
+  let compile ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
+      ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
+      ~constraint_constants ~choices () =
     let self, cache_handle, proof_module, provers =
-      compile_promise ?self ?cache ?disk_keys ?override_wrap_domain
+      compile_promise ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
         ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
         ~constraint_constants ~choices ()
     in
@@ -1384,7 +1386,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let wrap =
                 let wrap_vk = Lazy.force wrap_vk in
                 let%bind.Promise proof, (), (), _ =
-                  step ~maxes:(module Maxes)
+                  step ~proof_cache:None ~maxes:(module Maxes)
                 in
                 let proof =
                   { proof with

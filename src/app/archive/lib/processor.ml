@@ -856,7 +856,7 @@ module Zkapp_nonce_bounds = struct
       id
 end
 
-module Zkapp_account_precondition_values = struct
+module Zkapp_account_precondition = struct
   type t =
     { balance_id : int option
     ; nonce_id : int option
@@ -882,7 +882,7 @@ module Zkapp_account_precondition_values = struct
         ; option bool
         ]
 
-  let table_name = "zkapp_account_precondition_values"
+  let table_name = "zkapp_account_precondition"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (acct : Zkapp_precondition.Account.t) =
@@ -913,7 +913,7 @@ module Zkapp_account_precondition_values = struct
     in
     let receipt_chain_hash =
       Zkapp_basic.Or_ignore.to_option acct.receipt_chain_hash
-      |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
+      |> Option.map ~f:Receipt.Chain_hash.to_base58_check
     in
     let proved_state = Zkapp_basic.Or_ignore.to_option acct.proved_state in
     let is_new = Zkapp_basic.Or_ignore.to_option acct.is_new in
@@ -932,75 +932,6 @@ module Zkapp_account_precondition_values = struct
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
       value
-
-  let load (module Conn : CONNECTION) id =
-    Conn.find
-      (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
-      id
-end
-
-module Zkapp_account_precondition = struct
-  type t =
-    { kind : Account_update.Account_precondition.Tag.t
-    ; account_precondition_values_id : int option
-    ; nonce : int64 option
-    }
-  [@@deriving fields, hlist]
-
-  let zkapp_account_precondition_kind_typ =
-    let encode = function
-      | Account_update.Account_precondition.Tag.Full ->
-          "full"
-      | Nonce ->
-          "nonce"
-      | Accept ->
-          "accept"
-    in
-    let decode = function
-      | "full" ->
-          Result.return Account_update.Account_precondition.Tag.Full
-      | "nonce" ->
-          Result.return Account_update.Account_precondition.Tag.Nonce
-      | "accept" ->
-          Result.return Account_update.Account_precondition.Tag.Accept
-      | _ ->
-          Result.failf "Failed to decode zkapp_account_precondition_kind_typ"
-    in
-    Caqti_type.enum "zkapp_precondition_type" ~encode ~decode
-
-  let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.
-        [ zkapp_account_precondition_kind_typ; option int; option int64 ]
-
-  let table_name = "zkapp_account_precondition"
-
-  let add_if_doesn't_exist (module Conn : CONNECTION)
-      (account_precondition : Account_update.Account_precondition.t) =
-    let open Deferred.Result.Let_syntax in
-    let%bind account_precondition_values_id =
-      match account_precondition with
-      | Account_update.Account_precondition.Full acct ->
-          Zkapp_account_precondition_values.add_if_doesn't_exist
-            (module Conn)
-            acct
-          >>| Option.some
-      | _ ->
-          return None
-    in
-    let kind = Account_update.Account_precondition.tag account_precondition in
-    let nonce =
-      match account_precondition with
-      | Account_update.Account_precondition.Nonce nonce ->
-          Option.some @@ Unsigned.UInt32.to_int64 nonce
-      | _ ->
-          None
-    in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
-      (module Conn)
-      { kind; account_precondition_values_id; nonce }
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -1486,20 +1417,83 @@ module Zkapp_events = struct
 
   let table_name = "zkapp_events"
 
+  module Field_array_map = Map.Make (struct
+    type t = int array [@@deriving sexp]
+
+    let compare = Array.compare Int.compare
+  end)
+
+  (* Account_update.Body.Events'.t is defined as `field array list`,
+     which is ismorphic to a list of list of fields.
+
+     We are batching the insertion of field and field_array to optimize
+     the speed of archiving max-cost zkapps.
+
+     1. we flatten the list of list of fields to get all the field elements
+     2. insert all the field elements in one query
+     3. construct a map "M" from `field_id` to `field` by querying against the zkapp_field table
+     4. use "M" and the list of list of fields to compute the list of list of field_ids
+     5. insert all list of `list of field_ids` in one query
+     6. construct a map "M'" from `field_array_id` to `field_id array` by querying against
+        the zkapp_field_array table
+     7. use "M'" and the list of list of field_ids to compute the list of field_array_ids
+     8. insert the list of field_arrays
+  *)
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (events : Account_update.Body.Events'.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind (element_ids : int array) =
-      Mina_caqti.deferred_result_list_map events
-        ~f:(Zkapp_field_array.add_if_doesn't_exist (module Conn))
-      >>| Array.of_list
+    let%bind field_array_id_list =
+      if not @@ List.is_empty events then
+        let field_list_list =
+          List.map events ~f:(fun field_array ->
+              Array.map field_array ~f:Pickles.Backend.Tick.Field.to_string
+              |> Array.to_list )
+        in
+        let fields = field_list_list |> List.concat in
+        let%bind field_id_list_list =
+          if not @@ List.is_empty fields then
+            let%map field_map =
+              Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field"
+                ~col:("field", Caqti_type.string)
+                (module Conn)
+                fields
+              >>| String.Map.of_alist_exn
+            in
+            let field_id_list_list =
+              List.map field_list_list ~f:(List.map ~f:(Map.find_exn field_map))
+            in
+            field_id_list_list
+          else
+            (* if there's no fields, then we must have some list of empty lists *)
+            return @@ List.map field_list_list ~f:(fun _ -> [])
+        in
+        (* this conversion should be done by caqti using `typ`, FIX this in the future *)
+        let field_array_list =
+          List.map field_id_list_list ~f:(fun id_list ->
+              List.map id_list ~f:Int.to_string
+              |> String.concat ~sep:", " |> sprintf "{%s}" )
+        in
+        let%map field_array_map =
+          Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field_array"
+            ~col:("element_ids", Mina_caqti.array_int_typ)
+            (module Conn)
+            field_array_list
+          >>| Field_array_map.of_alist_exn
+        in
+        let field_array_id_list =
+          List.map field_id_list_list ~f:(fun field_id_list ->
+              Map.find_exn field_array_map (Array.of_list field_id_list) )
+          |> Array.of_list
+        in
+        field_array_id_list
+      else return @@ Array.of_list []
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name
       ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
       ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
       (module Conn)
-      element_ids
+      field_array_id_list
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -1560,14 +1554,17 @@ module Zkapp_account_update_body = struct
       Account_identifiers.add_if_doesn't_exist (module Conn) account_identifier
     in
     let%bind update_id =
-      Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
+      Metrics.time ~label:"zkapp_updates.add"
+      @@ fun () -> Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
     in
     let increment_nonce = body.increment_nonce in
     let%bind events_id =
-      Zkapp_events.add_if_doesn't_exist (module Conn) body.events
+      Metrics.time ~label:"Zkapp_events.add"
+      @@ fun () -> Zkapp_events.add_if_doesn't_exist (module Conn) body.events
     in
     let%bind actions_id =
-      Zkapp_events.add_if_doesn't_exist (module Conn) body.actions
+      Metrics.time ~label:"Zkapp_actions.add"
+      @@ fun () -> Zkapp_events.add_if_doesn't_exist (module Conn) body.actions
     in
     let%bind call_data_id =
       Zkapp_field.add_if_doesn't_exist (module Conn) body.call_data
@@ -1669,6 +1666,8 @@ module Zkapp_account_update = struct
       (account_update : Account_update.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let%bind body_id =
+      Metrics.time ~label:"Zkapp_account_update_body.add"
+      @@ fun () ->
       Zkapp_account_update_body.add_if_doesn't_exist
         (module Conn)
         account_update.body
@@ -1914,7 +1913,7 @@ module User_command = struct
             (Caqti_request.find typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
-                    | "typ" -> Some "user_command_type" | _ -> None )
+                    | "command_type" -> Some "user_command_type" | _ -> None )
                   ~cols:Fields.names () ) )
             { command_type = user_cmd.command_type
             ; fee_payer_id
@@ -1966,11 +1965,15 @@ module User_command = struct
       let open Deferred.Result.Let_syntax in
       let zkapp_command = Zkapp_command.to_simple ps in
       let%bind zkapp_fee_payer_body_id =
+        Metrics.time ~label:"Zkapp_fee_payer_body.add"
+        @@ fun () ->
         Zkapp_fee_payer_body.add_if_doesn't_exist
           (module Conn)
           zkapp_command.fee_payer.body
       in
       let%bind zkapp_account_updates_ids =
+        Metrics.time ~label:"Zkapp_account_update.add"
+        @@ fun () ->
         Mina_caqti.deferred_result_list_map zkapp_command.account_updates
           ~f:(Zkapp_account_update.add_if_doesn't_exist (module Conn))
         >>| Array.of_list
@@ -2063,7 +2066,8 @@ module Internal_command = struct
           (Caqti_request.find typ Caqti_type.int
              (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                 ~tannot:(function
-                  | "typ" -> Some "internal_command_type" | _ -> None )
+                  | "command_type" -> Some "internal_command_type" | _ -> None
+                  )
                 ~cols:Fields.names () ) )
           { command_type = internal_cmd.command_type
           ; receiver_id
@@ -2710,7 +2714,8 @@ module Accounts_created = struct
 end
 
 module Protocol_versions = struct
-  type t = { major : int; minor : int; patch : int } [@@deriving hlist, fields]
+  type t = { transaction : int; network : int; patch : int }
+  [@@deriving hlist, fields]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -2718,8 +2723,9 @@ module Protocol_versions = struct
 
   let table_name = "protocol_versions"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) ~major ~minor ~patch =
-    let t = { major; minor; patch } in
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~transaction ~network
+      ~patch =
+    let t = { transaction; network; patch } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -2834,9 +2840,9 @@ module Block = struct
             (Consensus.Data.Consensus_state.block_stake_winner consensus_state)
         in
         let last_vrf_output =
-          (* encode as hex, Postgresql won't accept arbitrary bitstrings *)
+          (* encode as base64, same as in precomputed blocks JSON *)
           Consensus.Data.Consensus_state.last_vrf_output consensus_state
-          |> Hex.Safe.to_hex
+          |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
         in
         let%bind snarked_ledger_hash_id =
           Snarked_ledger_hash.add_if_doesn't_exist
@@ -2880,23 +2886,23 @@ module Block = struct
           |> Unsigned.UInt32.to_int64
         in
         let%bind protocol_version_id =
-          let major = Protocol_version.major protocol_version in
-          let minor = Protocol_version.minor protocol_version in
+          let transaction = Protocol_version.transaction protocol_version in
+          let network = Protocol_version.network protocol_version in
           let patch = Protocol_version.patch protocol_version in
           Protocol_versions.add_if_doesn't_exist
             (module Conn)
-            ~major ~minor ~patch
+            ~transaction ~network ~patch
         in
         let%bind proposed_protocol_version_id =
           Option.value_map proposed_protocol_version ~default:(return None)
             ~f:(fun ppv ->
-              let major = Protocol_version.major ppv in
-              let minor = Protocol_version.minor ppv in
+              let transaction = Protocol_version.transaction ppv in
+              let network = Protocol_version.network ppv in
               let patch = Protocol_version.patch ppv in
               let%map id =
                 Protocol_versions.add_if_doesn't_exist
                   (module Conn)
-                  ~major ~minor ~patch
+                  ~transaction ~network ~patch
               in
               Some id )
         in
@@ -2975,6 +2981,8 @@ module Block = struct
               (failed_str, Some display)
         in
         let%bind _seq_no =
+          Metrics.time ~label:"adding_transactions"
+          @@ fun () ->
           Mina_caqti.deferred_result_list_fold transactions ~init:0
             ~f:(fun sequence_no -> function
             | { Mina_base.With_status.status
@@ -3000,6 +3008,9 @@ module Block = struct
                       let status, failure_reasons =
                         failure_reasons user_command.status
                       in
+                      Metrics.time
+                        ~label:"block_and_zkapp_command.add_if_doesn't_exist"
+                      @@ fun () ->
                       Block_and_zkapp_command.add_if_doesn't_exist
                         (module Conn)
                         ~block_id ~zkapp_command_id:id ~sequence_no ~status
@@ -3240,8 +3251,9 @@ module Block = struct
             Public_key.add_if_doesn't_exist (module Conn) block.block_winner
           in
           let last_vrf_output =
-            (* already encoded as hex *)
+            (* encode as base64, same as in precomputed blocks JSON *)
             block.last_vrf_output
+            |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
           in
           let%bind snarked_ledger_hash_id =
             Snarked_ledger_hash.add_if_doesn't_exist
@@ -3257,41 +3269,39 @@ module Block = struct
             Epoch_data.add_if_doesn't_exist (module Conn) block.next_epoch_data
           in
           let%bind protocol_version_id =
-            let major = Protocol_version.major block.protocol_version in
-            let minor = Protocol_version.minor block.protocol_version in
+            let transaction =
+              Protocol_version.transaction block.protocol_version
+            in
+            let network = Protocol_version.network block.protocol_version in
             let patch = Protocol_version.patch block.protocol_version in
             Protocol_versions.add_if_doesn't_exist
               (module Conn)
-              ~major ~minor ~patch
+              ~transaction ~network ~patch
           in
           let%bind proposed_protocol_version_id =
             Option.value_map block.proposed_protocol_version
               ~default:(return None) ~f:(fun ppv ->
-                let major = Protocol_version.major ppv in
-                let minor = Protocol_version.minor ppv in
+                let transaction = Protocol_version.transaction ppv in
+                let network = Protocol_version.network ppv in
                 let patch = Protocol_version.patch ppv in
                 let%map id =
                   Protocol_versions.add_if_doesn't_exist
                     (module Conn)
-                    ~major ~minor ~patch
+                    ~transaction ~network ~patch
                 in
                 Some id )
           in
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               {sql| INSERT INTO blocks
-                     (state_hash, parent_id, parent_hash,
-                      creator_id, block_winner_id,last_vrf_output,
-                      snarked_ledger_hash_id, staking_epoch_data_id,
-                      next_epoch_data_id,
-                      min_window_density, sub_window_densities, total_currency,
-                      ledger_hash, height,
-                      global_slot_since_hard_fork, global_slot_since_genesis,
-                      protocol_version, proposed_protocol_version,
-                      timestamp, chain_status)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::bigint[], ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
-                     RETURNING id
-               |sql} )
+               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                  ~tannot:(function
+                    | "sub_window_densities" ->
+                        Some "bigint[]"
+                    | "chain_status" ->
+                        Some "chain_status_type"
+                    | _ ->
+                        None )
+                  ~cols:Fields.names () ) )
             { state_hash = block.state_hash |> State_hash.to_base58_check
             ; parent_id
             ; parent_hash = block.parent_hash |> State_hash.to_base58_check
@@ -3540,9 +3550,12 @@ module Block = struct
         then
           (* a new block, allows marking some pending blocks as canonical *)
           let%bind subchain_blocks =
-            get_subchain
-              (module Conn)
-              ~start_block_id:highest_canonical_block_id ~end_block_id:block_id
+            Metrics.time ~label:"get_subchain (> canonical_height + k)"
+              (fun () ->
+                get_subchain
+                  (module Conn)
+                  ~start_block_id:highest_canonical_block_id
+                  ~end_block_id:block_id )
           in
           let block_height_less_k_int64 = Int64.( - ) block.height k_int64 in
           (* mark canonical, orphaned blocks in subchain at least k behind the new block *)
@@ -3550,38 +3563,45 @@ module Block = struct
             List.filter subchain_blocks ~f:(fun subchain_block ->
                 Int64.( <= ) subchain_block.height block_height_less_k_int64 )
           in
-          Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
-            ~f:(fun () block ->
-              let%bind () =
-                mark_as_canonical (module Conn) ~state_hash:block.state_hash
-              in
-              mark_as_orphaned
-                (module Conn)
-                ~state_hash:block.state_hash ~height:block.height )
+          Metrics.time ~label:"mark_as_canonical (> canonical_height + k)"
+            (fun () ->
+              Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
+                ~f:(fun () block ->
+                  let%bind () =
+                    mark_as_canonical (module Conn) ~state_hash:block.state_hash
+                  in
+                  mark_as_orphaned
+                    (module Conn)
+                    ~state_hash:block.state_hash ~height:block.height ) )
         else if Int64.( < ) block.height greatest_canonical_height then
           (* a missing block added in the middle of canonical chain *)
           let%bind canonical_block_above_id, _above_height =
-            get_nearest_canonical_block_above (module Conn) block.height
+            Metrics.time ~label:"get_nearest_canonical_block_above" (fun () ->
+                get_nearest_canonical_block_above (module Conn) block.height )
           in
           let%bind canonical_block_below_id, _below_height =
-            get_nearest_canonical_block_below (module Conn) block.height
+            Metrics.time ~label:"get_neareast_canonical_block_below" (fun () ->
+                get_nearest_canonical_block_below (module Conn) block.height )
           in
           (* we can always find this chain: the genesis block should be marked as canonical, and we've found a
              canonical block above this one *)
           let%bind canonical_blocks =
-            get_subchain
-              (module Conn)
-              ~start_block_id:canonical_block_below_id
-              ~end_block_id:canonical_block_above_id
+            Metrics.time ~label:"get_subchain (< canonical_height)" (fun () ->
+                get_subchain
+                  (module Conn)
+                  ~start_block_id:canonical_block_below_id
+                  ~end_block_id:canonical_block_above_id )
           in
-          Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
-            ~f:(fun () block ->
-              let%bind () =
-                mark_as_canonical (module Conn) ~state_hash:block.state_hash
-              in
-              mark_as_orphaned
-                (module Conn)
-                ~state_hash:block.state_hash ~height:block.height )
+          Metrics.time ~label:"mark_as_canonical (< canonical_height)"
+            (fun () ->
+              Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
+                ~f:(fun () block ->
+                  let%bind () =
+                    mark_as_canonical (module Conn) ~state_hash:block.state_hash
+                  in
+                  mark_as_orphaned
+                    (module Conn)
+                    ~state_hash:block.state_hash ~height:block.height ) )
         else
           (* a block at or above highest canonical block, not high enough to mark any blocks as canonical *)
           Deferred.Result.return ()
@@ -3711,7 +3731,12 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
           [%log info] "Attempting to add block data for $state_hash"
             ~metadata:
               [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
-          let%bind block_id = add_block (module Conn : CONNECTION) block in
+          let%bind block_id =
+            O1trace.thread "archive_processor.add_block"
+            @@ fun () ->
+            Metrics.time ~label:"add_block"
+            @@ fun () -> add_block (module Conn : CONNECTION) block
+          in
           (* if an existing block has a parent hash that's for the block just added,
              set its parent id
           *)
@@ -3721,7 +3746,10 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
               ~parent_hash:(hash block) ~parent_id:block_id
           in
           (* update chain status for existing blocks *)
-          let%bind () = Block.update_chain_status (module Conn) ~block_id in
+          let%bind () =
+            Metrics.time ~label:"update_chain_status" (fun () ->
+                Block.update_chain_status (module Conn) ~block_id )
+          in
           let%bind () =
             match delete_older_than with
             | Some num_blocks ->
@@ -3877,13 +3905,6 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
             "Runtime config does not contain a ledger, could not add genesis \
              accounts"
       | Some runtime_config_ledger -> (
-          (* blocks depend on having the protocol version set, which the daemon does on startup;
-             the actual value doesn't affect the block state hash, which is how we
-             identify a block in the archive db
-
-             here, we just set the protocol version to a dummy value
-          *)
-          Protocol_version.(set_current zero) ;
           let proof_level = Genesis_constants.Proof_level.compiled in
           let%bind precomputed_values =
             match%map

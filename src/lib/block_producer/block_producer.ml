@@ -71,6 +71,8 @@ let lift_sync f =
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
          Ivar.fill ivar (f ()) ) )
 
+let zkapp_cmd_limit = ref Mina_compile_config.zkapp_cmd_limit
+
 module Singleton_scheduler : sig
   type t
 
@@ -160,10 +162,11 @@ let report_transaction_inclusion_failures ~logger failed_txns =
       let leftover_bytes = available_bytes - base_error_size - 2 in
       wrap_error (`List (generate_errors failed_txns leftover_bytes)) )
 
-let generate_next_state ~constraint_constants ~previous_protocol_state
-    ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
-    ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
-    ~log_block_creation ~block_reward_threshold ~zkapps_per_block =
+let generate_next_state ~zkapp_cmd_limit ~constraint_constants
+    ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
+    ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
+    ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
+    ~zkapps_per_block =
   let open Interruptible.Let_syntax in
   let previous_protocol_state_body_hash =
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
@@ -200,7 +203,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                 staged_ledger ~coinbase_receiver ~logger
                 ~current_state_view:previous_state_view
                 ~transactions_by_fee:transactions ~get_completed_work
-                ~log_block_creation ~supercharge_coinbase
+                ~log_block_creation ~supercharge_coinbase ~zkapp_cmd_limit
               |> Result.map ~f:(fun (diff, failed_txns) ->
                      if not (List.is_empty failed_txns) then
                        don't_wait_for
@@ -417,7 +420,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
       (`Prover_error
         ( err
         , ( previous_protocol_state_proof
-          , internal_transition
+          , _internal_transition
           , pending_coinbase_witness ) ) ) ->
       let msg : (_, unit, string, unit) format4 =
         "Prover failed to prove freshly generated transition: $error"
@@ -427,8 +430,9 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
         ; ("prev_state", Protocol_state.value_to_yojson previous_protocol_state)
         ; ("prev_state_proof", Proof.to_yojson previous_protocol_state_proof)
         ; ("next_state", Protocol_state.value_to_yojson protocol_state)
-        ; ( "internal_transition"
-          , Internal_transition.to_yojson internal_transition )
+          (* Commented out because for large blocks it's an oversized log *)
+          (* ; ( "internal_transition"
+             , Internal_transition.to_yojson internal_transition ) *)
         ; ( "pending_coinbase_witness"
           , Pending_coinbase_witness.to_yojson pending_coinbase_witness )
         ; time_metadata
@@ -697,8 +701,14 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             in
             let start = Block_time.now time_controller in
             [%log info]
-              ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson crumb) ]
-              "Producing new block with parent $breadcrumb%!" ;
+              ~metadata:
+                [ ( "parent_hash"
+                  , Breadcrumb.parent_hash crumb |> State_hash.to_yojson )
+                ; ( "protocol_state"
+                  , Breadcrumb.protocol_state crumb
+                    |> Protocol_state.value_to_yojson )
+                ]
+              "Producing new block with parent $parent_hash%!" ;
             let previous_transition = Breadcrumb.block_with_hash crumb in
             let previous_protocol_state =
               Header.protocol_state
@@ -746,7 +756,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk:winner_pubkey ~block_reward_threshold
-                ~zkapps_per_block
+                ~zkapp_cmd_limit:!zkapp_cmd_limit ~zkapps_per_block
             in
             [%log internal] "Generate_next_state_done" ;
             match next_state_opt with
@@ -883,7 +893,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                       time ~logger ~time_controller
                         "Build breadcrumb on produced block" (fun () ->
                           Breadcrumb.build ~logger ~precomputed_values ~verifier
-                            ~trust_system ~parent:crumb ~transition
+                            ~get_completed_work:(Fn.const None) ~trust_system
+                            ~parent:crumb ~transition
                             ~sender:None (* Consider skipping `All here *)
                             ~skip_staged_ledger_verification:`Proofs
                             ~transition_receipt_time () )
@@ -899,12 +910,18 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                              | `Prover_error _ ) as err ->
                                err )
                     in
+                    let txs =
+                      Mina_block.transactions ~constraint_constants
+                        (Breadcrumb.block breadcrumb)
+                      |> List.map ~f:Transaction.yojson_summary_with_status
+                    in
                     [%log internal] "@block_metadata"
                       ~metadata:
                         [ ( "blockchain_length"
                           , Mina_numbers.Length.to_yojson
                             @@ Mina_block.blockchain_length
                             @@ Breadcrumb.block breadcrumb )
+                        ; ("transactions", `List txs)
                         ] ;
                     [%str_log info]
                       ~metadata:
@@ -1377,7 +1394,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
             time ~logger ~time_controller
               "Build breadcrumb on produced block (precomputed)" (fun () ->
                 Breadcrumb.build ~logger ~precomputed_values ~verifier
-                  ~trust_system ~parent:crumb ~transition ~sender:None
+                  ~get_completed_work:(Fn.const None) ~trust_system
+                  ~parent:crumb ~transition ~sender:None
                   ~skip_staged_ledger_verification:`Proofs
                   ~transition_receipt_time ()
                 |> Deferred.Result.map_error ~f:(function

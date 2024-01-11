@@ -74,7 +74,7 @@ let%test_module "Zkapp payments tests" =
                   ; preconditions =
                       { Account_update.Preconditions.network =
                           Zkapp_precondition.Protocol_state.accept
-                      ; account = Accept
+                      ; account = Zkapp_precondition.Account.accept
                       ; valid_while = Ignore
                       }
                   ; use_full_commitment = false
@@ -97,7 +97,7 @@ let%test_module "Zkapp payments tests" =
                   ; preconditions =
                       { Account_update.Preconditions.network =
                           Zkapp_precondition.Protocol_state.accept
-                      ; account = Accept
+                      ; account = Zkapp_precondition.Account.accept
                       ; valid_while = Ignore
                       }
                   ; use_full_commitment = false

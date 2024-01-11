@@ -1,5 +1,5 @@
 (library
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (name kimchi_gadgets)
  (public_name kimchi_backend.gadgets)
  (instrumentation (backend bisect_ppx))

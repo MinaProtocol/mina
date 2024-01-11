@@ -152,6 +152,18 @@ module Graphql = struct
     }
   |}]
 
+  module Global_slot_since_hard_fork =
+  [%graphql
+  {|
+    query {
+      daemonStatus {
+        consensusTimeNow {
+          globalSlot @ppxCustom(module: "Scalars.GlobalSlotSinceHardFork")
+        }
+      }
+    }
+  |}]
+
   module Best_chain =
   (* "slot" is serialized using Graphql_lib.Scalars.Slot
      to use that, we'd need to add the 'consensus' library,
@@ -174,8 +186,8 @@ module Graphql = struct
         protocolState {
           consensusState {
             blockHeight
-            slotSinceGenesis @ppxCustom(module: "Graphql_lib.Scalars.GlobalSlotSinceGenesis")
-            slot @ppxCustom(module: "Graphql_lib.Scalars.GlobalSlotSinceHardFork")
+            slotSinceGenesis @ppxCustom(module: "Scalars.GlobalSlotSinceGenesis")
+            slot @ppxCustom(module: "Scalars.GlobalSlotSinceHardFork")
           }
         }
       }
@@ -335,6 +347,29 @@ let get_peer_id ~logger node_uri =
 
 let must_get_peer_id ~logger node_uri =
   get_peer_id ~logger node_uri |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+let get_global_slot_since_hard_fork ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting global slot since hard fork from daemon status"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj =
+    Graphql.Global_slot_since_hard_fork.(make @@ makeVariables ())
+  in
+  let%bind query_result_obj =
+    exec_graphql_request ~logger ~node_uri
+      ~query_name:"global_slot_since_hard_fork" query_obj
+  in
+  [%log info] "global_slot_since_hard_fork, finished exec_graphql_request" ;
+  let res : Mina_numbers.Global_slot_since_hard_fork.t =
+    query_result_obj.daemonStatus.consensusTimeNow.globalSlot
+  in
+  [%log info] "global_slot_since_hard_fork, result of graphql query = %s"
+    (Mina_numbers.Global_slot_since_hard_fork.to_string res) ;
+  return res
+
+let must_get_global_slot_since_hard_fork ~logger node_uri =
+  get_global_slot_since_hard_fork ~logger node_uri
+  |> Deferred.bind ~f:Malleable_error.or_hard_error
 
 let get_best_chain ?max_length ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in

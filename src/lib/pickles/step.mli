@@ -9,6 +9,7 @@ module Make
        ?handler:
          (   Snarky_backendless.Request.request
           -> Snarky_backendless.Request.response )
+    -> proof_cache:Proof_cache.t option
     -> ( A.t
        , A_value.t
        , 'ret_var

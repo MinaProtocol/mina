@@ -35,9 +35,13 @@ locals {
         metrics = "8081"
         p2p     = var.seed_external_port
       }
-      # seedPeersURL         = var.seed_peers_url
+      itn = {
+        port    = "3086"
+        keys    = var.itn_keys
+      }
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
       exposeGraphql        = var.expose_graphql
+      exposeItnGraphql     = var.expose_itn_graphql
     }
     
     priorityClass = var.priority_class
@@ -75,6 +79,7 @@ locals {
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     # seedPeersURL         = var.seed_peers_url
     exposeGraphql        = var.expose_graphql
+    exposeItnGraphql     = var.expose_itn_graphql
     cpuRequest = var.cpu_request
     memRequest= var.mem_request
   }
@@ -215,5 +220,10 @@ locals {
     makeReportDiscordWebhookUrl = var.make_report_discord_webhook_url
     makeReportAccounts          = var.make_report_accounts
     seedPeersURL                = var.additional_peers
+  }
+
+  itn_orchestrator_vars = {
+    testnetName = var.testnet_name
+    image       = var.itn_orchestrator_image
   }
 }

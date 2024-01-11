@@ -177,6 +177,14 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
       (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
   }
 
+let time ~logger ~label f =
+  let start = Time.now () in
+  let x = f () in
+  let stop = Time.now () in
+  [%log info] "%s took %s" label
+    (Time.Span.to_string_hum (Time.diff stop start)) ;
+  x
+
 let rec load_with_max_length :
        context:(module CONTEXT)
     -> max_length:int
@@ -283,6 +291,8 @@ let rec load_with_max_length :
       ~snarked_ledger_hash:genesis_ledger_hash
   in
   match
+    time ~label:"Persistent_frontier.Instsance.check_database" ~logger
+    @@ fun () ->
     Persistent_frontier.Instance.check_database
       ~genesis_state_hash:
         (State_hash.With_state_hashes.state_hash
@@ -358,13 +368,15 @@ let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
     ~catchup_mode () =
   let open Context in
-  let max_length =
-    global_max_length (Precomputed_values.genesis_constants precomputed_values)
-  in
-  load_with_max_length
-    ~context:(module Context)
-    ~max_length ~retry_with_fresh_db ~verifier ~consensus_local_state
-    ~persistent_root ~persistent_frontier ~catchup_mode ()
+  O1trace.thread "transition_frontier_load" (fun () ->
+      let max_length =
+        global_max_length
+          (Precomputed_values.genesis_constants precomputed_values)
+      in
+      load_with_max_length
+        ~context:(module Context)
+        ~max_length ~retry_with_fresh_db ~verifier ~consensus_local_state
+        ~persistent_root ~persistent_frontier ~catchup_mode () )
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -453,12 +465,15 @@ let add_breadcrumb_exn t breadcrumb =
     Mina_block.Validated.valid_commands
     @@ Breadcrumb.validated_transition breadcrumb
   in
+  let tx_hash_json =
+    Fn.compose
+      Mina_transaction.Transaction_hash.(Fn.compose to_yojson hash_command)
+      User_command.forget_check
+  in
   [%str_log' trace t.logger] Added_breadcrumb_user_commands
     ~metadata:
       [ ( "user_commands"
-        , `List
-            (List.map user_cmds
-               ~f:(With_status.to_yojson User_command.Valid.to_yojson) ) )
+        , `List (List.map user_cmds ~f:(With_status.to_yojson tx_hash_json)) )
       ; ("state_hash", State_hash.to_yojson (Breadcrumb.state_hash breadcrumb))
       ] ;
   let lite_diffs =
@@ -593,7 +608,6 @@ module For_tests = struct
     let constraint_constants = precomputed_values.constraint_constants in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let transition_receipt_time = Some (Time.now ()) in
-        Protocol_version.(set_current zero) ;
         let genesis_transition =
           Mina_block.Validated.lift (Mina_block.genesis ~precomputed_values)
         in

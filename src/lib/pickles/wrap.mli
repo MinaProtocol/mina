@@ -1,7 +1,8 @@
 open Pickles_types
 
 val wrap :
-     max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
+     proof_cache:Proof_cache.t option
+  -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
   -> (module Pickles_types.Hlist.Maxes.S
         with type length = 'max_proofs_verified
          and type ns = 'max_local_max_proofs_verifieds )

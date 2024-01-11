@@ -1006,7 +1006,6 @@ module For_tests = struct
            ~src:(Lazy.force Genesis_ledger.t)
            ~dest:(Mina_ledger.Ledger.create ~depth:ledger_depth ()) )
     in
-    Protocol_version.(set_current zero) ;
     let root_data =
       let open Root_data in
       { transition =

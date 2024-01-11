@@ -81,14 +81,17 @@ type mutation {
     """Payments details"""
     input: PaymentsDetails!
   ): String!
+  
   scheduleZkappCommands(
     """Zkapp commands details"""
     input: ZkappCommandsDetails!
   ): String!
+
   stopScheduledTransactions(
     """Transaction scheduler handle"""
     handle: String!
   ): String!
+
   updateGating(
     """Gating update"""
     input: GatingUpdate!
@@ -108,6 +111,12 @@ type mutation {
     """Seconds to delay before stopping daemon (minimum 5)"""
     delaySeconds: Int
   ): String!
+
+  """Set zkApp commands per block limit for the block producer."""
+  zkAppCommandLimit(
+    """ZkApp commands per block limit."""
+    limit: Int
+  ): Int
 }
 
 """Network identifiers for another protocol participant"""
@@ -173,6 +182,12 @@ scalar UInt16
 
 """Keys and other information for scheduling zkapp commands"""
 input ZkappCommandsDetails {
+  """
+  Parameter of zkapp generation, each generated zkapp tx will have
+  (2*maxAccountUpdates+2) account updates (including balancing and fee payer)
+  """
+  maxAccountUpdates: Int
+
   """Generate max cost zkApp command"""
   maxCost: Boolean!
 
@@ -192,6 +207,12 @@ input ZkappCommandsDetails {
   Initial balance for zkApp accounts that we initially deploy for the purpose of test
   """
   initBalance: CurrencyAmount!
+
+  """Maximum new zkapp balance"""
+  maxNewZkappBalance: CurrencyAmount!
+
+  """Minimum new zkapp balance"""
+  minNewZkappBalance: CurrencyAmount!
 
   """Maximum balance change"""
   maxBalanceChange: CurrencyAmount!

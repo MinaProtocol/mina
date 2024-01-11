@@ -19,7 +19,7 @@ let mk_account_update_body ?preconditions ?(increment_nonce = false)
       ~default:
         Account_update.Preconditions.
           { network = Zkapp_precondition.Protocol_state.accept
-          ; account = Account_update.Account_precondition.Accept
+          ; account = Zkapp_precondition.Account.accept
           ; valid_while = Ignore
           }
   in

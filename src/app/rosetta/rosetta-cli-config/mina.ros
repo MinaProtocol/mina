@@ -1,7 +1,7 @@
 // Workflow used to create new accounts
 create_account(1){
   create{
-    network = {"network":"debug", "blockchain":"mina"};
+    network = {"network":"PLACEHOLDER_NETWORK_NAME", "blockchain":"mina"};
     key = generate_key({"curve_type": "pallas"});
     account = derive({
       "network_identifier": {{network}},
@@ -19,7 +19,7 @@ create_account(1){
 // Workflow used to generate payment transactions
 transfer_payment(10){
   transfer{
-    transfer.network = {"network":"debug", "blockchain":"mina"};
+    transfer.network = {"network":"PLACEHOLDER_NETWORK_NAME", "blockchain":"mina"};
     currency = {"symbol":"MINA", "decimals":9};
     sender = find_balance({
       "minimum_balance":{
@@ -94,7 +94,7 @@ transfer_payment(10){
 // Workflow used to generate delegation transactions
 transfer_delegation(10){
   transfer{
-    transfer.network = {"network":"debug", "blockchain":"mina"};
+    transfer.network = {"network":"PLACEHOLDER_NETWORK_NAME", "blockchain":"mina"};
     currency = {"symbol":"MINA", "decimals":9};
     sender = find_balance({
       "minimum_balance":{

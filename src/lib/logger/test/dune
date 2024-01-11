@@ -10,7 +10,7 @@
    logger
    logger.file_system
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx)))

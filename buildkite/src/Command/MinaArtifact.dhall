@@ -28,14 +28,15 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         Libp2p.step debVersion,
         Command.build
           Command.Config::{
-            commands = DebianVersions.toolchainRunner debVersion [
-              "DUNE_PROFILE=devnet",
-              "AWS_ACCESS_KEY_ID",
-              "AWS_SECRET_ACCESS_KEY",
-              "MINA_BRANCH=$BUILDKITE_BRANCH",
-              "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
-              "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
-            ] "./buildkite/scripts/build-artifact.sh",
+            commands = 
+              DebianVersions.toolchainRunner debVersion [
+                "DUNE_PROFILE=devnet",
+                "AWS_ACCESS_KEY_ID",
+                "AWS_SECRET_ACCESS_KEY",
+                "MINA_BRANCH=$BUILDKITE_BRANCH",
+                "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
+                "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
+              ] "./buildkite/scripts/build-artifact.sh",
             label = "Build Mina for ${DebianVersions.capitalName debVersion}",
             key = "build-deb-pkg",
             target = Size.XLarge,
@@ -68,6 +69,17 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         }
         in
         DockerImage.generateStep testExecutiveSpec,
+
+        -- batch_txn_tool image
+        let batchTxnSpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion,
+          service="mina-batch-txn",
+          network="berkeley",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image"
+        }
+        in
+        DockerImage.generateStep batchTxnSpec,
 
         -- archive image
         let archiveSpec = DockerImage.ReleaseSpec::{
