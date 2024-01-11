@@ -353,7 +353,8 @@ struct
       -> max_proofs_verified:
            (module Nat.Add.Intf with type n = max_proofs_verified)
       -> name:string
-      -> constraint_constants:Snark_keys_header.Constraint_constants.t
+      -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
+      -> ?commits:Snark_keys_header.Commits.With_date.t
       -> public_input:
            ( var
            , value
@@ -381,18 +382,40 @@ struct
          * _ =
    fun ~self ~cache ~proof_cache ?disk_keys ?override_wrap_domain
        ?override_wrap_main ?(num_chunks = 1) ~branches:(module Branches)
-       ~max_proofs_verified ~name ~constraint_constants ~public_input
+       ~max_proofs_verified ~name ?constraint_constants ?commits ~public_input
        ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
+      let constraint_constants : Snark_keys_header.Constraint_constants.t =
+        match constraint_constants with
+        | Some constraint_constants ->
+            constraint_constants
+        | None ->
+            { sub_windows_per_window = 0
+            ; ledger_depth = 0
+            ; work_delay = 0
+            ; block_window_duration_ms = 0
+            ; transaction_capacity = Log_2 0
+            ; pending_coinbase_depth = 0
+            ; coinbase_amount = Unsigned.UInt64.of_int 0
+            ; supercharged_coinbase_factor = 0
+            ; account_creation_fee = Unsigned.UInt64.of_int 0
+            ; fork = None
+            }
+      in
+      let (commits, commit_date) : Snark_keys_header.Commits.t * string =
+        match commits with
+        | Some { commits; commit_date } ->
+            (commits, commit_date)
+        | None ->
+            ( { mina = "[NOT SPECIFIED]"; marlin = "[NOT SPECIFIED]" }
+            , "[UNKNOWN]" )
+      in
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
       ; constraint_constants
-      ; commits =
-          { mina = Mina_version.commit_id
-          ; marlin = Mina_version.marlin_commit_id
-          }
+      ; commits
       ; length = (* This is a dummy, it gets filled in on read/write. *) 0
-      ; commit_date = Mina_version.commit_date
+      ; commit_date
       ; constraint_system_hash
       ; identifying_hash =
           (* TODO: Proper identifying hash. *)
@@ -964,7 +987,8 @@ let compile_with_wrap_main_override_promise :
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
-    -> constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?commits:Snark_keys_header.Commits.With_date.t
     -> choices:
          (   self:(var, value, max_proofs_verified, branches) Tag.t
           -> ( prev_varss
@@ -998,7 +1022,7 @@ let compile_with_wrap_main_override_promise :
  *)
  fun ?self ?(cache = []) ?proof_cache ?disk_keys ?override_wrap_domain
      ?override_wrap_main ?num_chunks ~public_input ~auxiliary_typ ~branches
-     ~max_proofs_verified ~name ~constraint_constants ~choices () ->
+     ~max_proofs_verified ~name ?constraint_constants ?commits ~choices () ->
   let self =
     match self with
     | None ->
@@ -1066,7 +1090,7 @@ let compile_with_wrap_main_override_promise :
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~proof_cache ~cache ?disk_keys ?override_wrap_domain
       ?override_wrap_main ?num_chunks ~branches ~max_proofs_verified ~name
-      ~public_input ~auxiliary_typ ~constraint_constants
+      ~public_input ~auxiliary_typ ?constraint_constants ?commits
       ~choices:(fun ~self -> conv_irs (choices ~self))
       ()
   in
@@ -1257,19 +1281,6 @@ end) =
 struct
   open Impls.Step
 
-  let constraint_constants : Snark_keys_header.Constraint_constants.t =
-    { sub_windows_per_window = 0
-    ; ledger_depth = 0
-    ; work_delay = 0
-    ; block_window_duration_ms = 0
-    ; transaction_capacity = Log_2 0
-    ; pending_coinbase_depth = 0
-    ; coinbase_amount = Unsigned.UInt64.of_int 0
-    ; supercharged_coinbase_factor = 0
-    ; account_creation_fee = Unsigned.UInt64.of_int 0
-    ; fork = None
-    }
-
   let rule self : _ Inductive_rule.t =
     { identifier = "main"
     ; prevs = [ self; self ]
@@ -1306,19 +1317,6 @@ struct
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"
-      ~constraint_constants:
-        (* Dummy values *)
-        { sub_windows_per_window = 0
-        ; ledger_depth = 0
-        ; work_delay = 0
-        ; block_window_duration_ms = 0
-        ; transaction_capacity = Log_2 0
-        ; pending_coinbase_depth = 0
-        ; coinbase_amount = Unsigned.UInt64.of_int 0
-        ; supercharged_coinbase_factor = 0
-        ; account_creation_fee = Unsigned.UInt64.of_int 0
-        ; fork = None
-        }
       ~choices:(fun ~self -> [ rule self ])
 
   module Proof = (val p)
@@ -1357,7 +1355,7 @@ struct
             ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
             ~branches:(module Nat.N1)
             ~max_proofs_verified:(module Nat.N2)
-            ~name:"recurse-on-bad" ~constraint_constants
+            ~name:"recurse-on-bad"
             ~choices:(fun ~self:_ ->
               [ { identifier = "main"
                 ; feature_flags = Plonk_types.Features.none_bool
