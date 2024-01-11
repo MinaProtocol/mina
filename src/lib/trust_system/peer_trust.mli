@@ -7,7 +7,7 @@
     or actually do anything when a peer should be banned. That's the
     responsibility of the caller, which is Trust_system. *)
 
-open Async
+open Async_kernel
 open Core
 open Pipe_lib
 
@@ -30,6 +30,8 @@ module type Action_intf = sig
   (** Convert an action into a format string and a set of metadata for
       logging *)
   val to_log : t -> string * (string, Yojson.Safe.t) List.Assoc.t
+
+  val is_reason_for_heartbeat : t -> bool
 end
 
 (** Trust increment that sets a maximum rate of doing a bad thing (presuming the
@@ -38,9 +40,7 @@ val max_rate : float -> float
 
 type Structured_log_events.t +=
   | Peer_banned of
-      { sender_id: Network_peer.Peer.t
-      ; expiration: Time.t
-      ; action: string }
+      { sender_id : Network_peer.Peer.t; expiration : Time.t; action : string }
   [@@deriving register_event]
 
 (* FIXME The parameter docs don't render :( *)
@@ -61,7 +61,11 @@ module Make (Action : Action_intf) : sig
       proactively disconnect from peers when they're banned. You *must* consume
       this, otherwise the program will block indefinitely when a peer is
       banned. *)
-  val ban_pipe : t -> (Network_peer.Peer.t * Time.t) Strict_pipe.Reader.t
+  val upcall_pipe :
+       t
+    -> [ `Ban of Network_peer.Peer.t * Time.t
+       | `Heartbeat of Network_peer.Peer.t ]
+       Strict_pipe.Reader.t
 
   (** Record an action a peer took. This may result in a ban event being
       emitted *)

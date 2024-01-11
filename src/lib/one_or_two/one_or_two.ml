@@ -1,10 +1,10 @@
-open Core
-open Async
+open Core_kernel
+open Async_kernel
 
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t = [`One of 'a | `Two of 'a * 'a]
+    type 'a t = [ `One of 'a | `Two of 'a * 'a ]
     [@@deriving equal, compare, hash, sexp, yojson]
 
     let to_latest a_latest = function
@@ -27,13 +27,13 @@ end]
 
 let length = function `One _ -> 1 | `Two _ -> 2
 
-let to_list = function `One a -> [a] | `Two (a, b) -> [a; b]
+let to_list = function `One a -> [ a ] | `Two (a, b) -> [ a; b ]
 
 let to_numbered_list = function
   | `One a ->
-      [(0, a)]
+      [ (0, a) ]
   | `Two (a, b) ->
-      [(0, a); (1, b)]
+      [ (0, a); (1, b) ]
 
 let group_sequence : 'a Sequence.t -> 'a t Sequence.t =
  fun to_group ->
@@ -42,11 +42,11 @@ let group_sequence : 'a Sequence.t -> 'a t Sequence.t =
       | None ->
           None
       | Some (a, rest_1) -> (
-        match Sequence.next rest_1 with
-        | None ->
-            Some (`One a, Sequence.empty)
-        | Some (b, rest_2) ->
-            Some (`Two (a, b), rest_2) ) )
+          match Sequence.next rest_1 with
+          | None ->
+              Some (`One a, Sequence.empty)
+          | Some (b, rest_2) ->
+              Some (`Two (a, b), rest_2) ) )
 
 let group_list : 'a list -> 'a t list =
  fun xs -> xs |> Sequence.of_list |> group_sequence |> Sequence.to_list
@@ -123,4 +123,5 @@ let gen inner_gen =
   Quickcheck.Generator.(
     union
       [ map inner_gen ~f:(fun x -> `One x)
-      ; map (tuple2 inner_gen inner_gen) ~f:(fun pair -> `Two pair) ])
+      ; map (tuple2 inner_gen inner_gen) ~f:(fun pair -> `Two pair)
+      ])

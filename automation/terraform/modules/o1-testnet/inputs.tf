@@ -30,12 +30,12 @@ variable "artifact_path" {
   default = "/tmp"
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type    = string
-  default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
+  default = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet"
 }
 
-variable "coda_archive_image" {
+variable "mina_archive_image" {
   type    = string
   default = ""
 }
@@ -45,24 +45,34 @@ variable "mina_archive_schema" {
   default = ""
 }
 
-variable "coda_agent_image" {
+variable "mina_archive_schema_aux_files" {
+  type    = list(string)
+  default = []
+}
+
+variable "mina_agent_image" {
   type    = string
   default = "codaprotocol/coda-user-agent:0.1.4"
 }
 
-variable "coda_agent_active" {
+variable "mina_agent_active" {
   type    = string
   default = "true"
 }
 
-variable "coda_bots_image" {
+variable "mina_bots_image" {
   type    = string
   default = ""
 }
 
-variable "coda_points_image" {
+variable "mina_points_image" {
   type    = string
   default = ""
+}
+
+variable "use_embedded_runtime_config" {
+  type    = bool
+  default = false
 }
 
 variable "watchdog_image" {
@@ -70,14 +80,19 @@ variable "watchdog_image" {
   default = "gcr.io/o1labs-192920/watchdog:latest"
 }
 
+variable "itn_orchestrator_image" {
+  type    = string
+  default = "gcr.io/o1labs-192920/itn_orchestrator_image:latest"
+}
+
 # this must be a string to avoid scientific notation truncation
-variable "coda_faucet_amount" {
+variable "mina_faucet_amount" {
   type    = string
   default = "10000000000"
 }
 
 # this must be a string to avoid scientific notation truncation
-variable "coda_faucet_fee" {
+variable "mina_faucet_fee" {
   type    = string
   default = "100000000"
 }
@@ -111,19 +126,34 @@ variable "seed_discovery_keypairs" {
   ]
 }
 
-# Block Producer Vars
-
-variable "whale_count" {
-  type    = number
-  default = 1
+variable "seed_external_port" {
+  type    = string
+  default = "10001"
 }
 
-variable "fish_count" {
-  type    = number
-  default = 1
+# Block Producer Vars
+
+variable "whales" {
+  description = "individual whale block producer node deployment configurations"
+  default     = null
+}
+
+variable "fishes" {
+  description = "individual fish block producer node deployment configurations"
+  default     = null
+}
+
+variable "nodes_with_user_agent" {
+  type    = list(string)
+  default = []
 }
 
 variable "seed_count" {
+  type    = number
+  default = 1
+}
+
+variable "plain_node_count" {
   type    = number
   default = 1
 }
@@ -159,24 +189,18 @@ variable "seed_starting_host_port" {
 
 # Snark Worker Vars
 
-variable "snark_worker_replicas" {
-  type    = number
-  default = 1
-}
-
-variable "snark_worker_fee" {
-  type    = string
-  default = "0.025"
-}
-
-variable "snark_worker_public_key" {
-  type    = string
-  default = "4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
-}
-
-variable "snark_worker_host_port" {
-  type    = number
-  default = 10400
+variable "snark_coordinators" {
+  description = "configurations for not just the snark coordinators but also the snark workers they coordinate"
+  type = list(
+    object({
+      snark_coordinator_name       = string,
+      snark_worker_replicas        = number
+      snark_worker_fee             = number
+      snark_worker_public_key      = string
+      snark_coordinators_host_port = number
+      persist_working_dir          = bool
+  }))
+  default = []
 }
 
 variable "agent_min_fee" {
@@ -214,7 +238,7 @@ variable "gcloud_seeds" {
   default = []
 }
 
-# Coda network services vars
+# Mina network services vars
 
 variable "restart_nodes" {
   type    = bool
@@ -247,8 +271,28 @@ variable "make_report_accounts" {
 }
 
 variable "log_precomputed_blocks" {
-  type = bool
+  type    = bool
   default = false
+}
+
+variable "worker_cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "worker_mem_request" {
+  type    = string
+  default = "0Mi"
+}
+
+variable "cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "mem_request" {
+  type    = string
+  default = "0Mi"
 }
 
 # Archive-Postgres Vars
@@ -260,7 +304,7 @@ variable "archive_node_count" {
 
 variable "archive_configs" {
   description = "individual archive-node deployment configurations"
-  default = null
+  default     = null
 }
 
 variable "upload_blocks_to_gcloud" {
@@ -269,6 +313,11 @@ variable "upload_blocks_to_gcloud" {
 }
 
 variable "seed_peers_url" {
+  type    = string
+  default = ""
+}
+
+variable "zkapps_dashboard_key" {
   type    = string
   default = ""
 }

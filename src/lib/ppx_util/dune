@@ -2,8 +2,12 @@
  (name ppx_util)
  (public_name ppx_util)
  (library_flags -linkall)
- (inline_tests)
- (libraries core_kernel ppxlib)
+ (inline_tests (flags -verbose -show-counts))
+ (libraries
+   ;; opam libraries
+   core_kernel
+   ppxlib
+ )
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))
  (instrumentation (backend bisect_ppx))

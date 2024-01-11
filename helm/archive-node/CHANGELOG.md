@@ -23,3 +23,7 @@
 1.0.2:
 ------
 - expose archive metrics for collection by (Prometheus) monitoring systems
+
+1.0.6:
+------
+- All references to the crypto currency now say Mina

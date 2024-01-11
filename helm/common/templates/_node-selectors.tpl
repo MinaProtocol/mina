@@ -1,7 +1,7 @@
 ### Mina node selector TEMPLATES ###
 
 {{/*
-Node selector: preemptible node affinity
+Node selector: spot node affinity
 */}}
 {{- define "nodeSelector.preemptible" }}
 affinity:
@@ -9,7 +9,7 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
         - matchExpressions:
-          - key: "cloud.google.com/gke-preemptible"
+          - key: "cloud.google.com/gke-spot"
             {{- if .nodeSelector.preemptible }}
             operator: In
             {{- else }}

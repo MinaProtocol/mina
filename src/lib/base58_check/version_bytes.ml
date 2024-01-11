@@ -2,7 +2,9 @@
 
 type t = char
 
-(* each of the following values should be distinct *)
+(** Base58Check version bytes for individual types
+    Each of the following values should be distinct
+*)
 
 let coinbase : t = '\x01'
 
@@ -32,9 +34,11 @@ let state_hash : t = '\x10'
 
 let state_body_hash : t = '\x11'
 
-let transaction_hash : t = '\x12'
+(* original mainnet transaction hashes *)
+let v1_transaction_hash : t = '\x12'
 
-let user_command : t = '\x13'
+(* used only to deserialize transaction ids, pre-Berkeley hard fork *)
+let signed_command_v1 : t = '\x13'
 
 let user_command_memo : t = '\x14'
 
@@ -48,15 +52,23 @@ let coinbase_stack_hash : t = '\x18'
 
 let pending_coinbase_hash_builder : t = '\x19'
 
-let snapp_command : t = '\x1A'
+let zkapp_command : t = '\x1A'
 
-(* the following version bytes are non-sequential because existing testnet
-   user key infrastructure depend on them. don't change them while we 
-   care about user keys! *)
+let verification_key : t = '\x1B'
+
+let token_id_key : t = '\x1C'
+
+let transaction_hash : t = '\x1D'
+
+(** used for testing only *)
+
+let ledger_test_hash : t = '\x30'
+
+(** The following version bytes are non-sequential; existing
+    user key infrastructure depends on them. don't change them!
+*)
 
 let private_key : t = '\x5A'
-
-let non_zero_curve_point : t = '\xCE'
 
 let non_zero_curve_point_compressed : t = '\xCB'
 

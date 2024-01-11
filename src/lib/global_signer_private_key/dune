@@ -3,9 +3,12 @@
  (public_name global_signer_private_key)
  (flags :standard -short-paths)
  (library_flags -linkall)
- (inline_tests)
- (libraries core_kernel signature_lib)
+ (inline_tests (flags -verbose -show-counts))
+ (libraries
+   ;; local libraries
+   snark_params
+   pickles)
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving.eq))
+  (pps ppx_version ppx_jane ppx_compare))
  (instrumentation (backend bisect_ppx))
  (synopsis "fold types"))

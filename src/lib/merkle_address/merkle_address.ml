@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Bitstring
 
 let depth = bitstring_length
@@ -6,7 +6,7 @@ let depth = bitstring_length
 let add_padding path =
   let length = depth path in
   if length mod 8 = 0 then path
-  else concat [path; zeroes_bitstring (8 - (length mod 8))]
+  else concat [ path; zeroes_bitstring (8 - (length mod 8)) ]
 
 let slice = subbitstring
 
@@ -42,6 +42,8 @@ let of_tuple (length, string) = slice (bitstring_of_string string) 0 length
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = int * string
 
@@ -57,15 +59,16 @@ module Stable = struct
 
     let to_latest = Fn.id
 
-    include Binable.Of_binable
-              (Binable_arg.Stable.V1)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable_without_uuid
+        (Binable_arg.Stable.V1)
+        (struct
+          type nonrec t = t
 
-                let to_binable = to_tuple
+          let to_binable = to_tuple
 
-                let of_binable = of_tuple
-              end)
+          let of_binable = of_tuple
+        end)
 
     let sexp_of_t = Fn.compose sexp_of_string to_string
 
@@ -82,8 +85,7 @@ module Stable = struct
     let hash_fold_t hash_state t =
       [%hash_fold: int * string] hash_state (to_tuple t)
 
-    [%%define_from_scope
-    compare, to_yojson]
+    [%%define_from_scope compare, to_yojson]
 
     let equal = equals
   end
@@ -95,9 +97,9 @@ let height ~ledger_depth path = ledger_depth - depth path
 
 let get = get
 
-[%%define_locally
-Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, compare, equal)]
+[%%define_locally Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson)]
 
+include Comparable.Make_binable (Stable.Latest)
 include Hashable.Make_binable (Stable.Latest)
 
 let of_byte_string = bitstring_of_string
@@ -112,13 +114,13 @@ let copy (path : t) : t =
 (* returns a slice of the original path, so the returned key needs to be
        copied before mutating the path *)
 let parent (path : t) =
-  if bitstring_length path = 0 then
+  if Int.equal (bitstring_length path) 0 then
     Or_error.error_string "Address length should be nonzero"
   else Or_error.return (slice path 0 (bitstring_length path - 1))
 
 let parent_exn = Fn.compose Or_error.ok_exn parent
 
-let is_leaf ~ledger_depth path = bitstring_length path >= ledger_depth
+let is_leaf ~ledger_depth path = Int.(bitstring_length path >= ledger_depth)
 
 let child ~ledger_depth (path : t) dir : t Or_error.t =
   if is_leaf ~ledger_depth path then
@@ -135,18 +137,19 @@ let to_int (path : t) : int =
   Sequence.range 0 (depth path)
   |> Sequence.fold ~init:0 ~f:(fun acc i ->
          let index = depth path - 1 - i in
-         acc + ((if get path index <> 0 then 1 else 0) lsl i) )
+         acc + ((if Int.(get path index <> 0) then 1 else 0) lsl i) )
 
 let of_int_exn ~ledger_depth index =
-  if index >= 1 lsl ledger_depth then failwith "Index is too large"
+  if Int.(index >= 1 lsl ledger_depth) then failwith "Index is too large"
   else
     let buf = create_bitstring ledger_depth in
-    Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
-      (ledger_depth - 1) 0
-    |> Sequence.fold ~init:index ~f:(fun i pos ->
-           Bitstring.put buf pos (i % 2) ;
-           i / 2 )
-    |> ignore ;
+    ignore
+      ( Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
+          (ledger_depth - 1) 0
+        |> Sequence.fold ~init:index ~f:(fun i pos ->
+               Bitstring.put buf pos (i % 2) ;
+               i / 2 )
+        : int ) ;
     buf
 
 let dirs_from_root t =
@@ -157,7 +160,7 @@ let root () = create_bitstring 0
 let sibling (path : t) : t =
   let path = copy path in
   let last_bit_index = depth path - 1 in
-  let last_bit = if get path last_bit_index = 0 then 1 else 0 in
+  let last_bit = if Int.equal (get path last_bit_index) 0 then 1 else 0 in
   put path last_bit_index last_bit ;
   path
 
@@ -166,12 +169,12 @@ let next (path : t) : t Option.t =
   let path = copy path in
   let len = depth path in
   let rec find_rightmost_clear_bit i =
-    if i < 0 then None
+    if Int.(i < 0) then None
     else if is_clear path i then Some i
     else find_rightmost_clear_bit (i - 1)
   in
   let rec clear_bits i =
-    if i >= len then ()
+    if Int.(i >= len) then ()
     else (
       clear path i ;
       clear_bits (i + 1) )
@@ -186,12 +189,12 @@ let prev (path : t) : t Option.t =
   let path = copy path in
   let len = depth path in
   let rec find_rightmost_one_bit i =
-    if i < 0 then None
+    if Int.(i < 0) then None
     else if is_set path i then Some i
     else find_rightmost_one_bit (i - 1)
   in
   let rec set_bits i =
-    if i >= len then ()
+    if Int.(i >= len) then ()
     else (
       set path i ;
       set_bits (i + 1) )
@@ -205,29 +208,38 @@ let serialize ~ledger_depth path =
   let path = add_padding path in
   let path_len = depth path in
   let required_bits = 8 * byte_count_of_bits ledger_depth in
-  assert (path_len <= required_bits) ;
+  assert (Int.(path_len <= required_bits)) ;
   let required_padding = required_bits - path_len in
   Bigstring.of_string @@ string_of_bitstring
-  @@ concat [path; zeroes_bitstring required_padding]
+  @@ concat [ path; zeroes_bitstring required_padding ]
 
 let is_parent_of parent ~maybe_child = Bitstring.is_prefix maybe_child parent
+
+let same_height_ancestors x y =
+  let depth_x = depth x in
+  let depth_y = depth y in
+  if Int.(depth_x < depth_y) then (x, slice y 0 depth_x)
+  else (slice x 0 depth_y, y)
+
+let is_further_right ~than path =
+  let than, path = same_height_ancestors than path in
+  Int.( < ) (compare than path) 0
 
 module Range = struct
   type nonrec t = t * t
 
   let rec fold_exl (first, last) ~init ~f =
     let comparison = compare first last in
-    if comparison > 0 then
+    if Int.(comparison > 0) then
       raise (Invalid_argument "first address needs to precede last address")
-    else if comparison = 0 then init
-    else
-      fold_exl (next first |> Option.value_exn, last) ~init:(f first init) ~f
+    else if Int.(comparison = 0) then init
+    else fold_exl (next first |> Option.value_exn, last) ~init:(f first init) ~f
 
   let fold_incl (first, last) ~init ~f =
     f last @@ fold_exl (first, last) ~init ~f
 
   let fold ?(stop = `Inclusive) (first, last) ~init ~f =
-    assert (depth first = depth last) ;
+    assert (Int.(depth first = depth last)) ;
     match stop with
     | `Inclusive ->
         fold_incl (first, last) ~init ~f
@@ -236,10 +248,10 @@ module Range = struct
 
   let subtree_range ~ledger_depth address =
     let first_node =
-      concat [address; zeroes_bitstring @@ height ~ledger_depth address]
+      concat [ address; zeroes_bitstring @@ height ~ledger_depth address ]
     in
     let last_node =
-      concat [address; ones_bitstring @@ height ~ledger_depth address]
+      concat [ address; ones_bitstring @@ height ~ledger_depth address ]
     in
     (first_node, last_node)
 
@@ -251,37 +263,25 @@ module Range = struct
         | _, `Stop ->
             None
         | current_node, `Don't_stop ->
-            if compare current_node last_node = 0 then
+            if Int.equal (compare current_node last_node) 0 then
               Some (current_node, (current_node, `Stop))
             else
               Option.map (next current_node) ~f:(fun next_node ->
                   (current_node, (next_node, `Don't_stop)) ) )
 end
 
-let%test "Bitstring bin_io serialization does not change" =
-  (* Bitstring.t is trustlisted as a versioned type. This test assures that serializations of that type haven't changed *)
-  let text =
-    "Contrary to popular belief, Lorem Ipsum is not simply random text. It \
-     has roots in a piece of classical Latin literature."
-  in
-  let bitstring = Bitstring.bitstring_of_string text in
-  let known_good_digest = "c4c7ade09ba305b69ffac494a6eab60e" in
-  Ppx_version_runtime.Serialization.check_serialization
-    (module Stable.V1)
-    bitstring known_good_digest
-
 module Make_test (Input : sig
   val depth : int
 end) =
 struct
   let%test "the merkle root should have no path" =
-    dirs_from_root (root ()) = []
+    List.is_empty (dirs_from_root (root ()))
 
   let%test_unit "parent_exn(child_exn(node)) = node" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t List.t * Direction.t]
       (Quickcheck.Generator.tuple2
          (Direction.gen_var_length_list Input.depth)
-         Direction.gen)
+         Direction.gen )
       ~f:(fun (path, direction) ->
         let address = of_directions path in
         [%test_eq: t]
@@ -304,8 +304,7 @@ struct
 
   let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
-      (Direction.gen_var_length_list ~start:1 Input.depth)
-      ~f:(fun directions ->
+      (Direction.gen_var_length_list ~start:1 Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result: t] ~expect:address (sibling @@ sibling address) )
 

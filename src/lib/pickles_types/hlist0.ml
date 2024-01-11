@@ -11,8 +11,8 @@ module Length = struct
 
   type 'xs n = T : 'n Nat.t * ('xs, 'n) t -> 'xs n
 
-  let rec contr : type xs n m.
-      (xs, n) t -> (xs, m) t -> (n, m) Core_kernel.Type_equal.t =
+  let rec contr :
+      type xs n m. (xs, n) t -> (xs, m) t -> (n, m) Core_kernel.Type_equal.t =
    fun t1 t2 ->
     match (t1, t2) with
     | Z, Z ->
@@ -22,10 +22,7 @@ module Length = struct
         T
 end
 
-module H1 (F : sig
-  type _ t
-end) =
-struct
+module H1 (F : Poly_types.T1) = struct
   type _ t = [] : unit t | ( :: ) : 'a F.t * 'b t -> ('a * 'b) t
 
   let rec length : type tail1. tail1 t -> tail1 Length.n = function
@@ -36,10 +33,7 @@ struct
         T (S n, S p)
 end
 
-module H1_1 (F : sig
-  type (_, _) t
-end) =
-struct
+module H1_1 (F : Poly_types.T2) = struct
   type (_, 's) t =
     | [] : (unit, _) t
     | ( :: ) : ('a, 's) F.t * ('b, 's) t -> ('a * 'b, 's) t

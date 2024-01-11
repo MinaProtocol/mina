@@ -8,18 +8,23 @@ module type S = sig
 
   type attached_mask
 
+  type accumulated_t
+
   (* registering a mask makes it an active child of the parent Merkle tree
      - reads to the mask that fail are delegated to the parent
      - writes to the parent notify the child mask
   *)
 
-  val register_mask : t -> unattached_mask -> attached_mask
+  val register_mask :
+    ?accumulated:accumulated_t -> t -> unattached_mask -> attached_mask
+
+  val unsafe_preload_accounts_from_parent :
+    attached_mask -> account_id list -> unit
 
   (** raises an exception if mask is not registered *)
   val unregister_mask_exn :
-       ?grandchildren:[ `Check
-                      | `Recursive
-                      | `I_promise_I_am_reparenting_this_mask ]
+       ?grandchildren:
+         [ `Check | `Recursive | `I_promise_I_am_reparenting_this_mask ]
     -> loc:string
     -> attached_mask
     -> unattached_mask

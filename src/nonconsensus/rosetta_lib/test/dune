@@ -1,10 +1,20 @@
 (executable
- (package rosetta_lib)
  (name test_encodings)
- (public_name test_encodings)
  (modes native)
  (modules test_encodings)
- (libraries core_kernel signature_lib_nonconsensus rosetta_lib_nonconsensus)
+ (libraries
+   ;;opam libraries
+   core_kernel
+   base
+   ;;local libraries
+   rosetta_lib_nonconsensus
+   rosetta_coding_nonconsensus
+   signature_lib_nonconsensus
+ )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp)))
