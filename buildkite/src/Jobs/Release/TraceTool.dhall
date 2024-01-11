@@ -18,19 +18,19 @@ in
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
-      dirtyWhen = [ S.contains "src/app/trace-tool", S.strictlyStart (S.contains "buildkite/src/Jobs/TraceTool") ],
+      dirtyWhen = [ S.contains "src/app/trace-tool", S.strictlyStart (S.contains "buildkite/src/Jobs/Release/TraceTool") ],
       path = "Release",
       name = "TraceTool"
     },
     steps = [
       Command.build
         Command.Config::{
-          commands = RunInToolchain.runInToolchain ([] : List Text) "cd src/app/trace-tool && PATH=/home/opam/.cargo/bin:$PATH cargo build"
+          commands = RunInToolchain.runInToolchain ([] : List Text) "cd src/app/trace-tool && PATH=/home/opam/.cargo/bin:$PATH cargo build --release"
           , label = "Build trace-tool"
           , key = "build-trace-tool"
           , target = Size.Small
           , docker = None Docker.Type
-          , artifact_paths = [ S.contains "src/app/trace-tool/target/debug/trace-tool" ]
+          , artifact_paths = [ S.contains "src/app/trace-tool/target/release/trace-tool" ]
         }
     ]
   }

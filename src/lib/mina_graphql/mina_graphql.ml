@@ -1569,6 +1569,16 @@ module Mutations = struct
                  exit 0 ) ;
               return @@ Ok s )
 
+    let zkapp_cmd_limit =
+      field "zkAppCommandLimit"
+        ~args:
+          Arg.[ arg "limit" ~doc:"ZkApp commands per block limit." ~typ:int ]
+        ~typ:int
+        ~doc:"Set zkApp commands per block limit for the block producer."
+        ~resolve:(fun { ctx = _; _ } () limit ->
+          Block_producer.zkapp_cmd_limit := limit ;
+          limit )
+
     let commands =
       [ schedule_payments
       ; schedule_zkapp_commands
@@ -1576,6 +1586,7 @@ module Mutations = struct
       ; update_gating
       ; flush_internal_logs
       ; stop_daemon
+      ; zkapp_cmd_limit
       ]
   end
 end
@@ -2561,17 +2572,7 @@ module Queries = struct
           if not with_seq_no then Error "Missing sequence information"
           else Ok (Itn_logger.get_logs start_log_id) )
 
-    let zkapp_cmd_limit =
-      field "zkAppCommandLimit"
-        ~args:
-          Arg.[ arg "limit" ~doc:"ZkApp commands per block limit." ~typ:int ]
-        ~typ:int
-        ~doc:"Set zkApp commands per block limit for the block producer."
-        ~resolve:(fun { ctx = _; _ } () limit ->
-          Block_producer.zkapp_cmd_limit := limit ;
-          limit )
-
-    let commands = [ auth; slots_won; internal_logs; zkapp_cmd_limit ]
+    let commands = [ auth; slots_won; internal_logs ]
   end
 end
 
