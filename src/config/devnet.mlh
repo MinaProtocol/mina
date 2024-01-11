@@ -17,7 +17,6 @@
 [%%define slots_per_epoch 7140]
 [%%define slots_per_sub_window 7]
 [%%define sub_windows_per_window 11]
-[%%define zkapps_per_block 128]
 
 [%%define record_async_backtraces false]
 [%%define time_offsets true]
