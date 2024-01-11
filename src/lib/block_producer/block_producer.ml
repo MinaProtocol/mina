@@ -926,7 +926,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     res) )
       in
       let production_supervisor = Restartable.create ~task:produce in
-      let scheduler = Block_time.Timeout.Earliest.create time_controller in
+      let scheduler = Block_time.Timeout.scheduler () in
       let rec check_next_block_timing slot i () =
         (* Begin checking for the ability to produce a block *)
         match Broadcast_pipe.Reader.peek frontier_reader with
@@ -1006,8 +1006,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                        Vrf_evaluation_state.poll ~vrf_evaluator ~logger
                          vrf_evaluation_state
                      in
-                     Block_time.Timeout.Earliest.schedule scheduler
-                       (Block_time.now time_controller)
+                     Block_time.Timeout.reschedule scheduler time_controller
+                       ~new_deadline:(Block_time.now time_controller)
                        ~f:(check_next_block_timing new_global_slot i')
                    in
                    match
@@ -1023,8 +1023,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                          consensus_state ;
                        [%log info] "No more slots won in this epoch" ;
                        return
-                         (Block_time.Timeout.Earliest.schedule scheduler
-                            epoch_end_time
+                         (Block_time.Timeout.reschedule scheduler
+                            time_controller ~new_deadline:epoch_end_time
                             ~f:(check_next_block_timing new_global_slot i') )
                    | At last_slot ->
                        set_next_producer_timing (`Evaluating_vrf last_slot)
@@ -1141,8 +1141,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                             in
                             let%bind () = after span_till_time in
                             generate_genesis_proof_if_needed () ) ;
-                         Block_time.Timeout.Earliest.schedule scheduler
-                           scheduled_time ~f:(fun () ->
+                         Block_time.Timeout.reschedule scheduler time_controller
+                           ~new_deadline:scheduled_time ~f:(fun () ->
                              ignore
                                ( Interruptible.finally
                                    (Restartable.restart production_supervisor

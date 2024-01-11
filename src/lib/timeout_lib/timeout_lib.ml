@@ -26,6 +26,8 @@ module type Time_intf = sig
 
   val diff : t -> t -> Span.t
 
+  val add : t -> Span.t -> t
+
   val ( < ) : t -> t -> bool
 end
 
@@ -33,12 +35,29 @@ module Timeout_intf (Time : Time_intf) = struct
   module type S = sig
     type 'a t
 
+    type ('a, 'b) reschedulable
+
+    type ('a, 'b) reschedulable_result =
+      [ `Rescheduled
+      | `Paused of 'b Deferred.t
+      | `Canceled of 'a
+      | `Complete of 'b ]
+
     val create : Time.Controller.t -> Time.Span.t -> f:(Time.t -> 'a) -> 'a t
+
+    val scheduler : unit -> (_, _) reschedulable
+
+    (** While a timeout is paused, the callback is prevented from firing. *)
+    val pause : (_, _) reschedulable -> unit
+
+    (** Unpause the timeout, processing the callback if enough time has elapsed. *)
+    val unpause : (_, _) reschedulable -> unit
 
     val to_deferred : 'a t -> 'a Async_kernel.Deferred.t
 
     val peek : 'a t -> 'a option
 
+    (** Never fire the callback. *)
     val cancel : Time.Controller.t -> 'a t -> 'a -> unit
 
     val remaining_time : 'a t -> Time.Span.t
@@ -55,47 +74,53 @@ module Timeout_intf (Time : Time_intf) = struct
       -> 'a Deferred.t
       -> 'a Deferred.t
 
-    module Earliest : sig
-      type t
-
-      val create : Time.Controller.t -> t
-
-      (** Pause all execution. No dispatched task will be called until [unpause t] is executed. *)
-      val pause : t -> unit
-
-      (** Unpause execution. Any pending task is examined. *)
-      val unpause : t -> unit
-
-      val schedule : t -> Time.t -> f:(unit -> unit) -> unit
-    end
+    (** A timeout can be rescheduled, when created via [scheduler ()]. If
+        [new_deadline] is after the current deadline, it is ignored,
+        and [f] will be called at the earliest deadline time. *)
+    val reschedule :
+         ('a, 'b) reschedulable
+      -> Time.Controller.t
+      -> new_deadline:Time.t
+      -> f:(unit -> 'b)
+      -> unit
   end
 end
 
 module Make (Time : Time_intf) : Timeout_intf(Time).S = struct
   type 'a t =
     { deferred : 'a Deferred.t
-    ; cancel : 'a -> unit
+    ; cancel : 'a option Ivar.t
     ; start_time : Time.t
     ; span : Time.Span.t
     ; ctrl : Time.Controller.t
     }
 
+  type ('a, 'b) reschedulable_result =
+    [ `Rescheduled
+    | `Paused of 'b Deferred.t
+    | `Canceled of 'a
+    | `Complete of 'b ]
+
+  type ('a, 'b) reschedulable =
+    { mutable timeout : ('a, 'b) reschedulable_result t option
+    ; mutable unpaused : unit Ivar.t
+    }
+
   let create ctrl span ~f:action =
     let open Deferred.Let_syntax in
-    let cancel_ivar = Ivar.create () in
+    let cancel = Ivar.create () in
     let timeout = after (Time.Span.to_time_ns_span span) >>| fun () -> None in
     let deferred =
-      Deferred.any [ Ivar.read cancel_ivar; timeout ]
+      Deferred.any [ Ivar.read cancel; timeout ]
       >>| function None -> action (Time.now ctrl) | Some x -> x
     in
-    let cancel value = Ivar.fill_if_empty cancel_ivar (Some value) in
     { ctrl; deferred; cancel; start_time = Time.now ctrl; span }
 
   let to_deferred { deferred; _ } = deferred
 
   let peek { deferred; _ } = Deferred.peek deferred
 
-  let cancel _ { cancel; _ } value = cancel value
+  let cancel _ { cancel; _ } value = Ivar.fill_if_empty cancel (Some value)
 
   let remaining_time { ctrl : _; start_time; span; _ } =
     let current_time = Time.now ctrl in
@@ -123,55 +148,48 @@ module Make (Time : Time_intf) : Timeout_intf(Time).S = struct
     | `Ok x ->
         x
 
-  module Earliest = struct
-    type nonrec t =
-      { mutable timeout : unit t option
-      ; mutable unpaused : unit Ivar.t
-      ; mutable canceled : bool ref
-      ; time_controller : Time.Controller.t
-      }
+  let scheduler () : (_, _) reschedulable =
+    { timeout = None; unpaused = Ivar.create_full () }
 
-    let create_timeout = create
+  let pause ({ unpaused; _ } as t) =
+    if Ivar.is_full unpaused then t.unpaused <- Ivar.create ()
 
-    let create time_controller =
-      { time_controller
-      ; unpaused = Ivar.create_full ()
-      ; timeout = None
-      ; canceled = ref false
-      }
+  let unpause { unpaused; _ } = Ivar.fill unpaused ()
 
-    let pause t = if Ivar.is_full t.unpaused then t.unpaused <- Ivar.create ()
-
-    let unpause t = Ivar.fill t.unpaused ()
-
-    let cancel t =
-      match t.timeout with
-      | Some timeout ->
-          cancel t.time_controller timeout () ;
-          t.canceled := true ;
-          t.timeout <- None
-      | None ->
-          ()
-
-    let schedule t time ~f =
-      let min a b = if Time.(a < b) then a else b in
-      cancel t ;
-      t.canceled <- ref false ;
-      let new_start_time =
-        Option.value_map t.timeout ~default:time ~f:(fun { start_time; _ } ->
-            min time start_time )
-      in
-      let wait_span = Time.diff new_start_time (Time.now t.time_controller) in
-      let canceled = t.canceled in
-      let timeout =
-        create_timeout t.time_controller wait_span ~f:(fun _ ->
-            don't_wait_for
-              (let%map () = Ivar.read t.unpaused in
-               if not !canceled then (t.timeout <- None ;
-               f ()) ) )
-      in
-      t.timeout <- Some timeout
-  end
+  let reschedule (t : (_, 'complete) reschedulable) ctrl ~new_deadline
+      ~(f : unit -> 'complete) =
+    let f_now () =
+      t.timeout <- None ;
+      f ()
+    in
+    let min a b = if Time.( < ) a b then a else b in
+    Option.iter t.timeout ~f:(fun timeout -> cancel ctrl timeout `Rescheduled) ;
+    let until_earliest_deadline =
+      Time.diff
+        (Option.value_map t.timeout ~default:new_deadline ~f:(fun t ->
+             let remaining = remaining_time t in
+             if Time.Span.(remaining < zero) then (
+               (* An overdue timeout gets ignored, and ought to be incredibly rare. *)
+               [%log' error (Logger.create ())]
+                 "rescheduled a timeout that was overdue this cycle" ;
+               new_deadline )
+             else min new_deadline Time.(add (now ctrl) remaining) ) )
+        (Time.now ctrl)
+    in
+    let wait_til_unpaused _ =
+      if Ivar.is_full t.unpaused then `Complete (f_now ())
+      else
+        let res = Ivar.create () in
+        don't_wait_for
+          (let%map () = Ivar.read t.unpaused in
+           if
+             Option.value_map ~default:true
+               ~f:(fun { cancel; _ } -> Ivar.is_empty cancel)
+               t.timeout
+           then Ivar.fill res (f_now ()) ) ;
+        `Paused (Ivar.read res)
+    in
+    t.timeout <- Some (create ctrl until_earliest_deadline ~f:wait_til_unpaused)
 end
 
 module Core_time = Make (struct
