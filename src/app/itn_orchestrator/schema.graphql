@@ -173,6 +173,12 @@ scalar UInt16
 
 """Keys and other information for scheduling zkapp commands"""
 input ZkappCommandsDetails {
+  """
+  Parameter of zkapp generation, each generated zkapp tx will have
+  (2*maxAccountUpdates+2) account updates (including balancing and fee payer)
+  """
+  maxAccountUpdates: Int
+
   """Generate max cost zkApp command"""
   maxCost: Boolean!
 
@@ -193,17 +199,17 @@ input ZkappCommandsDetails {
   """
   initBalance: CurrencyAmount!
 
+  """Maximum new zkapp balance"""
+  maxNewZkappBalance: CurrencyAmount!
+
+  """Minimum new zkapp balance"""
+  minNewZkappBalance: CurrencyAmount!
+
   """Maximum balance change"""
   maxBalanceChange: CurrencyAmount!
 
   """Minimum balance change"""
   minBalanceChange: CurrencyAmount!
-
-  """Minimum new zkapp balance"""
-  minNewZkappBalance: CurrencyAmount!
-
-  """Maximum new zkapp balance"""
-  maxNewZkappBalance: CurrencyAmount!
 
   """Disable the precondition in account updates"""
   noPrecondition: Boolean!

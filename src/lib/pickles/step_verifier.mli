@@ -41,6 +41,7 @@ val finalize_other_proof :
   -> step_domains:
        [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
        | `Side_loaded ]
+  -> zk_rows:int
   -> sponge:Step_main_inputs.Sponge.t
   -> prev_challenges:
        ( (Step_main_inputs.Impl.Field.t, 'a) Pickles_types.Vector.t
@@ -76,7 +77,7 @@ val finalize_other_proof :
 
 val hash_messages_for_next_step_proof :
      index:
-       Step_main_inputs.Inner_curve.t
+       Step_main_inputs.Inner_curve.t array
        Pickles_types.Plonk_verification_key_evals.t
   -> ('s -> Step_main_inputs.Impl.Field.t array)
   -> (   ( 'a
@@ -91,7 +92,7 @@ val hash_messages_for_next_step_proof :
 
 val hash_messages_for_next_step_proof_opt :
      index:
-       Step_main_inputs.Inner_curve.t
+       Step_main_inputs.Inner_curve.t array
        Pickles_types.Plonk_verification_key_evals.t
   -> ('s -> Step_main_inputs.Impl.Field.t array)
   -> Step_main_inputs.Sponge.t
@@ -135,7 +136,7 @@ val verify :
          Step_main_inputs.Impl.field
          Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
   -> wrap_verification_key:
-       Step_main_inputs.Inner_curve.t
+       Step_main_inputs.Inner_curve.t array
        Pickles_types.Plonk_verification_key_evals.t
   -> ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
      , Step_main_inputs.Impl.field Limb_vector.Challenge.t
@@ -174,3 +175,14 @@ val verify :
      Import.Types.Step.Proof_state.Per_proof.In_circuit.t
      (* unfinalized *)
   -> Step_main_inputs.Impl.Boolean.var
+
+module For_tests_only : sig
+  type field := Step_main_inputs.Impl.Field.t
+
+  val side_loaded_domain :
+       log2_size:field
+    -> < generator : field
+       ; log2_size : field
+       ; shifts : field Pickles_types.Plonk_types.Shifts.t
+       ; vanishing_polynomial : field -> field >
+end

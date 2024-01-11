@@ -482,7 +482,7 @@ struct
           , `Global_slot_since_genesis global_slot_since_genesis ) ->
           [ ( "valid_until"
             , Mina_numbers.Global_slot_since_genesis.to_yojson valid_until )
-          ; ( "current_global_slot"
+          ; ( "current_global_slot_since_genesis"
             , Mina_numbers.Global_slot_since_genesis.to_yojson
                 global_slot_since_genesis )
           ]
@@ -1047,7 +1047,7 @@ struct
           in
           Deferred.return
           @@ Result.ok_if_true
-               (not (already_mem && not is_sender_local))
+               ((not already_mem) || is_sender_local)
                ~error:Recently_seen
         in
         let%bind () =

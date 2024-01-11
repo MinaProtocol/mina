@@ -1,5 +1,9 @@
 (* load_data.ml -- load archive db data to "native" OCaml data *)
 
+(* these functions are used by the replayer and `extract_blocks` to load particular pieces
+   of archive db data
+*)
+
 open Core_kernel
 open Async
 open Mina_base
@@ -448,7 +452,8 @@ let get_account_update_body ~pool body_id =
       | _ ->
           failwith "Ill-formatted string for balance change"
     in
-    Currency.Amount.Signed.create ~magnitude ~sgn
+    (* amount might be negative zero *)
+    Currency.Amount.Signed.create_preserve_zero_sign ~magnitude ~sgn
   in
   let%bind events = load_events pool events_id in
   let%bind actions = load_events pool actions_id in

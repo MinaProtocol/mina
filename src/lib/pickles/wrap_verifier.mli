@@ -62,8 +62,8 @@ val incrementally_verify_proof :
   -> step_domains:(Import.Domains.t, 'a) Pickles_types.Vector.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fp.t
   -> verification_key:
-       ( Wrap_main_inputs.Inner_curve.t
-       , ( Wrap_main_inputs.Inner_curve.t
+       ( Wrap_main_inputs.Inner_curve.t array
+       , ( Wrap_main_inputs.Inner_curve.t array
          , Impls.Wrap.Boolean.var )
          Pickles_types.Opt.t )
        Pickles_types.Plonk_verification_key_evals.Step.t
@@ -144,15 +144,15 @@ val finalize_other_proof :
 val choose_key :
   'n.
      'n One_hot_vector.t
-  -> ( ( Wrap_main_inputs.Inner_curve.t
-       , ( Wrap_main_inputs.Inner_curve.t
+  -> ( ( Wrap_main_inputs.Inner_curve.t array
+       , ( Wrap_main_inputs.Inner_curve.t array
          , Impls.Wrap.Boolean.var )
          Pickles_types.Opt.t )
        index'
      , 'n )
      Pickles_types.Vector.t
-  -> ( Wrap_main_inputs.Inner_curve.t
-     , ( Wrap_main_inputs.Inner_curve.t
+  -> ( Wrap_main_inputs.Inner_curve.t array
+     , ( Wrap_main_inputs.Inner_curve.t array
        , Impls.Wrap.Boolean.var )
        Pickles_types.Opt.t )
      index'

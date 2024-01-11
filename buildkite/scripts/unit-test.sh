@@ -22,5 +22,8 @@ time make build
 echo "--- Build all targets"
 dune build "${path}" --profile="${profile}" -j16
 
+echo "--- Check for changes to verification keys"
+time dune runtest "src/app/print_blockchain_snark_vk" --profile="${profile}" -j16
+
 echo "--- Run unit tests"
 time dune runtest "${path}" --profile="${profile}" -j16 || (./scripts/link-coredumps.sh)
