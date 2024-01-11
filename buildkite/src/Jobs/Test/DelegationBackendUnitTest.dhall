@@ -41,7 +41,6 @@ Pipeline.build
           label = "delegation backend unit-tests",
           soft_fail = Some (B/SoftFail.Boolean True),
           key = "delegation-backend-unit-tests",
-          soft_fail = Some (B/SoftFail.Boolean True),
           target = Size.Small,
           docker = None Docker.Type
         }
