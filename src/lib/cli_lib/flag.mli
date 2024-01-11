@@ -12,6 +12,8 @@ val privkey_read_path : string Command.Param.t
 
 val conf_dir : string option Command.Param.t
 
+val config_files : string option Command.Param.t
+
 module Types : sig
   type 'a with_name = { name : string; value : 'a }
 

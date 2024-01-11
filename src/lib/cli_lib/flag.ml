@@ -33,6 +33,15 @@ let conf_dir =
   flag "--config-directory" ~aliases:[ "config-directory" ]
     ~doc:"DIR Configuration directory" (optional string)
 
+let config_files =
+  let open Command.Param in
+  flag "--config-file" ~aliases:[ "config-file" ]
+    ~doc:
+      "PATH path to a configuration file (overrides MINA_CONFIG_FILE, default: \
+       <config_dir>/daemon.json). Pass multiple times to override fields from \
+       earlier config files"
+    (listed string)
+
 module Doc_builder = struct
   type 'value t =
     { type_name : string
