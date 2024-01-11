@@ -44,6 +44,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Step_main_inputs = Step_main_inputs
   module Step_verifier = Step_verifier
   module Proof_cache = Proof_cache
+  module Ro = Ro
 
   type chunking_data = Verify.Instance.chunking_data =
     { num_chunks : int; domain_size : int; zk_rows : int }
