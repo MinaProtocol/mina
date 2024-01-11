@@ -165,7 +165,7 @@ module Output = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = string [@@deriving sexp, equal, compare, hash]
+        type t = string [@@deriving sexp, equal, compare, hash, yojson]
 
         let to_yojson t =
           `String (Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet t)

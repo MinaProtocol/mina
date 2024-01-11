@@ -45,6 +45,7 @@ let opt_time_to_yojson = function
   | None ->
       `Null
 
+(** An auxiliary data structure for collecting various metrics for boostrap controller. *)
 type bootstrap_cycle_stats =
   { cycle_result : string
   ; sync_ledger_time : time
@@ -96,6 +97,7 @@ let should_sync ~root_sync_ledger t candidate_state =
   (not @@ done_syncing_root root_sync_ledger)
   && worth_getting_root t candidate_state
 
+(** Update [Synced_ledger]'s target and [best_seen_transition] and [current_root] accordingly. *)
 let start_sync_job_with_peer ~sender ~root_sync_ledger
     ({ context = (module Context); _ } as t) peer_best_tip peer_root =
   let open Context in
@@ -139,6 +141,11 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger
   | `Repeat ->
       `Ignored
 
+(** For each transition, this function would compare it with the existing one.
+    If the incoming transition is better, then download the merkle list from
+    that transition to its root and verify it. If we get a better root than
+    the existing one, then reset the Sync_ledger's target by calling
+    [start_sync_job_with_peer] function. *)
 let on_transition ({ context = (module Context); _ } as t) ~sender
     ~root_sync_ledger ~genesis_constants candidate_transition =
   let open Context in
@@ -173,6 +180,9 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
         | Error e ->
             return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
+(** A helper function that wraps the calls to Sync_ledger and iterate through
+    incoming transitions, add those to the transition_cache and calls
+    [on_transition] function. *)
 let sync_ledger ({ context = (module Context); _ } as t) ~preferred
     ~root_sync_ledger ~transition_graph ~sync_ledger_reader ~genesis_constants =
   let open Context in
@@ -227,9 +237,19 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
       else 1 )
     ~f:(With_hash.map ~f:Mina_block.consensus_state)
 
-(* We conditionally ask other peers for their best tip. This is for testing
-   eager bootstrapping and the regular functionalities of bootstrapping in
-   isolation *)
+(** The entry point function for bootstrap controller. When bootstrap finished
+    it would return a transition frontier with the root breadcrumb and a list
+    of transitions collected during bootstrap.
+
+    Bootstrap controller would do the following steps to contrust the
+    transition frontier:
+    1. Download the root snarked_ledger.
+    2. Download the scan state and pending coinbases.
+    3. Construct the staged ledger from the snarked ledger, scan state and
+       pending coinbases.
+    4. Synchronize the consensus local state if necessary.
+    5. Close the old frontier and reload a new one from disk.
+ *)
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~consensus_local_state ~transition_reader ~best_seen_transition
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
@@ -289,6 +309,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           Transition_frontier.Persistent_root.Instance.snarked_ledger
             temp_persistent_root_instance
         in
+        (* step 1. download snarked_ledger *)
         let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
           time_deferred
             (let root_sync_ledger =
@@ -319,6 +340,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         Mina_metrics.(
           Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
             (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
+        (* step 2. Download scan state and pending coinbases. *)
         let%bind ( staged_ledger_data_download_time
                  , staged_ledger_construction_time
                  , staged_ledger_aux_result ) =
@@ -408,6 +430,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                       | Some protocol_state ->
                           Ok (With_hash.data protocol_state)
                     in
+                    (* step 3. Construct staged ledger from snarked ledger, scan state
+                       and pending coinbases. *)
                     (* Construct the staged ledger before constructing the transition
                      * frontier in order to verify the scan state we received.
                      * TODO: reorganize the code to avoid doing this twice (#3480) *)
@@ -504,7 +528,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
               |> Mina_block.header |> Mina_block.Header.protocol_state
               |> Protocol_state.consensus_state
             in
-            (* Synchronize consensus local state if necessary *)
+            (* step 4. Synchronize consensus local state if necessary *)
             let%bind ( local_state_sync_time
                      , (local_state_sync_required, local_state_sync_result) ) =
               time_deferred
@@ -554,7 +578,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                 in
                 loop (this_cycle :: previous_cycles)
             | Ok () ->
-                (* Close the old frontier and reload a new on from disk. *)
+                (* step 5. Close the old frontier and reload a new one from disk. *)
                 let new_root_data : Transition_frontier.Root_data.Limited.t =
                   Transition_frontier.Root_data.Limited.create
                     ~transition:(Mina_block.Validated.lift new_root)

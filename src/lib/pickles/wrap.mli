@@ -185,3 +185,40 @@ module Type1 :
       Plonk_checks.Make
         (Pickles_types.Shifted_value.Type1)
         (Plonk_checks.Scalars.Tick)
+
+module For_tests_only : sig
+  type shifted_tick_field =
+    Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+
+  type scalar_challenge_constant =
+    Import.Challenge.Constant.t Import.Scalar_challenge.t
+
+  type deferred_values_and_hints =
+    { x_hat_evals : Backend.Tick.Field.t array * Backend.Tick.Field.t array
+    ; sponge_digest_before_evaluations : Backend.Tick.Field.t
+    ; deferred_values :
+        ( ( Import.Challenge.Constant.t
+          , scalar_challenge_constant
+          , shifted_tick_field
+          , (shifted_tick_field, bool) Opt.t
+          , (scalar_challenge_constant, bool) Opt.t
+          , bool )
+          Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+        , scalar_challenge_constant
+        , shifted_tick_field
+        , scalar_challenge_constant Import.Bulletproof_challenge.t
+          Import.Types.Step_bp_vec.t
+        , Import.Branch_data.t )
+        Import.Types.Wrap.Proof_state.Deferred_values.t
+    }
+
+  val deferred_values :
+       sgs:(Kimchi_pasta_basic.Vesta.Affine.t, 'n) Vector.t
+    -> actual_feature_flags:bool Plonk_types.Features.t
+    -> prev_challenges:((Pasta_bindings.Fp.t, 'a) Vector.t, 'n) Vector.t
+    -> step_vk:Kimchi_bindings.Protocol.VerifierIndex.Fp.t
+    -> public_input:Pasta_bindings.Fp.t list
+    -> proof:Backend.Tick.Proof.with_public_evals
+    -> actual_proofs_verified:'n Nat.t
+    -> deferred_values_and_hints
+end
