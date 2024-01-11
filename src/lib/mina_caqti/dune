@@ -1,7 +1,7 @@
 (library
  (name mina_caqti)
  (public_name mina_caqti)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    core_kernel

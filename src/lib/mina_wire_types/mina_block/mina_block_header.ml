@@ -13,8 +13,8 @@ module type Concrete = sig
       ; protocol_state_proof : Mina_base.Proof.V2.t
       ; delta_block_chain_proof :
           Data_hash_lib.State_hash.V1.t * Mina_base_state_body_hash.V1.t list
-      ; current_protocol_version : Protocol_version.V1.t
-      ; proposed_protocol_version_opt : Protocol_version.V1.t option
+      ; current_protocol_version : Protocol_version.V2.t
+      ; proposed_protocol_version_opt : Protocol_version.V2.t option
       }
   end
 end
@@ -26,8 +26,8 @@ module M = struct
       ; protocol_state_proof : Mina_base.Proof.V2.t
       ; delta_block_chain_proof :
           Data_hash_lib.State_hash.V1.t * Mina_base_state_body_hash.V1.t list
-      ; current_protocol_version : Protocol_version.V1.t
-      ; proposed_protocol_version_opt : Protocol_version.V1.t option
+      ; current_protocol_version : Protocol_version.V2.t
+      ; proposed_protocol_version_opt : Protocol_version.V2.t option
       }
   end
 end

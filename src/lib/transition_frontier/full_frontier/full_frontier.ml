@@ -344,6 +344,8 @@ let calculate_root_transition_diff t heir =
     (Root_transitioned
        { new_root = new_root_data
        ; garbage = Full garbage_nodes
+       ; old_root_scan_state =
+           Full (Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
        ; just_emitted_a_proof
        } )
 
@@ -505,6 +507,15 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
             (Staged_ledger.scan_state
                (Breadcrumb.staged_ledger new_root_node.breadcrumb) )
           : unit Or_error.t ) ;
+      (*Check that the new snarked ledger is as expected*)
+      let new_snarked_ledger_hash = Ledger.merkle_root mt in
+      let expected_snarked_ledger_hash =
+        Breadcrumb.protocol_state new_root_node.breadcrumb
+        |> Protocol_state.blockchain_state
+        |> Blockchain_state.snarked_ledger_hash
+      in
+      assert (
+        Ledger_hash.equal new_snarked_ledger_hash expected_snarked_ledger_hash ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
@@ -622,8 +633,10 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let new_root_protocol_states =
         Root_data.Limited.protocol_states new_root
       in
+      [%log' internal t.logger] "Move_frontier_root" ;
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         ~enable_epoch_ledger_sync ;
+      [%log' internal t.logger] "Move_frontier_root_done" ;
       (old_root_hash, Some new_root_hash)
 
 module Metrics = struct
@@ -709,9 +722,11 @@ module Metrics = struct
         | Some parent ->
             find_ancestor ~f parent
     in
+    let curr_global_slot_u32 cs =
+      curr_global_slot cs |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
+    in
     let start =
-      let open Consensus.Data.Consensus_state in
-      let slot = intprop curr_global_slot in
+      let slot = intprop curr_global_slot_u32 in
       let best_tip_slot = slot best_tip in
       let k = Unsigned.UInt32.to_int consensus_constants.k in
       match
@@ -722,7 +737,7 @@ module Metrics = struct
     in
     let change f = intprop f best_tip - intprop f start in
     let length_change = change blockchain_length in
-    let slot_change = change curr_global_slot in
+    let slot_change = change curr_global_slot_u32 in
     if slot_change = 0 then 1.
     else Float.of_int length_change /. Float.of_int slot_change
 end
@@ -949,7 +964,8 @@ module For_tests = struct
     Async.Thread_safe.block_on_async_exn (fun () ->
         Verifier.create ~logger ~proof_level ~constraint_constants
           ~conf_dir:None
-          ~pids:(Child_processes.Termination.create_pid_table ()) )
+          ~pids:(Child_processes.Termination.create_pid_table ())
+          () )
 
   module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
@@ -990,7 +1006,6 @@ module For_tests = struct
            ~src:(Lazy.force Genesis_ledger.t)
            ~dest:(Mina_ledger.Ledger.create ~depth:ledger_depth ()) )
     in
-    Protocol_version.(set_current zero) ;
     let root_data =
       let open Root_data in
       { transition =

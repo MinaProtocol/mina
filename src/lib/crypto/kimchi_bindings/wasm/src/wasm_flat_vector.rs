@@ -72,7 +72,7 @@ impl<'a, T> std::iter::IntoIterator for &'a WasmFlatVector<T> {
     type Item = <&'a Vec<T> as std::iter::IntoIterator>::Item;
     type IntoIter = <&'a Vec<T> as std::iter::IntoIterator>::IntoIter;
     fn into_iter(self) -> Self::IntoIter {
-        (&self.0).into_iter()
+        self.0.iter()
     }
 }
 

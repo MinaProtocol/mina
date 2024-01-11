@@ -109,15 +109,15 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
       Float.of_string cliff_time_months *. slots_per_month_float
     in
     (* if there's a fractional slot, wait until next slot by rounding up *)
-    Global_slot.of_int (Float.iround_up_exn num_slots_float)
+    Global_slot_since_genesis.of_int (Float.iround_up_exn num_slots_float)
   in
   let cliff_amount = Currency.Amount.of_mina_string_exn cliff_amount in
   let vesting_period =
     match Int.of_string unlock_frequency with
     | 0 ->
-        Global_slot.of_int 1
+        Global_slot_since_genesis.of_int 1
     | 1 ->
-        Global_slot.of_int slots_per_month
+        Global_slot_since_genesis.of_int slots_per_month
     | _ ->
         failwithf "Expected unlock frequency to be 0 or 1, got %s"
           unlock_frequency ()

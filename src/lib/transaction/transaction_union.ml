@@ -51,7 +51,7 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
               ; fee_token = Token_id.default
               ; fee_payer_pk = other_pk
               ; nonce = Account.Nonce.zero
-              ; valid_until = Mina_numbers.Global_slot.max_value
+              ; valid_until = Mina_numbers.Global_slot_since_genesis.max_value
               ; memo = Signed_command_memo.empty
               }
           ; body =
@@ -75,7 +75,7 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
                 ; fee_token
                 ; fee_payer_pk = pk2
                 ; nonce = Account.Nonce.zero
-                ; valid_until = Mina_numbers.Global_slot.max_value
+                ; valid_until = Mina_numbers.Global_slot_since_genesis.max_value
                 ; memo = Signed_command_memo.empty
                 }
             ; body =

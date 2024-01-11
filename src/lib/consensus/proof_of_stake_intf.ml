@@ -16,7 +16,7 @@ module type Full = sig
     module Consensus_state : sig
       include
         module type of Data.Consensus_state
-          with type Value.Stable.V1.t = Data.Consensus_state.Value.Stable.V1.t
+          with type Value.Stable.V2.t = Data.Consensus_state.Value.Stable.V2.t
            and type var = Data.Consensus_state.var
 
       val global_slot : Value.t -> Global_slot.t
@@ -35,7 +35,8 @@ module type Full = sig
         val dummy_advance :
              Value.t
           -> ?increase_epoch_count:bool
-          -> new_global_slot:Mina_numbers.Global_slot.t
+          -> new_global_slot_since_genesis:
+               Mina_numbers.Global_slot_since_genesis.t
           -> Value.t
       end
     end

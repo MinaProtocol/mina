@@ -17,6 +17,10 @@ mina:
     metrics: "10001"
     p2p: "10909"
   exposeGraphql: false
+  exposeItnGraphql: false
+  itn:
+    port: "3086"
+    keys: ""
   cpuRequest: 6
   memRequest: "12.0Gi"
 
@@ -30,3 +34,8 @@ healthcheck:
 
 nodeSelector:
   preemptible: false
+
+storage:
+  accessMode: "ReadWriteOnce"
+  size: "4Gi"
+  storageClass: "standard"

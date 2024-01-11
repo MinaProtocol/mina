@@ -15,6 +15,8 @@
    ppx_inline_test.config
    result
    async_kernel
+   async_unix
+   async
    core_kernel
    ;; local libraries
    merkle_ledger
@@ -36,6 +38,5 @@
  (preprocess
   (pps ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
- (inline_tests
-  (libraries rocks))
+ (inline_tests (flags -verbose -show-counts))
  (synopsis "Testing account databases"))

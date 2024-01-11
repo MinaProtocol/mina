@@ -4,6 +4,8 @@ module "kubernetes_testnet" {
 
   use_local_charts    = true
   expose_graphql      = var.deploy_graphql_ingress
+  expose_itn_graphql  = var.expose_itn_graphql
+  itn_keys            = var.itn_keys
   healthcheck_enabled = false
   deploy_watchdog     = false
 
@@ -11,17 +13,19 @@ module "kubernetes_testnet" {
   cluster_region = var.cluster_region
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
-
-  mina_image         = var.mina_image
-  use_custom_entrypoint = true
-  custom_entrypoint = "/mina_daemon_puppeteer.py"
-  mina_archive_image = var.mina_archive_image
-  mina_agent_image   = var.mina_agent_image
-  mina_bots_image    = var.mina_bots_image
-  mina_points_image  = var.mina_points_image
-
-  log_level             = "Trace"
-  log_snark_work_gossip = true
+  priority_class = kubernetes_priority_class.testnet_priority_class.metadata[0].name
+  
+  itn_orchestrator_image        = var.itn_orchestrator_image
+  mina_image                    = var.mina_image
+  use_custom_entrypoint         = true
+  custom_entrypoint             = "/mina_daemon_puppeteer.py"
+  mina_archive_image            = var.mina_archive_image
+  mina_agent_image              = var.mina_agent_image
+  mina_bots_image               = var.mina_bots_image
+  mina_points_image             = var.mina_points_image
+  enable_working_dir_persitence = var.enable_working_dir_persitence
+  log_level                     = "Trace"
+  log_snark_work_gossip         = true
 
   #make sure everyone has the seed peer's multiaddress
   additional_peers = ["/dns4/seed.${var.testnet_name}/tcp/${local.seed_external_port}/p2p/12D3KooWCoGWacXE4FRwAX8VqhnWVKhz5TTEecWEuGmiNrDt2XLf"]
@@ -46,6 +50,7 @@ module "kubernetes_testnet" {
       snark_worker_fee      = var.snark_worker_fee
       snark_worker_public_key = var.snark_coordinator_config.public_key
       snark_coordinators_host_port = local.snark_worker_host_port
+      persist_working_dir = var.enable_working_dir_persitence
     }
   ]
 
@@ -68,6 +73,7 @@ module "kubernetes_testnet" {
       enable_peer_exchange   = true
       enableArchive          = var.archive_node_count > 0
       archiveAddress         = element(local.archive_node_names, index)
+      persist_working_dir    = var.enable_working_dir_persitence
     }
   ]
 

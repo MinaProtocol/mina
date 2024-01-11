@@ -6,6 +6,21 @@ variable "deploy_graphql_ingress" {
   type = bool
 }
 
+variable "expose_itn_graphql" {
+  type    = bool
+  default = false
+}
+
+variable "itn_keys" {
+  type    = string
+  default = ""
+}
+
+variable "itn_orchestrator_image" {
+  type    = string
+  default = "gcr.io/o1labs-192920/itn_orchestrator_image:latest"
+}
+
 variable "aws_route53_zone_id" {
   type = string
 }
@@ -44,6 +59,11 @@ variable "mina_bots_image" {
 
 variable "mina_points_image" {
   type = string
+}
+
+variable "enable_working_dir_persitence" {
+  type = bool
+  default = false
 }
 
 variable "runtime_config" {
@@ -91,6 +111,10 @@ variable "cpu_request" {
 variable "mem_request" {
   type    = string
   default = "0Mi"
+}
+
+variable "pod_priority" {
+  type    = number
 }
 
 variable "archive_configs" {

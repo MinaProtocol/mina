@@ -20,7 +20,7 @@ extern "C" {
 
 #[wasm_bindgen]
 pub fn greet(name: &str) {
-    alert(&format!("Hello, {}!", name));
+    alert(&format!("Hello, {name}!"));
 }
 
 #[wasm_bindgen]
@@ -59,6 +59,7 @@ pub fn set_u32_ptr(ptr: *mut u32, arg: u32) {
     }
 }
 
+#[allow(unreachable_code)]
 #[wasm_bindgen]
 pub fn wait_until_non_zero(ptr: *const u32) -> u32 {
     // The rust docs explicitly forbid using this for cross-thread syncronization. Oh well, we
@@ -73,7 +74,7 @@ pub fn wait_until_non_zero(ptr: *const u32) -> u32 {
     unreachable!();
 }
 
-pub use wasm_bindgen_rayon::init_thread_pool;
+pub mod rayon;
 
 /// Arkworks types
 pub mod arkworks;

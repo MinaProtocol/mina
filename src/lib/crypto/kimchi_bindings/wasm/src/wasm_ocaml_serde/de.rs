@@ -58,7 +58,7 @@ impl<'de> de::MapAccess<'de> for ObjectAccess {
             Some(field) => {
                 self.next_value = Some(Deserializer::from(self.data.get(self.idx)));
                 self.idx += 1;
-                return Ok(Some(seed.deserialize(str_deserializer(field))?));
+                Ok(Some(seed.deserialize(str_deserializer(field))?))
             }
         }
     }
@@ -91,11 +91,11 @@ impl Deserializer {
     fn as_bytes(&self) -> Option<Vec<u8>> {
         if let Some(v) = self.0.dyn_ref::<Uint8Array>() {
             Some(v.to_vec())
-        } else if let Some(v) = self.0.dyn_ref::<ArrayBuffer>() {
-            /* We can hit this case when the values have come from the non-serde conversions. */
-            Some(Uint8Array::new(v).to_vec())
         } else {
-            None
+            /* We can hit this case when the values have come from the non-serde conversions. */
+            self.0
+                .dyn_ref::<ArrayBuffer>()
+                .map(|v| Uint8Array::new(v).to_vec())
         }
     }
 }
@@ -172,19 +172,19 @@ impl<'de> de::Deserializer<'de> for Deserializer {
         visitor.visit_u32(self.0.unchecked_into::<Number>().as_f64().unwrap() as u32)
     }
 
-    fn deserialize_i64<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_i64<V: de::Visitor<'de>>(self, _visitor: V) -> Result<V::Value> {
         Err(Error::custom("Deserializing i64 is not implemented"))
     }
 
-    fn deserialize_u64<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_u64<V: de::Visitor<'de>>(self, _visitor: V) -> Result<V::Value> {
         Err(Error::custom("Deserializing u64 is not implemented"))
     }
 
-    fn deserialize_i128<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_i128<V: de::Visitor<'de>>(self, _visitor: V) -> Result<V::Value> {
         Err(Error::custom("Deserializing i128 is not implemented"))
     }
 
-    fn deserialize_u128<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_u128<V: de::Visitor<'de>>(self, _visitor: V) -> Result<V::Value> {
         Err(Error::custom("Deserializing u128 is not implemented"))
     }
 
@@ -205,7 +205,7 @@ impl<'de> de::Deserializer<'de> for Deserializer {
     fn deserialize_newtype_struct<V: de::Visitor<'de>>(
         self,
         _name: &'static str,
-        visitor: V,
+        _visitor: V,
     ) -> Result<V::Value> {
         Err(Error::custom(
             "Deserializing newtype structus is not implemented",
@@ -226,15 +226,15 @@ impl<'de> de::Deserializer<'de> for Deserializer {
     fn deserialize_tuple_struct<V: de::Visitor<'de>>(
         self,
         _name: &'static str,
-        len: usize,
-        visitor: V,
+        _len: usize,
+        _visitor: V,
     ) -> Result<V::Value> {
         Err(Error::custom(
             "Deserializing tuple structs is not implemented",
         ))
     }
 
-    fn deserialize_map<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_map<V: de::Visitor<'de>>(self, _visitor: V) -> Result<V::Value> {
         Err(Error::custom("Deserializing maps is not implemented"))
     }
 
@@ -273,8 +273,9 @@ impl<'de> de::Deserializer<'de> for Deserializer {
         }
     }
 
+    #[inline]
     fn is_human_readable(&self) -> bool {
-        true
+        false
     }
 }
 

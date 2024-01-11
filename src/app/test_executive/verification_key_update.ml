@@ -104,7 +104,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Wait for nodes to initialize"
         (wait_for t
            (Wait_condition.nodes_to_initialize
-              (Core.String.Map.data (Network.all_nodes network)) ) )
+              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
     in
     let whale1 =
       Core.String.Map.find_exn (Network.block_producers network) "whale1"
@@ -185,7 +185,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; preconditions =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
-            ; account = Accept
+            ; account = Zkapp_precondition.Account.accept
             ; valid_while = Ignore
             }
         ; authorization_kind = Signature
@@ -320,7 +320,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
     let%bind () =
       section "Send a zkApp to create a zkApp account"
-        (send_zkapp ~logger whale1 zkapp_command_create_account)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri whale1)
+           zkapp_command_create_account )
     in
     let%bind () =
       section
@@ -331,21 +333,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section
         "Send zkApp to update verification key to v1 and then refers to v1 in \
          the subsequent account update"
-        (send_zkapp ~logger whale1 zkapp_command_update_vk1)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri whale1)
+           zkapp_command_update_vk1 )
     in
 
     let%bind () =
       section
         "Send zkApp to update to a new verification key v2 and then refers to \
          the old key v1"
-        (send_invalid_zkapp ~logger whale1 zkapp_command_update_vk2_refers_vk1
-           "Verification_failed" )
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri whale1)
+           zkapp_command_update_vk2_refers_vk1
+           "Expected vk hash doesn't match hash in vk we received" )
     in
     let%bind () =
       section
         "Send zkApp to update to a new verification key v2 and then refers to \
          that"
-        (send_zkapp ~logger whale1 zkapp_command_update_vk2)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri whale1)
+           zkapp_command_update_vk2 )
     in
     let%bind () =
       section

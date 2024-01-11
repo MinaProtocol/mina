@@ -2,7 +2,7 @@
  (name cli_lib)
  (public_name cli_lib)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    result

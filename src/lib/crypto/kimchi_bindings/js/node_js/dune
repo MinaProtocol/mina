@@ -1,5 +1,6 @@
 (library
  (name node_backend)
+ (public_name bindings_js.node_backend)
  (js_of_ocaml
   (flags
    (:include flags.sexp))
@@ -18,6 +19,7 @@
   flags.sexp)
  (deps
   ../../wasm/Cargo.toml
+  ../../wasm/Cargo.lock
   (source_tree ../../wasm/src)
   (source_tree ../../wasm/.cargo/config)
   (source_tree ../../../proof-systems))
@@ -27,6 +29,6 @@
    (run chmod -R +w ../../wasm .)
    (setenv
     CARGO_TARGET_DIR
-    "%{read:../../stubs/dune-build-root}/cargo_kimchi_wasm"
+    "%{read:../../../kimchi_bindings/stubs/dune-build-root}/cargo_kimchi_wasm"
     (run ./build.sh))
    (write-file flags.sexp "()"))))

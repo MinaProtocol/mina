@@ -1,7 +1,7 @@
 (library
  (name mina_block)
  (public_name mina_block)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    integers
@@ -57,6 +57,7 @@
    random_oracle_input
    ppx_version.runtime
    mina_wire_types
+   internal_tracing
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson)))

@@ -10,7 +10,7 @@ module Step = struct
         * Backend.Tick.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
-        | _id, header, n, h ->
+        | _id, header, n, _h ->
             sprintf !"step-%s-%s-%d-%s" header.kind.type_ header.kind.identifier
               n header.identifying_hash
     end
@@ -20,10 +20,11 @@ module Step = struct
       [@@deriving sexp]
 
       let to_string : t -> _ = function
-        | _id, header, n, h ->
+        | _id, header, n, _h ->
             sprintf !"vk-step-%s-%s-%d-%s" header.kind.type_
               header.kind.identifier n header.identifying_hash
     end
+    [@@warning "-4"]
   end
 
   let storable =
@@ -135,10 +136,11 @@ module Wrap = struct
         [%equal: unit * Md5.t] ((* TODO: *) ignore x1, y1) (ignore x2, y2)
 
       let to_string : t -> _ = function
-        | _id, header, h ->
+        | _id, header, _h ->
             sprintf !"vk-wrap-%s-%s-%s" header.kind.type_ header.kind.identifier
               header.identifying_hash
     end
+    [@@warning "-4"]
 
     module Proving = struct
       type t =
@@ -147,7 +149,7 @@ module Wrap = struct
         * Backend.Tock.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
-        | _id, header, h ->
+        | _id, header, _h ->
             sprintf !"wrap-%s-%s-%s" header.kind.type_ header.kind.identifier
               header.identifying_hash
     end
@@ -209,12 +211,12 @@ module Wrap = struct
         (let k_v = Lazy.force k_v in
          let s_v =
            Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
-             (fun (_, header, cs) ~path ->
+             (fun (_, header, _cs) ~path ->
                Or_error.try_with_join (fun () ->
                    let open Or_error.Let_syntax in
                    let%map header_read, index =
                      Snark_keys_header.read_with_header
-                       ~read_data:(fun ~offset path ->
+                       ~read_data:(fun ~offset:_ path ->
                          Binable.of_string
                            (module Vk.Stable.Latest)
                            (In_channel.read_all path) )
@@ -244,7 +246,7 @@ module Wrap = struct
          match Key_cache.Sync.read cache s_v k_v with
          | Ok (vk, d) ->
              (vk, d)
-         | Error e ->
+         | Error _e ->
              let kp, _dirty = Lazy.force pk in
              let vk = Keypair.vk kp in
              let pk = Keypair.pk kp in

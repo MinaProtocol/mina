@@ -18,7 +18,8 @@ module Stable = struct
     type t = Legacy_token.Stable.V1.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
-    let to_latest _ = failwith "Not implemented"
+    let to_latest token_id =
+      Legacy_token.to_field token_id |> Account_id.Digest.of_field
   end
 end]
 
@@ -35,6 +36,11 @@ Account_id.Digest.
   , of_string
   , comparator
   , ( <> ) )]
+
+let of_string s =
+  try Account_id.Digest.of_string s
+  with Base58_check.Invalid_base58_check_length _ ->
+    Legacy_token.of_string s |> Stable.V1.to_latest
 
 include Account_id.Digest.Binables
 

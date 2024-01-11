@@ -12,6 +12,7 @@
    bin_prot.shape
    sexplib0
    base.caml
+   integers
    ;; local libraries
    mina_wire_types
    error_json

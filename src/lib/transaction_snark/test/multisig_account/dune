@@ -15,6 +15,7 @@
    mina_base.import
    pickles
    pickles.backend
+   pickles_base
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    kimchi_backend.common
@@ -42,7 +43,7 @@
    data_hash_lib
    )
   (library_flags -linkall)
-  (inline_tests)
+  (inline_tests (flags -verbose -show-counts))
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane))
   (instrumentation (backend bisect_ppx)))

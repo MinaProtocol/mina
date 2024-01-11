@@ -118,7 +118,7 @@ pub fn caml_pasta_fq_div(x: WasmPastaFq, y: WasmPastaFq) -> WasmPastaFq {
 
 #[wasm_bindgen]
 pub fn caml_pasta_fq_inv(x: WasmPastaFq) -> Option<WasmPastaFq> {
-    x.0.inverse().map(|x| WasmPastaFq(x))
+    x.0.inverse().map(WasmPastaFq)
 }
 
 #[wasm_bindgen]
@@ -134,7 +134,7 @@ pub fn caml_pasta_fq_is_square(x: WasmPastaFq) -> bool {
 
 #[wasm_bindgen]
 pub fn caml_pasta_fq_sqrt(x: WasmPastaFq) -> Option<WasmPastaFq> {
-    x.0.sqrt().map(|x| WasmPastaFq(x))
+    x.0.sqrt().map(WasmPastaFq)
 }
 
 #[wasm_bindgen]

@@ -20,6 +20,7 @@ type block_sink_config =
   ; log_gossip_heard : bool
   ; consensus_constants : Consensus.Constants.t
   ; genesis_constants : Genesis_constants.t
+  ; constraint_constants : Genesis_constants.Constraint_constants.t
   }
 
 val create :

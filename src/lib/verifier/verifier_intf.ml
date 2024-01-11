@@ -47,6 +47,13 @@ module Base = struct
 
     val get_blockchain_verification_key :
       t -> Pickles.Verification_key.t Or_error.t Deferred.t
+
+    val toggle_internal_tracing : t -> bool -> unit Or_error.t Deferred.t
+
+    (* in ITN logger, sets the client port of daemon to send RPC requests to
+       sets the process kind for the Itn logger to "verifier"
+    *)
+    val set_itn_logger_data : t -> daemon_port:int -> unit Or_error.t Deferred.t
   end
 end
 
@@ -55,9 +62,12 @@ module type S = sig
 
   val create :
        logger:Logger.t
+    -> ?enable_internal_tracing:bool
+    -> ?internal_trace_filename:string
     -> proof_level:Genesis_constants.Proof_level.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> pids:Child_processes.Termination.t
     -> conf_dir:string option
+    -> unit
     -> t Deferred.t
 end

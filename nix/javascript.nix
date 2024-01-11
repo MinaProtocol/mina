@@ -23,42 +23,6 @@ in {
       mv src/*.js $out/share/client_sdk
     '';
   };
-  snarky_js = nix-npm-buildPackage.buildNpmPackage {
-    src = ../src/lib/snarky_js_bindings/snarkyjs;
-    preBuild = ''
-      BINDINGS_PATH=./src/node_bindings
-      mkdir -p "$BINDINGS_PATH"
-      cp ${plonk_wasm}/nodejs/plonk_wasm* "$BINDINGS_PATH"
-      cp ${ocamlPackages_mina.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js "$BINDINGS_PATH"
-      chmod -R 777 "$BINDINGS_PATH"
-
-      # TODO: deduplicate from ./scripts/build-snarkyjs-node.sh
-      # better error messages
-      # TODO: find a less hacky way to make adjustments to jsoo compiler output
-      # `s` is the jsoo representation of the error message string, and `s.c` is the actual JS string
-      sed -i 's/function failwith(s){throw \[0,Failure,s\]/function failwith(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
-      sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
-      sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
-    '';
-    npmBuild = "npm run build";
-    # TODO: add snarky-run
-    # TODO
-    # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"
-  };
-
-  mina-signer = final.nix-npm-buildPackage.buildNpmPackage {
-    src = ../frontend/mina-signer;
-    preBuild = ''
-      cp ${ocamlPackages_mina.mina_client_sdk}/share/client_sdk/client_sdk.bc.js src
-      cp src/client_sdk.{bc,min}.js
-      chmod 0666 src/client_sdk.bc.js
-      cp ${plonk_wasm}/nodejs/plonk_wasm{.js,_bg.wasm} src
-      chmod 0666 src/plonk_wasm{.js,_bg.wasm}
-    '';
-    npmBuild = "npm run build";
-    doCheck = true;
-    checkPhase = "npm test";
-  };
 
   # Jobs/Release/LeaderboardArtifact
   leaderboard = nix-npm-buildPackage.buildYarnPackage {
@@ -99,4 +63,3 @@ in {
     '';
   };
 }
-

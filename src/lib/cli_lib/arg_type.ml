@@ -4,7 +4,7 @@ open Signature_lib
 let validate_int16 x =
   let max_port = 1 lsl 16 in
   if 0 <= x && x < max_port then Ok x
-  else Or_error.errorf !"Port not between 0 and %d" max_port
+  else Or_error.errorf "Port not between 0 and %d" max_port
 
 let int16 =
   Command.Arg_type.map Command.Param.int
@@ -73,7 +73,8 @@ let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
 
 let global_slot =
-  Command.Arg_type.map Command.Param.int ~f:Mina_numbers.Global_slot.of_int
+  Command.Arg_type.map Command.Param.int
+    ~f:Mina_numbers.Global_slot_since_genesis.of_int
 
 let txn_fee =
   Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_mina_string_exn

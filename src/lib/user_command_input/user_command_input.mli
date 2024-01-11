@@ -58,7 +58,7 @@ val create :
      ?nonce:Account.Nonce.t
   -> fee:Currency.Fee.t
   -> fee_payer_pk:Public_key.Compressed.t
-  -> valid_until:Global_slot.t option
+  -> valid_until:Global_slot_since_genesis.t option
   -> memo:Signed_command_memo.t
   -> body:Signed_command_payload.Body.t
   -> signer:Public_key.Compressed.t

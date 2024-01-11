@@ -80,6 +80,7 @@ val create_gating_config :
   -> trusted_ips:string list
   -> trusted_peers:Builder.PeerId.t list
   -> isolate:bool
+  -> clean_added_peers:bool
   -> gating_config
 
 val create_rpc_request :
@@ -104,4 +105,4 @@ val read_incoming_messages :
      string Strict_pipe.Reader.t
   -> incoming_message Or_error.t Strict_pipe.Reader.t
 
-val write_outgoing_message : Writer.t -> outgoing_message -> unit
+val write_outgoing_message : Writer.t -> outgoing_message -> int

@@ -18,6 +18,8 @@ DROP TABLE accounts_created;
 
 DROP TABLE blocks;
 
+DROP TABLE protocol_versions;
+
 DROP TYPE chain_status_type;
 
 DROP TABLE epoch_data;
@@ -49,8 +51,6 @@ DROP TABLE zkapp_updates;
 DROP TABLE zkapp_network_precondition;
 
 DROP TABLE zkapp_account_precondition;
-
-DROP TABLE zkapp_account_precondition_values;
 
 DROP TABLE zkapp_accounts;
 
@@ -85,8 +85,6 @@ DROP TABLE zkapp_nonce_bounds;
 DROP TABLE zkapp_token_id_bounds;
 
 DROP TYPE zkapp_auth_required_type;
-
-DROP TYPE zkapp_precondition_type;
 
 DROP TABLE snarked_ledger_hashes;
 

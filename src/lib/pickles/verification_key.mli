@@ -37,4 +37,7 @@ type t = Stable.Latest.t =
 
 val dummy_commitments : 'a -> 'a Pickles_types.Plonk_verification_key_evals.t
 
+val dummy_step_commitments :
+  'a -> ('a, 'a option) Pickles_types.Plonk_verification_key_evals.Step.t
+
 val dummy : Stable.Latest.t lazy_t

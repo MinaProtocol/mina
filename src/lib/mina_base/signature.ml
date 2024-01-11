@@ -52,6 +52,8 @@ end]
 
 let dummy = (Field.one, Inner_curve.Scalar.one)
 
+let gen = Stable.Latest.gen
+
 module Raw = struct
   open Rosetta_coding.Coding
 
@@ -63,10 +65,6 @@ module Raw = struct
     let field_enc = String.sub raw ~pos:0 ~len:field_len in
     let scalar_enc = String.sub raw ~pos:field_len ~len:field_len in
     try Some (to_field field_enc, to_scalar scalar_enc) with _ -> None
-
-  let%test_unit "partial isomorphism" =
-    Quickcheck.test ~trials:300 Stable.Latest.gen ~f:(fun signature ->
-        [%test_eq: t option] (Some signature) (encode signature |> decode) )
 end
 
 [%%ifdef consensus_mechanism]
@@ -78,10 +76,3 @@ type var = Field.Var.t * Inner_curve.Scalar.var
 [%%define_locally
 Stable.Latest.
   (of_base58_check_exn, of_base58_check, of_yojson, to_yojson, to_base58_check)]
-
-let%test "Base58Check is stable" =
-  let expected =
-    "7mWxjLYgbJUkZNcGouvhVj5tJ8yu9hoexb9ntvPK8t5LHqzmrL6QJjjKtf5SgmxB4QWkDw7qoMMbbNGtHVpsbJHPyTy2EzRQ"
-  in
-  let got = to_base58_check dummy in
-  String.equal got expected

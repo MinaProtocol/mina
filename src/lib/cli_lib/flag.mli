@@ -73,6 +73,8 @@ module Log : sig
   val level : Logger.Level.t Command.Param.t
 
   val file_log_level : Logger.Level.t Command.Param.t
+
+  val file_log_rotations : int Command.Param.t
 end
 
 type signed_command_common =
@@ -93,7 +95,8 @@ module Signed_command : sig
 
   val fee : Currency.Fee.t option Command.Param.t
 
-  val valid_until : Mina_numbers.Global_slot.t option Command.Param.t
+  val valid_until :
+    Mina_numbers.Global_slot_since_genesis.t option Command.Param.t
 
   val nonce : Mina_numbers.Account_nonce.t option Command.Param.t
 

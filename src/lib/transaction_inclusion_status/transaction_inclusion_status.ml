@@ -91,7 +91,8 @@ let%test_module "transaction_status" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            () )
 
     let key_gen =
       let open Quickcheck.Generator in
@@ -125,7 +126,7 @@ let%test_module "transaction_status" =
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
-           ~f:(fun transactions ->
+           ~f:(fun Network_pool.With_nonce.{ message = transactions; _ } ->
              [%log trace]
                "Transactions have been applied successfully and is propagated \
                 throughout the 'network'"

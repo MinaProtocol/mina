@@ -114,6 +114,33 @@ module Node = struct
     ; parent : State_hash.t
     ; result : ([ `Added_to_frontier ], Attempt_history.t) Result.t Ivar.t
     }
+
+  let trace_state_change ~logger t = function
+    | State.Finished | State.Root _ ->
+        Internal_tracing.with_state_hash t.state_hash
+        @@ fun () -> [%log internal] "Catchup_job_finished"
+    | State.Failed ->
+        Internal_tracing.with_state_hash t.state_hash
+        @@ fun () -> [%log internal] "Failure"
+    | State.To_download _ ->
+        Internal_tracing.with_state_hash t.state_hash
+        @@ fun () -> [%log internal] "To_download"
+    | State.To_initial_validate _ ->
+        Internal_tracing.with_state_hash t.state_hash
+        @@ fun () -> [%log internal] "To_initial_validate"
+    | State.To_verify _ ->
+        Internal_tracing.with_state_hash t.state_hash
+        @@ fun () -> [%log internal] "To_verify"
+    | State.Wait_for_parent _ ->
+        Internal_tracing.with_state_hash t.state_hash
+        @@ fun () -> [%log internal] "Wait_for_parent"
+    | State.To_build_breadcrumb _ ->
+        Internal_tracing.with_state_hash t.state_hash
+        @@ fun () -> [%log internal] "To_build_breadcrumb"
+
+  let set_state t s =
+    trace_state_change ~logger:(Logger.null ()) t s ;
+    t.state <- s
 end
 
 let add_state states (node : Node.t) =
@@ -156,9 +183,7 @@ let tear_down { nodes; states; _ } =
   Hashtbl.clear states
 
 let set_state t (node : Node.t) s =
-  remove_state t.states node ;
-  node.state <- s ;
-  add_state t.states node
+  remove_state t.states node ; Node.set_state node s ; add_state t.states node
 
 let finish t (node : Node.t) b =
   let s, r =

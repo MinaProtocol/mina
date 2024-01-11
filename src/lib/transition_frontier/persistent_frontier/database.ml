@@ -219,6 +219,8 @@ let close t = Rocks.close t.db
 open Schema
 open Rocks
 
+type batch_t = Batch.t
+
 let mem db ~key = Option.is_some (get db ~key)
 
 let get_if_exists db ~default ~key =
@@ -315,51 +317,61 @@ let initialize t ~root_data =
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:(protocol_states root_data |> List.map ~f:With_hash.data) )
 
-let add t ~transition =
+let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
+    ~parent_hashes =
+  let f h = Some_key.Some_key (Arcs h) in
+  let values =
+    get_batch t.db ~keys:(Some_key Root :: List.map parent_hashes ~f)
+  in
+  let populate res parent_hash arc_opt =
+    let%bind.Result () = res in
+    match arc_opt with
+    | Some (Some_key.Some_key_value (Arcs _, (data : State_hash.t list))) ->
+        State_hash.Table.set arcs_cache ~key:parent_hash ~data ;
+        Result.return ()
+    | _ ->
+        Error (`Not_found (`Arcs parent_hash))
+  in
+  match values with
+  | Some (Some_key_value (Root, (old_root : Root_data.Minimal.Stable.V2.t)))
+    :: arcs ->
+      let%map.Result () =
+        List.fold2_exn ~init:(Result.return ()) ~f:populate parent_hashes arcs
+      in
+      old_root
+  | _ ->
+      Error (`Not_found `Old_root_transition)
+
+let add ~arcs_cache ~transition =
   let transition = Mina_block.Validated.forget transition in
   let hash = State_hash.With_state_hashes.state_hash transition in
   let parent_hash =
     With_hash.data transition |> Mina_block.header |> Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
-  let%bind () =
-    Result.ok_if_true
-      (mem t.db ~key:(Transition parent_hash))
-      ~error:(`Not_found (`Parent_transition parent_hash))
-  in
-  let%map parent_arcs =
-    get t.db ~key:(Arcs parent_hash) ~error:(`Not_found (`Arcs parent_hash))
-  in
-  Batch.with_batch t.db ~f:(fun batch ->
-      Batch.set batch ~key:(Transition hash) ~data:(With_hash.data transition) ;
-      Batch.set batch ~key:(Arcs hash) ~data:[] ;
-      Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs) )
+  let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
+  State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
+  State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
+  fun batch ->
+    Batch.set batch ~key:(Transition hash) ~data:(With_hash.data transition) ;
+    Batch.set batch ~key:(Arcs hash) ~data:[] ;
+    Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
-let move_root t ~new_root ~garbage =
+let move_root ~old_root ~new_root ~garbage =
   let open Root_data.Limited in
-  let%bind () =
-    Result.ok_if_true
-      (mem t.db ~key:(Transition (hashes new_root).state_hash))
-      ~error:(`Not_found `New_root_transition)
-  in
-  let%map old_root =
-    get t.db ~key:Root ~error:(`Not_found `Old_root_transition)
-  in
   let old_root_hash = Root_data.Minimal.hash old_root in
-  (* TODO: Result compatible rocksdb batch transaction *)
-  Batch.with_batch t.db ~f:(fun batch ->
-      Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
-      Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(List.map ~f:With_hash.data (protocol_states new_root)) ;
-      List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
-          (* because we are removing entire forks of the tree, there is
-           * no need to have extra logic to any remove arcs to the node
-           * we are deleting since there we are deleting all of a node's
-           * parents as well
-           *)
-          Batch.remove batch ~key:(Transition node_hash) ;
-          Batch.remove batch ~key:(Arcs node_hash) ) ) ;
-  old_root_hash
+  fun batch ->
+    Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
+    Batch.set batch ~key:Protocol_states_for_root_scan_state
+      ~data:(List.map ~f:With_hash.data (protocol_states new_root)) ;
+    List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
+        (* because we are removing entire forks of the tree, there is
+         * no need to have extra logic to any remove arcs to the node
+         * we are deleting since there we are deleting all of a node's
+         * parents as well
+         *)
+        Batch.remove batch ~key:(Transition node_hash) ;
+        Batch.remove batch ~key:(Arcs node_hash) )
 
 let get_transition t hash =
   let%map transition =
@@ -395,11 +407,7 @@ let get_root_hash t =
 
 let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 
-let set_best_tip t hash =
-  let%map old_best_tip_hash = get_best_tip t in
-  (* no need to batch because we only do one operation *)
-  set t.db ~key:Best_tip ~data:hash ;
-  old_best_tip_hash
+let set_best_tip data = Batch.set ~key:Best_tip ~data
 
 let rec crawl_successors t hash ~init ~f =
   let open Deferred.Result.Let_syntax in
@@ -411,3 +419,5 @@ let rec crawl_successors t hash ~init ~f =
           ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
       in
       crawl_successors t succ_hash ~init:init' ~f )
+
+let with_batch t = Batch.with_batch t.db

@@ -2,7 +2,7 @@
  (name genesis_constants)
  (public_name genesis_constants)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    ppx_inline_test.config

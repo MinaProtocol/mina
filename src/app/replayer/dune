@@ -1,7 +1,6 @@
 (executable
  (package replayer)
  (name replayer)
- (flags -w -32-34)
  (public_name replayer)
  (libraries
    ;; opam libraries
@@ -10,6 +9,8 @@
    result
    async.async_command
    async
+   base.caml
+   bin_prot.shape
    caqti-async
    core_kernel
    archive_lib
@@ -57,6 +58,7 @@
    unsigned_extended
    random_oracle
    codable
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

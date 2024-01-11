@@ -28,10 +28,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
     in
     let node =
       Core.String.Map.find_exn (Network.block_producers network) "node"
@@ -52,7 +53,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       "check that the account balances are what we expect after the block has \
        been produced"
       (let%bind { total_balance = bp_balance; _ } =
-         Network.Node.must_get_account_data ~logger node
+         Graphql_requests.must_get_account_data ~logger
+           (Network.Node.get_ingress_uri node)
            ~account_id:bp_pk_account_id
        in
        (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)

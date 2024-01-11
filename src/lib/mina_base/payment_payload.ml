@@ -15,7 +15,7 @@ module Poly = struct
             ( 'public_key
             , 'amount )
             Mina_wire_types.Mina_base.Payment_payload.Poly.V2.t =
-        { source_pk : 'public_key; receiver_pk : 'public_key; amount : 'amount }
+        { receiver_pk : 'public_key; amount : 'amount }
       [@@deriving equal, sexp, hash, yojson, compare, hlist]
     end
 
@@ -59,37 +59,25 @@ module Stable = struct
 end]
 
 let dummy =
-  Poly.
-    { source_pk = Public_key.Compressed.empty
-    ; receiver_pk = Public_key.Compressed.empty
-    ; amount = Amount.zero
-    }
+  Poly.{ receiver_pk = Public_key.Compressed.empty; amount = Amount.zero }
 
 [%%ifdef consensus_mechanism]
 
 type var = (Public_key.Compressed.var, Amount.var) Poly.t
 
-let var_of_t ({ source_pk; receiver_pk; amount } : t) : var =
-  { source_pk = Public_key.Compressed.var_of_t source_pk
-  ; receiver_pk = Public_key.Compressed.var_of_t receiver_pk
+let var_of_t ({ receiver_pk; amount } : t) : var =
+  { receiver_pk = Public_key.Compressed.var_of_t receiver_pk
   ; amount = Amount.var_of_t amount
   }
 
 [%%endif]
 
-let gen_aux ?source_pk max_amount =
+let gen_aux max_amount =
   let open Quickcheck.Generator.Let_syntax in
-  let%bind source_pk =
-    match source_pk with
-    | Some source_pk ->
-        return source_pk
-    | None ->
-        Public_key.Compressed.gen
-  in
   let%bind receiver_pk = Public_key.Compressed.gen in
   let%map amount = Amount.gen_incl Amount.zero max_amount in
-  Poly.{ source_pk; receiver_pk; amount }
+  Poly.{ receiver_pk; amount }
 
-let gen ?source_pk max_amount = gen_aux ?source_pk max_amount
+let gen max_amount = gen_aux max_amount
 
-let gen_default_token ?source_pk max_amount = gen_aux ?source_pk max_amount
+let gen_default_token max_amount = gen_aux max_amount
