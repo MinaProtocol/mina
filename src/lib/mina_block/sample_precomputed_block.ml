@@ -94,7 +94,7 @@ let sample_block_sexp =
        (last_vrf_output
         "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000")
        (total_currency 10016120000000000)
-       (curr_global_slot
+       (curr_global_slot_since_hard_fork
         ((slot_number 6) (slots_per_epoch 576)))
        (global_slot_since_genesis 6)
        (staking_epoch_data
@@ -276,7 +276,7 @@ let sample_block_sexp =
  (delta_transition_chain_proof
   (16014239194902465465595109881398070442140660435305474755749637269252225632503
    ()))
- (protocol_version ((major 0) (minor 0) (patch 0)))
+ (protocol_version ((transaction 1) (network 1) (patch 0)))
  (proposed_protocol_version ())
  (accounts_accessed
   ((2
@@ -621,7 +621,7 @@ let sample_block_json =
           ],
           "last_vrf_output": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
           "total_currency": "10016120000000000",
-          "curr_global_slot": {
+          "curr_global_slot_since_hard_fork": {
             "slot_number": "6",
             "slots_per_epoch": "576"
           },
@@ -882,8 +882,8 @@ let sample_block_json =
       []
     ],
     "protocol_version": {
-      "major": 0,
-      "minor": 0,
+      "transaction": 1,
+      "network": 1,
       "patch": 0
     },
     "accounts_accessed": [

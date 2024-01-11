@@ -101,6 +101,12 @@ spec:
           protocol: TCP
           containerPort: {{ $.Values.mina.ports.p2p }}
           hostPort: {{ $.Values.mina.ports.external }}
+        {{- if $.Values.mina.exposeItnGraphql }}
+        - name: http-itn-graphql
+          protocol: TCP
+          port: {{ $.Values.mina.itn.port }}
+          targetPort: {{ $.Values.mina.itn.port }}
+        {{- end }}  
 {{$data := dict "name" $.Values.name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.seed.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
@@ -156,6 +162,12 @@ spec:
     protocol: TCP
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
+  {{- if $.Values.mina.exposeItnGraphql }}
+  - name: http-itn-graphql
+    protocol: TCP
+    port: {{ $.Values.mina.itn.port }}
+    targetPort: {{ $.Values.mina.itn.port }}
+  {{- end }}  
 {{- end }}
 ---
 {{- if $.Values.persist_working_dir }}

@@ -415,5 +415,7 @@ module type Full = sig
     end
 
     val multiple_transfers : Multiple_transfers_spec.t -> Zkapp_command.t
+
+    val set_proof_cache : Pickles.Proof_cache.t -> unit
   end
 end

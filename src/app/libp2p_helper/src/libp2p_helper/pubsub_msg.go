@@ -8,8 +8,8 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
-	peer "github.com/libp2p/go-libp2p/core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 type ValidationPushT = ipc.Libp2pHelperInterface_Validation
@@ -32,29 +32,26 @@ func (m ValidationPush) handle(app *app) {
 	}
 	vid, err := ValidationPushT(m).ValidationId()
 	if err != nil {
-		app.P2p.Logger.Errorf("handleValidation: error %w", err)
+		app.P2p.Logger.Errorf("handleValidation: error %s", err)
 		return
 	}
+	res := ValidationUnknown
+	switch ValidationPushT(m).Result() {
+	case ipc.ValidationResult_accept:
+		res = pubsub.ValidationAccept
+	case ipc.ValidationResult_reject:
+		res = pubsub.ValidationReject
+	case ipc.ValidationResult_ignore:
+		res = pubsub.ValidationIgnore
+	default:
+		app.P2p.Logger.Warnf("handleValidation: unknown validation result %d", ValidationPushT(m).Result())
+	}
 	seqno := vid.Id()
-	app.ValidatorMutex.Lock()
-	defer app.ValidatorMutex.Unlock()
-	if st, ok := app.Validators[seqno]; ok {
-		res := ValidationUnknown
-		switch ValidationPushT(m).Result() {
-		case ipc.ValidationResult_accept:
-			res = pubsub.ValidationAccept
-		case ipc.ValidationResult_reject:
-			res = pubsub.ValidationReject
-		case ipc.ValidationResult_ignore:
-			res = pubsub.ValidationIgnore
-		default:
-			app.P2p.Logger.Warnf("handleValidation: unknown validation result %d", ValidationPushT(m).Result())
-		}
+	if st, found := app.RemoveValidator(seqno); found {
 		st.Completion <- res
 		if st.TimedOutAt != nil {
 			app.P2p.Logger.Errorf("validation for item %d took %d seconds", seqno, time.Now().Add(validationTimeout).Sub(*st.TimedOutAt))
 		}
-		delete(app.Validators, seqno)
 	} else {
 		app.P2p.Logger.Warnf("handleValidation: validation seqno %d unknown", seqno)
 	}
@@ -67,7 +64,7 @@ func fromPublishReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.Publish()
 	return PublishReq(i), err
 }
-func (m PublishReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m PublishReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -87,12 +84,12 @@ func (m PublishReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	if topic, has = app.Topics[topicName]; !has {
+	if topic, has = app.GetTopic(topicName); !has {
 		topic, err = app.P2p.Pubsub.Join(topicName)
 		if err != nil {
 			return mkRpcRespError(seqno, badp2p(err))
 		}
-		app.Topics[topicName] = topic
+		app.AddTopic(topicName, topic)
 	}
 
 	if err := topic.Publish(app.Ctx, data); err != nil {
@@ -112,7 +109,7 @@ func fromSubscribeReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.Subscribe()
 	return SubscribeReq(i), err
 }
-func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m SubscribeReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -136,7 +133,7 @@ func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badp2p(err))
 	}
 
-	app.Topics[topicName] = topic
+	app.AddTopic(topicName, topic)
 
 	err = app.P2p.Pubsub.RegisterTopicValidator(topicName, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
 		app.P2p.Logger.Debugf("Received gossip message on topic %s from %s", topicName, id.Pretty())
@@ -148,12 +145,7 @@ func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 
 		seenAt := time.Now()
 
-		seqno := app.NextId()
-		ch := make(chan pubsub.ValidationResult)
-		app.ValidatorMutex.Lock()
-		app.Validators[seqno] = new(validationStatus)
-		app.Validators[seqno].Completion = ch
-		app.ValidatorMutex.Unlock()
+		seqno, ch := app.AddValidator()
 
 		app.P2p.Logger.Info("validating a new pubsub message ...")
 
@@ -161,17 +153,14 @@ func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 
 		if err != nil && !app.UnsafeNoTrustIP {
 			app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us a pubsub message, dropping it", peer.Encode(id))
-			app.ValidatorMutex.Lock()
-			defer app.ValidatorMutex.Unlock()
-			delete(app.Validators, seqno)
+			app.RemoveValidator(seqno)
 			return pubsub.ValidationIgnore
 		}
 
 		deadline, ok := ctx.Deadline()
 		if !ok {
 			app.P2p.Logger.Errorf("no deadline set on validation context")
-			defer app.ValidatorMutex.Unlock()
-			delete(app.Validators, seqno)
+			app.RemoveValidator(seqno)
 			return pubsub.ValidationIgnore
 		}
 		app.writeMsg(mkGossipReceivedUpcall(sender, deadline, seenAt, msg.Data, seqno, subId))
@@ -187,12 +176,7 @@ func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 
 			validationTimeoutMetric.Inc()
 
-			app.ValidatorMutex.Lock()
-
-			now := time.Now()
-			app.Validators[seqno].TimedOutAt = &now
-
-			app.ValidatorMutex.Unlock()
+			app.TimeoutValidator(seqno)
 
 			if app.UnsafeNoTrustIP {
 				app.P2p.Logger.Info("validated anyway!")
@@ -228,12 +212,11 @@ func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 	}
 
 	ctx, cancel := context.WithCancel(app.Ctx)
-	app.Subs[subId] = subscription{
+	app.AddSubscription(subId, subscription{
 		Sub:    sub,
-		Idx:    subId,
-		Ctx:    ctx,
 		Cancel: cancel,
-	}
+	})
+
 	go func() {
 		for {
 			_, err = sub.Next(ctx)
@@ -259,7 +242,7 @@ func fromUnsubscribeReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.Unsubscribe()
 	return UnsubscribeReq(i), err
 }
-func (m UnsubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m UnsubscribeReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -268,14 +251,14 @@ func (m UnsubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 	subId := subId_.Id()
-	if sub, ok := app.Subs[subId]; ok {
+	if sub, found := app.RemoveSubscription(subId); found {
 		sub.Sub.Cancel()
 		sub.Cancel()
-		delete(app.Subs, subId)
 		return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 			_, err := m.NewUnsubscribe()
 			panicOnErr(err)
 		})
+	} else {
+		return mkRpcRespError(seqno, badRPC(errors.New("subscription not found")))
 	}
-	return mkRpcRespError(seqno, badRPC(errors.New("subscription not found")))
 }

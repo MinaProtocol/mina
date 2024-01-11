@@ -104,7 +104,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Wait for nodes to initialize"
         (wait_for t
            (Wait_condition.nodes_to_initialize
-              (Core.String.Map.data (Network.all_nodes network)) ) )
+              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
     in
     let whale1 =
       Core.String.Map.find_exn (Network.block_producers network) "whale1"
@@ -185,7 +185,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; preconditions =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
-            ; account = Accept
+            ; account = Zkapp_precondition.Account.accept
             ; valid_while = Ignore
             }
         ; authorization_kind = Signature

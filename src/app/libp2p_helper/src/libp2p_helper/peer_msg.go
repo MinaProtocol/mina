@@ -22,7 +22,7 @@ func fromAddPeerReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.AddPeer()
 	return AddPeerReq(i), err
 }
-func (m AddPeerReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m AddPeerReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -40,19 +40,14 @@ func (m AddPeerReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	app.AddedPeers = append(app.AddedPeers, *info)
-	app.P2p.GatingState().TrustedPeers[info.ID] = struct{}{}
+	app.AddPeers(*info)
+	app.P2p.GatingState().TrustPeer(info.ID)
 
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
 	}
 
 	app.P2p.Logger.Info("addPeer Trying to connect to: ", info)
-
-	if AddPeerReqT(m).IsSeed() {
-		app.P2p.Seeds = append(app.P2p.Seeds, *info)
-	}
-
 	err = app.P2p.Host.Connect(app.Ctx, *info)
 	if err != nil {
 		return mkRpcRespError(seqno, badp2p(err))
@@ -71,7 +66,7 @@ func fromGetPeerNodeStatusReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.GetPeerNodeStatus()
 	return GetPeerNodeStatusReq(i), err
 }
-func (m GetPeerNodeStatusReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m GetPeerNodeStatusReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	ctx, cancel := context.WithTimeout(app.Ctx, codanet.NodeStatusTimeout)
 	defer cancel()
 	pma, err := GetPeerNodeStatusReqT(m).Peer()
@@ -147,7 +142,7 @@ func fromListPeersReq(req ipcRpcRequest) (rpcRequest, error) {
 	i, err := req.ListPeers()
 	return ListPeersReq(i), err
 }
-func (msg ListPeersReq) handle(app *app, seqno uint64) *capnp.Message {
+func (msg ListPeersReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -193,7 +188,7 @@ func (m HeartbeatPeerPush) handle(app *app) {
 		peerID, err = peer.Decode(id2)
 	}
 	if err != nil {
-		app.P2p.Logger.Errorf("HeartbeatPeerPush.handle: error %w", err)
+		app.P2p.Logger.Errorf("HeartbeatPeerPush.handle: error %s", err)
 		return
 	}
 	app.P2p.HeartbeatPeer(peerID)

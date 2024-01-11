@@ -148,7 +148,7 @@ A number of C libraries are expected to be available in the system and are also 
 If you use vim, add this snippet in your `.vimrc` file to use Merlin. (Note: Be sure to change the HOME directory to match yours.)
 
 ```bash
-let s:ocamlmerlin="/Users/USERNAME/.opam/4.07/share/merlin"
+let s:ocamlmerlin="/Users/USERNAME/.opam/4.14.0/share/merlin"
 execute "set rtp+=".s:ocamlmerlin."/vim"
 execute "set rtp+=".s:ocamlmerlin."/vimbufsync"
 let g:syntastic_ocaml_checkers=['merlin']
@@ -163,7 +163,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 - If you use emacs, install the `opam` packages mentioned above and also install `tuareg`. Add the following to your `.emacs` file:
 
 ```lisp
-(let ((opam-share (ignore-errors (car (process-lines "opam" "config" "var" "share")))))
+(let ((opam-share (ignore-errors (car (process-lines "opam" "var" "share")))))
   (when (and opam-share (file-directory-p opam-share))
     ;; Register Merlin
     (add-to-list 'load-path (expand-file-name "emacs/site-lisp" opam-share))
@@ -220,7 +220,7 @@ $ chmod 0700 /path/to
 ```
 
 Additionally, you must provide a list of peers to connect to bootstrap the node.
-The list of peers depends on the network you want to connect to and is announced when the network is being launched. For Mainnet, the list of peers is avaialable at:
+The list of peers depends on the network you want to connect to and is announced when the network is being launched. For Mainnet, the list of peers is available at:
 https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt.
 
 The `daemon.json` config file also contains bootstrap data that is specific to the network the node is trying to connect to and must be tailored specifically for a particular network. This file can also override some of the configuration options selected during compilation. The `daemon.json` file can be extracted from the Docker image
@@ -335,7 +335,7 @@ To override these constants, pass a json file to `runtime_genesis_ledger.exe` wi
 
 The exe then packages the overridden constants along with the genesis ledger and the genesis proof for the daemon to consume.
 
-<b> 2. Constants that can be overriden at runtime are:</b>
+<b> 2. Constants that can be overridden at runtime are:</b>
 
 - genesis_state_timestamp
 - transaction pool max size

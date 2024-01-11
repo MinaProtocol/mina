@@ -126,8 +126,8 @@ end)
           "Refusing to rebroadcast $diff. Pool diff apply feedback: empty diff"
           ~metadata:
             [ ( "diff"
-              , Resource_pool.Diff.verified_to_yojson
-                @@ Envelope.Incoming.data diff )
+              , `String Resource_pool.Diff.(summary @@ t_of_verified diff.data)
+              )
             ] ;
         drop diff' rejected cb )
       else (

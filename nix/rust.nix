@@ -8,10 +8,16 @@ let
       # override stdenv.targetPlatform here, if neccesary
     };
   toolchainHashes = {
-    "1.67.0" = "sha256-riZUc+R9V35c/9e8KJUE+8pzpXyl0lRXt3ZkKlxoY0g=";
-    "nightly-2023-02-05" =
-      "sha256-MM8fdvveBEWzpwjH7u6C0F7qSWGPIMpfZWLgVxSqtxY=";
-    # copy this line with the correct toolchain name
+    "1.72" = "sha256-dxE7lmCFWlq0nl/wKcmYvpP9zqQbBitAQgZ1zx9Ooik=";
+    "nightly-2023-09-01" = "sha256-zek9JAnRaoX8V0U2Y5ssXVe9tvoQ0ERGXfUCUGYdrMA=";
+    # copy the placeholder line with the correct toolchain name when adding a new toolchain
+    # That is,
+    # 1. Put the correct version name;
+    #
+    # 2. Put the hash you get in line "got" from the error you obtain, which looks like
+    #    error: hash mismatch in fixed-output derivation '/nix/store/XXXXX'
+    #          specified: sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+    #             got:    sha256-Q9UgzzvxLi4x9aWUJTn+/5EXekC98ODRU1TwhUs9RnY=
     "placeholder" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   };
   # rust-toolchain.toml -> { rustc, cargo, rust-analyzer, ... }
@@ -94,7 +100,7 @@ in
     };
 
   kimchi-rust = rustChannelFromToolchainFileOf
-    ../src/lib/snarkyjs/src/bindings/kimchi/wasm/rust-toolchain.toml;
+    ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml;
 
   # TODO: raise issue on nixpkgs and remove workaround when fix is applied
   kimchi-rust-wasm = (final.kimchi-rust.rust.override {
@@ -118,7 +124,7 @@ in
   plonk_wasm =
     let
 
-      lock = ../src/lib/snarkyjs/src/bindings/kimchi/wasm/Cargo.lock;
+      lock = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
 
       deps = builtins.listToAttrs (map
         (pkg: {
@@ -135,10 +141,10 @@ in
         version = deps.wasm-bindgen.version;
         src = final.fetchCrate {
           inherit pname version;
-          sha256 = "sha256-0rK+Yx4/Jy44Fw5VwJ3tG243ZsyOIBBehYU54XP/JGk=";
+          sha256 = "sha256-0u9bl+FkXEK2b54n7/l9JOCtKo+pb42GF9E1EnAUQa0=";
         };
 
-        cargoSha256 = "sha256-vcpxcRlW1OKoD64owFF6mkxSqmNrvY+y3Ckn5UwEQ50=";
+        cargoSha256 = "sha256-AsZBtE2qHJqQtuCt/wCAgOoxYMfvDh8IzBPAOkYSYko=";
         nativeBuildInputs = [ final.pkg-config ];
 
         buildInputs = with final;
@@ -150,18 +156,19 @@ in
 
         checkInputs = [ final.nodejs ];
 
-        # other tests require it to be ran in the wasm-bindgen monorepo
-        cargoTestFlags = [ "--test=interface-types" ];
+        # other tests, like --test=wasm-bindgen, require it to be ran in the
+        # wasm-bindgen monorepo
+        cargoTestFlags = [ "--test=reference" ];
       };
     in
     rustPlatform.buildRustPackage {
       pname = "plonk_wasm";
       version = "0.1.0";
       src = final.lib.sourceByRegex ../src [
-        "^lib(/snarkyjs(/src(/bindings(/kimchi(/wasm(/.*)?)?)?)?)?)?$"
+        "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
         "^lib(/crypto(/proof-systems(/.*)?)?)?$"
       ];
-      sourceRoot = "source/lib/snarkyjs/src/bindings/kimchi/wasm";
+      sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
       nativeBuildInputs = [ final.wasm-pack wasm-bindgen-cli ];
       buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
       cargoLock.lockFile = lock;
@@ -200,4 +207,3 @@ in
     cargoLock.lockFile = ../src/app/trace-tool/Cargo.lock;
   };
 }
-

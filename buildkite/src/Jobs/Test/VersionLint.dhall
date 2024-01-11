@@ -5,6 +5,7 @@ let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -48,7 +49,7 @@ Pipeline.build
       let lintDirtyWhen = [
         S.strictlyStart (S.contains "src"),
         S.exactly "buildkite/src/Jobs/Test/VersionLint" "dhall",
-        S.exactly "buildkite/scripts/version_linter" "sh"
+        S.exactly "buildkite/scripts/version-linter" "sh"
       ]
 
       in
@@ -56,7 +57,8 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = lintDirtyWhen,
         path = "Test",
-        name = "VersionLint"
+        name = "VersionLint",
+        tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
       },
     steps = [
       buildTestCmd "develop" Size.Small dependsOn
