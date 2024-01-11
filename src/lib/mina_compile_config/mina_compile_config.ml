@@ -81,4 +81,4 @@ let zkapp_cmd_limit = Some zkapp_cmd_limit
 
 [%%endif]
 
-let zkapps_per_block = 100
+let zkapps_per_block = 128
