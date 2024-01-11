@@ -166,7 +166,7 @@ let generate_next_state ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
     ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
-    ~zkapps_per_block =
+    ~zkapps_per_block_hard_cap =
   let open Interruptible.Let_syntax in
   let previous_protocol_state_body_hash =
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
@@ -244,7 +244,7 @@ let generate_next_state ~zkapp_cmd_limit ~constraint_constants
           ~global_slot diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
-          ~coinbase_receiver ~supercharge_coinbase ~zkapps_per_block
+          ~coinbase_receiver ~supercharge_coinbase ~zkapps_per_block_hard_cap
       with
       | Ok
           ( `Hash_after_applying next_staged_ledger_hash
@@ -615,7 +615,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
     ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state ~net
-    ~zkapps_per_block =
+    ~zkapps_per_block_hard_cap =
   let open Context in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
@@ -756,7 +756,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk:winner_pubkey ~block_reward_threshold
-                ~zkapp_cmd_limit:!zkapp_cmd_limit ~zkapps_per_block
+                ~zkapp_cmd_limit:!zkapp_cmd_limit ~zkapps_per_block_hard_cap
             in
             [%log internal] "Generate_next_state_done" ;
             match next_state_opt with

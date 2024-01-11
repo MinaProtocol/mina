@@ -403,8 +403,8 @@ module For_tests = struct
             ~coinbase_receiver ~logger staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
-            ~zkapps_per_block:
-              precomputed_values.genesis_constants.zkapps_per_block
+            ~zkapps_per_block_hard_cap:
+              precomputed_values.genesis_constants.zkapps_per_block_hard_cap
         with
         | Ok r ->
             return r
